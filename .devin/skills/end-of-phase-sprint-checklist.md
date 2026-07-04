@@ -80,6 +80,10 @@ cd apps/web && npx tsc --noEmit
   - **Tenant settings** (`apps/web/src/components/settings/TenantSettings.tsx`): If a tenant-facing page was added (under `/t/[tenantId]/settings/...`), ensure a settings card was added to the appropriate group/section with title, description, icon, color, and href.
   - **Admin settings** (`apps/web/src/app/(platform)/settings/admin/page.tsx`): If an admin-facing page was added (under `/settings/admin/...`), ensure a card or link was added to the appropriate section with label, icon, and href.
   - **Sub-pages**: If a new sub-page was added (e.g., `/settings/promotion/analytics`), ensure it has its own settings card or a link from the parent page's UI — don't rely solely on the sidebar for discoverability.
+  - **Store-related pages**: If a new purchasable store or store-adjacent feature was added, verify it appears in:
+    - **Dashboard** `StoreAccessCard.tsx` — store entry with icon, badge, and href
+    - **App Store** `AppStoreClient.tsx` — tab in the unified store page at `/t/{tenantId}/settings/store`
+    - See `.devin/skills/self-serve-stores-guide.md` for the full store list and patterns
 
 ---
 

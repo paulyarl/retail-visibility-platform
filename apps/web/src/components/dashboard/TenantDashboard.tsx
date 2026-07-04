@@ -432,30 +432,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               organizationId: tier.organizationId,
               organizationName: tier.organizationName,
               organizationTenants: organizationTenants,
-              organizationTier: tier.organization ? {
-                tier_key: tier.organization.id,
-                display_name: tier.organization.name,
-                price_monthly: tier.organization.limits?.maxProducts ? 299.99 : 0,
-                max_skus: tier.organization.limits?.maxProducts || 0,
-                max_locations: tier.organization.limits?.maxLocations || 0,
-                features: tier.organization.features?.map(f => ({
-                  feature_key: f.id,
-                  feature_name: f.name,
-                  is_enabled: f.enabled !== false,
-                })),
-              } : undefined,
-              tenantTier: tier.tenant ? {
-                tier_key: tier.tenant.id,
-                display_name: tier.tenant.name,
-                price_monthly: tier.tenant.limits?.maxProducts ? 49 : 0,
-                max_skus: tier.tenant.limits?.maxProducts || 0,
-                max_locations: tier.tenant.limits?.maxLocations || 0,
-                features: tier.tenant.features?.map(f => ({
-                  feature_key: f.id,
-                  feature_name: f.name,
-                  is_enabled: f.enabled !== false,
-                })),
-              } : undefined,
+              organizationTier: tier.rawTierData?.organizationTier,
+              tenantTier: tier.rawTierData?.tenantTier,
             }}
           />
         )}

@@ -853,6 +853,106 @@ const TIPS: TipDefinition[] = [
       return s;
     },
   },
+
+  // ═══════════════════════════════════════════════════════
+  // VISIBILITY: App Store discovery — boost your reach
+  // ═══════════════════════════════════════════════════════
+
+  {
+    id: 'app-store-discover-features',
+    category: 'upgrade',
+    priority: 'medium',
+    title: 'Boost your visibility — explore the App Store',
+    body: 'Discover features you can add to reach more customers. The App Store brings together all purchasable capabilities, placements, and promotions in one place. Browse available options and start a free trial in minutes.',
+    cta: 'Browse App Store',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/store`,
+    icon: 'Store',
+    gradient: 'from-blue-500 to-purple-600',
+    condition: (ctx) => {
+      const caps = ctx.capabilities?.effective;
+      if (!caps) return false;
+      return !caps.storefront.enabled || !caps.featured.enabled || !caps.directory_entry.enabled || !caps.faq.enabled;
+    },
+    score: (ctx) => {
+      let s = 45;
+      const caps = ctx.capabilities?.effective;
+      if (caps && !caps.storefront.enabled) s += 15;
+      if (caps && !caps.featured.enabled) s += 10;
+      if (caps && !caps.directory_entry.enabled) s += 10;
+      return s;
+    },
+  },
+
+  {
+    id: 'app-store-featured-placement',
+    category: 'engagement',
+    priority: 'medium',
+    title: 'Spotlight your best products with a featured placement',
+    body: 'Featured placements put your products in the spotlight on your storefront and directory listing. Visit the App Store to purchase a placement and start driving more views to your top products.',
+    cta: 'Get featured placement',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/store`,
+    icon: 'Sparkles',
+    gradient: 'from-purple-500 to-pink-600',
+    condition: (ctx) => {
+      const caps = ctx.capabilities?.effective;
+      if (!caps) return false;
+      return caps.storefront.enabled && !caps.featured.enabled && ctx.businessState.activeItems > 0;
+    },
+    score: (ctx) => {
+      let s = 55;
+      if (ctx.businessState.activeItems > 10) s += 10;
+      if (ctx.businessState.ordersCount > 0) s += 5;
+      return s;
+    },
+  },
+
+  {
+    id: 'app-store-directory-promotion',
+    category: 'engagement',
+    priority: 'medium',
+    title: 'Get promoted in the directory — stand out from competitors',
+    body: 'Directory promotions put your store front and center in local search results. Visit the App Store to choose a promotion tier and start attracting more nearby shoppers.',
+    cta: 'Explore promotions',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/store`,
+    icon: 'TrendingUp',
+    gradient: 'from-amber-500 to-orange-600',
+    condition: (ctx) => {
+      const caps = ctx.capabilities?.effective;
+      if (!caps) return false;
+      return caps.directory_entry.enabled && ctx.businessState.hasPublishedDirectory && !isEnterprise(ctx.tierKey);
+    },
+    score: (ctx) => {
+      let s = 50;
+      if (ctx.businessState.ordersCount === 0) s += 10;
+      if (!isEcommerceOrAbove(ctx.tierKey)) s += 5;
+      return s;
+    },
+  },
+
+  {
+    id: 'app-store-trial-available',
+    category: 'upgrade',
+    priority: 'high',
+    title: 'Free trials available — try premium features risk-free',
+    body: 'Several features in the App Store offer free trials. Test drive advanced capabilities like AI-powered chatbot, CRM support tickets, or fulfillment scheduling without committing to a paid plan right away.',
+    cta: 'Start a free trial',
+    ctaLink: (ctx) => `/t/${ctx.tenantId}/settings/store`,
+    icon: 'Sparkles',
+    gradient: 'from-indigo-500 to-blue-600',
+    condition: (ctx) => {
+      const caps = ctx.capabilities?.effective;
+      if (!caps) return false;
+      return !caps.chatbot.enabled || !caps.crm.enabled || !caps.fulfillment.enabled;
+    },
+    score: (ctx) => {
+      let s = 60;
+      const caps = ctx.capabilities?.effective;
+      if (caps && !caps.chatbot.enabled) s += 10;
+      if (caps && !caps.crm.enabled) s += 8;
+      if (ctx.businessState.isTrial) s -= 15;
+      return s;
+    },
+  },
 ];
 
 // ====================

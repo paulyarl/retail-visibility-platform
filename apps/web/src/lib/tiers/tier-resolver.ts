@@ -31,6 +31,7 @@ export interface TierInfo {
   source: 'organization' | 'tenant';
   features: TierFeature[];
   limits: TierLimits;
+  price?: number;
 }
 
 export interface ResolvedTier {
@@ -49,6 +50,12 @@ export interface ResolvedTier {
    * for any feature belonging to a capability type.
    */
   capabilityFeatures?: Record<string, boolean>;
+  /**
+   * Raw tier data from the /api/tenants/:id/tier endpoint.
+   * Use this to pass tenantTier/organizationTier objects directly to
+   * SubscriptionDisplayCard, avoiding lossy TierInfo transformation.
+   */
+  rawTierData?: any;
 }
 
 /**

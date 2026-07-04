@@ -261,6 +261,19 @@ class BotPlatformGuideService {
       recs.push('Feature your best products on your storefront. Go to Settings → Featured Products.');
     }
 
+    // App Store recommendation — suggest the unified store when there are disabled capabilities
+    const hasDisabled = !effective.storefront?.enabled ||
+      !effective.directory_entry?.enabled ||
+      !effective.faq?.enabled ||
+      !effective.crm?.enabled ||
+      !effective.payment_gateway?.enabled ||
+      !effective.featured?.enabled ||
+      !effective.fulfillment?.enabled ||
+      !effective.commerce?.enabled;
+    if (hasDisabled) {
+      recs.push('Browse the App Store to purchase features, placements, and promotions in one place. Go to Settings → App Store.');
+    }
+
     return recs;
   }
 }

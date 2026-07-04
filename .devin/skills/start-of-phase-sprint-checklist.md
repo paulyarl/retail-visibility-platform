@@ -105,9 +105,13 @@ cd apps/web && npx tsc --noEmit
 - [ ] **Plan file-based fallback updates.** Even though the DB is the active system, update `buildTenantNav()` / `buildAdminNavItems()` / `buildNavItems()` for resilience and reference.
 
 - [ ] **Identify ALL settings cards needed.** New pages often need to be discoverable from settings landing pages, not just the sidebar. Check both:
-  - **Tenant settings** (`apps/web/src/components/settings/TenantSettings.tsx`): If the new page is tenant-facing (under `/t/[tenantId]/settings/...`), identify which group/section to add the card to (e.g., "Featured Products", "Organization Management", "Storefront"). Note the card title, description, icon, color, and href.
+  - **Tenant settings** (`apps/web/src/components/settings/TenantSettings.tsx`): If the new page is tenant-facing (under `/t/[tenantId]/settings/...`), identify which group/section to add the card to (e.g., "Stores", "Featured Products", "Organization Management", "Storefront"). Note the card title, description, icon, color, and href.
   - **Admin settings** (`apps/web/src/app/(platform)/settings/admin/page.tsx`): If the new page is admin-facing (under `/settings/admin/...`), identify which section/group to add the card or link to. Note the label, icon, and href.
   - **Don't forget sub-pages**: Even if the parent page already has a settings card, a new sub-page (e.g., `/settings/promotion/analytics`) may need its own card or a link from the parent page's UI.
+  - **Store-related pages**: If the new page is a purchasable store or store-adjacent feature, also add it to:
+    - **Dashboard** `StoreAccessCard.tsx` — add a store entry with icon, badge, and href
+    - **App Store** `AppStoreClient.tsx` — add a new tab in the unified store page at `/t/{tenantId}/settings/store`
+    - See `.devin/skills/self-serve-stores-guide.md` for the full store list and patterns
 
 - [ ] **Check for dynamic template conflicts.** If the new page is a child of a `tenant-locations` or `organization-locations` template parent, it CANNOT be a database link — those children are generated client-side by `DynamicNavTemplates.tsx`.
 

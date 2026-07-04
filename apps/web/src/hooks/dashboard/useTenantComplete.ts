@@ -361,7 +361,8 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
           maxProducts: rawTierData.tenantTier?.max_skus || getTierLimit(rawTierData.tier || 'starter', 'products'),
           maxLocations: rawTierData.tenantTier?.max_locations || getTierLimit(rawTierData.tier || 'starter', 'locations'),
           maxUsers: getTierLimit(rawTierData.tier || 'starter', 'users'),
-        }
+        },
+        price: rawTierData.tenantTier?.price_monthly ?? rawTierData.tenantTier?.price,
       };
 
       // Build organization tier if available
@@ -380,7 +381,8 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
           maxProducts: rawTierData.organizationTier.max_skus,
           maxLocations: rawTierData.organizationTier.max_locations,
           maxUsers: 999,
-        }
+        },
+        price: rawTierData.organizationTier.price_monthly ?? rawTierData.organizationTier.price,
       } : undefined;
 
       // Determine effective tier (org overrides tenant for chains)
@@ -405,7 +407,8 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
         organizationId: rawTierData.organizationId,
         isChain,
         canUpgrade,
-        upgradeOptions: getUpgradeOptions(effectiveTier.level)
+        upgradeOptions: getUpgradeOptions(effectiveTier.level),
+        rawTierData,
       };
     } catch (err) {
       console.warn('[useTenantComplete] Error resolving tier:', err);

@@ -16,11 +16,14 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/role-validation';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import CrmAlertService from '../services/CrmAlertService';
 import { audit } from '../audit';
 
 const router = Router();
@@ -522,6 +525,32 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
 
       invalidateEffectiveCapabilities(tenantId);
 
+      // Refresh bot knowledge embeddings with feature purchase info — fire-and-forget
+      (async () => {
+        try {
+          await BotKnowledgeEmbeddingService.getInstance().refreshFeaturePurchaseEmbeddings(tenantId);
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to refresh feature purchase embeddings', undefined, { error: (err as Error).message });
+        }
+      })();
+
+      // CRM alert for App Store trial start — fire-and-forget
+      (async () => {
+        try {
+          await CrmAlertService.getInstance().createAppStoreAlert({
+            tenantId,
+            featureKey,
+            featureName: catalogEntry.marketing_name || featureKey,
+            alertType: 'app_store_trial',
+            priceCents,
+            billingCycle,
+            trialDays,
+          });
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to create App Store CRM alert', undefined, { error: (err as Error).message });
+        }
+      })();
+
       await audit({
         tenantId,
         actor: (req as any).user?.id || null,
@@ -676,6 +705,31 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
     // 5. Invalidate capability cache
     invalidateEffectiveCapabilities(tenantId);
 
+    // 5b. Refresh bot knowledge embeddings with feature purchase info — fire-and-forget
+    (async () => {
+      try {
+        await BotKnowledgeEmbeddingService.getInstance().refreshFeaturePurchaseEmbeddings(tenantId);
+      } catch (err) {
+        logger.warn('[BSaaS] Failed to refresh feature purchase embeddings', undefined, { error: (err as Error).message });
+      }
+    })();
+
+    // 5c. CRM alert for App Store purchase — fire-and-forget
+    (async () => {
+      try {
+        await CrmAlertService.getInstance().createAppStoreAlert({
+          tenantId,
+          featureKey,
+          featureName: catalogEntry.marketing_name || featureKey,
+          alertType: 'app_store_purchase',
+          priceCents,
+          billingCycle,
+        });
+      } catch (err) {
+        logger.warn('[BSaaS] Failed to create App Store CRM alert', undefined, { error: (err as Error).message });
+      }
+    })();
+
     // 6. Audit log
     await audit({
       tenantId,
@@ -763,6 +817,29 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
     }
 
     invalidateEffectiveCapabilities(tenantId);
+
+    // Refresh bot knowledge embeddings to clear stale feature purchase info — fire-and-forget
+    (async () => {
+      try {
+        await BotKnowledgeEmbeddingService.getInstance().refreshFeaturePurchaseEmbeddings(tenantId);
+      } catch (err) {
+        logger.warn('[BSaaS] Failed to refresh feature purchase embeddings on cancel', undefined, { error: (err as Error).message });
+      }
+    })();
+
+    // CRM alert for App Store cancellation — fire-and-forget
+    (async () => {
+      try {
+        await CrmAlertService.getInstance().createAppStoreAlert({
+          tenantId,
+          featureKey: purchase.feature_key,
+          featureName: purchase.feature_key,
+          alertType: 'app_store_cancel',
+        });
+      } catch (err) {
+        logger.warn('[BSaaS] Failed to create App Store CRM alert on cancel', undefined, { error: (err as Error).message });
+      }
+    })();
 
     await audit({
       tenantId,

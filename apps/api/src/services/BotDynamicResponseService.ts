@@ -259,7 +259,11 @@ class BotDynamicResponseService {
         const crmAssistantService = BotCrmAssistantService.getInstance();
         // We don't have customer email in this context, so inject general CRM availability
         // The actual ticket lookup happens via the CRM skill endpoints
-        crmContext = '\n\nCRM context: This tenant has a CRM system. The customer may have open support tickets. Offer to check ticket status or create a new ticket if needed.';
+        if (pageContext === 'dashboard') {
+          crmContext = '\n\nCRM context: This tenant has a CRM system. The merchant may have open support tickets. Offer to check ticket status or create a new ticket if needed. App Store related issues (purchases, billing, feature activation, refunds) can be escalated to an App Store support ticket with category "app_store".';
+        } else {
+          crmContext = '\n\nCRM context: This tenant has a CRM system. The customer may have open support tickets. Offer to check ticket status or create a new ticket if needed.';
+        }
         crmContextUsed = true;
       }
     } catch (crmError) {
@@ -343,6 +347,40 @@ class BotDynamicResponseService {
       } catch (promoError) {
         logger.warn('[BotDynamicResponseService] Promotion RAG search failed, continuing without it', undefined, {
           error: promoError instanceof Error ? promoError.message : String(promoError),
+        });
+      }
+
+      // Feature store purchase knowledge — always available when feature_purchase embeddings exist
+      try {
+        const hasFeaturePurchase = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'feature_purchase');
+        if (hasFeaturePurchase) {
+          const featurePurchaseResult = await knowledgeService.searchKnowledge(tenantId, message, ['feature_purchase'], 3);
+          if (featurePurchaseResult.chunks.length > 0) {
+            knowledgeContext += '\n\nFeature Store purchases context:\n' +
+              featurePurchaseResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      } catch (featurePurchaseError) {
+        logger.warn('[BotDynamicResponseService] Feature purchase RAG search failed, continuing without it', undefined, {
+          error: featurePurchaseError instanceof Error ? featurePurchaseError.message : String(featurePurchaseError),
+        });
+      }
+
+      // Featured store placement knowledge — always available when featured_placement embeddings exist
+      try {
+        const hasFeaturedPlacement = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'featured_placement');
+        if (hasFeaturedPlacement) {
+          const featuredPlacementResult = await knowledgeService.searchKnowledge(tenantId, message, ['featured_placement'], 3);
+          if (featuredPlacementResult.chunks.length > 0) {
+            knowledgeContext += '\n\nFeatured Store placements context:\n' +
+              featuredPlacementResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      } catch (featuredPlacementError) {
+        logger.warn('[BotDynamicResponseService] Featured placement RAG search failed, continuing without it', undefined, {
+          error: featuredPlacementError instanceof Error ? featuredPlacementError.message : String(featuredPlacementError),
         });
       }
     } catch (knowledgeError) {
