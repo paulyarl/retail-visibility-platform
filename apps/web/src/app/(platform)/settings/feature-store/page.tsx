@@ -11,11 +11,11 @@ import { subscriptionBillingService, type PaymentMethod } from '@/services/Subsc
 
 export const dynamic = 'force-dynamic';
 
-export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?: string }) {
+export default function FeatureStorePage() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
 
-  const tenantId = propTenantId || searchParams?.get('tenantId') || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+  const tenantId = searchParams?.get('tenantId') || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
 
   const [catalog, setCatalog] = useState<BsaasCatalogItem[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);

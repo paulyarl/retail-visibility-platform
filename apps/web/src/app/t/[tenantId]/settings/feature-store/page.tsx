@@ -7,7 +7,7 @@ export default async function TenantScopedFeatureStore({ params }: { params: Pro
   return (
     <TenantGuard tenantId={tenantId}>
       <SetTenantId tenantId={tenantId} />
-      <FeatureStorePage tenantId={tenantId} />
+      <FeatureStorePage />
     </TenantGuard>
   );
 }

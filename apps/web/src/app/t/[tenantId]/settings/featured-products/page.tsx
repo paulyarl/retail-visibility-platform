@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import SetTenantId from '@/components/client/SetTenantId';
 import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager';
-import { ArrowLeft, Star } from 'lucide-react';
+import { ArrowLeft, Star, TrendingUp, Eye, MousePointer, BarChart3, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import TenantFeaturedAccessService from '@/services/TenantFeaturedAccessService';
@@ -274,6 +274,83 @@ export default function FeaturedProductsSettings({
               />
             </>
           )}
+        </div>
+      </div>
+
+      {/* Benefits Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-gray-50 rounded-lg p-8">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-blue-600" />
+            Why Feature Your Products?
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Eye className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Highlight Your Best Products</h4>
+                <p className="text-gray-600 text-sm">Badge labels like "New Arrival" and "On Sale" catch shopper attention immediately</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Increase Product Discovery</h4>
+                <p className="text-gray-600 text-sm">Featured sections appear prominently on your storefront homepage</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <MousePointer className="w-6 h-6 text-amber-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Boost Conversion Rates</h4>
+                <p className="text-gray-600 text-sm">Highlighted products convert up to 2x better than regular listings</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Curate Your Showcase</h4>
+                <p className="text-gray-600 text-sm">Organize products into meaningful categories that guide shopper browsing</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href={`/t/${tenant.id}/settings/featured-store`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              Browse Featured Store
+            </Link>
+            <Link
+              href={`/t/${tenant.id}/settings/products/badges/suggestions`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Star className="w-4 h-4" />
+              Explore Badge Suggestions
+            </Link>
+          </div>
         </div>
       </div>
     </div>

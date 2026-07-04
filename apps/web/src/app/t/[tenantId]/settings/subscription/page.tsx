@@ -7,7 +7,7 @@ export default async function TenantScopedSubscriptionSettings({ params }: { par
   return (
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      <SubscriptionSettingsPage tenantId={tenantId} />
+      <SubscriptionSettingsPage />
     </>
   );
 }
