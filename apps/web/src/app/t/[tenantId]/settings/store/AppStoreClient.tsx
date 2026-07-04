@@ -253,8 +253,11 @@ function StoreSummaryPanel({ tenantId }: { tenantId: string }) {
           className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-2"
         >
           <div className="flex items-center justify-between">
-            <div className={`p-1.5 rounded-lg ${card.iconBg}`}>
-              <span className={card.iconColor}>{card.icon}</span>
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg ${card.iconBg}`}>
+                <span className={card.iconColor}>{card.icon}</span>
+              </div>
+              <span className="text-sm font-medium text-gray-700">{card.label}</span>
             </div>
             {card.active ? (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">

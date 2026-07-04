@@ -60,3 +60,4 @@ scripts/storage_migration/
 scripts/0*.sh
 scripts/README.md
 DATABASE_MIGRATION_PLAN.md
+.agents/skills/nil-youth-sports-platform/.claude/
