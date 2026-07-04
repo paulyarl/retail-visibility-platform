@@ -376,8 +376,8 @@ export default function AppStoreClient({
           {/* Tab content */}
           <div className="p-5">
             <Suspense fallback={<TabLoading />}>
-              {activeTab === 'plans' && <SubscriptionPage tenantId={tenantId} />}
-              {activeTab === 'features' && <FeatureStorePage tenantId={tenantId} />}
+              {activeTab === 'plans' && <SubscriptionPage />}
+              {activeTab === 'features' && <FeatureStorePage />}
               {activeTab === 'placements' && <FeaturedStoreClient tenantId={tenantId} />}
               {activeTab === 'promotions' && <PromotionSettingsPage tenantId={tenantId} />}
             </Suspense>

@@ -109,6 +109,7 @@ export const FIELD_METADATA: Record<SubscriptionDisplayField, {
 };
 
 const STORAGE_KEY = 'subscription-display-config';
+const CONFIG_CHANGED_EVENT = 'subscription-display-config-changed';
 
 /**
  * Hook for managing subscription display preferences
@@ -124,35 +125,49 @@ export function useSubscriptionDisplay(tenantId?: string) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    try {
-      const saved = localStorage.getItem(storageKey);
-      // console.log('[useSubscriptionDisplay] Loading from localStorage:', { storageKey, saved });
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Migrate old 'features' field to 'capabilities'
-        const migratedFields = (parsed.visibleFields || DEFAULT_CONFIG.visibleFields)
-          .map((f: string) => f === 'features' ? 'capabilities' : f);
-        // Merge with defaults to handle new fields
-        setConfig({
-          ...DEFAULT_CONFIG,
-          ...parsed,
-          visibleFields: migratedFields as SubscriptionDisplayField[],
-        });
+    const loadFromStorage = () => {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const migratedFields = (parsed.visibleFields || DEFAULT_CONFIG.visibleFields)
+            .map((f: string) => f === 'features' ? 'capabilities' : f);
+          setConfig({
+            ...DEFAULT_CONFIG,
+            ...parsed,
+            visibleFields: migratedFields as SubscriptionDisplayField[],
+          });
+        }
+      } catch (error) {
+        console.warn('[useSubscriptionDisplay] Failed to load config:', error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.warn('[useSubscriptionDisplay] Failed to load config:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    loadFromStorage();
+
+    // Listen for config changes from other hook instances (e.g. the options modal)
+    const handleConfigChanged = (e: Event) => {
+      if (e instanceof CustomEvent && e.detail?.storageKey === storageKey) {
+        loadFromStorage();
+      }
+    };
+    window.addEventListener(CONFIG_CHANGED_EVENT, handleConfigChanged);
+
+    return () => {
+      window.removeEventListener(CONFIG_CHANGED_EVENT, handleConfigChanged);
+    };
   }, [storageKey]);
 
-  // Save config to localStorage
+  // Save config to localStorage and notify other hook instances
   const saveConfig = useCallback((newConfig: SubscriptionDisplayConfig) => {
     if (typeof window === 'undefined') return;
 
     try {
       localStorage.setItem(storageKey, JSON.stringify(newConfig));
       setConfig(newConfig);
+      window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: { storageKey } }));
     } catch (error) {
       console.warn('[useSubscriptionDisplay] Failed to save config:', error);
     }
@@ -173,6 +188,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
       const newConfig = { ...prev, visibleFields: fields };
       if (typeof window !== 'undefined') {
         localStorage.setItem(storageKey, JSON.stringify(newConfig));
+        window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: { storageKey } }));
       }
       return newConfig;
     });
@@ -184,6 +200,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
       const newConfig = { ...prev, layout };
       if (typeof window !== 'undefined') {
         localStorage.setItem(storageKey, JSON.stringify(newConfig));
+        window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: { storageKey } }));
       }
       return newConfig;
     });
@@ -195,6 +212,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
       const newConfig = { ...prev, showUpgradePrompt: !prev.showUpgradePrompt };
       if (typeof window !== 'undefined') {
         localStorage.setItem(storageKey, JSON.stringify(newConfig));
+        window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: { storageKey } }));
       }
       return newConfig;
     });
@@ -206,6 +224,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
       const newConfig = { ...prev, showUpgradePrompt: show };
       if (typeof window !== 'undefined') {
         localStorage.setItem(storageKey, JSON.stringify(newConfig));
+        window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: { storageKey } }));
       }
       return newConfig;
     });

@@ -318,13 +318,16 @@ export function NavItemRow({
   );
 
   if (hasChildren) {
-    const handleToggle = () => onToggle(key);
+    const handleToggle = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onToggle(key);
+    };
     const ToggleLink = item.href ? Link : 'button' as React.ElementType;
     return (
       <div>
         <ToggleLink
-          {...(item.href ? { href: item.href, prefetch: item.prefetch ?? true } : {})}
-          onClick={handleToggle}
+          {...(item.href ? { href: item.href, prefetch: item.prefetch ?? true } : { onClick: handleToggle })}
           className={sharedClass}
           style={{ paddingLeft, paddingRight: 12 }}
           aria-expanded={isExpanded}
@@ -336,7 +339,13 @@ export function NavItemRow({
           )}
           <span className="flex-1 text-left truncate">{item.label}</span>
           {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant || 'default'} />}
-          <Icon.ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400')} />
+          <button
+            onClick={handleToggle}
+            className="flex-shrink-0 p-1.5 -mr-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:bg-neutral-300 dark:active:bg-neutral-600 transition-colors"
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+          >
+            <Icon.ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400')} />
+          </button>
         </ToggleLink>
         {isExpanded && (
           <div className="mt-0.5 space-y-0.5">

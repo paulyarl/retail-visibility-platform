@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Star, Search, CreditCard, Sparkles, Check, AlertCircle, Loader2, Package, Clock } from 'lucide-react';
+import { ArrowLeft, Star, Search, CreditCard, Sparkles, Check, AlertCircle, Loader2, Package, Clock, TrendingUp, Eye, BarChart3 } from 'lucide-react';
 import { FeaturedPlacementPurchaseService, type PlacementPlan, type PlacementPurchase } from '@/services/FeaturedPlacementPurchaseService';
 import { itemsService } from '@/services/ItemsService';
 import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
@@ -541,6 +541,81 @@ export default function FeaturedStoreClient({ tenantId }: { tenantId: string }) 
             )}
           </>
         )}
+
+        {/* Benefits Section */}
+        <div className="bg-gray-50 rounded-lg p-8">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-blue-600" />
+            Why Purchase a Featured Placement?
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Premium Top Placement</h4>
+                <p className="text-gray-600 text-sm">Your product gets guaranteed top placement on your storefront</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Eye className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Stand Out from the Crowd</h4>
+                <p className="text-gray-600 text-sm">Featured products get eye-catching visual treatment with badges and priority positioning</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-amber-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Flexible Durations</h4>
+                <p className="text-gray-600 text-sm">Choose from 1 week, 2 weeks, or 1 month — perfect for promotions and seasonal pushes</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Track Your ROI</h4>
+                <p className="text-gray-600 text-sm">Monitor impressions and clicks to see exactly how your featured placement performs</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href={`/t/${tenantId}/settings/featured-products`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Star className="w-4 h-4" />
+              Manage Featured Products
+            </Link>
+            <Link
+              href={`/t/${tenantId}/settings/promotion`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Explore Directory Promotion
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
