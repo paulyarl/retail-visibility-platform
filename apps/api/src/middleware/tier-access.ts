@@ -329,8 +329,8 @@ export function requireTierFeature(feature: string) {
         return next();
       }
       
-      // Get tenant ID from params, body, or query
-      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
+      // Get tenant ID from params, body, query, or header
+      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId || (req.headers['x-tenant-id'] as string);
       
       if (!tenantId) {
         return res.status(400).json({
@@ -432,7 +432,7 @@ export function requireAnyTierFeature(features: string[]) {
         return next();
       }
       
-      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId;
+      const tenantId = req.params.tenantId || req.body.tenantId || req.query.tenantId || (req.headers['x-tenant-id'] as string);
       
       if (!tenantId) {
         return res.status(400).json({
@@ -483,7 +483,7 @@ export function requireAnyTierFeature(features: string[]) {
 
 export async function requireWritableSubscription(req: Request, res: Response, next: NextFunction) {
   try {
-    const tenantId = (req.params.tenantId || req.params.id || req.body.tenantId || req.query.tenantId) as string | undefined;
+    const tenantId = (req.params.tenantId || req.params.id || req.body.tenantId || req.query.tenantId || req.headers['x-tenant-id']) as string | undefined;
 
     if (!tenantId) {
       return res.status(400).json({

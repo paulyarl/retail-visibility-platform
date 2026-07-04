@@ -55,6 +55,155 @@ async function getCatalogEntry(featureKey: string): Promise<{
 }
 
 /**
+ * Map capability_type key to the parent-gate feature key that controls the master "enabled" flag.
+ * When a tenant purchases a sub-feature whose capability type has a parent gate,
+ * we auto-create a zero-cost companion purchase for the parent gate so the resolver
+ * sees it as enabled. Without this, purchasing e.g. chatbot_skill_crm_assistant on a
+ * tier without chatbot_enabled would charge the tenant but produce no effective capability.
+ */
+const PARENT_GATE_FEATURES: Record<string, string> = {
+  chatbot_options: 'chatbot_enabled',
+  crm_options: 'crm_enabled',
+  social_commerce_options: 'social_commerce_enabled',
+  storefront_options: 'storefront_opt_enabled',
+  quickstart_options: 'quickstart_enabled',
+  fulfillment_options: 'fulfillment_enabled',
+  payment_gateway_options: 'payment_gateway_enabled',
+  featured_options: 'featured_enabled',
+  faq_options: 'faq_enabled',
+  barcode_scan_options: 'barcode_enabled',
+  directory_entry: 'directory_entry_enabled',
+  directory_promotion: 'directory_promotion_enabled',
+  organization_options: 'org_enabled',
+  integration_options: 'integration_enabled',
+};
+
+/**
+ * Ensure the parent-gate feature for a capability type is active for the tenant.
+ * If the tier already includes it, no companion is needed.
+ * If not, creates a zero-cost companion purchase (source='companion', no expiry).
+ */
+async function ensureCompanionPurchase(
+  tenantId: string,
+  capabilityKey: string | null,
+  purchasedFeatureKey: string
+): Promise<void> {
+  if (!capabilityKey) return;
+  const parentFeatureKey = PARENT_GATE_FEATURES[capabilityKey];
+  if (!parentFeatureKey) return;
+
+  // Check if parent gate is already in tier
+  const parentTierStatus = await checkTierFeatureStatus(tenantId, parentFeatureKey);
+  if (parentTierStatus.inTier) return; // Tier already provides the gate — no companion needed
+
+  // Check if there's already an active companion or real purchase for the parent gate
+  const existing = await prisma.tenant_feature_purchases.findUnique({
+    where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: parentFeatureKey } },
+  });
+  if (existing && ['active', 'past_due', 'trial'].includes(existing.status)) return;
+
+  // Create zero-cost companion purchase
+  await prisma.tenant_feature_purchases.upsert({
+    where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: parentFeatureKey } },
+    update: {
+      source: 'companion',
+      status: 'active',
+      expires_at: null,
+      metadata: {
+        companion_for: purchasedFeatureKey,
+        price_cents: 0,
+        created_reason: 'auto_companion_parent_gate',
+      },
+      updated_at: new Date(),
+    },
+    create: {
+      tenant_id: tenantId,
+      feature_key: parentFeatureKey,
+      source: 'companion',
+      status: 'active',
+      expires_at: null,
+      metadata: {
+        companion_for: purchasedFeatureKey,
+        price_cents: 0,
+        created_reason: 'auto_companion_parent_gate',
+      },
+    },
+  });
+
+  console.log(`[BSaaS] Created companion purchase for ${parentFeatureKey} (companion to ${purchasedFeatureKey}) for tenant ${tenantId}`);
+}
+
+/**
+ * When a real (non-companion) purchase is cancelled, check if any other active
+ * real purchases remain for the same capability type. If none remain, cancel the
+ * companion purchase for the parent gate too.
+ */
+async function maybeCancelCompanion(
+  tenantId: string,
+  cancelledFeatureKey: string
+): Promise<void> {
+  // Find the capability type for the cancelled feature
+  const cancelledFeature = await prisma.features_list.findUnique({
+    where: { key: cancelledFeatureKey },
+    select: { id: true },
+  });
+  if (!cancelledFeature) return;
+
+  const capLink = await prisma.capability_features_list.findFirst({
+    where: { feature_id: cancelledFeature.id },
+    include: { capability_type_list: { select: { key: true } } },
+  });
+  const capabilityKey = capLink?.capability_type_list?.key;
+  if (!capabilityKey) return;
+
+  const parentFeatureKey = PARENT_GATE_FEATURES[capabilityKey];
+  if (!parentFeatureKey) return;
+
+  // Check if any other active real (non-companion) purchases exist for features
+  // in the same capability type
+  const capFeatureLinks = await prisma.capability_features_list.findMany({
+    where: { capability_type_id: capLink.capability_type_id },
+    select: { feature_id: true },
+  });
+  const capFeatureIds = capFeatureLinks.map(l => l.feature_id);
+  const capFeatures = await prisma.features_list.findMany({
+    where: { id: { in: capFeatureIds } },
+    select: { key: true },
+  });
+  const capFeatureKeys = capFeatures.map(f => f.key);
+
+  // Exclude the cancelled feature and the parent gate itself from the check
+  const otherFeatureKeys = capFeatureKeys.filter(k => k !== cancelledFeatureKey && k !== parentFeatureKey);
+  if (otherFeatureKeys.length === 0) return;
+
+  const activeRealPurchases = await prisma.tenant_feature_purchases.findMany({
+    where: {
+      tenant_id: tenantId,
+      feature_key: { in: otherFeatureKeys },
+      status: { in: ['active', 'past_due', 'trial'] },
+      source: { not: 'companion' },
+    },
+  });
+
+  if (activeRealPurchases.length === 0) {
+    // No other real purchases — cancel the companion
+    await prisma.tenant_feature_purchases.updateMany({
+      where: {
+        tenant_id: tenantId,
+        feature_key: parentFeatureKey,
+        source: 'companion',
+        status: { in: ['active', 'past_due'] },
+      },
+      data: {
+        status: 'cancelled',
+        updated_at: new Date(),
+      },
+    });
+    console.log(`[BSaaS] Cancelled companion purchase for ${parentFeatureKey} (no remaining real purchases) for tenant ${tenantId}`);
+  }
+}
+
+/**
  * Helper to get tenant ID from request
  */
 function getTenantId(req: Request): string | null {
@@ -75,6 +224,7 @@ function getTenantId(req: Request): string | null {
 const MERCHANT_GATE_MAP: Record<string, { table: string; toggleColumn: string }> = {
   chatbot_options: { table: 'tenant_chatbot_options_settings', toggleColumn: 'chatbot_enabled' },
   crm_options: { table: 'tenant_crm_options_settings', toggleColumn: 'crm_enabled' },
+  social_commerce_options: { table: 'tenant_social_commerce_options_settings', toggleColumn: 'social_commerce_enabled' },
 };
 
 /**
@@ -329,6 +479,9 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       });
     }
 
+    // 2c. For trial branch, also ensure companion purchase
+    // (handled after trial creation below)
+
     // 3. Trial branch: if trial_days > 0, create trial purchase without charging
     if (trialDays > 0 && billingCycle !== 'one_time') {
       const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
@@ -363,6 +516,9 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
           },
         },
       });
+
+      // Ensure parent-gate companion purchase exists for trial purchases too
+      await ensureCompanionPurchase(tenantId, tierStatus.capabilityKey, featureKey);
 
       invalidateEffectiveCapabilities(tenantId);
 
@@ -514,6 +670,9 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       },
     });
 
+    // 4b. Ensure parent-gate companion purchase exists (if capability type has a gate)
+    await ensureCompanionPurchase(tenantId, tierStatus.capabilityKey, featureKey);
+
     // 5. Invalidate capability cache
     invalidateEffectiveCapabilities(tenantId);
 
@@ -597,6 +756,11 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
         updated_at: new Date(),
       },
     });
+
+    // 2. If this was a real (non-companion) purchase, maybe cancel the companion
+    if (purchase.source !== 'companion') {
+      await maybeCancelCompanion(tenantId, purchase.feature_key);
+    }
 
     invalidateEffectiveCapabilities(tenantId);
 

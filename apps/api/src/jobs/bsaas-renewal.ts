@@ -44,6 +44,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   // 1. Find active purchases expiring within 24 hours (monthly/annual only)
+  //    Skip companion purchases (source='companion') — they have no expiry and no charge
   const expiringPurchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'active',
@@ -130,6 +131,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
   }
 
   // 1b. Process expired trials — attempt charge to convert to active
+  // Skip companion purchases — they don't have trials
   const expiredTrials = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'trial',
@@ -208,6 +210,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
   }
 
   // 2. Retry past_due purchases within grace period
+  // Skip companion purchases — they can't be past_due (no charge)
   const pastDuePurchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'past_due',
@@ -323,6 +326,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
   }
 
   // 3. Expire cancelled purchases that have reached end of billing period
+  // Skip companion purchases — they have no expiry to check
   const cancelledExpiring = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'cancelled',
@@ -352,6 +356,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
   // 4. Suspend active purchases whose expiry has passed (missed renewal)
   //    These get a grace period instead of immediate suspension
+  // Skip companion purchases — they have no expiry (expires_at=null)
   const overduePurchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'active',
