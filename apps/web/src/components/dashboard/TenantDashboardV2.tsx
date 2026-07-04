@@ -41,6 +41,7 @@ import GrowthTipCard from "./GrowthTipCard";
 import CapabilityShowcase from "./CapabilityShowcase";
 import ConstraintAlertBanner from "./ConstraintAlertBanner";
 import QuickLinksCard from "./QuickLinksCard";
+import StoreAccessCard from "./StoreAccessCard";
 import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
 import type { TipContext } from "@/lib/growth-tips/tipEngine";
 import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
@@ -478,6 +479,12 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.39 }}>
               <QuickLinksCard tenantId={tenantId} />
             </motion.div>
+
+            {/* Stores — grouped visibility for Featured Store + Feature Store */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.37 }}>
+              <StoreAccessCard tenantId={tenantId} />
+            </motion.div>
+
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
               <CapabilityShowcase
                 capabilities={allCaps.data}
@@ -522,34 +529,8 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               organizationId: tier?.organizationId || tenantData?.organizationId || undefined,
               organizationName: tier?.organizationName || undefined,
               organizationTenants,
-              organizationTier: tier?.organization
-                ? {
-                  tier_key: tier.organization.id,
-                  display_name: tier.organization.name,
-                  price_monthly: tier.organization.limits?.maxProducts ? 299.99 : 0,
-                  max_skus: tier.organization.limits?.maxProducts || 0,
-                  max_locations: tier.organization.limits?.maxLocations || 0,
-                  features: tier.organization.features?.map((f) => ({
-                    feature_key: f.id,
-                    feature_name: f.name,
-                    is_enabled: f.enabled !== false,
-                  })),
-                }
-                : undefined,
-              tenantTier: tier?.tenant
-                ? {
-                  tier_key: tier.tenant.id,
-                  display_name: tier.tenant.name,
-                  price_monthly: tier.tenant.limits?.maxProducts ? 49 : 0,
-                  max_skus: tier.tenant.limits?.maxProducts || 0,
-                  max_locations: tier.tenant.limits?.maxLocations || 0,
-                  features: tier.tenant.features?.map((f) => ({
-                    feature_key: f.id,
-                    feature_name: f.name,
-                    is_enabled: f.enabled !== false,
-                  })),
-                }
-                : undefined,
+              organizationTier: tier?.rawTierData?.organizationTier,
+              tenantTier: tier?.rawTierData?.tenantTier,
             }}
           />
         </motion.div>

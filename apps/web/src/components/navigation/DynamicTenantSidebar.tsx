@@ -327,6 +327,21 @@ function buildTenantNav(
       ],
     },
     {
+      label: 'App Store',
+      href: `/t/${currentTenantId}/settings/store`,
+      icon: <Icon.Store />,
+      requiredGroup: 'IS_TENANT_MANAGER',
+      badge: 'NEW',
+      badgeVariant: 'new',
+      children: [
+        { label: 'Browse All', href: `/t/${currentTenantId}/settings/store` },
+        { label: 'Plans', href: `/t/${currentTenantId}/settings/store?tab=plans` },
+        { label: 'Features', href: `/t/${currentTenantId}/settings/store?tab=features` },
+        { label: 'Featured Products', href: `/t/${currentTenantId}/settings/store?tab=placements` },
+        { label: 'Directory Promotion', href: `/t/${currentTenantId}/settings/store?tab=promotions` },
+      ],
+    },
+    {
       label: 'My Subscription',
       href: `/t/${currentTenantId}/settings/subscription`,
       icon: <Icon.CreditCard />,

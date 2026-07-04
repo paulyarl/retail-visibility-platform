@@ -23,10 +23,10 @@ const TIER_COLORS: Record<string, string> = {
 
 
 
-export default function PromotionSettingsPage() {
+export default function PromotionSettingsPage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
   const params = useParams();
   const router = useRouter();
-  const tenantId = params.tenantId as string;
+  const tenantId = propTenantId || (params?.tenantId as string);
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<any>(null);

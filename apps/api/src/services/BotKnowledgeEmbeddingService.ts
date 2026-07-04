@@ -497,6 +497,212 @@ class BotKnowledgeEmbeddingService {
     return parts.length > 1 ? parts.join('\n') : null;
   }
 
+  // ─── Feature Purchase Embeddings ───
+
+  /**
+   * Refresh BSaaS feature purchase embeddings for a tenant.
+   * Reads active tenant_feature_purchases (source='bsaas') and chunks each
+   * into bot_knowledge_embeddings with source_type='feature_purchase'.
+   */
+  async refreshFeaturePurchaseEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
+    const pool = getDirectPool();
+
+    // Delete existing feature_purchase embeddings for this tenant
+    await pool.query(
+      "DELETE FROM bot_knowledge_embeddings WHERE tenant_id = $1 AND source_type = 'feature_purchase'",
+      [tenantId]
+    );
+
+    const result = await pool.query(
+      `SELECT
+        tfp.id,
+        tfp.feature_key,
+        tfp.status,
+        tfp.source,
+        tfp.billing_cycle,
+        tfp.price_cents,
+        tfp.trial_ends_at,
+        tfp.current_period_end,
+        bc.marketing_name,
+        bc.description
+      FROM tenant_feature_purchases tfp
+      LEFT JOIN bsaas_catalog bc ON bc.feature_key = tfp.feature_key
+      WHERE tfp.tenant_id = $1
+        AND tfp.status = 'active'
+        AND tfp.source = 'bsaas'
+      ORDER BY tfp.created_at`,
+      [tenantId]
+    );
+
+    if (result.rows.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddingModel = await BotRagService.getInstance().getEmbeddingModel();
+    const texts: string[] = [];
+    const sourceIds: string[] = [];
+
+    for (const row of result.rows) {
+      const text = this.chunkFeaturePurchase(row);
+      if (text) {
+        texts.push(text);
+        sourceIds.push(row.id);
+      }
+    }
+
+    if (texts.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddings = await this.generateEmbeddings(texts);
+
+    for (let i = 0; i < texts.length; i++) {
+      const embeddingStr = `[${embeddings[i].join(',')}]`;
+      await pool.query(
+        `INSERT INTO bot_knowledge_embeddings (tenant_id, source_type, source_id, chunk_text, chunk_index, embedding, model)
+         VALUES ($1, 'feature_purchase', $2, $3, 0, $4::vector, $5)
+         ON CONFLICT (tenant_id, source_type, source_id, chunk_index) DO UPDATE SET
+           chunk_text = EXCLUDED.chunk_text,
+           embedding = EXCLUDED.embedding,
+           model = EXCLUDED.model,
+           updated_at = now()`,
+        [tenantId, sourceIds[i], texts[i], embeddingStr, embeddingModel]
+      );
+    }
+
+    logger.info('[BotKnowledgeEmbeddingService] Refreshed feature purchase embeddings', undefined, {
+      tenantId,
+      count: texts.length,
+    });
+
+    return { processed: result.rows.length, chunks: texts.length };
+  }
+
+  private chunkFeaturePurchase(row: any): string | null {
+    const parts: string[] = ['Feature Store Purchase:'];
+    const name = row.marketing_name || row.feature_key;
+    parts.push(`Feature: ${name}`);
+    if (row.description) {
+      parts.push(`Description: ${row.description}`);
+    }
+    parts.push(`Status: ${row.status}`);
+    if (row.billing_cycle) {
+      parts.push(`Billing: ${row.billing_cycle}`);
+    }
+    if (row.price_cents) {
+      parts.push(`Price: $${(row.price_cents / 100).toFixed(2)}/${row.billing_cycle || 'cycle'}`);
+    }
+    if (row.trial_ends_at) {
+      parts.push(`Trial ends: ${new Date(row.trial_ends_at).toLocaleDateString()}`);
+    }
+    if (row.current_period_end) {
+      parts.push(`Current period ends: ${new Date(row.current_period_end).toLocaleDateString()}`);
+    }
+    return parts.join('\n');
+  }
+
+  // ─── Featured Placement Embeddings ───
+
+  /**
+   * Refresh featured placement embeddings for a tenant.
+   * Reads active featured_placement_purchases and chunks each into
+   * bot_knowledge_embeddings with source_type='featured_placement'.
+   */
+  async refreshFeaturedPlacementEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
+    const pool = getDirectPool();
+
+    // Delete existing featured_placement embeddings for this tenant
+    await pool.query(
+      "DELETE FROM bot_knowledge_embeddings WHERE tenant_id = $1 AND source_type = 'featured_placement'",
+      [tenantId]
+    );
+
+    const result = await pool.query(
+      `SELECT
+        fpp.id,
+        fpp.plan_key,
+        fpp.surface,
+        fpp.status,
+        fpp.price_cents,
+        fpp.duration_days,
+        fpp.activated_at,
+        fpp.expires_at,
+        ii.name as product_name
+      FROM featured_placement_purchases fpp
+      LEFT JOIN inventory_items ii ON ii.id = fpp.inventory_item_id
+      WHERE fpp.tenant_id = $1
+        AND fpp.status = 'active'
+      ORDER BY fpp.activated_at DESC`,
+      [tenantId]
+    );
+
+    if (result.rows.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddingModel = await BotRagService.getInstance().getEmbeddingModel();
+    const texts: string[] = [];
+    const sourceIds: string[] = [];
+
+    for (const row of result.rows) {
+      const text = this.chunkFeaturedPlacement(row);
+      if (text) {
+        texts.push(text);
+        sourceIds.push(row.id);
+      }
+    }
+
+    if (texts.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddings = await this.generateEmbeddings(texts);
+
+    for (let i = 0; i < texts.length; i++) {
+      const embeddingStr = `[${embeddings[i].join(',')}]`;
+      await pool.query(
+        `INSERT INTO bot_knowledge_embeddings (tenant_id, source_type, source_id, chunk_text, chunk_index, embedding, model)
+         VALUES ($1, 'featured_placement', $2, $3, 0, $4::vector, $5)
+         ON CONFLICT (tenant_id, source_type, source_id, chunk_index) DO UPDATE SET
+           chunk_text = EXCLUDED.chunk_text,
+           embedding = EXCLUDED.embedding,
+           model = EXCLUDED.model,
+           updated_at = now()`,
+        [tenantId, sourceIds[i], texts[i], embeddingStr, embeddingModel]
+      );
+    }
+
+    logger.info('[BotKnowledgeEmbeddingService] Refreshed featured placement embeddings', undefined, {
+      tenantId,
+      count: texts.length,
+    });
+
+    return { processed: result.rows.length, chunks: texts.length };
+  }
+
+  private chunkFeaturedPlacement(row: any): string | null {
+    const parts: string[] = ['Featured Store Placement:'];
+    if (row.product_name) {
+      parts.push(`Product: ${row.product_name}`);
+    }
+    parts.push(`Plan: ${row.plan_key}`);
+    parts.push(`Surface: ${row.surface}`);
+    parts.push(`Status: ${row.status}`);
+    if (row.duration_days) {
+      parts.push(`Duration: ${row.duration_days} days`);
+    }
+    if (row.price_cents) {
+      parts.push(`Price: $${(row.price_cents / 100).toFixed(2)}`);
+    }
+    if (row.activated_at) {
+      parts.push(`Activated: ${new Date(row.activated_at).toLocaleDateString()}`);
+    }
+    if (row.expires_at) {
+      parts.push(`Expires: ${new Date(row.expires_at).toLocaleDateString()}`);
+    }
+    return parts.join('\n');
+  }
+
   // ─── Unified Refresh ───
 
   /**
@@ -601,7 +807,7 @@ class BotKnowledgeEmbeddingService {
    */
   async refreshKnowledgeEmbeddings(
     tenantId: string,
-    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion'
+    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement'
   ): Promise<{ processed: number; chunks: number }> {
     if (sourceType === 'badge_registry') {
       return this.refreshBadgeRegistryEmbeddings(tenantId);
@@ -621,6 +827,12 @@ class BotKnowledgeEmbeddingService {
     if (sourceType === 'promotion') {
       return this.refreshPromotionEmbeddings(tenantId);
     }
+    if (sourceType === 'feature_purchase') {
+      return this.refreshFeaturePurchaseEmbeddings(tenantId);
+    }
+    if (sourceType === 'featured_placement') {
+      return this.refreshFeaturedPlacementEmbeddings(tenantId);
+    }
 
     const badgeResult = await this.refreshBadgeRegistryEmbeddings(tenantId);
     const policyResult = await this.refreshPolicyEmbeddings(tenantId);
@@ -628,9 +840,11 @@ class BotKnowledgeEmbeddingService {
     const hoursResult = await this.refreshHoursEmbeddings(tenantId);
     const fulfillmentResult = await this.refreshFulfillmentEmbeddings(tenantId);
     const promotionResult = await this.refreshPromotionEmbeddings(tenantId);
+    const featurePurchaseResult = await this.refreshFeaturePurchaseEmbeddings(tenantId);
+    const featuredPlacementResult = await this.refreshFeaturedPlacementEmbeddings(tenantId);
     return {
-      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed,
-      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks,
+      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed,
+      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks,
     };
   }
 

@@ -16,6 +16,7 @@ export type SubscriptionDisplayField =
   | 'skuLimit'           // Max SKUs
   | 'locationLimit'      // Max locations
   | 'capabilities'       // Effective capability domains summary
+  | 'capabilityBreakdown' // Per-domain enabled/disabled breakdown
   | 'trialInfo'          // Trial end date if applicable
   | 'organizationTenants'; // Organization's tenant list
 
@@ -84,6 +85,12 @@ export const FIELD_METADATA: Record<SubscriptionDisplayField, {
   capabilities: {
     label: 'Capabilities',
     description: 'Active platform capability domains',
+    icon: 'Shield',
+    category: 'subscription',
+  },
+  capabilityBreakdown: {
+    label: 'Capability Breakdown',
+    description: 'Per-domain enabled/disabled status from effective capabilities',
     icon: 'Shield',
     category: 'subscription',
   },

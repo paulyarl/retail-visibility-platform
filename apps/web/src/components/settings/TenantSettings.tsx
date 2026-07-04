@@ -10,6 +10,79 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
   const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError } = useTenantComplete(tenantId);
   const legacySettingsGroups = [
     {
+      title: 'Stores',
+      description: 'Purchase features, placements, promotions, and manage your plan',
+      cards: [
+        {
+          title: 'App Store',
+          description: 'Browse all purchasable plans, features, placements, and promotions in one place',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/store`,
+          color: 'bg-gradient-to-r from-blue-500 to-purple-600',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+        {
+          title: 'Feature Store',
+          description: 'Purchase à la carte capability features to enhance your plan',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/feature-store`,
+          color: 'bg-violet-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+        {
+          title: 'Featured Store',
+          description: 'Purchase featured placement plans to spotlight your products',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/featured-store`,
+          color: 'bg-purple-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'featuredOptions',
+        },
+        {
+          title: 'Directory Promotion',
+          description: 'Boost your store visibility on the directory map and search results',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/promotion`,
+          color: 'bg-amber-600',
+          badge: 'Directory',
+          accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'directoryPromotion',
+        },
+        {
+          title: 'My Subscription',
+          description: 'Manage your plan tier, upgrade, and view included features',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/subscription`,
+          color: 'bg-blue-500',
+          badge: 'Manage',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+      ],
+    },
+    {
       title: 'Account & Preferences',
       description: 'Personalize your experience',
       cards: [
@@ -170,6 +243,19 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/tier-features`,
           color: 'bg-indigo-500',
+        },
+        {
+          title: 'Feature Store',
+          description: 'Purchase à la carte capability features to enhance your plan',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/feature-store`,
+          color: 'bg-violet-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
         },
       ],
     },
@@ -433,14 +519,14 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           capabilityKey: 'socialCommerceOptions',
         },
         {
-          title: 'Social Share Buttons',
-          description: 'Configure social media share buttons for products and storefront',
+          title: 'Social Commerce',
+          description: 'Configure Meta, TikTok, social proof, share buttons, and abandoned cart',
           icon: (
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
           ),
-          href: `/t/${tenantId}/settings/social-share`,
+          href: `/t/${tenantId}/settings/social-commerce`,
           color: 'bg-pink-500',
           capabilityKey: 'socialCommerceOptions',
         },

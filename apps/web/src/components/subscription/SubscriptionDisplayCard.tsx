@@ -69,6 +69,25 @@ interface SubscriptionDisplayCardProps {
 
 const TOTAL_CAPABILITY_DOMAINS = 16;
 
+const CAPABILITY_DOMAINS: Array<{ key: string; label: string; field: keyof AllCapabilitiesState }> = [
+  { key: 'commerce', label: 'Commerce', field: 'commerce' },
+  { key: 'paymentGateway', label: 'Payment Gateway', field: 'paymentGateway' },
+  { key: 'storefront', label: 'Storefront', field: 'storefront' },
+  { key: 'barcodeScan', label: 'Barcode Scan', field: 'barcodeScan' },
+  { key: 'fulfillment', label: 'Fulfillment', field: 'fulfillment' },
+  { key: 'productOptions', label: 'Product Options', field: 'productOptions' },
+  { key: 'featuredOptions', label: 'Featured Options', field: 'featuredOptions' },
+  { key: 'integrationOptions', label: 'Integrations', field: 'integrationOptions' },
+  { key: 'quickstartOptions', label: 'Quickstart', field: 'quickstartOptions' },
+  { key: 'storefrontOptions', label: 'Storefront Options', field: 'storefrontOptions' },
+  { key: 'directoryEntryOptions', label: 'Directory Entry', field: 'directoryEntryOptions' },
+  { key: 'faqOptions', label: 'FAQ', field: 'faqOptions' },
+  { key: 'crmOptions', label: 'CRM', field: 'crmOptions' },
+  { key: 'chatbotOptions', label: 'Chatbot', field: 'chatbotOptions' },
+  { key: 'socialCommerceOptions', label: 'Social Commerce', field: 'socialCommerceOptions' },
+  { key: 'directoryPromotion', label: 'Directory Promotion', field: 'directoryPromotion' },
+];
+
 function countEnabledCapabilities(caps: AllCapabilitiesState): number {
   const domains = [
     caps.commerce, caps.paymentGateway, caps.storefront, caps.barcodeScan,
@@ -255,6 +274,33 @@ export function SubscriptionDisplayCard({
             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {enabledCapabilityCount}/{TOTAL_CAPABILITY_DOMAINS} active
             </span>
+          </div>
+        );
+
+      case 'capabilityBreakdown':
+        if (!capabilities) return null;
+        return (
+          <div key={field} className="col-span-2 sm:col-span-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon className="w-4 h-4 text-primary-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Capability Breakdown ({enabledCapabilityCount}/{CAPABILITY_DOMAINS.length} active)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pl-6">
+              {CAPABILITY_DOMAINS.map(({ key, label, field: capField }) => {
+                const domain = capabilities[capField] as { enabled?: boolean } | undefined;
+                const isEnabled = !!domain?.enabled;
+                return (
+                  <div key={key} className="flex items-center gap-1.5 text-xs">
+                    <span className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                    <span className={isEnabled ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'}>
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
 

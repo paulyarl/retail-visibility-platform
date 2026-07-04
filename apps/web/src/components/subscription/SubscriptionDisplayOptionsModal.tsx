@@ -17,7 +17,7 @@ interface SubscriptionDisplayOptionsModalProps {
 const FIELD_CATEGORIES = {
   subscription: {
     label: 'Subscription',
-    fields: ['effectiveTier', 'subscriptionStatus', 'pricing', 'capabilities', 'trialInfo'] as SubscriptionDisplayField[],
+    fields: ['effectiveTier', 'subscriptionStatus', 'pricing', 'capabilities', 'capabilityBreakdown', 'trialInfo'] as SubscriptionDisplayField[],
   },
   limits: {
     label: 'Limits',

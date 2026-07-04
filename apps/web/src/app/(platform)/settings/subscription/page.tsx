@@ -62,13 +62,13 @@ interface PendingRequest {
 }
 
 
-export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
+export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?: string }) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   
-  // Get tenant ID from URL parameter, prop, or localStorage (in priority order)
-  const urlTenantId = searchParams?.get('tenantId');
-  let tenantId = urlTenantId || propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+  // Get tenant ID from prop, URL parameter, or localStorage (in priority order)
+  const urlTenantId = propTenantId || searchParams?.get('tenantId');
+  let tenantId = urlTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
   
   // Validate tenant ownership - PLATFORM_ADMIN and PLATFORM_SUPPORT can access any tenant
   if (urlTenantId && user?.tenants) {
@@ -78,7 +78,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     if (!isAuthorized) {
       console.warn(`[Subscription] User ${user.id} attempted to access tenant ${urlTenantId} without authorization`);
       // Fall back to user's first tenant or localStorage
-      tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || user.tenants[0]?.id || null;
+      tenantId = (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || user.tenants[0]?.id || null;
     }
   }
   
@@ -125,7 +125,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   }
 
   // Platform users see catalog view only if no tenant context
-  if (isPlatformUser(user) && !tenant && !propTenantId) {
+  if (isPlatformUser(user) && !tenant && !urlTenantId) {
     return (
       <div className="min-h-screen bg-neutral-50">
         <PageHeader

@@ -14,6 +14,7 @@ import { logger } from '../logger';
 import { generatePlacementPurchaseId } from '../lib/id-generator';
 import { invalidateActiveFeaturedCache } from './ActiveFeaturedResolver';
 import CrmAlertService from './CrmAlertService';
+import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
 import Stripe from 'stripe';
 
 export interface PlacementPlan {
@@ -350,6 +351,15 @@ export class FeaturedPlacementService extends BaseService {
       alertType: 'featured_placement_active',
     }).catch(err => logger.warn('[FeaturedPlacement] Failed to create activation alert', undefined, { error: (err as Error).message }));
 
+    // Refresh bot knowledge embeddings with featured placement info — fire-and-forget
+    (async () => {
+      try {
+        await BotKnowledgeEmbeddingService.getInstance().refreshFeaturedPlacementEmbeddings(purchase.tenant_id);
+      } catch (err) {
+        logger.warn('[FeaturedPlacement] Failed to refresh featured placement embeddings', undefined, { error: (err as Error).message });
+      }
+    })();
+
     // Send billing notification (email + CRM alert) — fire-and-forget
     (async () => {
       try {
@@ -511,6 +521,15 @@ export class FeaturedPlacementService extends BaseService {
       priceCents: purchase.price_cents,
       alertType: 'featured_placement_expired',
     }).catch(err => logger.warn('[FeaturedPlacement] Failed to create revocation alert', undefined, { error: (err as Error).message }));
+
+    // Refresh bot knowledge embeddings to clear stale featured placement info — fire-and-forget
+    (async () => {
+      try {
+        await BotKnowledgeEmbeddingService.getInstance().refreshFeaturedPlacementEmbeddings(purchase.tenant_id);
+      } catch (err) {
+        logger.warn('[FeaturedPlacement] Failed to refresh featured placement embeddings on revocation', undefined, { error: (err as Error).message });
+      }
+    })();
 
     logger.info('[FeaturedPlacement] Purchase revoked', undefined, { purchaseId, reason });
   }

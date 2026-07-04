@@ -261,6 +261,65 @@ export class CrmAlertService extends BaseService {
       console.error('[CrmAlertService] Failed to create featured placement alert:', error);
     }
   }
+
+  /**
+   * Create an App Store lifecycle alert.
+   * Fire-and-forget from bsaas-purchases.ts — errors are logged, never thrown.
+   */
+  async createAppStoreAlert(params: {
+    tenantId: string;
+    featureKey: string;
+    featureName: string;
+    alertType: 'app_store_purchase' | 'app_store_trial' | 'app_store_cancel' | 'app_store_renewal_failed';
+    priceCents?: number;
+    billingCycle?: string;
+    trialDays?: number;
+  }): Promise<void> {
+    try {
+      const priceFormatted = params.priceCents ? `$${(params.priceCents / 100).toFixed(2)}` : '';
+      const cycleLabel = params.billingCycle === 'annual' ? '/yr' : params.billingCycle === 'monthly' ? '/mo' : '';
+
+      const titles: Record<string, string> = {
+        app_store_purchase: `Feature purchased — ${params.featureName}`,
+        app_store_trial: `Free trial started — ${params.featureName}`,
+        app_store_cancel: `Feature cancelled — ${params.featureName}`,
+        app_store_renewal_failed: `Renewal failed — ${params.featureName}`,
+      };
+
+      const bodies: Record<string, string> = {
+        app_store_purchase: `You purchased "${params.featureName}" (${params.featureKey}) from the App Store${priceFormatted ? ` for ${priceFormatted}${cycleLabel}` : ''}. The feature is now active.`,
+        app_store_trial: `Your ${params.trialDays}-day free trial of "${params.featureName}" (${params.featureKey}) has started. It will auto-convert to a paid subscription when the trial ends.`,
+        app_store_cancel: `You cancelled "${params.featureName}" (${params.featureKey}). Access continues until the current billing period ends.`,
+        app_store_renewal_failed: `Renewal payment failed for "${params.featureName}" (${params.featureKey}). The feature will enter a 7-day grace period before suspension.`,
+      };
+
+      const icons: Record<string, string> = {
+        app_store_purchase: '🛒',
+        app_store_trial: '🎁',
+        app_store_cancel: '✅',
+        app_store_renewal_failed: '⚠️',
+      };
+
+      await this.create({
+        tenant_id: params.tenantId,
+        type: 'app_store',
+        title: titles[params.alertType],
+        body: bodies[params.alertType],
+        icon: icons[params.alertType],
+        metadata: {
+          feature_key: params.featureKey,
+          feature_name: params.featureName,
+          alert_type: params.alertType,
+          price_cents: params.priceCents,
+          billing_cycle: params.billingCycle,
+          trial_days: params.trialDays,
+          source: 'app_store',
+        },
+      });
+    } catch (error) {
+      console.error('[CrmAlertService] Failed to create App Store alert:', error);
+    }
+  }
 }
 
 export default CrmAlertService;
