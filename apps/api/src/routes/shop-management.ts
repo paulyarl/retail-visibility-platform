@@ -485,6 +485,7 @@ router.put('/:tenantId/seo', async (req, res) => {
             id: tenantId,
             tenant_id: tenantId,
             is_published: false,
+            updated_at: new Date(),
             ...(seo_description !== undefined && { seo_description }),
             ...(seo_keywords !== undefined && { seo_keywords: seo_keywords as string[] }),
           },

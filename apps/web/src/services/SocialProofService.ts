@@ -80,7 +80,8 @@ class SocialProofServiceClass extends TenantApiSingleton {
     if (!result.success || !result.data) {
       return { mentions: [], total: 0 };
     }
-    return result.data;
+    const payload = (result.data as any).data ?? result.data;
+    return { mentions: payload.mentions ?? [], total: payload.total ?? 0 };
   }
 
   async getSummary(tenantId: string): Promise<ModerationSummary | null> {
@@ -94,7 +95,8 @@ class SocialProofServiceClass extends TenantApiSingleton {
     if (!result.success || !result.data) {
       return null;
     }
-    return result.data;
+    const payload = (result.data as any).data ?? result.data;
+    return payload;
   }
 
   async createMention(
@@ -131,7 +133,8 @@ class SocialProofServiceClass extends TenantApiSingleton {
       throw new Error(errMsg || 'Failed to create mention');
     }
     await this.invalidateServiceCaches(tenantId);
-    return result.data;
+    const payload = (result.data as any).data ?? result.data;
+    return payload;
   }
 
   async updateMention(

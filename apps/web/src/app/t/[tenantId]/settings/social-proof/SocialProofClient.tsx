@@ -58,8 +58,8 @@ export default function SocialProofClient({ tenantId }: SocialProofClientProps) 
         SocialProofService.listMentions(tenantId, filter !== 'all' ? { status: filter } : undefined),
         SocialProofService.getSummary(tenantId),
       ]);
-      setMentions(listResult.mentions);
-      setSummary(summaryResult);
+      setMentions(listResult?.mentions ?? []);
+      setSummary(summaryResult ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load social proof data');
     } finally {
