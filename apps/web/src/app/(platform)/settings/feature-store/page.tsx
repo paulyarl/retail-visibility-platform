@@ -234,8 +234,9 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                         Enable in Settings
                       </Button>
                     ) : (
-                      <Button
-                        color="blue"
+                      <Button 
+                        variant="gradient"
+                        style={{ color: 'white' }}
                         size="sm"
                         onClick={() => handlePurchaseClick(item)}
                         leftSection={<IconBolt size={16} />}

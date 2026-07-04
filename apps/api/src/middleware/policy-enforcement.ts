@@ -99,7 +99,7 @@ export async function enforcePolicyCompliance(
       return next();
     }
 
-    const tenantId = req.body?.tenantId || req.query?.tenantId;
+    const tenantId = req.body?.tenantId || req.query?.tenantId || (req.headers['x-tenant-id'] as string);
     
     if (!tenantId) {
       // No tenant ID, skip policy check (will fail validation elsewhere)
