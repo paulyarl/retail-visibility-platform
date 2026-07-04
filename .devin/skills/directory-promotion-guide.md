@@ -216,10 +216,41 @@ Each transition fires the appropriate billing notification via `sendBillingNotif
 Extends `TenantApiSingleton`. Methods:
 - `getPlans(tenantId)`, `getStatus(tenantId)`, `createPurchase()`, `activatePurchase()`, `cancelPromotion()`
 - `getAnalytics(tenantId)` — tenant analytics dashboard data
+- `trackImpression(tenantId)` — fire-and-forget POST to `/promotion/track-impression` (no caching, silent failure)
+- `trackClick(tenantId)` — fire-and-forget POST to `/promotion/track-click` (no caching, silent failure)
 - `adminListPlans()`, `adminCreatePlan()`, `adminUpdatePlan()`, `adminDeletePlan()` — catalog CRUD
 - `adminGetRevenue()`, `adminListPurchases()` — admin revenue dashboard
 
-All methods use `makeDefaultRequest` with cache keys prefixed `directory-promotion-*`.
+All methods use `makeDefaultRequest` with cache keys prefixed `directory-promotion-*`. Tracking methods are fire-and-forget (no cache key, wrapped in try/catch with empty catch).
+
+### Frontend Tracking Wiring
+
+Impression and click tracking must be fired by directory components when rendering or clicking promoted store cards. The pattern uses a `useRef` guard to ensure impressions fire only once per component mount:
+
+**Components that fire tracking:**
+
+| Component | Impression | Click |
+|---|---|---|
+| `StoreCard.tsx` | `useEffect` on mount, guarded by `impressionFired` ref | `onClick` on `<Link>` |
+| `UnifiedStoreCard.tsx` | `useEffect` after `isPromoted` is declared, guarded by `impressionFired` ref | `onClick` on all 4 `<Link>` elements (list title, grid logo, grid title, visit button) |
+| `PromotedStoresCarousel.tsx` | Fires for all stores after fetch completes, guarded by `impressionFired` ref | `onClick` on each store `<Link>` |
+
+**Important**: In `UnifiedStoreCard`, the `useEffect` must be placed AFTER the `isPromoted` variable declaration (line ~108), not before it. Placing it before causes TS2448 (block-scoped variable used before declaration).
+
+**Pattern**:
+```typescript
+const impressionFired = useRef(false);
+
+useEffect(() => {
+  if (listing.isPromoted && !impressionFired.current) {
+    impressionFired.current = true;
+    DirectoryPromotionService.trackImpression(listing.tenantId);
+  }
+}, [listing.isPromoted, listing.tenantId]);
+
+// On Link click:
+onClick={() => { if (listing.isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}
+```
 
 ### Pages
 
@@ -325,3 +356,50 @@ Shows current promotion status (tier, status badge, price, dates, auto-renew) an
 3. Add method to frontend `DirectoryPromotionService` or `CrmAdminService`
 4. Add UI card/section to the dashboard component
 5. Use `Promise.allSettled` when combining data from multiple services
+
+---
+
+## 11. Tier Feature Auditing
+
+### `TIER_FEATURES` Constant
+
+**File**: `apps/web/src/app/t/[tenantId]/settings/promotion/page.tsx`
+
+The `TIER_FEATURES` constant maps tier names to feature lists displayed on the promotion purchase page. **Every feature listed must be backed by an actual platform-delivered capability.** Do not list features that the platform cannot deliver.
+
+### Current Delivered Features (as of 2026-07-04)
+
+| Tier | Feature | Delivery Mechanism |
+|---|---|---|
+| Basic | Gold marker on map | `DirectoryMap.tsx` / `DirectoryMapGoogle.tsx` — gold pin, larger size, star badge, z-index boost |
+| Basic | Promoted badge | `StoreCard.tsx` / `UnifiedStoreCard.tsx` — registry-driven badge with tier-colored gradient |
+| Basic | Higher visibility | `directory-v2.ts` — SQL `ORDER BY promotionBoost` (featured=0, premium=1, basic=2) |
+| Basic | Basic analytics | `/promotion/analytics` endpoint — impressions, clicks, CTR, daily averages |
+| Premium | Featured in search results | `directory-v2.ts` — premium tier gets boost priority 1 |
+| Premium | Homepage carousel spot | `PromotedStoresCarousel.tsx` — renders in 3 directory layouts |
+| Premium | Detailed analytics dashboard | `/t/[tenantId]/settings/promotion/analytics` page with CTR, daily averages, days active |
+| Premium | Chatbot promotion awareness | `BotKnowledgeEmbeddingService.refreshPromotionEmbeddings()` — RAG context injection |
+| Featured | Highest search priority | `directory-v2.ts` — featured tier gets boost priority 0 |
+| Featured | Premium badge styling | Purple gradient badge in `StoreCard`, `UnifiedStoreCard`, `PromotedStoresCarousel` |
+| Featured | Enhanced carousel placement | Purple gradient carousel cards with tier-colored borders |
+| Featured | Automated renewal protection | `promotion-renewal.ts` job + 7-day grace period + billing email/CRM alerts |
+
+### Audit Methodology
+
+When auditing tier features against platform delivery:
+
+1. **Search the backend service** (`DirectoryPromotionService.ts`) for activation/deactivation logic — what columns are set/cleared on `directory_listings_list`
+2. **Search the directory rendering components** (`StoreCard.tsx`, `UnifiedStoreCard.tsx`, `DirectoryMap.tsx`, `DirectoryMapGoogle.tsx`, `PromotedStoresCarousel.tsx`) for `isPromoted` / `promotionTier` conditional rendering
+3. **Search the directory API** (`directory-v2.ts`) for SQL `ORDER BY` clauses that boost promoted listings
+4. **Search for analytics endpoints** (`promotion.ts`) — what metrics are returned and are they tier-differentiated
+5. **Search for ancillary systems** — bot knowledge embeddings, billing notifications, renewal jobs, CRM widgets
+6. **Map each promised feature** to the specific code that delivers it. If no code delivers it, either replace the feature text with a delivered equivalent or implement the missing capability
+
+### Tier Card Interactivity
+
+The tier cards on the promotion page must be `<button>` elements (not `<div>`) with `onClick` handlers that call `setSelectedPlanKey(firstPlan.planKey)` for the clicked tier. This enables:
+- All three tiers (basic, premium, featured) to be selectable
+- Duration options and price summary to update dynamically based on selected tier
+- Keyboard accessibility (buttons are focusable by default)
+
+If tier cards are non-interactive `<div>` elements, only the default tier (premium) is selectable and the other tiers are visually present but functionally inert.

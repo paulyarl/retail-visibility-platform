@@ -184,6 +184,13 @@ After adding to `features_list`, the feature is **not automatically available to
     - Provide a `label`, `icon` (from lucide-react), `detail` string (list active sub-features or "Not available"), and `settingsLink` (e.g. `/t/${tenantId}/bot/options`).
     - This is the "Your Capabilities" card on the tenant dashboard — a capability missing from this array will not appear on the dashboard even if it works functionally.
 
+12. **Update the TierFeaturesClient** in `apps/web/src/app/t/[tenantId]/settings/tier-features/TierFeaturesClient.tsx`:
+    - Add an entry to the `CAPABILITY_META` array with the capability type key, a human-readable label, and the flexible feature key(s) for that domain.
+    - Add a corresponding entry in the `summarizeResolvedCapabilities` function that reads from the `AllCapabilitiesState` domain field and returns `{ key, label, enabled, flexible, detail }`.
+    - The capability type key must match what `getCapabilityTypeForFeature()` returns for features in this domain (i.e. the key from `CAPABILITY_FEATURE_PREFIXES` in `CapabilityResolutionService.ts`).
+    - The flexible key(s) must match the `*_flexible` feature key defined in the backend resolver.
+    - A capability missing from `CAPABILITY_META` will not appear in the tier comparison table or the resolved capabilities section on the tier-features settings page.
+
 ## Verification Queries
 
 ```sql
@@ -261,3 +268,4 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the CapabilityShowcase** — a capability missing from the `rows` array in `CapabilityShowcase.tsx` will not appear in the "Your Capabilities" card on the tenant dashboard, even though it works functionally.
 - **Do not forget CCL write-time validation** — if a `block` severity constraint references the new capability, the PUT handler MUST call `await validateProposedChange()` with a simulated effective state before persisting. Forgetting this allows invalid configurations to be saved. See R22 in `capability-data-flow-rules.md`.
 - **Do not forget the `flexible ||` prefix on standalone feature flags** — when adding a new feature flag to a resolver, always prefix the check with `flexible ||` (R23). Standalone booleans outside the group array pattern (e.g., `featured_expiry_monitor`) are the most commonly missed. Without the prefix, the feature stays disabled on flexible tiers even though the admin granted full capability access via `*_flexible`.
+- **Do not forget the TierFeaturesClient** — a capability missing from `CAPABILITY_META` and `summarizeResolvedCapabilities` in `TierFeaturesClient.tsx` will not appear in the tier comparison table or the "Your Resolved Capabilities" section on the `/t/[tenantId]/settings/tier-features` page, even though it works functionally. This is the page where tenants compare what they have vs what higher tiers offer.

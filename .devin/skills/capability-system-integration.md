@@ -230,6 +230,8 @@ if (data.selected_type) {
 - See `capability-data-flow-rules.md` Rules R18-R22 for full details
 - See `capability-deployment-flow.md` Phase 4.5 for the complete workflow
 
+**Also update `CONSTRAINT_METADATA`**: Add an entry for the new capability domain in the `CONSTRAINT_METADATA` constant in `apps/api/src/routes/admin/capability-constraints.ts`. Include the capability key, label, and all fields from the `EffectiveXxx` interface with correct `value_type` (`string`, `boolean`, or `array`), valid `operators`, and suggested `values`. Without this, the new capability won't appear in the Source/Target dropdowns in the Add Constraint modal.
+
 ### 5. Frontend Layer
 
 **Settings page**: `apps/web/src/app/t/[tenantId]/settings/<capability>-options/`
@@ -268,6 +270,13 @@ if (data.selected_type) {
   - Compute `tier` (is the capability available at the tier level?) and `merchantGated` (is it partially disabled by merchant prefs?)
   - Provide `label`, `icon` (from lucide-react), `detail` (list active sub-features or "Not available"), and `settingsLink`
 - A capability missing from this array will not appear on the dashboard even if it works functionally
+
+**TierFeaturesClient**: `apps/web/src/app/t/[tenantId]/settings/tier-features/TierFeaturesClient.tsx`
+
+- The tier comparison page at `/t/[tenantId]/settings/tier-features` — shows resolved capabilities and a comparison table grouped by capability domain
+- Add an entry to the `CAPABILITY_META` array with: the capability type key (must match `CAPABILITY_FEATURE_PREFIXES` output), a human-readable label, and the `*_flexible` feature key(s) for the domain
+- Add a corresponding entry in the `summarizeResolvedCapabilities` function that reads from the `AllCapabilitiesState` domain field and returns `{ key, label, enabled, flexible, detail }`
+- A capability missing from `CAPABILITY_META` will not appear in the comparison table or the resolved capabilities section
 
 ## Key Patterns
 
