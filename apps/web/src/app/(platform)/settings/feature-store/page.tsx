@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
 import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag } from '@tabler/icons-react';
-import { TrendingUp, Eye, Zap, BarChart3, Sparkles, Star } from 'lucide-react';
+import { TrendingUp, Eye, Zap, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem } from '@/services/BsaasPurchaseService';
@@ -305,18 +305,18 @@ export default function FeatureStorePage() {
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
-              href={`/t/${tenantId}/settings/featured-products`}
+              href={`/t/${tenantId}/settings/tier-features`}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <Sparkles className="w-4 h-4" />
-              Manage Featured Products
+              <Zap className="w-4 h-4" />
+              See Your Plan Features
             </Link>
             <Link
-              href={`/t/${tenantId}/settings/promotion`}
+              href={`/t/${tenantId}/settings/store?tab=plans`}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <Star className="w-4 h-4" />
-              Explore Directory Promotion
+              <TrendingUp className="w-4 h-4" />
+              Explore All Plans
             </Link>
           </div>
         </div>
