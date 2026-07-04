@@ -96,6 +96,20 @@ router.get('/:tenantId/returns', async (req, res) => {
 });
 
 /**
+ * Merchant summary stats
+ */
+router.get('/:tenantId/returns/summary', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const summary = await returnRequestService.getSummary(tenantId);
+    res.json({ success: true, data: summary });
+  } catch (error) {
+    logger.error('Returns summary error', undefined, { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ success: false, error: 'summary_failed', message: 'Failed to get summary' });
+  }
+});
+
+/**
  * Merchant views a single return request
  */
 router.get('/:tenantId/returns/:id', async (req, res) => {
@@ -174,20 +188,6 @@ router.put('/:tenantId/returns/:id/complete', async (req, res) => {
   } catch (error) {
     logger.error('Complete return error', undefined, { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ success: false, error: 'complete_failed', message: 'Failed to complete return' });
-  }
-});
-
-/**
- * Merchant summary stats
- */
-router.get('/:tenantId/returns/summary', async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const summary = await returnRequestService.getSummary(tenantId);
-    res.json({ success: true, data: summary });
-  } catch (error) {
-    logger.error('Returns summary error', undefined, { error: error instanceof Error ? error.message : String(error) });
-    res.status(500).json({ success: false, error: 'summary_failed', message: 'Failed to get summary' });
   }
 });
 

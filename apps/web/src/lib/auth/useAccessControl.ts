@@ -173,8 +173,12 @@ export function useAccessControl(
   const platformSupport = isPlatformSupport(user);
   const platformViewer = isPlatformViewer(user);
   const tenantAdmin = tenantId ? isTenantOwnerOrAdmin(user, tenantId) : false;
-  const orgAdmin = organizationData ? isOrgAdmin(user, organizationData.id, organizationData) : false;
-  const orgMember = organizationData ? isOrgMember(user, organizationData.id, organizationData) : false;
+  const orgAdmin = organizationData
+    ? isOrgAdmin(user, organizationData.id, organizationData)
+    : (platformAdmin || tenantAdmin);
+  const orgMember = organizationData
+    ? isOrgMember(user, organizationData.id, organizationData)
+    : (platformAdmin || tenantAdmin);
   const role = tenantId ? getTenantRole(user, tenantId) : null;
 
   return {

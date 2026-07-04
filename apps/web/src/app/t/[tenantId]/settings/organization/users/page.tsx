@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   Users, UserPlus, Trash2, Mail, Pencil, X, Crown,
   Check, Loader2, Building2,
@@ -36,11 +37,13 @@ export default function OrgUsersPage() {
   const tenantId = params.tenantId as string;
 
   const { isOrgAdmin, loading: accessLoading, organizationId, isPlatformAdmin } = useOrgBehaviorAccess(tenantId);
-  const { user: authUser } = useAuth();
+  const { user: authUser, isLoading: authLoading } = useAuth();
+
+  const userIsPlatformAdmin = isPlatformAdmin || authUser?.role === 'PLATFORM_ADMIN' || authUser?.role === 'ADMIN';
 
   const currentUserId = authUser?.id || (authUser as any)?.sub || '';
   const currentUserOrgRole = organizationId && authUser ? getOrgRole(authUser as any, organizationId) : null;
-  const isCurrentUserOrgOwner = currentUserOrgRole === 'ORG_OWNER' || isPlatformAdmin;
+  const isCurrentUserOrgOwner = currentUserOrgRole === 'ORG_OWNER' || userIsPlatformAdmin;
 
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [invitations, setInvitations] = useState<OrgInvitation[]>([]);
@@ -73,10 +76,12 @@ export default function OrgUsersPage() {
   }, [organizationId]);
 
   useEffect(() => {
-    if (!accessLoading && isOrgAdmin && organizationId) {
+    if (!accessLoading && !authLoading && (isOrgAdmin || userIsPlatformAdmin) && organizationId) {
       loadData();
+    } else if (!accessLoading && !authLoading && (!isOrgAdmin || !organizationId)) {
+      setLoading(false);
     }
-  }, [loadData, accessLoading, isOrgAdmin, organizationId]);
+  }, [loadData, accessLoading, authLoading, isOrgAdmin, userIsPlatformAdmin, organizationId]);
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +158,7 @@ export default function OrgUsersPage() {
   };
   const getAvailableRoles = () => (isCurrentUserOrgOwner ? ALL_ORG_ROLES : NON_OWNER_ORG_ROLES);
 
-  if (accessLoading) {
+  if (accessLoading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
         <Spinner size="lg" />
@@ -161,12 +166,12 @@ export default function OrgUsersPage() {
     );
   }
 
-  if (!isOrgAdmin) {
+  if (!isOrgAdmin && !userIsPlatformAdmin) {
     return (
       <AccessDenied
         title="Organization Admin Access Required"
         message="You need organization administrator privileges to manage org-wide team members."
-        userRole={isPlatformAdmin ? 'Platform Admin' : 'User'}
+        userRole={userIsPlatformAdmin ? 'Platform Admin' : 'User'}
         backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
       />
     );
@@ -181,6 +186,22 @@ export default function OrgUsersPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {!organizationId ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+            <Building2 className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Organization
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              This location is not part of an organization. Create or join an organization to manage team members across multiple locations.
+            </p>
+            <Link href={`/t/${tenantId}/settings/organization`} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors mt-4">
+              <Building2 className="w-5 h-5" />
+              Create or Join Organization
+            </Link>
+          </div>
+        ) : (
+        <>
         {/* Header Actions */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -419,10 +440,12 @@ export default function OrgUsersPage() {
             <li><strong>Organization Viewer</strong> — Read-only access to org-level dashboards</li>
           </ul>
         </div>
+        </>
+        )}
       </div>
 
       {/* Invite Modal */}
-      {inviteModalOpen && (
+      {inviteModalOpen && organizationId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">

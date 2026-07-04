@@ -9,6 +9,7 @@ import { Router } from 'express';
 import ShopManagementService from '../services/ShopManagementService';
 import { authenticateToken } from '../middleware/auth';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import { prisma } from '../prisma';
 
 const router = Router();
 const shopService = ShopManagementService.getInstance();
@@ -401,6 +402,109 @@ router.put('/:tenantId/social', async (req, res) => {
       success: false,
       error: 'internal_error',
       message: 'Failed to update social links'
+    });
+  }
+});
+
+// ====================
+// SEO ENDPOINTS
+// ====================
+
+/**
+ * GET /api/shop-management/:tenantId/seo
+ * Get SEO settings (seo_tags from business profile + seo_description/seo_keywords from directory settings)
+ */
+router.get('/:tenantId/seo', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const [profile, dirSettings] = await Promise.all([
+      prisma.tenant_business_profiles_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: { seo_tags: true },
+      }),
+      prisma.directory_settings_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: { seo_description: true, seo_keywords: true },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        seo_tags: (profile?.seo_tags as string[]) || [],
+        seo_description: dirSettings?.seo_description || '',
+        seo_keywords: dirSettings?.seo_keywords || [],
+      },
+    });
+  } catch (error) {
+    console.error('[Get SEO Error]', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to fetch SEO settings',
+    });
+  }
+});
+
+/**
+ * PUT /api/shop-management/:tenantId/seo
+ * Update SEO settings
+ */
+router.put('/:tenantId/seo', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { seo_tags, seo_description, seo_keywords } = req.body;
+
+    // Update seo_tags on business profile
+    if (seo_tags !== undefined) {
+      await prisma.tenant_business_profiles_list.update({
+        where: { tenant_id: tenantId },
+        data: { seo_tags: seo_tags as any, updated_at: new Date() },
+      });
+    }
+
+    // Update seo_description and seo_keywords on directory settings
+    if (seo_description !== undefined || seo_keywords !== undefined) {
+      const existing = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: tenantId },
+      });
+
+      if (existing) {
+        await prisma.directory_settings_list.update({
+          where: { tenant_id: tenantId },
+          data: {
+            ...(seo_description !== undefined && { seo_description }),
+            ...(seo_keywords !== undefined && { seo_keywords: seo_keywords as string[] }),
+            updated_at: new Date(),
+          },
+        });
+      } else {
+        await prisma.directory_settings_list.create({
+          data: {
+            id: tenantId,
+            tenant_id: tenantId,
+            is_published: false,
+            ...(seo_description !== undefined && { seo_description }),
+            ...(seo_keywords !== undefined && { seo_keywords: seo_keywords as string[] }),
+          },
+        });
+      }
+    }
+
+    // Refresh business info embeddings (fire-and-forget)
+    BotKnowledgeEmbeddingService.getInstance().refreshBusinessInfoEmbeddings(tenantId).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'SEO settings updated successfully',
+    });
+  } catch (error) {
+    console.error('[Update SEO Error]', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_error',
+      message: 'Failed to update SEO settings',
     });
   }
 });

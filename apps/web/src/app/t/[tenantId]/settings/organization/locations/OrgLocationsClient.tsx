@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   Building2, Plus, Trash2, MapPin, Star, AlertTriangle, Check, Loader2, Store,
 } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useOrgBehaviorAccess } from '@/hooks/tenant-access/useOrgBehaviorAccess';
+import { useAuth } from '@/contexts/AuthContext';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastContainer, Spinner } from '@/components/ui';
@@ -33,6 +35,8 @@ export default function OrgLocationsClient() {
   const tenantId = params.tenantId as string;
 
   const { isOrgAdmin, loading: accessLoading, organizationId, isPlatformAdmin } = useOrgBehaviorAccess(tenantId);
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  const userIsPlatformAdmin = isPlatformAdmin || authUser?.role === 'PLATFORM_ADMIN' || authUser?.role === 'ADMIN';
   const { success, error, toasts, removeToast } = useToast();
 
   const [orgTenants, setOrgTenants] = useState<OrgTenant[]>([]);
@@ -70,10 +74,12 @@ export default function OrgLocationsClient() {
   }, [organizationId]);
 
   useEffect(() => {
-    if (!accessLoading && isOrgAdmin && organizationId) {
+    if (!accessLoading && !authLoading && (isOrgAdmin || userIsPlatformAdmin) && organizationId) {
       loadData();
+    } else if (!accessLoading && !authLoading && (!isOrgAdmin || !organizationId)) {
+      setLoading(false);
     }
-  }, [loadData, accessLoading, isOrgAdmin, organizationId]);
+  }, [loadData, accessLoading, authLoading, isOrgAdmin, userIsPlatformAdmin, organizationId]);
 
   const handleAddTenant = async () => {
     if (!selectedTenantId || !organizationId) return;
@@ -107,7 +113,7 @@ export default function OrgLocationsClient() {
     }
   };
 
-  if (accessLoading) {
+  if (accessLoading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
         <Spinner size="lg" />
@@ -115,12 +121,12 @@ export default function OrgLocationsClient() {
     );
   }
 
-  if (!isOrgAdmin) {
+  if (!isOrgAdmin && !userIsPlatformAdmin) {
     return (
       <AccessDenied
         title="Organization Admin Access Required"
         message="You need organization administrator privileges to manage locations."
-        userRole={isPlatformAdmin ? 'Platform Admin' : 'User'}
+        userRole={userIsPlatformAdmin ? 'Platform Admin' : 'User'}
         backLink={{ href: `/t/${tenantId}/settings`, label: 'Back to Settings' }}
       />
     );
@@ -141,6 +147,22 @@ export default function OrgLocationsClient() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ToastContainer toasts={toasts} onClose={removeToast} />
 
+        {!organizationId ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+            <Building2 className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Organization
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              This location is not part of an organization. Create or join an organization to manage multiple locations from one place.
+            </p>
+            <Link href={`/t/${tenantId}/settings/organization`} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors mt-4">
+              <Building2 className="w-5 h-5" />
+              Create or Join Organization
+            </Link>
+          </div>
+        ) : (
+          <>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -301,10 +323,12 @@ export default function OrgLocationsClient() {
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> You can add up to {maxLocations || '∞'} locations based on your organization tier</li>
           </ul>
         </div>
+          </>
+        )}
       </div>
 
       {/* Add Location Modal */}
-      {showAddModal && (
+      {showAddModal && organizationId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
