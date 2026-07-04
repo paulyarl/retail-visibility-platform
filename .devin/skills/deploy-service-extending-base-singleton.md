@@ -266,6 +266,31 @@ export class CrmTicketService extends BaseService {
 3. **Cache invalidation is the service’s responsibility.**  After a mutation (POST/PUT/PATCH/DELETE), call `this.invalidateCache(key)` or implement `invalidateServiceCaches` for tenant-scoped services.
 4. **Context/isolation are not optional for tenant services.**  The `TenantApiSingleton` cache contract exists so the platform can evict caches automatically when data changes.
 5. **SSR safety:**  Frontend singletons must guard `localStorage` / `window` access with `typeof window !== 'undefined'`.  The base classes already do this for auth headers, but service-specific localStorage reads need manual guards.
+6. **Backend route mounting for public endpoints:**  Public tenant-scoped routes must be mounted at `/api/public/tenants/:tenantId/*` using a `mergeParams` router — **never** at `/api/tenants/:tenantId/*`.  The `/api/tenants` path has blanket `authenticateToken` middleware (from `trialSetupRoutes`, `tenantNotificationsRoutes`, etc.) that intercepts ALL routes under `/api/tenants/*`, even public ones.  See `troubleshooting-public-page-api-leaks.md` Pattern 4 for details.
+
+### 3.1 Backend route pattern for public tenant-scoped endpoints
+
+When a frontend service extends `PublicApiSingleton` and calls a tenant-scoped endpoint, the backend route **must** be mounted at `/api/public/tenants/:tenantId/*`:
+
+```ts
+// route-file.ts
+const publicTenantRouter = express.Router({ mergeParams: true });
+
+publicTenantRouter.get('/my-endpoint', async (req: express.Request<{ tenantId: string }>, res) => {
+  const { tenantId } = req.params;
+  // ... handler
+});
+
+export { publicTenantRouter };
+export default router; // main router for platform-level + admin routes
+
+// index.ts
+import myRoutes, { publicTenantRouter as myPublicRouter } from './routes/route-file';
+app.use('/api', myRoutes);                        // platform-level + admin routes
+app.use('/api/public/tenants/:tenantId', myPublicRouter); // public tenant-scoped route
+```
+
+**Existing examples**: `faq-public.ts` at `/api/public/tenants/:tenantId`, `active-featured.ts` at `/api/public/tenants/:tenantId`, `storefront-policies` at `/api/public/storefront-policies/:tenantId`, `bot` public routes at `/api/public/bot/*`.
 
 ---
 

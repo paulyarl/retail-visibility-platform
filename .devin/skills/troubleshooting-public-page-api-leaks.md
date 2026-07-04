@@ -73,6 +73,47 @@ A hook has an internal `if (!isAuthenticated) return;` guard inside `useEffect`,
 
 **Fix**: Move the guard to the **caller** level (see Pattern 1) so the hook is never called on pages where it's not needed. Hooks cannot be conditionally called, so the component that calls them must be conditionally rendered.
 
+### Pattern 4: Backend blanket auth middleware on `/api/tenants` catching public endpoints
+
+A public route is defined without `authenticateToken` (e.g. `router.get('/tenants/:tenantId/active-featured', ...)`), but it's mounted at `/api` while other routers are mounted at `/api/tenants` with blanket `authenticateToken` middleware:
+
+```ts
+// index.ts — these apply authenticateToken to ALL /api/tenants/* requests
+app.use('/api/tenants', authenticateToken, trialSetupRoutes);
+app.use('/api/tenants', authenticateToken, tenantNotificationsRoutes);
+
+// Public route — mounted at /api, path resolves to /api/tenants/:tenantId/active-featured
+app.use('/api', activeFeaturedRoutes); // ← intercepted by the blanket auth above
+```
+
+Even though the public route handler itself has no auth middleware, Express processes `app.use('/api/tenants', authenticateToken, ...)` first because it matches the request path `/api/tenants/:tenantId/active-featured`. The `authenticateToken` middleware runs, finds no Auth0 session, and returns `401 authentication_required`.
+
+**This affects ALL routes under `/api/tenants/*`**, regardless of which router defines them. The blanket middleware on the mount path runs before any individual route handler.
+
+**Fix**: Move public tenant-scoped endpoints to `/api/public/tenants/:tenantId/*` — a path that never matches the `/api/tenants` mount point. Use a separate `publicTenantRouter` with `mergeParams: true`:
+
+```ts
+// active-featured.ts
+const publicTenantRouter = express.Router({ mergeParams: true });
+
+publicTenantRouter.get('/active-featured', async (req: express.Request<{ tenantId: string }>, res) => {
+  const { tenantId } = req.params;
+  // ... handler logic
+});
+
+export { publicTenantRouter };
+export default router; // main router for platform-level + admin routes
+
+// index.ts
+import activeFeaturedRoutes, { publicTenantRouter as activeFeaturedPublicRouter } from './routes/active-featured';
+app.use('/api', activeFeaturedRoutes); // platform-level + admin routes
+app.use('/api/public/tenants/:tenantId', activeFeaturedPublicRouter); // public tenant-scoped route
+```
+
+Then update the frontend service to call `/api/public/tenants/:tenantId/active-featured` instead of `/api/tenants/:tenantId/active-featured`.
+
+**Existing examples of this pattern**: `faq-public.ts` mounted at `/api/public/tenants/:tenantId`, `storefront-policies` at `/api/public/storefront-policies/:tenantId`, `bot` public routes at `/api/public/bot/*`.
+
 ---
 
 ## Diagnostic Steps
@@ -90,6 +131,8 @@ A hook has an internal `if (!isAuthenticated) return;` guard inside `useEffect`,
 
 5. **Check dependency array stability** — If there's a "changed size between renders" error, look for `undefined`-able values in `useEffect`/`useCallback` dependency arrays.
 
+6. **Check for backend route conflicts** — If the frontend service is correct (extends `PublicApiSingleton`, calls a public URL) but `curl` with no cookies still returns `401 authentication_required`, the problem is on the backend. Search `index.ts` for `app.use('/api/tenants', authenticateToken, ...)` — any router mounted this way applies `authenticateToken` to ALL `/api/tenants/*` paths, even public routes defined elsewhere. See **Pattern 4** for the fix.
+
 ---
 
 ## Key Files
@@ -102,6 +145,10 @@ A hook has an internal `if (!isAuthenticated) return;` guard inside `useEffect`,
 | `apps/web/src/services/NavigationLinksService.ts` | Frontend service for nav links (5-min cache) |
 | `apps/web/src/components/navigation/SettingsLayoutRouter.tsx` | Settings-only router that uses `useNavLinks` (safe) |
 | `apps/web/src/components/navigation/DynamicTenantSidebar.tsx` | Tenant sidebar — uses `useNavLinks` (safe, only on /t/ pages) |
+| `apps/api/src/index.ts` | Main API entry — mounts all routers; blanket `authenticateToken` on `/api/tenants` lives here |
+| `apps/api/src/routes/active-featured.ts` | Public tenant-scoped route using `publicTenantRouter` with `mergeParams` (fixed) |
+| `apps/api/src/routes/faq-public.ts` | Existing example of the `/api/public/tenants/:tenantId` pattern |
+| `apps/web/src/services/ActiveFeaturedService.ts` | Frontend service — extends `PublicApiSingleton`, calls `/api/public/tenants/:tenantId/active-featured` |
 
 ---
 
@@ -113,9 +160,13 @@ A hook has an internal `if (!isAuthenticated) return;` guard inside `useEffect`,
 
 3. **Always wrap pathname-derived booleans in `Boolean(...)`.** This prevents `undefined` from destabilizing React dependency arrays.
 
-4. **Public pages should only call `/api/public/*` endpoints.** No exceptions. If a public page needs data that's behind an admin/tenant endpoint, create a public proxy endpoint.
+4. **Public pages should only call `/api/public/*` endpoints.** No exceptions. If a public page needs data that's behind an admin/tenant endpoint, create a public proxy endpoint at `/api/public/tenants/:tenantId/*` using a `mergeParams` router.
 
-5. **When adding a new global component**, audit every hook and service call it makes. Trace each one to the API endpoint it hits. If any endpoint is admin/tenant-scoped, add a guard in the wrapper.
+5. **Never mount public routes under `/api/tenants`.** The `/api/tenants` path has blanket `authenticateToken` middleware from `trialSetupRoutes`, `tenantNotificationsRoutes`, and other routers. Public tenant-scoped endpoints must be mounted at `/api/public/tenants/:tenantId/*` instead. See **Pattern 4**.
+
+6. **When adding a new global component**, audit every hook and service call it makes. Trace each one to the API endpoint it hits. If any endpoint is admin/tenant-scoped, add a guard in the wrapper.
+
+7. **When adding a new public tenant-scoped backend route**, always mount it at `/api/public/tenants/:tenantId/*` using a `mergeParams` router. Never define public routes at `/tenants/:tenantId/*` on a router mounted at `/api` — the blanket auth middleware on `/api/tenants` will intercept them.
 
 ---
 
