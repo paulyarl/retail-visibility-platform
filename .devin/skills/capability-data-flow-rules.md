@@ -304,6 +304,7 @@ Feature keys MUST follow this canonical pattern:
 - Mixing prefixes within a capability (e.g., `product_opt_*` in `product_options` — use `product_options_*`)
 - Abbreviated prefixes (e.g., `storefront_opt_*` — use `storefront_options_*`)
 - Flat keys without group prefix in an options capability (e.g., `product_variant` — use `product_options_creation_variants`)
+- Using `_tier_` for internal capability levels (confusing with platform subscription tiers) — use `_level_` instead (e.g., `directory_promotion_level_basic`, not `directory_promotion_tier_basic`)
 
 **Backward compatibility**: Legacy keys MAY be retained as aliases during migration. Resolvers check new keys first, then fall back to legacy keys. See `docs/CAPABILITY_TYPES_TARGET_ARCHITECTURE.md` §5 for the complete alias mapping.
 

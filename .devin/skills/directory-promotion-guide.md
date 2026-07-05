@@ -8,7 +8,9 @@ description: Complete guide for implementing and extending the Directory Promoti
 
 ## Feature Overview
 
-Directory Promotion is a monetized feature that lets store owners promote their business in the public directory. It supports tiered plans (basic, premium, featured), one-time or auto-renewing purchases, grace periods, and analytics tracking.
+Directory Promotion is a monetized feature that lets store owners promote their business in the public directory. It supports leveled plans (basic, premium, featured), one-time or auto-renewing purchases, grace periods, and analytics tracking.
+
+**Trail-blazing status**: Directory Promotion is the first fully capability-aligned automated type on the platform. All feature keys are registered in `features_list` + `capability_features_list` (migration 086), making it the reference pattern for future automated capability types.
 
 **Design doc**: `docs/DIRECTORY_PROMOTION_SPRINT_PLAN.md`
 
@@ -20,9 +22,12 @@ Directory Promotion is a monetized feature that lets store owners promote their 
 
 | Table | Purpose |
 |---|---|
-| `promotion_catalog` | Admin-managed plans (tier, duration, price, active flag) |
+| `promotion_catalog` | Admin-managed plans (level, duration, price, active flag) |
 | `promotion_purchases` | Purchase records (tenant, plan, status, Stripe payment, renewal chain) |
 | `directory_listings_list` | Materialized view — promotion columns: `is_promoted`, `promotion_tier`, `promotion_started_at`, `promotion_expires_at`, `promotion_impressions`, `promotion_clicks` |
+| `features_list` | Capability feature keys: `directory_promotion_enabled`, `_flexible`, `_disabled`, `_level_basic`, `_level_premium`, `_level_featured` |
+| `capability_features_list` | Links all 6 directory_promotion feature keys to the `directory_promotion` capability type |
+| `tier_features_list` | Platform tier → feature key assignments (controls which promotion levels each tier can purchase) |
 | `badge_events` | Unified analytics log — promotion impressions/clicks tracked via `trackBadgeEvent` |
 | `bot_knowledge_embeddings` | RAG embeddings — `source_type='promotion'` for bot knowledge |
 
@@ -37,7 +42,7 @@ pending → active → (grace_period → expired | cancelled)
 
 - `id`: tenant-scoped ID via `generatePromotionPurchaseId` (`promo-{tk}-{nanoid}`)
 - `plan_key`: references `promotion_catalog.plan_key`
-- `tier`: `'basic' | 'premium' | 'featured'`
+- `tier`: `'basic' | 'premium' | 'featured'` (promotion level — not to be confused with platform subscription tiers)
 - `status`: `'pending' | 'active' | 'grace_period' | 'expired' | 'cancelled'`
 - `stripe_payment_intent_id`: payment reference
 - `renewed_from`: ID of previous purchase (for auto-renewal chain)
@@ -53,6 +58,7 @@ pending → active → (grace_period → expired | cancelled)
 **File**: `apps/api/src/services/DirectoryPromotionService.ts`
 
 Key methods:
+- `getAvailableLevels()` — queries `features_list` for `directory_promotion_level_*` keys, returns available promotion levels (falls back to `['basic', 'premium', 'featured']` if none found)
 - `listPlans(tenantId)` — active plans from catalog
 - `createPurchase(tenantId, planKey)` — creates pending purchase + Stripe payment intent
 - `activatePurchase(purchaseId, stripePaymentIntentId?)` — sets active, updates `directory_listings_list`, fires billing notification + bot embedding refresh
@@ -94,8 +100,8 @@ After any lifecycle transition, two fire-and-forget async IIFEs are dispatched:
 **File**: `apps/api/src/services/BotKnowledgeEmbeddingService.ts`
 
 1. Deletes existing `source_type='promotion'` embeddings for the tenant
-2. Reads `directory_listings_list` for active promotion (tier, dates, impressions, clicks)
-3. Chunks into text via `chunkPromotion()` — includes tier label, features list, dates, performance stats
+2. Reads `directory_listings_list` for active promotion (level, dates, impressions, clicks)
+3. Chunks into text via `chunkPromotion()` — includes level label, features list, dates, performance stats
 4. Generates embedding and inserts into `bot_knowledge_embeddings`
 5. Returns `{ processed, chunks }` — `{ 0, 0 }` if no active promotion (clears stale embeddings)
 
@@ -157,7 +163,7 @@ Five notification types registered in `BillingNotificationService`:
 
 | Type | Triggered On | Email Content | CRM Alert |
 |---|---|---|---|
-| `directory_promotion_purchased` | `activatePurchase` (new) | Tier label, duration, expiration, price | Info severity |
+| `directory_promotion_purchased` | `activatePurchase` (new) | Level label, duration, expiration, price | Info severity |
 | `directory_promotion_renewal_success` | `activatePurchase` (renewal) | Renewal confirmation, new expiration | Info severity |
 | `directory_promotion_renewal_failed` | `promotion-renewal.ts` job | Payment failure, grace period start | Warning severity |
 | `directory_promotion_grace_period_warning` | `enterGracePeriod` | Grace period warning, expiration date | Warning severity |
@@ -196,8 +202,9 @@ Each transition fires the appropriate billing notification via `sendBillingNotif
 - `POST /api/tenants/:tenantId/promotion/track-click` — increment + badge event
 
 ### Admin Endpoints
+- `GET /api/admin/promotion/levels` — list available promotion levels from capability feature keys (`directory_promotion_level_*`)
 - `GET /api/admin/promotion/catalog` — list all plans (including inactive)
-- `POST /api/admin/promotion/catalog` — create plan
+- `POST /api/admin/promotion/catalog` — create plan (plan_key auto-generated from level + duration)
 - `PUT /api/admin/promotion/catalog/:planKey` — update plan
 - `DELETE /api/admin/promotion/catalog/:planKey` — delete plan
 - `GET /api/admin/promotion/revenue` — revenue summary
@@ -218,7 +225,8 @@ Extends `TenantApiSingleton`. Methods:
 - `getAnalytics(tenantId)` — tenant analytics dashboard data
 - `trackImpression(tenantId)` — fire-and-forget POST to `/promotion/track-impression` (no caching, silent failure)
 - `trackClick(tenantId)` — fire-and-forget POST to `/promotion/track-click` (no caching, silent failure)
-- `adminListPlans()`, `adminCreatePlan()`, `adminUpdatePlan()`, `adminDeletePlan()` — catalog CRUD
+- `adminGetLevels()` — fetches available promotion levels from `GET /api/admin/promotion/levels` (capability-driven)
+- `adminListPlans()`, `adminCreatePlan()`, `adminUpdatePlan()`, `adminDeletePlan()` — catalog CRUD (create no longer requires `planKey` — auto-generated by backend)
 - `adminGetRevenue()`, `adminListPurchases()` — admin revenue dashboard
 
 All methods use `makeDefaultRequest` with cache keys prefixed `directory-promotion-*`. Tracking methods are fire-and-forget (no cache key, wrapped in try/catch with empty catch).
@@ -267,7 +275,7 @@ onClick={() => { if (listing.isPromoted) DirectoryPromotionService.trackClick(li
 - **Loading states**: Full-page spinner with `RefreshCw` animated icon
 - **Error states**: Red-bordered alert box with error message
 - **Empty states**: Centered icon + heading + description, with CTA when applicable
-- **Tier colors**: `basic: amber`, `premium: blue`, `featured: purple` — consistent across all pages
+- **Level colors**: `basic: amber`, `premium: blue`, `featured: purple` — consistent across all pages
 - **Promise.allSettled**: Used in revenue dashboard to fetch from multiple services gracefully
 
 ### Settings Cards
@@ -333,13 +341,17 @@ Shows current promotion status (tier, status badge, price, dates, auto-renew) an
 
 ## 10. Extension Points
 
-### Adding a New Promotion Tier
+### Adding a New Promotion Level
 
-1. Add to `TIER_FEATURES` in tenant promotion page
-2. Add to `TIER_COLORS` in all promotion UI components
-3. Add to `tierFeatures` map in `BotKnowledgeEmbeddingService.chunkPromotion()`
-4. Add to `tierLabels` map in `BotKnowledgeEmbeddingService.chunkPromotion()`
-5. Create a `promotion_catalog` entry via admin UI or SQL
+1. Add a `directory_promotion_level_{name}` feature key to `features_list` + link to `directory_promotion` in `capability_features_list`
+2. Add to `ALL_LEVELS` in `DirectoryPromotionResolver.ts` (resolver is a pure function — cannot query DB)
+3. Add to `TIER_FEATURES` in tenant promotion page
+4. Add to `LEVEL_COLORS` in promotion UI components (for badge color)
+5. Add to `tierFeatures` map in `BotKnowledgeEmbeddingService.chunkPromotion()`
+6. Add to `tierLabels` map in `BotKnowledgeEmbeddingService.chunkPromotion()`
+7. Create a `promotion_catalog` entry via admin UI — level dropdown auto-populates from `features_list`, plan key auto-generated as `{level}_{duration}day`
+
+**Note**: Steps 1 and 7 are now the primary steps. The admin catalog dropdown and backend validation are **DB-driven** — they automatically pick up new levels from `features_list`. Steps 2–6 are for the resolver, frontend display, and bot knowledge — they still require manual updates because those components use hardcoded arrays/maps.
 
 ### Adding a New Notification Type
 
@@ -359,17 +371,85 @@ Shows current promotion status (tier, status badge, price, dates, auto-renew) an
 
 ---
 
-## 11. Tier Feature Auditing
+## 11. Capability-Gated Purchase Model
+
+Directory Promotion is the first capability type where the platform tier's feature key assignment directly controls **which promotion levels a tenant can purchase**. This is the trail-blazing pattern for automated capability types.
+
+### How Platform Tier Controls Promotion Level Availability
+
+The `DirectoryPromotionResolver` reads the tenant's platform tier feature keys and builds an `allowed_tiers` array. The `DirectoryPromotionService.createPurchase()` method checks this array before allowing a purchase.
+
+| Platform Tier Assignment | `enabled` | `allowed_tiers` | Effect on Tenant |
+|---|---|---|---|
+| `directory_promotion_disabled` | `false` | `[]` | Promotion completely unavailable — no levels purchasable |
+| `directory_promotion_flexible` | `true` | `['basic', 'premium', 'featured']` | All levels available for purchase |
+| `directory_promotion_enabled` only | `true` | `[]` | Promotion enabled but no specific levels granted — tenant must purchase levels via BSaaS or upgrade |
+| `directory_promotion_level_basic` | `true` | `['basic']` | Only Basic level purchasable |
+| `directory_promotion_level_basic` + `_level_premium` | `true` | `['basic', 'premium']` | Basic and Premium levels purchasable |
+| All three `_level_*` keys | `true` | `['basic', 'premium', 'featured']` | All levels purchasable (same as flexible) |
+| No keys assigned | `false` | `[]` | Default disabled — no levels purchasable |
+
+### Why This Is Groundbreaking
+
+This pattern unifies two previously separate concepts:
+
+1. **Capability gating** (can the tenant access this feature at all?) — controlled by `_enabled` / `_disabled` / `_flexible`
+2. **Tier-differentiated offerings** (which specific options within the capability can the tenant purchase?) — controlled by individual `_level_*` feature keys
+
+Before this, capability types either had flat feature keys (on/off per feature) or group gates (creation/layout/sections). Directory Promotion introduces **purchasable levels** — where the platform tier determines the ceiling of what's available, and the tenant purchases within that ceiling.
+
+### Data Flow
+
+```
+Platform Tier (subscription_tiers_list)
+  ↓
+tier_features_list (which directory_promotion_* keys are enabled for this tier)
+  ↓
+DirectoryPromotionResolver.resolveDirectoryPromotion()
+  → enabled: !_disabled && (_enabled || _flexible || any _level_* key)
+  → allowed_tiers: [_level_basic, _level_premium, _level_featured] filtered by tier assignment
+  ↓
+DirectoryPromotionService.createPurchase()
+  → checks enabled && allowed_tiers.includes(plan.tier)
+  → blocks purchase if level not in allowed_tiers
+  ↓
+Tenant purchases within their allowed levels
+```
+
+### Admin UI Implications
+
+In the admin tier-capabilities dialog, admins assign `directory_promotion_*` feature keys to platform tiers:
+- **Trial tier**: Assign `directory_promotion_disabled` → no promotions available
+- **Starter tier**: Assign `directory_promotion_level_basic` → only Basic purchasable
+- **Growth tier**: Assign `directory_promotion_level_basic` + `_level_premium` → Basic and Premium purchasable
+- **Scale/Enterprise tier**: Assign `directory_promotion_flexible` → all levels purchasable
+
+This replaces the previous hard-coded tier mapping in `registry.yaml` with a fully admin-manageable capability assignment.
+
+### Catalog-Level Alignment
+
+The admin promotion catalog (`/settings/admin/promotion-catalog`) is now **fully aligned** with capability features:
+
+- **Level dropdown**: Dynamically populated from `GET /api/admin/promotion/levels`, which queries `features_list` for `directory_promotion_level_*` keys — no hardcoded `<option>` tags
+- **Plan key**: Auto-generated as `{level}_{duration}day` (e.g., `basic_30day`, `premium_90day`) — admin no longer types a plan key
+- **Backend validation**: `createCatalogPlan()` and `updateCatalogPlan()` validate the level against `features_list` — rejects with `invalid_level` if the feature key doesn't exist
+- **Duplicate prevention**: Creating a plan with an existing level+duration combination returns `plan_key_exists` (409)
+
+This eliminates the previous three-independent-hardcoded-lists problem (resolver `ALL_LEVELS`, backend `validTiers`, frontend `<select>` options). Adding a new level to `features_list` automatically makes it available in the admin dropdown and passes backend validation.
+
+---
+
+## 12. Tier Feature Auditing
 
 ### `TIER_FEATURES` Constant
 
 **File**: `apps/web/src/app/t/[tenantId]/settings/promotion/page.tsx`
 
-The `TIER_FEATURES` constant maps tier names to feature lists displayed on the promotion purchase page. **Every feature listed must be backed by an actual platform-delivered capability.** Do not list features that the platform cannot deliver.
+The `TIER_FEATURES` constant maps level names to feature lists displayed on the promotion purchase page. **Every feature listed must be backed by an actual platform-delivered capability.** Do not list features that the platform cannot deliver.
 
 ### Current Delivered Features (as of 2026-07-04)
 
-| Tier | Feature | Delivery Mechanism |
+| Level | Feature | Delivery Mechanism |
 |---|---|---|
 | Basic | Gold marker on map | `DirectoryMap.tsx` / `DirectoryMapGoogle.tsx` — gold pin, larger size, star badge, z-index boost |
 | Basic | Promoted badge | `StoreCard.tsx` / `UnifiedStoreCard.tsx` — registry-driven badge with tier-colored gradient |
@@ -386,20 +466,20 @@ The `TIER_FEATURES` constant maps tier names to feature lists displayed on the p
 
 ### Audit Methodology
 
-When auditing tier features against platform delivery:
+When auditing level features against platform delivery:
 
 1. **Search the backend service** (`DirectoryPromotionService.ts`) for activation/deactivation logic — what columns are set/cleared on `directory_listings_list`
 2. **Search the directory rendering components** (`StoreCard.tsx`, `UnifiedStoreCard.tsx`, `DirectoryMap.tsx`, `DirectoryMapGoogle.tsx`, `PromotedStoresCarousel.tsx`) for `isPromoted` / `promotionTier` conditional rendering
 3. **Search the directory API** (`directory-v2.ts`) for SQL `ORDER BY` clauses that boost promoted listings
-4. **Search for analytics endpoints** (`promotion.ts`) — what metrics are returned and are they tier-differentiated
+4. **Search for analytics endpoints** (`promotion.ts`) — what metrics are returned and are they level-differentiated
 5. **Search for ancillary systems** — bot knowledge embeddings, billing notifications, renewal jobs, CRM widgets
 6. **Map each promised feature** to the specific code that delivers it. If no code delivers it, either replace the feature text with a delivered equivalent or implement the missing capability
 
-### Tier Card Interactivity
+### Level Card Interactivity
 
-The tier cards on the promotion page must be `<button>` elements (not `<div>`) with `onClick` handlers that call `setSelectedPlanKey(firstPlan.planKey)` for the clicked tier. This enables:
-- All three tiers (basic, premium, featured) to be selectable
-- Duration options and price summary to update dynamically based on selected tier
+The level cards on the promotion page must be `<button>` elements (not `<div>`) with `onClick` handlers that call `setSelectedPlanKey(firstPlan.planKey)` for the clicked level. This enables:
+- All three levels (basic, premium, featured) to be selectable
+- Duration options and price summary to update dynamically based on selected level
 - Keyboard accessibility (buttons are focusable by default)
 
-If tier cards are non-interactive `<div>` elements, only the default tier (premium) is selectable and the other tiers are visually present but functionally inert.
+If level cards are non-interactive `<div>` elements, only the default level (premium) is selectable and the other levels are visually present but functionally inert.

@@ -36,6 +36,7 @@ import botPlatformRoutes from '../admin/bot-platform';
 import featurePurchasesRoutes from '../admin/feature-purchases';
 import botEmbedLicensesRoutes from '../admin/bot-embed-licenses';
 import bsaasCatalogRoutes from '../admin/bsaas-catalog';
+import bsaasBundlesRoutes from '../admin/bsaas-bundles';
 import bsaasAnalyticsRoutes from '../admin/bsaas-analytics';
 import bsaasPromotionsRoutes from '../admin/bsaas-promotions';
 import capabilityConstraintsRoutes from '../admin/capability-constraints';
@@ -108,6 +109,9 @@ export function mountAdminRoutes(app: Express) {
 
   // BSaaS catalog admin routes
   app.use('/api/admin/bsaas-catalog', authenticateToken, bsaasCatalogRoutes);
+
+  // BSaaS bundles admin routes
+  app.use('/api/admin/bsaas-bundles', authenticateToken, bsaasBundlesRoutes);
 
   // BSaaS analytics admin routes (read-only)
   app.use('/api/admin/bsaas-analytics', authenticateToken, bsaasAnalyticsRoutes);

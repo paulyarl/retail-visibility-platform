@@ -17,6 +17,7 @@
  *   POST   /api/admin/promotion/catalog                    — create plan
  *   PUT    /api/admin/promotion/catalog/:planKey           — update plan
  *   DELETE /api/admin/promotion/catalog/:planKey           — deactivate plan
+ *   GET    /api/admin/promotion/levels                     — list available promotion levels from capability features
  *   GET    /api/admin/promotion/purchases                   — list all purchases
  *   GET    /api/admin/promotion/revenue                     — revenue summary
  */
@@ -340,6 +341,19 @@ router.post('/tenants/:tenantId/promotion/track-click', async (req: Request, res
 // ====================
 
 /**
+ * GET /api/admin/promotion/levels — available promotion levels from capability features
+ */
+router.get('/admin/promotion/levels', async (req: Request, res: Response) => {
+  try {
+    const levels = await DirectoryPromotionService.getInstance().getAvailableLevels();
+    res.json({ levels });
+  } catch (error) {
+    console.error('Error fetching promotion levels:', error);
+    res.status(500).json({ error: 'Failed to fetch promotion levels' });
+  }
+});
+
+/**
  * GET /api/admin/promotion/catalog
  */
 router.get('/admin/promotion/catalog', async (req: Request, res: Response) => {
@@ -358,14 +372,13 @@ router.get('/admin/promotion/catalog', async (req: Request, res: Response) => {
  */
 router.post('/admin/promotion/catalog', async (req: Request, res: Response) => {
   try {
-    const { planKey, label, tier, durationDays, priceCents, currency, sortOrder } = req.body;
+    const { label, tier, durationDays, priceCents, currency, sortOrder } = req.body;
 
-    if (!planKey || !label || !tier || !durationDays || !priceCents) {
+    if (!label || !tier || !durationDays || !priceCents) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     const plan = await DirectoryPromotionService.getInstance().createCatalogPlan({
-      planKey,
       label,
       tier,
       durationDays,
@@ -379,8 +392,11 @@ router.post('/admin/promotion/catalog', async (req: Request, res: Response) => {
     const message = (error as Error).message;
     console.error('Error creating promotion catalog plan:', message);
 
-    if (message === 'invalid_tier') {
-      return res.status(400).json({ error: 'Invalid tier. Must be: basic, premium, or featured' });
+    if (message === 'invalid_level') {
+      return res.status(400).json({ error: 'Invalid promotion level. Must be a registered directory_promotion_level_* feature key.' });
+    }
+    if (message === 'plan_key_exists') {
+      return res.status(409).json({ error: 'A plan with this level and duration already exists' });
     }
 
     res.status(500).json({ error: 'Failed to create promotion catalog plan' });

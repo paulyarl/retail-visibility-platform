@@ -79,6 +79,21 @@ export class DirectoryPromotionService extends BaseService {
   // CATALOG (Admin CRUD)
   // ====================
 
+  async getAvailableLevels(): Promise<string[]> {
+    const features = await prisma.features_list.findMany({
+      where: {
+        key: { startsWith: 'directory_promotion_level_' },
+        is_active: true,
+      },
+      select: { key: true },
+      orderBy: { sort_order: 'asc' },
+    });
+    const levels = features
+      .map(f => f.key.replace('directory_promotion_level_', ''))
+      .filter(Boolean);
+    return levels.length > 0 ? levels : ['basic', 'premium', 'featured'];
+  }
+
   async listCatalogPlans(includeInactive = false): Promise<PromotionPlan[]> {
     const plans = await prisma.promotion_catalog.findMany({
       where: includeInactive ? {} : { is_active: true },
@@ -95,7 +110,6 @@ export class DirectoryPromotionService extends BaseService {
   }
 
   async createCatalogPlan(data: {
-    planKey: string;
     label: string;
     tier: string;
     durationDays: number;
@@ -103,15 +117,24 @@ export class DirectoryPromotionService extends BaseService {
     currency?: string;
     sortOrder?: number;
   }): Promise<PromotionPlan> {
-    const validTiers = ['basic', 'premium', 'featured'];
-    if (!validTiers.includes(data.tier)) {
-      throw new Error('invalid_tier');
+    const validLevels = await this.getAvailableLevels();
+    if (!validLevels.includes(data.tier)) {
+      throw new Error('invalid_level');
+    }
+
+    const autoPlanKey = `${data.tier}_${data.durationDays}day`;
+
+    const existing = await prisma.promotion_catalog.findUnique({
+      where: { plan_key: autoPlanKey },
+    });
+    if (existing) {
+      throw new Error('plan_key_exists');
     }
 
     const plan = await prisma.promotion_catalog.create({
       data: {
         id: generatePromotionCatalogId(),
-        plan_key: data.planKey,
+        plan_key: autoPlanKey,
         label: data.label,
         tier: data.tier,
         duration_days: data.durationDays,
@@ -132,6 +155,13 @@ export class DirectoryPromotionService extends BaseService {
     isActive?: boolean;
     sortOrder?: number;
   }): Promise<PromotionPlan> {
+    if (data.tier !== undefined) {
+      const validLevels = await this.getAvailableLevels();
+      if (!validLevels.includes(data.tier)) {
+        throw new Error('invalid_level');
+      }
+    }
+
     const updateData: any = {};
     if (data.label !== undefined) updateData.label = data.label;
     if (data.tier !== undefined) updateData.tier = data.tier;
