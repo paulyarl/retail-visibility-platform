@@ -2,8 +2,11 @@
  * Directory Promotion Resolver
  *
  * Resolves effective directory promotion state from tier features.
- * Determines which promotion tiers (basic, premium, featured) are available
+ * Determines which promotion levels (basic, premium, featured) are available
  * based on the tenant's subscription plan.
+ *
+ * Note: "level" here refers to promotion levels, not platform subscription tiers.
+ * Feature keys use _level_ prefix to avoid confusion with platform tiers.
  */
 
 import type {
@@ -11,7 +14,7 @@ import type {
   PromotionTier,
 } from './types';
 
-const ALL_TIERS: PromotionTier[] = ['basic', 'premium', 'featured'];
+const ALL_LEVELS: PromotionTier[] = ['basic', 'premium', 'featured'];
 
 export function resolveDirectoryPromotion(
   features: Record<string, boolean>,
@@ -19,15 +22,15 @@ export function resolveDirectoryPromotion(
   const disabled = !!features.directory_promotion_disabled;
   const flexible = !!features.directory_promotion_flexible;
 
-  // Check if any individual promotion tier feature is enabled (implicit enable)
-  const hasAnyPromotionFeature = ALL_TIERS.some(t => !!features[`directory_promotion_tier_${t}`]);
+  // Check if any individual promotion level feature is enabled (implicit enable)
+  const hasAnyPromotionFeature = ALL_LEVELS.some(t => !!features[`directory_promotion_level_${t}`]);
   const enabled = !disabled && (!!features.directory_promotion_enabled || hasAnyPromotionFeature);
 
   const allowedTiers: PromotionTier[] = [];
 
   if (flexible || enabled) {
-    for (const t of ALL_TIERS) {
-      if (flexible || features[`directory_promotion_tier_${t}`]) {
+    for (const t of ALL_LEVELS) {
+      if (flexible || features[`directory_promotion_level_${t}`]) {
         allowedTiers.push(t);
       }
     }

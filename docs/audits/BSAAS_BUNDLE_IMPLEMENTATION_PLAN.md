@@ -6,9 +6,302 @@
 **Components**: `chatbot_flexible` + `crm_flexible` + `faq_flexible`  
 **Purpose**: Establish the pattern precedent for cross-domain bundle purchases in the BSaaS store.
 
+**Pattern Precedent**: Directory Promotion's admin catalog (`/settings/admin/promotion-catalog`) is the first capability-aware automated catalog with admin control for level, duration, and price. This plan extends that pattern to the BSaaS store — making the feature catalog admin page the unified control panel for individual features, flexible toggles, feature bundles, and flexible bundles.
+
 ---
 
-## Bundle Definition
+## Phase 0: Unified Admin Catalog (Pre-Bundle Foundation)
+
+Before implementing bundle purchases, the admin catalog page must be upgraded to manage **all BSaaS product types** from a single interface. The existing `/settings/admin/bsaas-catalog` page handles individual features in `bsaas_catalog`. Phase 0 extends it with a bundle management tab and capability-awareness, establishing the standard pattern for all future BSaaS catalog types.
+
+### Phase 0 Goals
+
+1. **Unified admin page** — A tabbed interface at `/settings/admin/bsaas-catalog` with two tabs: "Features" (existing) and "Bundles" (new)
+2. **Bundle CRUD** — Admin can create, edit, delete, and toggle bundles in `bsaas_bundles` + `bsaas_bundle_items`
+3. **Capability-aware display** — Each feature/bundle row shows its capability type(s), making it clear which domain(s) it belongs to
+4. **Admin service + API routes** — Backend CRUD for `bsaas_bundles` mirroring the existing `bsaas-catalog` admin routes
+5. **Pattern standard** — The resulting admin page becomes the template for any future capability-aware catalog (promotions, featured placements, etc.)
+
+### Phase 0 Step A: Database Migration (Bundles Table)
+
+Same migration as Step 1 below (`085_bsaas_bundles.sql`) — creates `bsaas_bundles` + `bsaas_bundle_items` tables. Run this first so the admin CRUD has a table to manage.
+
+### Phase 0 Step B: Prisma Schema
+
+Same as Step 2 below — add `bsaas_bundles` + `bsaas_bundle_items` models to `schema.prisma`.
+
+### Phase 0 Step C: Backend Admin Routes for Bundles
+
+**File**: `apps/api/src/routes/admin/bsaas-bundles.ts` (NEW)
+
+Mirrors the existing `admin/bsaas-catalog.ts` pattern:
+
+```typescript
+// GET    /api/admin/bsaas-bundles          — List all bundles (with items)
+// POST   /api/admin/bsaas-bundles          — Create a bundle + items
+// PUT    /api/admin/bsaas-bundles/:id      — Update bundle metadata + items
+// DELETE /api/admin/bsaas-bundles/:id      — Delete a bundle (cascades items)
+```
+
+**Validation schemas**:
+
+```typescript
+const createBundleSchema = z.object({
+  bundle_key: z.string().min(1),
+  marketing_name: z.string().min(1),
+  description: z.string().optional(),
+  price_cents: z.number().int().positive(),
+  billing_cycle: z.enum(['one_time', 'monthly', 'annual']).default('monthly'),
+  trial_days: z.number().int().min(0).default(0),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().default(0),
+  items: z.array(z.object({
+    feature_key: z.string().min(1),
+    sort_order: z.number().int().default(0),
+  })).min(1),
+});
+
+const updateBundleSchema = z.object({
+  marketing_name: z.string().optional(),
+  description: z.string().optional(),
+  price_cents: z.number().int().positive().optional(),
+  billing_cycle: z.enum(['one_time', 'monthly', 'annual']).optional(),
+  trial_days: z.number().int().min(0).optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+  items: z.array(z.object({
+    feature_key: z.string().min(1),
+    sort_order: z.number().int().default(0),
+  })).optional(),
+});
+```
+
+**Key route logic**:
+- `POST` validates all `feature_key`s in `items` exist in `features_list` before creating
+- `PUT` with `items` replaces all bundle items (delete + recreate) — atomic transaction
+- `GET` includes `bsaas_bundle_items` ordered by `sort_order`
+- All routes use `authenticateToken` + `requireAdmin` middleware
+- Audit log entries: `bsaas_bundle.create`, `bsaas_bundle.update`, `bsaas_bundle.delete`
+
+**Mount in** `apps/api/src/routes/mounts/admin-routes.ts`:
+```typescript
+import bsaasBundlesRouter from '../admin/bsaas-bundles';
+router.use('/bsaas-bundles', bsaasBundlesRouter);
+```
+
+### Phase 0 Step D: Frontend Admin Service for Bundles
+
+**File**: `apps/web/src/services/AdminBsaasBundleService.ts` (NEW)
+
+Mirrors `AdminBsaasCatalogService.ts` pattern:
+
+```typescript
+export interface BsaasBundleEntry {
+  id: string;
+  bundle_key: string;
+  marketing_name: string;
+  description: string | null;
+  price_cents: number;
+  billing_cycle: string;
+  trial_days: number;
+  is_active: boolean;
+  sort_order: number;
+  items: Array<{ id: string; feature_key: string; sort_order: number }>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BsaasBundleInput {
+  bundle_key: string;
+  marketing_name: string;
+  description?: string;
+  price_cents: number;
+  billing_cycle?: string;
+  trial_days?: number;
+  is_active?: boolean;
+  sort_order?: number;
+  items: Array<{ feature_key: string; sort_order?: number }>;
+}
+
+class AdminBsaasBundleService extends AdminApiSingleton {
+  // list(), create(), update(), remove() — same pattern as AdminBsaasCatalogService
+  // Calls /api/admin/bsaas-bundles
+}
+export const adminBsaasBundleService = AdminBsaasBundleService.getInstance();
+```
+
+### Phase 0 Step E: Unified Admin Catalog Page
+
+**File**: `apps/web/src/admin/components/BsaasCatalogManagement.tsx` (MODIFY)
+
+Add a tabbed interface with two tabs:
+
+1. **"Features" tab** (existing functionality, enhanced):
+   - Existing `bsaas_catalog` CRUD table
+   - **New**: Capability type column — shows which capability type each feature belongs to (via `capability_features_list` join)
+   - **New**: Feature type badge — "Individual", "Flexible", "Level" (based on feature key suffix: `_flexible`, `_level_*`, or plain)
+   - Existing: price, billing cycle, trial days, sort order, active toggle, edit, delete
+   - Existing: Complimentary access grant button
+
+2. **"Bundles" tab** (new):
+   - Bundle CRUD table with columns: Bundle Key, Name, Components (feature keys), Price, Cycle, Trial, Sort, Active, Actions
+   - Create/Edit modal with:
+     - Bundle key (auto-generated from name, or manual)
+     - Marketing name
+     - Description
+     - Price (in cents or dollars with auto-conversion)
+     - Billing cycle (monthly/annual/one-time)
+     - Trial days
+     - Sort order
+     - **Component picker** — multi-select from `features_list` keys, with search/filter, showing capability type per feature
+     - Sort order per component
+   - Active toggle (same pattern as features tab)
+   - Delete with confirmation
+   - Show component count and sum-of-individual-prices vs bundle price (discount %)
+
+**Tab implementation**:
+
+```tsx
+// Add tab state to BsaasCatalogManagement
+const [activeTab, setActiveTab] = useState<'features' | 'bundles'>('features');
+
+// Tab switcher in the header
+<div className="flex gap-1 border-b">
+  <button
+    onClick={() => setActiveTab('features')}
+    className={`px-4 py-2 text-sm font-medium ${activeTab === 'features' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+  >
+    Features ({entries.length})
+  </button>
+  <button
+    onClick={() => setActiveTab('bundles')}
+    className={`px-4 py-2 text-sm font-medium ${activeTab === 'bundles' ? 'border-b-2 border border-blue-500 text-blue-600' : 'text-gray-500'}`}
+  >
+    Bundles ({bundles.length})
+  </button>
+</div>
+
+{activeTab === 'features' ? <FeaturesTab /> : <BundlesTab />}
+```
+
+**Capability-awareness enhancement for Features tab**:
+
+Add a capability type column by fetching the `capability_features_list` join. Two approaches:
+- **Option A (preferred)**: Backend admin route returns capability type per feature (join in `GET /api/admin/bsaas-catalog`)
+- **Option B**: Frontend fetches `capability_features_list` separately and joins client-side
+
+Recommended: Option A — add `capability_type` to the admin catalog GET response:
+
+```typescript
+// In admin/bsaas-catalog.ts GET route:
+const entries = await prisma.bsaas_catalog.findMany({
+  where,
+  orderBy: { sort_order: 'asc' },
+  include: {
+    features_list: {
+      select: {
+        capability_features_list: {
+          include: { capability_type_list: { select: { key: true } } }
+        }
+      }
+    }
+  }
+});
+```
+
+**Feature type badge logic**:
+```typescript
+function getFeatureTypeBadge(featureKey: string): { label: string; color: string } {
+  if (featureKey.endsWith('_flexible')) return { label: 'Flexible', color: 'bg-purple-100 text-purple-800' };
+  if (featureKey.includes('_level_')) return { label: 'Level', color: 'bg-blue-100 text-blue-800' };
+  if (featureKey.endsWith('_disabled')) return { label: 'Gate', color: 'bg-red-100 text-red-800' };
+  if (featureKey.endsWith('_enabled')) return { label: 'Gate', color: 'bg-green-100 text-green-800' };
+  return { label: 'Individual', color: 'bg-gray-100 text-gray-800' };
+}
+```
+
+### Phase 0 Step F: Admin Page Wrapper
+
+**File**: `apps/web/src/app/(platform)/settings/admin/bsaas-catalog/page.tsx` (MODIFY)
+
+Add a proper page header with back link and description, matching the promotion-catalog page pattern:
+
+```tsx
+import BsaasCatalogManagement from '@/admin/components/BsaasCatalogManagement';
+
+export default function SettingsAdminBsaasCatalogPage() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6">
+          <a href="/settings/admin" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-3">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Admin
+          </a>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <ShoppingCart className="w-6 h-6 text-blue-600" />
+            BSaaS Catalog
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage purchasable features and bundles — pricing, availability, and composition
+          </p>
+        </div>
+        <BsaasCatalogManagement />
+      </div>
+    </div>
+  );
+}
+```
+
+### Phase 0 Step G: Seed Customer Engagement Suite via Admin UI
+
+Once Phase 0 is complete, the Customer Engagement Suite bundle can be created **through the admin UI** instead of via SQL migration seed. This is the key advantage — admins can create and manage bundles without touching the database.
+
+However, the migration (`085_bsaas_bundles.sql`) should still include the seed INSERT as a fallback/default. The admin UI will show it as an existing bundle that can be edited.
+
+### Phase 0 Testing Checklist
+
+- [ ] Migration `085_bsaas_bundles.sql` runs without errors
+- [ ] `npx prisma generate` succeeds with new models
+- [ ] `GET /api/admin/bsaas-bundles` returns empty array initially, then seeded bundle
+- [ ] `POST /api/admin/bsaas-bundles` creates a bundle with items
+- [ ] `PUT /api/admin/bsaas-bundles/:id` updates bundle metadata and replaces items
+- [ ] `DELETE /api/admin/bsaas-bundles/:id` deletes bundle + cascades items
+- [ ] Admin page shows two tabs (Features, Bundles)
+- [ ] Features tab shows capability type column + feature type badge
+- [ ] Bundles tab shows seeded Customer Engagement Suite with 3 components
+- [ ] Bundle create modal has component picker with searchable feature keys
+- [ ] Bundle edit modal pre-fills existing items
+- [ ] Active toggle works for both features and bundles
+- [ ] `npx tsc --noEmit --project apps/api` passes
+- [ ] `npx tsc --noEmit --project apps/web` passes
+
+### Phase 0 Pattern Standardization
+
+The resulting admin page establishes the **standard pattern** for all future capability-aware catalogs:
+
+| Element | Pattern | Reusable For |
+|---|---|---|
+| Tabbed interface | Features + Bundles tabs | Any catalog with multiple product types |
+| Capability type column | Join via `capability_features_list` | Any feature-based catalog |
+| Feature type badge | Classify by key suffix (`_flexible`, `_level_*`, `_enabled`, `_disabled`) | Any capability-aware listing |
+| Component picker | Multi-select from `features_list` with capability grouping | Any composite product (bundles, packs) |
+| CRUD with audit | `authenticateToken` + `requireAdmin` + `audit()` | All admin routes |
+| Admin service singleton | `AdminApiSingleton` extension with cache invalidation | All admin frontend services |
+
+This pattern directly mirrors the promotion-catalog admin page (`PromotionCatalogClient.tsx`) which established the precedent for:
+- Level-based plan management (basic/premium/featured)
+- Duration + price control
+- Active/inactive toggle
+- Create/edit modal with auto-generated keys
+
+The BSaaS catalog extends this with **bundle composition** (multi-feature products) and **capability-awareness** (showing which domain each product belongs to).
+
+---
+
+## Phase 1: Bundle Purchase Implementation
+
+### Bundle Definition
 
 | Field | Value |
 |---|---|
@@ -38,7 +331,7 @@ The merchant's tier must already have ≥1 enabled feature in **all three** capa
 
 ## Implementation Steps
 
-### Step 1: Database Migration
+### Step 1: Database Migration (shared with Phase 0)
 
 **File**: `database/migrations/085_bsaas_bundles.sql`
 
@@ -136,7 +429,7 @@ ON CONFLICT (feature_key) DO UPDATE SET
   updated_at     = NOW();
 ```
 
-### Step 2: Prisma Schema
+### Step 2: Prisma Schema (shared with Phase 0)
 
 **File**: `apps/api/prisma/schema.prisma`
 
@@ -174,7 +467,7 @@ model bsaas_bundle_items {
 }
 ```
 
-### Step 3: Backend — Bundle Purchase Endpoint
+### Step 3: Backend — Bundle Purchase Endpoint (Phase 1)
 
 **File**: `apps/api/src/routes/bsaas-purchases.ts`
 
@@ -696,7 +989,7 @@ Update the existing `POST /feature-purchase/:id/cancel` endpoint to handle bundl
 - Call `maybeCancelCompanionPurchase` for each component
 - `invalidateEffectiveCapabilities` once after all cancellations
 
-### Step 8: Testing Checklist
+### Step 8: Phase 1 Testing Checklist
 
 - [ ] Migration `085_bsaas_bundles.sql` runs without errors
 - [ ] `npx prisma generate` succeeds with new models

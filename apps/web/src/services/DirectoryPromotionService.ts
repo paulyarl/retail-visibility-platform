@@ -277,8 +277,18 @@ class DirectoryPromotionServiceClass extends TenantApiSingleton {
     return result.data.plans || [];
   }
 
+  async adminGetLevels(): Promise<string[]> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ levels: string[] }>>(
+      `/api/admin/promotion/levels`,
+      { method: 'GET' },
+      `directory-promotion-admin-levels`,
+      this.cacheTTL
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    return result.data.levels || ['basic', 'premium', 'featured'];
+  }
+
   async adminCreatePlan(data: {
-    planKey: string;
     label: string;
     tier: string;
     durationDays: number;

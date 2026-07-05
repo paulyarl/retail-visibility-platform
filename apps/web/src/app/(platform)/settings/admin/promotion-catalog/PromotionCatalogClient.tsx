@@ -5,7 +5,7 @@ import { RefreshCw, ArrowLeft, Plus, Pencil, Trash, Sparkles } from 'lucide-reac
 import Link from 'next/link';
 import { DirectoryPromotionService, PromotionPlan } from '@/services/DirectoryPromotionService';
 
-const TIER_COLORS: Record<string, string> = {
+const LEVEL_COLORS: Record<string, string> = {
   basic: 'bg-amber-100 text-amber-800',
   premium: 'bg-blue-100 text-blue-800',
   featured: 'bg-purple-100 text-purple-800',
@@ -13,6 +13,7 @@ const TIER_COLORS: Record<string, string> = {
 
 export default function PromotionCatalogClient() {
   const [plans, setPlans] = useState<PromotionPlan[]>([]);
+  const [levels, setLevels] = useState<string[]>(['basic', 'premium', 'featured']);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
@@ -23,8 +24,12 @@ export default function PromotionCatalogClient() {
     setLoading(true);
     setError(null);
     try {
-      const data = await DirectoryPromotionService.adminListPlans(showInactive);
-      setPlans(data);
+      const [planData, levelData] = await Promise.all([
+        DirectoryPromotionService.adminListPlans(showInactive),
+        DirectoryPromotionService.adminGetLevels(),
+      ]);
+      setPlans(planData);
+      setLevels(levelData);
     } catch (err: any) {
       setError(err.message || 'Failed to load promotion catalog');
     } finally {
@@ -76,7 +81,7 @@ export default function PromotionCatalogClient() {
                 Promotion Catalog
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                Manage directory promotion plans — tiers, durations, pricing
+                Manage directory promotion plans — levels, durations, pricing
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -132,7 +137,7 @@ export default function PromotionCatalogClient() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Plan Key</th>
                   <th className="px-4 py-3 font-medium">Label</th>
-                  <th className="px-4 py-3 font-medium">Tier</th>
+                  <th className="px-4 py-3 font-medium">Level</th>
                   <th className="px-4 py-3 font-medium text-right">Duration</th>
                   <th className="px-4 py-3 font-medium text-right">Price</th>
                   <th className="px-4 py-3 font-medium text-center">Sort</th>
@@ -146,7 +151,7 @@ export default function PromotionCatalogClient() {
                     <td className="px-4 py-3 font-mono text-xs text-gray-600">{plan.planKey}</td>
                     <td className="px-4 py-3 text-gray-900 font-medium">{plan.label}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TIER_COLORS[plan.tier] || 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${LEVEL_COLORS[plan.tier] || 'bg-gray-100 text-gray-800'}`}>
                         {plan.tier}
                       </span>
                     </td>
@@ -190,6 +195,7 @@ export default function PromotionCatalogClient() {
         {(showCreateModal || editingPlan) && (
           <PlanModal
             plan={editingPlan}
+            levels={levels}
             onClose={() => { setShowCreateModal(false); setEditingPlan(null); }}
             onSaved={() => { setShowCreateModal(false); setEditingPlan(null); fetchPlans(); }}
           />
@@ -199,18 +205,19 @@ export default function PromotionCatalogClient() {
   );
 }
 
-function PlanModal({ plan, onClose, onSaved }: { plan: PromotionPlan | null; onClose: () => void; onSaved: () => void }) {
+function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | null; levels: string[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    planKey: plan?.planKey || '',
     label: plan?.label || '',
-    tier: plan?.tier || 'basic',
-    durationDays: plan?.durationDays?.toString() || '7',
+    tier: plan?.tier || levels[0] || 'basic',
+    durationDays: plan?.durationDays?.toString() || '30',
     priceCents: plan?.priceCents ? (plan.priceCents / 100).toFixed(2) : '',
     currency: plan?.currency || 'USD',
     sortOrder: plan?.sortOrder?.toString() || '0',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const autoPlanKey = `${form.tier}_${form.durationDays}day`;
 
   const handleSave = async () => {
     setSaving(true);
@@ -227,7 +234,6 @@ function PlanModal({ plan, onClose, onSaved }: { plan: PromotionPlan | null; onC
       if (plan) {
         await DirectoryPromotionService.adminUpdatePlan(plan.planKey, data);
       } else {
-        data.planKey = form.planKey;
         await DirectoryPromotionService.adminCreatePlan(data);
       }
       onSaved();
@@ -248,14 +254,19 @@ function PlanModal({ plan, onClose, onSaved }: { plan: PromotionPlan | null; onC
         <div className="space-y-4">
           {!plan && (
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plan Key (auto-generated)</label>
+              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 font-mono text-gray-500">
+                {autoPlanKey}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Derived from level + duration</p>
+            </div>
+          )}
+          {plan && (
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Plan Key</label>
-              <input
-                type="text"
-                value={form.planKey}
-                onChange={(e) => setForm({ ...form, planKey: e.target.value })}
-                placeholder="e.g. basic_7day"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
+              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 font-mono text-gray-500">
+                {plan.planKey}
+              </div>
             </div>
           )}
           <div>
@@ -270,15 +281,17 @@ function PlanModal({ plan, onClose, onSaved }: { plan: PromotionPlan | null; onC
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tier</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
               <select
                 value={form.tier}
                 onChange={(e) => setForm({ ...form, tier: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
-                <option value="basic">Basic</option>
-                <option value="premium">Premium</option>
-                <option value="featured">Featured</option>
+                {levels.map(level => (
+                  <option key={level} value={level}>
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
