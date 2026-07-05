@@ -161,6 +161,22 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 8. Bot skill endpoints return 200 instead of 403
 ```
 
+### Companion Purchase Pattern (Critical)
+
+When a tenant purchases a sub-feature whose capability type has a parent gate (e.g., `chatbot_skill_crm_assistant` → `chatbot_enabled`), the backend auto-creates a **zero-cost companion purchase** for the parent gate. Without this, the tenant pays but the capability resolver gates the feature off because the parent gate isn't enabled.
+
+**Functions** (in `bsaas-purchases.ts`):
+- `ensureCompanionPurchase(tenantId, capabilityKey, purchasedFeatureKey)` — Creates companion on purchase activation
+- `maybeCancelCompanion(tenantId, cancelledFeatureKey)` — Cancels companion when no other active purchases remain
+
+**Key maps**:
+- `PARENT_GATE_FEATURES` — Maps capability type keys to parent gate feature keys
+- `MERCHANT_GATE_MAP` — Maps capability type keys to merchant settings tables and toggle columns
+
+**Same pattern applies to Featured Placements**: `FeaturedPlacementService` has `ensureFeaturedCapabilityCompanions()` and `maybeCancelFeaturedCapabilityCompanions()` that create companions for `featured_enabled` + `featured_featured` on activation and clean them up on expiration/revocation.
+
+See **`store-purchases-capability-checklist.md`** for the full checklist across all store purchase phases.
+
 ## Renewal Flow (Automated)
 
 ```
@@ -259,6 +275,7 @@ Currently renewals use synchronous `chargePaymentMethod` (PaymentIntent). Migrat
 
 ## Related Documents
 
+- **`store-purchases-capability-checklist.md`** — Checklist for ensuring all store purchase flows have capability awareness, companion purchase soft-enables, and companion cleanup
 - **`add-bsaas-feature.md`** — How to add a purchasable feature to the platform
 - **`docs/BSAAS_PHASED_PLAN.md`** — Original phased plan (Phases 1-5, all complete)
 - **`docs/BSAAS_PURCHASE_PHASED_PLAN.md`** — Phased plan for self-service purchase flow

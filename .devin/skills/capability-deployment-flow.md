@@ -444,6 +444,7 @@ Starting point: "I need to add or fix a capability"
 │
 ├── Adding purchasable (BSaaS) feature?
 │   → Use add-bsaas-feature.md (auto-merges into features map)
+│   → Also check store-purchases-capability-checklist.md for companion purchase requirements
 │
 ├── Adding chatbot skill?
 │   → Use add-chatbot-skill.md
