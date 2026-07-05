@@ -44,7 +44,8 @@ export function resolveChatbotOptions(
   }
   const feat = cleanFeatures;
 
-  const tierEnabled = !!feat.chatbot_enabled;
+  const disabled = !!feat.chatbot_disabled;
+  const tierEnabled = !disabled && !!feat.chatbot_enabled;
   const enabled = tierEnabled && (merchantPrefs?.chatbot_enabled !== false);
   const flexible = !!feat.chatbot_flexible;
 

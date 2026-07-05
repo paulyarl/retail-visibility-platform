@@ -30,7 +30,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Check, X, AlertTriangle } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/Switch';
 import { Pagination } from '@/components/ui/Pagination';
@@ -252,7 +252,7 @@ export default function CapabilityManagement() {
 
   const handleTierCapSave = async () => {
     if (tierCapForm.features.length > 0 && !tierCapForm.features.some(f => f.is_enabled)) {
-      setError('At least one feature must be enabled for this capability');
+      setError('At least one feature must be enabled (including the _disabled key for explicit disengagement)');
       return;
     }
     try {
@@ -854,6 +854,7 @@ export default function CapabilityManagement() {
           <TabsTrigger value="tier-capabilities">Tier Capabilities</TabsTrigger>
           <TabsTrigger value="legacy-tiers">Legacy Tiers</TabsTrigger>
           <TabsTrigger value="constraints">Constraints</TabsTrigger>
+          <TabsTrigger value="tier-coverage">Tier Coverage</TabsTrigger>
         </TabsList>
 
         {/* ===== OVERVIEW TAB ===== */}
@@ -1493,6 +1494,188 @@ export default function CapabilityManagement() {
                 ))
               )}
             </div>
+          </div>
+        </TabsContent>
+
+        {/* ===== TIER COVERAGE TAB ===== */}
+        <TabsContent value="tier-coverage">
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Tier Coverage Matrix</h2>
+              <p className="text-sm text-gray-500">Compare capability type assignments across tiers — identify missing assignments before they become issues</p>
+            </div>
+
+            {(() => {
+              const activeTiers = legacyTiers.filter(t => t.isActive);
+              const activeCapTypes = capabilityTypes.filter(ct => ct.is_active !== false);
+
+              if (activeTiers.length === 0 || activeCapTypes.length === 0) {
+                return (
+                  <div className="px-6 py-8 text-center text-gray-500">
+                    {activeTiers.length === 0 ? 'No active tiers available.' : 'No active capability types available.'}
+                  </div>
+                );
+              }
+
+              // Build lookup: tier_key + capability_type_key -> CapabilityData
+              const assignmentMap = new Map<string, CapabilityData>();
+              capabilities.forEach(c => {
+                if (c.tier_key && c.capability_type_key) {
+                  assignmentMap.set(`${c.tier_key}:${c.capability_type_key}`, c);
+                }
+              });
+
+              // Calculate missing count per tier
+              const missingByTier = activeTiers.map(tier => {
+                const missing = activeCapTypes.filter(ct => !assignmentMap.has(`${tier.tierKey}:${ct.capability_type_key}`));
+                return { tier, missingCount: missing.length, missingCaps: missing };
+              });
+
+              const totalMissing = missingByTier.reduce((sum, m) => sum + m.missingCount, 0);
+              const totalCells = activeTiers.length * activeCapTypes.length;
+              const coveragePct = totalCells > 0 ? Math.round(((totalCells - totalMissing) / totalCells) * 100) : 0;
+
+              return (
+                <>
+                  {/* Summary cards */}
+                  <div className="px-6 py-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                      <div className="text-xs text-gray-500 uppercase font-medium">Coverage</div>
+                      <div className={`text-2xl font-bold ${coveragePct >= 80 ? 'text-green-600' : coveragePct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{coveragePct}%</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                      <div className="text-xs text-gray-500 uppercase font-medium">Assigned</div>
+                      <div className="text-2xl font-bold text-green-600">{totalCells - totalMissing}</div>
+                      <div className="text-xs text-gray-400">of {totalCells} cells</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                      <div className="text-xs text-gray-500 uppercase font-medium">Missing</div>
+                      <div className={`text-2xl font-bold ${totalMissing === 0 ? 'text-green-600' : 'text-red-600'}`}>{totalMissing}</div>
+                      <div className="text-xs text-gray-400">gaps to close</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                      <div className="text-xs text-gray-500 uppercase font-medium">Tiers with Gaps</div>
+                      <div className={`text-2xl font-bold ${missingByTier.filter(m => m.missingCount > 0).length === 0 ? 'text-green-600' : 'text-amber-600'}`}>{missingByTier.filter(m => m.missingCount > 0).length}</div>
+                      <div className="text-xs text-gray-400">of {activeTiers.length} tiers</div>
+                    </div>
+                  </div>
+
+                  {/* Missing assignments alert */}
+                  {totalMissing > 0 && (
+                    <div className="px-6 py-3 border-b border-gray-100 bg-amber-50/50">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-amber-800">
+                          <strong>{totalMissing} missing capability type assignment{totalMissing !== 1 ? 's' : ''}</strong> across {missingByTier.filter(m => m.missingCount > 0).length} tier{missingByTier.filter(m => m.missingCount > 0).length !== 1 ? 's' : ''}.
+                          Click a missing cell to jump to that tier and assign the capability type.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Coverage matrix table */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10">Capability Type</th>
+                          {activeTiers.map(tier => {
+                            const tierMissing = missingByTier.find(m => m.tier.tierKey === tier.tierKey)?.missingCount || 0;
+                            return (
+                              <th key={tier.tierKey} className="px-3 py-3 text-center text-xs font-medium uppercase whitespace-nowrap">
+                                <div className={`flex items-center justify-center gap-1 ${tierMissing > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+                                  {tier.displayName}
+                                  {tierMissing > 0 && (
+                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{tierMissing}</span>
+                                  )}
+                                </div>
+                              </th>
+                            );
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {activeCapTypes.map(capType => {
+                          const capMissingCount = activeTiers.filter(t => !assignmentMap.has(`${t.tierKey}:${capType.capability_type_key}`)).length;
+                          return (
+                            <tr key={capType.capability_type_key} className={capMissingCount > 0 ? 'bg-amber-50/30' : ''}>
+                              <td className="px-4 py-3 sticky left-0 bg-inherit z-10">
+                                <div className="text-sm font-medium text-gray-900">{capType.capability_type_name}</div>
+                                <div className="text-xs text-gray-500 font-mono">{capType.capability_type_key}</div>
+                                {capType.category && <div className="text-xs text-gray-400 mt-0.5">{capType.category}</div>}
+                              </td>
+                              {activeTiers.map(tier => {
+                                const assignment = assignmentMap.get(`${tier.tierKey}:${capType.capability_type_key}`);
+                                const isAssigned = !!assignment;
+                                return (
+                                  <td key={tier.tierKey} className="px-3 py-3 text-center">
+                                    {isAssigned ? (
+                                      <div className="flex items-center justify-center" title={`${assignment.feature_count} features assigned`}>
+                                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-600">
+                                          <Check className="w-4 h-4" />
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleTierSelect(tier.tierKey)}
+                                        className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-100 text-red-500 hover:bg-red-200 transition-colors cursor-pointer"
+                                        title={`Click to assign ${capType.capability_type_name} to ${tier.displayName}`}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Per-tier missing breakdown */}
+                  {totalMissing > 0 && (
+                    <div className="px-6 py-4 border-t border-gray-200">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Missing Assignments by Tier</h3>
+                      <div className="space-y-3">
+                        {missingByTier.filter(m => m.missingCount > 0).map(({ tier, missingCount, missingCaps }) => (
+                          <div key={tier.tierKey} className="rounded-lg border border-amber-200 bg-amber-50/30 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-gray-900">{tier.displayName}</span>
+                                <Badge variant="destructive">{missingCount} missing</Badge>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTierSelect(tier.tierKey)}
+                              >
+                                Manage Tier
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {missingCaps.map(ct => (
+                                <span key={ct.capability_type_key} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-amber-200 text-xs text-gray-700">
+                                  <X className="w-3 h-3 text-red-400" />
+                                  {ct.capability_type_name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Legend */}
+                  <div className="px-6 py-3 border-t border-gray-200 flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600"><Check className="w-3 h-3" /></span> Assigned</span>
+                    <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-500"><X className="w-3 h-3" /></span> Missing — click to assign</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </TabsContent>
       </Tabs>

@@ -21,7 +21,8 @@ export function resolveIntegrationOptions(
   merchantPrefs: IntegrationOptionsMerchantSettings | null,
   capabilityEnabled?: boolean
 ): EffectiveIntegrations {
-  const enabled = capabilityEnabled ?? !!features.integration_enabled;
+  const disabled = !!features.integration_disabled;
+  const enabled = !disabled && (capabilityEnabled ?? !!features.integration_enabled);
   const flexible = !!features.integration_flexible;
 
   const posTypes: IntegrationType[] = ['clover', 'square'];

@@ -23,7 +23,8 @@ export function resolveSocialCommerceOptions(
   }
   const feat = cleanFeatures;
 
-  const enabled = !!feat.social_commerce_enabled;
+  const disabled = !!feat.social_commerce_disabled;
+  const enabled = !disabled && !!feat.social_commerce_enabled;
   const flexible = !!feat.social_commerce_flexible;
 
   // Meta Commerce group

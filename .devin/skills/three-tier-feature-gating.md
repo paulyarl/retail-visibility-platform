@@ -298,6 +298,44 @@ WHERE feature_key = '<your_feature_key>' AND status = 'active';
 
 > **Rule**: Never rely solely on `tier_features_list` queries to determine feature availability. Flexible tiers and BSaaS purchases are invisible to this query but are fully active at runtime via the resolver.
 
+## The `_disabled` Meta-Key
+
+Every capability type has a `{prefix}_disabled` feature key (e.g., `commerce_disabled`, `featured_disabled`, `storefront_disabled`). This key allows admins to **explicitly disengage** a capability type from a tier.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Enablement Precedence                      │
+├───────────────────┬──────────────────────────────────────────┤
+│  1. _disabled     │  Highest priority — hard OFF              │
+│  2. _enabled      │  Explicit ON                              │
+│  3. _flexible     │  Implicit ON (unlocks all features)       │
+│  4. Any feature   │  Implicit ON (individual feature enabled) │
+│  5. (nothing)     │  Default OFF (no fail-open)               │
+└───────────────────┴──────────────────────────────────────────┘
+```
+
+**Default is disabled only when nothing is enabled**: When neither `_enabled` nor `_disabled` is set AND no individual feature in the domain is enabled, the capability is **disabled**. However, if any individual feature is enabled (e.g., `payment_gateway_stripe`), the capability is implicitly enabled even without the `_enabled` meta-key. This is not fail-open — it's implicit enablement from feature presence.
+
+### Admin UI Usage
+
+In the admin tier-capabilities dialog, admins can:
+- Enable `_enabled` to turn a capability ON for a tier
+- Enable `_disabled` to explicitly turn a capability OFF for a tier (blocks purchases too)
+- Enable `_flexible` to unlock all features within a capability for a tier
+- Enable individual feature keys for granular control
+
+A submission with only `_disabled` enabled is valid — it means "this tier explicitly does NOT have this capability."
+
+### Purchase Gating
+
+`checkCapabilityEngagement` in `bsaas-purchases.ts` checks if a tenant's tier has any non-`_disabled` enabled feature in a capability type. If all enabled features are `_disabled` keys, purchases within that capability type are blocked with the message: "The {capability} capability is explicitly disabled for your plan."
+
+### Migration Reference
+
+- `086_capability_type_disabled_keys.sql` — inserts `_disabled` feature keys for all capability types that lacked them and links them via `capability_features_list`
+
 ## Related Documents
 
 - **`add-bsaas-feature.md`** — How to add a purchasable feature to the BSaaS store

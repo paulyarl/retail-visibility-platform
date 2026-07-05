@@ -119,8 +119,8 @@ export async function getOrganizationCommerceCapabilities(
   });
 
   const capabilities: CommerceCapabilities = {
-    // Commerce is enabled only if tier supports it AND organization has it enabled
-    commerce_enabled: tierCapabilities.commerce_enabled && (
+    // Commerce is enabled only if not explicitly disabled AND tier supports it AND organization has it enabled
+    commerce_enabled: !allTierFeatures.has('commerce_disabled') && tierCapabilities.commerce_enabled && (
       organizationCommerceSettings?.deposit_enabled || 
       organizationCommerceSettings?.full_payment_enabled || 
       (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options || tierCapabilities.commerce_full_payment)
@@ -249,9 +249,10 @@ export async function getTenantCommerceCapabilities(
     tenantValue !== undefined ? tenantValue : (orgValue !== undefined ? orgValue : defaultValue);
 
   // Determine final capabilities by combining tier features with hierarchical settings
+  const commerceDisabled = !!tierCapabilities.commerce_disabled;
   const capabilities: CommerceCapabilities = {
-    // Commerce is enabled only if tier supports it AND any level has it enabled
-    commerce_enabled: tierCapabilities.commerce_enabled && (
+    // Commerce is enabled only if not explicitly disabled AND tier supports it AND any level has it enabled
+    commerce_enabled: !commerceDisabled && tierCapabilities.commerce_enabled && (
       getHierarchicalValue(
         tenantCommerceSettings?.deposit_enabled || tenantCommerceSettings?.full_payment_enabled,
         organizationCommerceSettings?.deposit_enabled || organizationCommerceSettings?.full_payment_enabled,

@@ -136,7 +136,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
     const { tier_key, capability_type_key, capability_enabled, is_highlighted, highlight_order, marketing_name, features } = req.body;
     if (!tier_key || !capability_type_key) return res.status(400).json({ error: 'tier_key and capability_type_key required' });
 
-    // Validate at least one feature is enabled
+    // Validate at least one feature is enabled (including _disabled meta-keys)
     if (features && features.length > 0 && !features.some((f: any) => f.is_enabled)) {
       return res.status(400).json({ error: 'at_least_one_feature_must_be_enabled' });
     }

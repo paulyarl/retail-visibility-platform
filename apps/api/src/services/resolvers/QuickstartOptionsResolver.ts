@@ -17,7 +17,8 @@ export function resolveQuickstartOptions(
   features: Record<string, boolean>,
   merchantPrefs: QuickstartOptionsMerchantSettings | null
 ): EffectiveQuickstart {
-  const enabled = !!features.quickstart_enabled;
+  const disabled = !!features.quickstart_disabled;
+  const enabled = !disabled && !!features.quickstart_enabled;
   const flexible = !!features.quickstart_flexible;
 
   const productEnabled = flexible || !!features.quickstart_product_enabled;

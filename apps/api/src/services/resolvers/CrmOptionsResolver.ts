@@ -27,7 +27,8 @@ export function resolveCrmOptions(
   }
   const feat = cleanFeatures;
 
-  const tierEnabled = !!feat.crm_enabled;
+  const disabled = !!feat.crm_disabled;
+  const tierEnabled = !disabled && !!feat.crm_enabled;
   const enabled = tierEnabled && (merchantPrefs?.crm_enabled !== false);
   const flexible = !!feat.crm_flexible;
 

@@ -340,10 +340,14 @@ All resolvers MUST determine the `enabled` state using this precedence:
 1. If `*_disabled` is true → **OFF** (hard disable, highest priority)
 2. Else if `*_enabled` is true → **ON** (explicit enable)
 3. Else if `*_flexible` is true → **ON** (flexible implies enabled)
-4. Else if any individual feature or group gate is enabled → **ON** (implicit enable)
-5. Else → **OFF** (no features, no master gate)
+4. Else if any individual feature or group gate in the domain is enabled → **ON** (implicit enable)
+5. Else → **OFF** (default disabled — nothing enabled at all)
 
-This replaces ad-hoc enablement logic. The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
+**Key rule**: The default is **disabled** only when nothing at all is enabled in the capability domain — no `_enabled`, no `_disabled`, no `_flexible`, and no individual features. If any individual feature is enabled (e.g., `payment_gateway_stripe`), the capability is implicitly enabled even without the `_enabled` meta-key.
+
+The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
+
+**`_disabled` meta-keys**: Every capability type MUST have a `{prefix}_disabled` feature key in `features_list`, linked via `capability_features_list`. This allows admins to explicitly disengage a capability type from a tier without enabling any features. When `_disabled` is the only enabled feature for a capability type on a tier, `checkCapabilityEngagement` blocks purchases within that capability type.
 
 ### R23: Flexible Tier Unlocks ALL Features — No Exceptions
 When `*_flexible` is true, the resolver MUST treat EVERY feature flag within that capability as enabled — including standalone flags that are not part of any `allowed_*_types` array. The `flexible ||` prefix MUST be applied to every individual feature check, not just group-level allowed-type arrays.
@@ -401,7 +405,7 @@ PUT handlers in settings routes MUST use `validateProposedChange()` from `Capabi
 - **`isReadOnly` block** (frozen/canceled/expired): Add `result.effective.<domain>.enabled = false` if the capability involves writes, purchases, or active operations. Read-only display capabilities (storefront, CRM, FAQ, featured, directory entry, storefront options, product options, org options) are intentionally left `enabled = true` so the UI shows them in read-only mode.
 - **`isLimited` block** (maintenance/past_due): Add `result.effective.<domain>.enabled = false` if the capability involves creating new entities or purchases. Maintenance mode allows editing existing content but not growth actions.
 
-**Common pitfall**: Resolvers that fail-open (e.g., `DirectoryPromotionResolver` returns `enabled = true` when no tier config exists) will bypass tier gating for tiers like `expired_trial` that have minimal features. The Step 6 override is the safety net — if a new capability is missing from the override, it will appear enabled for frozen/canceled tenants.
+**Common pitfall**: Resolvers MUST NOT fail-open when nothing at all is enabled in the domain. The default is **disabled** only when no `_enabled`, no `_disabled`, no `_flexible`, AND no individual features are enabled. If any individual feature is enabled, the capability is implicitly enabled (R17 step 4). The Step 6 override remains the safety net for frozen/canceled tenants.
 
 **Also update `buildExpiredCapabilitiesResponse`** in `tenant-capabilities.ts` with a fully-disabled entry for the new domain (see R13).
 
