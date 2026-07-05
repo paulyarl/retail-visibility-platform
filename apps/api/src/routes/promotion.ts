@@ -20,6 +20,7 @@
  *   GET    /api/admin/promotion/levels                     — list available promotion levels from capability features
  *   GET    /api/admin/promotion/purchases                   — list all purchases
  *   GET    /api/admin/promotion/revenue                     — revenue summary
+ *   POST   /api/admin/promotion/grant-complimentary         — grant free promotion to tenant
  */
 
 import { Router, Request, Response } from 'express';
@@ -372,7 +373,7 @@ router.get('/admin/promotion/catalog', async (req: Request, res: Response) => {
  */
 router.post('/admin/promotion/catalog', async (req: Request, res: Response) => {
   try {
-    const { label, tier, durationDays, priceCents, currency, sortOrder } = req.body;
+    const { label, tier, durationDays, priceCents, currency, sortOrder, planKey } = req.body;
 
     if (!label || !tier || !durationDays || !priceCents) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -385,6 +386,7 @@ router.post('/admin/promotion/catalog', async (req: Request, res: Response) => {
       priceCents,
       currency,
       sortOrder,
+      planKey,
     });
 
     res.json({ plan });
@@ -508,6 +510,40 @@ router.get('/admin/promotion/tenant/:tenantId', async (req: Request, res: Respon
   } catch (error) {
     console.error('Error fetching tenant promotion data:', error);
     res.status(500).json({ error: 'Failed to fetch tenant promotion data' });
+  }
+});
+
+/**
+ * POST /api/admin/promotion/grant-complimentary — grant a tenant free promotion access
+ */
+router.post('/admin/promotion/grant-complimentary', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, planKey, reason } = req.body;
+
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+    if (!planKey || typeof planKey !== 'string') {
+      return res.status(400).json({ error: 'planKey is required' });
+    }
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+
+    const service = DirectoryPromotionService.getInstance();
+    const result = await service.grantComplimentary({
+      tenantId,
+      planKey,
+      reason: reason.trim(),
+      grantedBy: (req as any).user?.userId || 'admin',
+    });
+
+    res.json({ success: true, purchaseId: result.purchaseId });
+  } catch (error: any) {
+    const message = error?.message || 'Failed to grant complimentary promotion';
+    const status = ['plan_not_found_or_inactive', 'tenant_already_has_active_promotion', 'tenant_has_no_directory_listing'].includes(message)
+      ? 400 : 500;
+    res.status(status).json({ error: message });
   }
 });
 

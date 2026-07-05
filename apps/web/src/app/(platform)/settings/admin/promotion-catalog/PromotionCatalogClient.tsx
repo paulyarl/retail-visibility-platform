@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ArrowLeft, Plus, Pencil, Trash, Sparkles } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { RefreshCw, ArrowLeft, Plus, Pencil, Trash, Sparkles, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { DirectoryPromotionService, PromotionPlan } from '@/services/DirectoryPromotionService';
+import { adminOperationsService } from '@/services/AdminOperationsService';
+import { adminCapabilityService, CapabilityType } from '@/services/AdminCapabilityService';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 const LEVEL_COLORS: Record<string, string> = {
   basic: 'bg-amber-100 text-amber-800',
@@ -19,6 +22,7 @@ export default function PromotionCatalogClient() {
   const [showInactive, setShowInactive] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PromotionPlan | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showGrantModal, setShowGrantModal] = useState(false);
 
   const fetchPlans = useCallback(async () => {
     setLoading(true);
@@ -101,6 +105,13 @@ export default function PromotionCatalogClient() {
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
+              </button>
+              <button
+                onClick={() => setShowGrantModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+              >
+                <Gift className="w-4 h-4" />
+                Grant Access
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -191,6 +202,15 @@ export default function PromotionCatalogClient() {
           </div>
         )}
 
+        {/* Grant Complimentary Access Modal */}
+        {showGrantModal && (
+          <GrantPromotionModal
+            plans={plans}
+            onClose={() => setShowGrantModal(false)}
+            onGranted={() => { setShowGrantModal(false); fetchPlans(); }}
+          />
+        )}
+
         {/* Create/Edit Modal */}
         {(showCreateModal || editingPlan) && (
           <PlanModal
@@ -217,7 +237,25 @@ function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | n
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const autoPlanKey = `${form.tier}_${form.durationDays}day`;
+  const [capabilityTypes, setCapabilityTypes] = useState<CapabilityType[]>([]);
+  const [selectedCapType, setSelectedCapType] = useState<string>('directory_promotion');
+  const [selectedFeatureKey, setSelectedFeatureKey] = useState<string>('');
+
+  useEffect(() => {
+    adminCapabilityService.getCapabilityTypes().then((types) => {
+      setCapabilityTypes(types);
+    }).catch(() => {});
+  }, []);
+
+  const selectedType = capabilityTypes.find(t => t.capability_type_key === selectedCapType);
+  const allowedFeatures = selectedType?.allowed_features || [];
+
+  const featureKeyOptions = useMemo(() =>
+    allowedFeatures.map(f => ({ value: f, label: f })),
+    [allowedFeatures]
+  );
+
+  const effectivePlanKey = plan ? plan.planKey : (selectedFeatureKey || `${form.tier}_${form.durationDays}day`);
 
   const handleSave = async () => {
     setSaving(true);
@@ -234,7 +272,7 @@ function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | n
       if (plan) {
         await DirectoryPromotionService.adminUpdatePlan(plan.planKey, data);
       } else {
-        await DirectoryPromotionService.adminCreatePlan(data);
+        await DirectoryPromotionService.adminCreatePlan({ ...data, planKey: selectedFeatureKey || undefined });
       }
       onSaved();
     } catch (err: any) {
@@ -253,13 +291,40 @@ function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | n
 
         <div className="space-y-4">
           {!plan && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plan Key (auto-generated)</label>
-              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 font-mono text-gray-500">
-                {autoPlanKey}
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capability Type</label>
+                <select
+                  value={selectedCapType}
+                  onChange={(e) => { setSelectedCapType(e.target.value); setSelectedFeatureKey(''); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  {capabilityTypes.map(t => (
+                    <option key={t.capability_type_key} value={t.capability_type_key}>
+                      {t.capability_type_name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Select a capability type to browse its feature keys</p>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Derived from level + duration</p>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plan Key (from feature key)</label>
+                <SearchableSelect
+                  options={featureKeyOptions}
+                  value={selectedFeatureKey}
+                  onChange={setSelectedFeatureKey}
+                  placeholder="Select a feature key..."
+                />
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 font-mono text-gray-500 mt-2">
+                  {effectivePlanKey}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  {selectedFeatureKey
+                    ? 'Plan key set from selected capability feature key'
+                    : 'Select a feature key, or auto-generated from level + duration'}
+                </p>
+              </div>
+            </>
           )}
           {plan && (
             <div>
@@ -340,6 +405,138 @@ function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | n
             className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GrantPromotionModal({ plans, onClose, onGranted }: { plans: PromotionPlan[]; onClose: () => void; onGranted: () => void }) {
+  const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
+  const [tenantId, setTenantId] = useState('');
+  const [planKey, setPlanKey] = useState('');
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminOperationsService.getTenants(1, 500).then((result) => {
+      setTenants(result.tenants.map((t) => ({ id: t.id, name: t.name })));
+    }).catch(() => {});
+  }, []);
+
+  const tenantOptions = useMemo(() =>
+    tenants.map((t) => ({ value: t.id, label: `${t.name} (${t.id})` })),
+    [tenants]
+  );
+
+  const handleSubmit = async () => {
+    if (!tenantId) {
+      setError('Please select a tenant');
+      return;
+    }
+    if (!planKey) {
+      setError('Please select a plan');
+      return;
+    }
+    if (!reason.trim()) {
+      setError('Reason is required');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await DirectoryPromotionService.adminGrantComplimentary({
+        tenantId,
+        planKey,
+        reason: reason.trim(),
+      });
+      setSuccess(`Promotion granted successfully to tenant ${tenantId}`);
+      setTimeout(() => {
+        onGranted();
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'Failed to grant complimentary promotion');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+        <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+          <Gift className="w-5 h-5 text-emerald-600" />
+          Grant Complimentary Promotion
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Give a tenant free directory promotion access. No payment will be charged.
+        </p>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm mb-4">{error}</div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm mb-4">{success}</div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tenant *</label>
+            <SearchableSelect
+              options={tenantOptions}
+              value={tenantId}
+              onChange={setTenantId}
+              placeholder="Select a tenant..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Plan *</label>
+            <select
+              value={planKey}
+              onChange={(e) => setPlanKey(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">Select a plan...</option>
+              {plans.filter(p => p.isActive).map((plan) => (
+                <option key={plan.planKey} value={plan.planKey}>
+                  {plan.label} — {plan.tier} ({plan.durationDays}d)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason *</label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Beta tester, partnership, goodwill credit"
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+            <p className="text-xs text-gray-400 mt-1">Internal note — recorded in purchase metadata</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {saving ? 'Granting...' : 'Grant Access'}
           </button>
         </div>
       </div>

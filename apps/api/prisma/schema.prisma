@@ -432,29 +432,29 @@ model bsaas_catalog {
 }
 
 model bsaas_bundles {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bundle_key     String   @unique
-  marketing_name String
-  description    String?
-  price_cents    Int
-  billing_cycle  String   @default("monthly") @db.VarChar(20)
-  trial_days     Int      @default(0)
-  is_active      Boolean  @default(true)
-  sort_order     Int      @default(0)
-  created_at     DateTime @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bundle_key         String               @unique
+  marketing_name     String
+  description        String?
+  price_cents        Int
+  billing_cycle      String               @default("monthly") @db.VarChar(20)
+  trial_days         Int                  @default(0)
+  is_active          Boolean              @default(true)
+  sort_order         Int                  @default(0)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
   bsaas_bundle_items bsaas_bundle_items[]
 
   @@index([is_active, sort_order], map: "idx_bsaas_bundles_active")
 }
 
 model bsaas_bundle_items {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bundle_id    String   @db.Uuid
-  feature_key  String
-  sort_order   Int      @default(0)
-  created_at   DateTime @default(now()) @db.Timestamptz(6)
-  bsaas_bundles bsaas_bundles @relation(fields: [bundle_id], references: [id], onDelete: Cascade)
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bundle_id     String        @db.Uuid
+  feature_key   String
+  sort_order    Int           @default(0)
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  bsaas_bundles bsaas_bundles @relation(fields: [bundle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([bundle_id, feature_key])
   @@index([bundle_id], map: "idx_bsaas_bundle_items_bundle")

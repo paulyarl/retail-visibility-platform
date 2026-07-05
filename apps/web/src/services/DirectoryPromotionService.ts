@@ -295,6 +295,7 @@ class DirectoryPromotionServiceClass extends TenantApiSingleton {
     priceCents: number;
     currency?: string;
     sortOrder?: number;
+    planKey?: string;
   }): Promise<PromotionPlan> {
     const result = await this.makeDefaultRequest<ApiEnvelope<{ plan: PromotionPlan }>>(
       `/api/admin/promotion/catalog`,
@@ -346,6 +347,22 @@ class DirectoryPromotionServiceClass extends TenantApiSingleton {
   // ====================
   // ADMIN: PURCHASES & REVENUE
   // ====================
+
+  async adminGrantComplimentary(data: {
+    tenantId: string;
+    planKey: string;
+    reason: string;
+  }): Promise<{ purchaseId: string }> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ success: boolean; purchaseId: string }>>(
+      `/api/admin/promotion/grant-complimentary`,
+      { method: 'POST', body: JSON.stringify(data) },
+      undefined,
+      undefined
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (result.data.error) throw new Error(result.data.error);
+    return { purchaseId: result.data.purchaseId! };
+  }
 
   async adminListPurchases(filters: { status?: string; tier?: string; tenantId?: string } = {}): Promise<PromotionPurchase[]> {
     const params = new URLSearchParams();

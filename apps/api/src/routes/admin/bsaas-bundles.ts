@@ -15,11 +15,9 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../prisma';
 import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { audit } from '../../audit';
-
-const prisma = new PrismaClient();
 
 const router = Router();
 
@@ -35,7 +33,7 @@ const createBundleSchema = z.object({
   marketing_name: z.string().min(1),
   description: z.string().optional(),
   price_cents: z.number().int().positive(),
-  billing_cycle: z.enum(['one_time', 'monthly', 'annual']).default('monthly'),
+  billing_cycle: z.enum(['one_time', 'weekly', 'monthly', 'annual']).default('monthly'),
   trial_days: z.number().int().min(0).default(0),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().default(0),
@@ -49,7 +47,7 @@ const updateBundleSchema = z.object({
   marketing_name: z.string().optional(),
   description: z.string().optional(),
   price_cents: z.number().int().positive().optional(),
-  billing_cycle: z.enum(['one_time', 'monthly', 'annual']).optional(),
+  billing_cycle: z.enum(['one_time', 'weekly', 'monthly', 'annual']).optional(),
   trial_days: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),

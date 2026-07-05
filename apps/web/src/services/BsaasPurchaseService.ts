@@ -14,7 +14,7 @@ export interface BsaasCatalogItem {
   description: string;
   category: string | null;
   priceCents: number;
-  billingCycle: 'one_time' | 'monthly' | 'annual';
+  billingCycle: 'one_time' | 'weekly' | 'monthly' | 'annual';
   trialDays: number;
   purchase: {
     id: string;
@@ -53,6 +53,42 @@ export interface BsaasPurchaseResult {
   message?: string;
 }
 
+export interface BsaasBundleItem {
+  featureKey: string;
+  name: string;
+  inTier: boolean;
+  alreadyPurchased: boolean;
+}
+
+export interface BsaasBundleCatalogItem {
+  bundleKey: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  billingCycle: 'one_time' | 'weekly' | 'monthly' | 'annual';
+  trialDays: number;
+  items: BsaasBundleItem[];
+  tierEligible: boolean;
+  ineligibleReason: string | null;
+  ineligibleDomains: string[];
+  allActive: boolean;
+  allInTier: boolean;
+}
+
+export interface BsaasBundlePurchaseResult {
+  success: boolean;
+  data?: {
+    bundle_key: string;
+    status: string;
+    price_cents: number;
+    billing_cycle: string;
+    expires_at: string | null;
+    purchase_ids: string[];
+  };
+  error?: string;
+  message?: string;
+}
+
 class BsaasPurchaseService extends TenantApiSingleton {
   protected defaultContext: AppContext = AppContext.TENANT;
   protected defaultIsolation: CacheIsolation = CacheIsolation.TENANT;
@@ -79,7 +115,7 @@ class BsaasPurchaseService extends TenantApiSingleton {
   }
 
   public getServiceCachePatterns(): string[] {
-    return ['bsaas-catalog', 'bsaas-purchases'];
+    return ['bsaas-catalog', 'bsaas-purchases', 'bsaas-bundle-catalog'];
   }
 
   /**
@@ -171,6 +207,55 @@ class BsaasPurchaseService extends TenantApiSingleton {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Get the bundle catalog with tenant-specific tier status
+   */
+  async getBundleCatalog(): Promise<BsaasBundleCatalogItem[]> {
+    const response = await this.makeDefaultRequest<BsaasBundleCatalogItem[]>(
+      '/api/subscription/bundle-catalog',
+      { method: 'GET' },
+      'bsaas-bundle-catalog'
+    );
+
+    if (!response.success) {
+      throw new Error('Failed to fetch bundle catalog');
+    }
+
+    const data = response.data;
+    const actualData = Array.isArray(data) ? data : (data as any)?.data;
+    return Array.isArray(actualData) ? actualData : [];
+  }
+
+  /**
+   * Purchase a bundle
+   */
+  async purchaseBundle(
+    bundleKey: string,
+    paymentMethodId: string,
+    promotionCode?: string
+  ): Promise<BsaasBundlePurchaseResult> {
+    const response = await this.makeDefaultRequest<BsaasBundlePurchaseResult>(
+      '/api/subscription/bundle-purchase',
+      {
+        method: 'POST',
+        body: JSON.stringify({ bundleKey, paymentMethodId, ...(promotionCode ? { promotionCode } : {}) }),
+      },
+      'bsaas-bundle-purchase'
+    );
+
+    if (!response.success) {
+      const errorData = response.error as any;
+      return {
+        success: false,
+        error: typeof errorData === 'string' ? errorData : errorData?.error || 'purchase_failed',
+        message: typeof errorData === 'string' ? errorData : errorData?.message || 'Failed to purchase bundle',
+      };
+    }
+
+    const innerData = (response.data as any)?.data || response.data;
+    return { success: true, data: innerData };
   }
 }
 
