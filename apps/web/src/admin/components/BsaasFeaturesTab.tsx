@@ -51,6 +51,35 @@ interface Props {
   onSuccess: (msg: string) => void;
 }
 
+function filterCapabilityGates(features: string[]): string[] {
+  const gateSuffixes = ['_enabled', '_disabled', '_flexible'];
+  const gatePrefixes = new Map<string, number>();
+  for (const key of features) {
+    for (const suffix of gateSuffixes) {
+      if (key.endsWith(suffix)) {
+        const prefix = key.slice(0, -suffix.length);
+        const segs = prefix.split('_').length;
+        if (!gatePrefixes.has(prefix) || segs < gatePrefixes.get(prefix)!) {
+          gatePrefixes.set(prefix, segs);
+        }
+        break;
+      }
+    }
+  }
+  let capPrefix = '';
+  let minSegs = Infinity;
+  for (const [prefix, segs] of gatePrefixes) {
+    if (segs < minSegs) {
+      minSegs = segs;
+      capPrefix = prefix;
+    }
+  }
+  if (!capPrefix) return features;
+  return features.filter(
+    (f) => f !== `${capPrefix}_enabled` && f !== `${capPrefix}_disabled`,
+  );
+}
+
 function humanizeFeatureKey(key: string): string {
   return key
     .replace(/_/g, ' ')
@@ -343,9 +372,11 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                 >
                   <option value="">— Select a feature key —</option>
                   {(() => {
-                    const allowed = capabilityTypes
-                      .find((ct) => ct.capability_type_key === selectedCapType)
-                      ?.allowed_features || [];
+                    const allowed = filterCapabilityGates(
+                      capabilityTypes
+                        .find((ct) => ct.capability_type_key === selectedCapType)
+                        ?.allowed_features || [],
+                    );
                     const features = editingEntry && formData.feature_key && !allowed.includes(formData.feature_key)
                       ? [formData.feature_key, ...allowed]
                       : allowed;
