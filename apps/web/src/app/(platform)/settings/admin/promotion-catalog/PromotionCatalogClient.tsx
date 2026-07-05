@@ -251,7 +251,9 @@ function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | n
   const allowedFeatures = selectedType?.allowed_features || [];
 
   const featureKeyOptions = useMemo(() =>
-    allowedFeatures.map(f => ({ value: f, label: f })),
+    allowedFeatures
+      .filter(f => !f.endsWith('_enabled') && !f.endsWith('_disabled'))
+      .map(f => ({ value: f, label: f })),
     [allowedFeatures]
   );
 
