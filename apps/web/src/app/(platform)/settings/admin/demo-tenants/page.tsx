@@ -66,7 +66,7 @@ export default function DemoTenantsAdminPage() {
         demoTenantAdminService.getTemplates(),
       ]);
       if (tenantsResult) {
-        setTenants(tenantsResult.data);
+        setTenants(tenantsResult);
       }
       if (templatesResult) {
         setTemplates(templatesResult);

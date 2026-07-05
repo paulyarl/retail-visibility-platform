@@ -58,7 +58,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
     return DemoTenantAdminService.instance;
   }
 
-  async listDemoTenants(includeExpired = false): Promise<{ data: DemoTenant[]; total: number } | null> {
+  async listDemoTenants(includeExpired = false): Promise<DemoTenant[] | null> {
     const params = new URLSearchParams();
     if (includeExpired) params.set('includeExpired', 'true');
     const qs = params.toString();

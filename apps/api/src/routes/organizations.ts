@@ -260,6 +260,65 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /organizations/product-type-summary
+ * Admin endpoint: Aggregates product type distribution across all organizations.
+ * Returns per-org product mix (which product types they sell) for admin audit view.
+ * NOTE: Must be defined before /:id to avoid the parameterized route swallowing this path.
+ */
+router.get('/product-type-summary', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const isPlatformAdminUser = await isPlatformAdmin(req.user?.sub || req.user?.userId || '');
+    if (!isPlatformAdminUser) {
+      return res.status(403).json({ error: 'forbidden', message: 'Platform admin access required' });
+    }
+
+    const orgs = await prisma.organizations_list.findMany({
+      select: {
+        id: true,
+        name: true,
+        tenants: { select: { id: true } },
+      },
+    });
+
+    const summary = await Promise.all(
+      orgs.map(async (org) => {
+        const tenantIds = org.tenants.map((t) => t.id);
+        if (tenantIds.length === 0) {
+          return { orgId: org.id, orgName: org.name, productTypes: [], totalItems: 0 };
+        }
+
+        const grouped = await prisma.inventory_items.groupBy({
+          by: ['product_type'],
+          where: { tenant_id: { in: tenantIds } },
+          _count: { id: true },
+        });
+
+        const totalItems = grouped.reduce((sum, g) => sum + g._count.id, 0);
+        const productTypes = grouped.map((g) => ({
+          type: g.product_type || 'unknown',
+          count: g._count.id,
+        }));
+
+        return {
+          orgId: org.id,
+          orgName: org.name,
+          productTypes,
+          totalItems,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      organizations: summary.filter((s) => s.totalItems > 0),
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Product type summary error:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product type summary' });
+  }
+});
+
 // GET /organizations/:id - Get single organization
 // Permission: Organization members can read their own organization data
 // Supports both organization IDs and tenant IDs (with fallback)
@@ -2548,64 +2607,6 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
   } catch (error: any) {
     console.error('[Organizations] Sync from hero error:', error);
     res.status(500).json({ error: 'failed_to_sync_from_hero', message: error.message });
-  }
-});
-
-/**
- * GET /organizations/product-type-summary
- * Admin endpoint: Aggregates product type distribution across all organizations.
- * Returns per-org product mix (which product types they sell) for admin audit view.
- */
-router.get('/product-type-summary', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const isPlatformAdminUser = await isPlatformAdmin(req.user?.sub || req.user?.userId || '');
-    if (!isPlatformAdminUser) {
-      return res.status(403).json({ error: 'forbidden', message: 'Platform admin access required' });
-    }
-
-    const orgs = await prisma.organizations_list.findMany({
-      select: {
-        id: true,
-        name: true,
-        tenants: { select: { id: true } },
-      },
-    });
-
-    const summary = await Promise.all(
-      orgs.map(async (org) => {
-        const tenantIds = org.tenants.map((t) => t.id);
-        if (tenantIds.length === 0) {
-          return { orgId: org.id, orgName: org.name, productTypes: [], totalItems: 0 };
-        }
-
-        const grouped = await prisma.inventory_items.groupBy({
-          by: ['product_type'],
-          where: { tenant_id: { in: tenantIds } },
-          _count: { id: true },
-        });
-
-        const totalItems = grouped.reduce((sum, g) => sum + g._count.id, 0);
-        const productTypes = grouped.map((g) => ({
-          type: g.product_type || 'unknown',
-          count: g._count.id,
-        }));
-
-        return {
-          orgId: org.id,
-          orgName: org.name,
-          productTypes,
-          totalItems,
-        };
-      })
-    );
-
-    res.json({
-      success: true,
-      organizations: summary.filter((s) => s.totalItems > 0),
-    });
-  } catch (error: any) {
-    console.error('[Organizations] Product type summary error:', error);
-    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product type summary' });
   }
 });
 
