@@ -62,11 +62,20 @@ Each capability domain has a parent gate feature key. When a sub-feature is purc
 
 ## Full Checklist (All Store Phases)
 
+### Phase 0: Purchase Eligibility (Pre-Charge Gate)
+
+- [ ] **Capability engagement check**: Before charging, call `checkCapabilityEngagement(tenantId, featureKey)` to verify the tenant's tier already grants at least one feature in the same capability type. This is the "active capability engagement" rule — merchants can only purchase à la carte features within capability domains their tier already touches.
+- [ ] **Block if not engaged**: If the tenant's tier has zero features in the feature's capability type, return `403 upgrade_required` with a human-readable reason. Do NOT charge the card.
+- [ ] **Allow if engaged**: If the tier has at least one enabled feature in the capability type, proceed with the purchase. The merchant is vertically upgrading within an engaged domain.
+- [ ] **Standalone features**: Features with no `capability_features_list` association bypass the engagement check (standalone features are always eligible).
+- [ ] **Catalog API**: `GET /feature-catalog` must return `tierEligible: boolean` + `ineligibleReason: string | null` per item so the frontend can show locked state.
+- [ ] **Frontend locked state**: Ineligible items show "Upgrade Required" badge with lock icon, the reason text, and an "Upgrade Plan" button linking to `/t/{tenantId}/settings/store?tab=plans`.
+
 ### Phase 1: Purchase Creation (`createPurchase`)
 
 - [ ] **Capability awareness log**: Before creating the purchase record, check if the tenant's tier includes the parent gate feature. If not, log an informational message (not a warning — the purchase is valid, companions will handle it).
-- [ ] **No blocking**: Never block a purchase based on tier capability. The payment IS the entitlement.
 - [ ] **Validate plan/product ownership**: Ensure the plan exists, is active, and the product belongs to the tenant.
+- [ ] **Engagement already verified**: The capability engagement check (Phase 0) must have passed before reaching this phase. Do not re-check here.
 
 ### Phase 2: Purchase Activation (`activatePurchase`)
 
@@ -95,7 +104,7 @@ Each capability domain has a parent gate feature key. When a sub-feature is purc
 ### Phase 5: Frontend Display
 
 - [ ] **Surface labels**: Ensure each surface type has a human-readable label (e.g., `storefront_spotlight` → "Your Storefront Spotlight").
-- [ ] **No tier gating in UI**: The store page should show all plans regardless of tier. The purchase payment handles entitlement.
+- [ ] **Tier eligibility display**: The store page should show ineligible items with a locked state (gray "Upgrade Required" badge, reason text, "Upgrade Plan" button). Eligible items show the normal purchase button. The catalog API returns `tierEligible` + `ineligibleReason` per item.
 - [ ] **Active purchases list**: Show active placements with surface, expiry, and renewal options.
 
 ### Phase 6: Admin / Revocation
@@ -150,7 +159,7 @@ If directory promotions also need companion purchases, follow the same pattern w
 
 3. **Missing cleanup in renewal job**: The daily renewal job handles expiration but doesn't clean up companions. Fix: Add companion cleanup call after grace period expiration in the job.
 
-4. **Blocking purchase on tier check**: Never reject a purchase because the tier doesn't have the capability — the payment IS the entitlement. Only log an informational message.
+4. **Blocking purchase on capability engagement**: The `checkCapabilityEngagement()` function in `bsaas-purchases.ts` blocks purchases when the tenant's tier has zero features in the feature's capability type. This is intentional — merchants must upgrade their tier to unlock a new capability domain. The check traces `feature_key → capability_features_list → capability_type_id`, then queries `tier_features_list` for any enabled feature with that `capability_type_id` for the tenant's tier(s). Returns `403 upgrade_required` if not engaged.
 
 5. **Forgetting sub-type companion**: Some capabilities need both the parent gate AND a specific sub-type enabled (e.g., `featured_enabled` + `featured_featured`). Missing the sub-type companion means the resolver enables the domain but the specific feature type is still gated.
 

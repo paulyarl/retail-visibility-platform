@@ -232,6 +232,20 @@ This busts the cache for that tenant, ensuring the next request to the unified e
 
 **Important**: If you add purchase-granting logic outside the admin API (e.g., a checkout flow, a Stripe webhook), you **must** call `invalidateEffectiveCapabilities(tenantId)` after any purchase change.
 
+## Capability Engagement Purchase Eligibility
+
+The BSaaS purchase flow enforces an **active capability engagement** rule: a merchant can only purchase a feature à la carte if their tier already grants at least one other feature within the same capability type. This means:
+
+- **Eligible**: Tenant's tier has ≥1 enabled feature in `tier_features_list` with the same `capability_type_id` → can purchase additional features in that domain (vertical upgrade)
+- **Not eligible**: Tenant's tier has 0 features in that capability type → purchase blocked with `403 upgrade_required`, frontend shows locked state with "Upgrade Plan" button
+- **Standalone**: Features with no `capability_features_list` association bypass the check (always eligible)
+
+**Function**: `checkCapabilityEngagement(tenantId, featureKey)` in `bsaas-purchases.ts`
+
+**Data flow**: `feature_key → capability_features_list → capability_type_id → tier_features_list (WHERE tier_id IN tenant_tiers AND is_enabled=true)`
+
+When adding a new purchasable feature, ensure that at least one target tier has engagement in the feature's capability type. If no tier has any features in that capability type, no tenant will be able to purchase the feature — consider whether the feature should be tier-bundled instead.
+
 ## Expiry Handling
 
 Purchases have two layers of expiry protection:
@@ -260,11 +274,14 @@ When adding a new purchasable feature, verify:
 - [ ] Feature key exists in `features_list` and `canonical-features.ts`
 - [ ] Feature is linked to a `capability_type_list` entry via `capability_features_list`
 - [ ] Feature is enabled in `tier_features_list` for at least one tier (where bundled)
+- [ ] **Capability engagement**: At least one tier that should be able to purchase this feature à la carte has at least one other enabled feature in the same capability type in `tier_features_list`. Without this, the engagement check will block all purchases for that tier.
 - [ ] Granting the feature via `POST /api/admin/feature-purchases` succeeds
 - [ ] `GET /api/tenants/:tenantId/effective-capabilities` returns the feature as enabled for a tenant that purchased it but doesn't have it in their tier
 - [ ] Revoking the purchase via `DELETE /api/admin/feature-purchases/:id` removes the feature from the capabilities output
 - [ ] Cache invalidation works — changes are visible immediately without restart
 - [ ] Expired purchases (`expires_at < NOW()`) are not included in the capabilities output
+- [ ] `GET /api/subscription/feature-catalog` returns `tierEligible: true` for tenants whose tier is engaged in the feature's capability type, and `tierEligible: false` with `ineligibleReason` for tenants whose tier is not engaged
+- [ ] `POST /api/subscription/feature-purchase` returns `403 upgrade_required` for tenants whose tier is not engaged in the capability type
 - [ ] `npx tsc --noEmit --project apps/api` passes
 - [ ] `npx tsc --noEmit --project apps/web` passes
 

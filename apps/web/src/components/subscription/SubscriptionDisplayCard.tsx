@@ -282,18 +282,7 @@ export function SubscriptionDisplayCard({
         );
 
       case 'capabilityBreakdown':
-        if (!capabilities) return null;
-        if (!isExpanded) {
-          return (
-            <div key={field} className="flex items-center gap-2">
-              <Icon className="w-4 h-4 text-primary-600" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">Capabilities:</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {enabledCapabilityCount}/{CAPABILITY_DOMAINS.length} active
-              </span>
-            </div>
-          );
-        }
+        if (!capabilities || !isExpanded) return null;
         return (
           <div key={field} className="col-span-2 sm:col-span-3">
             <div className="flex items-center gap-2 mb-2">

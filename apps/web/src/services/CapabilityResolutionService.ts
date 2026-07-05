@@ -936,6 +936,7 @@ export interface AllCapabilitiesState {
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
+  purchasedFeatureKeys: string[];
 }
 
 // ====================
