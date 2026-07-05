@@ -13,6 +13,7 @@
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { invalidateActiveFeaturedCache } from '../services/ActiveFeaturedResolver';
+import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import CrmAlertService from '../services/CrmAlertService';
 import Stripe from 'stripe';
 
@@ -270,6 +271,9 @@ async function processGracePeriods(now: Date, result: RenewalJobResult): Promise
       invalidateActiveFeaturedCache(placement.tenant_id, placement.surface);
       invalidateActiveFeaturedCache(null);
 
+      // Cancel companion capability purchases if no other active placements remain
+      await maybeCancelFeaturedCompanions(placement.tenant_id);
+
       result.gracePeriodExpired++;
 
       // Send grace period expired notification
@@ -397,6 +401,70 @@ async function enterGracePeriod(placement: any, now: Date, result: RenewalJobRes
   });
 
   logger.info(`[PlacementRenewal] Entered grace period for placement ${placement.id}, grace ends ${gracePeriodEnd.toISOString()}`);
+}
+
+/**
+ * Cancel companion purchases for featured_enabled + featured_featured
+ * when no active placements or BSaaS purchases remain for the tenant.
+ * Mirrors FeaturedPlacementService.maybeCancelFeaturedCapabilityCompanions.
+ */
+async function maybeCancelFeaturedCompanions(tenantId: string): Promise<void> {
+  const activePlacements = await prisma.featured_placement_purchases.count({
+    where: { tenant_id: tenantId, status: 'active' },
+  });
+  if (activePlacements > 0) return;
+
+  const activeBsaasPurchases = await prisma.tenant_feature_purchases.count({
+    where: {
+      tenant_id: tenantId,
+      feature_key: { startsWith: 'featured_' },
+      status: { in: ['active', 'past_due', 'trial'] },
+      source: { not: 'companion' },
+    },
+  });
+  if (activeBsaasPurchases > 0) return;
+
+  const companionFeatureKeys = ['featured_enabled', 'featured_featured'];
+  for (const featureKey of companionFeatureKeys) {
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+        organization_id: true,
+        organizations_list: { select: { subscription_tier: true } },
+      },
+    });
+    if (!tenant) continue;
+
+    const tierKeys = [tenant.subscription_tier, tenant.organizations_list?.subscription_tier]
+      .filter((k): k is string => !!k);
+    if (tierKeys.length === 0) continue;
+
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: { tier_key: { in: tierKeys } },
+      select: { id: true },
+    });
+    const tierIds = tiers.map(t => t.id);
+
+    const inTier = await prisma.tier_features_list.findFirst({
+      where: { tier_id: { in: tierIds }, feature_key: featureKey, is_enabled: true },
+    });
+    if (inTier) continue;
+
+    await prisma.tenant_feature_purchases.updateMany({
+      where: {
+        tenant_id: tenantId,
+        feature_key: featureKey,
+        source: 'companion',
+        status: { in: ['active', 'past_due'] },
+      },
+      data: { status: 'expired', updated_at: new Date() },
+    });
+
+    logger.info(`[PlacementRenewal] Cancelled companion purchase for ${featureKey}`, undefined, { tenantId });
+  }
+
+  invalidateEffectiveCapabilities(tenantId);
 }
 
 /**

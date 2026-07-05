@@ -13,6 +13,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { generatePlacementPurchaseId } from '../lib/id-generator';
 import { invalidateActiveFeaturedCache } from './ActiveFeaturedResolver';
+import { invalidateEffectiveCapabilities } from './EffectiveCapabilityResolver';
 import CrmAlertService from './CrmAlertService';
 import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
 import Stripe from 'stripe';
@@ -190,6 +191,14 @@ export class FeaturedPlacementService extends BaseService {
       throw new Error('product_already_has_active_placement');
     }
 
+    // Capability awareness: log warning if tenant tier lacks featured_options capability.
+    // This is informational only — the placement payment IS the entitlement, and
+    // activatePurchase will soft-enable the capability via companion purchases.
+    const featuredInTier = await this.isFeatureInTier(tenantId, 'featured_enabled');
+    if (!featuredInTier) {
+      logger.info('[FeaturedPlacement] Tenant tier does not include featured_enabled — companion purchase will be created on activation', undefined, { tenantId, planKey });
+    }
+
     // Create purchase record (pending)
     const purchaseId = generatePlacementPurchaseId(tenantId);
     await prisma.featured_placement_purchases.create({
@@ -248,6 +257,159 @@ export class FeaturedPlacementService extends BaseService {
       purchaseId,
       checkoutUrl: session.url!,
     };
+  }
+
+  // ====================
+  // CAPABILITY COMPANION PURCHASES
+  // ====================
+
+  /**
+   * Ensure the tenant has active companion purchases for the featured_options
+   * capability parent gate (featured_enabled) and the individual 'featured' type
+   * (featured_featured). If the tenant's tier already includes these features,
+   * no companion is created. This guarantees that a paid featured placement
+   * is visible on all surfaces (storefront, cross-tenant, directory) regardless
+   * of tier — the placement payment IS the entitlement.
+   *
+   * Pattern mirrors ensureCompanionPurchase() in bsaas-purchases.ts.
+   */
+  private async ensureFeaturedCapabilityCompanions(tenantId: string): Promise<void> {
+    const companionFeatureKeys = ['featured_enabled', 'featured_featured'];
+
+    for (const featureKey of companionFeatureKeys) {
+      // Check if already in tier
+      const inTier = await this.isFeatureInTier(tenantId, featureKey);
+      if (inTier) continue;
+
+      // Check if companion or real purchase already exists
+      const existing = await prisma.tenant_feature_purchases.findUnique({
+        where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+      });
+      if (existing && ['active', 'past_due', 'trial'].includes(existing.status)) continue;
+
+      // Create zero-cost companion purchase
+      await prisma.tenant_feature_purchases.upsert({
+        where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
+        update: {
+          source: 'companion',
+          status: 'active',
+          expires_at: null,
+          metadata: {
+            companion_for: 'featured_placement',
+            price_cents: 0,
+            created_reason: 'auto_companion_featured_placement',
+          },
+          updated_at: new Date(),
+        },
+        create: {
+          tenant_id: tenantId,
+          feature_key: featureKey,
+          source: 'companion',
+          status: 'active',
+          expires_at: null,
+          metadata: {
+            companion_for: 'featured_placement',
+            price_cents: 0,
+            created_reason: 'auto_companion_featured_placement',
+          },
+        },
+      });
+
+      logger.info('[FeaturedPlacement] Created companion purchase for ' + featureKey, undefined, { tenantId });
+    }
+
+    invalidateEffectiveCapabilities(tenantId);
+  }
+
+  /**
+   * When a placement expires or is revoked, check if any other active placements
+   * remain for the tenant. If not, cancel companion purchases for featured_enabled
+   * and featured_featured (unless a BSaaS purchase or tier feature still needs them).
+   *
+   * Pattern mirrors maybeCancelCompanion() in bsaas-purchases.ts.
+   */
+  private async maybeCancelFeaturedCapabilityCompanions(tenantId: string): Promise<void> {
+    // Check if any other active placements exist for this tenant
+    const activePlacements = await prisma.featured_placement_purchases.count({
+      where: {
+        tenant_id: tenantId,
+        status: 'active',
+      },
+    });
+
+    if (activePlacements > 0) return;
+
+    // Check if any active real (non-companion) BSaaS purchases exist for featured_* features
+    const activeBsaasPurchases = await prisma.tenant_feature_purchases.count({
+      where: {
+        tenant_id: tenantId,
+        feature_key: { startsWith: 'featured_' },
+        status: { in: ['active', 'past_due', 'trial'] },
+        source: { not: 'companion' },
+      },
+    });
+
+    if (activeBsaasPurchases > 0) return;
+
+    // No active placements or BSaaS purchases — cancel companions
+    const companionFeatureKeys = ['featured_enabled', 'featured_featured'];
+    for (const featureKey of companionFeatureKeys) {
+      // Don't cancel if the tier already provides this feature (companion wasn't created by us)
+      const inTier = await this.isFeatureInTier(tenantId, featureKey);
+      if (inTier) continue;
+
+      await prisma.tenant_feature_purchases.updateMany({
+        where: {
+          tenant_id: tenantId,
+          feature_key: featureKey,
+          source: 'companion',
+          status: { in: ['active', 'past_due'] },
+        },
+        data: {
+          status: 'expired',
+          updated_at: new Date(),
+        },
+      });
+
+      logger.info('[FeaturedPlacement] Cancelled companion purchase for ' + featureKey, undefined, { tenantId });
+    }
+
+    invalidateEffectiveCapabilities(tenantId);
+  }
+
+  /**
+   * Check if a feature key is enabled in the tenant's tier (or org tier).
+   */
+  private async isFeatureInTier(tenantId: string, featureKey: string): Promise<boolean> {
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+        organization_id: true,
+        organizations_list: { select: { subscription_tier: true } },
+      },
+    });
+    if (!tenant) return false;
+
+    const tierKeys = [tenant.subscription_tier, tenant.organizations_list?.subscription_tier]
+      .filter((k): k is string => !!k);
+    if (tierKeys.length === 0) return false;
+
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: { tier_key: { in: tierKeys } },
+      select: { id: true },
+    });
+    const tierIds = tiers.map(t => t.id);
+
+    const tierFeature = await prisma.tier_features_list.findFirst({
+      where: {
+        tier_id: { in: tierIds },
+        feature_key: featureKey,
+        is_enabled: true,
+      },
+    });
+
+    return !!tierFeature;
   }
 
   // ====================
@@ -323,6 +485,10 @@ export class FeaturedPlacementService extends BaseService {
     // Invalidate cache
     invalidateActiveFeaturedCache(purchase.tenant_id, purchase.surface);
     invalidateActiveFeaturedCache(null);
+
+    // Ensure featured_options capability companions (featured_enabled + featured_featured)
+    // so the placement is visible on ALL surfaces regardless of tier
+    await this.ensureFeaturedCapabilityCompanions(purchase.tenant_id);
 
     // Emit badge_event
     try {
@@ -508,6 +674,9 @@ export class FeaturedPlacementService extends BaseService {
     // Invalidate cache
     invalidateActiveFeaturedCache(purchase.tenant_id, purchase.surface);
     invalidateActiveFeaturedCache(null);
+
+    // Cancel companion purchases if no other active placements remain
+    await this.maybeCancelFeaturedCapabilityCompanions(purchase.tenant_id);
 
     // Create CRM alert
     CrmAlertService.getInstance().createFeaturedPlacementAlert({
