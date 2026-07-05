@@ -946,6 +946,7 @@ export interface AllCapabilitiesState {
 const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   commerce_: 'commerce_types',
   payment_gateway_: 'payment_gateway_options',
+  storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
   fulfillment_: 'fulfillment_options',
@@ -955,7 +956,6 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   featured_: 'featured_options',
   integration_: 'integration_options',
   quickstart_: 'quickstart_options',
-  storefront_opt_: 'storefront_options',
   directory_entry_: 'directory_entry_options',
   faq_: 'faq_options',
   crm_: 'crm_options',

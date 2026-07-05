@@ -27,7 +27,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: string[
   { key: 'chatbot_options', label: 'Chatbot', flexibleKeys: ['chatbot_flexible'] },
   { key: 'crm_options', label: 'CRM', flexibleKeys: ['crm_flexible'] },
   { key: 'faq_options', label: 'FAQ', flexibleKeys: ['faq_flexible'] },
-  { key: 'directory_entry', label: 'Directory Entry', flexibleKeys: ['directory_entry_flexible'] },
+  { key: 'directory_entry_options', label: 'Directory Entry', flexibleKeys: ['directory_entry_flexible'] },
   { key: 'social_commerce_options', label: 'Social Commerce', flexibleKeys: ['social_commerce_flexible'] },
 ];
 
@@ -72,7 +72,7 @@ function summarizeResolvedCapabilities(caps: AllCapabilitiesState): ResolvedCapS
     { key: 'chatbot_options', label: 'Chatbot', enabled: cb.enabled, flexible: cb.isFlexible, detail: cb.enabled ? [cb.staticEnabled && 'Static', cb.dynamicEnabled && 'Dynamic', cb.skillsEnabled && 'Skills', cb.kbEnabled && 'KB', cb.widgetEnabled && 'Widget'].filter(Boolean).join(', ') || 'AI Assistant' : 'Not available' },
     { key: 'crm_options', label: 'CRM', enabled: crm.enabled, flexible: crm.isFlexible, detail: crm.enabled ? 'Support Hub' : 'Not available' },
     { key: 'faq_options', label: 'FAQ', enabled: faq.enabled, flexible: faq.isFlexible, detail: faq.enabled ? [faq.storefrontEnabled && 'Storefront', faq.productEnabled && 'Product', faq.templatesEnabled && 'Templates'].filter(Boolean).join(', ') || 'Basic' : 'Not available' },
-    { key: 'directory_entry', label: 'Directory Entry', enabled: de.enabled, flexible: de.isFlexible, detail: de.enabled ? `${de.effectiveLayout ?? 'classic'} layout` : 'Not available' },
+    { key: 'directory_entry_options', label: 'Directory Entry', enabled: de.enabled, flexible: de.isFlexible, detail: de.enabled ? `${de.effectiveLayout ?? 'classic'} layout` : 'Not available' },
     { key: 'social_commerce_options', label: 'Social Commerce', enabled: scc.enabled, flexible: scc.isFlexible, detail: scc.enabled ? [scc.metaEnabled && 'Meta', scc.tiktokEnabled && 'TikTok', scc.canUseShareButtons && 'Share'].filter(Boolean).join(', ') || 'Available' : 'Not available' },
   ];
 }
