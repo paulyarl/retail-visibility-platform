@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
-import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag } from '@tabler/icons-react';
+import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag, IconLock } from '@tabler/icons-react';
 import { TrendingUp, Eye, Zap, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,6 +73,10 @@ export default function FeatureStorePage() {
       setError(`"${item.name}" is already active for your tenant.`);
       return;
     }
+    if (item.tierEligible === false) {
+      setError(item.ineligibleReason || 'Your current plan does not support purchasing this feature. Please upgrade your plan.');
+      return;
+    }
 
     const defaultMethod = paymentMethods.find(m => m.isDefault) || paymentMethods[0];
     if (!defaultMethod) {
@@ -112,6 +116,8 @@ export default function FeatureStorePage() {
           setError(`This feature is included in your tier but disabled in your settings. Enable it in your Settings page instead.`);
         } else if (result.error === 'payment_failed') {
           setError(result.message || 'Payment failed. Please check your payment method.');
+        } else if (result.error === 'upgrade_required') {
+          setError(result.message || 'Your current plan does not support purchasing this feature. Please upgrade your plan.');
         } else if (result.error === 'already_active') {
           setError('This feature is already active for your tenant.');
         } else {
@@ -188,24 +194,32 @@ export default function FeatureStorePage() {
             const isSuspended = item.purchase?.status === 'suspended';
             const inTier = item.tierAvailability === 'in_tier_active';
             const gateOff = item.tierAvailability === 'in_tier_gate_off';
+            const notEligible = item.tierEligible === false && !isActive && !inTier && !gateOff;
 
             return (
               <Grid.Col key={item.key} span={{ base: 12, md: 6, lg: 4 }}>
-                <Card withBorder shadow="sm" p="lg" className="flex flex-col h-full">
+                <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''}`}>
                   <Group justify="space-between" mb="xs">
                     <Text fw={600} size="lg">{item.name}</Text>
                     {isActive && <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>Active</Badge>}
                     {isSuspended && <Badge color="orange" variant="light">Suspended</Badge>}
                     {inTier && !isActive && <Badge color="blue" variant="light">In Your Plan</Badge>}
                     {gateOff && !isActive && <Badge color="yellow" variant="light">Disabled in Settings</Badge>}
+                    {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
                   </Group>
 
                   <Text size="sm" c="dimmed" className="flex-grow" mb="md">
                     {item.description}
                   </Text>
 
+                  {notEligible && (
+                    <Text size="xs" c="dimmed" className="mb-md" style={{ fontStyle: 'italic' }}>
+                      {item.ineligibleReason}
+                    </Text>
+                  )}
+
                   <Group justify="space-between" mt="auto">
-                    <Text fw={700} size="xl" c="blue">
+                    <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'blue'}>
                       {formatPrice(item.priceCents, item.billingCycle)}
                     </Text>
 
@@ -228,6 +242,12 @@ export default function FeatureStorePage() {
                       <Button variant="light" color="yellow" size="sm" disabled>
                         Enable in Settings
                       </Button>
+                    ) : notEligible ? (
+                      <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
+                        <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
+                          Upgrade Plan
+                        </Button>
+                      </Link>
                     ) : (
                       <Button 
                         variant="gradient"

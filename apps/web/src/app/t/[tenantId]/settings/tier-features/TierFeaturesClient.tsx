@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, X, Sparkles, TrendingUp, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Check, X, Sparkles, TrendingUp, Zap, ChevronDown, ChevronRight, ShoppingBag, LayoutGrid, List } from 'lucide-react';
 import { useTenantComplete } from '@/hooks/dashboard/useTenantComplete';
 import { useTierConfig } from '@/lib/tiers/useTierConfig';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -121,11 +121,51 @@ function getCapabilityFeatureRows(
   });
 }
 
+interface EffectiveFeatureRow {
+  feature: string;
+  featureName: string;
+  capabilityKey: string;
+  capabilityLabel: string;
+  isPurchased: boolean;
+  isFlexible: boolean;
+}
+
+function buildEffectiveFeatures(
+  tierFeatures: string[],
+  purchasedFeatureKeys: string[],
+  resolvedCaps: ResolvedCapSummary[] | null,
+): EffectiveFeatureRow[] {
+  const purchasedSet = new Set(purchasedFeatureKeys);
+  const tierSet = new Set(tierFeatures);
+  const allFeatures = new Set<string>([...tierFeatures, ...purchasedFeatureKeys]);
+  const capLabelMap = new Map<string, string>();
+  const capFlexibleSet = new Set<string>();
+  if (resolvedCaps) {
+    resolvedCaps.forEach(rc => {
+      capLabelMap.set(rc.key, rc.label);
+      if (rc.flexible) capFlexibleSet.add(rc.key);
+    });
+  }
+  return Array.from(allFeatures).sort().map(feature => {
+    const capKey = getCapabilityTypeForFeature(feature) || 'uncategorized';
+    const capLabel = capLabelMap.get(capKey) || capKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return {
+      feature,
+      featureName: FEATURE_DISPLAY_NAMES[feature] || feature.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      capabilityKey: capKey,
+      capabilityLabel: capLabel,
+      isPurchased: purchasedSet.has(feature) && !tierSet.has(feature),
+      isFlexible: capFlexibleSet.has(capKey),
+    };
+  });
+}
+
 export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
   const { tenant, tier, loading } = useTenantComplete(tenantId);
   const tierConfig = useTierConfig();
   const { data: allCaps, loading: capsLoading } = useAllCapabilities(tenantId);
   const [expandedCap, setExpandedCap] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'comparison' | 'effective'>('comparison');
 
   const currentTierKey = tier?.effective?.id || tenant?.subscriptionTier || 'discovery';
   const currentTierName = TIER_DISPLAY_NAMES[currentTierKey] || currentTierKey;
@@ -163,6 +203,23 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
     return map;
   }, [resolvedCaps]);
 
+  const effectiveFeatures = useMemo(() => {
+    if (!allCaps) return [];
+    const tierFeatures = tierConfig.getTierFeatures(currentTierKey);
+    return buildEffectiveFeatures(tierFeatures, allCaps.purchasedFeatureKeys, resolvedCaps);
+  }, [allCaps, tierConfig, currentTierKey, resolvedCaps]);
+
+  const effectiveFeaturesByCapability = useMemo(() => {
+    const groups: Record<string, EffectiveFeatureRow[]> = {};
+    effectiveFeatures.forEach(f => {
+      if (!groups[f.capabilityKey]) groups[f.capabilityKey] = [];
+      groups[f.capabilityKey].push(f);
+    });
+    return groups;
+  }, [effectiveFeatures]);
+
+  const purchasedCount = effectiveFeatures.filter(f => f.isPurchased).length;
+
   const isLoading = loading || (capsLoading && !allCaps);
 
   return (
@@ -179,7 +236,7 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
               Tier Features
             </h1>
             <p className="text-sm text-neutral-500 mt-1">
-              Your current plan and capability comparison
+              Your plan, resolved capabilities, and effective features
             </p>
           </div>
         </div>
@@ -213,6 +270,30 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
                   </Link>
                 </div>
               </div>
+            </div>
+
+            {/* Tab Bar */}
+            <div className="flex items-center gap-1 border-b border-neutral-200">
+              <button
+                onClick={() => setActiveTab('comparison')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'comparison' ? 'border-blue-600 text-blue-600' : 'border-transparent text-neutral-500 hover:text-neutral-700'}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Tier Comparison
+              </button>
+              <button
+                onClick={() => setActiveTab('effective')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'effective' ? 'border-blue-600 text-blue-600' : 'border-transparent text-neutral-500 hover:text-neutral-700'}`}
+              >
+                <List className="w-4 h-4" />
+                Effective Features
+                {purchasedCount > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full">
+                    <ShoppingBag className="w-2.5 h-2.5" />
+                    {purchasedCount}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Resolved Capabilities — from effective capability resolution */}
@@ -257,6 +338,7 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
             )}
 
             {/* Capability Comparison Table */}
+            {activeTab === 'comparison' && (
             <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-neutral-200">
                 <h2 className="text-lg font-semibold text-neutral-900">Capability Comparison</h2>
@@ -370,8 +452,81 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
                 </table>
               </div>
             </div>
+            )}
 
-            {/* Feature Store CTA */}
+            {/* Effective Features Tab */}
+            {activeTab === 'effective' && (
+              <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-neutral-200">
+                  <div className="flex items-center gap-2">
+                    <List className="w-4 h-4 text-blue-500" />
+                    <h2 className="text-lg font-semibold text-neutral-900">All Effective Features</h2>
+                  </div>
+                  <p className="text-sm text-neutral-500 mt-1">
+                    Every feature currently active for your tenant — bundled tier features plus individually purchased add-ons
+                  </p>
+                  {purchasedCount > 0 && (
+                    <div className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg">
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      {purchasedCount} purchased {purchasedCount === 1 ? 'feature' : 'features'} beyond your tier
+                    </div>
+                  )}
+                </div>
+                <div className="divide-y divide-neutral-100">
+                  {Object.entries(effectiveFeaturesByCapability).map(([capKey, features]) => {
+                    const capMeta = CAPABILITY_META.find(m => m.key === capKey);
+                    const capLabel = capMeta?.label || features[0]?.capabilityLabel || capKey;
+                    const isFlexible = features.some(f => f.isFlexible);
+                    const purchasedInGroup = features.filter(f => f.isPurchased).length;
+                    return (
+                      <div key={capKey} className="p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-sm font-semibold text-neutral-900">{capLabel}</span>
+                          {isFlexible && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                              <Zap className="w-2.5 h-2.5" />
+                              Flexible
+                            </span>
+                          )}
+                          {purchasedInGroup > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full">
+                              <ShoppingBag className="w-2.5 h-2.5" />
+                              {purchasedInGroup} purchased
+                            </span>
+                          )}
+                          <span className="text-xs text-neutral-400 ml-auto">{features.length} features</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {features.map(f => (
+                            <div key={f.feature} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-neutral-50">
+                              <div className="flex-shrink-0 w-4 h-4 rounded-full bg-green-100 flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-green-600" />
+                              </div>
+                              <span className="text-neutral-700 flex-1 truncate">{f.featureName}</span>
+                              {f.isPurchased && (
+                                <span title="Individually purchased from Feature Store" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-700 bg-purple-100 px-1 py-0.5 rounded-full">
+                                  <ShoppingBag className="w-2.5 h-2.5" />
+                                </span>
+                              )}
+                              {f.isFlexible && !f.isPurchased && (
+                                <span title="Unlocked via flexible tier capability" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1 py-0.5 rounded-full">
+                                  <Zap className="w-2.5 h-2.5" />
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {effectiveFeatures.length === 0 && (
+                    <div className="p-8 text-center text-sm text-neutral-400">
+                      No effective features found. Loading may still be in progress.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-6">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>

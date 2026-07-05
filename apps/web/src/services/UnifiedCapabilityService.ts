@@ -139,6 +139,7 @@ interface BackendEffectiveCapabilities {
     org_override?: Record<string, Record<string, boolean>>;
   };
   uncategorized_features: string[];
+  purchased_feature_keys?: string[];
 }
 
 interface BackendEffectiveCommerce {
@@ -922,6 +923,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
+    purchasedFeatureKeys: b.purchased_feature_keys || [],
   };
 }
 

@@ -99,13 +99,20 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 ## What Was Built (All Phases Complete)
 
 ### Phase 1: Backend Purchase API
-- `GET /api/subscription/feature-catalog` — Returns purchasable features from `bsaas_catalog` table with tier-aware status
+- `GET /api/subscription/feature-catalog` — Returns purchasable features from `bsaas_catalog` table with tier-aware status **and capability engagement eligibility** (`tierEligible`, `ineligibleReason` per item)
 - `GET /api/subscription/feature-purchases` — Lists tenant's active purchases
-- `POST /api/subscription/feature-purchase` — Self-service purchase with Stripe charge
+- `POST /api/subscription/feature-purchase` — Self-service purchase with Stripe charge **(pre-charge capability engagement check blocks ineligible purchases with `403 upgrade_required`)**
 - `POST /api/subscription/feature-purchase/:id/cancel` — Cancel a purchase
 - **File**: `apps/api/src/routes/bsaas-purchases.ts`
 - **Catalog table**: `bsaas_catalog` (migration `047_bsaas_catalog.sql`)
 - Purchase metadata includes `payment_method_id` for renewal re-charging
+
+### Phase 5: Capability Engagement Purchase Gate
+- **Rule**: A merchant can only purchase a feature à la carte if their tier already grants at least one other feature within the same capability type ("active capability engagement"). This enables vertical upgrades within an engaged capability domain while blocking purchases for capability types the tier doesn't touch at all.
+- **Function**: `checkCapabilityEngagement(tenantId, featureKey)` in `bsaas-purchases.ts`
+- **Data flow**: `feature_key → capability_features_list → capability_type_id → tier_features_list (WHERE tier_id IN tenant_tiers AND is_enabled=true)`
+- **No schema changes**: Reuses existing `tier_features_list → capability_features_list → capability_type_list` chain
+- **Frontend**: Ineligible items show locked card with "Upgrade Required" badge, reason text, and "Upgrade Plan" button linking to `/t/{tenantId}/settings/store?tab=plans`
 
 ### Phase 2: Frontend Purchase Page
 - **File**: `apps/web/src/app/(platform)/settings/feature-store/page.tsx`
@@ -143,20 +150,22 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 2. Sees catalog of purchasable features (e.g., "CRM Assistant Skill — $19/mo")
    - Features already in their tier show as "Included" (in_tier_active)
    - Features in tier but gated off show as "Included (inactive)" (in_tier_gate_off)
-  . Features not in tier show price + "Add" button (not_in_tier)
-3. Clicks "Add" on a feature
+   - Features not in tier and tier is engaged in the capability type show price + "Add" button (not_in_tier, tierEligible=true)
+   - Features not in tier and tier has NO engagement in the capability type show locked state with "Upgrade Required" badge (not_in_tier, tierEligible=false)
+3. Clicks "Add" on an eligible feature
 4. Selects existing payment method or enters new card (Stripe Elements)
 5. Frontend calls POST /api/subscription/feature-purchase
    { featureKey: 'chatbot_skill_crm_assistant', paymentMethodId: 'pm_xxx' }
 6. Backend:
    a. Validate feature exists in bsaas_catalog and is active
    b. Check tenant doesn't already have active purchase or tier inclusion
-   c. Get payment method via SubscriptionBillingService
-   d. Charge via Stripe (chargePaymentMethod — one-time PaymentIntent)
-   e. Upsert tenant_feature_purchases (status=active, source=bsaas, expires_at=+30d or +365d)
-   f. invalidateEffectiveCapabilities(tenantId)
-   g. Audit log (feature_purchase.create)
-   h. BillingNotificationService.sendNotification({ type: 'bsaas_purchase_success' })
+   c. **Check capability engagement** — verify tenant's tier has ≥1 feature in the same capability type. If not, return 403 upgrade_required.
+   d. Get payment method via SubscriptionBillingService
+   e. Charge via Stripe (chargePaymentMethod — one-time PaymentIntent)
+   f. Upsert tenant_feature_purchases (status=active, source=bsaas, expires_at=+30d or +365d)
+   g. invalidateEffectiveCapabilities(tenantId)
+   h. Audit log (feature_purchase.create)
+   i. BillingNotificationService.sendNotification({ type: 'bsaas_purchase_success' })
 7. Frontend refreshes capabilities → feature is now available
 8. Bot skill endpoints return 200 instead of 403
 ```

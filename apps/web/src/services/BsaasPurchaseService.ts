@@ -25,6 +25,8 @@ export interface BsaasCatalogItem {
   } | null;
   tierAvailability: 'not_in_tier' | 'in_tier_active' | 'in_tier_gate_off';
   tierCapabilityKey: string | null;
+  tierEligible: boolean;
+  ineligibleReason: string | null;
 }
 
 export interface BsaasPurchaseRecord {

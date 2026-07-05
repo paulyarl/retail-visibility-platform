@@ -207,6 +207,86 @@ async function maybeCancelCompanion(
 }
 
 /**
+ * Check whether the tenant's tier already grants at least one feature within the same
+ * capability type as the given feature key. This is the "active capability engagement" rule:
+ * a merchant can purchase a feature à la carte only if their tier already engages them in
+ * that capability domain (i.e., they have at least one other feature in the same type).
+ *
+ * Returns { eligible: true } if the tier has at least one feature in the capability type,
+ * or { eligible: false, reason } if not (meaning the merchant needs a tier upgrade first).
+ */
+async function checkCapabilityEngagement(
+  tenantId: string,
+  featureKey: string
+): Promise<{ eligible: boolean; reason: string | null; capabilityKey: string | null }> {
+  // 1. Find the feature and its capability type
+  const feature = await prisma.features_list.findUnique({
+    where: { key: featureKey },
+    select: { id: true },
+  });
+  if (!feature) {
+    return { eligible: false, reason: 'Feature not found', capabilityKey: null };
+  }
+
+  const capLink = await prisma.capability_features_list.findFirst({
+    where: { feature_id: feature.id },
+    include: { capability_type_list: { select: { key: true, id: true } } },
+  });
+  if (!capLink?.capability_type_list) {
+    // No capability type association — allow purchase (standalone feature)
+    return { eligible: true, reason: null, capabilityKey: null };
+  }
+
+  const capabilityKey = capLink.capability_type_list.key;
+  const capabilityTypeId = capLink.capability_type_list.id;
+
+  // 2. Get tenant's tier(s)
+  const tenant = await prisma.tenants.findUnique({
+    where: { id: tenantId },
+    select: {
+      subscription_tier: true,
+      organization_id: true,
+      organizations_list: { select: { subscription_tier: true } },
+    },
+  });
+  if (!tenant) {
+    return { eligible: false, reason: 'Tenant not found', capabilityKey };
+  }
+
+  const tierKeys = [tenant.subscription_tier, tenant.organizations_list?.subscription_tier]
+    .filter((k): k is string => !!k);
+  if (tierKeys.length === 0) {
+    return { eligible: false, reason: 'No subscription tier assigned', capabilityKey };
+  }
+
+  const tiers = await prisma.subscription_tiers_list.findMany({
+    where: { tier_key: { in: tierKeys } },
+    select: { id: true },
+  });
+  const tierIds = tiers.map(t => t.id);
+
+  // 3. Check if the tenant's tier has ANY feature in the same capability type
+  const tierFeaturesInCapType = await prisma.tier_features_list.findFirst({
+    where: {
+      tier_id: { in: tierIds },
+      capability_type_id: capabilityTypeId,
+      is_enabled: true,
+    },
+    select: { feature_key: true },
+  });
+
+  if (!tierFeaturesInCapType) {
+    return {
+      eligible: false,
+      reason: `Your current plan doesn't include any features in the ${capabilityKey.replace(/_options$/, '').replace(/_/g, ' ')} category. Upgrade your plan to unlock this feature.`,
+      capabilityKey,
+    };
+  }
+
+  return { eligible: true, reason: null, capabilityKey };
+}
+
+/**
  * Helper to get tenant ID from request
  */
 function getTenantId(req: Request): string | null {
@@ -354,8 +434,13 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
     const tierStatusPromises = catalog.map(item => checkTierFeatureStatus(tenantId, item.key));
     const tierStatuses = await Promise.all(tierStatusPromises);
 
+    // Check capability engagement eligibility for each catalog item (batch)
+    const engagementPromises = catalog.map(item => checkCapabilityEngagement(tenantId, item.key));
+    const engagementResults = await Promise.all(engagementPromises);
+
     const catalogWithStatus = catalog.map((item, i) => {
       const tierStatus = tierStatuses[i];
+      const engagement = engagementResults[i];
       let tierAvailability: 'not_in_tier' | 'in_tier_active' | 'in_tier_gate_off' = 'not_in_tier';
       if (tierStatus.inTier) {
         tierAvailability = tierStatus.merchantGateOn === false ? 'in_tier_gate_off' : 'in_tier_active';
@@ -365,6 +450,8 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
         purchase: purchaseMap.get(item.key) || null,
         tierAvailability,
         tierCapabilityKey: tierStatus.capabilityKey,
+        tierEligible: engagement.eligible,
+        ineligibleReason: engagement.reason,
       };
     });
 
@@ -482,7 +569,19 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       });
     }
 
-    // 2c. For trial branch, also ensure companion purchase
+    // 2c. Check capability engagement — tenant's tier must already have at least one
+    // feature in the same capability type to purchase à la carte within that domain
+    const engagement = await checkCapabilityEngagement(tenantId, featureKey);
+    if (!engagement.eligible) {
+      return res.status(403).json({
+        success: false,
+        error: 'upgrade_required',
+        message: engagement.reason || 'Your current plan does not support purchasing this feature. Please upgrade your plan.',
+        capabilityKey: engagement.capabilityKey,
+      });
+    }
+
+    // 2d. For trial branch, also ensure companion purchase
     // (handled after trial creation below)
 
     // 3. Trial branch: if trial_days > 0, create trial purchase without charging
