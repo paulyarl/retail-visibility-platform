@@ -23,7 +23,8 @@ export function resolveStorefrontOptions(
   features: Record<string, boolean>,
   merchantPrefs: StorefrontOptionsMerchantSettings | null
 ): EffectiveStorefrontOptions {
-  const enabled = !!features.storefront_opt_enabled;
+  const disabled = !!features.storefront_opt_disabled;
+  const enabled = !disabled && !!features.storefront_opt_enabled;
   const flexible = !!features.storefront_opt_flexible;
   const mainOn = enabled;
 

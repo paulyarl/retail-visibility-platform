@@ -18,26 +18,26 @@ export function resolveFeaturedOptions(
   features: Record<string, boolean>,
   merchantPrefs: FeaturedOptionsMerchantSettings | null
 ): EffectiveFeatured {
-  const enabled = !!features.featured_enabled;
+  const disabled = !!features.featured_disabled;
   const flexible = !!features.featured_flexible;
-
-  // Fail-open: when no tier config exists at all, allow all types.
-  // This matches the SQL gate behavior in tier-capability-sql.ts where
-  // tfa.tier_key IS_NULL skips all capability gating.
-  const hasAnyFeaturedConfig = Object.keys(features).some(k => k.startsWith('featured_'));
 
   const tenantControlled: FeaturedType[] = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured'];
   const platformControlled: FeaturedType[] = ['bestseller', 'trending', 'recommended', 'random_featured'];
 
+  // Check if any individual featured feature is enabled (implicit enable)
+  const allFeaturedTypes = [...tenantControlled, ...platformControlled];
+  const hasAnyFeaturedFeature = allFeaturedTypes.some(t => !!features[`featured_${t}`]);
+  const enabled = !disabled && (!!features.featured_enabled || hasAnyFeaturedFeature);
+
   const allowedTenantTypes: FeaturedType[] = [];
   const allowedPlatformTypes: FeaturedType[] = [];
 
-  if (!hasAnyFeaturedConfig || flexible || enabled) {
+  if (flexible || enabled) {
     for (const t of tenantControlled) {
-      if (!hasAnyFeaturedConfig || flexible || features[`featured_${t}`]) allowedTenantTypes.push(t);
+      if (flexible || features[`featured_${t}`]) allowedTenantTypes.push(t);
     }
     for (const t of platformControlled) {
-      if (!hasAnyFeaturedConfig || flexible || features[`featured_${t}`]) allowedPlatformTypes.push(t);
+      if (flexible || features[`featured_${t}`]) allowedPlatformTypes.push(t);
     }
   }
 
@@ -60,8 +60,8 @@ export function resolveFeaturedOptions(
   const effectiveTenantTypes = allowedTenantTypes.filter((t) => prefs[`featured_${t}` as keyof typeof prefs] !== false);
   const effectivePlatformTypes = allowedPlatformTypes.filter((t) => prefs[`featured_${t}` as keyof typeof prefs] !== false);
 
-  // Fail-open: unconfigured tiers are treated as enabled to match SQL gate behavior
-  const isEnabled = !hasAnyFeaturedConfig || enabled;
+  // Enabled = explicit _enabled OR any individual featured feature enabled (and not _disabled)
+  const isEnabled = enabled;
 
   return {
     enabled: isEnabled,

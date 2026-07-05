@@ -266,7 +266,7 @@ async function checkCapabilityEngagement(
   const tierIds = tiers.map(t => t.id);
 
   // 3. Check if the tenant's tier has ANY feature in the same capability type
-  const tierFeaturesInCapType = await prisma.tier_features_list.findFirst({
+  const tierFeaturesInCapType = await prisma.tier_features_list.findMany({
     where: {
       tier_id: { in: tierIds },
       capability_type_id: capabilityTypeId,
@@ -275,10 +275,22 @@ async function checkCapabilityEngagement(
     select: { feature_key: true },
   });
 
-  if (!tierFeaturesInCapType) {
+  if (tierFeaturesInCapType.length === 0) {
     return {
       eligible: false,
       reason: `Your current plan doesn't include any features in the ${capabilityKey.replace(/_options$/, '').replace(/_/g, ' ')} category. Upgrade your plan to unlock this feature.`,
+      capabilityKey,
+    };
+  }
+
+  // 4. Check if the capability type is explicitly disabled (all enabled features are _disabled keys)
+  const hasNonDisabledFeature = tierFeaturesInCapType.some(
+    tf => !tf.feature_key.endsWith('_disabled')
+  );
+  if (!hasNonDisabledFeature) {
+    return {
+      eligible: false,
+      reason: `The ${capabilityKey.replace(/_options$/, '').replace(/_/g, ' ')} capability is explicitly disabled for your plan.`,
       capabilityKey,
     };
   }

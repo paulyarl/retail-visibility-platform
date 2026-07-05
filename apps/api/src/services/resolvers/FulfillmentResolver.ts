@@ -13,7 +13,8 @@ export function resolveFulfillment(
   features: Record<string, boolean>,
   merchantPrefs: FulfillmentMerchantSettings | null
 ): EffectiveFulfillment {
-  const enabled = !!features.fulfillment_enabled;
+  const disabled = !!features.fulfillment_disabled;
+  const enabled = !disabled && !!features.fulfillment_enabled;
   const flexible = !!features.fulfillment_flexible;
   const pickup = !!features.fulfillment_pickup;
   const delivery = !!features.fulfillment_delivery;

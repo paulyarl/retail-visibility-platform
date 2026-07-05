@@ -23,7 +23,7 @@ const dynamicTier = flexible || !!feat.chatbot_dynamic_enabled;
 1. **Full domain unlock** — Instead of buying individual features one by one, the merchant gets everything in the capability domain
 2. **Zero code changes** — The `EffectiveCapabilityResolver` already merges `tenant_feature_purchases` into `mergedFeatures`, so purchasing `crm_flexible` automatically sets `feat.crm_flexible = true` in the resolver
 3. **Perfect engagement fit** — The merchant must already be engaged in the capability (has ≥1 feature from their tier), so flexible is a natural vertical upgrade
-4. **Compelling pricing** — Priced below a full tier upgrade but above individual feature purchases
+4. **Compelling pricing** — Priced below a full tier upgrade but above any individual feature price within the domain, making it a bargain vs. buying features separately
 
 ### Flexible Toggle Sale Candidates
 
@@ -600,10 +600,98 @@ Same flow as existing catalog items. Each feature key must:
 
 ### Pricing Strategy
 
-Flexible toggle prices should be:
-- **Below** the cost of upgrading to the cheapest tier that includes flexible for that capability
-- **Above** the cost of buying 2-3 individual features (incentivizes flexible over cherry-picking)
-- **Proportional** to the number of features unlocked (more features = higher price)
+#### Flexible Toggle Pricing Rules
+
+Flexible toggle prices must satisfy **three constraints**:
+
+1. **Above every individual feature price in the same domain** — Flexible is the premium option; no single feature in the domain may cost more. This makes flexible the clear "best value" for merchants who want multiple features.
+2. **Below the cost of buying all individual features** — The discount vs. buying everything separately is what makes flexible a bargain. Target 40-60% off the sum of all individual feature prices in the domain.
+3. **Below the cheapest tier upgrade that grants flexible for that domain** — The merchant should feel they're getting a deal vs. upgrading their entire tier.
+
+**Example — Chatbot domain**:
+- Most expensive individual feature: `chatbot_skill_cross_merchant` at $24/mo
+- Sum of all individual chatbot features (if sold separately): ~$120/mo
+- Cheapest tier with `chatbot_flexible`: Professional at $199/mo
+- **Flexible price: $49/mo** — above the $24/mo max individual, well below $120/mo sum, well below $199/mo tier upgrade
+
+#### Individual Feature Pricing Rule
+
+No individual feature within a domain may be priced higher than that domain's flexible toggle. If an individual feature's standalone value exceeds the flexible price, the flexible price must be raised.
+
+#### Cross-Domain Bundles
+
+Bundles group features across multiple capability types into a single purchasable product at a discount vs. buying each separately. Bundles are a **new product type** in the BSaaS store.
+
+**Bundle types**:
+
+1. **Flexible Bundles** — Multiple flexible toggles packaged together at a steep discount
+2. **Feature Bundles** — Curated groups of individual features across domains that solve a specific merchant need
+3. **Mixed Bundles** — A flexible toggle + individual features from other domains
+
+**Flexible Bundle Candidates**:
+
+| Bundle Name | Includes | Sum of Individual Flexibles | Bundle Price | Discount | Target Merchant |
+|---|---|---|---|---|---|
+| Customer Engagement Suite | `chatbot_flexible` + `crm_flexible` + `faq_flexible` | $107/mo | $79/mo | 26% | Merchants who want full bot + CRM + FAQ |
+| Commerce Power Pack | `social_commerce_flexible` + `storefront_opt_flexible` + `product_options_flexible` | $97/mo | $69/mo | 29% | Merchants investing in storefront + social selling |
+| Operations Bundle | `integration_flexible` + `fulfillment_flexible` + `payment_gateway_flexible` | $69/mo | $49/mo | 29% | Merchants who need all operational integrations |
+| Growth Bundle | `featured_flexible` + `directory_entry_flexible` + `quickstart_flexible` | $57/mo | $39/mo | 32% | Merchants focused on visibility and onboarding |
+| Storefront Pro Bundle | `storefront_both_options` + `storefront_opt_flexible` + `product_types_flexible` | $59/mo | $39/mo | 34% | Merchants building a full storefront experience |
+| Everything Pack | All 17 flexible toggles | $434/mo | $299/mo | 31% | Merchant who wants full platform without Enterprise tier |
+
+**Feature Bundle Candidates** (curated cross-domain):
+
+| Bundle Name | Includes | Sum of Individual Prices | Bundle Price | Discount | Target Merchant |
+|---|---|---|---|---|---|
+| Social Seller | `social_commerce_meta_enabled` + `social_commerce_tiktok_enabled` + `social_commerce_abandoned_cart` + `storefront_social` | $67/mo | $49/mo | 27% | Merchants selling via Instagram/TikTok |
+| AI Assistant | `chatbot_dynamic_enabled` + `chatbot_kb_rag_retrieval` + `quickstart_wizard_ai` + `quickstart_image_gen` | $47/mo | $35/mo | 26% | Merchants who want AI across bot + onboarding |
+| POS Pro | `integration_clover` + `integration_square` + `payment_gateway_square` + `fulfillment_shipping` | $38/mo | $29/mo | 24% | Retail merchants with physical + online sales |
+| Premium Listings | `directory_entry_gallery_enabled` + `directory_entry_layout_premium` + `directory_entry_seo_enabled` + `featured_expiry_monitor` | $34/mo | $25/mo | 26% | Merchants investing in directory + featured visibility |
+
+**Bundle Pricing Rules**:
+
+1. **Below sum of parts** — Bundle price must be lower than buying each item separately (typically 20-35% discount)
+2. **Above the most expensive single item** — Bundle must still be a premium product
+3. **Engagement check per domain** — Each feature/flexible in the bundle must pass `checkCapabilityEngagement` for the merchant's tier. If any item fails, the entire bundle is blocked with an upgrade prompt for the specific capability type(s) the merchant isn't engaged in.
+4. **Prorated refunds on cancellation** — If a bundle is cancelled, each component is deactivated. No partial bundle persistence.
+
+**Bundle Implementation**:
+
+Bundles require a new `bsaas_bundles` table and purchase-flow changes:
+
+```sql
+CREATE TABLE IF NOT EXISTS bsaas_bundles (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  bundle_key      TEXT        NOT NULL UNIQUE,
+  marketing_name  TEXT        NOT NULL,
+  description     TEXT,
+  price_cents     INTEGER     NOT NULL CHECK (price_cents > 0),
+  billing_cycle   VARCHAR(20) NOT NULL DEFAULT 'monthly',
+  trial_days      INTEGER     NOT NULL DEFAULT 0,
+  is_active       BOOLEAN     NOT NULL DEFAULT true,
+  sort_order      INTEGER     NOT NULL DEFAULT 0,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS bsaas_bundle_items (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  bundle_id       UUID        NOT NULL REFERENCES bsaas_bundles(id) ON DELETE CASCADE,
+  feature_key     TEXT        NOT NULL,
+  sort_order      INTEGER     NOT NULL DEFAULT 0,
+  UNIQUE (bundle_id, feature_key)
+);
+```
+
+The purchase flow for bundles would:
+1. Validate all `feature_key`s in the bundle exist in `features_list`
+2. Run `checkCapabilityEngagement` for each feature — all must pass
+3. Charge the bundle price (single Stripe charge)
+4. Create one `tenant_feature_purchases` row per feature in the bundle (all linked to the same charge)
+5. Call `ensureCompanionPurchase` for each feature's parent gate
+6. `invalidateEffectiveCapabilities` once after all purchases are created
+
+The catalog API (`GET /feature-catalog`) would return bundles alongside individual features, with a `type: 'bundle' | 'feature'` field. The frontend would render bundles as grouped cards with their component features listed.
 
 ### Migration Template
 

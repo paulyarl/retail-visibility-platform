@@ -15,7 +15,8 @@ export function resolveBarcodeScan(
   features: Record<string, boolean>,
   merchantPrefs: BarcodeScanMerchantSettings | null
 ): EffectiveBarcodeScan {
-  const enabled = !!features.barcode_enabled;
+  const disabled = !!features.barcode_disabled;
+  const enabled = !disabled && !!features.barcode_enabled;
   const flexible = !!features.barcode_flexible;
 
   const allowedModes: BarcodeScanMode[] = [];

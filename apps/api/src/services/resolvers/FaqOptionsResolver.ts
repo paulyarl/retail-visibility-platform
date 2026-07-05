@@ -27,7 +27,8 @@ export function resolveFaqOptions(
   features: Record<string, boolean>,
   merchantPrefs?: FaqOptionsMerchantSettings | null
 ): EffectiveFaq {
-  const enabled = !!features.faq_enabled && (merchantPrefs?.faq_enabled !== false);
+  const disabled = !!features.faq_disabled;
+  const enabled = !disabled && !!features.faq_enabled && (merchantPrefs?.faq_enabled !== false);
   const flexible = !!features.faq_flexible;
 
   const storefrontEnabled = flexible || !!features.faq_storefront_enabled;

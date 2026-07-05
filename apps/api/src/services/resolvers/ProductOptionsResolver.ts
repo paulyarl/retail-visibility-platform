@@ -31,7 +31,6 @@ export function resolveProductOptions(
   const legacyEnabled = !!features.product_enabled;
   const legacyFlexible = !!features.product_flexible;
 
-  const hasAnyFeature = hasAnyOptionsFeature(features);
   const enabled = masterDisabled
     ? false
     : masterEnabled
@@ -42,7 +41,7 @@ export function resolveProductOptions(
           ? true
           : legacyFlexible
             ? true
-            : hasAnyFeature;
+            : hasAnyOptionsFeature(features);
 
   const isFlexible = flexible || legacyFlexible;
 

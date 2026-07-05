@@ -20,7 +20,8 @@ export function resolvePaymentGateway(
   features: Record<string, boolean>,
   merchantPrefs: PaymentGatewayMerchantSettings | null
 ): EffectivePaymentGateway {
-  const enabled = !!features.payment_gateway_enabled;
+  const disabled = !!features.payment_gateway_disabled;
+  const enabled = !disabled && !!features.payment_gateway_enabled;
   const flexible = !!features.payment_gateway_flexible;
 
   // Tier-allowed gateways (hard gate)

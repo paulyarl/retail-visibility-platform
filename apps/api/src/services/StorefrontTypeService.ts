@@ -140,7 +140,8 @@ class StorefrontTypeService {
     // Determine enabled state
     // 1. Deactivation master gate takes highest priority
     // 2. Activation master gates enable explicitly
-    // 3. Feature/flexible gates enable implicitly when master gates are untouched
+    // 3. Any individual feature gate enabled implies enabled
+    // 4. Default to disabled when nothing is enabled
     const hasAnyFeatureGate = online || retail || service || social || bothOptions;
     const isEnabled = masterDeactivate
       ? false

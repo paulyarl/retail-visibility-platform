@@ -17,8 +17,18 @@ export function resolveDirectoryEntryOptions(
   merchantPrefs: StorefrontOptionsMerchantSettings | null
 ): EffectiveDirectoryEntryOptions {
   // Single-key pattern: present + true = enabled; missing/false = disabled
-  const enabled = !!features.directory_entry_enabled;
+  const disabled = !!features.directory_entry_disabled;
   const flexible = !!features.directory_entry_flexible;
+
+  // Check if any individual directory_entry feature is enabled (implicit enable)
+  const hasAnyDirectoryEntryFeature = Object.keys(features).some(
+    k => k.startsWith('directory_entry_') &&
+    k !== 'directory_entry_enabled' &&
+    k !== 'directory_entry_disabled' &&
+    k !== 'directory_entry_flexible' &&
+    features[k]
+  );
+  const enabled = !disabled && (!!features.directory_entry_enabled || hasAnyDirectoryEntryFeature);
   const mainOn = enabled;
 
   // Layout gates
@@ -31,12 +41,6 @@ export function resolveDirectoryEntryOptions(
     if (features.directory_entry_layout_editorial) allowedLayouts.push('editorial');
     if (features.directory_entry_layout_immersive) allowedLayouts.push('immersive');
     if (features.directory_entry_layout_premium) allowedLayouts.push('premium');
-  }
-
-  // Fail-open: when no directory entry config exists at all, allow classic
-  const hasAnyDirectoryEntryConfig = Object.keys(features).some(k => k.startsWith('directory_entry_'));
-  if (!hasAnyDirectoryEntryConfig && allowedLayouts.length === 0) {
-    allowedLayouts.push('classic');
   }
 
   const prefs = {

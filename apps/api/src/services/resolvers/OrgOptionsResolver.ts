@@ -29,7 +29,8 @@ export function resolveOrgOptions(
   features: Record<string, boolean>,
   capabilityEnabled?: boolean
 ): EffectiveOrgOptions {
-  const enabled = !!features.org_enabled || !!capabilityEnabled;
+  const disabled = !!features.org_disabled;
+  const enabled = !disabled && (!!features.org_enabled || !!capabilityEnabled);
   const flexible = !!features.org_flexible;
 
   // Tabs: overview and billing are always available when org is enabled

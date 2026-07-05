@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, X, Sparkles, TrendingUp, Zap, ChevronDown, ChevronRight, ShoppingBag, LayoutGrid, List } from 'lucide-react';
+import { ArrowLeft, Check, X, Sparkles, TrendingUp, Zap, ChevronDown, ChevronRight, ShoppingBag, LayoutGrid, List, Info, Boxes, Layers } from 'lucide-react';
 import { useTenantComplete } from '@/hooks/dashboard/useTenantComplete';
 import { useTierConfig } from '@/lib/tiers/useTierConfig';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -268,6 +268,53 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
                     <TrendingUp className="w-4 h-4" />
                     Upgrade Plan
                   </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Capability Education Panel */}
+            <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Info className="w-4 h-4 text-blue-500" />
+                  <h2 className="text-lg font-semibold text-neutral-900">Understanding Capabilities & Features</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Boxes className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-semibold text-neutral-900">What is a Capability?</span>
+                    </div>
+                    <p className="text-xs text-neutral-600 leading-relaxed">
+                      A capability is a platform domain — like Storefront, Commerce, or CRM — that groups related features together. Your tier unlocks specific capabilities, and each capability enables a set of features within that domain.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-neutral-900">Flexible Capabilities</span>
+                    </div>
+                    <p className="text-xs text-neutral-600 leading-relaxed">
+                      Some tiers unlock a <span className="font-medium">flexible</span> capability, meaning every feature within that domain is automatically enabled — no need to configure each one individually. Look for the <Zap className="w-3 h-3 inline text-amber-600" /> marker.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ShoppingBag className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-semibold text-neutral-900">Purchased Features</span>
+                    </div>
+                    <p className="text-xs text-neutral-600 leading-relaxed">
+                      Need a feature from a higher tier without upgrading? Purchase individual features from the Feature Store. These add to your effective features beyond what your tier bundle includes. Look for the <ShoppingBag className="w-3 h-3 inline text-purple-600" /> marker.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 rounded-lg bg-neutral-50 border border-neutral-200">
+                  <div className="flex items-start gap-2">
+                    <Layers className="w-4 h-4 text-neutral-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-neutral-500 leading-relaxed">
+                      <span className="font-medium text-neutral-700">How it works:</span> Your tier determines which capabilities are available. Capabilities resolve into specific features. Flexible capabilities unlock all features in a domain. Purchased features add on top of your tier bundle. The result is your <span className="font-medium text-neutral-700">effective features</span> — the complete set of what's active for your store right now.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

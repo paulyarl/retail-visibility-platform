@@ -34,13 +34,17 @@ export async function resolveCommerce(
   // and returns a merged CommerceCapabilities object.
   const caps = await getTenantCommerceCapabilities(tenantId);
 
+  // Check for explicit _disabled meta-key (disabled > enabled > flexible > features)
+  const commerceDisabled = !!rawCaps.capabilities.commerce_types?.features?.commerce_disabled;
+  const commerceEnabled = !commerceDisabled && caps.commerce_enabled;
+
   // Merchant preferences as booleans (default true when unset)
   const depositEnabled = merchantPrefs?.deposit_enabled !== false;
   const fullPaymentEnabled = merchantPrefs?.full_payment_enabled !== false;
 
   // Effective payment type: tier allows AND merchant enabled
   let effectivePaymentType: EffectiveCommerce['payment_type'] = 'none';
-  if (!caps.commerce_enabled) {
+  if (!commerceEnabled) {
     effectivePaymentType = 'none';
   } else if (caps.deposit_enabled && caps.full_payment_enabled) {
     effectivePaymentType = depositEnabled && fullPaymentEnabled ? 'both'
@@ -53,11 +57,11 @@ export async function resolveCommerce(
     effectivePaymentType = depositEnabled ? 'deposit' : 'none';
   }
 
-  const effectiveCartVisible = caps.commerce_enabled && effectivePaymentType !== 'none';
+  const effectiveCartVisible = commerceEnabled && effectivePaymentType !== 'none';
 
   return {
-    enabled: caps.commerce_enabled,
-    cart_visible: caps.commerce_enabled && (caps.deposit_enabled || caps.full_payment_enabled),
+    enabled: commerceEnabled,
+    cart_visible: commerceEnabled && (caps.deposit_enabled || caps.full_payment_enabled),
     payment_type: caps.deposit_enabled && caps.full_payment_enabled ? 'both'
       : caps.full_payment_enabled ? 'full'
       : caps.deposit_enabled ? 'deposit'
@@ -70,6 +74,6 @@ export async function resolveCommerce(
       deposit_enabled: depositEnabled,
       full_payment_enabled: fullPaymentEnabled,
     },
-    is_flexible: caps.deposit_enabled && caps.full_payment_enabled,
+    is_flexible: commerceEnabled && caps.deposit_enabled && caps.full_payment_enabled,
   };
 }
