@@ -32,7 +32,7 @@ const createCatalogSchema = z.object({
   marketing_name: z.string().optional(),
   description: z.string().optional(),
   price_cents: z.number().int().positive(),
-  billing_cycle: z.enum(['one_time', 'monthly', 'annual']).default('monthly'),
+  billing_cycle: z.enum(['one_time', 'weekly', 'monthly', 'annual']).default('monthly'),
   trial_days: z.number().int().min(0).default(0),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().default(0),
@@ -42,7 +42,7 @@ const updateCatalogSchema = z.object({
   marketing_name: z.string().optional(),
   description: z.string().optional(),
   price_cents: z.number().int().positive().optional(),
-  billing_cycle: z.enum(['one_time', 'monthly', 'annual']).optional(),
+  billing_cycle: z.enum(['one_time', 'weekly', 'monthly', 'annual']).optional(),
   trial_days: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
@@ -65,7 +65,34 @@ router.get('/', async (req: Request, res: Response) => {
       orderBy: { sort_order: 'asc' },
     });
 
-    res.json({ success: true, data: entries });
+    // Enrich with capability type info via features_list -> capability_features_list -> capability_type_list
+    const featureKeys = entries.map(e => e.feature_key);
+    let capabilityMap: Record<string, string[]> = {};
+    if (featureKeys.length > 0) {
+      const features = await prisma.features_list.findMany({
+        where: { key: { in: featureKeys } },
+        select: {
+          key: true,
+          capability_features_list: {
+            include: {
+              capability_type_list: { select: { key: true, name: true } },
+            },
+          },
+        },
+      });
+      for (const f of features) {
+        capabilityMap[f.key] = f.capability_features_list.map(
+          cfl => cfl.capability_type_list?.key
+        ).filter(Boolean) as string[];
+      }
+    }
+
+    const enriched = entries.map(e => ({
+      ...e,
+      capability_types: capabilityMap[e.feature_key] || [],
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (error) {
     console.error('[BSaaS Catalog] Error listing:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to list catalog' });

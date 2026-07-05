@@ -17,6 +17,7 @@ export interface BsaasCatalogEntry {
   trial_days: number;
   is_active: boolean;
   sort_order: number;
+  capability_types?: string[];
   created_at: string;
   updated_at: string;
 }

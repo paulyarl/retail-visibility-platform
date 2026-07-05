@@ -299,6 +299,24 @@ async function checkCapabilityEngagement(
 }
 
 /**
+ * Check capability engagement for all features in a bundle.
+ * Returns { eligible: true } if the tenant's tier has ≥1 feature in EVERY
+ * capability type represented by the bundle's component features.
+ */
+async function checkBundleEngagement(
+  tenantId: string,
+  featureKeys: string[]
+): Promise<{ eligible: boolean; failedDomains: Array<{ capabilityKey: string; reason: string }> }> {
+  const results = await Promise.all(
+    featureKeys.map(fk => checkCapabilityEngagement(tenantId, fk))
+  );
+  const failedDomains = results
+    .filter(r => !r.eligible && r.capabilityKey)
+    .map(r => ({ capabilityKey: r.capabilityKey!, reason: r.reason! }));
+  return { eligible: failedDomains.length === 0, failedDomains };
+}
+
+/**
  * Helper to get tenant ID from request
  */
 function getTenantId(req: Request): string | null {
@@ -420,7 +438,7 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
           description: entry.description || f.description || '',
           category: f.category,
           priceCents: entry.price_cents,
-          billingCycle: entry.billing_cycle as 'one_time' | 'monthly' | 'annual',
+          billingCycle: entry.billing_cycle as 'one_time' | 'weekly' | 'monthly' | 'annual',
           trialDays: entry.trial_days,
         };
       });
@@ -471,6 +489,79 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[BSaaS] Error fetching feature catalog:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch feature catalog' });
+  }
+});
+
+// ====================
+// Bundle Catalog
+// ====================
+
+// GET /api/subscription/bundle-catalog
+router.get('/bundle-catalog', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'Tenant ID is required' });
+    }
+
+    const bundles = await prisma.bsaas_bundles.findMany({
+      where: { is_active: true },
+      orderBy: { sort_order: 'asc' },
+      include: { bsaas_bundle_items: { orderBy: { sort_order: 'asc' } } },
+    });
+
+    // Fetch tenant's current purchases
+    const purchases = await prisma.tenant_feature_purchases.findMany({
+      where: {
+        tenant_id: tenantId,
+        status: { in: ['active', 'past_due', 'trial', 'suspended'] },
+      },
+      select: { feature_key: true, status: true, source: true },
+    });
+    const purchaseKeys = new Set(purchases.map(p => p.feature_key));
+
+    const bundleData = await Promise.all(
+      bundles.map(async (bundle) => {
+        const featureKeys = bundle.bsaas_bundle_items.map(i => i.feature_key);
+        const engagement = await checkBundleEngagement(tenantId, featureKeys);
+
+        // Check if all components are already active
+        const allActive = featureKeys.every(fk => purchaseKeys.has(fk));
+
+        // Check tier status for each component
+        const tierStatuses = await Promise.all(
+          featureKeys.map(fk => checkTierFeatureStatus(tenantId, fk))
+        );
+        const allInTier = tierStatuses.every(ts => ts.inTier);
+
+        return {
+          bundleKey: bundle.bundle_key,
+          name: bundle.marketing_name,
+          description: bundle.description || '',
+          priceCents: bundle.price_cents,
+          billingCycle: bundle.billing_cycle as 'one_time' | 'weekly' | 'monthly' | 'annual',
+          trialDays: bundle.trial_days,
+          items: featureKeys.map((fk, i) => ({
+            featureKey: fk,
+            name: bundle.bsaas_bundle_items[i]?.feature_key || fk,
+            inTier: tierStatuses[i].inTier,
+            alreadyPurchased: purchaseKeys.has(fk),
+          })),
+          tierEligible: engagement.eligible,
+          ineligibleReason: engagement.eligible
+            ? null
+            : engagement.failedDomains.map(d => d.reason).join(' '),
+          ineligibleDomains: engagement.failedDomains.map(d => d.capabilityKey),
+          allActive,
+          allInTier,
+        };
+      })
+    );
+
+    res.json({ success: true, data: bundleData });
+  } catch (error: any) {
+    logger.error('[BSaaS] Error fetching bundle catalog:', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch bundle catalog' });
   }
 });
 
@@ -680,7 +771,7 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
         tenantId,
         type: 'bsaas_trial_started',
         amount: priceCents,
-        billingCycle: billingCycle as 'monthly' | 'annual',
+        billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
         metadata: { featureKey, featureName: feature.name, trialDays },
       }).catch(err => console.error('[BSaaS] Failed to send trial notification:', err));
 
@@ -759,11 +850,13 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
     }
 
     // 4. Create the purchase record
-    const expiresAt = billingCycle === 'monthly'
-      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      : billingCycle === 'annual'
-        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-        : null;
+    const expiresAt = billingCycle === 'weekly'
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      : billingCycle === 'monthly'
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        : billingCycle === 'annual'
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          : null;
 
     const purchase = await prisma.tenant_feature_purchases.upsert({
       where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: featureKey } },
@@ -862,7 +955,7 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       tenantId,
       type: 'bsaas_purchase_success',
       amount: priceCents,
-      billingCycle: billingCycle as 'monthly' | 'annual',
+      billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
       metadata: { featureKey, featureName: feature.name },
     }).catch(err => console.error('[BSaaS] Failed to send purchase notification:', err));
 
@@ -881,6 +974,269 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[BSaaS] Error purchasing feature:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase feature' });
+  }
+});
+
+// ====================
+// Purchase a Bundle
+// ====================
+
+const bundlePurchaseSchema = z.object({
+  bundleKey: z.string().min(1),
+  paymentMethodId: z.string().optional(),
+  promotionCode: z.string().optional(),
+  tenantId: z.string().optional(),
+});
+
+// POST /api/subscription/bundle-purchase
+router.post('/bundle-purchase', async (req: Request, res: Response) => {
+  try {
+    const validation = bundlePurchaseSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
+    }
+
+    const tenantId = validation.data.tenantId || (req as any).user?.tenantId || req.headers['x-tenant-id'] as string;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'Tenant ID is required' });
+    }
+
+    const { bundleKey, paymentMethodId, promotionCode } = validation.data;
+
+    // 1. Verify bundle exists and is active
+    const bundle = await prisma.bsaas_bundles.findUnique({
+      where: { bundle_key: bundleKey },
+      include: { bsaas_bundle_items: { orderBy: { sort_order: 'asc' } } },
+    });
+    if (!bundle || !bundle.is_active) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Bundle not found' });
+    }
+
+    const featureKeys = bundle.bsaas_bundle_items.map(i => i.feature_key);
+    const priceCents = bundle.price_cents;
+    const billingCycle = bundle.billing_cycle;
+    const trialDays = bundle.trial_days || 0;
+
+    // 2. Check for existing active purchases of ALL components
+    const existingPurchases = await prisma.tenant_feature_purchases.findMany({
+      where: {
+        tenant_id: tenantId,
+        feature_key: { in: featureKeys },
+        status: { in: ['active', 'past_due', 'trial'] },
+      },
+    });
+    if (existingPurchases.length === featureKeys.length) {
+      return res.status(409).json({ success: false, error: 'already_active', message: 'All components of this bundle are already active for your tenant' });
+    }
+
+    // 3. Check capability engagement for ALL components
+    const engagement = await checkBundleEngagement(tenantId, featureKeys);
+    if (!engagement.eligible) {
+      const reasons = engagement.failedDomains.map(d => d.reason).join(' ');
+      return res.status(403).json({
+        success: false,
+        error: 'upgrade_required',
+        message: reasons || 'Your current plan does not support purchasing this bundle. Please upgrade your plan.',
+        failedDomains: engagement.failedDomains.map(d => d.capabilityKey),
+      });
+    }
+
+    // 4. Trial branch
+    if (trialDays > 0 && billingCycle !== 'one_time') {
+      const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+
+      // Create trial purchase for each component feature
+      const purchases = await Promise.all(
+        featureKeys.map(fk =>
+          prisma.tenant_feature_purchases.upsert({
+            where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: fk } },
+            update: {
+              source: 'bsaas_bundle',
+              status: 'trial',
+              expires_at: trialExpiresAt,
+              metadata: {
+                bundle_key: bundleKey,
+                bundle_name: bundle.marketing_name,
+                price_cents: priceCents,
+                billing_cycle: billingCycle,
+                trial_days: trialDays,
+                trial_started_at: new Date().toISOString(),
+                payment_method_id: paymentMethodId || null,
+              } as any,
+              updated_at: new Date(),
+            },
+            create: {
+              tenant_id: tenantId,
+              feature_key: fk,
+              source: 'bsaas_bundle',
+              status: 'trial',
+              expires_at: trialExpiresAt,
+              metadata: {
+                bundle_key: bundleKey,
+                bundle_name: bundle.marketing_name,
+                price_cents: priceCents,
+                billing_cycle: billingCycle,
+                trial_days: trialDays,
+                trial_started_at: new Date().toISOString(),
+                payment_method_id: paymentMethodId || null,
+              } as any,
+            },
+          })
+        )
+      );
+
+      // Ensure companion purchases for each component's parent gate
+      for (const fk of featureKeys) {
+        const tierStatus = await checkTierFeatureStatus(tenantId, fk);
+        await ensureCompanionPurchase(tenantId, tierStatus.capabilityKey, fk);
+      }
+
+      invalidateEffectiveCapabilities(tenantId);
+
+      await audit({
+        tenantId,
+        actor: (req as any).user?.id || null,
+        action: 'bundle_purchase.trial_start',
+        payload: {
+          entity_type: 'other',
+          bundle_key: bundleKey,
+          bundle_name: bundle.marketing_name,
+          feature_keys: featureKeys,
+          trial_days: trialDays,
+          expires_at: trialExpiresAt.toISOString(),
+        },
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          bundle_key: bundleKey,
+          status: 'trial',
+          price_cents: priceCents,
+          billing_cycle: billingCycle,
+          trial_days: trialDays,
+          expires_at: trialExpiresAt,
+          purchase_ids: purchases.map(p => p.id),
+        },
+      });
+    }
+
+    // 5. Normal purchase: charge via Stripe
+    if (!paymentMethodId) {
+      return res.status(400).json({ success: false, error: 'payment_required', message: 'Payment method is required for non-trial purchases' });
+    }
+
+    const billingService = getSubscriptionBillingService();
+    const chargeResult = await billingService.chargePaymentMethod(
+      tenantId,
+      paymentMethodId,
+      priceCents,
+      `BSaaS Bundle: ${bundle.marketing_name}`
+    );
+
+    if (!chargeResult.success) {
+      return res.status(402).json({ success: false, error: 'payment_failed', message: chargeResult.error || 'Payment failed' });
+    }
+
+    // 6. Create purchase records for each component
+    const expiresAt = billingCycle === 'weekly'
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      : billingCycle === 'monthly'
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        : billingCycle === 'annual'
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          : null;
+
+    const purchases = await Promise.all(
+      featureKeys.map(fk =>
+        prisma.tenant_feature_purchases.upsert({
+          where: { tenant_id_feature_key: { tenant_id: tenantId, feature_key: fk } },
+          update: {
+            source: 'bsaas_bundle',
+            status: 'active',
+            expires_at: expiresAt,
+            metadata: {
+              bundle_key: bundleKey,
+              bundle_name: bundle.marketing_name,
+              price_cents: priceCents,
+              billing_cycle: billingCycle,
+              transaction_id: chargeResult.transactionId,
+              payment_method_id: paymentMethodId,
+              purchased_at: new Date().toISOString(),
+            } as any,
+            updated_at: new Date(),
+          },
+          create: {
+            tenant_id: tenantId,
+            feature_key: fk,
+            source: 'bsaas_bundle',
+            status: 'active',
+            expires_at: expiresAt,
+            metadata: {
+              bundle_key: bundleKey,
+              bundle_name: bundle.marketing_name,
+              price_cents: priceCents,
+              billing_cycle: billingCycle,
+              transaction_id: chargeResult.transactionId,
+              payment_method_id: paymentMethodId,
+              purchased_at: new Date().toISOString(),
+            } as any,
+          },
+        })
+      )
+    );
+
+    // 7. Ensure companion purchases for each component's parent gate
+    for (const fk of featureKeys) {
+      const tierStatus = await checkTierFeatureStatus(tenantId, fk);
+      await ensureCompanionPurchase(tenantId, tierStatus.capabilityKey, fk);
+    }
+
+    // 8. Invalidate capability cache
+    invalidateEffectiveCapabilities(tenantId);
+
+    // 9. Audit log
+    await audit({
+      tenantId,
+      actor: (req as any).user?.id || null,
+      action: 'bundle_purchase.create',
+      payload: {
+        entity_type: 'other',
+        bundle_key: bundleKey,
+        bundle_name: bundle.marketing_name,
+        feature_keys: featureKeys,
+        price_cents: priceCents,
+        billing_cycle: billingCycle,
+        transaction_id: chargeResult.transactionId,
+        purchase_ids: purchases.map(p => p.id),
+      },
+    });
+
+    // 10. Send notification
+    const notificationService = getBillingNotificationService();
+    notificationService.sendNotification({
+      tenantId,
+      type: 'bsaas_purchase_success',
+      amount: priceCents,
+      billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
+      metadata: { bundleKey, bundleName: bundle.marketing_name, featureKeys },
+    }).catch(err => console.error('[BSaaS] Failed to send bundle notification:', err));
+
+    res.json({
+      success: true,
+      data: {
+        bundle_key: bundleKey,
+        status: 'active',
+        price_cents: priceCents,
+        billing_cycle: billingCycle,
+        transaction_id: chargeResult.transactionId,
+        expires_at: expiresAt,
+        purchase_ids: purchases.map(p => p.id),
+      },
+    });
+  } catch (error: any) {
+    console.error('[BSaaS] Error purchasing bundle:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase bundle' });
   }
 });
 
@@ -912,6 +1268,46 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
 
     if (purchase.status === 'cancelled' || purchase.status === 'expired') {
       return res.status(400).json({ success: false, error: 'already_cancelled', message: 'This purchase is already cancelled or expired' });
+    }
+
+    // Check if this is a bundle-sourced purchase — if so, cascade cancel all components
+    const purchaseMetadata = (purchase.metadata as any) || {};
+    const bundleKey = purchaseMetadata.bundle_key;
+    let cancelledIds: string[] = [id];
+    let cancelledFeatureKeys: string[] = [purchase.feature_key];
+
+    if (bundleKey && purchase.source === 'bsaas_bundle') {
+      // Find all other purchases with the same bundle_key for this tenant
+      const siblingPurchases = await prisma.tenant_feature_purchases.findMany({
+        where: {
+          tenant_id: tenantId,
+          feature_key: { not: purchase.feature_key },
+          status: { in: ['active', 'past_due', 'trial', 'suspended'] },
+        },
+      });
+
+      const bundleSiblings = siblingPurchases.filter(p => {
+        const meta = (p.metadata as any) || {};
+        return meta.bundle_key === bundleKey;
+      });
+
+      // Cancel all sibling bundle components
+      for (const sibling of bundleSiblings) {
+        await prisma.tenant_feature_purchases.update({
+          where: { id: sibling.id },
+          data: {
+            status: 'cancelled',
+            updated_at: new Date(),
+          },
+        });
+        cancelledIds.push(sibling.id);
+        cancelledFeatureKeys.push(sibling.feature_key);
+
+        // Maybe cancel companion for each sibling
+        if (sibling.source !== 'companion') {
+          await maybeCancelCompanion(tenantId, sibling.feature_key);
+        }
+      }
     }
 
     await prisma.tenant_feature_purchases.update({
@@ -955,12 +1351,13 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
     await audit({
       tenantId,
       actor: (req as any).user?.id || null,
-      action: 'feature_purchase.cancel',
+      action: bundleKey ? 'bundle_purchase.cancel' : 'feature_purchase.cancel',
       payload: {
         id,
         entity_type: 'other',
         feature_key: purchase.feature_key,
         previous_status: purchase.status,
+        ...(bundleKey ? { bundle_key: bundleKey, cancelled_feature_keys: cancelledFeatureKeys, cancelled_ids: cancelledIds } : {}),
       },
     });
 
@@ -969,7 +1366,9 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
     notificationService.sendNotification({
       tenantId,
       type: 'bsaas_purchase_cancelled',
-      metadata: { featureKey: purchase.feature_key },
+      metadata: bundleKey
+        ? { bundleKey, featureKeys: cancelledFeatureKeys }
+        : { featureKey: purchase.feature_key },
     }).catch(err => console.error('[BSaaS] Failed to send cancel notification:', err));
 
     res.json({
@@ -978,6 +1377,7 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
         purchase_id: id,
         feature_key: purchase.feature_key,
         status: 'cancelled',
+        ...(bundleKey ? { bundle_key: bundleKey, cancelled_purchase_ids: cancelledIds } : {}),
       },
     });
   } catch (error: any) {

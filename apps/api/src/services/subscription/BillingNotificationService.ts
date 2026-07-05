@@ -50,7 +50,7 @@ export interface BillingNotificationData {
   type: BillingNotificationType;
   tier?: string;
   amount?: number;
-  billingCycle?: 'monthly' | 'annual';
+  billingCycle?: 'weekly' | 'monthly' | 'annual';
   gracePeriodDaysRemaining?: number;
   reason?: string;
   invoiceId?: string;
@@ -608,7 +608,7 @@ Welcome back! Your subscription is now active.`;
         <p>Your subscription for <strong>${business}</strong> has been updated.</p>
         <div style="background: #eff6ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
           <p style="margin: 0;"><strong>New Plan:</strong> ${data.tier || 'N/A'}</p>
-          ${data.amount ? `<p style="margin: 8px 0 0;"><strong>Amount:</strong> $${(data.amount / 100).toFixed(2)}/${data.billingCycle === 'annual' ? 'year' : 'month'}</p>` : ''}
+          ${data.amount ? `<p style="margin: 8px 0 0;"><strong>Amount:</strong> $${(data.amount / 100).toFixed(2)}/${data.billingCycle === 'annual' ? 'year' : data.billingCycle === 'weekly' ? 'week' : 'month'}</p>` : ''}
         </div>
         <p>Your new plan is now active.</p>
       </div>
@@ -621,7 +621,7 @@ Welcome back! Your subscription is now active.`;
 Your subscription for ${business} has been updated.
 
 New Plan: ${data.tier || 'N/A'}
-${data.amount ? `Amount: $${(data.amount / 100).toFixed(2)}/${data.billingCycle === 'annual' ? 'year' : 'month'}` : ''}
+${data.amount ? `Amount: $${(data.amount / 100).toFixed(2)}/${data.billingCycle === 'annual' ? 'year' : data.billingCycle === 'weekly' ? 'week' : 'month'}` : ''}
 
 Your new plan is now active.`;
   }

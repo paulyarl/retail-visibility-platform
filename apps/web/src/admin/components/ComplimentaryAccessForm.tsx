@@ -6,12 +6,14 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { adminFeaturePurchasesService } from '@/services/AdminFeaturePurchasesService';
 import { adminBsaasCatalogService, type BsaasCatalogEntry } from '@/services/AdminBsaasCatalogService';
+import { adminOperationsService } from '@/services/AdminOperationsService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +32,7 @@ interface ComplimentaryAccessFormProps {
 
 export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess }: ComplimentaryAccessFormProps) {
   const [catalog, setCatalog] = useState<BsaasCatalogEntry[]>([]);
+  const [tenants, setTenants] = useState<{ id: string; name: string; subscriptionTier: string; subscriptionStatus: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -42,8 +45,24 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
   useEffect(() => {
     if (open) {
       adminBsaasCatalogService.list().then(setCatalog).catch(() => {});
+      adminOperationsService.getTenants(1, 500).then((result) => {
+        setTenants(result.tenants.map((t) => ({
+          id: t.id,
+          name: t.name,
+          subscriptionTier: t.subscriptionTier,
+          subscriptionStatus: t.subscriptionStatus,
+        })));
+      }).catch(() => {});
     }
   }, [open]);
+
+  const tenantOptions = useMemo(() =>
+    tenants.map((t) => ({
+      value: t.id,
+      label: `${t.name} (${t.id})`,
+    })),
+    [tenants]
+  );
 
   const resetForm = () => {
     setTenantId('');
@@ -119,11 +138,12 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
           )}
 
           <div>
-            <label className="text-sm font-medium mb-1 block">Tenant ID *</label>
-            <Input
+            <label className="text-sm font-medium mb-1 block">Tenant *</label>
+            <SearchableSelect
+              options={tenantOptions}
               value={tenantId}
-              onChange={(e) => setTenantId(e.target.value)}
-              placeholder="e.g. tenant_abc123"
+              onChange={setTenantId}
+              placeholder="Select a tenant..."
             />
             <p className="text-xs text-neutral-400 mt-1">The tenant to receive the feature</p>
           </div>

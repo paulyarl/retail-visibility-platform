@@ -45,17 +45,111 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
   // 1. Find active purchases expiring within 24 hours (monthly/annual only)
   //    Skip companion purchases (source='companion') — they have no expiry and no charge
+  //    Include both 'bsaas' and 'bsaas_bundle' sources
   const expiringPurchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'active',
       expires_at: { lte: tomorrow, gt: now },
-      source: 'bsaas',
+      source: { in: ['bsaas', 'bsaas_bundle'] },
     },
   });
 
-  console.log(`[BSaaS Renewal] Found ${expiringPurchases.length} purchases due for renewal`);
+  // Separate bundle purchases from individual purchases
+  const bundleGroups = new Map<string, typeof expiringPurchases>();
+  const individualExpiring: typeof expiringPurchases = [];
 
-  for (const purchase of expiringPurchases) {
+  for (const p of expiringPurchases) {
+    const meta = (p.metadata as any) || {};
+    const bundleKey = meta.bundle_key;
+    if (bundleKey && p.source === 'bsaas_bundle') {
+      if (!bundleGroups.has(bundleKey)) bundleGroups.set(bundleKey, []);
+      bundleGroups.get(bundleKey)!.push(p);
+    } else {
+      individualExpiring.push(p);
+    }
+  }
+
+  console.log(`[BSaaS Renewal] Found ${expiringPurchases.length} purchases due for renewal (${bundleGroups.size} bundle groups, ${individualExpiring.length} individual)`);
+
+  // 1a. Renew bundle purchases — charge once per bundle, then renew all components
+  for (const [bundleKey, purchases] of bundleGroups) {
+    try {
+      const firstPurchase = purchases[0];
+      const metadata = (firstPurchase.metadata as any) || {};
+      const priceCents = metadata.price_cents;
+      const billingCycle = metadata.billing_cycle;
+      const paymentMethodId = metadata.payment_method_id;
+      const bundleName = metadata.bundle_name || bundleKey;
+
+      if (!priceCents || !billingCycle || billingCycle === 'one_time') {
+        continue;
+      }
+
+      if (!paymentMethodId) {
+        console.warn(`[BSaaS Renewal] No payment_method_id for bundle ${bundleKey}, entering grace period for all components`);
+        for (const p of purchases) {
+          await enterGracePeriod(p, 'No payment method on file', result);
+        }
+        continue;
+      }
+
+      // Charge once for the entire bundle
+      const billingService = getSubscriptionBillingService();
+      const chargeResult = await billingService.chargePaymentMethod(
+        firstPurchase.tenant_id,
+        paymentMethodId,
+        priceCents,
+        `BSaaS Bundle renewal: ${bundleName}`
+      );
+
+      if (chargeResult.success) {
+        // Extend expiry for all component purchases
+        const newExpiresAt = billingCycle === 'weekly'
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          : billingCycle === 'monthly'
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+        await Promise.all(purchases.map(p =>
+          prisma.tenant_feature_purchases.update({
+            where: { id: p.id },
+            data: {
+              expires_at: newExpiresAt,
+              updated_at: new Date(),
+              metadata: {
+                ...((p.metadata as any) || {}),
+                last_renewed_at: new Date().toISOString(),
+                last_transaction_id: chargeResult.transactionId,
+              },
+            },
+          })
+        ));
+
+        result.renewed += purchases.length;
+        console.log(`[BSaaS Renewal] Renewed bundle ${bundleKey} (${purchases.length} components) for tenant ${firstPurchase.tenant_id}`);
+
+        const notificationService = getBillingNotificationService();
+        notificationService.sendNotification({
+          tenantId: firstPurchase.tenant_id,
+          type: 'bsaas_renewal_success',
+          amount: priceCents,
+          billingCycle: billingCycle as 'monthly' | 'annual',
+          metadata: { bundleKey, bundleName, featureKeys: purchases.map(p => p.feature_key) },
+        }).catch(err => console.error('[BSaaS Renewal] Failed to send bundle renewal notification:', err));
+      } else {
+        // Bundle charge failed — enter grace period for all components
+        for (const p of purchases) {
+          await enterGracePeriod(p, chargeResult.error || 'Payment declined', result, bundleName, priceCents, billingCycle);
+        }
+      }
+    } catch (error: any) {
+      console.error(`[BSaaS Renewal] Error processing bundle ${bundleKey}:`, error);
+      result.errors.push(`Bundle ${bundleKey}: ${error.message}`);
+    }
+  }
+
+  // 1b. Renew individual (non-bundle) purchases as before
+  for (const purchase of individualExpiring) {
     try {
       const metadata = (purchase.metadata as any) || {};
       const priceCents = metadata.price_cents;
@@ -91,9 +185,11 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
       if (chargeResult.success) {
         // Extend expiry
-        const newExpiresAt = billingCycle === 'monthly'
-          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        const newExpiresAt = billingCycle === 'weekly'
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          : billingCycle === 'monthly'
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
         await prisma.tenant_feature_purchases.update({
           where: { id: purchase.id },
@@ -117,7 +213,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
           tenantId: purchase.tenant_id,
           type: 'bsaas_renewal_success',
           amount: priceCents,
-          billingCycle: billingCycle as 'monthly' | 'annual',
+          billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { featureKey: purchase.feature_key, featureName },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send renewal notification:', err));
       } else {
@@ -132,17 +228,104 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
   // 1b. Process expired trials — attempt charge to convert to active
   // Skip companion purchases — they don't have trials
+  // Include both 'bsaas' and 'bsaas_bundle' sources
   const expiredTrials = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'trial',
       expires_at: { lt: now },
-      source: 'bsaas',
+      source: { in: ['bsaas', 'bsaas_bundle'] },
     },
   });
 
-  console.log(`[BSaaS Renewal] Found ${expiredTrials.length} expired trials to convert`);
+  // Group expired trials by bundle_key for batch processing
+  const expiredBundleTrials = new Map<string, typeof expiredTrials>();
+  const individualExpiredTrials: typeof expiredTrials = [];
 
-  for (const purchase of expiredTrials) {
+  for (const p of expiredTrials) {
+    const meta = (p.metadata as any) || {};
+    const bundleKey = meta.bundle_key;
+    if (bundleKey && p.source === 'bsaas_bundle') {
+      if (!expiredBundleTrials.has(bundleKey)) expiredBundleTrials.set(bundleKey, []);
+      expiredBundleTrials.get(bundleKey)!.push(p);
+    } else {
+      individualExpiredTrials.push(p);
+    }
+  }
+
+  console.log(`[BSaaS Renewal] Found ${expiredTrials.length} expired trials to convert (${expiredBundleTrials.size} bundle groups, ${individualExpiredTrials.length} individual)`);
+
+  // Convert bundle trial groups — charge once per bundle
+  for (const [bundleKey, purchases] of expiredBundleTrials) {
+    try {
+      const firstPurchase = purchases[0];
+      const metadata = (firstPurchase.metadata as any) || {};
+      const priceCents = metadata.price_cents;
+      const billingCycle = metadata.billing_cycle;
+      const paymentMethodId = metadata.payment_method_id;
+      const bundleName = metadata.bundle_name || bundleKey;
+
+      if (!paymentMethodId || !priceCents) {
+        for (const p of purchases) {
+          await enterGracePeriod(p, 'Trial expired — no payment method on file', result, bundleName, priceCents, billingCycle);
+        }
+        continue;
+      }
+
+      const billingService = getSubscriptionBillingService();
+      const chargeResult = await billingService.chargePaymentMethod(
+        firstPurchase.tenant_id,
+        paymentMethodId,
+        priceCents,
+        `BSaaS Bundle trial conversion: ${bundleName}`
+      );
+
+      if (chargeResult.success) {
+        const newExpiresAt = billingCycle === 'weekly'
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          : billingCycle === 'monthly'
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+        await Promise.all(purchases.map(p =>
+          prisma.tenant_feature_purchases.update({
+            where: { id: p.id },
+            data: {
+              status: 'active',
+              expires_at: newExpiresAt,
+              updated_at: new Date(),
+              metadata: {
+                ...((p.metadata as any) || {}),
+                trial_converted_at: new Date().toISOString(),
+                last_transaction_id: chargeResult.transactionId,
+              },
+            },
+          })
+        ));
+
+        result.renewed += purchases.length;
+        console.log(`[BSaaS Renewal] Bundle trial converted: ${bundleKey} (${purchases.length} components) for tenant ${firstPurchase.tenant_id}`);
+
+        const notificationService = getBillingNotificationService();
+        notificationService.sendNotification({
+          tenantId: firstPurchase.tenant_id,
+          type: 'bsaas_purchase_success',
+          amount: priceCents,
+          billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
+          metadata: { bundleKey, bundleName, featureKeys: purchases.map(p => p.feature_key) },
+        }).catch(err => console.error('[BSaaS Renewal] Failed to send bundle trial conversion notification:', err));
+      } else {
+        for (const p of purchases) {
+          await enterGracePeriod(p, chargeResult.error || 'Payment declined during trial conversion', result, bundleName, priceCents, billingCycle);
+        }
+      }
+    } catch (error: any) {
+      console.error(`[BSaaS Renewal] Error converting bundle trial ${bundleKey}:`, error);
+      result.errors.push(`Bundle trial ${bundleKey}: ${error.message}`);
+    }
+  }
+
+  // Convert individual expired trials as before
+  for (const purchase of individualExpiredTrials) {
     try {
       const metadata = (purchase.metadata as any) || {};
       const priceCents = metadata.price_cents;
@@ -170,9 +353,11 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
       );
 
       if (chargeResult.success) {
-        const newExpiresAt = billingCycle === 'monthly'
-          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        const newExpiresAt = billingCycle === 'weekly'
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          : billingCycle === 'monthly'
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
         await prisma.tenant_feature_purchases.update({
           where: { id: purchase.id },
@@ -196,7 +381,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
           tenantId: purchase.tenant_id,
           type: 'bsaas_purchase_success',
           amount: priceCents,
-          billingCycle: billingCycle as 'monthly' | 'annual',
+          billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { featureKey: purchase.feature_key, featureName },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send trial conversion notification:', err));
       } else {
@@ -211,10 +396,11 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
   // 2. Retry past_due purchases within grace period
   // Skip companion purchases — they can't be past_due (no charge)
+  // Include both 'bsaas' and 'bsaas_bundle' sources
   const pastDuePurchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'past_due',
-      source: 'bsaas',
+      source: { in: ['bsaas', 'bsaas_bundle'] },
     },
   });
 
@@ -237,7 +423,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
           tenantId: purchase.tenant_id,
           type: 'bsaas_renewal_failed',
           amount: metadata.price_cents,
-          billingCycle: metadata.billing_cycle as 'monthly' | 'annual',
+          billingCycle: metadata.billing_cycle as 'weekly' | 'monthly' | 'annual',
           reason: 'Grace period expired',
           metadata: { featureKey: purchase.feature_key, featureName: metadata.feature_name || purchase.feature_key },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send suspension notification:', err));
@@ -270,9 +456,11 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
       if (chargeResult.success) {
         // Retry succeeded — reactivate
-        const newExpiresAt = billingCycle === 'monthly'
-          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        const newExpiresAt = billingCycle === 'weekly'
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          : billingCycle === 'monthly'
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
         await prisma.tenant_feature_purchases.update({
           where: { id: purchase.id },
@@ -297,7 +485,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
           tenantId: purchase.tenant_id,
           type: 'bsaas_renewal_success',
           amount: priceCents,
-          billingCycle: billingCycle as 'monthly' | 'annual',
+          billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { featureKey: purchase.feature_key, featureName },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send retry success notification:', err));
       } else {
@@ -313,7 +501,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
           tenantId: purchase.tenant_id,
           type: 'bsaas_grace_period_warning',
           amount: priceCents,
-          billingCycle: billingCycle as 'monthly' | 'annual',
+          billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           gracePeriodDaysRemaining: daysRemaining,
           reason: chargeResult.error || 'Payment declined',
           metadata: { featureKey: purchase.feature_key, featureName },
@@ -327,11 +515,12 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
 
   // 3. Expire cancelled purchases that have reached end of billing period
   // Skip companion purchases — they have no expiry to check
+  // Include both 'bsaas' and 'bsaas_bundle' sources
   const cancelledExpiring = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'cancelled',
       expires_at: { lt: now },
-      source: 'bsaas',
+      source: { in: ['bsaas', 'bsaas_bundle'] },
     },
   });
 
@@ -357,11 +546,12 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
   // 4. Suspend active purchases whose expiry has passed (missed renewal)
   //    These get a grace period instead of immediate suspension
   // Skip companion purchases — they have no expiry (expires_at=null)
+  // Include both 'bsaas' and 'bsaas_bundle' sources
   const overduePurchases = await prisma.tenant_feature_purchases.findMany({
     where: {
       status: 'active',
       expires_at: { lt: now },
-      source: 'bsaas',
+      source: { in: ['bsaas', 'bsaas_bundle'] },
     },
   });
 
@@ -414,7 +604,7 @@ async function enterGracePeriod(
     tenantId: purchase.tenant_id,
     type: 'bsaas_grace_period_warning',
     amount: priceCents || metadata.price_cents,
-    billingCycle: (billingCycle || metadata.billing_cycle) as 'monthly' | 'annual',
+    billingCycle: (billingCycle || metadata.billing_cycle) as 'weekly' | 'monthly' | 'annual',
     gracePeriodDaysRemaining: GRACE_PERIOD_DAYS,
     reason,
     metadata: {

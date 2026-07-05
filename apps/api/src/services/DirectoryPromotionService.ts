@@ -116,16 +116,17 @@ export class DirectoryPromotionService extends BaseService {
     priceCents: number;
     currency?: string;
     sortOrder?: number;
+    planKey?: string;
   }): Promise<PromotionPlan> {
     const validLevels = await this.getAvailableLevels();
     if (!validLevels.includes(data.tier)) {
       throw new Error('invalid_level');
     }
 
-    const autoPlanKey = `${data.tier}_${data.durationDays}day`;
+    const finalPlanKey = data.planKey || `${data.tier}_${data.durationDays}day`;
 
     const existing = await prisma.promotion_catalog.findUnique({
-      where: { plan_key: autoPlanKey },
+      where: { plan_key: finalPlanKey },
     });
     if (existing) {
       throw new Error('plan_key_exists');
@@ -134,7 +135,7 @@ export class DirectoryPromotionService extends BaseService {
     const plan = await prisma.promotion_catalog.create({
       data: {
         id: generatePromotionCatalogId(),
-        plan_key: autoPlanKey,
+        plan_key: finalPlanKey,
         label: data.label,
         tier: data.tier,
         duration_days: data.durationDays,
@@ -377,6 +378,87 @@ export class DirectoryPromotionService extends BaseService {
         logger.warn('[DirectoryPromotion] Failed to refresh promotion embeddings', undefined, { error: (err as Error).message });
       }
     })();
+  }
+
+  // ====================
+  // GRANT COMPLIMENTARY (Admin — no Stripe payment)
+  // ====================
+
+  async grantComplimentary(data: {
+    tenantId: string;
+    planKey: string;
+    reason: string;
+    grantedBy?: string;
+  }): Promise<{ purchaseId: string }> {
+    const { tenantId, planKey, reason, grantedBy } = data;
+
+    const plan = await prisma.promotion_catalog.findUnique({
+      where: { plan_key: planKey },
+    });
+    if (!plan || !plan.is_active) {
+      throw new Error('plan_not_found_or_inactive');
+    }
+
+    // Check for existing active promotion
+    const existing = await prisma.promotion_purchases.findFirst({
+      where: {
+        tenant_id: tenantId,
+        status: { in: ['active', 'grace_period', 'pending'] },
+      },
+    });
+    if (existing) {
+      throw new Error('tenant_already_has_active_promotion');
+    }
+
+    // Verify tenant has a directory listing
+    const pool = getDirectPool();
+    const listingCheck = await pool.query(
+      'SELECT id FROM directory_listings_list WHERE tenant_id = $1 LIMIT 1',
+      [tenantId]
+    );
+    if (listingCheck.rows.length === 0) {
+      throw new Error('tenant_has_no_directory_listing');
+    }
+
+    const purchaseId = generatePromotionPurchaseId(tenantId);
+    await prisma.promotion_purchases.create({
+      data: {
+        id: purchaseId,
+        tenant_id: tenantId,
+        plan_key: planKey,
+        tier: plan.tier,
+        price_cents: 0,
+        currency: plan.currency || 'USD',
+        duration_days: plan.duration_days,
+        status: 'pending',
+      },
+    });
+
+    // Activate immediately without Stripe payment
+    await this.activatePurchase(purchaseId, `comp_${Date.now()}`);
+
+    // Update metadata to record the grant
+    await prisma.promotion_purchases.update({
+      where: { id: purchaseId },
+      data: {
+        metadata: {
+          granted_by: grantedBy || 'admin',
+          granted_at: new Date().toISOString(),
+          reason,
+          complimentary: true,
+        },
+      } as any,
+    });
+
+    logger.info('[DirectoryPromotion] Complimentary promotion granted', undefined, {
+      purchaseId,
+      tenantId,
+      planKey,
+      tier: plan.tier,
+      reason,
+    });
+
+    return { purchaseId };
   }
 
   // ====================

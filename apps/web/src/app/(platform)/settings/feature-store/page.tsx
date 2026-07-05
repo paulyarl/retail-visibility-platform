@@ -7,7 +7,7 @@ import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, Icon
 import { TrendingUp, Eye, Zap, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { bsaasPurchaseService, type BsaasCatalogItem } from '@/services/BsaasPurchaseService';
+import { bsaasPurchaseService, type BsaasCatalogItem, type BsaasBundleCatalogItem } from '@/services/BsaasPurchaseService';
 import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +19,7 @@ export default function FeatureStorePage() {
   const tenantId = searchParams?.get('tenantId') || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
 
   const [catalog, setCatalog] = useState<BsaasCatalogItem[]>([]);
+  const [bundleCatalog, setBundleCatalog] = useState<BsaasBundleCatalogItem[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -26,8 +27,10 @@ export default function FeatureStorePage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [purchaseTarget, setPurchaseTarget] = useState<BsaasCatalogItem | null>(null);
+  const [bundleTarget, setBundleTarget] = useState<BsaasBundleCatalogItem | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showBundleConfirm, setShowBundleConfirm] = useState(false);
   const [promoCode, setPromoCode] = useState('');
 
   const loadData = useCallback(async () => {
@@ -43,11 +46,13 @@ export default function FeatureStorePage() {
 
     try {
       setLoading(true);
-      const [catalogData, methodsData] = await Promise.all([
+      const [catalogData, bundleData, methodsData] = await Promise.all([
         bsaasPurchaseService.getFeatureCatalog(),
+        bsaasPurchaseService.getBundleCatalog(),
         subscriptionBillingService.getPaymentMethods(),
       ]);
       setCatalog(catalogData);
+      setBundleCatalog(bundleData);
       setPaymentMethods(methodsData || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load feature store');
@@ -131,6 +136,66 @@ export default function FeatureStorePage() {
     }
   };
 
+  const handleBundlePurchaseClick = (bundle: BsaasBundleCatalogItem) => {
+    if (bundle.allActive) {
+      setError(`All components of "${bundle.name}" are already active for your tenant.`);
+      return;
+    }
+    if (bundle.tierEligible === false) {
+      setError(bundle.ineligibleReason || 'Your current plan does not support purchasing this bundle. Please upgrade your plan.');
+      return;
+    }
+
+    const defaultMethod = paymentMethods.find(m => m.isDefault) || paymentMethods[0];
+    if (!defaultMethod) {
+      setError('No payment method found. Please add a payment method in your subscription settings first.');
+      return;
+    }
+
+    setBundleTarget(bundle);
+    setSelectedPaymentMethodId(defaultMethod.id);
+    setPromoCode('');
+    setShowBundleConfirm(true);
+    setError(null);
+  };
+
+  const handleConfirmBundlePurchase = async () => {
+    if (!bundleTarget || !selectedPaymentMethodId) return;
+
+    try {
+      setProcessing(true);
+      setError(null);
+
+      const result = await bsaasPurchaseService.purchaseBundle(
+        bundleTarget.bundleKey,
+        selectedPaymentMethodId,
+        promoCode.trim() || undefined
+      );
+
+      if (result.success) {
+        const statusLabel = result.data?.status === 'trial' ? ` (trial — ${bundleTarget.trialDays} days)` : '';
+        setSuccess(`Successfully purchased "${bundleTarget.name}"${statusLabel}! All components are now active.`);
+        setShowBundleConfirm(false);
+        setBundleTarget(null);
+        await loadData();
+      } else {
+        if (result.error === 'payment_failed') {
+          setError(result.message || 'Payment failed. Please check your payment method.');
+        } else if (result.error === 'upgrade_required') {
+          setError(result.message || 'Your current plan does not support purchasing this bundle. Please upgrade your plan.');
+        } else if (result.error === 'already_active') {
+          setError('All components of this bundle are already active for your tenant.');
+        } else {
+          setError(result.message || result.error || 'Failed to purchase bundle');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to process bundle purchase');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleCancelPurchase = async (purchaseId: string, featureName: string) => {
     if (!confirm(`Are you sure you want to cancel "${featureName}"? You will lose access at the end of the current billing period.`)) return;
 
@@ -180,7 +245,7 @@ export default function FeatureStorePage() {
           </Alert>
         )}
 
-        {catalog.length === 0 && !loading && (
+        {catalog.length === 0 && bundleCatalog.length === 0 && !loading && (
           <Card withBorder p="xl" className="text-center">
             <IconInfoCircle size={48} className="mx-auto text-neutral-400 mb-4" />
             <Text size="lg" c="dimmed">No features are currently available for purchase.</Text>
@@ -188,7 +253,108 @@ export default function FeatureStorePage() {
           </Card>
         )}
 
-        <Grid>
+        {/* Bundles Section */}
+        {bundleCatalog.filter(b => !b.allActive).length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-blue-600" />
+              <h2 className="text-xl font-bold text-gray-900">Bundles</h2>
+              <Badge color="violet" variant="light" size="sm">Save more</Badge>
+            </div>
+            <Grid>
+              {bundleCatalog.filter(b => !b.allActive).map((bundle) => {
+                const notEligible = bundle.tierEligible === false;
+                const componentSum = bundle.items.reduce((sum, _item) => sum, 0);
+                const savingsPercent = componentSum > 0 && bundle.priceCents < componentSum
+                  ? Math.round(((componentSum - bundle.priceCents) / componentSum) * 100)
+                  : 0;
+
+                return (
+                  <Grid.Col key={bundle.bundleKey} span={{ base: 12, md: 6 }}>
+                    <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''}`}>
+                      <Group justify="space-between" mb="xs">
+                        <Group gap="sm">
+                          <Text fw={700} size="lg">{bundle.name}</Text>
+                          <Badge color="violet" variant="filled" size="sm">Bundle</Badge>
+                          {bundle.trialDays > 0 && (
+                            <Badge color="teal" variant="light" size="sm">{bundle.trialDays}-day trial</Badge>
+                          )}
+                        </Group>
+                        {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
+                      </Group>
+
+                      <Text size="sm" c="dimmed" className="flex-grow" mb="sm">
+                        {bundle.description}
+                      </Text>
+
+                      {/* Component list */}
+                      <Stack gap="xs" mb="md">
+                        {bundle.items.map((item) => (
+                          <Group key={item.featureKey} gap="sm">
+                            {item.alreadyPurchased ? (
+                              <IconCheck size={16} className="text-green-600" />
+                            ) : item.inTier ? (
+                              <IconCheck size={16} className="text-blue-500" />
+                            ) : (
+                              <IconCircleX size={16} className="text-neutral-400" />
+                            )}
+                            <Text size="sm" c={item.alreadyPurchased ? 'green' : item.inTier ? 'blue' : 'dimmed'}>
+                              {item.name}
+                              {item.alreadyPurchased && ' (already owned)'}
+                              {item.inTier && !item.alreadyPurchased && ' (in your plan)'}
+                            </Text>
+                          </Group>
+                        ))}
+                      </Stack>
+
+                      {notEligible && (
+                        <Text size="xs" c="dimmed" className="mb-md" style={{ fontStyle: 'italic' }}>
+                          {bundle.ineligibleReason}
+                        </Text>
+                      )}
+
+                      <Group justify="space-between" mt="auto">
+                        <Group gap="sm">
+                          <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'violet'}>
+                            {formatPrice(bundle.priceCents, bundle.billingCycle)}
+                          </Text>
+                          {savingsPercent > 0 && (
+                            <Badge color="green" variant="light" size="sm">Save {savingsPercent}%</Badge>
+                          )}
+                        </Group>
+
+                        {notEligible ? (
+                          <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
+                            <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
+                              Upgrade Plan
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Button
+                            variant="gradient"
+                            gradient={{ from: 'violet', to: 'blue' }}
+                            style={{ color: 'white' }}
+                            size="sm"
+                            onClick={() => handleBundlePurchaseClick(bundle)}
+                            leftSection={<IconBolt size={16} />}
+                          >
+                            {bundle.trialDays > 0 ? 'Start Trial' : 'Purchase Bundle'}
+                          </Button>
+                        )}
+                      </Group>
+                    </Card>
+                  </Grid.Col>
+                );
+              })}
+            </Grid>
+          </div>
+        )}
+
+        {/* Individual Features Section */}
+        {catalog.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">Individual Features</h2>
+            <Grid>
           {catalog.map((item) => {
             const isActive = item.purchase?.status === 'active';
             const isSuspended = item.purchase?.status === 'suspended';
@@ -264,7 +430,9 @@ export default function FeatureStorePage() {
               </Grid.Col>
             );
           })}
-        </Grid>
+            </Grid>
+          </div>
+        )}
 
         {/* Benefits Section */}
         <div className="bg-gray-50 rounded-lg p-8 mt-6">
@@ -414,6 +582,108 @@ export default function FeatureStorePage() {
                   disabled={!selectedPaymentMethodId}
                 >
                   Confirm Purchase
+                </Button>
+              </Group>
+            </Stack>
+          )}
+        </Modal>
+
+        {/* Bundle Purchase Confirmation Modal */}
+        <Modal
+          opened={showBundleConfirm}
+          onClose={() => setShowBundleConfirm(false)}
+          title="Confirm Bundle Purchase"
+          size="md"
+        >
+          {bundleTarget && (
+            <Stack gap="md">
+              <Card withBorder p="md" bg="violet.50">
+                <Group justify="space-between">
+                  <Group gap="sm">
+                    <Text fw={600}>{bundleTarget.name}</Text>
+                    <Badge color="violet" variant="filled" size="sm">Bundle</Badge>
+                  </Group>
+                  <Text fw={700} c="violet">{formatPrice(bundleTarget.priceCents, bundleTarget.billingCycle)}</Text>
+                </Group>
+                <Text size="sm" c="dimmed" mt="xs">{bundleTarget.description}</Text>
+                {bundleTarget.trialDays > 0 && (
+                  <Text size="xs" c="teal" mt="xs" fw={500}>
+                    Includes {bundleTarget.trialDays}-day free trial. No charge until trial ends.
+                  </Text>
+                )}
+              </Card>
+
+              <div>
+                <Text size="sm" fw={500} mb="xs">What's included:</Text>
+                <Stack gap="xs">
+                  {bundleTarget.items.map((item) => (
+                    <Group key={item.featureKey} gap="sm">
+                      <IconCheck size={16} className={item.alreadyPurchased ? 'text-green-600' : item.inTier ? 'text-blue-500' : 'text-neutral-400'} />
+                      <Text size="sm" c={item.alreadyPurchased ? 'green' : 'dimmed'}>
+                        {item.name}
+                        {item.alreadyPurchased && ' (already owned)'}
+                      </Text>
+                    </Group>
+                  ))}
+                </Stack>
+              </div>
+
+              <div>
+                <Text size="sm" fw={500} mb="xs">Payment Method</Text>
+                {paymentMethods.length === 0 ? (
+                  <Alert color="orange" icon={<IconAlertCircle size={16} />}>
+                    No payment methods available. Add one in your subscription settings.
+                  </Alert>
+                ) : (
+                  <Stack gap="xs">
+                    {paymentMethods.map((method) => (
+                      <Card
+                        key={method.id}
+                        withBorder
+                        p="sm"
+                        onClick={() => setSelectedPaymentMethodId(method.id)}
+                        className={`cursor-pointer transition-colors ${selectedPaymentMethodId === method.id ? 'border-violet-500 bg-violet-50' : 'hover:border-neutral-300'}`}
+                      >
+                        <Group gap="sm">
+                          <IconCreditCard size={20} className="text-neutral-500" />
+                          <Text size="sm">
+                            {method.cardBrand ? `${method.cardBrand} •••• ${method.cardLast4}` : method.paypalEmail || 'Payment method'}
+                          </Text>
+                          {method.isDefault && <Badge size="xs" variant="light">Default</Badge>}
+                        </Group>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+              </div>
+
+              <div>
+                <Text size="sm" fw={500} mb="xs">Promo Code (optional)</Text>
+                <div className="flex items-center gap-sm">
+                  <div className="flex items-center flex-1">
+                    <span className="inline-flex items-center justify-center px-3 h-38 bg-neutral-100 border border-r-0 border-neutral-200 rounded-l-md text-neutral-500">
+                      <IconTag size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder="Enter promo code"
+                      className="flex-1 h-38 px-3 border border-neutral-200 rounded-r-md text-sm focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Group justify="flex-end">
+                <Button variant="default" onClick={() => setShowBundleConfirm(false)}>Cancel</Button>
+                <Button
+                  color="violet"
+                  loading={processing}
+                  onClick={handleConfirmBundlePurchase}
+                  disabled={!selectedPaymentMethodId}
+                >
+                  {bundleTarget.trialDays > 0 ? 'Start Trial' : 'Confirm Purchase'}
                 </Button>
               </Group>
             </Stack>

@@ -21,6 +21,8 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 │  POST /api/subscription/feature-purchase                  │
 │  GET  /api/subscription/feature-catalog                   │
 │  POST /api/subscription/feature-purchase/:id/cancel       │
+│  GET  /api/subscription/bundle-catalog                    │
+│  POST /api/subscription/bundle-purchase                   │
 └────────────────────────┬─────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────┐
@@ -32,8 +34,8 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
                          │
 ┌────────────────────────▼─────────────────────────────────┐
 │  tenant_feature_purchases table                           │
-│  - feature_key, status, source='bsaas', expires_at       │
-│  - metadata: { price_cents, billing_cycle, stripe_* }    │
+│  - feature_key, status, source='bsaas'|'bsaas_bundle'    │
+│  - metadata: { price_cents, billing_cycle, bundle_key? } │
 └────────────────────────┬─────────────────────────────────┘
                          │
 ┌────────────────────────▼─────────────────────────────────┐
@@ -221,20 +223,26 @@ Admins manage the catalog via the admin UI at `/settings/admin/bsaas-catalog`.
 
 | File | Purpose |
 |------|---------|
-| `apps/api/src/routes/bsaas-purchases.ts` | Tenant-facing purchase API (catalog, purchase, cancel) |
+| `apps/api/src/routes/bsaas-purchases.ts` | Tenant-facing purchase API (catalog, bundle catalog, purchase, bundle purchase, cancel) |
 | `apps/api/src/routes/admin/bsaas-catalog.ts` | Admin CRUD for bsaas_catalog table |
-| `apps/api/src/jobs/bsaas-renewal.ts` | Daily renewal job (re-charge, suspend, expire) |
+| `apps/api/src/routes/admin/bsaas-bundles.ts` | Admin CRUD for bsaas_bundles + bsaas_bundle_items |
+| `apps/api/src/jobs/bsaas-renewal.ts` | Daily renewal job (re-charge, bundle grouping, suspend, expire) |
 | `apps/api/src/services/subscription/SubscriptionBillingService.ts` | Billing service (chargePaymentMethod reused) |
 | `apps/api/src/services/subscription/BillingNotificationService.ts` | Notification service (extended with bsaas_* types) |
 | `apps/api/src/services/EffectiveCapabilityResolver.ts` | Automatic merge of purchases into capabilities |
 | `apps/api/src/index.ts` | Server startup (renewal job wired in) |
 | `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | Feature Store purchase page |
-| `apps/web/src/services/BsaasPurchaseService.ts` | Frontend purchase service |
+| `apps/web/src/services/BsaasPurchaseService.ts` | Frontend purchase service (features + bundles) |
+| `apps/web/src/services/AdminBsaasBundleService.ts` | Admin frontend bundle service |
 | `apps/web/src/app/api/admin/bsaas-catalog/route.ts` | Admin API proxy route |
 | `apps/web/src/services/AdminBsaasCatalogService.ts` | Admin frontend service |
-| `apps/web/src/admin/components/BsaasCatalogManagement.tsx` | Admin catalog management UI |
+| `apps/web/src/admin/components/BsaasCatalogManagement.tsx` | Admin catalog management UI (tabs: features + bundles) |
+| `apps/web/src/admin/components/BundlesTab.tsx` | Admin bundle management tab |
+| `apps/web/src/admin/components/BundleEditModal.tsx` | Admin bundle create/edit modal |
 | `apps/web/src/app/(platform)/settings/admin/bsaas-catalog/page.tsx` | Admin catalog page |
 | `database/migrations/047_bsaas_catalog.sql` | Catalog table migration |
+| `database/migrations/087_bsaas_bundles.sql` | Bundle tables + Customer Engagement Suite seed |
+| `database/migrations/088_bsaas_bundle_seeds.sql` | Commerce Power Pack, Operations, Growth, Everything Pack seeds |
 
 ## Expansion Opportunities
 
@@ -262,25 +270,92 @@ Currently renewals use synchronous `chargePaymentMethod` (PaymentIntent). Migrat
 - Stripe-hosted invoice PDFs and receipt emails
 - **Implementation**: Create Stripe Price objects per catalog entry, subscribe customer on purchase, handle `invoice.payment_failed` in `stripe-webhooks.ts` to suspend purchases
 
-### 2. Bundle Pricing / Feature Packs
-- Group multiple features into a discounted bundle
-- New `bsaas_bundles` table with `bundle_price_cents`, `bundle_billing_cycle`
-- Junction table `bsaas_bundle_features` mapping bundles to feature keys
-- Purchase endpoint extended to accept `bundleId` as alternative to `featureKey`
-- Single charge covers all features in the bundle
-
-### 3. Usage-Based Pricing (Metered BSaaS)
+### 2. Usage-Based Pricing (Metered BSaaS)
 - For features like AI bot conversations, API calls, or product embeddings
 - Stripe Metered Billing: create subscription item with `usage_type=metered`
 - Report usage to Stripe via `subscriptionItems.createUsageRecord()`
 - Invoice generated automatically by Stripe based on usage tiers
 - Requires `bsaas_catalog.price_model` column: `flat` vs `metered` vs `tiered`
 
-### 4. Feature Upgrades / Downgrades
+### 3. Feature Upgrades / Downgrades
 - Allow tenants to switch between monthly and annual billing
 - Proration logic: calculate remaining value, apply credit or charge difference
 - Update `billing_cycle` and `price_cents` in purchase metadata
 - Adjust `expires_at` based on new cycle
+
+## Bundle Purchase Flow
+
+Bundles group multiple flexible toggle features across capability domains into a single purchasable product at a discount vs. buying each separately.
+
+### Schema
+
+- **`bsaas_bundles`** table — `bundle_key`, `marketing_name`, `description`, `price_cents`, `billing_cycle`, `trial_days`, `is_active`, `sort_order`
+- **`bsaas_bundle_items`** table — `bundle_id`, `feature_key`, `sort_order` (junction table linking bundles to feature keys)
+- **Migrations**: `087_bsaas_bundles.sql` (tables + Customer Engagement Suite seed), `088_bsaas_bundle_seeds.sql` (Commerce Power Pack, Operations Bundle, Growth Bundle, Everything Pack seeds)
+- **Prisma models**: `bsaas_bundles`, `bsaas_bundle_items`
+
+### Bundle Catalog Endpoint
+
+- **`GET /api/subscription/bundle-catalog`** — Returns active bundles with component features, tier eligibility per component, purchase status, and trial info per tenant
+- Uses `checkBundleEngagement()` to verify the tenant's tier has ≥1 feature in EVERY capability type represented by the bundle's components
+- Filters out bundles where all components are already active (`allActive`)
+
+### Bundle Purchase Endpoint
+
+- **`POST /api/subscription/bundle-purchase`** — Validates bundle, checks existing purchases, verifies capability engagement for ALL components
+- **Trial branch**: Creates `tenant_feature_purchases` rows with `source='bsaas_bundle'`, `status='trial'` for each component
+- **Normal purchase**: Single Stripe charge for the entire bundle price, creates active purchase rows for each component
+- Each component's `metadata` includes `bundle_key`, `bundle_name`, `price_cents`, `billing_cycle`, `payment_method_id`
+- Calls `ensureCompanionPurchase()` for each component's parent gate
+- Calls `invalidateEffectiveCapabilities()` once after all purchases
+- Audit logs and notifications sent
+
+### Bundle Cancellation (Cascade)
+
+- When cancelling a `bsaas_bundle` purchase, the cancel endpoint checks `metadata.bundle_key`
+- Finds all other purchases with the same `bundle_key` for the tenant
+- Cancels all components (bundle = all-or-nothing)
+- Calls `maybeCancelCompanion()` for each component
+- Audit log records `bundle_purchase.cancel` with all cancelled IDs
+
+### Bundle Renewal (Single Charge)
+
+- The renewal job (`bsaas-renewal.ts`) groups expiring `bsaas_bundle` purchases by `metadata.bundle_key`
+- Charges once per bundle (not per component) — saves Stripe transaction fees
+- Extends expiry for all component purchases on success
+- On failure, enters grace period for all components
+- Expired trial conversion also groups by bundle_key and charges once
+
+### Source Field
+
+- `source: 'bsaas'` — Individual feature purchase
+- `source: 'bsaas_bundle'` — Bundle component purchase (linked via `metadata.bundle_key`)
+- `source: 'companion'` — Zero-cost parent gate companion (auto-created)
+- `source: 'admin_grant'` — Admin complimentary access
+
+The `EffectiveCapabilityResolver` treats all sources equally — it merges any active purchase into `mergedFeatures` regardless of source.
+
+### Available Bundles
+
+| Bundle | Key | Components | Price | Discount | Trial |
+|--------|-----|-----------|-------|----------|-------|
+| Customer Engagement Suite | `customer_engagement_suite` | chatbot_flexible + crm_flexible + faq_flexible | $79/mo | 26% | 14 days |
+| Commerce Power Pack | `commerce_power_pack` | social_commerce_flexible + storefront_opt_flexible + product_options_flexible | $69/mo | 29% | 14 days |
+| Operations Bundle | `operations_bundle` | integration_flexible + fulfillment_flexible + payment_gateway_flexible | $49/mo | 29% | 14 days |
+| Growth Bundle | `growth_bundle` | featured_flexible + directory_entry_flexible + quickstart_flexible | $39/mo | 32% | 14 days |
+| Everything Pack | `everything_pack` | All 17 flexible toggles | $299/mo | 31% | 14 days |
+
+### Admin Management
+
+- **Admin API**: `apps/api/src/routes/admin/bsaas-bundles.ts` — CRUD for bundles and bundle items
+- **Admin service**: `apps/web/src/services/AdminBsaasBundleService.ts`
+- **Admin UI**: `apps/web/src/admin/components/BundlesTab.tsx` + `BundleEditModal.tsx` (tab in BsaasCatalogManagement)
+- **Admin page**: `apps/web/src/app/(platform)/settings/admin/bsaas-catalog/page.tsx`
+
+### Frontend Bundle Purchase
+
+- **Service**: `BsaasPurchaseService.getBundleCatalog()` and `purchaseBundle()`
+- **UI**: Feature Store page (`feature-store/page.tsx`) shows bundle cards above individual features with component list, pricing, trial badges, eligibility states, and purchase confirmation modal
 
 ## Related Documents
 
