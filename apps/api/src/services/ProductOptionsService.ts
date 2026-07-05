@@ -24,8 +24,6 @@ export type ProductLayoutType = 'classic' | 'editorial' | 'immersive';
 
 export interface ProductOptionsState {
   enabled: boolean;
-  // Legacy type fields (backward compat — now sourced from ProductTypeService)
-  allowedTypes: ProductType[];
   // Creation group
   creationEnabled: boolean;
   showsVariants: boolean;
@@ -154,11 +152,6 @@ class ProductOptionsService {
     const masterEnabled = !!features.product_options_enabled;
     const flexible = !!features.product_options_flexible;
 
-    // Legacy fallback
-    const legacyEnabled = !!features.product_enabled;
-    const legacyFlexible = !!features.product_flexible;
-    const legacyDisabled = !!features.product_disabled;
-
     const hasAnyFeature = hasAnyOptFeature(features);
     const enabled = masterDisabled
       ? false
@@ -166,46 +159,32 @@ class ProductOptionsService {
         ? true
         : flexible
           ? true
-          : legacyDisabled
-            ? false
-            : legacyEnabled
-              ? true
-              : legacyFlexible
-                ? true
-                : hasAnyFeature;
+          : hasAnyFeature;
 
-    const isFlexible = flexible || legacyFlexible;
-
-    // ── Legacy type fields (backward compat) ──
-    const allowedTypes: ProductType[] = [];
-    if (isFlexible || features.product_physical) allowedTypes.push('physical');
-    if (isFlexible || features.product_digital) allowedTypes.push('digital');
-    if (isFlexible || features.product_hybrid) allowedTypes.push('hybrid');
-    if (isFlexible || features.product_service) allowedTypes.push('service');
+    const isFlexible = flexible;
 
     // ── Creation group (R16) ──
     const creationGroupEnabled = !!features.product_options_creation_enabled;
     const creationGroupDisabled = !!features.product_options_creation_disabled;
-    const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants || !!features.product_variant;
-    const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery || !!features.product_gallery;
-    const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video || !!features.product_video;
+    const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants;
+    const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery;
+    const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video;
     const showsSupplierCatalog = isFlexible || creationGroupEnabled || !!features.product_options_creation_supplier_catalog;
     const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
 
     // ── Layout group (R16) ──
     const layoutGroupEnabled = !!features.product_options_layout_enabled;
     const layoutGroupDisabled = !!features.product_options_layout_disabled;
-    const legacyLayoutEnabled = !!features.product_layout_enabled;
-    const layoutEnabled = !layoutGroupDisabled && (isFlexible || layoutGroupEnabled || legacyLayoutEnabled);
+    const layoutEnabled = !layoutGroupDisabled && (isFlexible || layoutGroupEnabled);
 
     const allowedLayouts: ProductLayoutType[] = [];
     if (isFlexible || (layoutEnabled && !layoutGroupDisabled)) {
       if (isFlexible || layoutGroupEnabled) {
         allowedLayouts.push('classic', 'editorial', 'immersive');
       } else {
-        if (features.product_options_layout_classic || features.product_layout_classic) allowedLayouts.push('classic');
-        if (features.product_options_layout_editorial || features.product_layout_editorial) allowedLayouts.push('editorial');
-        if (features.product_options_layout_immersive || features.product_layout_immersive) allowedLayouts.push('immersive');
+        if (features.product_options_layout_classic) allowedLayouts.push('classic');
+        if (features.product_options_layout_editorial) allowedLayouts.push('editorial');
+        if (features.product_options_layout_immersive) allowedLayouts.push('immersive');
       }
     }
 
@@ -214,22 +193,21 @@ class ProductOptionsService {
     const sectionsGroupDisabled = !!features.product_options_sections_disabled;
     const sectionsEnabled = !sectionsGroupDisabled && (isFlexible || sectionsGroupEnabled || hasAnySectionFeature(features));
 
-    const showsRecentlyViewed = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recently_viewed || !!features.product_opt_recently_viewed;
-    const showsQRCodes = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_codes || !!features.product_opt_qr_codes;
-    const showsQRLogo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_logo || !!features.product_opt_qr_logo;
-    const showsRecommended = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recommended || !!features.product_opt_recommended;
-    const showsMapDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_map_display || !!features.product_opt_map_display;
-    const showsLocationDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_display || !!features.product_opt_location_display;
-    const showsHoursDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_hours_display || !!features.product_opt_hours_display;
-    const showsEnhancedSEO = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_enhanced_seo || !!features.product_opt_enhanced_seo;
-    const showsReviews = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_reviews || !!features.product_opt_reviews;
-    const showsFulfillment = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_fulfillment || !!features.product_opt_fulfillment;
-    const showsCategories = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_categories || !!features.product_opt_categories;
-    const showsLocationAvailability = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_availability || !!features.product_opt_location_availability;
+    const showsRecentlyViewed = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recently_viewed;
+    const showsQRCodes = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_codes;
+    const showsQRLogo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_logo;
+    const showsRecommended = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recommended;
+    const showsMapDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_map_display;
+    const showsLocationDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_display;
+    const showsHoursDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_hours_display;
+    const showsEnhancedSEO = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_enhanced_seo;
+    const showsReviews = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_reviews;
+    const showsFulfillment = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_fulfillment;
+    const showsCategories = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_categories;
+    const showsLocationAvailability = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_availability;
 
     return {
       enabled,
-      allowedTypes,
       creationEnabled,
       showsVariants,
       showsGallery,
@@ -259,21 +237,11 @@ class ProductOptionsService {
   }
 
   /**
-   * Check if a specific product type is allowed for a tenant.
-   * @deprecated Use ProductTypeService.isProductTypeAllowed instead.
-   */
-  async isProductTypeAllowed(tenantId: string, type: ProductType): Promise<boolean> {
-    const state = await this.resolveProductOptionsState(tenantId);
-    return state.enabled && state.allowedTypes.includes(type);
-  }
-
-  /**
    * Return a disabled state (used when tenant not found or error).
    */
   private getDisabledState(): ProductOptionsState {
     return {
       enabled: false,
-      allowedTypes: [],
       creationEnabled: false,
       showsVariants: false,
       showsGallery: false,
@@ -313,16 +281,7 @@ function hasAnyOptFeature(features: Record<string, boolean>): boolean {
     features.product_options_layout_immersive ||
     features.product_options_sections_recently_viewed ||
     features.product_options_sections_qr_codes ||
-    features.product_options_sections_recommended ||
-    features.product_variant ||
-    features.product_gallery ||
-    features.product_video ||
-    features.product_layout_classic ||
-    features.product_layout_editorial ||
-    features.product_layout_immersive ||
-    features.product_opt_recently_viewed ||
-    features.product_opt_qr_codes ||
-    features.product_opt_recommended
+    features.product_options_sections_recommended
   );
 }
 
@@ -339,18 +298,7 @@ function hasAnySectionFeature(features: Record<string, boolean>): boolean {
     features.product_options_sections_reviews ||
     features.product_options_sections_fulfillment ||
     features.product_options_sections_categories ||
-    features.product_options_sections_location_availability ||
-    features.product_opt_recently_viewed ||
-    features.product_opt_qr_codes ||
-    features.product_opt_recommended ||
-    features.product_opt_map_display ||
-    features.product_opt_location_display ||
-    features.product_opt_hours_display ||
-    features.product_opt_enhanced_seo ||
-    features.product_opt_reviews ||
-    features.product_opt_fulfillment ||
-    features.product_opt_categories ||
-    features.product_opt_location_availability
+    features.product_options_sections_location_availability
   );
 }
 

@@ -10,13 +10,8 @@ import { generateProductOptionsSettingsId } from '../lib/id-generator';
 
 const router = Router();
 
-// Validation schema — type fields kept for backward compat but gated by product-type-settings route
+// Validation schema — type fields are managed by product-type-settings route
 const productOptionsSettingsSchema = z.object({
-  // Legacy type fields (still stored here for backward compat, but gating is via ProductTypeService)
-  product_physical_enabled: z.boolean().optional(),
-  product_digital_enabled: z.boolean().optional(),
-  product_hybrid_enabled: z.boolean().optional(),
-  product_service_enabled: z.boolean().optional(),
   // Creation group
   product_variant_enabled: z.boolean().optional(),
   product_gallery_enabled: z.boolean().optional(),
@@ -41,10 +36,6 @@ const productOptionsSettingsSchema = z.object({
 
 // Default settings
 const DEFAULT_SETTINGS = {
-  product_physical_enabled: true,
-  product_digital_enabled: true,
-  product_hybrid_enabled: true,
-  product_service_enabled: false,
   product_variant_enabled: true,
   product_gallery_enabled: true,
   product_video_enabled: false,
@@ -102,10 +93,6 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
       return res.json({
         success: true,
         settings: {
-          product_physical_enabled: false,
-          product_digital_enabled: false,
-          product_hybrid_enabled: false,
-          product_service_enabled: false,
           product_variant_enabled: false,
           product_gallery_enabled: false,
           product_video_enabled: false,
@@ -137,12 +124,6 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
 
     // Enforce tier gates using group-based structure
     const tierFilteredSettings: Record<string, boolean | string> = {};
-
-    // Legacy type fields — pass through without tier gating (types now gated by ProductTypeService)
-    tierFilteredSettings.product_physical_enabled = !!(rawSettings as any).product_physical_enabled;
-    tierFilteredSettings.product_digital_enabled = !!(rawSettings as any).product_digital_enabled;
-    tierFilteredSettings.product_hybrid_enabled = !!(rawSettings as any).product_hybrid_enabled;
-    tierFilteredSettings.product_service_enabled = !!(rawSettings as any).product_service_enabled;
 
     // Creation group: gated by tier showsVariants/showsGallery/showsVideo
     for (const [key, tierFlag] of Object.entries(CREATION_FEATURE_KEYS)) {
@@ -227,11 +208,6 @@ router.put('/:tenantId/product-options', authenticateToken, requireTenantAdmin, 
         filteredData[key] = value;
         continue;
       }
-      // Legacy type fields — pass through without tier gating (types now gated by ProductTypeService)
-      if (['product_physical_enabled', 'product_digital_enabled', 'product_hybrid_enabled', 'product_service_enabled'].includes(key)) {
-        filteredData[key] = value as boolean;
-        continue;
-      }
       // Creation group gates (variant, gallery, video)
       const creationFlag = CREATION_FEATURE_KEYS[key];
       if (creationFlag) {
@@ -297,10 +273,6 @@ router.put('/:tenantId/product-options', authenticateToken, requireTenantAdmin, 
     res.json({
       success: true,
       settings: {
-        product_physical_enabled: settings.product_physical_enabled,
-        product_digital_enabled: settings.product_digital_enabled,
-        product_hybrid_enabled: settings.product_hybrid_enabled,
-        product_service_enabled: settings.product_service_enabled,
         product_variant_enabled: settings.product_variant_enabled,
         product_gallery_enabled: settings.product_gallery_enabled,
         product_video_enabled: settings.product_video_enabled,

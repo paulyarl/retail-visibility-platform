@@ -105,10 +105,6 @@ export interface ProductTypeMerchantSettings {
 }
 
 export interface ProductOptionsMerchantSettings {
-  product_physical_enabled?: boolean | null;
-  product_digital_enabled?: boolean | null;
-  product_hybrid_enabled?: boolean | null;
-  product_service_enabled?: boolean | null;
   product_variant_enabled?: boolean | null;
   product_gallery_enabled?: boolean | null;
   product_video_enabled?: boolean | null;
@@ -349,9 +345,6 @@ export interface EffectiveProductType {
 
 export interface EffectiveProductOptions {
   enabled: boolean;
-  // ── Type fields (legacy, kept for backward compat — now sourced from product_types capability) ──
-  allowed_types: ProductType[];
-  effective_types: ProductType[];
   // ── Creation group ──
   creation_enabled: boolean;
   shows_variants: boolean;

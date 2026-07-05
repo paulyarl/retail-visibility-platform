@@ -3,18 +3,13 @@
  *
  * Resolves effective product options state from tier features + merchant preferences.
  * Uses group gates (R16) for creation, layout, and sections groups.
- * Checks new canonical keys (product_options_*) first, then falls back to
- * legacy keys (product_*) for backward compatibility.
  *
- * Note: Type gating (physical/digital/hybrid/service) has been moved to
- * ProductTypeResolver. Legacy type fields are still populated here for
- * backward compatibility during the transition period.
+ * Type gating (physical/digital/hybrid/service) is handled by ProductTypeResolver.
  */
 
 import type {
   EffectiveProductOptions,
   ProductOptionsMerchantSettings,
-  ProductType,
   ProductLayoutType,
 } from './types';
 
@@ -27,42 +22,23 @@ export function resolveProductOptions(
   const masterEnabled = !!features.product_options_enabled;
   const flexible = !!features.product_options_flexible;
 
-  // Legacy fallback
-  const legacyEnabled = !!features.product_enabled;
-  const legacyFlexible = !!features.product_flexible;
-
   const enabled = masterDisabled
     ? false
     : masterEnabled
       ? true
       : flexible
         ? true
-        : legacyEnabled
-          ? true
-          : legacyFlexible
-            ? true
-            : hasAnyOptionsFeature(features);
+        : hasAnyOptionsFeature(features);
 
-  const isFlexible = flexible || legacyFlexible;
-
-  // ── Legacy type fields (kept for backward compat — sourced from legacy keys) ──
-  const allowedTypes: ProductType[] = [];
-  if (features.product_physical) allowedTypes.push('physical');
-  if (features.product_digital) allowedTypes.push('digital');
-  if (features.product_hybrid) allowedTypes.push('hybrid');
-  if (features.product_service) allowedTypes.push('service');
-  if (isFlexible) {
-    allowedTypes.push('physical', 'digital', 'hybrid', 'service');
-  }
-  const uniqueAllowedTypes = [...new Set(allowedTypes)];
+  const isFlexible = flexible;
 
   // ── Creation group (R16: group gates) ──
   const creationGroupEnabled = !!features.product_options_creation_enabled;
   const creationGroupDisabled = !!features.product_options_creation_disabled;
 
-  const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants || !!features.product_variant;
-  const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery || !!features.product_gallery;
-  const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video || !!features.product_video;
+  const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants;
+  const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery;
+  const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video;
   const showsSupplierCatalog = isFlexible || creationGroupEnabled || !!features.product_options_creation_supplier_catalog;
 
   const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
@@ -70,17 +46,16 @@ export function resolveProductOptions(
   // ── Layout group (R16: group gates) ──
   const layoutGroupEnabled = !!features.product_options_layout_enabled;
   const layoutGroupDisabled = !!features.product_options_layout_disabled;
-  const legacyLayoutEnabled = !!features.product_layout_enabled;
 
-  const layoutEnabled = !layoutGroupDisabled && (isFlexible || layoutGroupEnabled || legacyLayoutEnabled);
+  const layoutEnabled = !layoutGroupDisabled && (isFlexible || layoutGroupEnabled);
   const allowedLayouts: ProductLayoutType[] = [];
   if (isFlexible || (layoutEnabled && !layoutGroupDisabled)) {
     if (isFlexible || layoutGroupEnabled) {
       allowedLayouts.push('classic', 'editorial', 'immersive');
     } else {
-      if (features.product_options_layout_classic || features.product_layout_classic) allowedLayouts.push('classic');
-      if (features.product_options_layout_editorial || features.product_layout_editorial) allowedLayouts.push('editorial');
-      if (features.product_options_layout_immersive || features.product_layout_immersive) allowedLayouts.push('immersive');
+      if (features.product_options_layout_classic) allowedLayouts.push('classic');
+      if (features.product_options_layout_editorial) allowedLayouts.push('editorial');
+      if (features.product_options_layout_immersive) allowedLayouts.push('immersive');
     }
   }
 
@@ -90,25 +65,21 @@ export function resolveProductOptions(
 
   const sectionsEnabled = !sectionsGroupDisabled && (isFlexible || sectionsGroupEnabled || hasAnySectionFeature(features));
 
-  const showsRecentlyViewed = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recently_viewed || !!features.product_opt_recently_viewed;
-  const showsQrCodes = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_codes || !!features.product_opt_qr_codes;
-  const showsQrLogo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_logo || !!features.product_opt_qr_logo;
-  const showsRecommended = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recommended || !!features.product_opt_recommended;
-  const showsMapDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_map_display || !!features.product_opt_map_display;
-  const showsLocationDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_display || !!features.product_opt_location_display;
-  const showsHoursDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_hours_display || !!features.product_opt_hours_display;
-  const showsEnhancedSeo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_enhanced_seo || !!features.product_opt_enhanced_seo;
-  const showsReviews = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_reviews || !!features.product_opt_reviews;
-  const showsFulfillment = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_fulfillment || !!features.product_opt_fulfillment;
-  const showsCategories = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_categories || !!features.product_opt_categories;
-  const showsLocationAvailability = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_availability || !!features.product_opt_location_availability;
+  const showsRecentlyViewed = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recently_viewed;
+  const showsQrCodes = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_codes;
+  const showsQrLogo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_logo;
+  const showsRecommended = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recommended;
+  const showsMapDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_map_display;
+  const showsLocationDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_display;
+  const showsHoursDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_hours_display;
+  const showsEnhancedSeo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_enhanced_seo;
+  const showsReviews = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_reviews;
+  const showsFulfillment = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_fulfillment;
+  const showsCategories = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_categories;
+  const showsLocationAvailability = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_availability;
 
   // ── Merchant preferences (soft toggles, default true when unset) ──
   const prefs = {
-    product_physical_enabled: merchantPrefs?.product_physical_enabled !== false,
-    product_digital_enabled: merchantPrefs?.product_digital_enabled !== false,
-    product_hybrid_enabled: merchantPrefs?.product_hybrid_enabled !== false,
-    product_service_enabled: merchantPrefs?.product_service_enabled !== false,
     product_variant_enabled: merchantPrefs?.product_variant_enabled !== false,
     product_gallery_enabled: merchantPrefs?.product_gallery_enabled !== false,
     product_video_enabled: merchantPrefs?.product_video_enabled !== false,
@@ -128,17 +99,6 @@ export function resolveProductOptions(
     product_opt_supplier_catalog: merchantPrefs?.product_opt_supplier_catalog !== false,
   };
 
-  // ── Effective types (legacy, for backward compat) ──
-  const effectiveTypes = uniqueAllowedTypes.filter((t) => {
-    switch (t) {
-      case 'physical': return prefs.product_physical_enabled;
-      case 'digital': return prefs.product_digital_enabled;
-      case 'hybrid': return prefs.product_hybrid_enabled;
-      case 'service': return prefs.product_service_enabled;
-      default: return true;
-    }
-  });
-
   // ── Effective layout ──
   const effectiveLayout = allowedLayouts.includes(prefs.product_layout as ProductLayoutType)
     ? prefs.product_layout as ProductLayoutType
@@ -146,9 +106,6 @@ export function resolveProductOptions(
 
   return {
     enabled,
-    // Legacy type fields (backward compat)
-    allowed_types: uniqueAllowedTypes,
-    effective_types: effectiveTypes,
     // Creation group
     creation_enabled: creationEnabled,
     shows_variants: showsVariants,
@@ -209,16 +166,7 @@ function hasAnyOptionsFeature(features: Record<string, boolean>): boolean {
     features.product_options_layout_immersive ||
     features.product_options_sections_recently_viewed ||
     features.product_options_sections_qr_codes ||
-    features.product_options_sections_recommended ||
-    features.product_variant ||
-    features.product_gallery ||
-    features.product_video ||
-    features.product_layout_classic ||
-    features.product_layout_editorial ||
-    features.product_layout_immersive ||
-    features.product_opt_recently_viewed ||
-    features.product_opt_qr_codes ||
-    features.product_opt_recommended
+    features.product_options_sections_recommended
   );
 }
 
@@ -235,17 +183,6 @@ function hasAnySectionFeature(features: Record<string, boolean>): boolean {
     features.product_options_sections_reviews ||
     features.product_options_sections_fulfillment ||
     features.product_options_sections_categories ||
-    features.product_options_sections_location_availability ||
-    features.product_opt_recently_viewed ||
-    features.product_opt_qr_codes ||
-    features.product_opt_recommended ||
-    features.product_opt_map_display ||
-    features.product_opt_location_display ||
-    features.product_opt_hours_display ||
-    features.product_opt_enhanced_seo ||
-    features.product_opt_reviews ||
-    features.product_opt_fulfillment ||
-    features.product_opt_categories ||
-    features.product_opt_location_availability
+    features.product_options_sections_location_availability
   );
 }

@@ -218,8 +218,6 @@ interface BackendEffectiveProductTypes {
 
 interface BackendEffectiveProductOptions {
   enabled: boolean;
-  allowed_types: ProductType[];
-  effective_types: ProductType[];
   shows_variants: boolean;
   shows_gallery: boolean;
   shows_video: boolean;
@@ -567,8 +565,6 @@ function mapProductType(b: BackendEffectiveProductTypes): ProductTypeState {
 function mapProductOptions(b: BackendEffectiveProductOptions): ProductOptionsState {
   return {
     enabled: b.enabled,
-    allowedTypes: b.allowed_types,
-    effectiveTypes: b.effective_types,
     creationEnabled: b.creation_enabled ?? true,
     showsVariants: b.shows_variants,
     showsGallery: b.shows_gallery,

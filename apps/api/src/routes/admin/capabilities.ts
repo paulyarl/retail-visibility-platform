@@ -16,31 +16,72 @@ const requirePlatformStaff = (req: any, res: any, next: any) => {
   next();
 };
 
-/** GET /api/admin/capabilities — aggregated overview */
+/** GET /api/admin/capabilities — aggregated overview, one row per (tier, capability_type) assignment */
 router.get('/', requirePlatformStaff, async (req, res) => {
   try {
-    const capTypes = await prisma.capability_type_list.findMany({
-      where: { is_active: true },
-      include: {
-        capability_features_list: { where: { is_active: true }, include: { features_list: { select: { key: true, name: true } } } },
-        subscription_tiers_list: { select: { tier_key: true, name: true, sort_order: true } },
+    // Query tier_features_list to get actual tier-capability type assignments
+    const tierFeatures = await prisma.tier_features_list.findMany({
+      where: {
+        is_enabled: true,
+        capability_type_id: { not: null },
       },
-      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+      include: {
+        capability_type_list: { select: { key: true, name: true, category: true, description: true, sort_order: true, is_active: true } },
+        subscription_tiers_list: { select: { tier_key: true, name: true, sort_order: true, is_active: true } },
+      },
     });
 
-    const result = capTypes.map(ct => ({
-      capability_type_key: ct.key,
-      capability_type_name: ct.name,
-      category: ct.category || '',
-      tier_key: ct.subscription_tiers_list?.tier_key || '',
-      tier_name: ct.subscription_tiers_list?.name || '',
-      description: ct.description || '',
-      feature_count: ct.capability_features_list.length,
-      features_in_capability: ct.capability_features_list
-        .map((cf: any) => cf.features_list?.key || cf.feature_id).join(', '),
-      capability_sort_order: ct.sort_order ?? 0,
-      tier_sort_order: ct.subscription_tiers_list?.sort_order ?? 0,
-    }));
+    // Group by (tier_key, capability_type_key) and aggregate feature counts
+    const assignmentMap = new Map<string, {
+      capability_type_key: string;
+      capability_type_name: string;
+      category: string;
+      tier_key: string;
+      tier_name: string;
+      description: string;
+      feature_count: number;
+      features_in_capability: string[];
+      capability_sort_order: number;
+      tier_sort_order: number;
+    }>();
+
+    for (const tf of tierFeatures) {
+      const capKey = tf.capability_type_list?.key;
+      const tierKey = tf.subscription_tiers_list?.tier_key;
+      if (!capKey || !tierKey) continue;
+      // Skip inactive capability types and tiers
+      if (tf.capability_type_list?.is_active === false) continue;
+      if (tf.subscription_tiers_list?.is_active === false) continue;
+
+      const mapKey = `${tierKey}:${capKey}`;
+      if (!assignmentMap.has(mapKey)) {
+        assignmentMap.set(mapKey, {
+          capability_type_key: capKey,
+          capability_type_name: tf.capability_type_list?.name || capKey,
+          category: tf.capability_type_list?.category || '',
+          tier_key: tierKey,
+          tier_name: tf.subscription_tiers_list?.name || tierKey,
+          description: tf.capability_type_list?.description || '',
+          feature_count: 0,
+          features_in_capability: [],
+          capability_sort_order: tf.capability_type_list?.sort_order ?? 0,
+          tier_sort_order: tf.subscription_tiers_list?.sort_order ?? 0,
+        });
+      }
+      const entry = assignmentMap.get(mapKey)!;
+      entry.feature_count++;
+      entry.features_in_capability.push(tf.feature_key);
+    }
+
+    const result = Array.from(assignmentMap.values())
+      .sort((a, b) => {
+        if (a.tier_sort_order !== b.tier_sort_order) return a.tier_sort_order - b.tier_sort_order;
+        return a.capability_sort_order - b.capability_sort_order;
+      })
+      .map(entry => ({
+        ...entry,
+        features_in_capability: entry.features_in_capability.join(', '),
+      }));
 
     res.json(result);
   } catch (error) {
