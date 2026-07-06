@@ -19,10 +19,9 @@ const requirePlatformStaff = (req: any, res: any, next: any) => {
 /** GET /api/admin/capabilities — aggregated overview, one row per (tier, capability_type) assignment */
 router.get('/', requirePlatformStaff, async (req, res) => {
   try {
-    // Query tier_features_list to get actual tier-capability type assignments
+    // Query tier_features_list to get actual tier-capability type assignments (including disabled)
     const tierFeatures = await prisma.tier_features_list.findMany({
       where: {
-        is_enabled: true,
         capability_type_id: { not: null },
       },
       include: {
@@ -40,6 +39,8 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       tier_name: string;
       description: string;
       feature_count: number;
+      enabled_feature_count: number;
+      disabled_feature_count: number;
       features_in_capability: string[];
       capability_sort_order: number;
       tier_sort_order: number;
@@ -62,6 +63,8 @@ router.get('/', requirePlatformStaff, async (req, res) => {
           tier_name: tf.subscription_tiers_list?.name || tierKey,
           description: tf.capability_type_list?.description || '',
           feature_count: 0,
+          enabled_feature_count: 0,
+          disabled_feature_count: 0,
           features_in_capability: [],
           capability_sort_order: tf.capability_type_list?.sort_order ?? 0,
           tier_sort_order: tf.subscription_tiers_list?.sort_order ?? 0,
@@ -69,6 +72,11 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       }
       const entry = assignmentMap.get(mapKey)!;
       entry.feature_count++;
+      if (tf.is_enabled) {
+        entry.enabled_feature_count++;
+      } else {
+        entry.disabled_feature_count++;
+      }
       entry.features_in_capability.push(tf.feature_key);
     }
 
@@ -79,6 +87,8 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       })
       .map(entry => ({
         ...entry,
+        is_fully_enabled: entry.disabled_feature_count === 0,
+        has_disabled: entry.disabled_feature_count > 0,
         features_in_capability: entry.features_in_capability.join(', '),
       }));
 

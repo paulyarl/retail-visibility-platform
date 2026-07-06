@@ -30,7 +30,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { AlertCircle, Check, X, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Check, X, AlertTriangle, Pause } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/Switch';
 import { Pagination } from '@/components/ui/Pagination';
@@ -1533,20 +1533,28 @@ export default function CapabilityManagement() {
 
               const totalMissing = missingByTier.reduce((sum, m) => sum + m.missingCount, 0);
               const totalCells = activeTiers.length * activeCapTypes.length;
+              const totalAssigned = totalCells - totalMissing;
+              const disabledCount = Array.from(assignmentMap.values()).filter(c => c.has_disabled).length;
+              const fullyEnabledCount = totalAssigned - disabledCount;
               const coveragePct = totalCells > 0 ? Math.round(((totalCells - totalMissing) / totalCells) * 100) : 0;
 
               return (
                 <>
                   {/* Summary cards */}
-                  <div className="px-6 py-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="px-6 py-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
                       <div className="text-xs text-gray-500 uppercase font-medium">Coverage</div>
                       <div className={`text-2xl font-bold ${coveragePct >= 80 ? 'text-green-600' : coveragePct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{coveragePct}%</div>
                     </div>
                     <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
-                      <div className="text-xs text-gray-500 uppercase font-medium">Assigned</div>
-                      <div className="text-2xl font-bold text-green-600">{totalCells - totalMissing}</div>
+                      <div className="text-xs text-gray-500 uppercase font-medium">Fully Enabled</div>
+                      <div className="text-2xl font-bold text-green-600">{fullyEnabledCount}</div>
                       <div className="text-xs text-gray-400">of {totalCells} cells</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                      <div className="text-xs text-gray-500 uppercase font-medium">Partially Disabled</div>
+                      <div className="text-2xl font-bold text-amber-600">{disabledCount}</div>
+                      <div className="text-xs text-gray-400">has disabled features</div>
                     </div>
                     <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
                       <div className="text-xs text-gray-500 uppercase font-medium">Missing</div>
@@ -1557,6 +1565,22 @@ export default function CapabilityManagement() {
                       <div className="text-xs text-gray-500 uppercase font-medium">Tiers with Gaps</div>
                       <div className={`text-2xl font-bold ${missingByTier.filter(m => m.missingCount > 0).length === 0 ? 'text-green-600' : 'text-amber-600'}`}>{missingByTier.filter(m => m.missingCount > 0).length}</div>
                       <div className="text-xs text-gray-400">of {activeTiers.length} tiers</div>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="px-6 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600"><Check className="w-3 h-3" /></span>
+                      <span>Fully Enabled</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-600"><Pause className="w-3 h-3" /></span>
+                      <span>Partially Disabled</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-500"><X className="w-3 h-3" /></span>
+                      <span>Not Assigned</span>
                     </div>
                   </div>
 
@@ -1598,8 +1622,9 @@ export default function CapabilityManagement() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {activeCapTypes.map(capType => {
                           const capMissingCount = activeTiers.filter(t => !assignmentMap.has(`${t.tierKey}:${capType.capability_type_key}`)).length;
+                          const capDisabledCount = activeTiers.filter(t => assignmentMap.get(`${t.tierKey}:${capType.capability_type_key}`)?.has_disabled).length;
                           return (
-                            <tr key={capType.capability_type_key} className={capMissingCount > 0 ? 'bg-amber-50/30' : ''}>
+                            <tr key={capType.capability_type_key} className={capMissingCount > 0 || capDisabledCount > 0 ? 'bg-amber-50/30' : ''}>
                               <td className="px-4 py-3 sticky left-0 bg-inherit z-10">
                                 <div className="text-sm font-medium text-gray-900">{capType.capability_type_name}</div>
                                 <div className="text-xs text-gray-500 font-mono">{capType.capability_type_key}</div>
@@ -1608,19 +1633,28 @@ export default function CapabilityManagement() {
                               {activeTiers.map(tier => {
                                 const assignment = assignmentMap.get(`${tier.tierKey}:${capType.capability_type_key}`);
                                 const isAssigned = !!assignment;
+                                const hasDisabled = assignment?.has_disabled;
                                 return (
                                   <td key={tier.tierKey} className="px-3 py-3 text-center">
                                     {isAssigned ? (
-                                      <div className="flex items-center justify-center" title={`${assignment.feature_count} features assigned`}>
-                                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-600">
-                                          <Check className="w-4 h-4" />
-                                        </span>
+                                      <div className="flex items-center justify-center" title={hasDisabled
+                                        ? `${assignment!.enabled_feature_count} enabled, ${assignment!.disabled_feature_count} disabled features`
+                                        : `${assignment!.feature_count} features assigned`}>
+                                        {hasDisabled ? (
+                                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-600">
+                                            <Pause className="w-4 h-4" />
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-600">
+                                            <Check className="w-4 h-4" />
+                                          </span>
+                                        )}
                                       </div>
                                     ) : (
                                       <button
                                         onClick={() => handleTierSelect(tier.tierKey)}
                                         className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-100 text-red-500 hover:bg-red-200 transition-colors cursor-pointer"
-                                        title={`Click to assign ${capType.capability_type_name} to ${tier.displayName}`}
+                                        title={`Click to assign ${capType.capability_type_name} to ${tier.displayName || tier.name}`}
                                       >
                                         <X className="w-4 h-4" />
                                       </button>

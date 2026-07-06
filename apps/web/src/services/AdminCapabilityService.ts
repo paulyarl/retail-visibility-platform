@@ -16,6 +16,10 @@ export interface CapabilityData {
   tier_name: string;
   description: string;
   feature_count: number;
+  enabled_feature_count?: number;
+  disabled_feature_count?: number;
+  is_fully_enabled?: boolean;
+  has_disabled?: boolean;
   features_in_capability: string;
   capability_sort_order?: number;
   tier_sort_order?: number;
