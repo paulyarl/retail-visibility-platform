@@ -429,6 +429,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               onOpenCategorySync={() => setShowCategorySyncModal(true)}
               productTypeRollup={productTypeRollupData}
               readOnly={readOnly}
+              isPropagationAllowed={isPropagationAllowed}
             />
           </ProtectedCard>
         )}

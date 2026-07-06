@@ -141,8 +141,8 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
     if (!tierState.enabled) return false;
     if (tierState.isFlexible) return true;
 
-    if (key === 'social_commerce_meta_enabled') return tierState.metaEnabled;
-    if (key === 'social_commerce_tiktok_enabled') return tierState.tiktokEnabled;
+    if (key === 'social_commerce_meta_enabled') return tierState.allowedMetaTypes.length > 0;
+    if (key === 'social_commerce_tiktok_enabled') return tierState.allowedTikTokTypes.length > 0;
 
     if (key.startsWith('social_commerce_meta_')) return tierState.allowedMetaTypes.includes(key as any);
     if (key.startsWith('social_commerce_tiktok_')) return tierState.allowedTikTokTypes.includes(key as any);

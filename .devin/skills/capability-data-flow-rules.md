@@ -227,10 +227,10 @@ Every resolver MUST accept `(features, merchantPrefs)` and produce both tier-all
 `*Available` = `enabled AND effectiveTypes.length > 0`. Never use it as the sole tier check in dashboard components — it hides tier-allowed features when merchant hasn't toggled any on.
 
 ### R4: Use `allowed*Types` for Display, `canUse*` for Status
-Dashboard components MUST iterate `allowed*Types` arrays to decide which features to show, and use `canUse*` / `effective*` to decide if each is 'enabled' or 'merchant-gated'.
+Dashboard components AND settings pages MUST iterate `allowed*Types` arrays to decide which features to show, and use `canUse*` / `effective*` to decide if each is 'enabled' or 'merchant-gated'. This applies to both `PlanSummaryPanel`/`CapabilityShowcase` (dashboard) and `isTierAllowed` functions in settings pages.
 
 ### R5: Tier-Allowed Features Show as Merchant-Gated
-When the tier allows a feature but the merchant hasn't enabled it, the dashboard MUST show it with 'merchant-gated' (amber) status — NOT hide it.
+When the tier allows a feature but the merchant hasn't enabled it, the dashboard AND settings page MUST show it with 'merchant-gated' (amber) status — NOT hide it. In settings pages, this means the toggle is visible and enabled (not disabled), but the merchant hasn't turned it on yet. Only features not allowed by the tier should be disabled with a 'Not in your plan' label.
 
 ### R6: API Route Must Return `tierState`
 Every settings GET endpoint MUST return `{ success, settings, tierState }`. The frontend settings page needs `tierState` to render tier gating UI.
@@ -438,6 +438,50 @@ if (currentCaps) {
 ```
 
 **When to add write-time validation**: Add CCL validation to PUT handlers that change a capability's `effective_type` or `enabled` state. Only `block` severity constraints are enforced at write-time — `warn` and `info` severity constraints surface in the UI only (read-time).
+
+### R25: Settings Page `isTierAllowed` Must Use `allowed*Types`, Not Effective Flags or `isFlexible`-Only
+
+The `isTierAllowed` function in settings pages (e.g., `SocialCommerceSettingsClient.tsx`, `BotOptionsPage.tsx`, `CrmOptionsPage.tsx`) determines whether a feature toggle is enabled or shows 'Not in your plan'. This function MUST use `allowed*Types` arrays for tier permission checks — NOT effective flags (`*Enabled`, `metaEnabled`, `tiktokEnabled`) and NOT `isFlexible` as the sole gate.
+
+**Why effective flags are wrong here**: Effective flags like `metaEnabled` combine tier permission AND merchant opt-in (`tierAllowed && merchantEnabled`). When the merchant hasn't toggled a feature on, the effective flag is `false` even if the tier grants it — causing the settings page to show 'Not in your plan' for features the tier actually allows.
+
+**Why `isFlexible`-only is wrong**: Using `isFlexible` as the only tier gate blocks ALL tier-gated features for non-flexible tiers, even when the tier individually grants those features. Non-flexible tiers (e.g., `professional`, `growth`) have specific features enabled via `tier_features_list` — `isFlexible` only covers top-tier (e.g., `organization`, `chain`).
+
+**Correct patterns**:
+```ts
+// CORRECT — group toggle uses array length:
+if (key === 'social_commerce_meta_enabled') return tierState.allowedMetaTypes.length > 0;
+if (key === 'social_commerce_tiktok_enabled') return tierState.allowedTikTokTypes.length > 0;
+
+// CORRECT — individual feature uses array includes:
+if (key.startsWith('social_commerce_meta_')) return tierState.allowedMetaTypes.includes(key as any);
+
+// CORRECT — chatbot tier-gated feature checks specific allowed arrays:
+const isAllowed = !isTierGated || (chatbotCaps && (
+  chatbotCaps.isFlexible ||
+  (feature.key === 'chatbot_dynamic_enabled' && chatbotCaps.allowedResponseEngines.length > 0) ||
+  (feature.key === 'chatbot_skills_enabled' && chatbotCaps.allowedSkillTypes.length > 0)
+));
+
+// WRONG — uses effective flag (conflates tier + merchant):
+if (key === 'social_commerce_meta_enabled') return tierState.metaEnabled;  // ❌ false when merchant hasn't opted in
+
+// WRONG — uses isFlexible as sole gate (blocks non-flexible tiers):
+const isAllowed = !isTierGated || (chatbotCaps && chatbotCaps.isFlexible);  // ❌ blocks professional/growth tiers
+```
+
+**Audit checklist for settings pages**:
+1. For each `isTierAllowed(key)` branch, verify it checks `allowed*Types.includes(key)` or `allowed*Types.length > 0` — not `*Enabled` or `*Available`
+2. For features with `tierGate: true` flag, verify the gate checks the specific `allowed*Types` array — not just `isFlexible`
+3. Group toggles (e.g., `social_commerce_meta_enabled`) MUST use `allowed*Types.length > 0`, not the group's effective flag
+
+### R26: `CAPABILITY_DISPLAY` Settings Paths Must Point to Actual Settings Page
+
+The `settingsPath` in the `CAPABILITY_DISPLAY` map in `PlanSummaryPanel.tsx` MUST point to the actual settings page URL — not a parent route or dashboard. A wrong path causes the 'Configure' button to navigate to the wrong page.
+
+**Common pitfall**: Chatbot settings are at `/bot/options`, but the path was set to `/bot` (the bot dashboard). Always verify the path matches the actual route in `apps/web/src/app/t/[tenantId]/`.
+
+**Verification**: When adding or updating a `CAPABILITY_DISPLAY` entry, click the 'Configure' link in PlanSummaryPanel to verify it navigates to the correct settings page.
 
 ## File Reference
 

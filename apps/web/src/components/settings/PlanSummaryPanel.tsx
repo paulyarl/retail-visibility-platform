@@ -255,7 +255,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
-  chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot' },
+  chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot/options' },
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
 };
 

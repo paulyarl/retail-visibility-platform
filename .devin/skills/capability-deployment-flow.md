@@ -371,8 +371,10 @@ const allowedCount = cap?.allowedResponseEngines.length + cap?.allowedSkillTypes
 
 - Use `useXxxCapability(tenantId)` hook for tier state
 - Use `xxxOptionsService.getOptions()` for merchant prefs
-- Disable toggles when tier doesn't allow
-- Show "Not included in your plan" messaging when `tierState.enabled` is false
+- `isTierAllowed` function MUST use `allowed*Types` arrays for tier checks — NOT effective flags (`*Enabled`) or `isFlexible`-only (R25)
+- Group toggles use `allowed*Types.length > 0`; individual features use `allowed*Types.includes(key)`
+- Disable toggles when tier doesn't allow; show 'Not in your plan' label (R5)
+- Show 'Not included in your plan' messaging when `tierState.enabled` is false
 - Call PUT endpoint on save
 
 ---
@@ -493,5 +495,8 @@ When deploying a capability change, verify ALL of these:
 - [ ] **Frontend status display prefers backend**: Components displaying subscription status (e.g., `SubscriptionDisplayCard`) should use `capabilities.subscriptionContext.internalStatus` when available, falling back to `deriveInternalStatus()`. See R24
 - [ ] If adding a cross-capability constraint: insert into `capability_constraints_list` DB table + add static fallback in `CapabilityConstraintRegistry.ts` (R20)
 - [ ] **Update `CONSTRAINT_METADATA`** in `apps/api/src/routes/admin/capability-constraints.ts` — add an entry for the new capability domain with its key, label, fields (with correct `value_type`, `operators`, and `values` derived from the `EffectiveXxx` interface in `types.ts`). Without this, the new capability won't appear in the constraint form dropdowns.
+- [ ] Settings page `isTierAllowed` uses `allowed*Types` arrays, not effective flags or `isFlexible`-only (R25)
+- [ ] Settings page group toggles use `allowed*Types.length > 0`, not `*Enabled` effective flags (R25)
+- [ ] `CAPABILITY_DISPLAY` `settingsPath` points to actual settings page URL, not parent route (R26)
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors
