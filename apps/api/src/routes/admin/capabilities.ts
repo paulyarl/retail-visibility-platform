@@ -49,8 +49,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       const capKey = tf.capability_type_list?.key;
       const tierKey = tf.subscription_tiers_list?.tier_key;
       if (!capKey || !tierKey) continue;
-      // Skip inactive capability types and tiers
-      if (tf.capability_type_list?.is_active === false) continue;
+      // Skip inactive tiers (matching admin-tiers.ts which queries is_active: true on tiers)
       if (tf.subscription_tiers_list?.is_active === false) continue;
 
       const mapKey = `${tierKey}:${capKey}`;

@@ -414,6 +414,18 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     return result.data;
   }
 
+  async updateTenantStatus(tenantId: string, status: string, reason?: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenants/${tenantId}/status`,
+      { method: 'PATCH', body: JSON.stringify({ status, reason }) },
+    );
+    if (!result.success) {
+      const errMsg = typeof result.error === 'object' && result.error ? result.error.message : String(result.error || 'Failed to update status');
+      throw new Error(errMsg);
+    }
+    return result.data;
+  }
+
   private invalidateOrganizationCache(organizationId: string) {
     this.invalidateCache(`tenant-organization-${organizationId}`);
     this.invalidateCache(`organization-${organizationId}`);
