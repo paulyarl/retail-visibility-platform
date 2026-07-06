@@ -72,6 +72,28 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       entry.features_in_capability.push(tf.feature_key);
     }
 
+    // Diagnostic: count rows with null capability_type_id
+    const nullCapRows = await prisma.tier_features_list.count({
+      where: { is_enabled: true, capability_type_id: null },
+    });
+    const totalEnabledRows = await prisma.tier_features_list.count({
+      where: { is_enabled: true },
+    });
+
+    // Diagnostic: list all active tiers
+    const allActiveTiers = await prisma.subscription_tiers_list.findMany({
+      where: { is_active: true },
+      select: { tier_key: true, name: true, sort_order: true },
+      orderBy: { sort_order: 'asc' },
+    });
+
+    // Diagnostic: list all active capability types
+    const allActiveCapTypes = await prisma.capability_type_list.findMany({
+      where: { is_active: true },
+      select: { key: true, name: true },
+      orderBy: { sort_order: 'asc' },
+    });
+
     const result = Array.from(assignmentMap.values())
       .sort((a, b) => {
         if (a.tier_sort_order !== b.tier_sort_order) return a.tier_sort_order - b.tier_sort_order;
@@ -81,6 +103,25 @@ router.get('/', requirePlatformStaff, async (req, res) => {
         ...entry,
         features_in_capability: entry.features_in_capability.join(', '),
       }));
+
+    // Verbose diagnostic logging
+    console.log('[GET /api/admin/capabilities] DIAGNOSTICS:', {
+      totalEnabledTierFeatureRows: totalEnabledRows,
+      rowsWithCapabilityTypeId: totalEnabledRows - nullCapRows,
+      rowsWithNullCapabilityTypeId: nullCapRows,
+      distinctAssignments: assignmentMap.size,
+      activeTiers: allActiveTiers.length,
+      activeTiersList: allActiveTiers.map(t => t.tier_key),
+      activeCapTypes: allActiveCapTypes.length,
+      activeCapTypesList: allActiveCapTypes.map(c => c.key),
+      expectedCells: allActiveTiers.length * allActiveCapTypes.length,
+      assignedCells: assignmentMap.size,
+      missingCells: (allActiveTiers.length * allActiveCapTypes.length) - assignmentMap.size,
+      // Check for trial tiers (won't have tier_features_list rows)
+      trialTiers: allActiveTiers.filter(t => t.tier_key.startsWith('trial_')).map(t => t.tier_key),
+      // List which tier:cap pairs are assigned
+      assignedPairs: Array.from(assignmentMap.keys()).sort(),
+    });
 
     res.json(result);
   } catch (error) {
