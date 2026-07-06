@@ -20,6 +20,7 @@ import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 import { SelfServiceBillingWithStripe } from '@/components/subscription/SelfServiceBilling';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import CapabilityFeatureList from '@/components/subscription/CapabilityFeatureList';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ interface PendingRequest {
 }
 
 
-export default function SubscriptionPage() {
+export default function SubscriptionPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   
@@ -118,7 +119,7 @@ export default function SubscriptionPage() {
   // Show loading while user, tenant, or tier data is being fetched
   if (combinedLoading || !user || tiersLoading) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className={embedded ? "flex items-center justify-center py-20" : "min-h-screen bg-neutral-50 flex items-center justify-center"}>
         <div className="text-neutral-600">Loading subscription details...</div>
       </div>
     );
@@ -380,7 +381,7 @@ export default function SubscriptionPage() {
   // Store owners need a tenant to view subscription
   if (!tenant) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className={embedded ? "py-8" : "min-h-screen bg-neutral-50 flex items-center justify-center"}>
         <Card className="max-w-md" withBorder padding="lg" radius="md">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">No Subscription Found</h3>
@@ -444,32 +445,36 @@ export default function SubscriptionPage() {
     }));
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      <PageHeader
-        title="Subscription Management"
-        icon={<SubscriptionIcon />}
-        actions={
-          <Button
-            onClick={invalidateCache}
-            variant="outline"
-            size="sm"
-            className="text-xs"
-          >
-            Clear Cache & Refresh
-          </Button>
-        }
-      />
+    <div className={embedded ? "" : "min-h-screen bg-neutral-50 dark:bg-neutral-900"}>
+      {!embedded && (
+        <PageHeader
+          title="Subscription Management"
+          icon={<SubscriptionIcon />}
+          actions={
+            <Button
+              onClick={invalidateCache}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              Clear Cache & Refresh
+            </Button>
+          }
+        />
+      )}
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className={embedded ? "space-y-8" : "max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8"}>
         {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
         <SubscriptionStatusGuide />
 
         {/* Context Badges */}
-        <ContextBadges 
-          tenant={tenant || undefined} 
-          showPlatformRole={!tenant}
-          contextLabel="Subscription"
-        />
+        {!embedded && (
+          <ContextBadges 
+            tenant={tenant || undefined} 
+            showPlatformRole={!tenant}
+            contextLabel="Subscription"
+          />
+        )}
         
         {/* Current Plan */}
         {/* SKU Overage Alert */}
@@ -619,20 +624,12 @@ export default function SubscriptionPage() {
               )}
             </div>
 
-            {/* Features */}
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3">Your Plan Includes:</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {tierInfo.features.map((feature: any, idx) => (
-                  <div key={idx} className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span className="text-sm text-neutral-700">
-                      {typeof feature === 'object' ? feature.featureName || feature.featureKey : feature}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Features — capability-aware listing */}
+            <CapabilityFeatureList
+              tenantId={tenantId || ''}
+              compact
+              showFeatureStoreLink
+            />
 
             {/* Capability Summary — shows resolved commerce, payment, and storefront states */}
             {allCapabilities.data && (

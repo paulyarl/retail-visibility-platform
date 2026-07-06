@@ -377,9 +377,13 @@ export interface DirectoryEntryOptionsState {
   canShowQr: boolean;
   canShowSocial: boolean;
   canShowSeo: boolean;
+  // External link — tier-gated availability + effective state
+  canShowExternalLink: boolean;
+  externalLinkEnabled: boolean;
   merchantPreferences: {
     directory_entry_opt_enabled: boolean;
     directory_entry_layout: DirectoryEntryLayoutKey;
+    external_link_enabled?: boolean;
   };
   features: Record<string, boolean>;
 }

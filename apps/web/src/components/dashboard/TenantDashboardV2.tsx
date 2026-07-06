@@ -346,16 +346,10 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                     <Sparkles className="w-5 h-5 text-purple-600" />
                     <h3 className="font-semibold text-gray-900">Support & Help Desk</h3>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Link href={`/t/${tenantId}/support`} className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors">
-                      All tickets
-                      <ArrowRight className="w-3 h-3" />
-                    </Link>
-                    <Link href={`/t/${tenantId}/bot`} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
-                      Configure bot
-                      <ArrowRight className="w-3 h-3" />
-                    </Link>
-                  </div>
+                  <Link href={`/t/${tenantId}/support`} className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors">
+                    All tickets
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
                 </div>
 
                 {/* CRM Stat Badges */}
@@ -397,19 +391,25 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                 {/* Bot Stat Badges */}
                 {chatbotEnabled ? (
                   <>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Bot className="w-4 h-4 text-indigo-600" />
-                      <span className="text-sm font-medium text-gray-700">Chatbot</span>
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        botConfig?.status === 'active'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          botConfig?.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'
-                        }`} />
-                        {botConfig?.status === 'active' ? 'Online' : 'Inactive'}
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Bot className="w-4 h-4 text-indigo-600" />
+                        <span className="text-sm font-medium text-gray-700">Store Assistant</span>
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                          botConfig?.status === 'active'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            botConfig?.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'
+                          }`} />
+                          {botConfig?.status === 'active' ? 'Online' : 'Inactive'}
+                        </span>
+                      </div>
+                      <Link href={`/t/${tenantId}/bot`} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+                        Configure bot
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="rounded-xl bg-gray-50 p-3 text-center">

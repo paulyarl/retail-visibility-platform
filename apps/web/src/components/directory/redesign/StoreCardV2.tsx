@@ -32,14 +32,12 @@ export default function StoreCardV2({
   const isImmersive = appearance === 'immersive';
   const isEditorial = appearance === 'editorial';
 
-  const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
-    store.subscriptionTier || '',
-  );
-  const destinationUrl =
-    canUseCustomUrl && store.website
-      ? store.website
-      : `/tenant/${store.tenantId}`;
-  const isExternalLink = canUseCustomUrl && !!store.website;
+  // Use external link only when capability flag is set and website exists
+  const canUseExternal = store.canUseExternalLink && !!store.website;
+  const destinationUrl = canUseExternal
+    ? (store.website as string)
+    : `/directory/${store.tenantId}`;
+  const isExternalLink = canUseExternal;
 
   const formatRating = (rating: number) =>
     rating > 0 ? rating.toFixed(1) : 'New';

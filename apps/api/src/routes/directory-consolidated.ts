@@ -77,11 +77,13 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           dll.is_featured,
           dll.subscription_tier,
           dll.use_custom_website,
+          COALESCE(mec.is_enabled, false) as can_use_external_link,
           dll.is_published,
           dll.created_at,
           dll.updated_at,
           dll.keywords
          FROM directory_listings_list dll
+         LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
          WHERE dll.slug = $1 AND dll.is_published = true
          LIMIT 1`,
         [slug]
@@ -366,6 +368,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       isFeatured: listing.is_featured,
       subscriptionTier: listing.subscription_tier,
       useCustomWebsite: listing.use_custom_website,
+      canUseExternalLink: (listing as any).can_use_external_link || false,
       isPublished: listing.is_published,
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,

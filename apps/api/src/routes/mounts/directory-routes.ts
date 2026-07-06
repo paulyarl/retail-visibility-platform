@@ -49,8 +49,8 @@ export function mountDirectoryRoutes(app: Express) {
   // Directory routes - mount AFTER category routes to avoid conflicts
   // Category routes handle: /api/directory/categories/*
   // These routes handle: /api/directory/search, /api/directory/locations, etc.
-  // app.use('/api/directory', directoryRoutes); // OLD: Public directory endpoint - no auth required
-  app.use('/api/directory', enhancedDirectoryRoutes); // NEW: Enhanced routes with proper tenant filtering
+  app.use('/api/directory', directoryRoutes); // /stores, /search, /locations, /:identifier (single-segment paths)
+  app.use('/api/directory', enhancedDirectoryRoutes); // /:slug/related, /categories/enhanced, etc. (two-segment paths)
   // app.use('/api/directory/enhanced', enhancedDirectoryRoutes); // OLD: Enhanced routes at /enhanced
   app.use('/api/admin/directory', directoryAdminRoutes); // Admin directory management (auth in routes)
   app.use('/api/support/directory', directorySupportRoutes); // Support directory tools (auth in routes)

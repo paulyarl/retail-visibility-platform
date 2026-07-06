@@ -29,6 +29,7 @@ interface StoreCardProps {
     promotionTier?: string;
     subscriptionTier: string;
     useCustomWebsite: boolean;
+    canUseExternalLink?: boolean;
     website?: string;
     distance?: number;
     isOpen?: boolean;
@@ -60,17 +61,12 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
     }
   }, [listing.isPromoted, listing.tenantId]);
 
-  // Determine destination URL based on tier and settings
-  const canUseCustomUrl = ['professional', 'enterprise', 'organization'].includes(
-    listing.subscriptionTier
-  );
-  
-  const destinationUrl = 
-    canUseCustomUrl && listing.useCustomWebsite && listing.website
-      ? listing.website
-      : `/tenant/${listing.tenantId}`;
-  
-  const isExternalLink = canUseCustomUrl && listing.useCustomWebsite && listing.website;
+  // Use external link only when capability flag is set and website exists
+  const canUseExternal = listing.canUseExternalLink && !!listing.website;
+  const destinationUrl = canUseExternal
+    ? (listing.website as string)
+    : `/directory/${listing.tenantId}`;
+  const isExternalLink = canUseExternal;
 
   // Format rating
   const formatRating = (rating: number) => {
@@ -101,8 +97,6 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
     >
       <Link
         href={destinationUrl}
-        target={isExternalLink ? '_blank' : undefined}
-        rel={isExternalLink ? 'noopener noreferrer' : undefined}
         className="block"
         onClick={() => { if (listing.isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}
       >

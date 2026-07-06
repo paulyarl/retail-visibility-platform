@@ -51,6 +51,7 @@ interface DirectoryListing {
   isFeatured: boolean;
   subscription_tier: string;
   useCustomWebsite: boolean;
+  canUseExternalLink?: boolean;
   distance?: number;
   isOpen?: boolean;
 }
@@ -112,7 +113,8 @@ router.get('/search', async (req, res) => {
         dll.product_count as "productCount",
         dll.is_featured as "isFeatured",
         dll.subscription_tier as "subscriptionTier",
-        dll.use_custom_website as "useCustomWebsite"
+        dll.use_custom_website as "useCustomWebsite",
+        COALESCE(mec.is_enabled, false) as "canUseExternalLink"
     `;
 
     // Add distance calculation if lat/lng provided
@@ -126,6 +128,7 @@ router.get('/search', async (req, res) => {
     const baseQuery = Prisma.sql`
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
+      LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
       WHERE dll.is_published = true
         AND (dll.business_hours IS NULL OR dll.business_hours::text != 'null')
     `;
@@ -574,6 +577,7 @@ router.get('/:slug', async (req, res) => {
       isFeatured: listing.is_featured,
       subscriptionTier: listing.subscription_tier,
       useCustomWebsite: listing.use_custom_website,
+      canUseExternalLink: (listing as any).canUseExternalLink || false,
       isPublished: listing.is_published,
       createdAt: listing.created_at,
       updatedAt: listing.updated_at,

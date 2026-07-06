@@ -54,13 +54,17 @@ interface CacheEntry {
 const MEMORY_CACHE = new Map<string, CacheEntry>();
 const MEMORY_TTL_MS = 60_000; // 60 seconds
 
+const MV_CACHE = new Map<string, CacheEntry>();
+const MV_TTL_MS = 60_000; // 60 seconds
+
 /**
  * Invalidate the in-memory cache for a tenant.
  * Call this from every settings PUT handler.
  */
 export function invalidateEffectiveCapabilities(tenantId: string): void {
   MEMORY_CACHE.delete(tenantId);
-  logger.debug('[EffectiveCapabilityResolver] Invalidated cache', undefined, { tenantId, correlationId: generateCorrelationId(tenantId) });
+  MV_CACHE.delete(tenantId);
+  logger.debug('[EffectiveCapabilityResolver] Invalidated caches (resolver + MV)', undefined, { tenantId, correlationId: generateCorrelationId(tenantId) });
 }
 
 // ====================
@@ -111,6 +115,7 @@ export async function resolveEffectiveCapabilities(
         trial_ends_at: true,
         subscription_ends_at: true,
         organization_id: true,
+        org_standing_mode: true,
         organizations_list: { select: { subscription_tier: true, subscription_status: true } },
       },
     }),
@@ -242,8 +247,30 @@ export async function resolveEffectiveCapabilities(
   result.constraint_status = constraint_status;
 
   // 6. Apply subscription-status-aware capability override
+  // Asymmetric inheritance: if tenant is in 'inherited' mode and org is in good standing,
+  // the tenant's STATUS is lifted to 'active' regardless of its own status.
+  // The tenant's TIER is never replaced — capabilities are always resolved from the
+  // tenant's own tier (steps 4-5). Org tier only gates org-level features (org_options, propagation).
+  // Org bad standing does NOT drag the tenant down — tenant's own status is the floor.
+  const standingMode = tenant.org_standing_mode || 'independent';
+  let effectiveStatus = tenant.subscription_status;
+
+  if (standingMode === 'inherited' && tenant.organizations_list) {
+    const orgInternalStatus = deriveInternalStatus({
+      subscription_status: tenant.organizations_list.subscription_status,
+      subscription_tier: tenant.organizations_list.subscription_tier,
+      trialEndsAt: null,
+      subscription_ends_at: null,
+    });
+    // Only lift up — org active/trialing/past_due rescues a frozen/canceled/expired tenant
+    if (orgInternalStatus === 'active' || orgInternalStatus === 'trialing' || orgInternalStatus === 'past_due') {
+      effectiveStatus = 'active';
+    }
+    // If org is also bad, fall through with tenant's own status (no change)
+  }
+
   const internalStatus = deriveInternalStatus({
-    subscription_status: tenant.subscription_status,
+    subscription_status: effectiveStatus,
     subscription_tier: tenant.subscription_tier,
     trialEndsAt: tenant.trial_ends_at,
     subscription_ends_at: tenant.subscription_ends_at,
@@ -251,7 +278,7 @@ export async function resolveEffectiveCapabilities(
 
   const maintenanceState = getMaintenanceState({
     tier: tenant.subscription_tier,
-    status: tenant.subscription_status,
+    status: effectiveStatus,
     trialEndsAt: tenant.trial_ends_at,
   });
 
@@ -329,6 +356,371 @@ export async function resolveEffectiveCapabilities(
   // 8. Cache in memory
   MEMORY_CACHE.set(tenantId, { data: result, expiry: Date.now() + MEMORY_TTL_MS });
 
+  return result;
+}
+
+// ====================
+// MV-BASED RESOLVER (for public endpoints)
+// ====================
+
+/**
+ * Invalidate the MV-based cache for a tenant.
+ * Called alongside invalidateEffectiveCapabilities when settings change.
+ */
+export function invalidateMVCapabilities(tenantId: string): void {
+  MV_CACHE.delete(tenantId);
+}
+
+/**
+ * Fetch raw capabilities from the pre-resolved materialized view.
+ *
+ * Replaces the 5+ queries in fetchRawCapabilities with a single MV lookup.
+ * The MV already merges tier features, BSaaS purchases, admin overrides,
+ * and all three flexible expansions.
+ *
+ * Trade-off: data is up to 10 minutes stale (MV refresh interval).
+ * Acceptable for public/read-only surfaces. Not for settings pages or
+ * post-purchase confirmation — those use resolveEffectiveCapabilities.
+ */
+async function fetchRawCapabilitiesFromMV(tenantId: string): Promise<RawCapabilitiesInput | null> {
+  // 1. Get all enabled feature keys for this tenant from the MV
+  const mvRows = await prisma.$queryRaw<{ feature_key: string }[]>`
+    SELECT feature_key FROM mv_tenant_effective_capabilities WHERE tenant_id = ${tenantId}
+  `;
+
+  // 2. Get tier info from tenants table
+  const tenant = await prisma.tenants.findUnique({
+    where: { id: tenantId },
+    select: {
+      subscription_tier: true,
+      organization_id: true,
+      organizations_list: { select: { subscription_tier: true } },
+    },
+  });
+
+  if (!tenant) return null;
+
+  const orgTierKey = tenant.organizations_list?.subscription_tier || null;
+  const tenantTierKey = tenant.subscription_tier || null;
+  const resolvedOrgTierKey = orgTierKey ? getEffectiveTier(orgTierKey) : null;
+  const resolvedTenantTierKey = tenantTierKey ? getEffectiveTier(tenantTierKey) : null;
+  const effectiveTierKey = resolvedOrgTierKey || resolvedTenantTierKey || 'starter';
+
+  const tier = await prisma.subscription_tiers_list.findFirst({
+    where: { tier_key: effectiveTierKey },
+    select: { name: true, description: true },
+  });
+
+  // 3. If MV has no rows, the tenant has no enabled features.
+  // Still return a valid RawCapabilitiesInput with empty capabilities.
+  const featureKeys = mvRows.map(r => r.feature_key);
+
+  // 4. Look up capability types for these features
+  let capabilities: Record<string, { capability_enabled: boolean; is_highlighted: boolean; features: Record<string, boolean> }> = {};
+  const uncategorizedFeatures: string[] = [];
+
+  if (featureKeys.length > 0) {
+    const features = await prisma.features_list.findMany({
+      where: { key: { in: featureKeys } },
+      select: { id: true, key: true },
+    });
+
+    const featureIdToKey = new Map(features.map(f => [f.id, f.key]));
+    const capLinks = await prisma.capability_features_list.findMany({
+      where: { feature_id: { in: [...featureIdToKey.keys()] } },
+      include: { capability_type_list: { select: { key: true } } },
+    });
+
+    const featureKeyToCapKey = new Map<string, string>();
+    for (const link of capLinks) {
+      const fKey = featureIdToKey.get(link.feature_id);
+      if (fKey && link.capability_type_list?.key) {
+        featureKeyToCapKey.set(fKey, link.capability_type_list.key);
+      }
+    }
+
+    for (const fk of featureKeys) {
+      const capKey = featureKeyToCapKey.get(fk);
+      if (capKey) {
+        if (!capabilities[capKey]) {
+          capabilities[capKey] = { capability_enabled: true, is_highlighted: false, features: {} };
+        }
+        capabilities[capKey].features[fk] = true;
+      } else {
+        uncategorizedFeatures.push(fk);
+      }
+    }
+  }
+
+  // 5. Lightweight query for purchased feature keys (for metadata)
+  const purchases = await prisma.tenant_feature_purchases.findMany({
+    where: {
+      tenant_id: tenantId,
+      status: { in: ['active', 'past_due', 'trial'] },
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { feature_key: true },
+  });
+
+  return {
+    tier_key: effectiveTierKey,
+    tier_name: tier?.name || effectiveTierKey,
+    tier_description: tier?.description || '',
+    capabilities,
+    uncategorized_features: uncategorizedFeatures,
+    purchased_feature_keys: purchases.map(p => p.feature_key),
+    override_feature_keys: [],
+  };
+}
+
+/**
+ * Resolve effective capabilities using the pre-resolved MV.
+ *
+ * Same output shape as resolveEffectiveCapabilities, but raw capabilities
+ * come from the MV instead of the multi-query fetchRawCapabilities.
+ *
+ * Use this for public/read-only endpoints where 10-minute staleness is acceptable.
+ * Use resolveEffectiveCapabilities for settings pages, post-purchase, and write routes.
+ */
+export async function resolveEffectiveCapabilitiesFromMV(
+  tenantIdOrSlug: string,
+  opts: { detail?: 'full' | 'summary' } = {}
+): Promise<EffectiveCapabilities | null> {
+  const detail = opts.detail ?? 'summary';
+  const correlationId = generateCorrelationId();
+  const logMeta = { correlationId, tenantId: tenantIdOrSlug };
+
+  // 1. Resolve identifier
+  const resolved = await resolveTenantIdentifier(tenantIdOrSlug);
+  if (!resolved) {
+    logger.warn('[MVCapabilities] Tenant not found', undefined, logMeta);
+    return null;
+  }
+  const tenantId = resolved.id;
+  logMeta.tenantId = tenantId;
+
+  // 2. Check MV cache
+  const cached = MV_CACHE.get(tenantId);
+  if (cached && cached.expiry > Date.now()) {
+    logger.debug('[MVCapabilities] Cache hit', undefined, logMeta);
+    return { ...cached.data };
+  }
+
+  // 3. Fetch tenant + MV raw caps + merchant settings in parallel
+  const [tenant, rawCaps, merchantBundle] = await Promise.all([
+    prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        organization_id: true,
+        organizations_list: { select: { subscription_tier: true, subscription_status: true } },
+      },
+    }),
+    fetchRawCapabilitiesFromMV(tenantId),
+    fetchMerchantSettings(tenantId),
+  ]);
+
+  if (!tenant || !rawCaps) {
+    logger.warn('[MVCapabilities] Unable to resolve capabilities', undefined, logMeta);
+    return null;
+  }
+
+  // 4. Build tier info
+  const tierInfo = {
+    key: rawCaps.tier_key,
+    name: rawCaps.tier_name || rawCaps.tier_key,
+    description: rawCaps.tier_description || '',
+  };
+
+  // 5. Dispatch to per-domain resolvers (same pipeline as resolveEffectiveCapabilities)
+  const effective = await Promise.all([
+    resolveCommerce(tenantId, rawCaps, merchantBundle.commerce),
+    resolvePaymentGateway(
+      rawCaps.capabilities.payment_gateway_options?.features || {},
+      merchantBundle.paymentGateway
+    ),
+    resolveStorefrontType(tenantId, merchantBundle.storefrontType),
+    resolveFulfillment(
+      rawCaps.capabilities.fulfillment_options?.features || {},
+      merchantBundle.fulfillment
+    ),
+    resolveBarcodeScan(
+      rawCaps.capabilities.barcode_scan_options?.features || {},
+      merchantBundle.barcodeScan
+    ),
+    resolveProductType(
+      rawCaps.capabilities.product_types?.features || {},
+      merchantBundle.productType
+    ),
+    resolveProductOptions(
+      rawCaps.capabilities.product_options?.features || {},
+      merchantBundle.productOptions
+    ),
+    resolveFeaturedOptions(
+      rawCaps.capabilities.featured_options?.features || {},
+      merchantBundle.featuredOptions
+    ),
+    resolveIntegrationOptions(
+      rawCaps.capabilities.integration_options?.features || {},
+      merchantBundle.integrationOptions,
+      rawCaps.capabilities.integration_options?.capability_enabled
+    ),
+    resolveQuickstartOptions(
+      rawCaps.capabilities.quickstart_options?.features || {},
+      merchantBundle.quickstartOptions
+    ),
+    resolveStorefrontOptions(
+      rawCaps.capabilities.storefront_options?.features || {},
+      merchantBundle.storefrontOptions
+    ),
+    resolveDirectoryEntryOptions(
+      rawCaps.capabilities.directory_entry?.features || {},
+      merchantBundle.directoryEntry
+    ),
+    resolveFaqOptions(
+      rawCaps.capabilities.faq_options?.features || {},
+      merchantBundle.faqOptions
+    ),
+    resolveCrmOptions(
+      rawCaps.capabilities.crm_options?.features || {},
+      merchantBundle.crmOptions
+    ),
+    resolveChatbotOptions(
+      rawCaps.capabilities.chatbot_options?.features || {},
+      merchantBundle.chatbotOptions
+    ),
+    resolveOrgOptions(
+      rawCaps.capabilities.organization_options?.features || {},
+      rawCaps.capabilities.organization_options?.capability_enabled
+    ),
+    resolveSocialCommerceOptions(
+      rawCaps.capabilities.social_commerce_options?.features || {},
+      merchantBundle.socialCommerceOptions
+    ),
+    resolveDirectoryPromotion(
+      rawCaps.capabilities.directory_promotion?.features || {}
+    ),
+  ]);
+
+  const result: EffectiveCapabilities = {
+    tenant_id: tenantId,
+    tier: tierInfo,
+    subscription_context: {
+      internalStatus: 'active',
+      maintenanceState: null,
+      isReadOnly: false,
+      isLimited: false,
+      writable: true,
+    },
+    effective: {
+      commerce: effective[0],
+      payment_gateway: effective[1],
+      storefront: effective[2],
+      fulfillment: effective[3],
+      barcode_scan: effective[4],
+      product_types: effective[5],
+      product_options: effective[6],
+      featured: effective[7],
+      integrations: effective[8],
+      quickstart: effective[9],
+      storefront_options: effective[10],
+      directory_entry: effective[11],
+      faq: effective[12],
+      crm: effective[13],
+      chatbot: effective[14],
+      org_options: effective[15],
+      social_commerce_options: effective[16],
+      directory_promotion: effective[17],
+    },
+    constraint_violations: [],
+    constraint_status: {},
+    uncategorized_features: rawCaps.uncategorized_features,
+    purchased_feature_keys: rawCaps.purchased_feature_keys || [],
+  };
+
+  // 6. Apply cross-capability constraints
+  const { violations, constraint_status } = await applyCrossCapabilityConstraints(result.effective);
+  result.constraint_violations = violations;
+  result.constraint_status = constraint_status;
+
+  // 7. Apply subscription-status-aware capability override
+  const internalStatus = deriveInternalStatus({
+    subscription_status: tenant.subscription_status,
+    subscription_tier: tenant.subscription_tier,
+    trialEndsAt: tenant.trial_ends_at,
+    subscription_ends_at: tenant.subscription_ends_at,
+  });
+
+  const maintenanceState = getMaintenanceState({
+    tier: tenant.subscription_tier,
+    status: tenant.subscription_status,
+    trialEndsAt: tenant.trial_ends_at,
+  });
+
+  const isReadOnly = internalStatus === 'frozen' || internalStatus === 'canceled' || internalStatus === 'expired';
+  const isLimited = internalStatus === 'maintenance' || internalStatus === 'past_due';
+
+  const subCtx: SubscriptionContext = {
+    internalStatus,
+    maintenanceState,
+    isReadOnly,
+    isLimited,
+    writable: !isReadOnly,
+  };
+  result.subscription_context = subCtx;
+
+  if (isReadOnly) {
+    result.effective.chatbot.enabled = false;
+    result.effective.barcode_scan.enabled = false;
+    result.effective.quickstart.enabled = false;
+    result.effective.commerce.enabled = false;
+    result.effective.fulfillment.enabled = false;
+    result.effective.integrations.enabled = false;
+    result.effective.payment_gateway.enabled = false;
+    result.effective.directory_promotion.enabled = false;
+  }
+
+  if (isLimited) {
+    result.effective.barcode_scan.enabled = false;
+    result.effective.quickstart.enabled = false;
+    result.effective.featured.enabled = false;
+    result.effective.chatbot.enabled = false;
+    result.effective.directory_promotion.enabled = false;
+  }
+
+  // Org-level subscription status check
+  const orgStatus = tenant.organizations_list?.subscription_status;
+  const orgTier = tenant.organizations_list?.subscription_tier;
+  if (orgStatus && orgTier) {
+    const orgInternalStatus = deriveInternalStatus({
+      subscription_status: orgStatus,
+      subscription_tier: orgTier,
+      trialEndsAt: null,
+      subscription_ends_at: null,
+    });
+    const orgReadOnly = orgInternalStatus === 'frozen' || orgInternalStatus === 'canceled' || orgInternalStatus === 'expired';
+    if (orgReadOnly) {
+      result.effective.org_options.enabled = false;
+    }
+  }
+
+  // 8. Attach raw gates for detail=full
+  if (detail === 'full') {
+    result.gates = {
+      tier_hard: rawCaps.capabilities,
+      merchant_soft: buildMerchantSoftGates(merchantBundle),
+    };
+  }
+
+  // 9. Cache in MV cache
+  MV_CACHE.set(tenantId, { data: result, expiry: Date.now() + MV_TTL_MS });
+
+  logger.debug('[MVCapabilities] Resolved from MV', undefined, logMeta);
   return result;
 }
 
@@ -454,6 +846,112 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
         });
       }
     }
+
+    // Flexible purchase expansion: if a tenant purchases {capability_key}_flexible,
+    // expand to ALL features in that capability type (mirrors MV flexible_purchase_features CTE)
+    for (const purchase of purchases) {
+      if (!purchase.feature_key.endsWith('_flexible')) continue;
+      const capType = featureKeyToCapType.get(purchase.feature_key);
+      if (!capType) continue;
+
+      const flexibleCapLinks = capLinks.filter(l => l.capability_type_list?.key === capType.key);
+      for (const cfl of flexibleCapLinks) {
+        const expandedFeature = featureIdToKey.get(cfl.feature_id);
+        if (!expandedFeature) continue;
+        const existing = mergedFeatures.get(expandedFeature);
+        if (existing) {
+          existing.is_enabled = true;
+        } else {
+          mergedFeatures.set(expandedFeature, {
+            feature_key: expandedFeature,
+            is_enabled: true,
+            is_highlighted: false,
+            capability_type_list: capType,
+          });
+        }
+      }
+    }
+  }
+
+  // Merge admin overrides (tenant_feature_overrides_list)
+  // Admin can grant any feature to a tenant, including _flexible keys that expand
+  // to all features in a capability type. This mirrors the MV's override + flexible_override CTEs.
+  const overrides = await prisma.tenant_feature_overrides_list.findMany({
+    where: {
+      tenant_id: tenantId,
+      granted: true,
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { feature: true },
+  });
+
+  const overrideFeatureKeys = overrides.map(o => o.feature);
+
+  if (overrideFeatureKeys.length > 0) {
+    // Resolve capability_type for override features (same pattern as purchases)
+    const overrideFeatures = await prisma.features_list.findMany({
+      where: { key: { in: overrideFeatureKeys } },
+      select: { id: true, key: true },
+    });
+
+    const overrideFeatureIdToKey = new Map(overrideFeatures.map(f => [f.id, f.key]));
+
+    const overrideCapLinks = await prisma.capability_features_list.findMany({
+      where: { feature_id: { in: [...overrideFeatureIdToKey.keys()] } },
+      include: { capability_type_list: { select: { key: true, name: true, category: true } } },
+    });
+
+    const overrideFeatureKeyToCapType = new Map<string, any>();
+    for (const link of overrideCapLinks) {
+      const fKey = overrideFeatureIdToKey.get(link.feature_id);
+      if (fKey) overrideFeatureKeyToCapType.set(fKey, link.capability_type_list);
+    }
+
+    // Add override features to merged map
+    for (const fk of overrideFeatureKeys) {
+      const existing = mergedFeatures.get(fk);
+      if (existing) {
+        existing.is_enabled = true;
+      } else {
+        const capType = overrideFeatureKeyToCapType.get(fk) || null;
+        mergedFeatures.set(fk, {
+          feature_key: fk,
+          is_enabled: true,
+          is_highlighted: false,
+          capability_type_list: capType,
+        });
+      }
+    }
+
+    // Flexible override expansion: if an override grants {capability_key}_flexible,
+    // expand to ALL features in that capability type (mirrors MV flexible_override_features CTE)
+    for (const fk of overrideFeatureKeys) {
+      if (!fk.endsWith('_flexible')) continue;
+      const capType = overrideFeatureKeyToCapType.get(fk);
+      if (!capType) continue;
+
+      // Fetch all features linked to this capability type
+      const allCapFeatures = await prisma.capability_features_list.findMany({
+        where: { capability_type_id: overrideCapLinks.find(l => l.capability_type_list?.key === capType.key)?.capability_type_id, is_active: true },
+        include: { features_list: { select: { key: true, is_active: true } } },
+      });
+
+      for (const cfl of allCapFeatures) {
+        if (!cfl.features_list?.is_active) continue;
+        const expandedKey = cfl.features_list.key;
+        const existing = mergedFeatures.get(expandedKey);
+        if (existing) {
+          existing.is_enabled = true;
+        } else {
+          mergedFeatures.set(expandedKey, {
+            feature_key: expandedKey,
+            is_enabled: true,
+            is_highlighted: false,
+            capability_type_list: capType,
+          });
+        }
+      }
+    }
   }
 
   // Group by capability type
@@ -483,6 +981,7 @@ async function fetchRawCapabilities(tenantId: string): Promise<RawCapabilitiesIn
     capabilities,
     uncategorized_features: uncategorizedFeatures,
     purchased_feature_keys: purchases.length > 0 ? purchases.map(p => p.feature_key) : [],
+    override_feature_keys: overrideFeatureKeys.length > 0 ? overrideFeatureKeys : [],
   };
 }
 

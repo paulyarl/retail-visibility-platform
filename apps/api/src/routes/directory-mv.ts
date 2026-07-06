@@ -177,7 +177,7 @@ router.get('/search', async (req: Request, res: Response) => {
             COALESCE(real_counts.product_count, 0) as product_count,
             dll.is_featured,
             dll.subscription_tier,
-            null as use_custom_website,
+            COALESCE(mec.is_enabled, false) as can_use_external_link,
             dll.created_at,
             dll.updated_at,
             COALESCE(dll.primary_category, t.metadata->'gbp_categories'->'primary'->>'name') as gbp_primary_category_name,
@@ -189,6 +189,7 @@ router.get('/search', async (req: Request, res: Response) => {
           FROM directory_listings_list dll
           INNER JOIN tenants t ON dll.tenant_id = t.id
           LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+          LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
           LEFT JOIN (
             SELECT 
               tenant_id,
@@ -233,7 +234,7 @@ router.get('/search', async (req: Request, res: Response) => {
           COALESCE(real_counts.product_count, 0) as product_count,
           dll.is_featured,
           dll.subscription_tier,
-          null as use_custom_website,
+          COALESCE(mec.is_enabled, false) as can_use_external_link,
           dll.created_at,
           dll.updated_at,
           COALESCE(dll.primary_category, t.metadata->'gbp_categories'->'primary'->>'name') as gbp_primary_category_name,
@@ -244,6 +245,7 @@ router.get('/search', async (req: Request, res: Response) => {
         FROM directory_listings_list dll
         INNER JOIN tenants t ON dll.tenant_id = t.id
         LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+        LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
         LEFT JOIN (
           SELECT 
             tenant_id,
@@ -302,7 +304,8 @@ router.get('/search', async (req: Request, res: Response) => {
         productCount: row.product_count || 0,
         isFeatured: row.is_featured || false,
         subscriptionTier: row.subscription_tier || 'trial',
-        useCustomWebsite: row.use_custom_website || false,
+        useCustomWebsite: false,
+        canUseExternalLink: row.can_use_external_link || false,
         businessHours: row.business_hours,
         directoryPublished: row.directory_published || false, // Add directory publish status
         createdAt: row.created_at,
@@ -552,7 +555,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         dll.is_featured as is_featured,
         dll.subscription_tier,
         dll.subscription_tier as subscription_tier,
-        null as use_custom_website,
+        COALESCE(mec.is_enabled, false) as can_use_external_link,
         dll.created_at,
         dll.created_at as created_at,
         dll.updated_at,
@@ -565,6 +568,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         true as directory_published
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
+      LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
       LEFT JOIN (
         SELECT 
           tenant_id,
@@ -629,7 +633,8 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         productCount: row.product_count || 0,
         isFeatured: row.is_featured || false,
         subscriptionTier: row.subscription_tier || 'trial',
-        useCustomWebsite: row.use_custom_website || false,
+        useCustomWebsite: false,
+        canUseExternalLink: row.can_use_external_link || false,
         businessHours: row.business_hours,
         directoryPublished: row.directory_published || false,
         createdAt: row.created_at,

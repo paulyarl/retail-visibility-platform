@@ -426,6 +426,19 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     return result.data;
   }
 
+  async updateStandingMode(organizationId: string, tenantId: string, standingMode: 'independent' | 'inherited'): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/organizations/${organizationId}/tenants/${tenantId}/standing-mode`,
+      { method: 'PATCH', body: JSON.stringify({ standingMode }) },
+    );
+    if (!result.success) {
+      const errMsg = typeof result.error === 'object' && result.error ? result.error.message : String(result.error || 'Failed to update standing mode');
+      throw new Error(errMsg);
+    }
+    this.invalidateOrganizationCache(organizationId);
+    return result.data;
+  }
+
   private invalidateOrganizationCache(organizationId: string) {
     this.invalidateCache(`tenant-organization-${organizationId}`);
     this.invalidateCache(`organization-${organizationId}`);

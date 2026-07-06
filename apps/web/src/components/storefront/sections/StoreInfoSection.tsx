@@ -69,8 +69,8 @@ function useSocialLinks(tenant: any) {
     if (profileSocial?.instagram || meta.instagram) links.push({ platform: 'Instagram', url: profileSocial?.instagram || meta.instagram, icon: 'instagram' });
     if (profileSocial?.twitter || meta.twitter || meta.x) links.push({ platform: 'X', url: profileSocial?.twitter || meta.twitter || meta.x, icon: 'x' });
     if (profileSocial?.linkedin || meta.linkedin) links.push({ platform: 'LinkedIn', url: profileSocial?.linkedin || meta.linkedin, icon: 'linkedin' });
-    if (meta.tiktok) links.push({ platform: 'TikTok', url: meta.tiktok, icon: 'tiktok' });
-    if (meta.youtube) links.push({ platform: 'YouTube', url: meta.youtube, icon: 'youtube' });
+    if (profileSocial?.tiktok || meta.tiktok) links.push({ platform: 'TikTok', url: profileSocial?.tiktok || meta.tiktok, icon: 'tiktok' });
+    if (profileSocial?.youtube || meta.youtube) links.push({ platform: 'YouTube', url: profileSocial?.youtube || meta.youtube, icon: 'youtube' });
     return links;
   }, [tenant]);
 }

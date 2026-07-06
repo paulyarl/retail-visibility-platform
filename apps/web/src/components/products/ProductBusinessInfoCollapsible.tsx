@@ -217,7 +217,9 @@ export default function ProductBusinessInfoCollapsible({
                         {(metadata?.social_links as any)?.facebook || (metadata?.socialLinks as any)?.facebook ||
                             (metadata?.social_links as any)?.instagram || (metadata?.socialLinks as any)?.instagram ||
                             (metadata?.social_links as any)?.twitter || (metadata?.socialLinks as any)?.twitter ||
-                            (metadata?.social_links as any)?.linkedin || (metadata?.socialLinks as any)?.linkedin ? (
+                            (metadata?.social_links as any)?.linkedin || (metadata?.socialLinks as any)?.linkedin ||
+                            (metadata?.social_links as any)?.tiktok || (metadata?.socialLinks as any)?.tiktok ||
+                            (metadata?.social_links as any)?.youtube || (metadata?.socialLinks as any)?.youtube ? (
                             <div>
                                 <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">Follow Us</h3>
                                 {(metadata?.social_links as any)?.facebook || (metadata?.socialLinks as any)?.facebook ? (
@@ -327,6 +329,52 @@ export default function ProductBusinessInfoCollapsible({
                                         </div>
 
 
+                                    </div>
+                                ) : null}
+
+                                {/* TikTok */}
+                                {(metadata?.social_links as any)?.tiktok || (metadata?.socialLinks as any)?.tiktok ? (
+                                    <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                                        <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.14v14.93a2.84 2.84 0 0 1-2.87 2.56 2.78 2.78 0 0 1-2.77-2.78 2.78 2.78 0 0 1 2.77-2.77c.3 0 .6.05.88.14v-3.2a6.33 6.33 0 0 0-1-.08A6 6 0 0 0 6.7 19.7a6 6 0 0 0 10.4-4.07v-7a7.83 7.83 0 0 0 4.77 1.62V6.69h-1.28z" />
+                                        </svg>
+                                        <div>
+                                            <a
+                                                href={(metadata?.social_links as any)?.tiktok || (metadata?.socialLinks as any)?.tiktok}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 text-neutral-900 hover:text-neutral-700 dark:text-neutral-100 dark:hover:text-neutral-300 transition-colors"
+                                                title="TikTok"
+                                            >
+                                                <svg className="h-12 w-12" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.14v14.93a2.84 2.84 0 0 1-2.87 2.56 2.78 2.78 0 0 1-2.77-2.78 2.78 2.78 0 0 1 2.77-2.77c.3 0 .6.05.88.14v-3.2a6.33 6.33 0 0 0-1-.08A6 6 0 0 0 6.7 19.7a6 6 0 0 0 10.4-4.07v-7a7.83 7.83 0 0 0 4.77 1.62V6.69h-1.28z" />
+                                                </svg>
+                                                <p className="text-sm font-medium text-neutral-900 dark:text-white">View and follow us</p>
+                                            </a>
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {/* YouTube */}
+                                {(metadata?.social_links as any)?.youtube || (metadata?.socialLinks as any)?.youtube ? (
+                                    <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                                        <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                                        </svg>
+                                        <div>
+                                            <a
+                                                href={(metadata?.social_links as any)?.youtube || (metadata?.socialLinks as any)?.youtube}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                                title="YouTube"
+                                            >
+                                                <svg className="h-12 w-12" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                                                </svg>
+                                                <p className="text-sm font-medium text-neutral-900 dark:text-white">View and subscribe</p>
+                                            </a>
+                                        </div>
                                     </div>
                                 ) : null}
                             </div>

@@ -387,6 +387,8 @@ interface BackendEffectiveDirectoryEntry {
   can_show_qr: boolean;
   can_show_social: boolean;
   can_show_seo: boolean;
+  can_show_external_link: boolean;
+  external_link_enabled: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -744,6 +746,8 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     canShowQr: b.can_show_qr,
     canShowSocial: b.can_show_social,
     canShowSeo: b.can_show_seo,
+    canShowExternalLink: b.can_show_external_link,
+    externalLinkEnabled: b.external_link_enabled,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };

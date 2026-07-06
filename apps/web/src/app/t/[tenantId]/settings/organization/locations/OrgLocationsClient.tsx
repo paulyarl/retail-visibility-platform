@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Building2, Plus, Trash2, MapPin, AlertTriangle, Check, Loader2, Store,
-  Crown, Settings as SettingsIcon, ExternalLink,
+  Crown, Settings as SettingsIcon, ExternalLink, ShieldCheck, ShieldOff,
 } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useOrgBehaviorAccess } from '@/hooks/tenant-access/useOrgBehaviorAccess';
@@ -29,6 +29,8 @@ interface OrgTenant {
   subdomain?: string | null;
   service_level?: string;
   featured_access_approved?: boolean;
+  org_standing_mode?: string;
+  standing_mode_grace_until?: string | null;
 }
 
 interface AvailableTenant {
@@ -59,9 +61,11 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [orgName, setOrgName] = useState('');
   const [maxLocations, setMaxLocations] = useState(0);
+  const [orgSubStatus, setOrgSubStatus] = useState<string>('');
 
   const [heroLoading, setHeroLoading] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
+  const [standingModeLoading, setStandingModeLoading] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!organizationId) return;
@@ -77,6 +81,7 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
         setOrgTenants(orgAny.tenants || []);
         setOrgName(orgAny.name || 'Organization');
         setMaxLocations(orgAny.maxLocations || orgAny.max_locations || 0);
+        setOrgSubStatus(orgAny.subscription_status || '');
       }
 
       setAvailableTenants(available);
@@ -139,6 +144,27 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
       error(err?.message || 'Failed to set hero location.');
     } finally {
       setHeroLoading(null);
+    }
+  };
+
+  const handleStandingModeChange = async (tenantIdToUpdate: string, newMode: 'independent' | 'inherited', tenantName: string) => {
+    if (!organizationId) return;
+    const modeLabels = { independent: 'Independent', inherited: 'Inherited' };
+    if (!confirm(
+      `Set "${tenantName}" to ${modeLabels[newMode]} standing?\n\n` +
+      (newMode === 'inherited'
+        ? 'This location will inherit good standing from the organization. If the org is active, this location will function as active even if its own subscription lapses.'
+        : 'This location will be independently billed. Its own subscription status determines access, but it still inherits org tools and capabilities.')
+    )) return;
+    setStandingModeLoading(tenantIdToUpdate);
+    try {
+      await organizationsService.updateStandingMode(organizationId, tenantIdToUpdate, newMode);
+      success(`"${tenantName}" standing mode set to ${modeLabels[newMode]}.`);
+      await loadData();
+    } catch (err: any) {
+      error(err?.message || 'Failed to update standing mode.');
+    } finally {
+      setStandingModeLoading(null);
     }
   };
 
@@ -254,6 +280,23 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
           </div>
         )}
 
+        {/* Org Standing Warning Banner */}
+        {orgSubStatus && !['active', 'trialing', 'trial', 'past_due'].includes(orgSubStatus) && orgTenants.some(t => (t.org_standing_mode || 'independent') === 'inherited') && (
+          <div className="mb-6 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                  Organization is not in good standing ({orgSubStatus})
+                </p>
+                <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                  Locations set to <strong>Inherited</strong> will automatically switch to <strong>Independent</strong> billing after a 7-day grace period if the organization does not recover. Affected tenants have been notified via CRM alerts.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Current Locations */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -290,6 +333,9 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                       Subscription
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Standing
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Items
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -315,7 +361,9 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                     const subStatus = t.subscription_status || 'unknown';
                     const subTier = t.subscription_tier || '—';
                     const isDemo = t.is_demo === true;
-                    const isBusy = removeLoading === t.id || heroLoading === t.id || statusLoading === t.id;
+                    const isBusy = removeLoading === t.id || heroLoading === t.id || statusLoading === t.id || standingModeLoading === t.id;
+                    const standingMode = t.org_standing_mode || 'independent';
+                    const isInherited = standingMode === 'inherited';
                     return (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -386,6 +434,37 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                             }`}>
                               {subStatus}
                             </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleStandingModeChange(t.id, isInherited ? 'independent' : 'inherited', t.name)}
+                              disabled={isBusy}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
+                                isInherited
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/50'
+                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                              }`}
+                              title={isInherited
+                                ? 'Inherited: org good standing covers this location. Click to make independent.'
+                                : 'Independent: location is billed separately. Click to inherit from org.'
+                              }
+                            >
+                              {standingModeLoading === t.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : isInherited ? (
+                                <ShieldCheck className="w-3 h-3" />
+                              ) : (
+                                <ShieldOff className="w-3 h-3" />
+                              )}
+                              {isInherited ? 'Inherited' : 'Independent'}
+                            </button>
+                            {isInherited && t.standing_mode_grace_until && (
+                              <span className="text-xs text-orange-600 dark:text-orange-400" title={`Grace period ends ${new Date(t.standing_mode_grace_until).toLocaleDateString()}`}>
+                                ⏳ {Math.max(0, Math.ceil((new Date(t.standing_mode_grace_until).getTime() - Date.now()) / 86400000))}d left
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -462,6 +541,7 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> The hero (primary) location cannot be removed — set another location as hero first</li>
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> Removing a location detaches it from the organization but does not delete it</li>
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> You can add up to {maxLocations || '∞'} locations based on your organization tier</li>
+            <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> <strong>Standing Mode</strong>: Toggle each location between <em>Inherited</em> (org covers billing — location stays active while org is healthy) or <em>Independent</em> (location pays its own subscription). Org tools and capabilities are always available regardless of mode.</li>
           </ul>
         </div>
           </>

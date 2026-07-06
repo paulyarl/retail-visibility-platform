@@ -13,6 +13,7 @@ import { prisma, basePrisma } from '../prisma';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { getTrialManagementService, GRACE_DURATION_DAYS } from '../services/subscription/TrialManagementService';
 import { expireManualSubscriptionControl } from './expireManualSubscriptionControl';
+import { processOrgStandingInheritance } from './org-standing-inheritance';
 
 export interface GracePeriodResult {
   processed: number;
@@ -152,6 +153,15 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
     } catch (error: any) {
       console.error('[GracePeriodJob] Error sending grace period warnings:', error);
       result.errors.push(`Grace period warnings: ${error.message}`);
+    }
+
+    // 5. Process org standing inheritance grace periods
+    try {
+      const standingResult = await processOrgStandingInheritance();
+      console.log(`[GracePeriodJob] Org standing: Orgs bad: ${standingResult.orgsDetectedBad}, Grace set: ${standingResult.gracePeriodSet}, Flipped: ${standingResult.tenantsAutoFlipped}, Cleared: ${standingResult.graceCleared}, Alerts: ${standingResult.alertsSent}`);
+    } catch (error: any) {
+      console.error('[GracePeriodJob] Error processing org standing inheritance:', error);
+      result.errors.push(`Org standing: ${error.message}`);
     }
 
     console.log(`[GracePeriodJob] Complete. Trials: ${result.trialEndsProcessed}, Retries: ${result.retried}, Demoted: ${result.demoted}, Errors: ${result.errors.length}`);

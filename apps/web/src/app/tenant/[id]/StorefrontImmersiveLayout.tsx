@@ -29,6 +29,7 @@ import StorefrontFooter from './layouts/shared/StorefrontFooter';
 import TrustSignalsBar from './layouts/shared/TrustSignalsBar';
 import SectionDivider from './layouts/shared/SectionDivider';
 import StickySearchBar from './layouts/shared/StickySearchBar';
+import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 
 export default function StorefrontImmersiveLayout({
   tenantId,
@@ -340,9 +341,13 @@ export default function StorefrontImmersiveLayout({
         </div>
       </header>
 
+      {/* Situational Status Panel — shown when storefront is disabled by tier, location status, or subscription issue */}
+      {storefrontStatus.shouldShowPanel && (
+        <StorefrontStatusPanel tenantId={tenantId} tenantInfo={storefrontStatus.tenant as any} />
+      )}
 
       {/* HERO STRIP */}
-      {!isProductsOnly && heroProducts.length > 0 && (
+      {!isProductsOnly && heroProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
         <section className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-800">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4">
             <div className="flex items-center justify-between mb-3">
@@ -365,6 +370,7 @@ export default function StorefrontImmersiveLayout({
       )}
 
       {/* FILTER BAR */}
+      {!storefrontStatus.shouldShowPanel && (
       <div className="sticky top-[56px] md:top-[88px] z-40 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2">
           <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
@@ -411,13 +417,17 @@ export default function StorefrontImmersiveLayout({
           </div>
         </div>
       </div>
+      )}
 
       {/* BADGE FILTER */}
+      {!storefrontStatus.shouldShowPanel && (
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3">
         <StorefrontBadgeFilter tenantId={tenantId} />
       </div>
+      )}
 
       {/* PRODUCT GRID */}
+      {!storefrontStatus.shouldShowPanel && (
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
         {isProductsOnly && featured && (
           <div className="flex items-center gap-3 mb-4">
@@ -505,8 +515,9 @@ export default function StorefrontImmersiveLayout({
           </>
         )}
       </main>
+      )}
 
-      {!isProductsOnly && <SectionDivider variant="gradient" />}
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && <SectionDivider variant="gradient" />}
 
       {/* SERVICE SECTION */}
       {showServices && serviceProducts.length > 0 && !storefrontStatus.shouldShowPanel && (
@@ -567,7 +578,7 @@ export default function StorefrontImmersiveLayout({
       )}
 
       {/* TABBED FEATURED SECTIONS */}
-      {!isProductsOnly && featuredData && featuredData.buckets && featuredData.buckets.length > 0 && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && featuredData && featuredData.buckets && featuredData.buckets.length > 0 && (
         <section className="bg-neutral-50 dark:bg-neutral-900 py-10">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
             <FeaturedBucketsShowcase
@@ -581,7 +592,7 @@ export default function StorefrontImmersiveLayout({
           </div>
         </section>
       )}
-      {!isProductsOnly && <SectionDivider variant="spacer" />}
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && <SectionDivider variant="spacer" />}
 
       {/* QUICK STORE INFO ROW */}
       {!isProductsOnly && !storefrontStatus.shouldShowPanel && (businessDescription || showsContact || showsHours) && (
@@ -661,10 +672,10 @@ export default function StorefrontImmersiveLayout({
           </div>
         </section>
       )}
-      {!isProductsOnly && <SectionDivider variant="spacer" />}
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && <SectionDivider variant="spacer" />}
 
       {/* FAQ + INQUIRY SIDE BY SIDE */}
-      {!isProductsOnly && faqEnabled && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && faqEnabled && (
         <section className="bg-white dark:bg-neutral-950 py-10">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -704,7 +715,7 @@ export default function StorefrontImmersiveLayout({
       )}
 
       {/* COMPACT FOOTER */}
-      {!isProductsOnly && <StorefrontFooter
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && <StorefrontFooter
         tenantId={tenantId}
         businessName={businessName}
         businessDescription={businessDescription}

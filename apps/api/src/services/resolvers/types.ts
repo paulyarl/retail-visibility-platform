@@ -29,6 +29,7 @@ export interface RawCapabilitiesInput {
   capabilities: Record<string, CapabilityGroup>;
   uncategorized_features: string[];
   purchased_feature_keys?: string[];
+  override_feature_keys?: string[];
 }
 
 // ====================
@@ -198,6 +199,7 @@ export interface StorefrontOptionsMerchantSettings {
   directory_entry_layout?: string | null;
   default_qr_resolution?: string | null;
   default_gallery_limit?: number | null;
+  external_link_enabled?: boolean | null;
 }
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
@@ -486,6 +488,9 @@ export interface EffectiveDirectoryEntryOptions {
   can_show_qr: boolean;
   can_show_social: boolean;
   can_show_seo: boolean;
+  // External link — tier-gated availability + effective state (tier AND merchant)
+  can_show_external_link: boolean;
+  external_link_enabled: boolean;
   merchant_preferences: Record<string, any>;
 }
 

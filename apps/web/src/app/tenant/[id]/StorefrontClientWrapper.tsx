@@ -15,7 +15,7 @@ import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilit
 // import SmartProductCard from '@/components/products/SmartProductCard';
 // import StorefrontActions from '@/components/products/StorefrontActions';
 // import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
-import { useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
+import { useStorefrontStatus, StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 
@@ -437,32 +437,39 @@ export default function StorefrontClientWrapper({
         subscriptionEndsAt={tenant?.subscriptionEndsAt ?? null}
       />
 
+      {/* Situational Status Panel — shown when storefront is disabled by tier, location status, or subscription issue */}
+      {storefrontStatus.shouldShowPanel && (
+        <StorefrontStatusPanel tenantId={tenantId} tenantInfo={tenantInfoForStatus as any} />
+      )}
+
       {/* About the Store */}
-      <StoreAboutSection
-        tenantId={tenantId}
-        tenant={tenant}
-        businessName={businessName}
-        logoUrl={logoUrl}
-        layoutVariant="classic"
-        storefrontStatus={storefrontStatus}
-        isRetailStore={isRetailStore}
-        businessHours={businessHours}
-        mapLocation={mapLocation}
-        contactInfo={contactInfo}
-        hoursStatus={hoursStatus}
-        primaryGBPCategory={primaryGBPCategory}
-        totalItems={totalItems}
-        showsHours={showsHours}
-        showsHoursStatus={showsHoursStatus}
-        showsAnimatedHours={showsAnimatedHours}
-        showsMap={showsMap}
-        showsLocation={showsLocation}
-        showsContact={showsContact}
-        showsSocialMedia={showsSocialMedia}
-        showsFulfillment={showsFulfillment}
-        showsInteractiveMaps={showsInteractiveMaps}
-        showsReviews={showsReviews}
-      />
+      {!storefrontStatus.shouldShowPanel && (
+        <StoreAboutSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          logoUrl={logoUrl}
+          layoutVariant="classic"
+          storefrontStatus={storefrontStatus}
+          isRetailStore={isRetailStore}
+          businessHours={businessHours}
+          mapLocation={mapLocation}
+          contactInfo={contactInfo}
+          hoursStatus={hoursStatus}
+          primaryGBPCategory={primaryGBPCategory}
+          totalItems={totalItems}
+          showsHours={showsHours}
+          showsHoursStatus={showsHoursStatus}
+          showsAnimatedHours={showsAnimatedHours}
+          showsMap={showsMap}
+          showsLocation={showsLocation}
+          showsContact={showsContact}
+          showsSocialMedia={showsSocialMedia}
+          showsFulfillment={showsFulfillment}
+          showsInteractiveMaps={showsInteractiveMaps}
+          showsReviews={showsReviews}
+        />
+      )}
 
       {/* Product Section: Featured Navigation, Status Panel, Product Catalog, Featured Showcase */}
       <ProductSection
@@ -561,32 +568,34 @@ export default function StorefrontClientWrapper({
       )}
 
       {/* Store Information Card - Consolidated Location, Contact, Hours */}
-      <StoreInfoSection
-        tenantId={tenantId}
-        tenant={tenant}
-        businessName={businessName}
-        logoUrl={logoUrl}
-        layoutVariant="classic"
-        storefrontStatus={storefrontStatus}
-        isRetailStore={isRetailStore}
-        isProductsOnly={isProductsOnly}
-        businessHours={businessHours}
-        mapLocation={mapLocation}
-        contactInfo={contactInfo}
-        hoursStatus={hoursStatus}
-        primaryGBPCategory={primaryGBPCategory}
-        totalItems={totalItems}
-        showsHours={showsHours}
-        showsHoursStatus={showsHoursStatus}
-        showsAnimatedHours={showsAnimatedHours}
-        showsMap={showsMap}
-        showsLocation={showsLocation}
-        showsContact={showsContact}
-        showsSocialMedia={showsSocialMedia}
-        showsFulfillment={showsFulfillment}
-        showsInteractiveMaps={showsInteractiveMaps}
-        showsReviews={showsReviews}
-      />
+      {!storefrontStatus.shouldShowPanel && (
+        <StoreInfoSection
+          tenantId={tenantId}
+          tenant={tenant}
+          businessName={businessName}
+          logoUrl={logoUrl}
+          layoutVariant="classic"
+          storefrontStatus={storefrontStatus}
+          isRetailStore={isRetailStore}
+          isProductsOnly={isProductsOnly}
+          businessHours={businessHours}
+          mapLocation={mapLocation}
+          contactInfo={contactInfo}
+          hoursStatus={hoursStatus}
+          primaryGBPCategory={primaryGBPCategory}
+          totalItems={totalItems}
+          showsHours={showsHours}
+          showsHoursStatus={showsHoursStatus}
+          showsAnimatedHours={showsAnimatedHours}
+          showsMap={showsMap}
+          showsLocation={showsLocation}
+          showsContact={showsContact}
+          showsSocialMedia={showsSocialMedia}
+          showsFulfillment={showsFulfillment}
+          showsInteractiveMaps={showsInteractiveMaps}
+          showsReviews={showsReviews}
+        />
+      )}
       {/* Store Ratings and Reviews */}
       {/* Gradient border line */}
       {/* Advanced Catalog Navigation */}
@@ -610,12 +619,14 @@ export default function StorefrontClientWrapper({
         </div>
       )}
       {/* FAQ Section */}
-      <FAQSection
-        tenantId={tenantId}
-        faqEnabled={!!faqEnabled}
-        faqFeedbackEnabled={!!faqFeedbackEnabled}
-        layoutVariant="classic"
-      />
+      {!storefrontStatus.shouldShowPanel && (
+        <FAQSection
+          tenantId={tenantId}
+          faqEnabled={!!faqEnabled}
+          faqFeedbackEnabled={!!faqFeedbackEnabled}
+          layoutVariant="classic"
+        />
+      )}
 
       {/* Contact / Inquiry Form */}
       {crmInquiryStorefrontEnabled && !storefrontStatus.shouldShowPanel && tenantId && (

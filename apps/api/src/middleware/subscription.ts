@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma";
 import { getMaintenanceState, deriveInternalStatus } from "../utils/subscription-status";
+import { resolveOrgStandingInheritance } from "../utils/org-standing-inheritance";
 
 /**
  * Subscription status check middleware
@@ -30,6 +31,11 @@ export async function requireActiveSubscription(
         subscription_tier: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        organization_id: true,
+        org_standing_mode: true,
+        organizations_list: {
+          select: { subscription_status: true, subscription_tier: true },
+        },
       },
     });
 
@@ -40,10 +46,27 @@ export async function requireActiveSubscription(
       });
     }
 
+    // Check org standing inheritance (asymmetric: org good standing lifts tenant status up)
+    // Only status is lifted — tenant's own tier is always used for capability/limit purposes.
+    const standingMode = tenant.org_standing_mode || 'independent';
+    let effectiveStatus = tenant.subscription_status;
+
+    if (standingMode === 'inherited' && tenant.organizations_list) {
+      const orgInternalStatus = deriveInternalStatus({
+        subscription_status: tenant.organizations_list.subscription_status,
+        subscription_tier: tenant.organizations_list.subscription_tier,
+        trialEndsAt: null,
+        subscription_ends_at: null,
+      });
+      if (orgInternalStatus === 'active' || orgInternalStatus === 'trialing' || orgInternalStatus === 'past_due') {
+        effectiveStatus = 'active';
+      }
+    }
+
     const now = new Date();
 
     // Check if subscription is canceled
-    if (tenant.subscription_status === "canceled") {
+    if (effectiveStatus === "canceled") {
       return res.status(402).json({
         error: "subscription_canceled",
         message: "Your subscription has been canceled. Please contact support to reactivate.",
@@ -57,7 +80,7 @@ export async function requireActiveSubscription(
 
     // Check if trial has expired - convert to active status (keep same tier)
     if (
-      tenant.subscription_status === "trial" &&
+      effectiveStatus === "trial" &&
       tenant.trial_ends_at &&
       tenant.trial_ends_at < now
     ) {
@@ -78,7 +101,7 @@ export async function requireActiveSubscription(
 
     // Check if subscription has expired
     if (
-      tenant.subscription_status === "active" &&
+      effectiveStatus === "active" &&
       tenant.subscription_ends_at &&
       tenant.subscription_ends_at < now
     ) {
@@ -95,7 +118,7 @@ export async function requireActiveSubscription(
     }
 
     // Check if payment is past due
-    if (tenant.subscription_status === "past_due") {
+    if (effectiveStatus === "past_due") {
       return res.status(402).json({
         error: "payment_past_due",
         message: "Your payment is past due. Please update your payment method.",
@@ -286,6 +309,11 @@ export async function requireWritableSubscription(
         subscription_tier: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        organization_id: true,
+        org_standing_mode: true,
+        organizations_list: {
+          select: { subscription_status: true, subscription_tier: true },
+        },
       },
     });
 
@@ -296,10 +324,30 @@ export async function requireWritableSubscription(
       });
     }
 
+    // Check org standing inheritance (asymmetric: org good standing lifts tenant status up)
+    // Only status is lifted — tenant's own tier is always used for capability/limit purposes.
+    const standingMode = tenant.org_standing_mode || 'independent';
+    let effectiveStatus = tenant.subscription_status;
+
+    if (standingMode === 'inherited' && tenant.organizations_list) {
+      const orgInternalStatus = deriveInternalStatus({
+        subscription_status: tenant.organizations_list.subscription_status,
+        subscription_tier: tenant.organizations_list.subscription_tier,
+        trialEndsAt: null,
+        subscription_ends_at: null,
+      });
+      if (orgInternalStatus === 'active' || orgInternalStatus === 'trialing' || orgInternalStatus === 'past_due') {
+        effectiveStatus = 'active';
+      }
+    }
+
     // Derive internal status to determine write permissions
     // Enhance tenant with both naming conventions for compatibility
     const { enhanceDatabaseResult } = require('../middleware/universal-transform');
-    const enhancedTenant = enhanceDatabaseResult(tenant);
+    const enhancedTenant = enhanceDatabaseResult({
+      ...tenant,
+      subscription_status: effectiveStatus,
+    });
     const internalStatus = deriveInternalStatus(enhancedTenant);
 
     // Frozen accounts are read-only (visibility only)

@@ -56,6 +56,7 @@ export interface DirectoryStore {
   longitude?: number; // Flattened coordinate
   businessHours?: any;
   distance?: number;
+  canUseExternalLink?: boolean;
 }
 
 export interface DirectoryCategory {

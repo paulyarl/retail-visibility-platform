@@ -180,8 +180,8 @@ export default function CapabilityShowcase({
     // --- Directory Entry ---
     const de = cap.directoryEntryOptions;
     const deTier = de?.enabled ?? false;
-    const deAllowedCount = (de?.allowedLayouts.length ?? 0) + (de?.hoursEnabled ? 1 : 0) + (de?.mapEnabled ? 1 : 0) + (de?.contactEnabled ? 1 : 0) + (de?.galleryEnabled ? 1 : 0) + (de?.qrEnabled ? 1 : 0) + (de?.socialEnabled ? 1 : 0) + (de?.seoEnabled ? 1 : 0);
-    const deEffectiveCount = (de?.hoursEnabled ? 1 : 0) + (de?.mapEnabled ? 1 : 0) + (de?.contactEnabled ? 1 : 0) + (de?.galleryEnabled ? 1 : 0) + (de?.qrEnabled ? 1 : 0) + (de?.socialEnabled ? 1 : 0) + (de?.seoEnabled ? 1 : 0);
+    const deAllowedCount = (de?.allowedLayouts.length ?? 0) + (de?.hoursEnabled ? 1 : 0) + (de?.mapEnabled ? 1 : 0) + (de?.contactEnabled ? 1 : 0) + (de?.galleryEnabled ? 1 : 0) + (de?.qrEnabled ? 1 : 0) + (de?.socialEnabled ? 1 : 0) + (de?.seoEnabled ? 1 : 0) + (de?.canShowExternalLink ? 1 : 0);
+    const deEffectiveCount = (de?.hoursEnabled ? 1 : 0) + (de?.mapEnabled ? 1 : 0) + (de?.contactEnabled ? 1 : 0) + (de?.galleryEnabled ? 1 : 0) + (de?.qrEnabled ? 1 : 0) + (de?.socialEnabled ? 1 : 0) + (de?.seoEnabled ? 1 : 0) + (de?.externalLinkEnabled ? 1 : 0);
     const deMerchantGated = deTier && deEffectiveCount < deAllowedCount;
     const deDetailParts: string[] = [];
     if (de?.hoursEnabled) deDetailParts.push('Hours');
@@ -191,6 +191,7 @@ export default function CapabilityShowcase({
     if (de?.qrEnabled) deDetailParts.push('QR');
     if (de?.socialEnabled) deDetailParts.push('Social');
     if (de?.seoEnabled) deDetailParts.push('SEO');
+    if (de?.externalLinkEnabled) deDetailParts.push('External Link');
 
     // --- CRM Options ---
     // CRM only has a master toggle merchant pref (crm_enabled), no per-feature merchant prefs.
