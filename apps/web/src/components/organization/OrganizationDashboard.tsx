@@ -391,7 +391,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         {/* Locations Tab */}
         {activeTab === "locations" && isTabAllowed("locations") && (
           <div className="space-y-4">
-            {!readOnly && tenantId && (
+            {(!!organizationId || !readOnly) && tenantId && (
               <div className="flex justify-end">
                 <Button
                   leftSection={<MapPin size={16} />}
