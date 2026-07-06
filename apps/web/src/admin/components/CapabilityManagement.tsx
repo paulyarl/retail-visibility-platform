@@ -1506,7 +1506,7 @@ export default function CapabilityManagement() {
             </div>
 
             {(() => {
-              const activeTiers = legacyTiers.filter(t => t.isActive);
+              const activeTiers = legacyTiers.filter(t => t.isActive && !t.tierKey.startsWith('trial_'));
               const activeCapTypes = capabilityTypes.filter(ct => ct.is_active !== false);
 
               if (activeTiers.length === 0 || activeCapTypes.length === 0) {
