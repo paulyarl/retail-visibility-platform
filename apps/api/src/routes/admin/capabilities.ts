@@ -41,6 +41,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       feature_count: number;
       enabled_feature_count: number;
       disabled_feature_count: number;
+      is_paused: boolean;
       features_in_capability: string[];
       capability_sort_order: number;
       tier_sort_order: number;
@@ -65,6 +66,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
           feature_count: 0,
           enabled_feature_count: 0,
           disabled_feature_count: 0,
+          is_paused: false,
           features_in_capability: [],
           capability_sort_order: tf.capability_type_list?.sort_order ?? 0,
           tier_sort_order: tf.subscription_tiers_list?.sort_order ?? 0,
@@ -77,6 +79,10 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       } else {
         entry.disabled_feature_count++;
       }
+      // Check for explicit disengagement key: [capability_type_key]_disabled
+      if (tf.feature_key === `${capKey}_disabled` && tf.is_enabled) {
+        entry.is_paused = true;
+      }
       entry.features_in_capability.push(tf.feature_key);
     }
 
@@ -87,8 +93,8 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       })
       .map(entry => ({
         ...entry,
-        is_fully_enabled: entry.disabled_feature_count === 0,
-        has_disabled: entry.disabled_feature_count > 0,
+        is_fully_enabled: !entry.is_paused,
+        has_disabled: entry.is_paused,
         features_in_capability: entry.features_in_capability.join(', '),
       }));
 
