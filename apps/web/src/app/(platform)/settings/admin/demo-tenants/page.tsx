@@ -13,7 +13,7 @@ import {
   DemoTemplate,
 } from '@/services/DemoTenantAdminService';
 import { QrCode, Download, BarChart3, ExternalLink, RefreshCw, ArrowRightLeft } from 'lucide-react';
-import { TenantSelectorDropdown } from '@/app/(platform)/settings/admin/billing/components/TenantSelectorDropdown';
+import { manualBillingService } from '@/services/ManualBillingService';
 
 export default function DemoTenantsAdminPage() {
   const [mounted, setMounted] = useState(false);
@@ -40,6 +40,8 @@ export default function DemoTenantsAdminPage() {
   const [convertTemplate, setConvertTemplate] = useState('');
   const [convertExpiryDays, setConvertExpiryDays] = useState('30');
   const [converting, setConverting] = useState(false);
+  const [convertTenants, setConvertTenants] = useState<{ id: string; name: string }[]>([]);
+  const [convertTenantsLoading, setConvertTenantsLoading] = useState(false);
 
   // QR modal state
   const [qrOpen, setQrOpen] = useState(false);
@@ -58,6 +60,27 @@ export default function DemoTenantsAdminPage() {
     fetchData();
   }, [mounted, hasAccess, includeExpired]);
 
+  useEffect(() => {
+    if (!convertOpen) return;
+    async function loadConvertTenants() {
+      setConvertTenantsLoading(true);
+      try {
+        const tenantsArray = await manualBillingService.getAllTenants();
+        setConvertTenants((tenantsArray || []).map((t: any) => ({ id: t.id, name: t.name })));
+      } catch (error: any) {
+        console.error('Failed to load tenants for conversion:', error);
+        notifications.show({
+          title: 'Error',
+          message: error.message || 'Failed to load tenants',
+          color: 'red',
+        });
+      } finally {
+        setConvertTenantsLoading(false);
+      }
+    }
+    loadConvertTenants();
+  }, [convertOpen]);
+
   async function fetchData() {
     setLoading(true);
     try {
@@ -65,10 +88,10 @@ export default function DemoTenantsAdminPage() {
         demoTenantAdminService.listDemoTenants(includeExpired),
         demoTenantAdminService.getTemplates(),
       ]);
-      if (tenantsResult) {
+      if (tenantsResult && Array.isArray(tenantsResult)) {
         setTenants(tenantsResult);
       }
-      if (templatesResult) {
+      if (templatesResult && Array.isArray(templatesResult)) {
         setTemplates(templatesResult);
       }
     } catch (error: any) {
@@ -514,11 +537,16 @@ export default function DemoTenantsAdminPage() {
         size="md"
       >
         <Stack gap="md">
-          <TenantSelectorDropdown
-            selectedTenant={convertTenantId || null}
-            onTenantSelect={(id) => setConvertTenantId(id || '')}
-            placeholder="Search for a tenant to convert..."
-            showStats={false}
+          <Select
+            label="Tenant"
+            placeholder="Select tenant"
+            data={convertTenants.map((t) => ({ value: t.id, label: t.name }))}
+            value={convertTenantId}
+            onChange={(val) => setConvertTenantId(val || '')}
+            searchable
+            required
+            disabled={convertTenantsLoading}
+            nothingFoundMessage="No tenants found"
           />
           <Select
             label="Template (optional)"

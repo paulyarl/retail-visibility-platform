@@ -67,7 +67,8 @@ class DemoTenantAdminService extends AdminApiSingleton {
       {},
       `admin-demo-tenants:${includeExpired}`
     );
-    return (result as any)?.data ?? null;
+    const data = (result as any)?.data;
+    return Array.isArray(data?.data) ? data.data : null;
   }
 
   async getTemplates(): Promise<DemoTemplate[] | null> {
@@ -76,7 +77,8 @@ class DemoTenantAdminService extends AdminApiSingleton {
       {},
       'admin-demo-tenants-templates'
     );
-    return (result as any)?.data ?? null;
+    const data = (result as any)?.data;
+    return Array.isArray(data?.data) ? data.data : null;
   }
 
   async getDemoTenant(id: string): Promise<DemoTenantDetail | null> {
@@ -85,7 +87,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
       {},
       `admin-demo-tenant:${id}`
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 
   async createDemoTenant(options: {
@@ -102,7 +104,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
         body: JSON.stringify(options),
       }
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 
   async expireDemoTenant(id: string): Promise<{ expired: boolean; reason: string } | null> {
@@ -110,7 +112,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
       `/api/admin/demo-tenants/${encodeURIComponent(id)}/expire`,
       { method: 'POST' }
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 
   async deleteDemoTenant(id: string): Promise<{ deleted: boolean; productsDeleted: number } | null> {
@@ -118,7 +120,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
       `/api/admin/demo-tenants/${encodeURIComponent(id)}`,
       { method: 'DELETE' }
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 
   async convertToDemoTenant(options: {
@@ -135,7 +137,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
         body: JSON.stringify(options),
       }
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 
   async revokeDemoStatus(tenantId: string): Promise<{ revoked: boolean; tenantId: string; reason: string } | null> {
@@ -143,7 +145,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
       `/api/admin/demo-tenants/${encodeURIComponent(tenantId)}/revoke-demo`,
       { method: 'POST' }
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 
   async getQRAnalytics(tenantId: string): Promise<any | null> {
@@ -152,7 +154,7 @@ class DemoTenantAdminService extends AdminApiSingleton {
       {},
       `admin-demo-tenant-qr-analytics:${tenantId}`
     );
-    return (result as any)?.data ?? null;
+    return (result as any)?.data?.data ?? null;
   }
 }
 

@@ -16,7 +16,7 @@ import { organizationsService } from "@/services/OrganizationsSingletonService";
 import { useOrgDashboardData } from "@/hooks/organization/useOrgDashboardData";
 import { useOrgTabAccess } from "@/hooks/organization/useOrgTabAccess";
 import type { TabDef, OrganizationData } from "./types";
-import type { OrgTabKey } from "@/services/OrgCapabilityService";
+import type { OrgTabKey, OrgPanelKey } from "@/services/OrgCapabilityService";
 
 import OrgDashboardHeader from "./OrgDashboardHeader";
 import OrgTabNav from "./OrgTabNav";
@@ -47,6 +47,8 @@ import OrgBotWidget from "./OrgBotWidget";
 import OrgHelpDeskWidget from "./OrgHelpDeskWidget";
 import OrgBotPreviewCard from "./OrgBotPreviewCard";
 import OrgAppStoreWidget from "./OrgAppStoreWidget";
+import OrgGrowthTipCard from "./OrgGrowthTipCard";
+import type { OrgTipContext } from "@/lib/growth-tips/orgTipEngine";
 import { useOrgCapabilityRollup } from "@/hooks/organization/useOrgCapabilityRollup";
 import { useOrgProductTypeRollup } from "@/hooks/organization/useOrgProductTypeRollup";
 import { useOrgProductMix } from "@/hooks/organization/useOrgProductMix";
@@ -130,6 +132,38 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
 
   // Derive tier name for locked tab CTA
   const lockedTierName = billingCounters?.subscriptionTier || orgData?.subscriptionTier || "Chain Professional";
+
+  // ─── Org Growth Tip Context ───
+  const orgSubscriptionStatus = billingCounters?.subscriptionStatus || orgData?.subscriptionStatus || 'active';
+  const orgIsTrial = orgSubscriptionStatus === 'trialing' || orgSubscriptionStatus === 'trial';
+  const orgIsReadOnly = orgCaps?.subscriptionContext?.isReadOnly ?? false;
+  const orgIsPastDue = orgSubscriptionStatus === 'past_due';
+  const lockedTabKeys: OrgTabKey[] = lockedTabs.map((t) => t.key as OrgTabKey);
+  const lockedPanels: OrgPanelKey[] = orgCaps
+    ? (['task_checklist', 'quick_links', 'system_status', 'recommendations', 'crm_summary'] as OrgPanelKey[]).filter(
+        (p) => !orgCaps.allowedPanels.includes(p)
+      )
+    : [];
+
+  const orgTipContext: OrgTipContext = {
+    orgTier: billingCounters?.subscriptionTier || orgData?.subscriptionTier || 'chain_starter',
+    orgTierName: lockedTierName,
+    orgCaps: orgCaps ?? null,
+    orgData: orgData ?? null,
+    billingCounters: billingCounters ?? null,
+    subscriptionStatus: orgSubscriptionStatus,
+    isTrial: orgIsTrial,
+    trialDaysLeft: null,
+    isReadOnly: orgIsReadOnly,
+    isPastDue: orgIsPastDue,
+    lockedTabs: lockedTabKeys,
+    lockedPanels,
+    heroLocation: heroLocation
+      ? { tenantId: heroLocation.tenantId, tenantName: heroLocation.tenantName, skuCount: heroLocation.skuCount }
+      : null,
+    organizationId,
+    tenantId: tenantId ?? null,
+  };
 
   // Handlers (preserved from original)
   const handleSetHeroLocation = async (newTenantId: string) => {
@@ -336,6 +370,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                     onNavigate={setActiveTab}
                   />
                 )}
+                <OrgGrowthTipCard tipContext={orgTipContext} />
                 {isPanelAllowed("system_status") && (
                   <OrgSystemStatusCard orgData={orgData} heroLocation={heroLocation} />
                 )}
