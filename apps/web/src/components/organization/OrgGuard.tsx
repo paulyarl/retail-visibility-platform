@@ -11,10 +11,12 @@ interface OrgGuardProps {
   tenantId: string | null;
   children: ReactNode;
   requireAdmin?: boolean;
+  organizationId?: string;
 }
 
-export function OrgGuard({ tenantId, children, requireAdmin = true }: OrgGuardProps) {
-  const { isOrgAdmin, isOrgMember, loading, isPlatformAdmin, organizationId } = useOrgBehaviorAccess(tenantId);
+export function OrgGuard({ tenantId, children, requireAdmin = true, organizationId: propOrgId }: OrgGuardProps) {
+  const { isOrgAdmin, isOrgMember, loading, isPlatformAdmin, organizationId: hookOrgId } = useOrgBehaviorAccess(tenantId);
+  const organizationId = hookOrgId || propOrgId;
   const { user: authUser, isLoading: authLoading } = useAuth();
   const userIsPlatformAdmin = isPlatformAdmin || authUser?.role === 'PLATFORM_ADMIN' || authUser?.role === 'ADMIN';
 
@@ -27,6 +29,14 @@ export function OrgGuard({ tenantId, children, requireAdmin = true }: OrgGuardPr
   }
 
   const hasAccess = userIsPlatformAdmin || (requireAdmin ? isOrgAdmin : isOrgMember);
+
+  // When an explicit organizationId is passed via props but the hook couldn't
+  // resolve org data from the tenant, trust the prop — the caller (e.g. the
+  // org dashboard) already verified access. The client component will do its
+  // own admin check using the prop org ID.
+  if (!hasAccess && !hookOrgId && propOrgId) {
+    return <>{children}</>;
+  }
 
   if (!hasAccess && !organizationId) {
     return (

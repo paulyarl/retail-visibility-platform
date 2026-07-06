@@ -105,7 +105,7 @@ model audit_log {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model badge_analytics {
-  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                     String   @id @db.VarChar(255)
   tenant_id              String   @db.VarChar(255)
   badge_key              String   @db.VarChar(50)
   period_start           DateTime @db.Date
@@ -138,7 +138,7 @@ model badge_analytics {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model badge_events {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                String   @id @db.VarChar(255)
   tenant_id         String   @db.VarChar(255)
   badge_key         String   @db.VarChar(50)
   inventory_item_id String   @db.VarChar(255)

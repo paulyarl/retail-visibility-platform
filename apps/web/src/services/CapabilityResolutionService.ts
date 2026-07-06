@@ -334,6 +334,9 @@ export interface ProductOptionsState {
     product_opt_categories: boolean;
     product_opt_location_availability: boolean;
     product_opt_supplier_catalog: boolean;
+    product_service_enabled: boolean;
+    product_digital_enabled: boolean;
+    product_hybrid_enabled: boolean;
   };
   /** Whether all product options are available (flexible tier) */
   isFlexible: boolean;
@@ -1355,6 +1358,9 @@ export function resolveProductOptionsState(
     product_opt_categories?: boolean;
     product_opt_location_availability?: boolean;
     product_opt_supplier_catalog?: boolean;
+    product_service_enabled?: boolean;
+    product_digital_enabled?: boolean;
+    product_hybrid_enabled?: boolean;
   } | null
 ): ProductOptionsState {
   const enabled = !!features.product_options_enabled;
@@ -1412,6 +1418,9 @@ export function resolveProductOptionsState(
     product_opt_categories: merchantPrefs?.product_opt_categories !== false,
     product_opt_location_availability: merchantPrefs?.product_opt_location_availability !== false,
     product_opt_supplier_catalog: merchantPrefs?.product_opt_supplier_catalog !== false,
+    product_service_enabled: merchantPrefs?.product_service_enabled !== false,
+    product_digital_enabled: merchantPrefs?.product_digital_enabled !== false,
+    product_hybrid_enabled: merchantPrefs?.product_hybrid_enabled !== false,
   };
 
   // Effective variant/gallery/video = tier allows AND merchant enabled
@@ -1931,131 +1940,116 @@ export function resolveStorefrontOptionsState(
     default_gallery_limit: merchantPrefs?.default_gallery_limit || 5,
   };
 
-  // --- Store Hours feature gate ---
-  const hoursGroupEnabled = !!features.storefront_opt_hours_enabled;
-  const hoursGroupDisabled = !!features.storefront_opt_hours_disabled;
-  const hoursEnabled = hoursGroupEnabled && !hoursGroupDisabled;
-  const hoursUntouched = !hoursGroupEnabled && !hoursGroupDisabled;
-
+  // --- Store Hours: individual features (group gate removed, fallback to old group gate) ---
   const allowedHoursTypes: StorefrontOptHoursType[] = [];
-  if (flexible || hoursEnabled) {
+  if (flexible) {
     allowedHoursTypes.push('hours_animated', 'hours_status');
-  } else if (hoursUntouched) {
+  } else if (features.storefront_opt_hours_animated || features.storefront_opt_hours_status) {
     if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
     if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
+  } else if (features.storefront_opt_hours_enabled && !features.storefront_opt_hours_disabled) {
+    allowedHoursTypes.push('hours_animated', 'hours_status');
   }
 
-  // --- Category Display feature gate ---
-  const categoryGroupEnabled = !!features.storefront_opt_category_enabled;
-  const categoryGroupDisabled = !!features.storefront_opt_category_disabled;
-  const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
-  const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
-
+  // --- Category: individual features (group gate removed, fallback to old group gate) ---
   const allowedCategoryTypes: StorefrontOptCategoryType[] = [];
-  if (flexible || categoryEnabled) {
+  if (flexible) {
     allowedCategoryTypes.push('category_store', 'category_product');
-  } else if (categoryUntouched) {
+  } else if (features.storefront_opt_category_store || features.storefront_opt_category_product) {
     if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
     if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
+  } else if (features.storefront_opt_category_enabled && !features.storefront_opt_category_disabled) {
+    allowedCategoryTypes.push('category_store', 'category_product');
   }
 
-  // --- Recommendation Display feature gate ---
-  const recommendGroupEnabled = !!features.storefront_opt_recommend_enabled;
-  const recommendGroupDisabled = !!features.storefront_opt_recommend_disabled;
-  const recommendEnabled = recommendGroupEnabled && !recommendGroupDisabled;
-  const recommendUntouched = !recommendGroupEnabled && !recommendGroupDisabled;
-
+  // --- Recommend: individual features (group gate removed, fallback to old group gate) ---
   const allowedRecommendTypes: StorefrontOptRecommendType[] = [];
-  if (flexible || recommendEnabled) {
+  if (flexible) {
     allowedRecommendTypes.push('recommend_store', 'recommend_products');
-  } else if (recommendUntouched) {
+  } else if (features.storefront_opt_recommend_store || features.storefront_opt_recommend_products) {
     if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
     if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
+  } else if (features.storefront_opt_recommend_enabled && !features.storefront_opt_recommend_disabled) {
+    allowedRecommendTypes.push('recommend_store', 'recommend_products');
   }
 
   // --- Section Display (standalone, no group gate) ---
   const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
-  const mapDisplayTierAllowed = flexible || !!features.storefront_opt_map_display;
-  const locationDisplayTierAllowed = flexible || !!features.storefront_opt_location_display;
+  const infoTierAllowed = flexible || !!features.storefront_opt_info || !!features.storefront_opt_info_enabled
+    || !!features.storefront_opt_storefront_social_media || !!features.storefront_opt_storefront_contact
+    || !!features.storefront_opt_interactive_maps || !!features.storefront_opt_map_display || !!features.storefront_opt_location_display;
 
   // --- User Behavior (standalone, no group gate) ---
   const recentlyViewedTierAllowed = flexible || !!features.storefront_opt_recently_viewed;
 
-  // --- Store Information feature gate ---
-  const infoGroupEnabled = !!features.storefront_opt_info_enabled;
-  const infoGroupDisabled = !!features.storefront_opt_info_disabled;
-  const infoEnabled = infoGroupEnabled && !infoGroupDisabled;
-  const infoUntouched = !infoGroupEnabled && !infoGroupDisabled;
-
+  // --- Info: consolidated key (new) with fallback to old group gate + individual keys ---
   const allowedInfoTypes: StorefrontOptInfoType[] = [];
-  if (flexible || infoEnabled) {
+  if (flexible || features.storefront_opt_info) {
     allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
-  } else if (infoUntouched) {
+  } else if (features.storefront_opt_info_enabled && !features.storefront_opt_info_disabled) {
+    allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+  } else {
     if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
     if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
     if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
   }
 
-  // --- QR Code Display feature gate ---
-  const qrGroupEnabled = !!features.storefront_opt_qr_enabled;
-  const qrGroupDisabled = !!features.storefront_opt_qr_disabled;
-  const qrEnabled = qrGroupEnabled && !qrGroupDisabled;
-  const qrUntouched = !qrGroupEnabled && !qrGroupDisabled;
-
+  // --- QR: new consolidated keys (qr, qr_resolution, qr_content) with fallback to old keys ---
+  const qrGroupOn = flexible || !!features.storefront_opt_qr
+    || (!!features.storefront_opt_qr_enabled && !features.storefront_opt_qr_disabled);
   const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
   const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
-  if (flexible || qrEnabled) {
+  if (qrGroupOn) {
     allowedQRResolutions.push('qr_codes_512', 'qr_codes_1024', 'qr_codes_2048');
     allowedQRContentTypes.push('qr_product', 'qr_store', 'qr_logo', 'qr_directory');
-  } else if (qrUntouched) {
-    if (features.storefront_opt_qr_codes_512) allowedQRResolutions.push('qr_codes_512');
-    if (features.storefront_opt_qr_codes_1024) allowedQRResolutions.push('qr_codes_1024');
-    if (features.storefront_opt_qr_codes_2048) allowedQRResolutions.push('qr_codes_2048');
-    if (features.storefront_opt_qr_product) allowedQRContentTypes.push('qr_product');
-    if (features.storefront_opt_qr_store) allowedQRContentTypes.push('qr_store');
-    if (features.storefront_opt_qr_logo) allowedQRContentTypes.push('qr_logo');
-    if (features.storefront_opt_qr_directory) allowedQRContentTypes.push('qr_directory');
+  } else {
+    if (features.storefront_opt_qr_resolution) {
+      allowedQRResolutions.push('qr_codes_512', 'qr_codes_1024', 'qr_codes_2048');
+    } else {
+      if (features.storefront_opt_qr_codes_512) allowedQRResolutions.push('qr_codes_512');
+      if (features.storefront_opt_qr_codes_1024) allowedQRResolutions.push('qr_codes_1024');
+      if (features.storefront_opt_qr_codes_2048) allowedQRResolutions.push('qr_codes_2048');
+    }
+    if (features.storefront_opt_qr_content) {
+      allowedQRContentTypes.push('qr_product', 'qr_store', 'qr_logo', 'qr_directory');
+    } else {
+      if (features.storefront_opt_qr_product) allowedQRContentTypes.push('qr_product');
+      if (features.storefront_opt_qr_store) allowedQRContentTypes.push('qr_store');
+      if (features.storefront_opt_qr_logo) allowedQRContentTypes.push('qr_logo');
+      if (features.storefront_opt_qr_directory) allowedQRContentTypes.push('qr_directory');
+    }
   }
 
-  // --- Gallery Display feature gate (radio — only one active at a time) ---
-  const galleryGroupEnabled = !!features.storefront_opt_gallery_enabled;
-  const galleryGroupDisabled = !!features.storefront_opt_gallery_disabled;
-  const galleryEnabled = galleryGroupEnabled && !galleryGroupDisabled;
-  const galleryUntouched = !galleryGroupEnabled && !galleryGroupDisabled;
-
+  // --- Gallery: new consolidated key with fallback to old group gate + individual keys ---
   const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
-  if (flexible || galleryEnabled) {
+  if (flexible || features.storefront_opt_gallery) {
     allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
-  } else if (galleryUntouched) {
+  } else if (features.storefront_opt_gallery_enabled && !features.storefront_opt_gallery_disabled) {
+    allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
+  } else {
     if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
     if (features.storefront_opt_image_gallery_10) allowedGalleryTypes.push('image_gallery_10');
     if (features.storefront_opt_image_gallery_15) allowedGalleryTypes.push('image_gallery_15');
   }
 
-  // --- Advanced feature gate ---
-  const advancedGroupEnabled = !!features.storefront_opt_advanced_enabled;
-  const advancedGroupDisabled = !!features.storefront_opt_advanced_disabled;
-  const advancedEnabled = advancedGroupEnabled && !advancedGroupDisabled;
-  const advancedUntouched = !advancedGroupEnabled && !advancedGroupDisabled;
-
+  // --- Advanced: individual features (group gate removed, fallback to old group gate) ---
   const allowedAdvancedTypes: StorefrontOptAdvancedType[] = [];
-  if (flexible || advancedEnabled) {
+  if (flexible) {
     allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
-  } else if (advancedUntouched) {
+  } else if (features.storefront_opt_enhanced_seo || features.storefront_opt_storefront_actions) {
     if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
     if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
+  } else if (features.storefront_opt_advanced_enabled && !features.storefront_opt_advanced_disabled) {
+    allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
   }
 
-  // --- Layout feature gate ---
-  const layoutGroupEnabled = !!features.storefront_opt_layout_enabled;
-  const layoutGroupDisabled = !!features.storefront_opt_layout_disabled;
-  const layoutEnabled = layoutGroupEnabled && !layoutGroupDisabled;
-  const layoutUntouched = !layoutGroupEnabled && !layoutGroupDisabled;
-
+  // --- Layout: new consolidated key with fallback to old group gate + individual keys ---
   const allowedLayouts: StorefrontOptLayoutType[] = [];
-  if (flexible || layoutEnabled) {
+  if (flexible || features.storefront_opt_layout) {
     allowedLayouts.push('classic', 'editorial', 'immersive');
-  } else if (layoutUntouched) {
+  } else if (features.storefront_opt_layout_enabled && !features.storefront_opt_layout_disabled) {
+    allowedLayouts.push('classic', 'editorial', 'immersive');
+  } else {
     if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
     if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
     if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
@@ -2074,8 +2068,8 @@ export function resolveStorefrontOptionsState(
     ? allowedRecommendTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
     : [];
   const effectiveHoursDisplay = prefs.storefront_opt_enabled && hoursDisplayTierAllowed && prefs.hours_display;
-  const effectiveMapDisplay = prefs.storefront_opt_enabled && mapDisplayTierAllowed && prefs.map_display;
-  const effectiveLocationDisplay = prefs.storefront_opt_enabled && locationDisplayTierAllowed && prefs.location_display;
+  const effectiveMapDisplay = prefs.storefront_opt_enabled && infoTierAllowed && prefs.map_display;
+  const effectiveLocationDisplay = prefs.storefront_opt_enabled && infoTierAllowed && prefs.location_display;
   const effectiveRecentlyViewed = prefs.storefront_opt_enabled && recentlyViewedTierAllowed && prefs.recently_viewed;
   const effectiveInfoTypes = prefs.storefront_opt_enabled
     ? allowedInfoTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
@@ -2099,23 +2093,23 @@ export function resolveStorefrontOptionsState(
   return {
     enabled: mainOn,
     isFlexible: flexible,
-    hoursEnabled: mainOn && (hoursEnabled || allowedHoursTypes.length > 0),
+    hoursEnabled: mainOn && allowedHoursTypes.length > 0,
     allowedHoursTypes,
-    categoryEnabled: mainOn && (categoryEnabled || allowedCategoryTypes.length > 0),
+    categoryEnabled: mainOn && allowedCategoryTypes.length > 0,
     allowedCategoryTypes,
-    recommendEnabled: mainOn && (recommendEnabled || allowedRecommendTypes.length > 0),
+    recommendEnabled: mainOn && allowedRecommendTypes.length > 0,
     allowedRecommendTypes,
     recentlyViewedEnabled: mainOn && recentlyViewedTierAllowed,
-    infoEnabled: mainOn && (infoEnabled || allowedInfoTypes.length > 0),
+    infoEnabled: mainOn && allowedInfoTypes.length > 0,
     allowedInfoTypes,
-    qrEnabled: mainOn && (qrEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
+    qrEnabled: mainOn && (qrGroupOn || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
     allowedQRResolutions,
     allowedQRContentTypes,
-    galleryEnabled: mainOn && (galleryEnabled || allowedGalleryTypes.length > 0),
+    galleryEnabled: mainOn && allowedGalleryTypes.length > 0,
     allowedGalleryTypes,
-    advancedEnabled: mainOn && (advancedEnabled || allowedAdvancedTypes.length > 0),
+    advancedEnabled: mainOn && allowedAdvancedTypes.length > 0,
     allowedAdvancedTypes,
-    layoutEnabled: mainOn && (layoutEnabled || allowedLayouts.length > 0),
+    layoutEnabled: mainOn && allowedLayouts.length > 0,
     allowedLayouts,
     effectiveLayout: effectiveLayouts.includes(prefs.storefront_layout as StorefrontOptLayoutType)
       ? (prefs.storefront_layout as StorefrontOptLayoutType)

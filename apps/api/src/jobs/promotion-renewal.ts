@@ -351,7 +351,7 @@ async function enterGracePeriod(purchase: any, now: Date, result: PromotionRenew
 
 function initStripe(): Stripe | null {
   if (!process.env.STRIPE_SECRET_KEY) return null;
-  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-05-27.dahlia' as any });
+  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' as any });
 }
 
 async function sendBillingNotification(data: BillingNotificationData): Promise<void> {

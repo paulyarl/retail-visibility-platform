@@ -9,7 +9,7 @@
  */
 
 import { CacheManager } from './cacheManager';
-import pako from 'pako';
+import { gzip, ungzip } from 'pako';
 
 import cacheManager from './cacheManager';
 
@@ -356,9 +356,9 @@ class ContextCacheManager {
       if (config.compressionType === 'brotli') {
         // For now, use gzip for brotli contexts (browser compatibility)
         // In production, you could use CompressionStream API for brotli
-        const compressed = pako.gzip(jsonString, { 
+        const compressed = gzip(jsonString, { 
           level: config.compressionLevel as any, // Type assertion for pako level
-          strategy: pako.constants.Z_DEFAULT_STRATEGY
+          strategy: 0 // Z_DEFAULT_STRATEGY
         });
         
         return {
@@ -371,9 +371,9 @@ class ContextCacheManager {
         };
       } else {
         // Use gzip compression
-        const compressed = pako.gzip(jsonString, { 
+        const compressed = gzip(jsonString, { 
           level: config.compressionLevel as any, // Type assertion for pako level
-          strategy: pako.constants.Z_DEFAULT_STRATEGY
+          strategy: 0 // Z_DEFAULT_STRATEGY
         });
         
         return {
@@ -406,7 +406,7 @@ class ContextCacheManager {
       if (data.type === 'gzip') {
         // Convert array back to Uint8Array and decompress
         const compressedData = new Uint8Array(data.data);
-        const decompressed = pako.ungzip(compressedData);
+        const decompressed = ungzip(compressedData);
         const jsonString = new TextDecoder().decode(decompressed);
         
         // console.log(`[ContextCacheManager] Decompression stats:`, {

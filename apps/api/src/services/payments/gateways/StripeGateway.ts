@@ -14,7 +14,7 @@ export class StripeGateway extends PaymentGatewayInterface {
     super(credentials, isTestMode);
     
     this.stripe = new Stripe(credentials.apiKey, {
-      apiVersion: '2026-05-27.dahlia',
+      apiVersion: '2026-06-24.dahlia',
       typescript: true,
     });
   }

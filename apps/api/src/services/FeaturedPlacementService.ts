@@ -11,7 +11,7 @@
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
-import { generatePlacementPurchaseId } from '../lib/id-generator';
+import { generatePlacementPurchaseId, generateBadgeEventId } from '../lib/id-generator';
 import { invalidateActiveFeaturedCache } from './ActiveFeaturedResolver';
 import { invalidateEffectiveCapabilities } from './EffectiveCapabilityResolver';
 import CrmAlertService from './CrmAlertService';
@@ -64,7 +64,7 @@ export class FeaturedPlacementService extends BaseService {
   private constructor() {
     super();
     if (process.env.STRIPE_SECRET_KEY) {
-      this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-05-27.dahlia' as any });
+      this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' as any });
     }
   }
 
@@ -494,6 +494,7 @@ export class FeaturedPlacementService extends BaseService {
     try {
       await prisma.badge_events.create({
         data: {
+          id: generateBadgeEventId(purchase.tenant_id),
           tenant_id: purchase.tenant_id,
           inventory_item_id: purchase.inventory_item_id,
           badge_key: 'featured',

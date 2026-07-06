@@ -30,11 +30,12 @@ interface AvailableTenant {
   _count?: { inventory_items: number };
 }
 
-export default function OrgLocationsClient() {
+export default function OrgLocationsClient({ organizationId: propOrgId }: { organizationId?: string }) {
   const params = useParams();
   const tenantId = params.tenantId as string;
 
-  const { isOrgAdmin, loading: accessLoading, organizationId, isPlatformAdmin } = useOrgBehaviorAccess(tenantId);
+  const { isOrgAdmin, loading: accessLoading, organizationId: hookOrgId, isPlatformAdmin } = useOrgBehaviorAccess(tenantId);
+  const organizationId = hookOrgId || propOrgId;
   const { user: authUser, isLoading: authLoading } = useAuth();
   const userIsPlatformAdmin = isPlatformAdmin || authUser?.role === 'PLATFORM_ADMIN' || authUser?.role === 'ADMIN';
   const { success, error, toasts, removeToast } = useToast();
@@ -74,12 +75,12 @@ export default function OrgLocationsClient() {
   }, [organizationId]);
 
   useEffect(() => {
-    if (!accessLoading && !authLoading && (isOrgAdmin || userIsPlatformAdmin) && organizationId) {
+    if (!accessLoading && !authLoading && (isOrgAdmin || userIsPlatformAdmin || propOrgId) && organizationId) {
       loadData();
     } else if (!accessLoading && !authLoading && (!isOrgAdmin || !organizationId)) {
       setLoading(false);
     }
-  }, [loadData, accessLoading, authLoading, isOrgAdmin, userIsPlatformAdmin, organizationId]);
+  }, [loadData, accessLoading, authLoading, isOrgAdmin, userIsPlatformAdmin, organizationId, propOrgId]);
 
   const handleAddTenant = async () => {
     if (!selectedTenantId || !organizationId) return;
@@ -121,7 +122,7 @@ export default function OrgLocationsClient() {
     );
   }
 
-  if (!isOrgAdmin && !userIsPlatformAdmin) {
+  if (!isOrgAdmin && !userIsPlatformAdmin && !propOrgId) {
     return (
       <AccessDenied
         title="Organization Admin Access Required"

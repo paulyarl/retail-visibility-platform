@@ -5,8 +5,7 @@
  * Determines which display/behavior features (variant, gallery, video,
  * layouts, sections) are available to a tenant based on their tier capabilities.
  *
- * Type gating (physical/digital/hybrid/service) has been moved to ProductTypeService.
- * Legacy type fields are kept for backward compatibility during transition.
+ * Type gating (physical/digital/hybrid/service) is handled by ProductTypeService.
  *
  * Pattern: Follows StorefrontOptionsService for group-gated consistency.
  */
