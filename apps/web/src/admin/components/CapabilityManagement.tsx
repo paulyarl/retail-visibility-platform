@@ -1525,14 +1525,30 @@ export default function CapabilityManagement() {
                 }
               });
 
+              // Identify org-scoped capability types and org tiers
+              const orgScopedCapKeys = new Set<string>();
+              const orgTierKeys = new Set<string>();
+              assignmentMap.forEach(c => {
+                if (c.is_org_scoped) {
+                  orgScopedCapKeys.add(c.capability_type_key);
+                  orgTierKeys.add(c.tier_key);
+                }
+              });
+
+              // Filter capability types: exclude org-scoped types for non-org tiers
+              const isOrgTier = (tierKey: string) => orgTierKeys.has(tierKey);
+              const applicableCapTypes = (tierKey: string) =>
+                activeCapTypes.filter(ct => isOrgTier(tierKey) || !orgScopedCapKeys.has(ct.capability_type_key));
+
               // Calculate missing count per tier
               const missingByTier = activeTiers.map(tier => {
-                const missing = activeCapTypes.filter(ct => !assignmentMap.has(`${tier.tierKey}:${ct.capability_type_key}`));
+                const caps = applicableCapTypes(tier.tierKey);
+                const missing = caps.filter(ct => !assignmentMap.has(`${tier.tierKey}:${ct.capability_type_key}`));
                 return { tier, missingCount: missing.length, missingCaps: missing };
               });
 
               const totalMissing = missingByTier.reduce((sum, m) => sum + m.missingCount, 0);
-              const totalCells = activeTiers.length * activeCapTypes.length;
+              const totalCells = activeTiers.reduce((sum, t) => sum + applicableCapTypes(t.tierKey).length, 0);
               const totalAssigned = totalCells - totalMissing;
               const disabledCount = Array.from(assignmentMap.values()).filter(c => c.has_disabled).length;
               const fullyEnabledCount = totalAssigned - disabledCount;
@@ -1582,6 +1598,10 @@ export default function CapabilityManagement() {
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-500"><X className="w-3 h-3" /></span>
                       <span>Not Assigned</span>
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-gray-300">—</span>
+                      <span>N/A (Org-Scoped)</span>
+                    </div>
                   </div>
 
                   {/* Missing assignments alert */}
@@ -1621,8 +1641,10 @@ export default function CapabilityManagement() {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {activeCapTypes.map(capType => {
-                          const capMissingCount = activeTiers.filter(t => !assignmentMap.has(`${t.tierKey}:${capType.capability_type_key}`)).length;
-                          const capDisabledCount = activeTiers.filter(t => assignmentMap.get(`${t.tierKey}:${capType.capability_type_key}`)?.has_disabled).length;
+                          const isOrgCap = orgScopedCapKeys.has(capType.capability_type_key);
+                          const applicableTiers = activeTiers.filter(t => isOrgTier(t.tierKey) || !isOrgCap);
+                          const capMissingCount = applicableTiers.filter(t => !assignmentMap.has(`${t.tierKey}:${capType.capability_type_key}`)).length;
+                          const capDisabledCount = applicableTiers.filter(t => assignmentMap.get(`${t.tierKey}:${capType.capability_type_key}`)?.has_disabled).length;
                           return (
                             <tr key={capType.capability_type_key} className={capMissingCount > 0 || capDisabledCount > 0 ? 'bg-amber-50/30' : ''}>
                               <td className="px-4 py-3 sticky left-0 bg-inherit z-10">
@@ -1631,9 +1653,19 @@ export default function CapabilityManagement() {
                                 {capType.category && <div className="text-xs text-gray-400 mt-0.5">{capType.category}</div>}
                               </td>
                               {activeTiers.map(tier => {
+                                const isApplicable = isOrgTier(tier.tierKey) || !isOrgCap;
                                 const assignment = assignmentMap.get(`${tier.tierKey}:${capType.capability_type_key}`);
                                 const isAssigned = !!assignment;
                                 const hasDisabled = assignment?.has_disabled;
+                                if (!isApplicable) {
+                                  return (
+                                    <td key={tier.tierKey} className="px-3 py-3 text-center">
+                                      <div className="flex items-center justify-center" title="Org-scoped capability — not applicable to individual tiers">
+                                        <span className="text-gray-300 text-xs">—</span>
+                                      </div>
+                                    </td>
+                                  );
+                                }
                                 return (
                                   <td key={tier.tierKey} className="px-3 py-3 text-center">
                                     {isAssigned ? (
