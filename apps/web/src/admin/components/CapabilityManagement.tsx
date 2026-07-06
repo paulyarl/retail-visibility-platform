@@ -1506,7 +1506,7 @@ export default function CapabilityManagement() {
             </div>
 
             {(() => {
-              const activeTiers = legacyTiers.filter(t => t.isActive);
+              const activeTiers = legacyTiers.filter(t => t.isActive && !t.tierKey.startsWith('trial_') && !t.tierKey.includes('expired_trial'));
               const activeCapTypes = capabilityTypes.filter(ct => ct.is_active !== false);
 
               if (activeTiers.length === 0 || activeCapTypes.length === 0) {
@@ -1581,10 +1581,11 @@ export default function CapabilityManagement() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10">Capability Type</th>
                           {activeTiers.map(tier => {
                             const tierMissing = missingByTier.find(m => m.tier.tierKey === tier.tierKey)?.missingCount || 0;
+                            const shortName = tier.tierKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                             return (
-                              <th key={tier.tierKey} className="px-3 py-3 text-center text-xs font-medium uppercase whitespace-nowrap">
-                                <div className={`flex items-center justify-center gap-1 ${tierMissing > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
-                                  {tier.displayName}
+                              <th key={tier.tierKey} className="px-2 py-3 text-center text-xs font-medium uppercase" title={tier.displayName || tier.name}>
+                                <div className={`flex flex-col items-center gap-0.5 ${tierMissing > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+                                  <span className="truncate max-w-[80px]">{shortName}</span>
                                   {tierMissing > 0 && (
                                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{tierMissing}</span>
                                   )}
