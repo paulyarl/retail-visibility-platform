@@ -4609,6 +4609,7 @@ model tenant_storefront_options_settings {
   storefront_layout       String?   @default("classic") @db.VarChar(20)
   directory_entry_layout  String?
   page_type               String?   @default("storefront") @db.VarChar(20)
+  external_link_enabled   Boolean?  @default(false)
   tenants                 tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_options_tenant")
 
   @@unique([tenant_id, page_type], map: "uq_storefront_options_tenant_page")
@@ -4715,6 +4716,8 @@ model tenants {
   demo_expires_at                                                                        DateTime?                                @db.Timestamptz(6)
   demo_source_tenant_id                                                                  String?                                  @db.VarChar(255)
   demo_template                                                                          String?                                  @db.VarChar(50)
+  org_standing_mode                                                                      String?                                  @default("independent") @db.VarChar(20)
+  standing_mode_grace_until                                                              DateTime?                                @db.Timestamp(6)
   abandoned_carts                                                                        abandoned_carts[]
   bot_configurations                                                                     bot_configurations?
   bot_conversations                                                                      bot_conversations[]

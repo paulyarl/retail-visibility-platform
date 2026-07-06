@@ -866,7 +866,7 @@ Your new plan is now active.`;
       case 'bsaas_purchase_success':
         return {
           title: `Feature purchased: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
-          description: `Tenant "${tenantName}" purchased the "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" feature for $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'}).\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
+          description: `Tenant "${tenantName}" purchased the "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}" feature for $${((data.amount || 0) / 100).toFixed(2)} (${data.billingCycle || 'monthly'}). Public storefront and directory updates may take up to 10 minutes to reflect this change.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
           priority: 'low',
         };
 
@@ -903,7 +903,7 @@ Your new plan is now active.`;
       case 'bsaas_trial_started':
         return {
           title: `Feature trial started: ${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'} — ${tenantName}`,
-          description: `Tenant "${tenantName}" started a ${data.metadata?.trialDays || 0}-day free trial for feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}". No charge until trial ends.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
+          description: `Tenant "${tenantName}" started a ${data.metadata?.trialDays || 0}-day free trial for feature "${data.metadata?.featureName || data.metadata?.featureKey || 'Unknown'}". No charge until trial ends. Public storefront and directory updates may take up to 10 minutes to reflect this change.\n\nFeature Store: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
           priority: 'low',
         };
 
@@ -1039,7 +1039,7 @@ Your new plan is now active.`;
       case 'bsaas_purchase_success':
         return {
           title: 'Feature purchased',
-          body: `You purchased "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" for ${tenantName}. It is now active.`,
+          body: `You purchased "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" for ${tenantName}. It is now active. Public storefront and directory updates may take up to 10 minutes to reflect this change.`,
           icon: '⚡',
         };
       case 'bsaas_renewal_success':
@@ -1069,13 +1069,13 @@ Your new plan is now active.`;
       case 'bsaas_trial_started':
         return {
           title: 'Free trial started',
-          body: `You started a ${data.metadata?.trialDays || 0}-day free trial for "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" on ${tenantName}. No charge until the trial ends.`,
+          body: `You started a ${data.metadata?.trialDays || 0}-day free trial for "${data.metadata?.featureName || data.metadata?.featureKey || 'a feature'}" on ${tenantName}. No charge until the trial ends. Public storefront and directory updates may take up to 10 minutes to reflect this change.`,
           icon: '🎁',
         };
       case 'featured_placement_purchased':
         return {
           title: 'Featured placement is live',
-          body: `Your featured placement "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" for ${tenantName} is now active. ${data.metadata?.durationDays || 0}-day placement expires on ${data.metadata?.expiresAt || 'soon'}.`,
+          body: `Your featured placement "${data.metadata?.planLabel || data.metadata?.planKey || 'Placement'}" for ${tenantName} is now active. ${data.metadata?.durationDays || 0}-day placement expires on ${data.metadata?.expiresAt || 'soon'}. Public storefront and directory updates may take up to 10 minutes to reflect this change.`,
           icon: '🎉',
         };
       case 'featured_placement_renewal_success':
@@ -1105,7 +1105,7 @@ Your new plan is now active.`;
       case 'directory_promotion_purchased':
         return {
           title: 'Directory promotion activated',
-          body: `Directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" for ${tenantName} is now active. Your store will be highlighted in the directory${data.metadata?.expiresAt ? ` until ${new Date(data.metadata.expiresAt).toLocaleDateString()}` : ''}.`,
+          body: `Directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" for ${tenantName} is now active. Your store will be highlighted in the directory${data.metadata?.expiresAt ? ` until ${new Date(data.metadata.expiresAt).toLocaleDateString()}` : ''}. Public storefront and directory updates may take up to 10 minutes to reflect this change.`,
           icon: '📍',
         };
       case 'directory_promotion_renewal_success':

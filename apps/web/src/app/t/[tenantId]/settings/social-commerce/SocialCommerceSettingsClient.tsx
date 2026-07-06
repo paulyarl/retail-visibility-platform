@@ -27,6 +27,8 @@ import {
 import Link from 'next/link';
 import { useSocialCommerceOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { socialCommerceOptionsService } from '@/services/SocialCommerceOptionsService';
+import { useSocialCommerceConnections } from '@/hooks/useSocialCommerceConnections';
+import { CheckCircle2, AlertTriangle, Plus, Link2 } from 'lucide-react';
 
 interface SocialCommerceSettings {
   social_commerce_enabled: boolean;
@@ -105,6 +107,7 @@ const EXPERIENCE_GROUP: FeatureGroup = {
 export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerceSettingsClientProps) {
   const { data: socialCap } = useSocialCommerceOptionsCapability(tenantId);
   const tierState = socialCap;
+  const { socialLinks, metaStatus, tiktokStatus } = useSocialCommerceConnections(tenantId);
 
   const [settings, setSettings] = useState<SocialCommerceSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -471,6 +474,126 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
           {saving ? 'Saving...' : 'Save Social Commerce Options'}
         </Button>
       </div>
+
+      {/* Social Profile Connections */}
+      {tierState?.enabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary-600" />
+              Social Profile Connections
+            </CardTitle>
+            <p className="text-sm text-neutral-600 mt-1">
+              Link your social profiles and connect them for commerce sync. Profiles you add in Business Settings can be activated for catalog sync and shopping.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {/* Meta (Facebook + Instagram) */}
+              <div className={`p-4 rounded-lg border ${metaStatus?.isConnected && !metaStatus?.isExpired ? 'border-green-200 bg-green-50' : 'border-neutral-200 bg-neutral-50'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Camera className="h-5 w-5 text-pink-600" />
+                    <div>
+                      <p className="font-medium text-sm text-neutral-900">Meta (Facebook + Instagram)</p>
+                      <p className="text-xs text-neutral-600 mt-0.5">
+                        {socialLinks?.facebook || socialLinks?.instagram
+                          ? `Profiles: ${[socialLinks?.facebook && 'Facebook', socialLinks?.instagram && 'Instagram'].filter(Boolean).join(', ')}`
+                          : 'No social profiles added yet'}
+                      </p>
+                    </div>
+                  </div>
+                  {metaStatus?.isConnected && !metaStatus?.isExpired ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-700 font-medium">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Connected
+                    </span>
+                  ) : metaStatus?.isExpired ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+                      <AlertTriangle className="w-4 h-4" />
+                      Reconnect
+                    </span>
+                  ) : (socialLinks?.facebook || socialLinks?.instagram) ? (
+                    tierState?.metaEnabled ? (
+                      <Link
+                        href={`/t/${tenantId}/settings/integrations/meta`}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        Connect for Commerce
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-neutral-400 font-medium">
+                        <Lock className="w-3.5 h-3.5" />
+                        Upgrade to connect
+                      </span>
+                    )
+                  ) : (
+                    <Link
+                      href={`/t/${tenantId}/settings/tenant`}
+                      className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Profile
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {/* TikTok */}
+              <div className={`p-4 rounded-lg border ${tiktokStatus?.isConnected && !tiktokStatus?.isExpired ? 'border-green-200 bg-green-50' : 'border-neutral-200 bg-neutral-50'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Video className="h-5 w-5 text-neutral-900" />
+                    <div>
+                      <p className="font-medium text-sm text-neutral-900">TikTok</p>
+                      <p className="text-xs text-neutral-600 mt-0.5">
+                        {socialLinks?.tiktok
+                          ? `Profile: ${socialLinks.tiktok}`
+                          : 'No TikTok profile added yet'}
+                      </p>
+                    </div>
+                  </div>
+                  {tiktokStatus?.isConnected && !tiktokStatus?.isExpired ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-700 font-medium">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Connected
+                    </span>
+                  ) : tiktokStatus?.isExpired ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+                      <AlertTriangle className="w-4 h-4" />
+                      Reconnect
+                    </span>
+                  ) : socialLinks?.tiktok ? (
+                    tierState?.tiktokEnabled ? (
+                      <Link
+                        href={`/t/${tenantId}/settings/integrations/tiktok`}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        Connect for Commerce
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-neutral-400 font-medium">
+                        <Lock className="w-3.5 h-3.5" />
+                        Upgrade to connect
+                      </span>
+                    )
+                  ) : (
+                    <Link
+                      href={`/t/${tenantId}/settings/tenant`}
+                      className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Profile
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* What's Next */}
       <Card>

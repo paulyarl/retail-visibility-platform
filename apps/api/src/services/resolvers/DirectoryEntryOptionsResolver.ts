@@ -43,9 +43,12 @@ export function resolveDirectoryEntryOptions(
     if (features.directory_entry_layout_premium) allowedLayouts.push('premium');
   }
 
+  const externalLinkTierAllowed = mainOn && (flexible || !!features.directory_entry_external_link);
+
   const prefs = {
     directory_entry_opt_enabled: merchantPrefs?.storefront_opt_enabled !== false,
     directory_entry_layout: merchantPrefs?.directory_entry_layout || 'classic',
+    external_link_enabled: merchantPrefs?.external_link_enabled === true,
   };
 
   // Effective layout = tier allowed AND merchant choice
@@ -89,6 +92,9 @@ export function resolveDirectoryEntryOptions(
     can_show_qr: mainOn && (flexible || !!features.directory_entry_qr_enabled),
     can_show_social: mainOn && (flexible || !!features.directory_entry_social_enabled),
     can_show_seo: mainOn && (flexible || !!features.directory_entry_seo_enabled),
+    // External link — tier feature OR flexible grants availability; merchant pref gates effective state
+    can_show_external_link: externalLinkTierAllowed,
+    external_link_enabled: externalLinkTierAllowed && (merchantPrefs?.external_link_enabled === true),
     merchant_preferences: prefs,
   };
 }

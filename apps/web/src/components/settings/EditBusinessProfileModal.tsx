@@ -8,6 +8,19 @@ import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 import { Button } from '@mantine/core';
+import { metaIntegrationService, MetaStatus } from '@/services/MetaIntegrationService';
+import { tiktokIntegrationService, TikTokStatus } from '@/services/TikTokIntegrationService';
+import { useSocialCommerceOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import Link from 'next/link';
+
+const SOCIAL_PLATFORMS = [
+  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourpage', helperText: 'Your Facebook page URL' },
+  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourhandle', helperText: 'Your Instagram profile URL' },
+  { key: 'twitter', label: 'Twitter/X', placeholder: 'https://twitter.com/yourhandle', helperText: 'Your Twitter/X profile URL' },
+  { key: 'linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/yourcompany', helperText: 'Your LinkedIn company page URL' },
+  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@yourchannel', helperText: 'Your YouTube channel URL' },
+  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@yourhandle', helperText: 'Your TikTok profile URL' },
+];
 
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
@@ -36,6 +49,9 @@ export default function EditBusinessProfileModal({
   const [logoPreview, setLogoPreview] = useState<string | null>(formData.logo_url || null);
   const [geocoding, setGeocoding] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [metaOAuth, setMetaOAuth] = useState<MetaStatus | null>(null);
+  const [tiktokOAuth, setTiktokOAuth] = useState<TikTokStatus | null>(null);
+  const { data: socialCap } = useSocialCommerceOptionsCapability(tenantId || null);
 
   // Reset form when modal opens/closes or profile changes
   useEffect(() => {
@@ -46,8 +62,15 @@ export default function EditBusinessProfileModal({
       setError(null);
       setSuccess(false);
       setLogoPreview(profile?.logo_url || null);
+
+      // Fetch OAuth connection status for Meta and TikTok
+      const tid = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+      if (tid) {
+        metaIntegrationService.getOAuthStatus(tid).then(setMetaOAuth).catch(() => setMetaOAuth(null));
+        tiktokIntegrationService.getOAuthStatus(tid).then(setTiktokOAuth).catch(() => setTiktokOAuth(null));
+      }
     }
-  }, [isOpen, profile]);
+  }, [isOpen, profile, tenantId]);
 
   // Fetch and optimize pasted logo URL
   const optimizePastedLogoUrl = async (url: string) => {
@@ -564,73 +587,93 @@ export default function EditBusinessProfileModal({
               Optional - Connect your social media profiles for better SEO and customer engagement
             </p>
 
-            {/* Facebook */}
-            <Input
-              label="Facebook"
-              placeholder="https://facebook.com/yourpage"
-              value={(formData.social_links as any)?.facebook || ''}
-              onChange={(e) => {
-                const currentLinks = formData.social_links || {};
-                handleChange('social_links', {
-                  ...currentLinks,
-                  facebook: e.target.value
-                });
-              }}
-              onBlur={() => handleBlur('social_links')}
-              error={errors.social_links}
-              helperText="Your Facebook page URL"
-            />
+            {SOCIAL_PLATFORMS.map((platform) => {
+              const isMetaPlatform = platform.key === 'facebook' || platform.key === 'instagram';
+              const isTikTokPlatform = platform.key === 'tiktok';
+              const metaConnected = isMetaPlatform && metaOAuth?.isConnected && !metaOAuth.isExpired;
+              const tiktokConnected = isTikTokPlatform && tiktokOAuth?.isConnected && !tiktokOAuth.isExpired;
+              const metaExpired = isMetaPlatform && metaOAuth?.isExpired;
+              const tiktokExpired = isTikTokPlatform && tiktokOAuth?.isExpired;
+              const tid = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
 
-            {/* Instagram */}
-            <Input
-              label="Instagram"
-              placeholder="https://instagram.com/yourhandle"
-              value={(formData.social_links as any)?.instagram || ''}
-              onChange={(e) => {
-                const currentLinks = formData.social_links || {};
-                handleChange('social_links', {
-                  ...currentLinks,
-                  instagram: e.target.value
-                });
-              }}
-              onBlur={() => handleBlur('social_links')}
-              error={errors.social_links}
-              helperText="Your Instagram profile URL"
-            />
-
-            {/* Twitter/X */}
-            <Input
-              label="Twitter/X"
-              placeholder="https://twitter.com/yourhandle"
-              value={(formData.social_links as any)?.twitter || ''}
-              onChange={(e) => {
-                const currentLinks = formData.social_links || {};
-                handleChange('social_links', {
-                  ...currentLinks,
-                  twitter: e.target.value
-                });
-              }}
-              onBlur={() => handleBlur('social_links')}
-              error={errors.social_links}
-              helperText="Your Twitter/X profile URL"
-            />
-
-            {/* LinkedIn */}
-            <Input
-              label="LinkedIn"
-              placeholder="https://linkedin.com/company/yourcompany"
-              value={(formData.social_links as any)?.linkedin || ''}
-              onChange={(e) => {
-                const currentLinks = formData.social_links || {};
-                handleChange('social_links', {
-                  ...currentLinks,
-                  linkedin: e.target.value
-                });
-              }}
-              onBlur={() => handleBlur('social_links')}
-              error={errors.social_links}
-              helperText="Your LinkedIn company page URL"
-            />
+              return (
+                <div key={platform.key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                      {platform.label}
+                    </label>
+                    {metaConnected && (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400 font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Commerce Connected
+                      </span>
+                    )}
+                    {tiktokConnected && (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400 font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Shop Connected
+                      </span>
+                    )}
+                    {metaExpired && (
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Reconnect needed
+                      </span>
+                    )}
+                    {tiktokExpired && (
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Reconnect needed
+                      </span>
+                    )}
+                    {isMetaPlatform && !metaConnected && !metaExpired && (formData.social_links as any)?.[platform.key] && tid && socialCap?.metaEnabled && (
+                      <Link
+                        href={`/t/${tid}/settings/integrations/meta`}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Connect for Commerce
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                      </Link>
+                    )}
+                    {isTikTokPlatform && !tiktokConnected && !tiktokExpired && (formData.social_links as any)?.[platform.key] && tid && socialCap?.tiktokEnabled && (
+                      <Link
+                        href={`/t/${tid}/settings/integrations/tiktok`}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Connect for Commerce
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                      </Link>
+                    )}
+                  </div>
+                  <Input
+                    placeholder={platform.placeholder}
+                    value={(formData.social_links as any)?.[platform.key] || ''}
+                    onChange={(e) => {
+                      const currentLinks = formData.social_links || {};
+                      handleChange('social_links', {
+                        ...currentLinks,
+                        [platform.key]: e.target.value
+                      });
+                    }}
+                    onBlur={() => handleBlur('social_links')}
+                    error={errors.social_links}
+                    helperText={platform.helperText}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Logo URL (Professional+ Tier) - with upload option */}

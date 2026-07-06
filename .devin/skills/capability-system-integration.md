@@ -303,6 +303,12 @@ Do not add resolution logic in the frontend. If you need a new computed field, a
 ### Most-Permissive-Wins
 When a tenant belongs to an organization with a higher tier, features are merged as a union — the most permissive tier wins. This is handled by `getMergedTierFeatures()` in the orchestrator before dispatching to resolvers.
 
+**Org Standing Mode** (`org_standing_mode`): The tenant's tier is always used for feature resolution regardless of standing mode. `org_standing_mode` (`'independent'` default, `'inherited'`) only affects **subscription-status gating** — when `inherited` and the org is healthy, the tenant's status is lifted to `active` (asymmetric: org bad standing does NOT drag tenant down). The tenant's tier is never replaced. See R27 in `capability-data-flow-rules.md` for full details.
+
+**Tier Change Audit** (`tier_change_logs_list`): All admin tier-system mutations (create/update/delete tiers and features) are logged with before/after state, changed_by, and reason. Queryable via `GET /api/admin/tier-system/change-logs`. Does not affect runtime resolution.
+
+**Tier Catalog Permissions** (`tier_catalog_permissions`): Tier-level permissions controlling global supplier catalog access (browse, add, override, edit, remove, max products). Separate from capability resolution — gates catalog management actions, not feature flags.
+
 ### Trial Tier Transparency
 Use `getEffectiveTier()` from `utils/trial-tier-transparency.ts` to map trial tiers to their base tiers for feature resolution. This happens in the orchestrator before resolver dispatch.
 

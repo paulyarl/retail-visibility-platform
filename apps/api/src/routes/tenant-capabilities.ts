@@ -14,7 +14,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { deriveInternalStatus } from '../utils/subscription-status';
-import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
 
 const router = Router({ mergeParams: true });
 
@@ -579,6 +579,8 @@ function buildExpiredCapabilitiesResponse(tenant: {
         can_show_qr: false,
         can_show_social: false,
         can_show_seo: false,
+        can_show_external_link: false,
+        external_link_enabled: false,
         merchant_preferences: {},
       },
       faq: {
@@ -696,7 +698,7 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
     const { tenantId } = req.params;
     const detail = req.query.detail === 'full' ? 'full' : 'summary';
 
-    const result = await resolveEffectiveCapabilities(tenantId, { detail });
+    const result = await resolveEffectiveCapabilitiesFromMV(tenantId, { detail });
 
     if (!result) {
       // Tenant not resolved by the service — check if it exists but has no resolvable

@@ -483,6 +483,27 @@ The `settingsPath` in the `CAPABILITY_DISPLAY` map in `PlanSummaryPanel.tsx` MUS
 
 **Verification**: When adding or updating a `CAPABILITY_DISPLAY` entry, click the 'Configure' link in PlanSummaryPanel to verify it navigates to the correct settings page.
 
+### R27: Org Standing Mode — Asymmetric Inheritance for Subscription Status Only
+
+The `org_standing_mode` column on `tenants` (`'independent'` default, `'inherited'`) controls **subscription-status gating only**. It does NOT affect tier feature resolution, capability merging, or the MV.
+
+**How it works** (implemented in `EffectiveCapabilityResolver.ts` Step 6, lines 249-270):
+1. If `org_standing_mode = 'inherited'` AND the org is in good standing (`active`, `trialing`, or `past_due`), the tenant's `effectiveStatus` is lifted to `'active'` — even if the tenant's own status is `frozen`, `canceled`, or `expired`.
+2. If the org is also in bad standing, the tenant's own status is the floor — no change.
+3. The tenant's **tier is NEVER replaced**. Capabilities are always resolved from the tenant's own tier. Org tier only gates org-level features (`org_options`, propagation).
+
+**Grace period** (`standing_mode_grace_until`): When an org falls out of good standing, inherited tenants get a 7-day grace period (`ORG_STANDING_GRACE_DAYS = 7`). The `org-standing-inheritance.ts` batch job:
+- Sets `standing_mode_grace_until = now() + 7 days` on inherited tenants
+- Sends CRM alerts to affected tenants
+- After grace expires: auto-flips `org_standing_mode` to `'independent'` and clears the timestamp
+- If org recovers: clears grace timestamps and sends "coverage restored" alerts
+
+**Key rule for new capability domains**: Standing mode does NOT change how you add capabilities. The Step 6 override (R23) already uses the standing-mode-aware `effectiveStatus`. When adding a new domain to the `isReadOnly`/`isLimited` override blocks, the standing mode logic is already applied upstream — no additional changes needed.
+
+**`tier_change_logs_list`**: Audit trail for tier system admin changes. Does NOT affect resolution at runtime. Used by `/api/admin/tier-system/change-logs` for compliance tracking.
+
+**`tier_catalog_permissions`**: Tier-level permissions for the global supplier catalog (browse, add, edit, remove). Separate from capability resolution — gates catalog management actions, not feature flags.
+
 ## File Reference
 
 ### Backend

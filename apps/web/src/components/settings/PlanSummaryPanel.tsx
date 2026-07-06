@@ -677,6 +677,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     addDe('QR', de.canShowQr, de.qrEnabled);
     addDe('Social', de.canShowSocial, de.socialEnabled);
     addDe('SEO', de.canShowSeo, de.seoEnabled);
+    addDe('External Link', de.canShowExternalLink, de.externalLinkEnabled);
     summaries.push({
       key: 'directory_entry',
       label: CAPABILITY_DISPLAY.directory_entry.label,

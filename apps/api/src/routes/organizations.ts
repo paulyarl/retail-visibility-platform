@@ -950,6 +950,64 @@ router.delete('/:id/tenants/:tenantId/self', authenticateToken, requireOrgAdmin,
   }
 });
 
+// PATCH /organizations/:id/tenants/:tenantId/standing-mode - Update tenant standing mode
+// Permission: Org admin — controls whether tenant inherits good standing from org or is independently billed
+const updateStandingModeSchema = z.object({
+  standingMode: z.enum(['independent', 'inherited']),
+});
+
+router.patch('/:id/tenants/:tenantId/standing-mode', authenticateToken, requireOrgAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = updateStandingModeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    const { tenantId } = req.params;
+    const { standingMode } = parsed.data;
+
+    // Verify tenant is in this organization
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { id: true, name: true, organization_id: true, org_standing_mode: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'tenant_not_found', message: 'Location not found' });
+    }
+
+    if (tenant.organization_id !== req.params.id) {
+      return res.status(400).json({
+        error: 'tenant_not_in_org',
+        message: 'This location is not part of this organization',
+      });
+    }
+
+    // Update standing mode
+    const updated = await prisma.tenants.update({
+      where: { id: tenantId },
+      data: { org_standing_mode: standingMode },
+      select: {
+        id: true,
+        name: true,
+        org_standing_mode: true,
+        subscription_status: true,
+        subscription_tier: true,
+      },
+    });
+
+    res.json({
+      id: updated.id,
+      name: updated.name,
+      org_standing_mode: updated.org_standing_mode,
+      message: `Standing mode for "${updated.name}" set to ${standingMode}.`,
+    });
+  } catch (error: any) {
+    console.error('[Organizations] Update standing mode error:', error);
+    res.status(500).json({ error: 'failed_to_update_standing_mode' });
+  }
+});
+
 // POST /organizations/:id/items/propagate - Propagate a single item to multiple tenants
 const propagateSchema = z.object({
   sourceItemId: z.string().min(1),

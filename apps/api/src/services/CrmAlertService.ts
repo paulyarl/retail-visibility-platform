@@ -287,8 +287,8 @@ export class CrmAlertService extends BaseService {
       };
 
       const bodies: Record<string, string> = {
-        app_store_purchase: `You purchased "${params.featureName}" (${params.featureKey}) from the App Store${priceFormatted ? ` for ${priceFormatted}${cycleLabel}` : ''}. The feature is now active.`,
-        app_store_trial: `Your ${params.trialDays}-day free trial of "${params.featureName}" (${params.featureKey}) has started. It will auto-convert to a paid subscription when the trial ends.`,
+        app_store_purchase: `You purchased "${params.featureName}" (${params.featureKey}) from the App Store${priceFormatted ? ` for ${priceFormatted}${cycleLabel}` : ''}. The feature is now active. Public storefront and directory updates may take up to 10 minutes to reflect this change.`,
+        app_store_trial: `Your ${params.trialDays}-day free trial of "${params.featureName}" (${params.featureKey}) has started. It will auto-convert to a paid subscription when the trial ends. Public storefront and directory updates may take up to 10 minutes to reflect this change.`,
         app_store_cancel: `You cancelled "${params.featureName}" (${params.featureKey}). Access continues until the current billing period ends.`,
         app_store_renewal_failed: `Renewal payment failed for "${params.featureName}" (${params.featureKey}). The feature will enter a 7-day grace period before suspension.`,
       };
