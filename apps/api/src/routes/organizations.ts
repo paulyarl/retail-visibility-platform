@@ -268,7 +268,8 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.get('/product-type-summary', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const isPlatformAdminUser = await isPlatformAdmin(req.user?.sub || req.user?.userId || '');
+    const user = (req as any).user;
+    const isPlatformAdminUser = isPlatformAdmin(user) || canPerformSupportActions(user);
     if (!isPlatformAdminUser) {
       return res.status(403).json({ error: 'forbidden', message: 'Platform admin access required' });
     }
