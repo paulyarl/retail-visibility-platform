@@ -79,8 +79,8 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       } else {
         entry.disabled_feature_count++;
       }
-      // Check for explicit disengagement key: [capability_type_key]_disabled
-      if (tf.feature_key === `${capKey}_disabled` && tf.is_enabled) {
+      // Check for explicit disengagement key: any feature ending in _disabled that is enabled
+      if (tf.feature_key?.endsWith('_disabled') && tf.is_enabled) {
         entry.is_paused = true;
       }
       entry.features_in_capability.push(tf.feature_key);

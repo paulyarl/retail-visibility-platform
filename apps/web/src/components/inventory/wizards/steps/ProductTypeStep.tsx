@@ -59,6 +59,7 @@ interface ProductTypeStepProps {
   onChange: (data: any) => void;
   tenantId?: string;
   parentSku?: string;
+  fromCatalog?: boolean;
 }
 
 const ATTRIBUTE_TYPES = [
@@ -76,7 +77,7 @@ const ATTRIBUTE_TYPES = [
   { id: 'warranty', label: 'Warranty', icon: '🛡️' }
 ];
 
-export default function ProductTypeStep({ data, errors, onChange, tenantId, parentSku }: ProductTypeStepProps) {
+export default function ProductTypeStep({ data, errors, onChange, tenantId, parentSku, fromCatalog }: ProductTypeStepProps) {
   const [showVariantConfig, setShowVariantConfig] = useState(false);
   const [newVariantName, setNewVariantName] = useState('');
   const [newAttributeType, setNewAttributeType] = useState('');
@@ -102,10 +103,10 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
       handleTypeChange('physical');
     } else if (data.type === 'hybrid' && !allowedTypes.includes('hybrid')) {
       handleTypeChange('physical');
-    } else if (data.type === 'service' && !allowedTypes.includes('service')) {
+    } else if (data.type === 'service' && (!allowedTypes.includes('service') || fromCatalog)) {
       handleTypeChange('physical');
     }
-  }, [data.type, allowedTypes]);
+  }, [data.type, allowedTypes, fromCatalog]);
 
   const handleTypeChange = (type: 'physical' | 'digital' | 'hybrid' | 'service') => {
     // Auto-adjust stock quantity based on product type
@@ -589,7 +590,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
             </Card>
           )}
 
-          {/* Service Product Type - Gated by allowedTypes (tier) and isProductEnabled (merchant) */}
+          {/* Service Product Type - Gated by allowedTypes (tier), isProductEnabled (merchant), and fromCatalog (constraint) */}
           {!allowedTypes.includes('service') ? (
             <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
               <CardContent className="p-4">
@@ -623,6 +624,24 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                 </div>
                 <p className="text-sm text-gray-400 mt-2">
                   Service products are disabled in your product types settings
+                </p>
+              </CardContent>
+            </Card>
+          ) : fromCatalog ? (
+            <Card className="opacity-50 cursor-not-allowed border-gray-200 bg-gray-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      {getTypeIcon('service')}
+                      <span className="font-medium text-gray-500">Service</span>
+                      <Badge variant="outline" className="text-xs">Not Available</Badge>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-400 mt-2">
+                  Service products cannot be created from supplier catalog items
                 </p>
               </CardContent>
             </Card>

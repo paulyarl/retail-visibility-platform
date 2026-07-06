@@ -34,7 +34,7 @@ import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { itemsService } from '@/services/ItemsSingletonService';
-import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useProductOptionsCapability, useProductTypeCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import type { TenantCatalogItem, BarcodeEnrichment } from '@/services/SupplierImportService';
 
 import WizardProgress from './components/WizardProgress';
@@ -366,7 +366,11 @@ export default function ItemCreationWizard({
 
   // Capability gate: show catalog search step 0 when supplier catalog is enabled
   const { data: productOptionsCap } = useProductOptionsCapability(tenantId);
-  const catalogEnabled = !isEditing && !!productOptionsCap?.effectiveShowsSupplierCatalog;
+  const { data: productTypeCap } = useProductTypeCapability(tenantId);
+  // Constraint: supplier catalog excludes service product type.
+  // If service product type is in effective types, hide the catalog step.
+  const serviceTypeEnabled = (productTypeCap?.effectiveTypes ?? []).includes('service');
+  const catalogEnabled = !isEditing && !!productOptionsCap?.effectiveShowsSupplierCatalog && !serviceTypeEnabled;
   const STEPS = catalogEnabled ? [CATALOG_STEP, ...BASE_STEPS] : BASE_STEPS;
   const stepOffset = catalogEnabled ? 1 : 0;
 
@@ -1059,6 +1063,7 @@ export default function ItemCreationWizard({
               onChange={(data) => handleStepData({ productType: data })}
               tenantId={tenantId}
               parentSku={wizardData.productType.sku}
+              fromCatalog={!!wizardData.catalogMatch && wizardData.catalogMatch.source_type === 'supplier_catalog'}
             />
             {wizardData.productType.type === 'service' && wizardData.productType.serviceProduct && (
               <ServiceDetailsStep
