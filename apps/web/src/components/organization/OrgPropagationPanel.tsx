@@ -9,7 +9,8 @@ import {
 import { Button } from "@mantine/core";
 import { Badge } from "@/components/ui/Badge";
 import type { OrganizationData } from "./types";
-import type { OrgProductTypeRollup } from "@/services/OrgCapabilityService";
+import type { OrgProductTypeRollup, OrgPropagationType } from "@/services/OrgCapabilityService";
+import { Lock } from "lucide-react";
 
 interface PropCardProps {
   icon: LucideIcon;
@@ -27,11 +28,12 @@ interface PropCardProps {
   actionHref?: string;
   syncing?: boolean;
   resultMessage?: { success: boolean; message: string; jobId?: string } | null;
+  locked?: boolean;
 }
 
 function PropCard({
   icon: Icon, iconBg, iconColor, borderClass, title, status, statusVariant,
-  description, subLabel, disabled, actionLabel, onAction, actionHref, syncing, resultMessage,
+  description, subLabel, disabled, actionLabel, onAction, actionHref, syncing, resultMessage, locked,
 }: PropCardProps) {
   return (
     <div className={`p-4 bg-white dark:bg-gray-900 rounded-xl border-2 ${borderClass} transition-colors`}>
@@ -43,6 +45,12 @@ function PropCard({
           <div className="flex items-center gap-2 mb-1">
             <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{title}</h4>
             <Badge variant={statusVariant} className="text-xs">{status}</Badge>
+            {locked && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+                <Lock className="w-3 h-3" />
+                Not in your plan
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">{description}</p>
           <p className="text-xs text-gray-400">{subLabel}</p>
@@ -141,6 +149,7 @@ interface OrgPropagationPanelProps {
   onOpenCategorySync: () => void;
   productTypeRollup?: OrgProductTypeRollup | undefined;
   readOnly?: boolean;
+  isPropagationAllowed?: (type: OrgPropagationType) => boolean;
 }
 
 export default function OrgPropagationPanel({
@@ -154,8 +163,11 @@ export default function OrgPropagationPanel({
   onOpenCategorySync,
   productTypeRollup,
   readOnly,
+  isPropagationAllowed,
 }: OrgPropagationPanelProps) {
   const heroId = heroLocation?.tenantId;
+  const isAllowed = (type: OrgPropagationType): boolean =>
+    !isPropagationAllowed || isPropagationAllowed(type);
 
   return (
     <motion.div
@@ -241,9 +253,10 @@ export default function OrgPropagationPanel({
               title="Categories" status="ACTIVE" statusVariant="success"
               description="Propagate product categories and Google taxonomy alignments"
               subLabel="Bulk propagation"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_categories')}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#categories` : undefined}
+              locked={!isAllowed('org_propagation_categories')}
             />
             <PropCard
               icon={Package} iconBg="bg-blue-100 dark:bg-blue-900/20" iconColor="text-blue-600"
@@ -251,10 +264,11 @@ export default function OrgPropagationPanel({
               title="Products/SKUs" status="ACTIVE" statusVariant="success"
               description="Propagate individual or bulk products to locations"
               subLabel="Single or bulk"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_products')}
               actionLabel="Sync All from Hero"
               onAction={onSyncFromHero}
               syncing={syncing}
+              locked={!isAllowed('org_propagation_products')}
             />
             <PropCard
               icon={Globe} iconBg="bg-indigo-100 dark:bg-indigo-900/20" iconColor="text-indigo-600"
@@ -262,11 +276,12 @@ export default function OrgPropagationPanel({
               title="GBP Category Sync" status="ACTIVE" statusVariant="success"
               description="Sync product categories to Google Business Profile"
               subLabel="Organization-wide sync"
-              disabled={readOnly || !organizationId}
+              disabled={readOnly || !organizationId || !isAllowed('org_propagation_categories')}
               actionLabel="Sync to GBP"
               onAction={onOpenCategorySync}
               syncing={syncingCategories}
               resultMessage={categorySyncResult}
+              locked={!isAllowed('org_propagation_categories')}
             />
           </div>
         </div>
@@ -283,9 +298,10 @@ export default function OrgPropagationPanel({
               title="Business Hours" status="NEW" statusVariant="default"
               description="Propagate regular and special hours to all locations"
               subLabel="Hours template"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_business_info')}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#hours` : undefined}
+              locked={!isAllowed('org_propagation_business_info')}
             />
             <PropCard
               icon={Building} iconBg="bg-cyan-100 dark:bg-cyan-900/20" iconColor="text-cyan-600"
@@ -293,9 +309,10 @@ export default function OrgPropagationPanel({
               title="Business Profile" status="NEW" statusVariant="default"
               description="Propagate business description, attributes, and settings"
               subLabel="Profile info"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_business_info')}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#profile` : undefined}
+              locked={!isAllowed('org_propagation_business_info')}
             />
           </div>
         </div>
@@ -312,9 +329,10 @@ export default function OrgPropagationPanel({
               title="Feature Flags" status="NEW" statusVariant="default"
               description="Enable or disable features across all locations"
               subLabel="Centralized control"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_settings')}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#flags` : undefined}
+              locked={!isAllowed('org_propagation_settings')}
             />
             <PropCard
               icon={Users} iconBg="bg-pink-100 dark:bg-pink-900/20" iconColor="text-pink-600"
@@ -322,9 +340,10 @@ export default function OrgPropagationPanel({
               title="User Roles & Permissions" status="NEW" statusVariant="default"
               description="Propagate user invitations and role assignments"
               subLabel="Team management"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_settings')}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#roles` : undefined}
+              locked={!isAllowed('org_propagation_settings')}
             />
           </div>
         </div>
@@ -341,9 +360,10 @@ export default function OrgPropagationPanel({
               title="Brand Assets" status="NEW" statusVariant="default"
               description="Propagate logos, colors, and branding elements"
               subLabel="Brand consistency"
-              disabled={readOnly || !heroLocation}
+              disabled={readOnly || !heroLocation || !isAllowed('org_propagation_settings')}
               actionLabel="Configure →"
               actionHref={heroId ? `/t/${heroId}/settings/propagation#brand` : undefined}
+              locked={!isAllowed('org_propagation_settings')}
             />
           </div>
         </div>

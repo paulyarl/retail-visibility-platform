@@ -175,7 +175,15 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
           <CardContent className="space-y-4">
             {group.features.map(feature => {
               const isTierGated = feature.tierGate && chatbotCaps;
-              const isAllowed = !isTierGated || (chatbotCaps && chatbotCaps.isFlexible);
+              const isAllowed = !isTierGated || (chatbotCaps && (
+                chatbotCaps.isFlexible ||
+                (feature.key === 'chatbot_dynamic_enabled' && chatbotCaps.allowedResponseEngines.length > 0) ||
+                (feature.key === 'chatbot_skills_enabled' && chatbotCaps.allowedSkillTypes.length > 0) ||
+                (feature.key === 'chatbot_kb_enabled' && chatbotCaps.allowedKbTypes.length > 0) ||
+                (feature.key === 'chatbot_widget_custom_theme' && chatbotCaps.allowedWidgetTypes.includes('chatbot_widget_custom_theme' as any)) ||
+                (feature.key === 'chatbot_widget_skill_cards' && chatbotCaps.allowedWidgetTypes.includes('chatbot_widget_skill_cards' as any)) ||
+                (feature.key === 'chatbot_widget_after_hours' && chatbotCaps.allowedWidgetTypes.includes('chatbot_widget_after_hours' as any))
+              ));
               const isActuallyAllowed = !isTierGated || isAllowed;
 
               return (
@@ -189,11 +197,16 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{feature.description}</p>
                   </div>
-                  <Switch
-                    checked={settings[feature.key]}
-                    onCheckedChange={(v) => handleToggle(feature.key, v)}
-                    disabled={!isActuallyAllowed}
-                  />
+                  <div className="flex items-center gap-3">
+                    {isTierGated && !isAllowed && (
+                      <span className="text-xs text-amber-600 font-medium">Not in your plan</span>
+                    )}
+                    <Switch
+                      checked={settings[feature.key]}
+                      onCheckedChange={(v) => handleToggle(feature.key, v)}
+                      disabled={!isActuallyAllowed}
+                    />
+                  </div>
                 </div>
               );
             })}
