@@ -82,38 +82,6 @@ router.get('/', requirePlatformStaff, async (req, res) => {
         features_in_capability: entry.features_in_capability.join(', '),
       }));
 
-    if (req.query.diagnostics === 'true') {
-      const allActiveTiers = await prisma.subscription_tiers_list.findMany({
-        where: { is_active: true, tier_key: { not: { startsWith: 'trial_' } } },
-        select: { tier_key: true, name: true },
-        orderBy: { sort_order: 'asc' },
-      });
-      const allActiveCapTypes = await prisma.capability_type_list.findMany({
-        where: { is_active: true },
-        select: { key: true, name: true },
-        orderBy: { sort_order: 'asc' },
-      });
-      const tierKeys = allActiveTiers.map(t => t.tier_key);
-      const capKeys = allActiveCapTypes.map(c => c.key);
-      const expectedPairs = tierKeys.flatMap(t => capKeys.map(c => `${t}:${c}`));
-      const assignedSet = new Set(assignmentMap.keys());
-      const missingPairs = expectedPairs.filter(p => !assignedSet.has(p));
-
-      return res.json({
-        result,
-        diagnostics: {
-          distinctAssignments: assignmentMap.size,
-          activeNonTrialTiers: tierKeys,
-          activeCapTypes: capKeys,
-          expectedCells: expectedPairs.length,
-          assignedCells: assignmentMap.size,
-          missingCells: missingPairs.length,
-          missingPairs,
-          assignedPairs: Array.from(assignedSet).sort(),
-        },
-      });
-    }
-
     res.json(result);
   } catch (error) {
     console.error('[GET /api/admin/capabilities] Error:', error);
