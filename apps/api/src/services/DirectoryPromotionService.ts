@@ -64,7 +64,7 @@ export class DirectoryPromotionService extends BaseService {
   private constructor() {
     super();
     if (process.env.STRIPE_SECRET_KEY) {
-      this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-05-27.dahlia' as any });
+      this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' as any });
     }
   }
 

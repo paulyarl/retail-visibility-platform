@@ -36,7 +36,6 @@ import OrgTaskChecklist from "./OrgTaskChecklist";
 import OrgQuickLinks from "./OrgQuickLinks";
 import OrgSystemStatusCard from "./OrgSystemStatusCard";
 import OrgRecommendationsCard from "./OrgRecommendationsCard";
-import OrgCrmSummaryCard from "./OrgCrmSummaryCard";
 import OrgTeamOverview from "./OrgTeamOverview";
 import OrgEmployeeDistribution from "./OrgEmployeeDistribution";
 import OrgLockedTab from "./OrgLockedTab";
@@ -44,8 +43,10 @@ import OrgPlanSummaryPanel from "./OrgPlanSummaryPanel";
 import OrgCapabilityRollup from "./OrgCapabilityRollup";
 import OrgProductMixCard from "./OrgProductMixCard";
 import OrgProductTypeRollup from "./OrgProductTypeRollup";
-import OrgBotStatusCard from "./OrgBotStatusCard";
 import OrgBotWidget from "./OrgBotWidget";
+import OrgHelpDeskWidget from "./OrgHelpDeskWidget";
+import OrgBotPreviewCard from "./OrgBotPreviewCard";
+import OrgAppStoreWidget from "./OrgAppStoreWidget";
 import { useOrgCapabilityRollup } from "@/hooks/organization/useOrgCapabilityRollup";
 import { useOrgProductTypeRollup } from "@/hooks/organization/useOrgProductTypeRollup";
 import { useOrgProductMix } from "@/hooks/organization/useOrgProductMix";
@@ -283,7 +284,37 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               readOnly={readOnly}
             />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left column (2/3) — Help Desk, Bot Preview, App Store, Plan Summary, Usage, Recommendations, Billing */}
               <div className="lg:col-span-2 space-y-6">
+                {isPanelAllowed("crm_summary") && (
+                  <OrgHelpDeskWidget
+                    organizationId={organizationId}
+                    locations={orgData.locationBreakdown}
+                    readOnly={readOnly}
+                    isPlatformAdmin={isPlatformAdmin}
+                  />
+                )}
+                <OrgBotPreviewCard
+                  data={botStatusData}
+                  loading={botStatusLoading}
+                  organizationId={organizationId}
+                  orgName={orgName}
+                  readOnly={readOnly}
+                  isPlatformAdmin={isPlatformAdmin}
+                />
+                <OrgAppStoreWidget
+                  organizationId={organizationId}
+                  locations={orgData.locationBreakdown}
+                  heroLocation={heroLocation}
+                  readOnly={readOnly}
+                  isPlatformAdmin={isPlatformAdmin}
+                />
+                <OrgPlanSummaryPanel
+                  orgCaps={orgCaps}
+                  loading={capsLoading}
+                  tierName={lockedTierName}
+                  readOnly={readOnly}
+                />
                 <OrgUsageGauges billingCounters={billingCounters} orgData={orgData} />
                 {isPanelAllowed("recommendations") && (
                   <OrgRecommendationsCard
@@ -296,6 +327,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                 )}
                 <OrgBillingCard billingCounters={billingCounters} />
               </div>
+              {/* Right column (1/3) — Task Checklist, System Status, Quick Links, Commerce */}
               <div className="space-y-6">
                 {isPanelAllowed("task_checklist") && (
                   <OrgTaskChecklist
@@ -315,16 +347,6 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                     onNavigate={setActiveTab}
                   />
                 )}
-                {isPanelAllowed("crm_summary") && (
-                  <OrgCrmSummaryCard
-                    organizationId={organizationId}
-                    locations={orgData.locationBreakdown}
-                  />
-                )}
-                <OrgBotStatusCard
-                  data={botStatusData}
-                  loading={botStatusLoading}
-                />
                 <OrgCommerceCard organizationId={organizationId} readOnly={readOnly} />
               </div>
             </div>
@@ -340,7 +362,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                   leftSection={<MapPin size={16} />}
                   variant="filled"
                   color="blue"
-                  onClick={() => router.push(`/t/${tenantId}/settings/organization/locations`)}
+                  onClick={() => router.push(`/t/${tenantId}/settings/organization/locations?organizationId=${organizationId}`)}
                 >
                   Manage Locations
                 </Button>
@@ -393,9 +415,13 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               data={productTypeRollupData}
               loading={productTypeRollupLoading}
             />
-            <OrgBotStatusCard
+            <OrgBotPreviewCard
               data={botStatusData}
               loading={botStatusLoading}
+              organizationId={organizationId}
+              orgName={orgName}
+              readOnly={readOnly}
+              isPlatformAdmin={isPlatformAdmin}
             />
             <OrgSystemStatusCard orgData={orgData} heroLocation={heroLocation} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -406,9 +432,11 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
                 productTypeRollup={productTypeRollupData}
                 productMix={productMixData}
               />
-              <OrgCrmSummaryCard
+              <OrgHelpDeskWidget
                 organizationId={organizationId}
                 locations={orgData.locationBreakdown}
+                readOnly={readOnly}
+                isPlatformAdmin={isPlatformAdmin}
               />
             </div>
           </div>

@@ -185,7 +185,7 @@ class TaxService {
       }
 
       const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2026-05-27.dahlia' as any,
+        apiVersion: '2026-06-24.dahlia' as any,
         typescript: true,
       });
 

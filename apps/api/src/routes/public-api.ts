@@ -3662,7 +3662,6 @@ router.get('/tenant/:tenantId/product-options', async (req, res) => {
       success: true,
       flags: {
         enabled: tierState.enabled,
-        allowedTypes: tierState.allowedTypes,
         showsVariants: tierState.showsVariants,
         showsGallery: tierState.showsGallery,
         showsVideo: tierState.showsVideo,
@@ -3675,7 +3674,6 @@ router.get('/tenant/:tenantId/product-options', async (req, res) => {
       },
       tierState: {
         enabled: tierState.enabled,
-        allowedTypes: tierState.allowedTypes,
         showsVariants: tierState.showsVariants,
         showsGallery: tierState.showsGallery,
         showsVideo: tierState.showsVideo,

@@ -48,7 +48,7 @@ export default function OrgAppStoreWidget({
 
   const activePurchases = features.filter((f) => f.purchase && f.purchase.status === "active");
   const availableBundles = bundles.filter((b) => !b.allActive);
-  const eligibleFeatures = features.filter((f) => f.tierEligible && !f.alreadyPurchased);
+  const eligibleFeatures = features.filter((f) => f.tierEligible && !f.purchase);
 
   const canPurchase = !readOnly || isPlatformAdmin;
   const storeHref = heroTenantId

@@ -724,11 +724,9 @@ export function useMerchantGates(
             ? (!fl.showsPickup || !flSettings.pickup_enabled) && (!fl.showsDelivery || !flSettings.delivery_enabled) && (!fl.showsShipping || !flSettings.shipping_enabled)
             : !fl.effectiveShowsPickup && !fl.effectiveShowsDelivery && !fl.effectiveShowsShipping
           : false,
-        // Product options: no master switch — check if all tier-allowed types are disabled by merchant
-        product_options: po && po.enabled && po.allowedTypes.length > 0
-          ? poSettings
-            ? po.allowedTypes.every(t => poSettings[`product_${t}_enabled`] === false)
-            : po.effectiveTypes.length === 0
+        // Product options: check if capability is disabled or all creation features are off
+        product_options: po
+          ? !po.enabled || (!po.creationEnabled && !po.showsVariants && !po.showsGallery && !po.showsVideo && !po.showsSupplierCatalog && !po.layoutEnabled && !po.sectionsEnabled)
           : false,
         // Featured options: check master switch from option service
         featured_options: fo ? fo.enabled && (foSettings ? foSettings.featured_enabled === false : fo.effectiveTypes.length === 0) : false,

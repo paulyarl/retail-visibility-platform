@@ -17,6 +17,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { invalidateActiveFeaturedCache } from '../services/ActiveFeaturedResolver';
 import CrmAlertService from '../services/CrmAlertService';
+import { generateBadgeEventId } from '../lib/id-generator';
 
 export interface ExpirationEnforcerResult {
   deactivated: number;
@@ -76,6 +77,7 @@ export async function processExpiredFeatured(): Promise<ExpirationEnforcerResult
     // Emit badge_events for analytics (fire-and-forget)
     try {
       const events = expired.map(fp => ({
+        id: generateBadgeEventId(fp.tenant_id),
         tenant_id: fp.tenant_id,
         inventory_item_id: fp.inventory_item_id,
         badge_key: fp.featured_type,
