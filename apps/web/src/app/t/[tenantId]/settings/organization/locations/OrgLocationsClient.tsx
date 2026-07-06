@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Building2, Plus, Trash2, MapPin, Star, AlertTriangle, Check, Loader2, Store,
+  Building2, Plus, Trash2, MapPin, AlertTriangle, Check, Loader2, Store,
+  Crown, Settings as SettingsIcon, ExternalLink,
 } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useOrgBehaviorAccess } from '@/hooks/tenant-access/useOrgBehaviorAccess';
@@ -19,6 +20,15 @@ interface OrgTenant {
   name: string;
   metadata?: Record<string, any>;
   _count?: { inventory_items: number };
+  location_status?: string;
+  subscription_status?: string;
+  subscription_tier?: string;
+  is_demo?: boolean;
+  directory_visible?: boolean;
+  slug?: string | null;
+  subdomain?: string | null;
+  service_level?: string;
+  featured_access_approved?: boolean;
 }
 
 interface AvailableTenant {
@@ -50,20 +60,23 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
   const [orgName, setOrgName] = useState('');
   const [maxLocations, setMaxLocations] = useState(0);
 
+  const [heroLoading, setHeroLoading] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
     try {
-      const [orgs, available] = await Promise.all([
-        organizationsService.getOrganizations(),
+      const [org, available] = await Promise.all([
+        organizationsService.getOrganizationById(organizationId),
         organizationsService.getAvailableTenants(organizationId),
       ]);
 
-      const myOrg = orgs.find((o: any) => o.id === organizationId);
-      if (myOrg) {
-        setOrgTenants(myOrg.tenants || []);
-        setOrgName(myOrg.name || 'Organization');
-        setMaxLocations((myOrg as any).maxLocations || (myOrg as any).max_locations || 0);
+      if (org) {
+        const orgAny = org as any;
+        setOrgTenants(orgAny.tenants || []);
+        setOrgName(orgAny.name || 'Organization');
+        setMaxLocations(orgAny.maxLocations || orgAny.max_locations || 0);
       }
 
       setAvailableTenants(available);
@@ -111,6 +124,44 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
       error(err?.message || 'Failed to remove location. Please try again.');
     } finally {
       setRemoveLoading(null);
+    }
+  };
+
+  const handleSetHero = async (tenantIdToHero: string, tenantName: string) => {
+    if (!organizationId) return;
+    if (!confirm(`Set "${tenantName}" as the hero (primary) location for ${orgName}?`)) return;
+    setHeroLoading(tenantIdToHero);
+    try {
+      await organizationsService.updateHeroLocation(organizationId, tenantIdToHero);
+      success(`"${tenantName}" is now the hero location.`);
+      await loadData();
+    } catch (err: any) {
+      error(err?.message || 'Failed to set hero location.');
+    } finally {
+      setHeroLoading(null);
+    }
+  };
+
+  const handleStatusChange = async (tenantIdToUpdate: string, newStatus: string, tenantName: string) => {
+    const statusLabels: Record<string, string> = {
+      active: 'Active', inactive: 'Temporarily Closed', closed: 'Permanently Closed',
+      pending: 'Pending', archived: 'Archived',
+    };
+    const needsReason = newStatus === 'closed' || newStatus === 'archived';
+    const reason = needsReason
+      ? prompt(`Reason for changing "${tenantName}" to ${statusLabels[newStatus]}? (required)`, '')
+      : undefined;
+    if (needsReason && !reason) return;
+
+    setStatusLoading(tenantIdToUpdate);
+    try {
+      await organizationsService.updateTenantStatus(tenantIdToUpdate, newStatus, reason || undefined);
+      success(`"${tenantName}" status changed to ${statusLabels[newStatus] || newStatus}.`);
+      await loadData();
+    } catch (err: any) {
+      error(err?.message || 'Failed to update location status.');
+    } finally {
+      setStatusLoading(null);
     }
   };
 
@@ -233,10 +284,13 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                       Location
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Items
+                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Role
+                      Subscription
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Items
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
@@ -246,6 +300,22 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {orgTenants.map((t) => {
                     const isHero = t.metadata?.isHeroLocation === true;
+                    const statusColors: Record<string, string> = {
+                      active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
+                      inactive: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200',
+                      closed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
+                      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200',
+                      archived: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+                    };
+                    const statusLabels: Record<string, string> = {
+                      active: 'Active', inactive: 'Temp Closed', closed: 'Closed',
+                      pending: 'Pending', archived: 'Archived',
+                    };
+                    const locStatus = t.location_status || 'active';
+                    const subStatus = t.subscription_status || 'unknown';
+                    const subTier = t.subscription_tier || '—';
+                    const isDemo = t.is_demo === true;
+                    const isBusy = removeLoading === t.id || heroLoading === t.id || statusLoading === t.id;
                     return (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -254,12 +324,22 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                               <Store className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
                                 {t.name}
                                 {isHero && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                                    <Star className="w-3 h-3" />
+                                    <Crown className="w-3 h-3" />
                                     Hero
+                                  </span>
+                                )}
+                                {isDemo && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200">
+                                    Demo
+                                  </span>
+                                )}
+                                {t.directory_visible === false && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                    Hidden
                                   </span>
                                 )}
                               </div>
@@ -269,35 +349,93 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
                             </div>
                           </div>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[locStatus] || statusColors.active}`}>
+                              {statusLabels[locStatus] || locStatus}
+                            </span>
+                            {userIsPlatformAdmin && !isBusy && (
+                              <select
+                                value={locStatus}
+                                onChange={(e) => handleStatusChange(t.id, e.target.value, t.name)}
+                                className="text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-1 py-0.5"
+                                title="Change location status"
+                              >
+                                <option value="active">Active</option>
+                                <option value="inactive">Temp Closed</option>
+                                <option value="closed">Permanently Closed</option>
+                                <option value="pending">Pending</option>
+                                <option value="archived">Archived</option>
+                              </select>
+                            )}
+                            {statusLoading === t.id && (
+                              <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-gray-900 dark:text-white capitalize">
+                              {subTier.replace(/_/g, ' ')}
+                            </span>
+                            <span className={`text-xs capitalize ${
+                              subStatus === 'active' ? 'text-green-600 dark:text-green-400' :
+                              subStatus === 'trialing' || subStatus === 'trial' ? 'text-blue-600 dark:text-blue-400' :
+                              subStatus === 'past_due' || subStatus === 'canceled' ? 'text-red-600 dark:text-red-400' :
+                              'text-gray-500 dark:text-gray-400'
+                            }`}>
+                              {subStatus}
+                            </span>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {t._count?.inventory_items ?? 0} items
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {isHero ? (
-                            <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                              Primary Location
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                              Member Location
-                            </span>
-                          )}
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {!isHero && (
-                            <button
-                              onClick={() => handleRemoveTenant(t.id, t.name)}
-                              disabled={removeLoading === t.id}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50"
-                              title="Remove from organization"
+                          <div className="flex items-center justify-end gap-2">
+                            {!isHero && (
+                              <button
+                                onClick={() => handleSetHero(t.id, t.name)}
+                                disabled={isBusy}
+                                className="text-amber-600 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300 disabled:opacity-50"
+                                title="Set as hero location"
+                              >
+                                {heroLoading === t.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Crown className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                            <Link
+                              href={`/t/${t.id}/settings`}
+                              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                              title="Location settings"
                             >
-                              {removeLoading === t.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
+                              <SettingsIcon className="w-4 h-4" />
+                            </Link>
+                            <Link
+                              href={`/t/${t.id}/dashboard`}
+                              className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                              title="Open location dashboard"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Link>
+                            {!isHero && (
+                              <button
+                                onClick={() => handleRemoveTenant(t.id, t.name)}
+                                disabled={isBusy}
+                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50"
+                                title="Remove from organization"
+                              >
+                                {removeLoading === t.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -318,6 +456,8 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
             You can attach locations (stores) that you own or manage to this organization. Only locations not already in another organization can be added.
           </p>
           <ul className="mt-3 space-y-1.5 text-sm text-amber-800 dark:text-amber-200">
+            <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> Click the crown icon to set a location as the hero (primary) location</li>
+            <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> Use the status dropdown to change a location's operational status (active, temp closed, etc.)</li>
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> Only locations where you are an owner or admin can be added</li>
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> The hero (primary) location cannot be removed — set another location as hero first</li>
             <li className="flex items-start gap-2"><Check className="w-4 h-4 mt-0.5 flex-shrink-0" /> Removing a location detaches it from the organization but does not delete it</li>
