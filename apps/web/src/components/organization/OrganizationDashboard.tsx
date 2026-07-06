@@ -391,13 +391,13 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         {/* Locations Tab */}
         {activeTab === "locations" && isTabAllowed("locations") && (
           <div className="space-y-4">
-            {(!!organizationId || !readOnly) && tenantId && (
+            {(!!organizationId || !readOnly) && (tenantId || heroLocation?.tenantId || orgData.locationBreakdown[0]?.tenantId) && (
               <div className="flex justify-end">
                 <Button
                   leftSection={<MapPin size={16} />}
                   variant="filled"
                   color="blue"
-                  onClick={() => router.push(`/t/${tenantId}/settings/organization/locations?organizationId=${organizationId}`)}
+                  onClick={() => router.push(`/t/${tenantId || heroLocation?.tenantId || orgData.locationBreakdown[0]?.tenantId}/settings/organization/locations?organizationId=${organizationId}`)}
                 >
                   Manage Locations
                 </Button>
