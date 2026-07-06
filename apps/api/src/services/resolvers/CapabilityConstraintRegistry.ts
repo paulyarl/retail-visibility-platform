@@ -220,6 +220,29 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     message: 'Social storefront benefits from quickstart categories for product discovery',
     resolution_hint: 'Enable Category Generator in Quickstart Options and generate fashion/beauty categories',
   },
+
+  // ── Supplier catalog excludes service product type ──
+  // Supplier catalog items are physical goods sourced from suppliers.
+  // Service products are intangible offerings. Combining them is illogical.
+  {
+    id: 'supplier_catalog_excludes_service_product',
+    type: 'excludes',
+    severity: 'block',
+    source: {
+      capability: 'product_options',
+      field: 'effective_shows_supplier_catalog',
+      operator: 'is_true',
+      value: true,
+    },
+    target: {
+      capability: 'product_types',
+      field: 'effective_types',
+      operator: 'includes',
+      value: 'service',
+    },
+    message: 'Supplier catalog import is not available when service product type is enabled',
+    resolution_hint: 'Disable service product type in your product types settings to use supplier catalog import, or disable supplier catalog import to use service products',
+  },
 ];
 
 // ====================
