@@ -61,9 +61,14 @@ export function useOrgTabAccess(
 
   return useMemo(() => {
     const roleAllowed = isPlatformAdmin ? ALL_TABS : getRoleAllowedTabs(userRole);
-    const capAllowed = orgCaps?.allowedTabs ?? ALL_TABS;
-    const capPanels = orgCaps?.allowedPanels ?? [];
-    const capPropagation = orgCaps?.allowedPropagationTypes ?? [];
+    // Platform admins bypass tier-based capability gating for support access
+    const capAllowed = isPlatformAdmin ? ALL_TABS : (orgCaps?.allowedTabs ?? ALL_TABS);
+    const capPanels = isPlatformAdmin
+      ? (['task_checklist', 'quick_links', 'system_status', 'recommendations', 'crm_summary'] as OrgPanelKey[])
+      : (orgCaps?.allowedPanels ?? []);
+    const capPropagation = isPlatformAdmin
+      ? (['org_propagation_products', 'org_propagation_categories', 'org_propagation_business_info', 'org_propagation_settings'] as OrgPropagationType[])
+      : (orgCaps?.allowedPropagationTypes ?? []);
 
     // Tab is visible if BOTH role and capability allow it
     const allowedSet = new Set<OrgTabKey>(
@@ -91,8 +96,8 @@ export function useOrgTabAccess(
 
     const isTabAllowed = (tab: OrgTabKey) => allowedSet.has(tab);
     const isTabLocked = (tab: OrgTabKey) => lockedSet.has(tab);
-    const isPanelAllowed = (panel: OrgPanelKey) => capPanels.includes(panel);
-    const isPropagationAllowed = (type: OrgPropagationType) => capPropagation.includes(type);
+    const isPanelAllowed = (panel: OrgPanelKey) => isPlatformAdmin || capPanels.includes(panel);
+    const isPropagationAllowed = (type: OrgPropagationType) => isPlatformAdmin || capPropagation.includes(type);
 
     return {
       visibleTabs,
