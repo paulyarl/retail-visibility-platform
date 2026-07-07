@@ -172,7 +172,7 @@ const TASKS: TaskDefinition[] = [
   {
     id: 'storefront-type-selection',
     label: () => 'Select your storefront type',
-    link: (ctx) => `/t/${ctx.tenantId}/settings/storefront-options`,
+    link: (ctx) => `/t/${ctx.tenantId}/settings/storefront-type-options`,
     category: 'visibility',
     priority: 'critical',
     condition: (ctx) => needsStorefrontTypeSelection(ctx),

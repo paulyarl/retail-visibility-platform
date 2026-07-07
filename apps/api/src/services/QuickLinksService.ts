@@ -166,7 +166,7 @@ const LINKS: LinkDefinition[] = [
     id: 'storefront-type-setup',
     label: () => 'Select Storefront Type',
     description: () => 'Choose your storefront type to activate key features',
-    href: (ctx) => `/t/${ctx.tenantId}/settings/storefront-options`,
+    href: (ctx) => `/t/${ctx.tenantId}/settings/storefront-type-options`,
     icon: 'Store',
     category: 'store',
     badge: () => 'Action needed',
