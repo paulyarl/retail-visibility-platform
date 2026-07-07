@@ -209,7 +209,7 @@ function CheckoutPageContent() {
             setDepositOption('required');
           }
           // Step 3: Check flexible commerce (both options)
-          else if (commerce_features.includes('commerce_both_options')) {
+          else if (commerce_features.includes('commerce_flexible')) {
             setCheckoutMode('full_payment'); // Default to full payment
             setDepositOption('optional'); // Customer can choose deposit
           }

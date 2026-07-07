@@ -14,9 +14,9 @@ export const CAPABILITY_GROUPS = [
 export type CapabilityGroup = typeof CAPABILITY_GROUPS[number];
 
 export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: string[]; group: CapabilityGroup }> = [
-  { key: 'commerce_types', label: 'Commerce', flexibleKeys: ['commerce_both_options'], group: 'Commerce & Conversion' },
+  { key: 'commerce_types', label: 'Commerce', flexibleKeys: ['commerce_flexible'], group: 'Commerce & Conversion' },
   { key: 'payment_gateway_options', label: 'Payment Gateways', flexibleKeys: ['payment_gateway_flexible'], group: 'Commerce & Conversion' },
-  { key: 'storefront_types', label: 'Storefront Types', flexibleKeys: ['storefront_both_options'], group: 'Platform Presence' },
+  { key: 'storefront_types', label: 'Storefront Types', flexibleKeys: ['storefront_flexible'], group: 'Platform Presence' },
   { key: 'storefront_options', label: 'Storefront Options', flexibleKeys: ['storefront_opt_flexible'], group: 'Platform Presence' },
   { key: 'fulfillment_options', label: 'Fulfillment', flexibleKeys: ['fulfillment_flexible'], group: 'Commerce & Conversion' },
   { key: 'barcode_scan_options', label: 'Barcode Scan', flexibleKeys: ['barcode_flexible'], group: 'Clover & Inventory' },

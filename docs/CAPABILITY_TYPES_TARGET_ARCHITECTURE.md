@@ -719,7 +719,7 @@ Existing `product-options-settings` route remains registered (updated in place).
 | Settings page | `storefront-type` | `storefront-options` | `product-types` | `product-options` |
 | Group gates | N/A (types) | hours, category, recommend, info, qr, gallery, advanced, layout | N/A (types) | creation, layout, sections |
 | Master toggle | `storefront_type_enabled` | `storefront_options_enabled` | `product_types_enabled` | `product_options_enabled` |
-| Flexible flag | `storefront_both_options` | `storefront_options_flexible` | `product_types_flexible` | `product_options_flexible` |
+| Flexible flag | `storefront_flexible` | `storefront_options_flexible` | `product_types_flexible` | `product_options_flexible` |
 | Merchant selection | `selected_storefront_type` | `storefront_layout` | `selected_product_type` | `product_layout` |
 
 Both families now follow identical patterns. Adding a new product page section is as simple as:

@@ -170,8 +170,8 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
 
           setCommerceFeatures({
             commerce_disabled: !features.commerce_enabled,
-            commerce_deposit_only: features.commerce_deposit_only || features.commerce_both_options,
-            commerce_full_payment: features.commerce_full_payment || features.commerce_both_options,
+            commerce_deposit_only: features.commerce_deposit_only || features.commerce_flexible,
+            commerce_full_payment: features.commerce_full_payment || features.commerce_flexible,
           });
         }
       } catch (tierError) {

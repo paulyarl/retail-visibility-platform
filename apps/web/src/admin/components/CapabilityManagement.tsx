@@ -30,7 +30,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
-import { AlertCircle, Check, X, AlertTriangle, Pause } from 'lucide-react';
+import { AlertCircle, Check, X, AlertTriangle, Pause, Zap } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/Switch';
 import { Pagination } from '@/components/ui/Pagination';
@@ -1551,16 +1551,22 @@ export default function CapabilityManagement() {
               const totalCells = activeTiers.reduce((sum, t) => sum + applicableCapTypes(t.tierKey).length, 0);
               const totalAssigned = totalCells - totalMissing;
               const disabledCount = Array.from(assignmentMap.values()).filter(c => c.has_disabled).length;
-              const fullyEnabledCount = totalAssigned - disabledCount;
+              const flexibleCount = Array.from(assignmentMap.values()).filter(c => c.has_flexible && !c.has_disabled).length;
+              const fullyEnabledCount = totalAssigned - disabledCount - flexibleCount;
               const coveragePct = totalCells > 0 ? Math.round(((totalCells - totalMissing) / totalCells) * 100) : 0;
 
               return (
                 <>
                   {/* Summary cards */}
-                  <div className="px-6 py-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="px-6 py-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-6 gap-4">
                     <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
                       <div className="text-xs text-gray-500 uppercase font-medium">Coverage</div>
                       <div className={`text-2xl font-bold ${coveragePct >= 80 ? 'text-green-600' : coveragePct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{coveragePct}%</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                      <div className="text-xs text-gray-500 uppercase font-medium">Flexible</div>
+                      <div className="text-2xl font-bold text-blue-600">{flexibleCount}</div>
+                      <div className="text-xs text-gray-400">all features unlocked</div>
                     </div>
                     <div className="rounded-lg border border-gray-200 p-3 bg-gray-50/50">
                       <div className="text-xs text-gray-500 uppercase font-medium">Fully Enabled</div>
@@ -1586,6 +1592,10 @@ export default function CapabilityManagement() {
 
                   {/* Legend */}
                   <div className="px-6 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-600"><Zap className="w-3 h-3" /></span>
+                      <span>Flexible</span>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-600"><Check className="w-3 h-3" /></span>
                       <span>Fully Enabled</span>
@@ -1657,6 +1667,7 @@ export default function CapabilityManagement() {
                                 const assignment = assignmentMap.get(`${tier.tierKey}:${capType.capability_type_key}`);
                                 const isAssigned = !!assignment;
                                 const hasDisabled = assignment?.has_disabled;
+                                const hasFlexible = assignment?.has_flexible && !hasDisabled;
                                 if (!isApplicable) {
                                   return (
                                     <td key={tier.tierKey} className="px-3 py-3 text-center">
@@ -1671,10 +1682,16 @@ export default function CapabilityManagement() {
                                     {isAssigned ? (
                                       <div className="flex items-center justify-center" title={hasDisabled
                                         ? `${assignment!.enabled_feature_count} enabled, ${assignment!.disabled_feature_count} disabled features`
+                                        : hasFlexible
+                                        ? `${assignment!.feature_count} features assigned (Flexible — all unlocked)`
                                         : `${assignment!.feature_count} features assigned`}>
                                         {hasDisabled ? (
                                           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-600">
                                             <Pause className="w-4 h-4" />
+                                          </span>
+                                        ) : hasFlexible ? (
+                                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-600">
+                                            <Zap className="w-4 h-4" />
                                           </span>
                                         ) : (
                                           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-600">

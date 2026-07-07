@@ -27,6 +27,8 @@ export interface StorefrontTypeState {
   isFlexible: boolean;
   /** Which storefront types are allowed by the tier */
   allowedTypes: StorefrontType[];
+  /** Whether storefront policies feature is enabled for the tier */
+  policiesEnabled: boolean;
   /** Raw feature map from tier capabilities */
   features: Record<string, boolean>;
 }
@@ -135,7 +137,10 @@ class StorefrontTypeService {
     const social = !!features.storefront_social;
 
     // Flexible gate
-    const bothOptions = !!features.storefront_both_options;
+    const bothOptions = !!features.storefront_flexible;
+
+    // Policies gate (platform key, no merchant control)
+    const policiesEnabled = !!features.storefront_policies;
 
     // Determine enabled state
     // 1. Deactivation master gate takes highest priority
@@ -181,6 +186,7 @@ class StorefrontTypeService {
 
     return {
       enabled: isEnabled,
+      policiesEnabled,
       type,
       isFlexible: bothOptions,
       allowedTypes,
@@ -205,6 +211,7 @@ class StorefrontTypeService {
       type: 'none',
       isFlexible: false,
       allowedTypes: [],
+      policiesEnabled: false,
       features: {},
     };
   }
