@@ -1,5 +1,5 @@
 import { getCapabilityTypeForFeature, AllCapabilitiesState } from '@/services/CapabilityResolutionService';
-import { FEATURE_DISPLAY_NAMES } from '@/lib/tiers/tier-features';
+import { FEATURE_DISPLAY_NAMES, TIER_FEATURES, getTierFeatures as getTierFeaturesRaw } from '@/lib/tiers/tier-features';
 
 export const COMPARISON_TIERS = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'];
 
@@ -82,6 +82,34 @@ export function isGateKey(featureKey: string): boolean {
   return featureKey.endsWith('_enabled') || featureKey.endsWith('_disabled');
 }
 
+const ALL_FLEXIBLE_KEYS = new Set<string>(
+  CAPABILITY_META.flatMap(m => m.flexibleKeys)
+);
+
+export function isFlexibleKey(featureKey: string): boolean {
+  return ALL_FLEXIBLE_KEYS.has(featureKey);
+}
+
+const ALL_FEATURES_BY_CAPABILITY: Record<string, string[]> = (() => {
+  const map: Record<string, Set<string>> = {};
+  Object.keys(TIER_FEATURES).forEach(tier => {
+    getTierFeaturesRaw(tier).forEach(f => {
+      if (isGateKey(f) || isFlexibleKey(f)) return;
+      const capKey = getCapabilityTypeForFeature(f);
+      if (!capKey) return;
+      if (!map[capKey]) map[capKey] = new Set();
+      map[capKey].add(f);
+    });
+  });
+  const result: Record<string, string[]> = {};
+  Object.entries(map).forEach(([k, v]) => { result[k] = Array.from(v).sort(); });
+  return result;
+})();
+
+export function getAllFeaturesForCapability(capKey: string): string[] {
+  return ALL_FEATURES_BY_CAPABILITY[capKey] || [];
+}
+
 export interface TierCapabilityInfo {
   enabled: boolean;
   flexible: boolean;
@@ -90,7 +118,7 @@ export interface TierCapabilityInfo {
 
 export function getTierCapabilityInfo(tierFeatures: string[], capKey: string, flexibleKeys: string[]): TierCapabilityInfo {
   const allInCap = tierFeatures.filter(f => getCapabilityTypeForFeature(f) === capKey);
-  const features = allInCap.filter(f => !isGateKey(f));
+  const features = allInCap.filter(f => !isGateKey(f) && !isFlexibleKey(f));
   const flexible = flexibleKeys.some(fk => tierFeatures.includes(fk));
   const hasDisabledGate = allInCap.some(f => f.endsWith('_disabled'));
   const hasEnabledGate = allInCap.some(f => f.endsWith('_enabled'));
@@ -148,7 +176,9 @@ export function buildEffectiveFeatures(
 ): EffectiveFeatureRow[] {
   const purchasedSet = new Set(purchasedFeatureKeys);
   const tierSet = new Set(tierFeatures);
-  const allFeatures = new Set<string>([...tierFeatures, ...purchasedFeatureKeys].filter(f => !isGateKey(f)));
+  const allFeatures = new Set<string>(
+    [...tierFeatures, ...purchasedFeatureKeys].filter(f => !isGateKey(f) && !isFlexibleKey(f))
+  );
   const capLabelMap = new Map<string, string>();
   const capFlexibleSet = new Set<string>();
   if (resolvedCaps) {
@@ -157,8 +187,12 @@ export function buildEffectiveFeatures(
       if (rc.flexible) capFlexibleSet.add(rc.key);
     });
   }
+  capFlexibleSet.forEach(capKey => {
+    getAllFeaturesForCapability(capKey).forEach(f => allFeatures.add(f));
+  });
   return Array.from(allFeatures).sort().map(feature => {
-    const capKey = getCapabilityTypeForFeature(feature) || 'uncategorized';
+    const capKey = getCapabilityTypeForFeature(feature);
+    if (!capKey) return null;
     const capLabel = capLabelMap.get(capKey) || capKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     return {
       feature,
@@ -168,5 +202,5 @@ export function buildEffectiveFeatures(
       isPurchased: purchasedSet.has(feature) && !tierSet.has(feature),
       isFlexible: capFlexibleSet.has(capKey),
     };
-  });
+  }).filter(Boolean) as EffectiveFeatureRow[];
 }
