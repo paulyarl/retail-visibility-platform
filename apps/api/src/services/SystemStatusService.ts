@@ -99,7 +99,7 @@ function buildStatusItems(
         label: 'Store',
         status: 'warning',
         detail: 'Storefront type selection required',
-        link: `/t/${tenantId}/settings/storefront-options`,
+        link: `/t/${tenantId}/settings/storefront-type-options`,
       });
     } else if (state.locationStatus === 'temporarily_closed') {
       items.push({
