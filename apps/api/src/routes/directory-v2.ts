@@ -28,12 +28,9 @@ router.get('/stores', async (req: Request, res: Response) => {
          AND (business_hours IS NULL OR business_hours::text != 'null')
        ORDER BY
          ${promotionBoost},
-         CASE 
-           WHEN $3 = 'activity' THEN activity_score
-           WHEN $3 = 'name' THEN business_name
-           WHEN $3 = 'city' THEN city
-           ELSE activity_score
-         END DESC,
+         CASE WHEN $3 = 'name' THEN business_name END ASC,
+         CASE WHEN $3 = 'city' THEN city END ASC,
+         CASE WHEN $3 != 'name' AND $3 != 'city' THEN updated_at END DESC,
          business_name ASC
        LIMIT $1 OFFSET $2
     `;

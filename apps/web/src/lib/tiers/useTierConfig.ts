@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { tierFeatureService, TierConfigData } from '@/services/TierFeatureService';
+import { publicTierFeatureService } from '@/services/PublicTierFeatureService';
 import {
   checkTierFeature as checkTierFeatureFallback,
   getRequiredTier as getRequiredTierFallback,
@@ -69,17 +70,20 @@ export interface TierConfigResult {
   refresh: () => Promise<void>;
 }
 
-export function useTierConfig(): TierConfigResult {
+export function useTierConfig(options?: { enabled?: boolean; publicMode?: boolean }): TierConfigResult {
+  const enabled = options?.enabled !== false;
+  const publicMode = options?.publicMode === true;
+  const service = publicMode ? publicTierFeatureService : tierFeatureService;
   const [config, setConfig] = useState<TierConfigData | null>(
-    tierFeatureService.isLoaded() ? null : null // always start null, load below
+    service.isLoaded() ? null : null
   );
-  const [loading, setLoading] = useState(!tierFeatureService.isLoaded());
+  const [loading, setLoading] = useState(!service.isLoaded());
   const [error, setError] = useState<string | null>(null);
 
   const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await tierFeatureService.getConfig();
+      const data = await service.getConfig();
       setConfig(data);
       setError(null);
     } catch (err) {
@@ -88,16 +92,17 @@ export function useTierConfig(): TierConfigResult {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [service]);
 
   useEffect(() => {
+    if (!enabled) return;
     loadConfig();
-  }, [loadConfig]);
+  }, [loadConfig, enabled]);
 
   const refresh = useCallback(async () => {
-    await tierFeatureService.invalidateServiceCaches();
+    await service.invalidateServiceCaches();
     await loadConfig();
-  }, [loadConfig]);
+  }, [loadConfig, service]);
 
   // Sync functions that use cached config or fall back to hardcoded
   return useMemo(() => {
