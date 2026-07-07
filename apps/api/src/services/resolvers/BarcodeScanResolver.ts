@@ -16,18 +16,17 @@ export function resolveBarcodeScan(
   merchantPrefs: BarcodeScanMerchantSettings | null
 ): EffectiveBarcodeScan {
   const disabled = !!features.barcode_disabled;
-  const enabled = !disabled && !!features.barcode_enabled;
   const flexible = !!features.barcode_flexible;
 
-  const allowedModes: BarcodeScanMode[] = [];
-  if (features.barcode_scan) allowedModes.push('scan');
-  if (features.barcode_manual) allowedModes.push('manual');
-  if (features.barcode_usb) allowedModes.push('usb');
-  if (features.barcode_camera) allowedModes.push('camera');
+  // R17: disabled > enabled > flexible > individual features
+  const hasAnyBarcodeFeature = !!features.barcode_scan || !!features.barcode_manual || !!features.barcode_usb || !!features.barcode_camera;
+  const enabled = !disabled && (!!features.barcode_enabled || flexible || hasAnyBarcodeFeature);
 
-  if (flexible) {
-    allowedModes.push('scan', 'manual', 'usb', 'camera');
-  }
+  const allowedModes: BarcodeScanMode[] = [];
+  if (flexible || features.barcode_scan) allowedModes.push('scan');
+  if (flexible || features.barcode_manual) allowedModes.push('manual');
+  if (flexible || features.barcode_usb) allowedModes.push('usb');
+  if (flexible || features.barcode_camera) allowedModes.push('camera');
 
   const uniqueModes = [...new Set(allowedModes)];
 

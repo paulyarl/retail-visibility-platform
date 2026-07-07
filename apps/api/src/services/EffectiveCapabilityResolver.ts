@@ -201,7 +201,8 @@ export async function resolveEffectiveCapabilities(
       merchantBundle.socialCommerceOptions
     ),
     resolveDirectoryPromotion(
-      rawCaps.capabilities.directory_promotion?.features || {}
+      rawCaps.capabilities.directory_promotion?.features || {},
+      rawCaps.capabilities.directory_promotion?.capability_enabled
     ),
   ]);
 
@@ -622,7 +623,8 @@ export async function resolveEffectiveCapabilitiesFromMV(
       merchantBundle.socialCommerceOptions
     ),
     resolveDirectoryPromotion(
-      rawCaps.capabilities.directory_promotion?.features || {}
+      rawCaps.capabilities.directory_promotion?.features || {},
+      rawCaps.capabilities.directory_promotion?.capability_enabled
     ),
   ]);
 

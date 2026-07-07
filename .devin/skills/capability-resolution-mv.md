@@ -80,7 +80,7 @@ Indexes:
 | Real-time capability check after purchase | ✅ | ❌ (stale up to 10 min) |
 | API route returning N stores with capability-gated fields | ❌ | ✅ (JOIN) |
 | Admin UI checking capabilities for a specific tenant | ✅ | ❌ |
-| Public effective-capabilities endpoint (`GET /:tenantId/effective-capabilities`) | ❌ | ✅ (`resolveEffectiveCapabilitiesFromMV`) |
+| Public effective-capabilities endpoint (`GET /:tenantId/effective-capabilities`) | ✅ | ❌ |
 
 **Rule of thumb**: If you're returning a list of tenants/stores and need a capability flag per row, use the MV. If you're checking a single tenant's capabilities in real-time (settings, post-purchase, write routes), use the resolver.
 
@@ -88,7 +88,7 @@ Indexes:
 
 `resolveEffectiveCapabilitiesFromMV(tenantIdOrSlug, opts)` in `EffectiveCapabilityResolver.ts` provides the same output shape as `resolveEffectiveCapabilities` but reads raw capabilities from the MV instead of running 5+ queries.
 
-- **Used by**: `GET /api/tenants/:tenantId/effective-capabilities` (public endpoint)
+- **Used by**: Bulk listing routes only (directory.ts, directory-mv.ts, directory-consolidated.ts). NOT used by `GET /api/tenants/:tenantId/effective-capabilities` — that endpoint uses `resolveEffectiveCapabilities` for real-time data.
 - **Cache**: Separate `MV_CACHE` (60s TTL), invalidated alongside `MEMORY_CACHE` by `invalidateEffectiveCapabilities`
 - **Pipeline**: MV lookup → per-domain resolvers → cross-capability constraints → subscription-status override → cache
 - **Trade-off**: Raw feature data is up to 10 minutes stale (MV refresh interval). Merchant settings are always fresh (fetched in real-time). Acceptable for public/read-only surfaces.

@@ -14,7 +14,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { getEffectiveTier } from '../utils/trial-tier-transparency';
 import { deriveInternalStatus } from '../utils/subscription-status';
-import { resolveEffectiveCapabilitiesFromMV } from '../services/EffectiveCapabilityResolver';
+import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router({ mergeParams: true });
 
@@ -698,7 +698,7 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
     const { tenantId } = req.params;
     const detail = req.query.detail === 'full' ? 'full' : 'summary';
 
-    const result = await resolveEffectiveCapabilitiesFromMV(tenantId, { detail });
+    const result = await resolveEffectiveCapabilities(tenantId, { detail });
 
     if (!result) {
       // Tenant not resolved by the service — check if it exists but has no resolvable
