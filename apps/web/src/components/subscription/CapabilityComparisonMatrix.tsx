@@ -31,9 +31,11 @@ export default function CapabilityComparisonMatrix({
 }: CapabilityComparisonMatrixProps) {
   const isTenantMode = !!tenantId;
   const { tenant, tier, loading: tenantLoading } = useTenantComplete(isTenantMode ? tenantId! : null);
-  const tierConfig = useTierConfig();
+  const tierConfig = useTierConfig({ publicMode: !isTenantMode });
   const { data: allCaps, loading: capsLoading } = useAllCapabilities(isTenantMode ? tenantId! : null);
   const [expandedCap, setExpandedCap] = useState<string | null>(null);
+
+  const getTierFeatures = tierConfig.getTierFeatures;
 
   const currentTierKey = isTenantMode
     ? (tier?.effective?.id || tenant?.subscriptionTier || 'discovery')
@@ -47,7 +49,7 @@ export default function CapabilityComparisonMatrix({
   const comparisonMatrix = useMemo(() => {
     const tierFeaturesMap: Record<string, string[]> = {};
     COMPARISON_TIERS.forEach(t => {
-      tierFeaturesMap[t] = tierConfig.getTierFeatures(t);
+      tierFeaturesMap[t] = getTierFeatures(t);
     });
 
     return CAPABILITY_META.map(capMeta => {
@@ -57,7 +59,7 @@ export default function CapabilityComparisonMatrix({
       });
       return { ...capMeta, tierInfos };
     });
-  }, [tierConfig]);
+  }, [getTierFeatures]);
 
   const currentTierCapStatus = useMemo(() => {
     if (!resolvedCaps) return null;
@@ -68,7 +70,7 @@ export default function CapabilityComparisonMatrix({
     return map;
   }, [resolvedCaps]);
 
-  const isLoading = isTenantMode && (tenantLoading || (capsLoading && !allCaps));
+  const isLoading = tierConfig.loading || (isTenantMode && (tenantLoading || (capsLoading && !allCaps)));
 
   if (isLoading) {
     return (

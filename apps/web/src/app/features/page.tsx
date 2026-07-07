@@ -16,31 +16,31 @@ import CapabilityComparisonMatrix from '@/components/subscription/CapabilityComp
 const featureCategories = [
   {
     name: 'Clover & Inventory',
-    icon: 'ðŸ”—',
+    icon: '🔎',
     description: 'Single source of truth for all your products',
     color: 'from-blue-500 to-purple-600'
   },
   {
     name: 'Google Visibility',
-    icon: 'ðŸ”',
+    icon: '🔍',
     description: 'Get discovered on Search, Shopping & Maps',
     color: 'from-green-500 to-emerald-600'
   },
   {
     name: 'Platform Presence',
-    icon: 'ðŸª',
+    icon: '🏪',
     description: 'Your store inside the Visible Shelf marketplace',
     color: 'from-purple-500 to-indigo-600'
   },
   {
     name: 'Commerce & Conversion',
-    icon: 'ðŸ›’',
+    icon: '🛒',
     description: 'From browsing to buying and fulfillment',
     color: 'from-amber-500 to-red-600'
   },
   {
     name: 'Management & Growth',
-    icon: 'ðŸ“ˆ',
+    icon: '📈',
     description: 'Analytics, multi-location & advanced features',
     color: 'from-cyan-500 to-blue-600'
   }
@@ -86,7 +86,7 @@ const features = [
       </svg>
     ),
     title: 'SKU Scanning + Inventory Intelligence',
-    description: 'ðŸŽ¯ BREAKTHROUGH: Scan barcodes and capture nutrition facts, allergens, specifications, and real-time analytics.',
+    description: '🎯 BREAKTHROUGH: Scan barcodes and capture nutrition facts, allergens, specifications, and real-time analytics.',
     benefits: [
       'Complete nutrition facts & Nutri-Score',
       'Allergen warnings & dietary info',
@@ -108,7 +108,7 @@ const features = [
       </svg>
     ),
     title: 'Full Google Business Profile Integration',
-    description: 'ðŸš€ Complete GMB sync: categories, business hours, photos, and products with SWIS integration.',
+    description: '🚀 Complete GMB sync: categories, business hours, photos, and products with SWIS integration.',
     benefits: [
       'Full GMB category sync',
       'Business hours automation',
@@ -185,7 +185,7 @@ const features = [
       </svg>
     ),
     title: 'Smart Product Categories',
-    description: 'ðŸŽ¯ Organize products with Google Product Taxonomy (5,595 categories) and auto-categorization.',
+    description: '🎯 Organize products with Google Product Taxonomy (5,595 categories) and auto-categorization.',
     benefits: [
       'Google taxonomy (5,595 categories)',
       'Auto-categorization',
@@ -261,9 +261,9 @@ const features = [
       </svg>
     ),
     title: 'Commitment Commerce - Holding Deposits',
-    description: 'ðŸŽ¯ Capture shopper intent with 10-15% holding deposits. Guarantee foot traffic without full payment.',
+    description: '🎯 Capture shopper intent with 10-15% holding deposits. Guarantee foot traffic without full payment.',
     benefits: [
-      '10â€“15% holding fee collected',
+      '10–15% holding fee collected',
       'Inventory reservation guaranteed',
       'Shopper commitment verification',
       'Forfeiture protection for retailers',
@@ -337,7 +337,7 @@ const features = [
       </svg>
     ),
     title: 'Multi-Location Management',
-    description: 'ðŸš€ POWERFUL: Manage all locations from one dashboard with propagation and testing capabilities.',
+    description: '🚀 POWERFUL: Manage all locations from one dashboard with propagation and testing capabilities.',
     benefits: [
       'Products & user roles propagation',
       'Hours, profile, categories sync',
@@ -428,7 +428,7 @@ const features = [
       </svg>
     ),
     title: 'Quick Start Wizard',
-    description: 'ðŸš€ Generate 50-100 realistic products in 1 SECOND. No manual data entry, no spreadsheets.',
+    description: '🚀 Generate 50-100 realistic products in 1 SECOND. No manual data entry, no spreadsheets.',
     benefits: [
       '360x faster than manual entry',
       'Beats barcode scanning (no equipment!)',
@@ -471,7 +471,7 @@ const tiers = [
       'Conversion features',
       'Payment processing'
     ],
-    commerceMode: 'âŒ Commerce Disabled',
+    commerceMode: '❌ Commerce Disabled',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'GET ONLINE',
@@ -485,7 +485,7 @@ const tiers = [
     description: 'Branded storefront inside Visible Shelf marketplace',
     trial: '14-day free trial',
     identity: 'I have a store online',
-    realization: 'Shoppers are browsing â€” but can\'t act on it',
+    realization: 'Shoppers are browsing — but can\'t act on it',
     upgradeTrigger: 'I want shoppers to commit to buying',
     features: [
       'Everything in Discovery',
@@ -505,7 +505,7 @@ const tiers = [
       'Conversion & reservation features',
       'Payment processing'
     ],
-    commerceMode: 'âŒ Commerce Disabled',
+    commerceMode: '❌ Commerce Disabled',
     cta: 'Start Free Trial',
     popular: true,
     badge: 'MOST POPULAR',
@@ -519,7 +519,7 @@ const tiers = [
     description: 'Deposit-based commerce to drive in-store pickup',
     trial: '14-day free trial',
     identity: 'I am selling online',
-    realization: 'Shoppers reserve and show up â€” but some want to pay fully online',
+    realization: 'Shoppers reserve and show up — but some want to pay fully online',
     upgradeTrigger: 'I want to offer flexible payment options',
     features: [
       'Everything in Discovery & Storefront',
@@ -538,7 +538,7 @@ const tiers = [
       'Full online payment collection',
       'Delivery / fulfilment options'
     ],
-    commerceMode: 'ðŸ’³ Deposit Only Required',
+    commerceMode: '💳 Deposit Only Required',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'DEPOSIT COMMERCE',
@@ -569,7 +569,7 @@ const tiers = [
       'Deposit payment options',
       'Multi-location support'
     ],
-    commerceMode: 'ðŸ’° Full Payment Only',
+    commerceMode: '💰 Full Payment Only',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'FULL ECOMMERCE',
@@ -600,7 +600,7 @@ const tiers = [
       'Multi-location support (beyond 10 locations)',
       'Enterprise features'
     ],
-    commerceMode: 'ðŸ”„ Flexible (Deposit or Full Payment)',
+    commerceMode: '🔁 Flexible (Deposit or Full Payment)',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'OMNICHANNEL',
@@ -633,7 +633,7 @@ const tiers = [
       'Multi-location support (beyond 5 locations)',
       'Enterprise security & compliance'
     ],
-    commerceMode: 'ðŸ”„ Flexible (Deposit or Full Payment)',
+    commerceMode: '🔁 Flexible (Deposit or Full Payment)',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'PREMIUM',
@@ -663,7 +663,7 @@ const tiers = [
       '14-day free trial'
     ],
     excluded: [],
-    commerceMode: 'ðŸ”„ Flexible (Deposit or Full Payment)',
+    commerceMode: '🔁 Flexible (Deposit or Full Payment)',
     cta: 'Start Free Trial',
     popular: false,
     badge: 'ENTERPRISE',
@@ -763,31 +763,31 @@ export default function FeaturesPage() {
               transition={{ duration: 0.6, delay: 0.2 }}
             >
               <h3 className="text-2xl font-bold text-red-900 mb-6 flex items-center gap-2">
-                <span>âŒ</span> The Old Way
+                <span>❌</span> The Old Way
               </h3>
               <ul className="space-y-3 text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">â€¢</span>
+                  <span className="text-red-600 mt-1">•</span>
                   <span>Hire a developer ($5,000-$20,000)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">â€¢</span>
+                  <span className="text-red-600 mt-1">•</span>
                   <span>Wait 3-6 months for launch</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">â€¢</span>
+                  <span className="text-red-600 mt-1">•</span>
                   <span>Pay monthly maintenance fees</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">â€¢</span>
+                  <span className="text-red-600 mt-1">•</span>
                   <span>Manually update every product</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">â€¢</span>
+                  <span className="text-red-600 mt-1">•</span>
                   <span>Hope Google finds you (eventually)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">â€¢</span>
+                  <span className="text-red-600 mt-1">•</span>
                   <span>Compete with outdated tools</span>
                 </li>
               </ul>
@@ -800,31 +800,31 @@ export default function FeaturesPage() {
               transition={{ duration: 0.6, delay: 0.3 }}
             >
               <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center gap-2">
-                <span>âœ…</span> Our Way
+                <span>✅</span> Our Way
               </h3>
               <ul className="space-y-3 text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">â€¢</span>
+                  <span className="text-green-600 mt-1">•</span>
                   <span><strong>Generate 100 products in 1 second</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">â€¢</span>
+                  <span className="text-green-600 mt-1">•</span>
                   <span><strong>Live on Google in minutes</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">â€¢</span>
+                  <span className="text-green-600 mt-1">•</span>
                   <span><strong>Beautiful storefront, no coding</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">â€¢</span>
+                  <span className="text-green-600 mt-1">•</span>
                   <span><strong>Auto-sync across all channels</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">â€¢</span>
+                  <span className="text-green-600 mt-1">•</span>
                   <span><strong>Compete with major retailers</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">â€¢</span>
+                  <span className="text-green-600 mt-1">•</span>
                   <span><strong>Save $2,400/month in labor</strong></span>
                 </li>
               </ul>
@@ -847,15 +847,15 @@ export default function FeaturesPage() {
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm text-neutral-700">
               <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
-                <span className="text-xl">ðŸª</span>
+                <span className="text-xl">🏪</span>
                 <span>Real retail experience</span>
               </div>
               <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
-                <span className="text-xl">ðŸ’°</span>
+                <span className="text-xl">💰</span>
                 <span>Small business pricing</span>
               </div>
               <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg">
-                <span className="text-xl">ðŸ¤</span>
+                <span className="text-xl">🤝</span>
                 <span>Built for your success</span>
               </div>
             </div>
@@ -878,13 +878,13 @@ export default function FeaturesPage() {
             className="text-center mb-12"
           >
             <div className="inline-block bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-bold text-sm mb-4">
-              âš¡ POWER COMBO
+              ⚡ POWER COMBO
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Quick Start Wizard + Product Scanning
             </h2>
             <p className="text-xl text-blue-100 max-w-3xl mx-auto">
-              These aren't competing featuresâ€”they're a <strong className="text-yellow-300">perfectly aligned system</strong> that saves you 15+ hours per 100 products
+              These aren't competing features—they're a <strong className="text-yellow-300">perfectly aligned system</strong> that saves you 15+ hours per 100 products
             </p>
           </motion.div>
 
@@ -901,17 +901,17 @@ export default function FeaturesPage() {
                   <span className="text-2xl font-bold text-blue-600">1</span>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 mb-2">
-                  âš¡ Quick Start Wizard
+                  ⚡ Quick Start Wizard
                 </h3>
                 <p className="text-sm text-neutral-600 font-semibold">Generate in 5 minutes</p>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Generate <strong>100 products instantly</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Basic info (name, category, price)</span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -933,25 +933,25 @@ export default function FeaturesPage() {
                   <span className="text-2xl font-bold text-purple-600">2</span>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 mb-2">
-                  ðŸ“± Product Scanning
+                  📱 Product Scanning
                 </h3>
                 <p className="text-sm text-neutral-600 font-semibold">Enrich in 50 minutes</p>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span><strong>Detects matching products</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Adds professional images (3+)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Adds descriptions & specifications</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Enriches existing products (no duplicates!)</span>
                 </li>
               </ul>
@@ -966,7 +966,7 @@ export default function FeaturesPage() {
             >
               <div className="text-center mb-4">
                 <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">ðŸŽ‰</span>
+                  <span className="text-2xl">🎉</span>
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">
                   Complete Products
@@ -975,19 +975,19 @@ export default function FeaturesPage() {
               </div>
               <ul className="space-y-2 text-sm text-white">
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-300 mt-0.5">â˜…</span>
+                  <span className="text-yellow-300 mt-0.5">★</span>
                   <span><strong>100 fully enriched products</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-300 mt-0.5">â˜…</span>
+                  <span className="text-yellow-300 mt-0.5">★</span>
                   <span>Professional images & descriptions</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-300 mt-0.5">â˜…</span>
+                  <span className="text-yellow-300 mt-0.5">★</span>
                   <span>Complete specifications</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-300 mt-0.5">â˜…</span>
+                  <span className="text-yellow-300 mt-0.5">★</span>
                   <span>Ready for Google Shopping</span>
                 </li>
               </ul>
@@ -1005,7 +1005,7 @@ export default function FeaturesPage() {
               {/* Old Way */}
               <div>
                 <h4 className="text-lg font-bold text-red-600 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">âŒ</span>
+                  <span className="text-2xl">❌</span>
                   The Old Way (Manual Entry)
                 </h4>
                 <div className="space-y-3 text-neutral-700">
@@ -1027,7 +1027,7 @@ export default function FeaturesPage() {
               {/* New Way */}
               <div>
                 <h4 className="text-lg font-bold text-green-600 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">âœ…</span>
+                  <span className="text-2xl">✅</span>
                   The Smart Way (Quick Start + Scan)
                 </h4>
                 <div className="space-y-3 text-neutral-700">
@@ -1051,7 +1051,7 @@ export default function FeaturesPage() {
             <div className="mt-8 pt-8 border-t-2 border-neutral-200">
               <div className="text-center">
                 <p className="text-2xl font-bold text-neutral-900 mb-2">
-                  ðŸ’° Save <span className="text-green-600">$394.58</span> and <span className="text-blue-600">15.75 hours</span> per 100 products
+                  💰 Save <span className="text-green-600">$394.58</span> and <span className="text-blue-600">15.75 hours</span> per 100 products
                 </p>
                 <p className="text-neutral-600">
                   That's a <strong className="text-purple-600">94% time reduction</strong> with better quality data!
@@ -1068,7 +1068,7 @@ export default function FeaturesPage() {
             className="mt-8 bg-yellow-400 rounded-xl p-6 text-center"
           >
             <p className="text-xl font-bold text-yellow-900 mb-2">
-              ðŸŽ¯ The Key: They Work TOGETHER, Not Against Each Other
+              🎯 The Key: They Work TOGETHER, Not Against Each Other
             </p>
             <p className="text-neutral-800 max-w-3xl mx-auto">
               Quick Start Wizard creates the foundation instantly. Product Scanning enriches it with professional data. 
@@ -1089,13 +1089,13 @@ export default function FeaturesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Storefront */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-6">
-              <div className="text-4xl mb-3">ðŸª</div>
+              <div className="text-4xl mb-3">🏪</div>
               <h3 className="text-lg font-bold text-neutral-900 mb-2">Complete Storefront</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
-                <li>â€¢ Product catalog with search</li>
-                <li>â€¢ Mobile-responsive design</li>
-                <li>â€¢ Interactive store maps</li>
-                <li>â€¢ Automatic SEO optimization</li>
+                <li>• Product catalog with search</li>
+                <li>• Mobile-responsive design</li>
+                <li>• Interactive store maps</li>
+                <li>• Automatic SEO optimization</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-blue-300">
                 <span className="text-xs font-semibold text-blue-800">No website developer needed!</span>
@@ -1104,13 +1104,13 @@ export default function FeaturesPage() {
 
             {/* Google Integration */}
             <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-lg p-6">
-              <div className="text-4xl mb-3">ðŸ”</div>
+              <div className="text-4xl mb-3">🔍</div>
               <h3 className="text-lg font-bold text-neutral-900 mb-2">Google Integration Suite</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
-                <li>â€¢ Google Shopping feeds</li>
-                <li>â€¢ Business Profile sync</li>
-                <li>â€¢ Google Maps integration</li>
-                <li>â€¢ Local SEO optimization</li>
+                <li>• Google Shopping feeds</li>
+                <li>• Business Profile sync</li>
+                <li>• Google Maps integration</li>
+                <li>• Local SEO optimization</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-green-300">
                 <span className="text-xs font-semibold text-green-800">Dominate local search!</span>
@@ -1119,13 +1119,13 @@ export default function FeaturesPage() {
 
             {/* QR Marketing */}
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-lg p-6">
-              <div className="text-4xl mb-3">ðŸ“±</div>
+              <div className="text-4xl mb-3">📱</div>
               <h3 className="text-lg font-bold text-neutral-900 mb-2">QR Code Marketing</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
-                <li>â€¢ High-res QR codes</li>
-                <li>â€¢ Print-ready formats</li>
-                <li>â€¢ Product-specific codes</li>
-                <li>â€¢ Trackable campaigns</li>
+                <li>• High-res QR codes</li>
+                <li>• Print-ready formats</li>
+                <li>• Product-specific codes</li>
+                <li>• Trackable campaigns</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-purple-300">
                 <span className="text-xs font-semibold text-purple-800">Bridge print to digital!</span>
@@ -1134,13 +1134,13 @@ export default function FeaturesPage() {
 
             {/* Analytics */}
             <div className="bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-200 rounded-lg p-6">
-              <div className="text-4xl mb-3">ðŸ“Š</div>
+              <div className="text-4xl mb-3">📊</div>
               <h3 className="text-lg font-bold text-neutral-900 mb-2">Performance Analytics</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
-                <li>â€¢ Impression tracking</li>
-                <li>â€¢ Click analytics</li>
-                <li>â€¢ Product performance</li>
-                <li>â€¢ ROI measurement</li>
+                <li>• Impression tracking</li>
+                <li>• Click analytics</li>
+                <li>• Product performance</li>
+                <li>• ROI measurement</li>
               </ul>
               <div className="mt-3 pt-3 border-t border-amber-300">
                 <span className="text-xs font-semibold text-amber-800">Data-driven decisions!</span>
@@ -1166,25 +1166,25 @@ export default function FeaturesPage() {
             {/* Barcode Scanning */}
             <div className="bg-white rounded-xl p-6 border-2 border-red-200">
               <div className="text-center mb-4">
-                <div className="text-4xl mb-2">ðŸ“±</div>
+                <div className="text-4xl mb-2">📱</div>
                 <h3 className="font-bold text-lg text-neutral-900">Barcode Scanning</h3>
-                <div className="text-red-600 font-semibold text-sm mt-1">Old Way âŒ</div>
+                <div className="text-red-600 font-semibold text-sm mt-1">Old Way ❌</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>Scan each product manually</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>Need expensive equipment</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>3+ hours for 50 products</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>Tedious and error-prone</span>
                 </li>
               </ul>
@@ -1193,25 +1193,25 @@ export default function FeaturesPage() {
             {/* CSV Import */}
             <div className="bg-white rounded-xl p-6 border-2 border-orange-200">
               <div className="text-center mb-4">
-                <div className="text-4xl mb-2">ðŸ“Š</div>
+                <div className="text-4xl mb-2">📊</div>
                 <h3 className="font-bold text-lg text-neutral-900">CSV Import</h3>
                 <div className="text-orange-600 font-semibold text-sm mt-1">Better, But... âš ï¸</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-0.5">âœ—</span>
+                  <span className="text-orange-500 mt-0.5">✗</span>
                   <span>Requires data cleanup</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-0.5">âœ—</span>
+                  <span className="text-orange-500 mt-0.5">✗</span>
                   <span>Need spreadsheet skills</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-0.5">âœ—</span>
+                  <span className="text-orange-500 mt-0.5">✗</span>
                   <span>Format must be perfect</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-0.5">âœ—</span>
+                  <span className="text-orange-500 mt-0.5">✗</span>
                   <span>Still takes 1-2 hours</span>
                 </li>
               </ul>
@@ -1220,25 +1220,25 @@ export default function FeaturesPage() {
             {/* Quick Start */}
             <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-6 border-2 border-blue-400 shadow-xl scale-105">
               <div className="text-center mb-4">
-                <div className="text-4xl mb-2">âš¡</div>
+                <div className="text-4xl mb-2">⚡</div>
                 <h3 className="font-bold text-lg text-white">Quick Start Wizard</h3>
-                <div className="text-yellow-300 font-semibold text-sm mt-1">GAME CHANGER! ðŸš€</div>
+                <div className="text-yellow-300 font-semibold text-sm mt-1">GAME CHANGER! 🚀</div>
               </div>
               <ul className="space-y-2 text-sm text-white">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">1 SECOND for 50 products!</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">Zero equipment needed</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">No spreadsheets required</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">360x faster than manual</span>
                 </li>
               </ul>
@@ -1248,7 +1248,7 @@ export default function FeaturesPage() {
           <div className="mt-8 text-center">
             <div className="inline-block bg-white rounded-lg px-6 py-4 shadow-lg border-2 border-green-200">
               <p className="text-lg font-bold text-neutral-900 mb-1">
-                â±ï¸ Time Comparison: 50 Products
+                ⏱️ Time Comparison: 50 Products
               </p>
               <div className="flex items-center justify-center gap-6 text-sm">
                 <div>
@@ -1258,7 +1258,7 @@ export default function FeaturesPage() {
                   <span className="text-orange-600 font-semibold">CSV:</span> 1-2 hours
                 </div>
                 <div>
-                  <span className="text-green-600 font-bold">Quick Start:</span> 1 second âš¡
+                  <span className="text-green-600 font-bold">Quick Start:</span> 1 second ⚡
                 </div>
               </div>
             </div>
@@ -1271,7 +1271,7 @@ export default function FeaturesPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="inline-block bg-yellow-400 text-green-900 text-sm px-4 py-1 rounded-full font-bold mb-4">
-              ðŸŽ¯ BREAKTHROUGH FEATURE
+              🎯 BREAKTHROUGH FEATURE
             </div>
             <h2 className="text-4xl font-bold text-neutral-900 mb-4">
               Product Intelligence That Beats Shopify & WooCommerce
@@ -1285,29 +1285,29 @@ export default function FeaturesPage() {
             {/* Shopify/WooCommerce */}
             <div className="bg-white rounded-xl p-6 border-2 border-red-200">
               <div className="text-center mb-4">
-                <div className="text-4xl mb-2">ðŸ›’</div>
+                <div className="text-4xl mb-2">🛒</div>
                 <h3 className="font-bold text-lg text-neutral-900">Shopify/WooCommerce</h3>
-                <div className="text-red-600 font-semibold text-sm mt-1">Manual Entry Only âŒ</div>
+                <div className="text-red-600 font-semibold text-sm mt-1">Manual Entry Only ❌</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>Type everything manually</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>No nutrition facts</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>No allergen warnings</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>No environmental data</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">âœ—</span>
+                  <span className="text-red-500 mt-0.5">✗</span>
                   <span>Basic product pages only</span>
                 </li>
               </ul>
@@ -1322,23 +1322,23 @@ export default function FeaturesPage() {
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">âœ“</span>
+                  <span className="text-green-500 mt-0.5">✓</span>
                   <span>Complete nutrition facts</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">âœ“</span>
+                  <span className="text-green-500 mt-0.5">✓</span>
                   <span>Allergen warnings</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">âœ“</span>
+                  <span className="text-green-500 mt-0.5">✓</span>
                   <span>Environmental data</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-0.5">âœ—</span>
+                  <span className="text-orange-500 mt-0.5">✗</span>
                   <span>Only for major chains</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-0.5">âœ—</span>
+                  <span className="text-orange-500 mt-0.5">✗</span>
                   <span>Small retailers left behind</span>
                 </li>
               </ul>
@@ -1347,29 +1347,29 @@ export default function FeaturesPage() {
             {/* Our Platform */}
             <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 border-2 border-green-400 shadow-xl scale-105">
               <div className="text-center mb-4">
-                <div className="text-4xl mb-2">âœ¨</div>
+                <div className="text-4xl mb-2">✨</div>
                 <h3 className="font-bold text-lg text-white">Our Platform</h3>
-                <div className="text-yellow-300 font-semibold text-sm mt-1">LEVEL PLAYING FIELD! ðŸŽ¯</div>
+                <div className="text-yellow-300 font-semibold text-sm mt-1">LEVEL PLAYING FIELD! 🎯</div>
               </div>
               <ul className="space-y-2 text-sm text-white">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">Complete nutrition facts</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">Allergen warnings & dietary info</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">Environmental impact data</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">Product specifications</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-300 mt-0.5">âœ“</span>
+                  <span className="text-green-300 mt-0.5">✓</span>
                   <span className="font-medium">For EVERY small retailer!</span>
                 </li>
               </ul>
@@ -1385,7 +1385,7 @@ export default function FeaturesPage() {
               {/* Without Our Platform */}
               <div>
                 <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-3">
-                  <h4 className="font-bold text-red-900 mb-2">âŒ Without Our Platform</h4>
+                  <h4 className="font-bold text-red-900 mb-2">❌ Without Our Platform</h4>
                   <div className="space-y-2 text-sm text-neutral-700">
                     <div className="bg-white p-3 rounded border border-red-200">
                       <p className="font-semibold">Coca-Cola 12oz</p>
@@ -1402,26 +1402,26 @@ export default function FeaturesPage() {
               {/* With Our Platform */}
               <div>
                 <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mb-3">
-                  <h4 className="font-bold text-green-900 mb-2">âœ… With Our Platform</h4>
+                  <h4 className="font-bold text-green-900 mb-2">✅ With Our Platform</h4>
                   <div className="space-y-2 text-sm text-neutral-700">
                     <div className="bg-white p-3 rounded border border-green-400 shadow-sm">
                       <p className="font-semibold">Coca-Cola Classic 12oz</p>
-                      <p className="text-xs text-neutral-500 mb-2">$1.99 â€¢ By Coca-Cola</p>
+                      <p className="text-xs text-neutral-500 mb-2">$1.99 • By Coca-Cola</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="flex items-center gap-1">
-                          <span className="text-green-600">âœ“</span>
+                          <span className="text-green-600">✓</span>
                           <span>Nutrition Facts</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-green-600">âœ“</span>
+                          <span className="text-green-600">✓</span>
                           <span>Allergen Info</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-green-600">âœ“</span>
+                          <span className="text-green-600">✓</span>
                           <span>Ingredients</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-green-600">âœ“</span>
+                          <span className="text-green-600">✓</span>
                           <span>Eco-Score</span>
                         </div>
                       </div>
@@ -1442,22 +1442,22 @@ export default function FeaturesPage() {
               <h3 className="text-2xl font-bold mb-3">PLUS: Real-Time Inventory Intelligence</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
                 <div className="bg-white/10 rounded-lg p-4">
-                  <div className="text-3xl mb-2">ðŸ“Š</div>
+                  <div className="text-3xl mb-2">📊</div>
                   <p className="font-semibold">Analytics Dashboard</p>
                   <p className="text-xs mt-1 opacity-90">Track your scanning activity</p>
                 </div>
                 <div className="bg-white/10 rounded-lg p-4">
-                  <div className="text-3xl mb-2">âœ…</div>
+                  <div className="text-3xl mb-2">✅</div>
                   <p className="font-semibold">Data Quality</p>
                   <p className="text-xs mt-1 opacity-90">See completeness metrics</p>
                 </div>
                 <div className="bg-white/10 rounded-lg p-4">
-                  <div className="text-3xl mb-2">ðŸ”</div>
+                  <div className="text-3xl mb-2">🔍</div>
                   <p className="font-semibold">Preview Tool</p>
                   <p className="text-xs mt-1 opacity-90">Check before you scan</p>
                 </div>
                 <div className="bg-white/10 rounded-lg p-4">
-                  <div className="text-3xl mb-2">ðŸ’°</div>
+                  <div className="text-3xl mb-2">💰</div>
                   <p className="font-semibold">Cost Savings</p>
                   <p className="text-xs mt-1 opacity-90">See your ROI</p>
                 </div>
@@ -1468,7 +1468,7 @@ export default function FeaturesPage() {
           <div className="mt-8 text-center">
             <div className="inline-block bg-white rounded-lg px-6 py-4 shadow-lg border-2 border-green-400">
               <p className="text-lg font-bold text-neutral-900 mb-1">
-                ðŸŽ¯ The Breakthrough
+                🎯 The Breakthrough
               </p>
               <p className="text-sm text-neutral-700">
                 Small retailers can now compete with major chains on product information quality.
@@ -1536,7 +1536,7 @@ export default function FeaturesPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white border-2 border-green-200 rounded-xl p-8 shadow-lg">
             <div className="flex items-start gap-6">
-              <div className="text-6xl">ðŸ†“</div>
+              <div className="text-6xl">🆓</div>
               <div className="flex-1">
                 <h2 className="text-3xl font-bold text-neutral-900 mb-3">14-Day Free Trial</h2>
                 <p className="text-lg text-neutral-700 mb-6">
@@ -1548,27 +1548,27 @@ export default function FeaturesPage() {
                     <h3 className="font-semibold text-neutral-900 mb-3">What's Included:</h3>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">âœ“</span>
+                        <span className="text-green-600 mt-0.5">✓</span>
                         <span>Trial any tier (Discovery, Storefront, Commitment, Professional, or Enterprise)</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">âœ“</span>
+                        <span className="text-green-600 mt-0.5">✓</span>
                         <span>Full access to all tier features</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">âœ“</span>
+                        <span className="text-green-600 mt-0.5">✓</span>
                         <span>Clover POS integration & real-time sync</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">âœ“</span>
+                        <span className="text-green-600 mt-0.5">✓</span>
                         <span>Google Search, Shopping & Maps visibility</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">âœ“</span>
+                        <span className="text-green-600 mt-0.5">✓</span>
                         <span>Platform directory & storefront (Storefront+)</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">âœ“</span>
+                        <span className="text-green-600 mt-0.5">✓</span>
                         <span>Test before you commit</span>
                       </li>
                     </ul>
@@ -1578,27 +1578,27 @@ export default function FeaturesPage() {
                     <h3 className="font-semibold text-neutral-900 mb-3">Terms & Conditions:</h3>
                     <ul className="space-y-2 text-sm text-neutral-700">
                       <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">â€¢</span>
+                        <span className="text-neutral-400 mt-0.5">•</span>
                         <span>14 days from account creation</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">â€¢</span>
+                        <span className="text-neutral-400 mt-0.5">•</span>
                         <span>No credit card required to start</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">â€¢</span>
+                        <span className="text-neutral-400 mt-0.5">•</span>
                         <span>Choose your tier at signup</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">â€¢</span>
+                        <span className="text-neutral-400 mt-0.5">•</span>
                         <span>Add payment before trial ends to continue</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">â€¢</span>
+                        <span className="text-neutral-400 mt-0.5">•</span>
                         <span>Cancel anytime with no charges</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-neutral-400 mt-0.5">â€¢</span>
+                        <span className="text-neutral-400 mt-0.5">•</span>
                         <span>If you don't upgrade, your account moves into read-only visibility mode: your storefront, directory, and Google listings stay online, but you can't add or update products or sync new changes until you choose a paid plan.</span>
                       </li>
                     </ul>
@@ -1607,7 +1607,7 @@ export default function FeaturesPage() {
                 
                 <div className="bg-green-50 border border-green-300 rounded-lg p-4">
                   <p className="text-sm text-neutral-800">
-                    <strong>ðŸ’¡ Pro Tip:</strong> Use the trial period to connect Clover, see your products indexed on Google, appear on Google Maps, and test the platform. Experience the tier progression from Discovery â†’ Storefront â†’ Commitment â†’ Professional â†’ Enterprise before choosing your path.
+                    <strong>💡 Pro Tip:</strong> Use the trial period to connect Clover, see your products indexed on Google, appear on Google Maps, and test the platform. Experience the tier progression from Discovery → Storefront → Commitment → Professional → Enterprise before choosing your path.
                   </p>
                 </div>
               </div>
@@ -1715,7 +1715,7 @@ export default function FeaturesPage() {
           <div className="mt-16">
             <div className="text-center mb-8">
               <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white mb-4">
-                ðŸš€ ENTERPRISE CHAIN MANAGEMENT
+                🚀 ENTERPRISE CHAIN MANAGEMENT
               </Badge>
               <h3 className="text-3xl font-bold text-neutral-900 mb-3">
                 Multi-Location Chain Pricing
@@ -1724,7 +1724,7 @@ export default function FeaturesPage() {
                 Massive savings for chains and franchises. Same great features, better pricing.
               </p>
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg p-6 max-w-4xl mx-auto">
-                <h4 className="text-xl font-bold text-emerald-900 mb-3">âœ¨ Exclusive Chain Features</h4>
+                <h4 className="text-xl font-bold text-emerald-900 mb-3">✨ Exclusive Chain Features</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                   <div className="flex items-start gap-2">
                     <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1778,7 +1778,7 @@ export default function FeaturesPage() {
                   <h4 className="text-xl font-bold text-neutral-900">Chain Starter</h4>
                   <Badge className="bg-blue-100 text-blue-800">$149/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600 mb-4">Up to 5 locations â€¢ 2,500 total SKUs</p>
+                <p className="text-sm text-neutral-600 mb-4">Up to 5 locations • 2,500 total SKUs</p>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1825,7 +1825,7 @@ export default function FeaturesPage() {
                   <h4 className="text-xl font-bold text-neutral-900">Chain Professional</h4>
                   <Badge className="bg-purple-100 text-purple-800">$499/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600 mb-4">Up to 10 locations â€¢ 50,000 total SKUs</p>
+                <p className="text-sm text-neutral-600 mb-4">Up to 10 locations • 50,000 total SKUs</p>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1853,7 +1853,7 @@ export default function FeaturesPage() {
                   </li>
                 </ul>
                 <div className="mt-4 pt-4 border-t border-neutral-200">
-                  <p className="text-xs text-green-700 font-semibold">Save 66% vs individual plans ($1,490 â†’ $499)</p>
+                  <p className="text-xs text-green-700 font-semibold">Save 66% vs individual plans ($1,490 → $499)</p>
                 </div>
               </div>
 
@@ -1863,7 +1863,7 @@ export default function FeaturesPage() {
                   <h4 className="text-xl font-bold text-neutral-900">Chain Enterprise</h4>
                   <Badge className="bg-amber-100 text-amber-800">$1,499/mo</Badge>
                 </div>
-                <p className="text-sm text-neutral-600 mb-4">Unlimited locations â€¢ Unlimited SKUs</p>
+                <p className="text-sm text-neutral-600 mb-4">Unlimited locations • Unlimited SKUs</p>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-primary-600 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1898,7 +1898,7 @@ export default function FeaturesPage() {
 
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
               <p className="text-sm text-green-900">
-                <strong>Example Savings:</strong> 10-location chain saves 66% ($1,490/mo â†’ $499/mo with Chain Professional)
+                <strong>Example Savings:</strong> 10-location chain saves 66% ($1,490/mo → $499/mo with Chain Professional)
               </p>
             </div>
           </div>
@@ -1932,23 +1932,23 @@ export default function FeaturesPage() {
               </div>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">â€¢</span>
+                  <span className="text-red-400 mt-0.5">•</span>
                   <span>70%+ cart abandonment rate</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">â€¢</span>
+                  <span className="text-red-400 mt-0.5">•</span>
                   <span>No upfront commitment from shoppers</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">â€¢</span>
+                  <span className="text-red-400 mt-0.5">•</span>
                   <span>Inventory held without guarantee</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">â€¢</span>
+                  <span className="text-red-400 mt-0.5">•</span>
                   <span>Full payment required upfront</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-red-400 mt-0.5">â€¢</span>
+                  <span className="text-red-400 mt-0.5">•</span>
                   <span>High customer acquisition cost</span>
                 </li>
               </ul>
@@ -1975,23 +1975,23 @@ export default function FeaturesPage() {
               </div>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>10-15% holding deposit secures commitment</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Shopper financial stake in transaction</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Inventory never held without protection</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Remaining balance paid in store</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">âœ“</span>
+                  <span className="text-green-600 mt-0.5">✓</span>
                   <span>Guaranteed foot traffic & pickup</span>
                 </li>
               </ul>
@@ -2013,23 +2013,23 @@ export default function FeaturesPage() {
               </div>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">âœ“</span>
+                  <span className="text-amber-600 mt-0.5">✓</span>
                   <span>Shopper chooses payment path</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">âœ“</span>
+                  <span className="text-amber-600 mt-0.5">✓</span>
                   <span>Deposit OR full payment option</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">âœ“</span>
+                  <span className="text-amber-600 mt-0.5">✓</span>
                   <span>Delivery and fulfillment services</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">âœ“</span>
+                  <span className="text-amber-600 mt-0.5">✓</span>
                   <span>Complete online transactions</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-0.5">âœ“</span>
+                  <span className="text-amber-600 mt-0.5">✓</span>
                   <span>Advanced analytics & insights</span>
                 </li>
               </ul>
@@ -2056,7 +2056,7 @@ export default function FeaturesPage() {
                   Shopper pays 10-15% holding deposit at checkout. This secures their commitment and reserves the inventory.
                 </p>
                 <div className="mt-3 p-2 bg-green-50 rounded text-xs text-green-700">
-                  Example: $100 item â†’ $10-15 deposit
+                  Example: $100 item → $10-15 deposit
                 </div>
               </div>
 
@@ -2148,7 +2148,7 @@ export default function FeaturesPage() {
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg text-center">
               <p className="text-sm text-blue-900 font-semibold">
-                ðŸ’¡ The retailer is never the loser. The platform never takes more than it earns. 
+                💡 The retailer is never the loser. The platform never takes more than it earns. 
                 The shopper bears the consequence of their own behavior.
               </p>
             </div>
@@ -2184,23 +2184,23 @@ export default function FeaturesPage() {
               
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">âœ“</span>
-                  <span>Direct tier selection (Discovery â†’ Enterprise)</span>
+                  <span className="text-blue-600 mt-0.5">✓</span>
+                  <span>Direct tier selection (Discovery → Enterprise)</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">âœ“</span>
+                  <span className="text-blue-600 mt-0.5">✓</span>
                   <span>Full control over features and capabilities</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">âœ“</span>
+                  <span className="text-blue-600 mt-0.5">✓</span>
                   <span>Independent billing and management</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">âœ“</span>
+                  <span className="text-blue-600 mt-0.5">✓</span>
                   <span>Simple setup and administration</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">âœ“</span>
+                  <span className="text-blue-600 mt-0.5">✓</span>
                   <span>Standalone analytics and reporting</span>
                 </div>
               </div>
@@ -2229,23 +2229,23 @@ export default function FeaturesPage() {
               
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">âœ“</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>Set baseline tier for all locations</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">âœ“</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>Individual locations can upgrade above baseline</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">âœ“</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>Unified billing and management</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">âœ“</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>Consolidated analytics across all locations</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-purple-600 mt-0.5">âœ“</span>
+                  <span className="text-purple-600 mt-0.5">✓</span>
                   <span>Centralized brand control with local flexibility</span>
                 </div>
               </div>
@@ -2386,19 +2386,19 @@ export default function FeaturesPage() {
                 </div>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">âœ“</span>
+                    <span className="text-blue-600 mt-0.5">✓</span>
                     <span>Baseline tier for all locations</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">âœ“</span>
+                    <span className="text-blue-600 mt-0.5">✓</span>
                     <span>$49 per additional location</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">âœ“</span>
+                    <span className="text-blue-600 mt-0.5">✓</span>
                     <span>Unified dashboard</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">âœ“</span>
+                    <span className="text-blue-600 mt-0.5">✓</span>
                     <span>Consolidated billing</span>
                   </li>
                 </ul>
@@ -2413,19 +2413,19 @@ export default function FeaturesPage() {
                 </div>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">âœ“</span>
+                    <span className="text-purple-600 mt-0.5">✓</span>
                     <span>Custom pricing based on volume</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">âœ“</span>
+                    <span className="text-purple-600 mt-0.5">✓</span>
                     <span>Dedicated account management</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">âœ“</span>
+                    <span className="text-purple-600 mt-0.5">✓</span>
                     <span>Advanced analytics suite</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">âœ“</span>
+                    <span className="text-purple-600 mt-0.5">✓</span>
                     <span>Priority support</span>
                   </li>
                 </ul>
@@ -2440,19 +2440,19 @@ export default function FeaturesPage() {
                 </div>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-0.5">âœ“</span>
+                    <span className="text-red-600 mt-0.5">✓</span>
                     <span>Enterprise-grade features</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-0.5">âœ“</span>
+                    <span className="text-red-600 mt-0.5">✓</span>
                     <span>White-label options</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-0.5">âœ“</span>
+                    <span className="text-red-600 mt-0.5">✓</span>
                     <span>Custom integrations</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-0.5">âœ“</span>
+                    <span className="text-red-600 mt-0.5">✓</span>
                     <span>Dedicated success team</span>
                   </li>
                 </ul>
@@ -2510,7 +2510,7 @@ export default function FeaturesPage() {
 
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 text-center">
               <p className="text-sm text-neutral-800 font-semibold mb-2">
-                ðŸŽ¯ <strong>Platform Advantage:</strong> Even large retailers struggle with multi-location inventory visibility. 
+                🎯 <strong>Platform Advantage:</strong> Even large retailers struggle with multi-location inventory visibility. 
                 Visible Shelf delivers it natively through a single Clover integration.
               </p>
               <p className="text-xs text-neutral-600">
@@ -2626,15 +2626,15 @@ export default function FeaturesPage() {
                 </p>
                 <ul className="space-y-2 text-sm text-purple-700">
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">â€¢</span>
+                    <span className="text-purple-600 mt-0.5">•</span>
                     <span>Clover integration + SEO infrastructure + Google SWIS</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">â€¢</span>
+                    <span className="text-purple-600 mt-0.5">•</span>
                     <span>Real-time sync across multiple platforms</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-600 mt-0.5">â€¢</span>
+                    <span className="text-purple-600 mt-0.5">•</span>
                     <span>Commerce layer with commitment model</span>
                   </li>
                 </ul>
@@ -2653,15 +2653,15 @@ export default function FeaturesPage() {
                 </p>
                 <ul className="space-y-2 text-sm text-indigo-700">
                   <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 mt-0.5">â€¢</span>
+                    <span className="text-indigo-600 mt-0.5">•</span>
                     <span>Head start compounds with every new retailer</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 mt-0.5">â€¢</span>
+                    <span className="text-indigo-600 mt-0.5">•</span>
                     <span>Network effects grow stronger over time</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-indigo-600 mt-0.5">â€¢</span>
+                    <span className="text-indigo-600 mt-0.5">•</span>
                     <span>Customer acquisition costs increase for followers</span>
                   </li>
                 </ul>
@@ -2680,15 +2680,15 @@ export default function FeaturesPage() {
                 </p>
                 <ul className="space-y-2 text-sm text-blue-700">
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">â€¢</span>
+                    <span className="text-blue-600 mt-0.5">•</span>
                     <span>See What's In Store integration is complex</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">â€¢</span>
+                    <span className="text-blue-600 mt-0.5">•</span>
                     <span>Requires deep Google Maps knowledge</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-0.5">â€¢</span>
+                    <span className="text-blue-600 mt-0.5">•</span>
                     <span>Unglamorous work that doesn't attract venture attention</span>
                   </li>
                 </ul>
@@ -2707,15 +2707,15 @@ export default function FeaturesPage() {
                 </p>
                 <ul className="space-y-2 text-sm text-green-700">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">â€¢</span>
+                    <span className="text-green-600 mt-0.5">•</span>
                     <span>Native integration provides immediate market access</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">â€¢</span>
+                    <span className="text-green-600 mt-0.5">•</span>
                     <span>Ready-made customer base of small retailers</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">â€¢</span>
+                    <span className="text-green-600 mt-0.5">•</span>
                     <span>Trusted POS system with existing relationships</span>
                   </li>
                 </ul>
@@ -2773,8 +2773,8 @@ export default function FeaturesPage() {
 
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 text-center">
               <p className="text-sm text-neutral-800 font-semibold">
-                ðŸ”„ <strong>The Flywheel Effect:</strong> More retailers â†’ More products â†’ More shoppers â†’ More data â†’ 
-                Better experience â†’ Even more retailers. The network effect compounds over time.
+                🔁 <strong>The Flywheel Effect:</strong> More retailers → More products → More shoppers → More data → 
+                Better experience → Even more retailers. The network effect compounds over time.
               </p>
             </div>
           </div>
@@ -2833,7 +2833,7 @@ export default function FeaturesPage() {
 
             <div className="mt-8 p-4 bg-gradient-to-r from-purple-50 to-red-50 rounded-lg text-center">
               <p className="text-sm text-neutral-800 font-semibold">
-                ðŸŽ¯ <strong>Positioning Statement:</strong> We're the only platform that bridges local retail inventory to 
+                🎯 <strong>Positioning Statement:</strong> We're the only platform that bridges local retail inventory to 
                 online discovery with guaranteed foot traffic - built for the retailers who need it most.
               </p>
             </div>
@@ -2849,18 +2849,18 @@ export default function FeaturesPage() {
           </h2>
           <div className="text-xl mb-8 space-y-4">
             <p className="text-neutral-200">
-              <strong>Visible Shelf meets retailers where they are â€” and shows them where they could be.</strong>
+              <strong>Visible Shelf meets retailers where they are — and shows them where they could be.</strong>
             </p>
             <p className="text-neutral-300">
               Every tier is powered by the same Clover integration and the same platform infrastructure. 
-              Retailers move up as their ambition grows â€” without ever changing systems.
+              Retailers move up as their ambition grows — without ever changing systems.
             </p>
           </div>
           
           <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-8 mb-8">
             <h3 className="text-2xl font-bold mb-4">Every Tier, One Mission</h3>
             <p className="text-lg text-neutral-200 mb-6">
-              Product visibility that drives conversion â€” without the IT team.
+              Product visibility that drives conversion — without the IT team.
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
@@ -2896,7 +2896,7 @@ export default function FeaturesPage() {
           
           <div className="text-center">
             <p className="text-lg text-neutral-300 mb-6">
-              This isn't just software â€” it's a complete business transformation platform.
+              This isn't just software — it's a complete business transformation platform.
             </p>
             <a href="/auth/signup">
               <Button size="lg" className="bg-white text-neutral-900 hover:bg-neutral-100">
@@ -2933,7 +2933,7 @@ export default function FeaturesPage() {
                 <h4 className="font-semibold text-blue-600 mb-1">Discovery</h4>
                 <p className="text-sm text-neutral-600">Get Found on Google</p>
               </div>
-              <div className="hidden lg:block text-2xl text-neutral-400">â†’</div>
+              <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   2
@@ -2941,7 +2941,7 @@ export default function FeaturesPage() {
                 <h4 className="font-semibold text-purple-600 mb-1">Storefront</h4>
                 <p className="text-sm text-neutral-600">Platform Presence</p>
               </div>
-              <div className="hidden lg:block text-2xl text-neutral-400">â†’</div>
+              <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   3
@@ -2949,7 +2949,7 @@ export default function FeaturesPage() {
                 <h4 className="font-semibold text-green-600 mb-1">Commitment</h4>
                 <p className="text-sm text-neutral-600">Capture Intent</p>
               </div>
-              <div className="hidden lg:block text-2xl text-neutral-400">â†’</div>
+              <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   4
@@ -2957,7 +2957,7 @@ export default function FeaturesPage() {
                 <h4 className="font-semibold text-amber-600 mb-1">Professional</h4>
                 <p className="text-sm text-neutral-600">Full E-Commerce</p>
               </div>
-              <div className="hidden lg:block text-2xl text-neutral-400">â†’</div>
+              <div className="hidden lg:block text-2xl text-neutral-400">→</div>
               <div className="flex-1 text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
                   5
@@ -3003,19 +3003,19 @@ export default function FeaturesPage() {
                   <h4 className="font-semibold text-green-900 mb-2">How it Works</h4>
                   <ul className="space-y-2 text-sm text-green-800">
                     <li className="flex items-start gap-2">
-                      <span className="text-green-600 mt-0.5">â€¢</span>
+                      <span className="text-green-600 mt-0.5">•</span>
                       <span>Shopper pays 10-15% holding deposit</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-600 mt-0.5">â€¢</span>
+                      <span className="text-green-600 mt-0.5">•</span>
                       <span>Inventory reserved immediately</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-600 mt-0.5">â€¢</span>
+                      <span className="text-green-600 mt-0.5">•</span>
                       <span>Remaining balance paid at pickup</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-green-600 mt-0.5">â€¢</span>
+                      <span className="text-green-600 mt-0.5">•</span>
                       <span>Guaranteed foot traffic to store</span>
                     </li>
                   </ul>
@@ -3024,10 +3024,10 @@ export default function FeaturesPage() {
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-semibold text-blue-900 mb-2">Best For</h4>
                   <ul className="space-y-1 text-sm text-blue-800">
-                    <li>â€¢ Shoppers who want to see/try products</li>
-                    <li>â€¢ High-value items requiring inspection</li>
-                    <li>â€¢ Building customer relationships</li>
-                    <li>â€¢ Driving additional in-store purchases</li>
+                    <li>• Shoppers who want to see/try products</li>
+                    <li>• High-value items requiring inspection</li>
+                    <li>• Building customer relationships</li>
+                    <li>• Driving additional in-store purchases</li>
                   </ul>
                 </div>
               </div>
@@ -3052,19 +3052,19 @@ export default function FeaturesPage() {
                   <h4 className="font-semibold text-amber-900 mb-2">How it Works</h4>
                   <ul className="space-y-2 text-sm text-amber-800">
                     <li className="flex items-start gap-2">
-                      <span className="text-amber-600 mt-0.5">â€¢</span>
+                      <span className="text-amber-600 mt-0.5">•</span>
                       <span>Shopper pays full amount online</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-amber-600 mt-0.5">â€¢</span>
+                      <span className="text-amber-600 mt-0.5">•</span>
                       <span>Transaction completed immediately</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-amber-600 mt-0.5">â€¢</span>
+                      <span className="text-amber-600 mt-0.5">•</span>
                       <span>Choose pickup or delivery</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-amber-600 mt-0.5">â€¢</span>
+                      <span className="text-amber-600 mt-0.5">•</span>
                       <span>Convenience-focused experience</span>
                     </li>
                   </ul>
@@ -3073,10 +3073,10 @@ export default function FeaturesPage() {
                 <div className="p-4 bg-purple-50 rounded-lg">
                   <h4 className="font-semibold text-purple-900 mb-2">Best For</h4>
                   <ul className="space-y-1 text-sm text-purple-800">
-                    <li>â€¢ Repeat customers who know products</li>
-                    <li>â€¢ Time-sensitive purchases</li>
-                    <li>â€¢ Delivery and fulfillment services</li>
-                    <li>â€¢ Maximum convenience shoppers</li>
+                    <li>• Repeat customers who know products</li>
+                    <li>• Time-sensitive purchases</li>
+                    <li>• Delivery and fulfillment services</li>
+                    <li>• Maximum convenience shoppers</li>
                   </ul>
                 </div>
               </div>
@@ -3146,7 +3146,7 @@ export default function FeaturesPage() {
 
             <div className="mt-8 p-4 bg-gradient-to-r from-green-50 to-amber-50 rounded-lg text-center">
               <p className="text-sm text-neutral-800 font-semibold">
-                ðŸŽ¯ <strong>Result:</strong> Retailer gets guaranteed commitment or full payment. 
+                🎯 <strong>Result:</strong> Retailer gets guaranteed commitment or full payment. 
                 Shopper gets the flexibility they want. Everyone wins.
               </p>
             </div>

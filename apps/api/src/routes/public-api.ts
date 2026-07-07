@@ -9,12 +9,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import shopsRoutes from './shops';
 import tenantsRoutes from './public/tenants';
+import publicTierConfigRoutes from './public-tier-config';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { DEFAULT_SETTINGS } from './storefront-options-settings';
 import ProductOptionsService from '../services/ProductOptionsService';
 
 const router = Router();
+
+// Public tier configuration (no auth required)
+router.use('/tier-config', publicTierConfigRoutes);
 
 // ====================
 // VALIDATION SCHEMAS
