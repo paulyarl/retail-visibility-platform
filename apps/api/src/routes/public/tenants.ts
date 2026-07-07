@@ -3,6 +3,7 @@ import { prisma } from '../../prisma';
 import { Prisma } from '@prisma/client';
 import { getDirectPool } from '../../utils/db-pool';
 import TenantProfileService from '../../services/TenantProfileService';
+import { resolveEffectiveStatusFromTenant } from '../../utils/org-standing-inheritance';
 
 const router = Router();
 
@@ -151,6 +152,8 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
           manual_subscription_expires_at: true,
           manual_subscription_reason: true,
           organization_id: true,
+          org_standing_mode: true,
+          organizations_list: { select: { subscription_status: true, subscription_tier: true } },
           location_status: true,
           gbp_primary_category_id: true,
           gbp_primary_category_name: true,
@@ -219,7 +222,7 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         id: profile.id,
         name: profile.name,
         slug: profile.slug,
-        subscriptionStatus: tenantData?.subscription_status,
+        subscriptionStatus: tenantData ? resolveEffectiveStatusFromTenant(tenantData).effectiveStatus : 'active',
         subscriptionTier: tenantData?.subscription_tier,
         hasPublishedDirectory: hasPublishedDirectory,
         hasFeaturedProducts,

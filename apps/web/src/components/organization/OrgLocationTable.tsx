@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Crown, ChevronLeft, ChevronRight, Package, Download, Layers, Wrench } from "lucide-react";
+import { Crown, ChevronLeft, ChevronRight, Package, Download, Layers, Wrench, MapPin, LayoutDashboard } from "lucide-react";
 import { Button } from "@mantine/core";
 import { Badge } from "@/components/ui/Badge";
 import type { OrganizationData } from "./types";
@@ -16,6 +16,7 @@ interface OrgLocationTableProps {
   locationsPerPage: number;
   onPageChange: (page: number) => void;
   productMix?: OrgProductMix | undefined;
+  organizationId?: string | null;
 }
 
 export default function OrgLocationTable({
@@ -26,6 +27,7 @@ export default function OrgLocationTable({
   locationsPerPage,
   onPageChange,
   productMix,
+  organizationId,
 }: OrgLocationTableProps) {
   const sorted = [...locations].sort((a, b) => b.skuCount - a.skuCount);
   const totalPages = Math.ceil(sorted.length / locationsPerPage);
@@ -121,11 +123,25 @@ export default function OrgLocationTable({
                         {pct.toFixed(1)}% of total pool
                       </p>
                     </div>
-                    <Link href={`/t/${location.tenantId}/items`}>
-                      <Button variant="light" size="sm">
-                        View Items
-                      </Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/t/${location.tenantId}/dashboard`}>
+                        <Button variant="light" size="sm" leftSection={<LayoutDashboard className="w-4 h-4" />}>
+                          Dashboard
+                        </Button>
+                      </Link>
+                      {organizationId && (
+                        <Link href={`/t/${location.tenantId}/settings/organization/locations?organizationId=${organizationId}`}>
+                          <Button variant="light" size="sm" leftSection={<MapPin className="w-4 h-4" />}>
+                            Manage
+                          </Button>
+                        </Link>
+                      )}
+                      <Link href={`/t/${location.tenantId}/items`}>
+                        <Button variant="light" size="sm">
+                          View Items
+                        </Button>
+                      </Link>
+                    </div>
                   </motion.div>
                 );
               })}

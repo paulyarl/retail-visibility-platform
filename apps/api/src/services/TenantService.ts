@@ -7,6 +7,7 @@
 
 import { prisma } from '../prisma';
 import { ResolvedTenant } from './UniversalIdentifierCache';
+import { resolveEffectiveStatusFromTenant } from '../utils/org-standing-inheritance';
 
 export interface TenantProfile {
   id: string;
@@ -171,6 +172,8 @@ export class TenantService {
           trial_ends_at: true,
           subscription_ends_at: true, 
           organization_id: true,           
+          org_standing_mode: true,
+          organizations_list: { select: { subscription_status: true, subscription_tier: true } },
           location_status: true,
           gbp_primary_category_id: true,
           gbp_primary_category_name: true,
@@ -243,7 +246,7 @@ export class TenantService {
         id: tenant.id,
         name: tenant.name||profileResult?.business_name,
         slug: tenant.slug || profileResult?.slug || tenantResult?.slug || '',
-        subscriptionStatus: tenant.subscription_status || 'unknown',
+        subscriptionStatus: resolveEffectiveStatusFromTenant(tenant).effectiveStatus || 'unknown',
         hasPublishedDirectory: hasDirectory as boolean,
         primaryCategory: tenantResult?.primary_category,
         seoKeywords: tenantResult?.seo_keywords,
@@ -318,6 +321,8 @@ export class TenantService {
             trial_ends_at: true,
             subscription_ends_at: true,
             organization_id: true,
+            org_standing_mode: true,
+            organizations_list: { select: { subscription_status: true, subscription_tier: true } },
             location_status: true
           }
         }),
@@ -379,7 +384,7 @@ export class TenantService {
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug || '',
-          subscriptionStatus: tenant.subscription_status || '',
+          subscriptionStatus: resolveEffectiveStatusFromTenant(tenant).effectiveStatus || '',
           metadata: tenant.metadata,
           createdAt: tenant.created_at.toISOString(),
           updatedAt: tenant.created_at.toISOString(), // Use created_at as fallback
@@ -587,7 +592,9 @@ export class TenantService {
           slug: true,
           subscription_status: true,
           metadata: true,
-          created_at: true
+          created_at: true,
+          org_standing_mode: true,
+          organizations_list: { select: { subscription_status: true, subscription_tier: true } },
         }
       });
 
@@ -604,7 +611,7 @@ export class TenantService {
         id: tenant.id,
         name: tenant.name,
         slug: tenant.slug || '',
-        subscriptionStatus: tenant.subscription_status || 'unknown',
+        subscriptionStatus: resolveEffectiveStatusFromTenant(tenant).effectiveStatus || 'unknown',
         metadata: tenant.metadata,
         createdAt: tenant.created_at.toISOString(),
         updatedAt: tenant.created_at.toISOString(), // Use created_at as fallback
@@ -788,6 +795,8 @@ export class TenantService {
           subscription_status: true,
           trial_ends_at: true,
           subscription_ends_at: true,
+          org_standing_mode: true,
+          organizations_list: { select: { subscription_status: true, subscription_tier: true } },
         }
       });
 
@@ -828,7 +837,7 @@ export class TenantService {
       }
 
       return {
-        status: tenant.subscription_status || 'active',
+        status: resolveEffectiveStatusFromTenant(tenant).effectiveStatus || 'active',
         plan: tierKey,
         expiresAt: tenant.subscription_ends_at?.toISOString() || tenant.trial_ends_at?.toISOString(),
         features,
