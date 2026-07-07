@@ -476,7 +476,7 @@ function mapCommerce(b: BackendEffectiveCommerce): CommerceState {
     checkoutMode: b.checkout_mode ?? {
       mode: b.effective_payment_type === 'deposit' ? 'deposit_only'
         : b.effective_payment_type === 'full' ? 'full_payment_only'
-        : b.effective_payment_type === 'both' ? 'flexible'
+        : b.effective_payment_type === 'flexible' ? 'flexible'
         : 'disabled',
     },
     isFlexible: b.is_flexible,

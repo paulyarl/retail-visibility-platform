@@ -82,6 +82,7 @@ const COMMERCE_PAYMENT_LABELS: Record<string, string> = {
   full: 'Full Payment',
   deposit: 'Deposit Only',
   both: 'Both Options',
+  flexible: 'Flexible',
   none: '',
 };
 
@@ -90,6 +91,7 @@ const COMMERCE_GROUP_FEATURES: Record<string, string[]> = {
   full: ['Full Payment'],
   deposit: ['Deposit Only'],
   both: ['Full Payment', 'Deposit'],
+  flexible: ['Full Payment', 'Deposit'],
 };
 
 const COMMERCE_DETAIL_LABELS: Record<string, string> = {
@@ -299,7 +301,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       if (groupFeatures) {
         groupFeatures.forEach(f => {
           specifics.push(f);
-          const isEnabled = c.effectivePaymentType === 'both' ||
+          const isEnabled = c.effectivePaymentType === 'flexible' ||
             (f === 'Full Payment' ? c.effectivePaymentType === 'full' : c.effectivePaymentType === 'deposit');
           statuses.push({ label: f, status: isEnabled ? 'enabled' : 'merchant-gated' });
         });

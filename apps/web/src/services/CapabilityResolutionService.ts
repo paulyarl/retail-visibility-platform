@@ -29,7 +29,7 @@ export interface CapabilityGroup {
 
 // --- Commerce Types ---
 
-export type CommercePaymentType = 'full' | 'deposit' | 'both' | 'none';
+export type CommercePaymentType = 'full' | 'deposit' | 'flexible' | 'none';
 
 export interface CheckoutModeConfig {
   mode: 'deposit_only' | 'full_payment_only' | 'flexible' | 'disabled';
@@ -997,7 +997,7 @@ export function resolveCommerceState(
   if (disabled || !enabled) {
     paymentType = 'none';
   } else if (bothOptions) {
-    paymentType = 'both';
+    paymentType = 'flexible';
   } else if (fullPayment) {
     paymentType = 'full';
   } else if (depositOnly) {
@@ -1017,9 +1017,9 @@ export function resolveCommerceState(
   let effectivePaymentType: CommercePaymentType = 'none';
   if (disabled || !enabled) {
     effectivePaymentType = 'none';
-  } else if (paymentType === 'both') {
-    // Tier allows both → merchant can disable either
-    if (prefs.deposit_enabled && prefs.full_payment_enabled) effectivePaymentType = 'both';
+  } else if (paymentType === 'flexible') {
+    // Tier allows flexible → merchant can disable either
+    if (prefs.deposit_enabled && prefs.full_payment_enabled) effectivePaymentType = 'flexible';
     else if (prefs.full_payment_enabled) effectivePaymentType = 'full';
     else if (prefs.deposit_enabled) effectivePaymentType = 'deposit';
     else effectivePaymentType = 'none';
@@ -1038,7 +1038,7 @@ export function resolveCommerceState(
       ? { mode: 'deposit_only' }
       : effectivePaymentType === 'full'
         ? { mode: 'full_payment_only' }
-        : effectivePaymentType === 'both'
+        : effectivePaymentType === 'flexible'
           ? { mode: 'flexible' }
           : { mode: 'disabled' };
 

@@ -98,7 +98,7 @@ function hasDepositOnly(ctx: TipContext): boolean {
 
 function hasBothPaymentPaths(ctx: TipContext): boolean {
   const c = ctx.capabilities?.effective.commerce;
-  return !!c && c.enabled && c.effective_payment_type === 'both';
+  return !!c && c.enabled && c.effective_payment_type === 'flexible';
 }
 
 function hasPaymentGateway(ctx: TipContext): boolean {

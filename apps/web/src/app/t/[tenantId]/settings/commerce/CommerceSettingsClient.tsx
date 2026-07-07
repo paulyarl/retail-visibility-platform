@@ -144,8 +144,8 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
       const { enabled, paymentType } = commerceCap.data;
       setCommerceFeatures({
         commerce_disabled: !enabled,
-        commerce_deposit_only: enabled && (paymentType === 'deposit' || paymentType === 'both'),
-        commerce_full_payment: enabled && (paymentType === 'full' || paymentType === 'both'),
+        commerce_deposit_only: enabled && (paymentType === 'deposit' || paymentType === 'flexible'),
+        commerce_full_payment: enabled && (paymentType === 'full' || paymentType === 'flexible'),
       });
     }
   }, [commerceCap.data]);
