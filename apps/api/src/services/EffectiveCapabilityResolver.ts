@@ -536,6 +536,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
         trial_ends_at: true,
         subscription_ends_at: true,
         organization_id: true,
+        org_standing_mode: true,
         organizations_list: { select: { subscription_tier: true, subscription_status: true } },
       },
     }),
@@ -667,8 +668,25 @@ export async function resolveEffectiveCapabilitiesFromMV(
   result.constraint_status = constraint_status;
 
   // 7. Apply subscription-status-aware capability override
+  // Asymmetric inheritance: if tenant is in 'inherited' mode and org is in good standing,
+  // the tenant's STATUS is lifted to 'active' regardless of its own status.
+  const standingMode = tenant.org_standing_mode || 'independent';
+  let effectiveStatus = tenant.subscription_status;
+
+  if (standingMode === 'inherited' && tenant.organizations_list) {
+    const orgInternalStatus = deriveInternalStatus({
+      subscription_status: tenant.organizations_list.subscription_status,
+      subscription_tier: tenant.organizations_list.subscription_tier,
+      trialEndsAt: null,
+      subscription_ends_at: null,
+    });
+    if (orgInternalStatus === 'active' || orgInternalStatus === 'trialing' || orgInternalStatus === 'past_due') {
+      effectiveStatus = 'active';
+    }
+  }
+
   const internalStatus = deriveInternalStatus({
-    subscription_status: tenant.subscription_status,
+    subscription_status: effectiveStatus,
     subscription_tier: tenant.subscription_tier,
     trialEndsAt: tenant.trial_ends_at,
     subscription_ends_at: tenant.subscription_ends_at,
@@ -676,7 +694,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
 
   const maintenanceState = getMaintenanceState({
     tier: tenant.subscription_tier,
-    status: tenant.subscription_status,
+    status: effectiveStatus,
     trialEndsAt: tenant.trial_ends_at,
   });
 
