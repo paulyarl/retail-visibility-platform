@@ -183,7 +183,7 @@ const TASKS: TaskDefinition[] = [
   {
     id: 'product-type-selection',
     label: () => 'Select your product type',
-    link: (ctx) => `/t/${ctx.tenantId}/settings/product-options`,
+    link: (ctx) => `/t/${ctx.tenantId}/settings/product-types`,
     category: 'visibility',
     priority: 'critical',
     condition: (ctx) => needsProductTypeSelection(ctx),
