@@ -592,10 +592,10 @@ export default function PaymentGatewaysPage() {
                     <span>Deposit checkout only - customers pay a deposit to reserve items, with balance due at pickup.</span>
                   </div>
                 )}
-                {commerceCap.data.enabled && (commerceCap.data.paymentType === 'full' || commerceCap.data.paymentType === 'both') && (
+                {commerceCap.data.enabled && (commerceCap.data.paymentType === 'full' || commerceCap.data.paymentType === 'flexible') && (
                   <div className="flex items-start gap-2 text-green-800">
                     <span className="font-medium min-w-[120px]">Commerce:</span>
-                    <span>Full checkout available - customers can complete full payment{commerceCap.data.paymentType === 'both' ? ' or deposit payment' : ''} at checkout.</span>
+                    <span>Full checkout available - customers can complete full payment{commerceCap.data.paymentType === 'flexible' ? ' or deposit payment' : ''} at checkout.</span>
                   </div>
                 )}
                 {paymentCap.data.checkoutAvailable && (

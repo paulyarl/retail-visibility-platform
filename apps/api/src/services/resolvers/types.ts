@@ -251,7 +251,7 @@ export interface SocialCommerceOptionsMerchantSettings {
 // EFFECTIVE (RESOLVED) STATE
 // ====================
 
-export type CommercePaymentType = 'full' | 'deposit' | 'both' | 'none';
+export type CommercePaymentType = 'full' | 'deposit' | 'flexible' | 'none';
 
 export interface EffectiveCommerce {
   enabled: boolean;

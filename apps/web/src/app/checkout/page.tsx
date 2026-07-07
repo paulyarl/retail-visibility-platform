@@ -278,7 +278,7 @@ function CheckoutPageContent() {
       } else if (effectivePaymentType === 'deposit') {
         setCheckoutMode('deposit');
         setDepositOption('required');
-      } else if (effectivePaymentType === 'both') {
+      } else if (effectivePaymentType === 'flexible') {
         setCheckoutMode('full_payment');
         setDepositOption('optional');
       } else {

@@ -650,7 +650,7 @@ export default function SubscriptionPage({ embedded = false }: { embedded?: bool
                       {allCapabilities.data.commerce.paymentType === 'none' ? 'No payment options' :
                        allCapabilities.data.commerce.paymentType === 'deposit' ? 'Deposit only' :
                        allCapabilities.data.commerce.paymentType === 'full' ? 'Full payment' :
-                       allCapabilities.data.commerce.paymentType === 'both' ? 'Deposit + Full payment' :
+                       allCapabilities.data.commerce.paymentType === 'flexible' ? 'Deposit + Full payment' :
                        'Standard'}
                     </p>
                   </div>

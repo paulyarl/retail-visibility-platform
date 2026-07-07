@@ -47,7 +47,7 @@ export async function resolveCommerce(
   if (!commerceEnabled) {
     effectivePaymentType = 'none';
   } else if (caps.deposit_enabled && caps.full_payment_enabled) {
-    effectivePaymentType = depositEnabled && fullPaymentEnabled ? 'both'
+    effectivePaymentType = depositEnabled && fullPaymentEnabled ? 'flexible'
       : fullPaymentEnabled ? 'full'
       : depositEnabled ? 'deposit'
       : 'none';
@@ -62,7 +62,7 @@ export async function resolveCommerce(
   return {
     enabled: commerceEnabled,
     cart_visible: commerceEnabled && (caps.deposit_enabled || caps.full_payment_enabled),
-    payment_type: caps.deposit_enabled && caps.full_payment_enabled ? 'both'
+    payment_type: caps.deposit_enabled && caps.full_payment_enabled ? 'flexible'
       : caps.full_payment_enabled ? 'full'
       : caps.deposit_enabled ? 'deposit'
       : 'none',

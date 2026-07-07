@@ -148,12 +148,12 @@ function hasDepositOnly(ctx: TipContext): boolean {
 
 function hasFullPayment(ctx: TipContext): boolean {
   const c = ctx.capabilities?.commerce;
-  return !!c && c.enabled && (c.effectivePaymentType === 'full' || c.effectivePaymentType === 'both');
+  return !!c && c.enabled && (c.effectivePaymentType === 'full' || c.effectivePaymentType === 'flexible');
 }
 
 function hasBothPaymentPaths(ctx: TipContext): boolean {
   const c = ctx.capabilities?.commerce;
-  return !!c && c.enabled && c.effectivePaymentType === 'both';
+  return !!c && c.enabled && c.effectivePaymentType === 'flexible';
 }
 
 function hasChatbot(ctx: TipContext): boolean {
