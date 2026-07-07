@@ -18,13 +18,14 @@ const ALL_LEVELS: PromotionTier[] = ['basic', 'premium', 'featured'];
 
 export function resolveDirectoryPromotion(
   features: Record<string, boolean>,
+  capabilityEnabled?: boolean,
 ): EffectiveDirectoryPromotion {
   const disabled = !!features.directory_promotion_disabled;
   const flexible = !!features.directory_promotion_flexible;
 
   // Check if any individual promotion level feature is enabled (implicit enable)
   const hasAnyPromotionFeature = ALL_LEVELS.some(t => !!features[`directory_promotion_level_${t}`]);
-  const enabled = !disabled && (!!features.directory_promotion_enabled || hasAnyPromotionFeature);
+  const enabled = !disabled && (!!features.directory_promotion_enabled || hasAnyPromotionFeature || !!capabilityEnabled);
 
   const allowedTiers: PromotionTier[] = [];
 
