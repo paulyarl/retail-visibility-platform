@@ -988,7 +988,7 @@ export function resolveCommerceState(
   merchantPrefs?: { deposit_enabled?: boolean; full_payment_enabled?: boolean } | null
 ): CommerceState {
   const enabled = !!features.commerce_enabled;
-  const bothOptions = !!features.commerce_both_options;
+  const bothOptions = !!features.commerce_flexible;
   const fullPayment = !!features.commerce_full_payment;
   const depositOnly = !!features.commerce_deposit_only;
   const disabled = !!features.commerce_disabled;
