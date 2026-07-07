@@ -123,13 +123,13 @@ export async function getOrganizationCommerceCapabilities(
     commerce_enabled: !allTierFeatures.has('commerce_disabled') && tierCapabilities.commerce_enabled && (
       organizationCommerceSettings?.deposit_enabled || 
       organizationCommerceSettings?.full_payment_enabled || 
-      (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options || tierCapabilities.commerce_full_payment)
+      (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_flexible || tierCapabilities.commerce_full_payment)
     ),
 
     // Payment options: Tier determines what's available and provides defaults, organization settings determine what's enabled
-    deposit_enabled: (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options) && (
+    deposit_enabled: (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_flexible) && (
       organizationCommerceSettings?.deposit_enabled ?? 
-      (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options)
+      (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_flexible)
     ),
     full_payment_enabled: tierCapabilities.commerce_full_payment && (
       organizationCommerceSettings?.full_payment_enabled ?? 
@@ -256,15 +256,15 @@ export async function getTenantCommerceCapabilities(
       getHierarchicalValue(
         tenantCommerceSettings?.deposit_enabled || tenantCommerceSettings?.full_payment_enabled,
         organizationCommerceSettings?.deposit_enabled || organizationCommerceSettings?.full_payment_enabled,
-        tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options || tierCapabilities.commerce_full_payment
+        tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_flexible || tierCapabilities.commerce_full_payment
       )
     ),
     
     // Payment options: Tier determines what's available and provides defaults, hierarchical settings determine what's enabled
-    deposit_enabled: (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options) && getHierarchicalValue(
+    deposit_enabled: (tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_flexible) && getHierarchicalValue(
       tenantCommerceSettings?.deposit_enabled,
       organizationCommerceSettings?.deposit_enabled,
-      tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_both_options
+      tierCapabilities.commerce_deposit_only || tierCapabilities.commerce_flexible
     ),
     full_payment_enabled: tierCapabilities.commerce_full_payment && getHierarchicalValue(
       tenantCommerceSettings?.full_payment_enabled,

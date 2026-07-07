@@ -20,6 +20,7 @@ export interface CapabilityData {
   disabled_feature_count?: number;
   is_fully_enabled?: boolean;
   has_disabled?: boolean;
+  has_flexible?: boolean;
   is_org_scoped?: boolean;
   features_in_capability: string;
   capability_sort_order?: number;

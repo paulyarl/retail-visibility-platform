@@ -590,7 +590,7 @@ export default function TierSystemPage() {
       'commerce_enabled': 'Commerce Enabled',
       'commerce_deposit_only': 'Deposit Only Commerce',
       'commerce_full_payment': 'Full Payment Commerce',
-      'commerce_both_options': 'Flexible Commerce (Both Options)'
+      'commerce_flexible': 'Flexible Commerce (Both Options)'
     };
     return names[featureKey] || featureKey;
   };
@@ -601,7 +601,7 @@ export default function TierSystemPage() {
       'commerce_enabled': 'Basic payment processing is enabled',
       'commerce_deposit_only': 'Customers pay deposit now, complete payment in-store',
       'commerce_full_payment': 'Customers pay full amount online',
-      'commerce_both_options': 'Customers choose between deposit or full payment'
+      'commerce_flexible': 'Customers choose between deposit or full payment'
     };
     return descriptions[featureKey] || 'Commerce feature';
   };
@@ -619,7 +619,7 @@ export default function TierSystemPage() {
     const hasDisabled = getCommerceFeatureState(tier, 'commerce_disabled');
     const hasDepositOnly = getCommerceFeatureState(tier, 'commerce_deposit_only');
     const hasFullPayment = getCommerceFeatureState(tier, 'commerce_full_payment');
-    const hasBothOptions = getCommerceFeatureState(tier, 'commerce_both_options');
+    const hasBothOptions = getCommerceFeatureState(tier, 'commerce_flexible');
 
     if (hasDisabled && (hasDepositOnly || hasFullPayment || hasBothOptions)) {
       errors.push('Cannot enable commerce features when commerce is disabled');
@@ -1651,11 +1651,11 @@ export default function TierSystemPage() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => handleToggleCommerceFeature('commerce_both_options', !getCommerceFeatureState(editingCommerceTier, 'commerce_both_options'))}
-                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_both_options') ? 'default' : 'outline'}
+                    onClick={() => handleToggleCommerceFeature('commerce_flexible', !getCommerceFeatureState(editingCommerceTier, 'commerce_flexible'))}
+                    variant={getCommerceFeatureState(editingCommerceTier, 'commerce_flexible') ? 'default' : 'outline'}
                     size="sm"
                   >
-                    {getCommerceFeatureState(editingCommerceTier, 'commerce_both_options') ? 'Enabled' : 'Disabled'}
+                    {getCommerceFeatureState(editingCommerceTier, 'commerce_flexible') ? 'Enabled' : 'Disabled'}
                   </Button>
                 </div>
 
@@ -1685,7 +1685,7 @@ export default function TierSystemPage() {
                     const hasDisabled = getCommerceFeatureState(editingCommerceTier, 'commerce_disabled');
                     const hasDepositOnly = getCommerceFeatureState(editingCommerceTier, 'commerce_deposit_only');
                     const hasFullPayment = getCommerceFeatureState(editingCommerceTier, 'commerce_full_payment');
-                    const hasBothOptions = getCommerceFeatureState(editingCommerceTier, 'commerce_both_options');
+                    const hasBothOptions = getCommerceFeatureState(editingCommerceTier, 'commerce_flexible');
 
                     if (hasDisabled) return '❌ Commerce Disabled';
                     if (hasDepositOnly) return '💳 Deposit Only Required';

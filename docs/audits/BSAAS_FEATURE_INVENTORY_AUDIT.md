@@ -42,8 +42,8 @@ const dynamicTier = flexible || !!feat.chatbot_dynamic_enabled;
 | Payment Gateway | `payment_gateway_flexible` | $25/mo | Unlocks all 3 gateways (Stripe, PayPal, Square) |
 | Barcode Scan | `barcode_flexible` | $12/mo | Unlocks all 4 scan methods (camera, USB, manual, scan) |
 | Quickstart | `quickstart_flexible` | $19/mo | Unlocks all 12 quickstart features (wizard, AI, image gen) |
-| Commerce Types | `commerce_both_options` | $15/mo | Unlocks both deposit + full payment modes |
-| Storefront Types | `storefront_both_options` | $15/mo | Unlocks all 4 storefront types (online, retail, service, social) |
+| Commerce Types | `commerce_flexible` | $15/mo | Unlocks both deposit + full payment modes |
+| Storefront Types | `storefront_flexible` | $15/mo | Unlocks all 4 storefront types (online, retail, service, social) |
 | Product Types | `product_types_flexible` | $15/mo | Unlocks all 4 product types (physical, digital, hybrid, service) |
 | Organization | `org_flexible` | $49/mo | Unlocks all 18 org features (tabs, panels, propagation) |
 
@@ -100,7 +100,7 @@ Features **not** suitable for standalone sale:
 | Feature Key | Name | Sale Candidate | Notes |
 |---|---|---|---|
 | `commerce_enabled` | Commerce Enabled | ❌ Master gate | Companion-purchased |
-| `commerce_both_options` | Flexible Commerce (Both Options) | ✅ **Flexible** | Domain unlock — $15/mo |
+| `commerce_flexible` | Flexible Commerce (Both Options) | ✅ **Flexible** | Domain unlock — $15/mo |
 | `commerce_deposit_only` | Commerce Deposit Only | ✅ **Medium** | Deposit-based selling — niche |
 | `commerce_full_payment` | Commerce Full Payment | ❌ Core | Standard commerce flow |
 
@@ -445,7 +445,7 @@ Features **not** suitable for standalone sale:
 | `storefront` | Storefront | ❌ Tier-defining | Fundamental capability |
 | `storefront_enabled` | Storefront Enabled | ❌ Master gate | Companion-purchased |
 | `storefront_disabled` | Storefront Disabled | ❌ Negative flag | Absence marker |
-| `storefront_both_options` | Flexible Storefront Type | ✅ **Flexible** | Domain unlock — $15/mo |
+| `storefront_flexible` | Flexible Storefront Type | ✅ **Flexible** | Domain unlock — $15/mo |
 | `storefront_online` | Online Storefront | ❌ Core | Basic storefront type |
 | `storefront_retail` | Retail Storefront | ✅ **Medium** | Retail-specific features |
 | `storefront_service` | Service Storefront | ✅ **Medium** | Service-specific features |
@@ -519,8 +519,8 @@ These unlock all features within a capability domain. Implementation is just add
 | `directory_entry_flexible` | Directory Entry — Full Access | $19/mo | monthly |
 | `quickstart_flexible` | Quick Start — Full Access | $19/mo | monthly |
 | `fulfillment_flexible` | Fulfillment — Full Access | $15/mo | monthly |
-| `commerce_both_options` | Commerce — Full Access | $15/mo | monthly |
-| `storefront_both_options` | Storefront Types — Full Access | $15/mo | monthly |
+| `commerce_flexible` | Commerce — Full Access | $15/mo | monthly |
+| `storefront_flexible` | Storefront Types — Full Access | $15/mo | monthly |
 | `product_types_flexible` | Product Types — Full Access | $15/mo | monthly |
 | `barcode_flexible` | Barcode Scan — Full Access | $12/mo | monthly |
 
@@ -636,7 +636,7 @@ Bundles group features across multiple capability types into a single purchasabl
 | Commerce Power Pack | `social_commerce_flexible` + `storefront_opt_flexible` + `product_options_flexible` | $97/mo | $69/mo | 29% | Merchants investing in storefront + social selling |
 | Operations Bundle | `integration_flexible` + `fulfillment_flexible` + `payment_gateway_flexible` | $69/mo | $49/mo | 29% | Merchants who need all operational integrations |
 | Growth Bundle | `featured_flexible` + `directory_entry_flexible` + `quickstart_flexible` | $57/mo | $39/mo | 32% | Merchants focused on visibility and onboarding |
-| Storefront Pro Bundle | `storefront_both_options` + `storefront_opt_flexible` + `product_types_flexible` | $59/mo | $39/mo | 34% | Merchants building a full storefront experience |
+| Storefront Pro Bundle | `storefront_flexible` + `storefront_opt_flexible` + `product_types_flexible` | $59/mo | $39/mo | 34% | Merchants building a full storefront experience |
 | Everything Pack | All 17 flexible toggles | $434/mo | $299/mo | 31% | Merchant who wants full platform without Enterprise tier |
 
 **Feature Bundle Candidates** (curated cross-domain):

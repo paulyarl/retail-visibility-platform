@@ -170,6 +170,7 @@ interface BackendEffectiveStorefront {
   is_flexible: boolean;
   allowed_types: StorefrontType[];
   has_merchant_selection: boolean;
+  policies_enabled: boolean;
   merchant_preferences: { storefront_type_enabled: boolean; selected_storefront_type: StorefrontType };
 }
 
@@ -503,6 +504,7 @@ function mapStorefront(b: BackendEffectiveStorefront): StorefrontState {
     isFlexible: b.is_flexible,
     allowedTypes: b.allowed_types,
     hasMerchantSelection: b.has_merchant_selection,
+    policiesEnabled: b.policies_enabled,
     merchantPreferences: b.merchant_preferences,
     features: {},
   };

@@ -49,7 +49,7 @@ commerce_disabled     | Discovery, Storefront, google_only, expired_trial
 commerce_enabled     | All commerce-capable tiers
 commerce_deposit_only| Commitment tier
 commerce_full_payment | Professional, Organization
-commerce_both_options | Enterprise, Chain Professional
+commerce_flexible | Enterprise, Chain Professional
 
 -- New V2 tiers (inactive)
 ecommerce     | $99/mo | Tier 4

@@ -735,7 +735,7 @@ The capability pipeline cannot resolve any storefront type without feature keys 
    - `storefront_retail` (all tiers)
    - `storefront_service` (all tiers — or tier-gated if desired)
    - `storefront_social` (mid+ tiers — social commerce is a premium capability)
-   - `storefront_both_options` (mid+ tiers)
+   - `storefront_flexible` (mid+ tiers)
 2. Verify `StorefrontTypeService.resolveFromFeatures()` correctly resolves types after seeding
 3. Test that `EffectiveCapabilityResolver` returns the correct `effective.storefront.type` for each tier
 4. Confirm the settings radio button in `StorefrontTypeOptionsSettingsClient` reflects the resolved type

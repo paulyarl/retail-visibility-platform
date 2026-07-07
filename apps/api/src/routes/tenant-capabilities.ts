@@ -67,7 +67,7 @@ async function resolveTenantIdentifier(identifier: string): Promise<{ id: string
  *     commerce_types: {
  *       capability_enabled: true,
  *       is_flexible: true,
- *       features: { commerce_enabled: true, commerce_both_options: true, ... }
+ *       features: { commerce_enabled: true, commerce_flexible: true, ... }
  *     },
  *     ...
  *   },

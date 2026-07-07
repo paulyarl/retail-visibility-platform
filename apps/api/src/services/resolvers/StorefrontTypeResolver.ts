@@ -55,6 +55,7 @@ export async function resolveStorefrontType(
     is_flexible: tierState.isFlexible,
     allowed_types: tierState.allowedTypes as StorefrontTypeValue[],
     has_merchant_selection: hasMerchantSelection,
+    policies_enabled: tierState.policiesEnabled,
     merchant_preferences: {
       storefront_type_enabled: storefrontTypeEnabled,
       selected_storefront_type: selectedStorefrontType,

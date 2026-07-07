@@ -42,6 +42,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       enabled_feature_count: number;
       disabled_feature_count: number;
       is_paused: boolean;
+      is_flexible: boolean;
       is_org_scoped: boolean;
       features_in_capability: string[];
       capability_sort_order: number;
@@ -68,6 +69,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
           enabled_feature_count: 0,
           disabled_feature_count: 0,
           is_paused: false,
+          is_flexible: false,
           is_org_scoped: false,
           features_in_capability: [],
           capability_sort_order: tf.capability_type_list?.sort_order ?? 0,
@@ -85,6 +87,10 @@ router.get('/', requirePlatformStaff, async (req, res) => {
       if (tf.feature_key?.endsWith('_disabled') && tf.is_enabled) {
         entry.is_paused = true;
       }
+      // Check for flexible key: any feature ending in _flexible that is enabled
+      if (tf.feature_key?.endsWith('_flexible') && tf.is_enabled) {
+        entry.is_flexible = true;
+      }
       // Mark org-scoped capability types (all features start with org_)
       if (tf.feature_key?.startsWith('org_')) {
         entry.is_org_scoped = true;
@@ -101,6 +107,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
         ...entry,
         is_fully_enabled: !entry.is_paused,
         has_disabled: entry.is_paused,
+        has_flexible: entry.is_flexible,
         is_org_scoped: entry.is_org_scoped,
         features_in_capability: entry.features_in_capability.join(', '),
       }));

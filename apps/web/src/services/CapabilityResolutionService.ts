@@ -98,6 +98,8 @@ export interface StorefrontState {
   allowedTypes: StorefrontType[];
   /** Whether the merchant has selected a specific type when multiple are available */
   hasMerchantSelection: boolean;
+  /** Whether storefront policies feature is enabled for the tier (platform key, no merchant control) */
+  policiesEnabled: boolean;
   /** Merchant preference for storefront type */
   merchantPreferences: {
     storefront_type_enabled: boolean;
@@ -2163,7 +2165,10 @@ export function resolveStorefrontState(
   const social = !!features.storefront_social;
 
   // Flexible gate
-  const bothOptions = !!features.storefront_both_options;
+  const bothOptions = !!features.storefront_flexible;
+
+  // Policies gate (platform key, no merchant control)
+  const policiesEnabled = !!features.storefront_policies;
 
   // Determine enabled state
   // 1. Deactivation master gate takes highest priority
@@ -2240,6 +2245,7 @@ export function resolveStorefrontState(
     isFlexible: bothOptions,
     allowedTypes,
     hasMerchantSelection,
+    policiesEnabled,
     merchantPreferences: prefs,
     features,
   };

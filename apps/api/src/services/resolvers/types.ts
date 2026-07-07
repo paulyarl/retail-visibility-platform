@@ -286,6 +286,7 @@ export interface EffectiveStorefront {
   is_flexible: boolean;
   allowed_types: StorefrontTypeValue[];
   has_merchant_selection: boolean;
+  policies_enabled: boolean;
   merchant_preferences: { storefront_type_enabled: boolean; selected_storefront_type: StorefrontTypeValue };
 }
 
