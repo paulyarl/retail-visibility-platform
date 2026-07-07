@@ -915,7 +915,7 @@ export default function FeaturesPage() {
                   <span>Basic info (name, category, price)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-yellow-600 mt-0.5">âš </span>
+                  <span className="text-yellow-600 mt-0.5">⚠</span>
                   <span>Missing: Images, descriptions, specs</span>
                 </li>
               </ul>
@@ -1195,7 +1195,7 @@ export default function FeaturesPage() {
               <div className="text-center mb-4">
                 <div className="text-4xl mb-2">📊</div>
                 <h3 className="font-bold text-lg text-neutral-900">CSV Import</h3>
-                <div className="text-orange-600 font-semibold text-sm mt-1">Better, But... âš ï¸</div>
+                <div className="text-orange-600 font-semibold text-sm mt-1">Better, But... ⚠️</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
@@ -1316,9 +1316,9 @@ export default function FeaturesPage() {
             {/* Major Retailers */}
             <div className="bg-white rounded-xl p-6 border-2 border-orange-200">
               <div className="text-center mb-4">
-                <div className="text-4xl mb-2">ðŸ¬</div>
+                <div className="text-4xl mb-2">🏬</div>
                 <h3 className="font-bold text-lg text-neutral-900">CVS/Walmart/Target</h3>
-                <div className="text-orange-600 font-semibold text-sm mt-1">Rich Data, But... âš ï¸</div>
+                <div className="text-orange-600 font-semibold text-sm mt-1">Rich Data, But... ⚠️</div>
               </div>
               <ul className="space-y-2 text-sm text-neutral-700">
                 <li className="flex items-start gap-2">
@@ -2335,7 +2335,7 @@ export default function FeaturesPage() {
                   <p className="text-xs font-semibold">Storefront Tier</p>
                   <p className="text-xs text-neutral-600">Baseline</p>
                 </div>
-                <div className="hidden lg:block text-2xl text-purple-600">â†“</div>
+                <div className="hidden lg:block text-2xl text-purple-600">↓</div>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-purple-300 rounded-lg flex items-center justify-center text-white font-bold mb-2">

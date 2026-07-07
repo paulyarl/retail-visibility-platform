@@ -92,6 +92,11 @@ export function getTierCapabilityInfo(tierFeatures: string[], capKey: string, fl
   const allInCap = tierFeatures.filter(f => getCapabilityTypeForFeature(f) === capKey);
   const features = allInCap.filter(f => !isGateKey(f));
   const flexible = flexibleKeys.some(fk => tierFeatures.includes(fk));
+  const hasDisabledGate = allInCap.some(f => f.endsWith('_disabled'));
+  const hasEnabledGate = allInCap.some(f => f.endsWith('_enabled'));
+  if (hasDisabledGate && !hasEnabledGate) {
+    return { enabled: false, flexible: false, features };
+  }
   return { enabled: allInCap.length > 0, flexible, features };
 }
 
