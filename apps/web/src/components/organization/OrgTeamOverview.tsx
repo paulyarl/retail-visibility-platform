@@ -22,6 +22,8 @@ interface TeamData {
 }
 
 export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverviewProps) {
+  const heroLocation = locations.find((loc) => loc.metadata?.isHeroLocation);
+  const orgTenantId = heroLocation?.tenantId || locations[0]?.tenantId || tenantId;
   const [teamData, setTeamData] = useState<TeamData[]>([]);
   const [orgUsers, setOrgUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,12 +57,12 @@ export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverview
         );
         setTeamData(results);
 
-        if (tenantId) {
+        if (orgTenantId) {
           try {
             const { useOrgBehaviorAccess } = await import("@/hooks/tenant-access/useOrgBehaviorAccess");
             void useOrgBehaviorAccess;
             const { organizationUsersService } = await import("@/services/OrganizationUsersService");
-            const tenant = await tenantInfoService.getTenantInfo(tenantId);
+            const tenant = await tenantInfoService.getTenantInfo(orgTenantId);
             const orgId = tenant?.metadata?.organizationId;
             if (orgId) {
               const orgUsersData = await organizationUsersService.getUsers(orgId);
@@ -79,7 +81,7 @@ export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverview
     if (locations.length > 0) {
       fetchTeamData();
     }
-  }, [locations, tenantId]);
+  }, [locations, orgTenantId]);
 
   const totalEmployees = teamData.reduce((sum, td) => sum + td.users.length, 0);
   const locationsWithTeams = teamData.filter((td) => td.users.length > 0).length;
@@ -139,11 +141,11 @@ export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverview
       </div>
 
       {/* Org Users Section */}
-      {totalOrgMembers > 0 && tenantId && (
+      {totalOrgMembers > 0 && orgTenantId && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 dark:text-white">Organization Members</h3>
-            <Link href={`/t/${tenantId}/settings/organization/users`}>
+            <Link href={`/t/${orgTenantId}/settings/organization/users`}>
               <Button variant="light" size="sm" rightSection={<ChevronRight className="w-4 h-4" />}>
                 Manage Org Users
               </Button>
@@ -184,7 +186,7 @@ export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverview
             ))}
             {orgUsers.length > 5 && (
               <div className="text-center pt-2">
-                <Link href={`/t/${tenantId}/settings/organization/users`}>
+                <Link href={`/t/${orgTenantId}/settings/organization/users`}>
                   <span className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400">
                     View all {orgUsers.length} members
                   </span>

@@ -18,6 +18,7 @@
 
 import { prisma } from '../prisma';
 import { resolveEffectiveCapabilities } from './EffectiveCapabilityResolver';
+import { resolveEffectiveStatusFromTenant } from '../utils/org-standing-inheritance';
 import { logger } from '../logger';
 import type { EffectiveCapabilities } from './resolvers/types';
 
@@ -1069,6 +1070,8 @@ async function fetchBusinessState(tenantId: string): Promise<TipContext['busines
         reopening_date: true,
         gbp_primary_category_id: true,
         effective_expires_at: true,
+        org_standing_mode: true,
+        organizations_list: { select: { subscription_status: true, subscription_tier: true } },
       },
     }),
     prisma.tenant_business_profiles_list.findUnique({
@@ -1107,7 +1110,7 @@ async function fetchBusinessState(tenantId: string): Promise<TipContext['busines
     typeof businessProfile.hours === 'object' &&
     Object.keys(businessProfile.hours as object).length > 0;
 
-  const subscriptionStatus = tenant?.subscription_status || 'active';
+  const { effectiveStatus: subscriptionStatus } = resolveEffectiveStatusFromTenant(tenant ?? { subscription_status: 'active' });
   const isTrial = subscriptionStatus === 'trialing' || subscriptionStatus === 'trial';
   const trialEndsAt = tenant?.effective_expires_at;
   const trialDaysLeft = isTrial && trialEndsAt

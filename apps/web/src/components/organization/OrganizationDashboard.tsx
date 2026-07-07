@@ -391,18 +391,6 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         {/* Locations Tab */}
         {activeTab === "locations" && isTabAllowed("locations") && (
           <div className="space-y-4">
-            {(!!organizationId || !readOnly) && (tenantId || heroLocation?.tenantId || orgData.locationBreakdown[0]?.tenantId) && (
-              <div className="flex justify-end">
-                <Button
-                  leftSection={<MapPin size={16} />}
-                  variant="filled"
-                  color="blue"
-                  onClick={() => router.push(`/t/${tenantId || heroLocation?.tenantId || orgData.locationBreakdown[0]?.tenantId}/settings/organization/locations?organizationId=${organizationId}`)}
-                >
-                  Manage Locations
-                </Button>
-              </div>
-            )}
             <OrgLocationTable
               locations={orgData.locationBreakdown}
               heroLocation={heroLocation}
@@ -411,6 +399,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
               locationsPerPage={5}
               onPageChange={setCurrentPage}
               productMix={productMixData}
+              organizationId={organizationId}
             />
           </div>
         )}
@@ -482,7 +471,7 @@ export default function OrganizationDashboard({ tenantId }: OrganizationDashboar
         {activeTab === "team" && isTabAllowed("team") && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              <OrgTeamOverview locations={orgData.locationBreakdown} tenantId={tenantId} />
+              <OrgTeamOverview locations={orgData.locationBreakdown} tenantId={heroLocation?.tenantId || orgData.locationBreakdown[0]?.tenantId || tenantId} />
             </div>
             <div className="space-y-6">
               <OrgEmployeeDistribution locations={orgData.locationBreakdown} />

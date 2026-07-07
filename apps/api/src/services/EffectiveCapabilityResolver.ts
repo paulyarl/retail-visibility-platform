@@ -439,6 +439,24 @@ async function fetchRawCapabilitiesFromMV(tenantId: string): Promise<RawCapabili
       }
     }
 
+    // Fallback: for feature keys not found in capability_features_list,
+    // check tier_features_list.capability_type_id (same source as fetchRawCapabilities).
+    // This handles cases where seed scripts set capability_type_id on tier_features_list
+    // but capability_features_list links are missing or were overwritten.
+    const unmappedKeys = featureKeys.filter(fk => !featureKeyToCapKey.has(fk));
+    if (unmappedKeys.length > 0) {
+      const tierFeatureLinks = await prisma.tier_features_list.findMany({
+        where: { feature_key: { in: unmappedKeys }, is_enabled: true },
+        include: { capability_type_list: { select: { key: true } } },
+      });
+
+      for (const tfl of tierFeatureLinks) {
+        if (tfl.capability_type_list?.key && !featureKeyToCapKey.has(tfl.feature_key)) {
+          featureKeyToCapKey.set(tfl.feature_key, tfl.capability_type_list.key);
+        }
+      }
+    }
+
     for (const fk of featureKeys) {
       const capKey = featureKeyToCapKey.get(fk);
       if (capKey) {

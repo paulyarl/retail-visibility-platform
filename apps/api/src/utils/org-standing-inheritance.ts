@@ -86,3 +86,31 @@ export async function resolveOrgStandingInheritance(tenantId: string): Promise<O
     inherited,
   };
 }
+
+/**
+ * Synchronous helper: resolve effective subscription status from already-fetched tenant data.
+ * Use this inline when you already have the tenant row with org_standing_mode and organizations_list.
+ * Avoids an extra DB query compared to resolveOrgStandingInheritance().
+ */
+export function resolveEffectiveStatusFromTenant(tenant: {
+  subscription_status: string | null;
+  org_standing_mode?: string | null;
+  organizations_list?: { subscription_status: string | null; subscription_tier: string | null } | null;
+}): { effectiveStatus: string; inherited: boolean } {
+  const standingMode = tenant.org_standing_mode || 'independent';
+  const ownStatus = tenant.subscription_status || 'active';
+
+  if (standingMode === 'inherited' && tenant.organizations_list) {
+    const orgInternalStatus = deriveInternalStatus({
+      subscription_status: tenant.organizations_list.subscription_status,
+      subscription_tier: tenant.organizations_list.subscription_tier,
+      trialEndsAt: null,
+      subscription_ends_at: null,
+    });
+    if (orgInternalStatus === 'active' || orgInternalStatus === 'trialing' || orgInternalStatus === 'past_due') {
+      return { effectiveStatus: 'active', inherited: true };
+    }
+  }
+
+  return { effectiveStatus: ownStatus, inherited: false };
+}
