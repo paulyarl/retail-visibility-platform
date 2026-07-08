@@ -246,6 +246,44 @@ The BSaaS purchase flow enforces an **active capability engagement** rule: a mer
 
 When adding a new purchasable feature, ensure that at least one target tier has engagement in the feature's capability type. If no tier has any features in that capability type, no tenant will be able to purchase the feature — consider whether the feature should be tier-bundled instead.
 
+## Flexible Tier Expansion in Feature Catalog
+
+When the feature catalog endpoint (`GET /api/subscription/feature-catalog`) checks if a feature is already in the tenant's tier via `checkTierFeatureStatus()`, it uses a two-step resolution that includes **flexible expansion from all sources**:
+
+1. **Exact match**: Check `tier_features_list` for the exact `feature_key` with `is_enabled=true`
+2. **Flexible fallback**: If no exact match, resolve the feature's capability type, construct `{capability_key}_flexible`, and check if the tenant has that flexible key from **any source**:
+   - Tier-bundled: `tier_features_list` (tier has `{capability}_flexible` enabled)
+   - Purchased: `tenant_feature_purchases` (tenant purchased `{capability}_flexible`)
+   - Admin grant: `tenant_feature_overrides_list` (admin granted `{capability}_flexible`)
+   If any source has the flexible key, the feature is in-tier via flexible expansion.
+
+This means: if a tier has `chatbot_flexible` enabled in `tier_features_list`, **all** features in the `chatbot_options` capability type will show as "Included in Plan" — even if they're not explicitly listed in `tier_features_list` for that tier. The same applies if the tenant purchased `chatbot_flexible` or an admin granted it.
+
+**When adding a new BSaaS feature**: If the feature's capability type already has a `_flexible` key available (tier-bundled, purchasable, or admin-grantable), the feature will automatically be in-tier for tenants with that flexible key. You only need to add the feature to `bsaas_catalog` for tiers that don't have the flexible key. No need to explicitly assign the feature to flexible tiers in `tier_features_list` — the flexible expansion handles it.
+
+**Verification queries**:
+```sql
+-- Check which tiers have flexible access (tier-bundled)
+SELECT stl.tier_key, tfl.feature_key, tfl.is_enabled
+FROM tier_features_list tfl
+JOIN subscription_tiers_list stl ON stl.id = tfl.tier_id
+WHERE tfl.feature_key = '<capability_key>_flexible'
+  AND tfl.is_enabled = true
+ORDER BY stl.sort_order;
+
+-- Check which tenants have purchased flexible access
+SELECT tenant_id, feature_key, status, expires_at
+FROM tenant_feature_purchases
+WHERE feature_key = '<capability_key>_flexible'
+  AND status IN ('active', 'past_due', 'trial');
+
+-- Check which tenants have admin-granted flexible access
+SELECT tenant_id, feature, granted, expires_at
+FROM tenant_feature_overrides_list
+WHERE feature = '<capability_key>_flexible'
+  AND granted = true;
+```
+
 ## Expiry Handling
 
 Purchases have two layers of expiry protection:
@@ -282,6 +320,7 @@ When adding a new purchasable feature, verify:
 - [ ] Expired purchases (`expires_at < NOW()`) are not included in the capabilities output
 - [ ] `GET /api/subscription/feature-catalog` returns `tierEligible: true` for tenants whose tier is engaged in the feature's capability type, and `tierEligible: false` with `ineligibleReason` for tenants whose tier is not engaged
 - [ ] `POST /api/subscription/feature-purchase` returns `403 upgrade_required` for tenants whose tier is not engaged in the capability type
+- [ ] **Flexible tier expansion**: For tiers with `{capability_key}_flexible` enabled, `GET /api/subscription/feature-catalog` returns `tierAvailability: 'in_tier_active'` (not `not_in_tier`) — feature shows as "Included in Plan" without explicit `tier_features_list` assignment
 - [ ] `npx tsc --noEmit --project apps/api` passes
 - [ ] `npx tsc --noEmit --project apps/web` passes
 
