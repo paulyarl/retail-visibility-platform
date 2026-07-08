@@ -371,7 +371,7 @@ async function checkTierFeatureStatus(
   });
   const tierIds = tiers.map(t => t.id);
 
-  // 2. Check if the feature is in any of the tenant's tier features
+  // 2. Check if the feature is explicitly in any of the tenant's tier features
   const tierFeature = await prisma.tier_features_list.findFirst({
     where: {
       tier_id: { in: tierIds },
@@ -381,11 +381,46 @@ async function checkTierFeatureStatus(
     include: { capability_type_list: { select: { key: true } } },
   });
 
-  if (!tierFeature) return { inTier: false, merchantGateOn: null, capabilityKey: null };
+  let capabilityKey: string | null = tierFeature?.capability_type_list?.key || null;
 
-  const capabilityKey = tierFeature.capability_type_list?.key || null;
+  // 3. If not an explicit tier feature, check flexible tier expansion:
+  //    If the tier has a {capability_key}_flexible feature, ALL features in that
+  //    capability type are included. This mirrors the MV's flexible_tier_features CTE.
+  if (!tierFeature) {
+    // Resolve the feature's capability type
+    const feature = await prisma.features_list.findUnique({
+      where: { key: featureKey },
+      select: { id: true },
+    });
+    if (!feature) return { inTier: false, merchantGateOn: null, capabilityKey: null };
 
-  // 3. Check merchant gate for the capability domain
+    const capLink = await prisma.capability_features_list.findFirst({
+      where: { feature_id: feature.id },
+      include: { capability_type_list: { select: { key: true, id: true } } },
+    });
+    if (!capLink?.capability_type_list) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
+
+    capabilityKey = capLink.capability_type_list.key;
+    const flexibleKey = `${capabilityKey}_flexible`;
+
+    // Check if the tenant's tier has the {capability_key}_flexible feature enabled
+    const flexibleTierFeature = await prisma.tier_features_list.findFirst({
+      where: {
+        tier_id: { in: tierIds },
+        feature_key: flexibleKey,
+        is_enabled: true,
+      },
+    });
+
+    if (!flexibleTierFeature) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
+    // Feature is in-tier via flexible expansion
+  }
+
+  // 4. Check merchant gate for the capability domain
   let merchantGateOn: boolean | null = null;
   if (capabilityKey && MERCHANT_GATE_MAP[capabilityKey]) {
     const gateInfo = MERCHANT_GATE_MAP[capabilityKey];

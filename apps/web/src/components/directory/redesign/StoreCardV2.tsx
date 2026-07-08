@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { MapPin, Package, Star, ExternalLink, Navigation } from 'lucide-react';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 import type { DirectoryStore } from '@/services/DirectorySingletonService';
 import type { DirectoryLayoutKey } from './types';
 
@@ -76,8 +77,9 @@ export default function StoreCardV2({
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate flex items-center gap-1.5">
                 {store.businessName}
+                {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
               </h3>
               {store.distance != null && (
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-medium shrink-0">
@@ -180,11 +182,12 @@ export default function StoreCardV2({
           {/* Name + Rating */}
           <div className="flex items-start justify-between gap-2">
             <h3
-              className={`font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 flex-1 ${
+              className={`font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 flex-1 flex items-center gap-1.5 ${
                 isEditorial ? 'text-lg tracking-tight' : 'text-base'
               }`}
             >
               {store.businessName}
+              {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
             </h3>
             {store.ratingAvg > 0 && (
               <div className="flex items-center gap-1 shrink-0">

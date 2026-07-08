@@ -109,8 +109,8 @@ router.get('/categories/:categoryId/stores', async (req: Request, res: Response)
         directory_listing_id,
         listing_created_at,
         last_product_updated,
-        (SELECT is_demo FROM tenants WHERE id = tenant_id) as is_demo,
-        (SELECT demo_expires_at FROM tenants WHERE id = tenant_id) as demo_expires_at
+        is_demo,
+        demo_expires_at
       FROM directory_category_products
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
@@ -476,8 +476,8 @@ router.get('/search', async (req: Request, res: Response) => {
         recently_updated_products,
         address,
         zip_code,
-        (SELECT is_demo FROM tenants WHERE id = tenant_id) as is_demo,
-        (SELECT demo_expires_at FROM tenants WHERE id = tenant_id) as demo_expires_at
+        is_demo,
+        demo_expires_at
       FROM directory_category_products
       WHERE ${whereClause}
       ORDER BY actual_product_count DESC, quality_score DESC, rating_avg DESC

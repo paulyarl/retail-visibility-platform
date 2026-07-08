@@ -12,11 +12,11 @@ import { subscriptionBillingService, type PaymentMethod } from '@/services/Subsc
 
 export const dynamic = 'force-dynamic';
 
-export default function FeatureStorePage() {
+export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
 
-  const tenantId = searchParams?.get('tenantId') || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+  const tenantId = propTenantId || searchParams?.get('tenantId') || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
 
   const [catalog, setCatalog] = useState<BsaasCatalogItem[]>([]);
   const [bundleCatalog, setBundleCatalog] = useState<BsaasBundleCatalogItem[]>([]);
@@ -139,6 +139,10 @@ export default function FeatureStorePage() {
   const handleBundlePurchaseClick = (bundle: BsaasBundleCatalogItem) => {
     if (bundle.allActive) {
       setError(`All components of "${bundle.name}" are already active for your tenant.`);
+      return;
+    }
+    if (bundle.allInTier) {
+      setError(`All components of "${bundle.name}" are already included in your subscription plan — no purchase needed.`);
       return;
     }
     if (bundle.tierEligible === false) {
@@ -264,6 +268,7 @@ export default function FeatureStorePage() {
             <Grid>
               {bundleCatalog.filter(b => !b.allActive).map((bundle) => {
                 const notEligible = bundle.tierEligible === false;
+                const allInTier = bundle.allInTier;
                 const componentSum = bundle.items.reduce((sum, _item) => sum, 0);
                 const savingsPercent = componentSum > 0 && bundle.priceCents < componentSum
                   ? Math.round(((componentSum - bundle.priceCents) / componentSum) * 100)
@@ -329,6 +334,10 @@ export default function FeatureStorePage() {
                               Upgrade Plan
                             </Button>
                           </Link>
+                        ) : allInTier ? (
+                          <Button variant="light" color="blue" size="sm" disabled>
+                            Included in Plan
+                          </Button>
                         ) : (
                           <Button
                             variant="gradient"
@@ -518,7 +527,7 @@ export default function FeatureStorePage() {
         >
           {purchaseTarget && (
             <Stack gap="md">
-              <Card withBorder p="md" bg="neutral.50">
+              <Card withBorder p="md" bg="gray.0">
                 <Group justify="space-between">
                   <Text fw={600}>{purchaseTarget.name}</Text>
                   <Text fw={700} c="blue">{formatPrice(purchaseTarget.priceCents, purchaseTarget.billingCycle)}</Text>
@@ -597,7 +606,7 @@ export default function FeatureStorePage() {
         >
           {bundleTarget && (
             <Stack gap="md">
-              <Card withBorder p="md" bg="violet.50">
+              <Card withBorder p="md" bg="violet.0">
                 <Group justify="space-between">
                   <Group gap="sm">
                     <Text fw={600}>{bundleTarget.name}</Text>

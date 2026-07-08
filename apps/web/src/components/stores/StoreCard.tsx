@@ -7,6 +7,7 @@ import { MapPin, Package, Star, ChevronRight, ShoppingBag, Phone, Globe } from '
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 // ==================== TYPES ====================
 
@@ -59,6 +60,8 @@ export interface StoreData {
   subscriptionTier?: string;
   businessHours?: any;
   distance?: number;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 export type ViewMode = 'grid' | 'list' | 'map';
@@ -211,6 +214,7 @@ export function StoreCard({
               className="text-lg font-semibold text-neutral-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <span>{store.name}</span>
+              {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
             </Link>
             
             {/* Store Category/Type */}
@@ -358,8 +362,9 @@ export function StoreCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
                     {store.name}
+                    {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
                   </h3>
 
                   {/* Category Badge */}
@@ -471,8 +476,9 @@ export function StoreCard({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+            <h3 className="font-semibold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
               {store.name}
+              {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
             </h3>
             {store.primaryCategory && (
               <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">

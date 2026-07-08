@@ -435,6 +435,81 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       }))
       .slice(0, 10) // Will be further limited by tier features in TierBasedLandingPage
   };
+
+  // Extract enriched fields from metadata for ProductDetailTabs consumption
+  // Mirrors item detail page logic at /t/[tenantId]/items/[itemId]/page.tsx
+  const meta = product.metadata || {};
+  const enrichedFields: Record<string, any> = {};
+
+  if (meta.ingredients) {
+    enrichedFields.ingredients = typeof meta.ingredients === 'string'
+      ? meta.ingredients
+      : Array.isArray(meta.ingredients)
+        ? meta.ingredients.join(', ')
+        : String(meta.ingredients);
+  }
+
+  if (meta.nutrition) {
+    const nutrition = meta.nutrition;
+    enrichedFields.nutritionFacts = {};
+    if (nutrition.per_100g) {
+      const per100g = nutrition.per_100g;
+      enrichedFields.nutritionFacts = {
+        servingSize: nutrition.servingSize || nutrition.serving_size || 'Per 100g',
+        calories: per100g.energy_kcal || per100g['energy-kcal_100g'] || per100g.energy,
+        totalFat: per100g.fat != null ? `${per100g.fat}g` : undefined,
+        saturatedFat: per100g.saturated_fat != null ? `${per100g.saturated_fat}g` : undefined,
+        carbohydrates: per100g.carbohydrates != null ? `${per100g.carbohydrates}g` : undefined,
+        sugars: per100g.sugars != null ? `${per100g.sugars}g` : undefined,
+        protein: per100g.proteins != null ? `${per100g.proteins}g` : undefined,
+        fiber: per100g.fiber != null ? `${per100g.fiber}g` : undefined,
+        sodium: per100g.sodium != null ? `${per100g.sodium}g` : undefined,
+        salt: per100g.salt != null ? `${per100g.salt}g` : undefined,
+      };
+    }
+    if (nutrition.grade || nutrition.nutrition_grade_fr) {
+      enrichedFields.nutriScore = nutrition.grade || nutrition.nutrition_grade_fr;
+    }
+  }
+
+  if (meta.allergens) {
+    enrichedFields.allergens = typeof meta.allergens === 'string'
+      ? meta.allergens.split(',').map((a: string) => a.trim()).filter(Boolean)
+      : Array.isArray(meta.allergens) ? meta.allergens : [];
+  }
+  if (meta.allergens_tags && Array.isArray(meta.allergens_tags)) {
+    enrichedFields.allergens = [...new Set([...(enrichedFields.allergens || []), ...meta.allergens_tags])];
+  }
+
+  if (meta.ingredients_analysis) {
+    const analysis = meta.ingredients_analysis;
+    enrichedFields.dietaryInfo = [];
+    if (analysis.vegan) enrichedFields.dietaryInfo.push('Vegan');
+    if (analysis.vegetarian) enrichedFields.dietaryInfo.push('Vegetarian');
+    if (analysis.palm_oil_free) enrichedFields.dietaryInfo.push('Palm Oil Free');
+  }
+
+  enrichedFields.environmentalInfo = [];
+  if (meta.environmental) {
+    const env = meta.environmental;
+    if (env.ecoscore_grade) {
+      enrichedFields.environmentalInfo.push(`Eco-Score: ${env.ecoscore_grade.toUpperCase()}`);
+    }
+    if (env.carbon_footprint) {
+      enrichedFields.environmentalInfo.push(`Carbon Footprint: ${env.carbon_footprint}g CO₂`);
+    }
+  }
+  if (meta.nova_group) {
+    enrichedFields.environmentalInfo.push(`Processing Level: NOVA ${meta.nova_group}`);
+  }
+  if (enrichedFields.environmentalInfo.length === 0) {
+    delete enrichedFields.environmentalInfo;
+  }
+
+  const productWithEnrichment = {
+    ...productWithGallery,
+    ...enrichedFields,
+  };
   // console.log(`productWithGallery: ${JSON.stringify(productWithGallery)}`)
 
   // Check if product is publicly accessible
@@ -567,44 +642,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             <TenantPaymentProvider tenantId={product.tenantId}>
               <ProductShowcaseLayout
                 product={{
-                  id: product.id,
-                  tenantId: product.tenantId,
-                  name: product.name,
-                  title: product.title,
-                  description: product.description,
-                  marketingDescription: product.marketingDescription || product.enhanced_description,
-                  price: product.price,
-                  priceCents: product.priceCents,
-                  listPriceCents: product.listPriceCents,
-                  salePriceCents: product.salePriceCents,
-                  currency: product.currency,
-                  imageUrl: product.imageUrl,
-                  imageGallery: productWithGallery.imageGallery,
-                  brand: product.brand,
-                  sku: product.sku,
-                  stock: product.stock,
-                  availability: product.availability,
-                  condition: product.condition,
-                  tenantCategoryId: product.category?.id,
-                  tenantCategory: product.category ? {
-                    id: product.category.id,
-                    name: product.category.name,
-                    slug: product.category.slug,
-                  } : undefined,
+                  ...productWithEnrichment,
                   featuredTypes: merchantFilteredFeaturedTypes,
                   bucketCounts,
-                  features: product.features || [],
-                  specifications: product.specifications,
                   slug: product.tenant?.slug || '',
-                  variants: product.variants,
-                  productType: product.productType,
-                  digitalDeliveryMethod: product.digitalDeliveryMethod,
-                  digitalAssets: product.digitalAssets,
-                  licenseType: product.licenseType,
-                  accessDurationDays: product.accessDurationDays,
-                  downloadLimit: product.downloadLimit,
-                  productSlug: product.productSlug,
-                  slugType: product.slugType,
                   videoUrl: (product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl || null,
                 } as any}
                 tenant={{
@@ -650,44 +691,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             <TenantPaymentProvider tenantId={product.tenantId}>
               <ProductQuickCommerceLayout
                 product={{
-                  id: product.id,
-                  tenantId: product.tenantId,
-                  name: product.name,
-                  title: product.title,
-                  description: product.description,
-                  marketingDescription: product.marketingDescription || product.enhanced_description,
-                  price: product.price,
-                  priceCents: product.priceCents,
-                  listPriceCents: product.listPriceCents,
-                  salePriceCents: product.salePriceCents,
-                  currency: product.currency,
-                  imageUrl: product.imageUrl,
-                  imageGallery: productWithGallery.imageGallery,
-                  brand: product.brand,
-                  sku: product.sku,
-                  stock: product.stock,
-                  availability: product.availability,
-                  condition: product.condition,
-                  tenantCategoryId: product.category?.id,
-                  tenantCategory: product.category ? {
-                    id: product.category.id,
-                    name: product.category.name,
-                    slug: product.category.slug,
-                  } : undefined,
+                  ...productWithEnrichment,
                   featuredTypes: merchantFilteredFeaturedTypes,
                   bucketCounts,
-                  features: product.features || [],
-                  specifications: product.specifications,
                   slug: product.tenant?.slug || '',
-                  variants: product.variants,
-                  productType: product.productType,
-                  digitalDeliveryMethod: product.digitalDeliveryMethod,
-                  digitalAssets: product.digitalAssets,
-                  licenseType: product.licenseType,
-                  accessDurationDays: product.accessDurationDays,
-                  downloadLimit: product.downloadLimit,
-                  productSlug: product.productSlug,
-                  slugType: product.slugType,
                   videoUrl: (product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl || null,
                 } as any}
                 tenant={{
@@ -790,48 +797,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   <TierBasedLandingPage
                     disableQRCode
                     product={{
-                      id: product.id,
-                      tenantId: product.tenantId,
-                      name: product.name,
-                      title: product.title,
-                      description: product.description,
-                      marketingDescription: product.marketingDescription || product.enhanced_description, // Use new field with fallback
-                      price: product.price,
-                      priceCents: product.priceCents,
-                      listPriceCents: product.listPriceCents,
-                      salePriceCents: product.salePriceCents,
-                      currency: product.currency,
-                      imageUrl: product.imageUrl,
-                      imageGallery: productWithGallery.imageGallery,
-                      brand: product.brand,
-                      sku: product.sku,
-                      stock: product.stock,
-                      availability: product.availability,
-                      condition: product.condition,
-                      tenantCategoryId: product.category?.id,
-                      tenantCategory: product.category ? {
-                        id: product.category.id,
-                        name: product.category.name,
-                        slug: product.category.slug,
-                      } : undefined,
+                      ...productWithEnrichment,
                       featuredTypes: merchantFilteredFeaturedTypes,
                       bucketCounts,
-                      gtin: undefined, // Not available in new API
-                      mpn: undefined, // Not available in new API
-                      defaultGatewayType: undefined, // Will be determined by tenant
-                      // Pass features from direct field as array, qrCodes will be handled by disableQRCode prop
-                      features: product.features || [],
-                      specifications: product.specifications, // Now available from direct field
+                      gtin: undefined,
+                      mpn: undefined,
+                      defaultGatewayType: undefined,
                       slug: product.tenant?.slug || '',
-                      variants: product.variants,
-                      productType: product.productType,
-                      digitalDeliveryMethod: product.digitalDeliveryMethod,
-                      digitalAssets: product.digitalAssets,
-                      licenseType: product.licenseType,
-                      accessDurationDays: product.accessDurationDays,
-                      downloadLimit: product.downloadLimit,
-                      productSlug: product.productSlug,
-                      slugType: product.slugType,
                     } as any}
                     tenant={{
                       id: product.tenantId,

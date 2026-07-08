@@ -7,6 +7,7 @@
 
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
+import { generateSessionId } from '../lib/id-generator';
 
 export interface CatalogSearchParams {
   supplierId?: string;
@@ -207,6 +208,10 @@ class SupplierCatalogServiceClass {
           });
           inserted++;
         }
+
+        if (row.gtin) {
+          this.syncToBarcodeEnrichment(row).catch(() => {});
+        }
       } catch (err) {
         await prisma.catalog_quarantine.create({
           data: {
@@ -282,6 +287,61 @@ class SupplierCatalogServiceClass {
         data: { error_message: `Replay error: ${errorMsg}` },
       });
       return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Sync a supplier catalog item's GTIN data into barcode_enrichment
+   * so the universal scan cache benefits from supplier-sourced data.
+   * Fire-and-forget — failures don't affect ingestion.
+   */
+  private async syncToBarcodeEnrichment(row: BatchIngestRow): Promise<void> {
+    if (!row.gtin || row.gtin.trim() === '') return;
+
+    try {
+      const categoryPath = row.category ? [row.category] : [];
+      const msrpCents = row.msrp_cents ?? null;
+
+      await prisma.barcode_enrichment.upsert({
+        where: { barcode: row.gtin },
+        create: {
+          id: generateSessionId('platform'),
+          barcode: row.gtin,
+          name: row.name || null,
+          brand: row.brand || null,
+          description: row.description || null,
+          category_path: categoryPath,
+          price_cents: msrpCents,
+          image_url: row.image_url || null,
+          metadata: {
+            supplier_sku: row.supplier_sku,
+            attrs: row.attrs,
+            source: 'supplier_catalog',
+          },
+          source: 'supplier_catalog',
+          last_fetched_at: new Date(),
+          fetch_count: 1,
+          updated_at: new Date(),
+        } as any,
+        update: {
+          name: row.name || null,
+          brand: row.brand || null,
+          description: row.description || null,
+          category_path: categoryPath,
+          price_cents: msrpCents,
+          image_url: row.image_url || null,
+          metadata: {
+            supplier_sku: row.supplier_sku,
+            attrs: row.attrs,
+            source: 'supplier_catalog',
+          },
+          source: 'supplier_catalog',
+          last_fetched_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error('[SupplierCatalog] Failed to sync GTIN to barcode_enrichment:', error);
     }
   }
 

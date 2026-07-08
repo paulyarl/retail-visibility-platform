@@ -63,13 +63,13 @@ interface PendingRequest {
 }
 
 
-export default function SubscriptionPage({ embedded = false }: { embedded?: boolean } = {}) {
+export default function SubscriptionPage({ embedded = false, tenantId: propTenantId }: { embedded?: boolean; tenantId?: string } = {}) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  
-  // Get tenant ID from URL parameter or localStorage (in priority order)
+
+  // Get tenant ID from prop, URL parameter, or localStorage (in priority order)
   const urlTenantId = searchParams?.get('tenantId');
-  let tenantId = urlTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+  let tenantId = propTenantId || urlTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
   
   // Validate tenant ownership - PLATFORM_ADMIN and PLATFORM_SUPPORT can access any tenant
   if (urlTenantId && user?.tenants) {

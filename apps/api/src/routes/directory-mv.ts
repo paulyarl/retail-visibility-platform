@@ -184,6 +184,8 @@ router.get('/search', async (req: Request, res: Response) => {
             dll.logo_url,
             dll.business_hours,
             true as directory_published,
+            t.is_demo,
+            t.demo_expires_at,
             ${distanceSelect},
             ROW_NUMBER() OVER (PARTITION BY dll.tenant_id ORDER BY dll.rating_avg DESC NULLS LAST) as rn
           FROM directory_listings_list dll
@@ -241,6 +243,8 @@ router.get('/search', async (req: Request, res: Response) => {
           dll.logo_url,
           dll.business_hours,
           true as directory_published,
+          t.is_demo,
+          t.demo_expires_at,
           NULL as distance_km
         FROM directory_listings_list dll
         INNER JOIN tenants t ON dll.tenant_id = t.id
@@ -308,6 +312,8 @@ router.get('/search', async (req: Request, res: Response) => {
         canUseExternalLink: row.can_use_external_link || false,
         businessHours: row.business_hours,
         directoryPublished: row.directory_published || false, // Add directory publish status
+        isDemo: row.is_demo || false,
+        demoExpiresAt: row.demo_expires_at || null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         distance: row.distance_km ? Math.round(row.distance_km * 10) / 10 : null, // Distance in km, rounded to 1 decimal
@@ -565,7 +571,9 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         -- Business hours for status indicator
         dll.business_hours,
         -- Directory publish status (always true since we're filtering)
-        true as directory_published
+        true as directory_published,
+        t.is_demo,
+        t.demo_expires_at
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
       LEFT JOIN mv_tenant_effective_capabilities mec ON mec.tenant_id = dll.tenant_id AND mec.feature_key = 'directory_entry_external_link'
@@ -637,6 +645,8 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
         canUseExternalLink: row.can_use_external_link || false,
         businessHours: row.business_hours,
         directoryPublished: row.directory_published || false,
+        isDemo: row.is_demo || false,
+        demoExpiresAt: row.demo_expires_at || null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
