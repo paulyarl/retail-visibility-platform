@@ -314,6 +314,8 @@ router.get('/tenants/:id/complete', authenticateToken, checkTenantAccess, async 
           created_at: true,
           monthly_sku_quota: true,
           skus_added_this_month: true,
+          is_demo: true,
+          demo_expires_at: true,
           organizations_list: {
             select: {
               id: true,
@@ -478,7 +480,9 @@ router.get('/tenants/:id/complete', authenticateToken, checkTenantAccess, async 
       stats: {
         productCount: itemCount,
         userCount: 1, // Placeholder
-      }
+      },
+      isDemo: tenant.is_demo || false,
+      demoExpiresAt: tenant.demo_expires_at ? tenant.demo_expires_at.toISOString() : null,
     };
 
     const response = {

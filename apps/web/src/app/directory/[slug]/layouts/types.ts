@@ -33,4 +33,6 @@ export interface DirectoryEntryLayoutProps {
   actualProductCount: number;
   storeStatus: any;
   fullAddress: string;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }

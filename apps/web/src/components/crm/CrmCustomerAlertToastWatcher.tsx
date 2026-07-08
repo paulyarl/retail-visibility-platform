@@ -45,6 +45,7 @@ export default function CrmCustomerAlertToastWatcher() {
         title: alert.title,
         description: alert.body || 'New alert',
         variant: alert.type === 'warning' ? 'warning' : 'info',
+        duration: 30000,
       });
     }
 

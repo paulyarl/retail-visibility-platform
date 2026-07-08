@@ -309,6 +309,19 @@ export async function resolveEffectiveCapabilities(
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
     // CRM, Storefront, Product Options, Featured, Storefront Options, Directory Entry, FAQ, Org Options
+
+    // CRM is a platform communication channel, not a feature benefit.
+    // Force enabled regardless of tier so tenants can always receive alerts,
+    // view tickets/tasks, and respond to existing items.
+    result.effective.crm.enabled = true;
+    result.effective.crm.crm_available = true;
+  }
+
+  // CRM is always available as a platform communication channel regardless of tier.
+  // If the tier doesn't include CRM features, force minimal access (read + respond).
+  if (!result.effective.crm.enabled) {
+    result.effective.crm.enabled = true;
+    result.effective.crm.crm_available = true;
   }
 
   if (isLimited) {

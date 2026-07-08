@@ -8,12 +8,14 @@ export type ToastProps = {
   description?: string
   action?: React.ReactNode
   variant?: 'default' | 'destructive' | 'success' | 'warning' | 'info'
+  duration?: number
 }
 
 export type ToastActionElement = React.ReactElement<any>
 
 const TOAST_LIMIT = 3
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000
+const DEFAULT_TOAST_DURATION = 5000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -21,6 +23,7 @@ type ToasterToast = ToastProps & {
   description?: React.ReactNode
   action?: ToastActionElement
   open?: boolean
+  duration?: number
   onOpenChange?: (open: boolean) => void
 }
 
@@ -150,6 +153,7 @@ type Toast = Omit<ToasterToast, 'id'>
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  const duration = props.duration ?? DEFAULT_TOAST_DURATION
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -163,12 +167,19 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
+      duration,
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss()
       },
     },
   })
+
+  if (duration > 0) {
+    setTimeout(() => {
+      dismiss()
+    }, duration)
+  }
 
   return {
     id: id,

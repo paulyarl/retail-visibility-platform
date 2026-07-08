@@ -160,6 +160,32 @@ router.post('/:id/revoke-demo', async (req: Request, res: Response) => {
 });
 
 /**
+ * PATCH /api/admin/demo-tenants/:id/tier
+ * Change the subscription tier of a demo tenant
+ * Body: { tier: string }
+ */
+router.patch('/:id/tier', async (req: Request, res: Response) => {
+  try {
+    const { tier } = req.body;
+
+    if (!tier || typeof tier !== 'string') {
+      return res.status(400).json({ success: false, error: 'tier is required and must be a string' });
+    }
+
+    const result = await demoTenantService.changeDemoTenantTier(req.params.id, tier);
+
+    if (!result.changed) {
+      return res.status(400).json({ success: false, error: result.reason });
+    }
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[Admin Demo Tenants] Error changing tier:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/admin/demo-tenants/:id/expire
  * Manually expire a demo tenant (marks as closed, does not delete data)
  */

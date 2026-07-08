@@ -10,6 +10,7 @@ import { navigateToTenant } from '@/lib/tenant-navigation';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 interface TenantScopeHeaderProps {
   tenantId: string;
@@ -221,8 +222,9 @@ export default function TenantScopeHeader({
             )}
             
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-semibold text-neutral-900 truncate">
-                {tenantName}
+              <h1 className="text-lg font-semibold text-neutral-900 truncate flex items-center gap-2">
+                <span className="truncate">{tenantName}</span>
+                <DemoBadge isDemo={tenantData?.isDemo} demoExpiresAt={tenantData?.demoExpiresAt} size="sm" />
               </h1>
               {showPageTitle && displayTitle && (
                 <p className="text-sm text-neutral-500 truncate">

@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Save, FileText, AlertCircle } from 'lucide-react';
+import { Save, FileText, AlertCircle, LayoutTemplate, RefreshCw } from 'lucide-react';
 import { tenantStorefrontPolicyService } from '@/services/TenantStorefrontPolicyService';
+import { policyTemplateService, OutdatedUsageRecord } from '@/services/PolicyTemplateService';
+import TemplateGallery from './TemplateGallery';
+import ComplianceChecklist from './ComplianceChecklist';
 
 interface StorefrontPolicies {
   return_policy: string | null;
@@ -17,6 +20,7 @@ interface StorefrontPolicies {
 
 interface StorefrontPoliciesClientProps {
   tenantId: string;
+  effectiveStorefrontType?: string;
 }
 
 const POLICY_FIELDS: Array<{
@@ -57,7 +61,7 @@ const POLICY_FIELDS: Array<{
   },
 ];
 
-export default function StorefrontPoliciesClient({ tenantId }: StorefrontPoliciesClientProps) {
+export default function StorefrontPoliciesClient({ tenantId, effectiveStorefrontType }: StorefrontPoliciesClientProps) {
   const router = useRouter();
   const [policies, setPolicies] = useState<StorefrontPolicies>({
     return_policy: null,
@@ -70,9 +74,12 @@ export default function StorefrontPoliciesClient({ tenantId }: StorefrontPolicie
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<keyof StorefrontPolicies>('return_policy');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [outdatedTemplates, setOutdatedTemplates] = useState<OutdatedUsageRecord[]>([]);
 
   useEffect(() => {
     fetchPolicies();
+    policyTemplateService.getOutdatedUsage(tenantId).then(setOutdatedTemplates).catch(() => {});
   }, [tenantId]);
 
   const fetchPolicies = async () => {
@@ -144,6 +151,38 @@ export default function StorefrontPoliciesClient({ tenantId }: StorefrontPolicie
         </div>
       </div>
 
+      {outdatedTemplates.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+          <div className="flex items-start gap-2">
+            <RefreshCw className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-amber-900">
+              <p className="font-medium">Policy template updates available</p>
+              <p className="mt-1">
+                {outdatedTemplates.length} policy template{outdatedTemplates.length > 1 ? 's have' : ' has'} been updated since you last applied {outdatedTemplates.length > 1 ? 'them' : 'it'}. Review and update to stay compliant.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {outdatedTemplates.map(r => (
+                  <li key={r.id} className="text-xs">
+                    <strong>{r.templateTitle || r.policyType.replace(/_/g, ' ')}</strong> — v{r.appliedVersion} → v{r.currentVersion}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="mt-2 text-xs font-medium text-amber-700 underline hover:text-amber-900"
+              >
+                Browse updated templates →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ComplianceChecklist
+        tenantId={tenantId}
+        onBrowseTemplates={() => setShowTemplates(true)}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Policy Editor</CardTitle>
@@ -166,6 +205,35 @@ export default function StorefrontPoliciesClient({ tenantId }: StorefrontPolicie
             ))}
           </div>
 
+          {/* Browse Templates toggle */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                showTemplates
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-blue-600 hover:bg-blue-50'
+              }`}
+            >
+              <LayoutTemplate className="h-4 w-4" />
+              {showTemplates ? 'Hide Templates' : 'Browse Templates'}
+            </button>
+          </div>
+
+          {/* Template Gallery */}
+          {showTemplates && (
+            <TemplateGallery
+              tenantId={tenantId}
+              effectiveStorefrontType={effectiveStorefrontType}
+              policyTypeFilter={activeTab}
+              onApplied={(policyType) => {
+                fetchPolicies();
+                setMessage({ type: 'success', text: `Template applied to ${policyType.replace(/_/g, ' ')}! Review and save.` });
+                setTimeout(() => setMessage(null), 5000);
+              }}
+            />
+          )}
+
           {/* Active policy editor */}
           <div className="space-y-3">
             <div>
@@ -184,9 +252,13 @@ export default function StorefrontPoliciesClient({ tenantId }: StorefrontPolicie
                 {(policies[activeTab] || '').length} characters
               </span>
               {policies[activeTab] ? (
-                <span className="text-xs text-green-600 font-medium">Configured</span>
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                  Configured
+                </span>
               ) : (
-                <span className="text-xs text-neutral-400">Not configured</span>
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                  Not configured
+                </span>
               )}
             </div>
           </div>

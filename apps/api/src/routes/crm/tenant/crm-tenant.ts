@@ -16,9 +16,9 @@ import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmAlertService from '../../../services/CrmAlertService';
 import CrmUserReadStateService from '../../../services/CrmUserReadStateService';
-import CrmOptionsService from '../../../services/CrmOptionsService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
+import { deriveInternalStatus } from '../../../utils/subscription-status';
 
 const router = Router({ mergeParams: true });
 
@@ -31,20 +31,42 @@ const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
 const alertService = CrmAlertService.getInstance();
 const userReadStateService = CrmUserReadStateService.getInstance();
-const crmOptionsService = CrmOptionsService.getInstance();
 
 // Helper to get tenant ID from request context
 function getTenantId(req: Request): string | null {
   return (req.headers['x-tenant-id'] as string) || req.user?.tenantIds?.[0] || null;
 }
 
-// Merchant gate check: returns false and sends 403 response if CRM is disabled
-async function checkCrmEnabled(tenantId: string, res: Response): Promise<boolean> {
-  const state = await crmOptionsService.resolveCrmOptionsState(tenantId);
-  if (!state.enabled) {
+// CRM is a platform communication channel, always accessible for Read and Update (respond).
+// Create operations are gated by subscription status: only active/trialing/past_due tenants
+// can create new items. Frozen/canceled/expired tenants can view and respond but not create.
+async function checkCrmCreateAllowed(tenantId: string, res: Response): Promise<boolean> {
+  const tenant = await prisma.tenants.findUnique({
+    where: { id: tenantId },
+    select: {
+      subscription_status: true,
+      subscription_tier: true,
+      trial_ends_at: true,
+      subscription_ends_at: true,
+    },
+  });
+  if (!tenant) {
+    res.status(404).json({ error: 'tenant_not_found', message: 'Tenant not found' });
+    return false;
+  }
+
+  const internalStatus = deriveInternalStatus({
+    subscription_status: tenant.subscription_status,
+    subscription_tier: tenant.subscription_tier,
+    trialEndsAt: tenant.trial_ends_at,
+    subscription_ends_at: tenant.subscription_ends_at,
+  });
+
+  if (internalStatus === 'frozen' || internalStatus === 'canceled' || internalStatus === 'expired') {
     res.status(403).json({
-      error: 'merchant_gate_disabled',
-      message: 'CRM is disabled. Enable it in CRM Options settings.',
+      error: 'subscription_read_only',
+      message: 'Your account is in read-only mode. You can view and respond to existing items, but cannot create new ones.',
+      subscription_status: internalStatus,
     });
     return false;
   }
@@ -60,8 +82,6 @@ router.get('/stats', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const userId = req.user?.userId || req.user?.user_id || null;
     const stats = await tenantService.getTenantCrmStats(tenantId, userId ?? undefined);
     res.json({ success: true, data: stats });
@@ -80,8 +100,6 @@ router.get('/contacts', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     // Auto-sync contacts from orders before listing
     await contactService.syncFromOrders(tenantId);
 
@@ -98,7 +116,7 @@ router.post('/contacts', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
+    if (!(await checkCrmCreateAllowed(tenantId, res))) return;
 
     const contact = await contactService.create({ tenant_id: tenantId, ...req.body });
     await audit({ tenantId, actor: req.user?.userId, action: 'create', payload: { entity_type: 'crm_contact', id: contact.id, ...req.body } });
@@ -114,8 +132,6 @@ router.get('/contacts/:contactId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const contact = await contactService.getDetail(req.params.contactId);
     if (!contact || contact.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'not_found', message: 'Contact not found' });
@@ -132,8 +148,6 @@ router.put('/contacts/:contactId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const contact = await contactService.update(req.params.contactId, req.body);
     await audit({ tenantId, actor: req.user?.userId, action: 'update', payload: { entity_type: 'crm_contact', id: contact.id } });
     res.json({ success: true, data: contact });
@@ -152,8 +166,6 @@ router.get('/tickets', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const tickets = await ticketService.listByTenant(tenantId, {
       status: req.query.status as string,
       priority: req.query.priority as string,
@@ -171,7 +183,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
+    if (!(await checkCrmCreateAllowed(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
@@ -212,8 +224,6 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
 
@@ -231,7 +241,6 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
     // Tenant users can see internal notes
     const messages = await messageService.listByTicket(req.params.ticketId, true);
     res.json({ success: true, data: messages });
@@ -246,8 +255,6 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
 
@@ -275,8 +282,6 @@ router.get('/tasks', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const tasks = await taskService.listByTenant(tenantId, { status: req.query.status as string, assignedTo: req.query.assignedTo as string });
     res.json({ success: true, data: tasks });
   } catch (error) {
@@ -294,8 +299,6 @@ router.get('/activities', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const activities = await activityService.listByTenant(tenantId, {
       type: req.query.type as string,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
@@ -317,8 +320,6 @@ router.get('/inquiries', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const inquiries = await inquiryService.listByTenant(tenantId, {
       status: req.query.status as string,
       priority: req.query.priority as string,
@@ -336,7 +337,7 @@ router.post('/inquiries', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
+    if (!(await checkCrmCreateAllowed(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
 
@@ -354,8 +355,6 @@ router.put('/inquiries/:inquiryId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
 
@@ -463,7 +462,7 @@ router.post('/inquiries/:inquiryId/create-ticket', async (req: Request, res: Res
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
+    if (!(await checkCrmCreateAllowed(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = req.user?.email || 'Tenant User';
@@ -513,8 +512,6 @@ router.get('/alerts', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const alerts = await alertService.listByTenant(tenantId, {
       type: req.query.type as string,
       unreadOnly: req.query.unread === 'true',
@@ -531,8 +528,6 @@ router.put('/alerts/:alertId/read', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const alert = await alertService.getById(req.params.alertId);
     if (!alert || alert.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'not_found', message: 'Alert not found' });
@@ -551,8 +546,6 @@ router.put('/alerts/read-all', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     await alertService.markAllRead(tenantId);
     res.json({ success: true });
   } catch (error) {
@@ -566,8 +559,6 @@ router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const alert = await alertService.getById(req.params.alertId);
     if (!alert || alert.tenant_id !== tenantId) {
       return res.status(404).json({ error: 'not_found', message: 'Alert not found' });
@@ -590,8 +581,6 @@ router.get('/read-state', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const userId = req.user?.userId || req.user?.user_id;
     if (!userId) return res.status(401).json({ error: 'unauthenticated', message: 'User ID required' });
 
@@ -609,8 +598,6 @@ router.put('/read-state', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
-
     const userId = req.user?.userId || req.user?.user_id;
     if (!userId) return res.status(401).json({ error: 'unauthenticated', message: 'User ID required' });
 
@@ -636,7 +623,6 @@ router.patch('/tickets/reorder', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
     const { items } = req.body as { items: { id: string; sort_order: number }[] };
     if (!Array.isArray(items)) return res.status(400).json({ error: 'invalid_input', message: 'items array required' });
     await ticketService.reorder(items);
@@ -652,7 +638,6 @@ router.patch('/tasks/reorder', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
-    if (!(await checkCrmEnabled(tenantId, res))) return;
     const { items } = req.body as { items: { id: string; sort_order: number }[] };
     if (!Array.isArray(items)) return res.status(400).json({ error: 'invalid_input', message: 'items array required' });
     await taskService.reorder(items);

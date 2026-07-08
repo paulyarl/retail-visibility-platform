@@ -1,6 +1,12 @@
 import { getCapabilityTypeForFeature, AllCapabilitiesState } from '@/services/CapabilityResolutionService';
 import { FEATURE_DISPLAY_NAMES, TIER_FEATURES, getTierFeatures as getTierFeaturesRaw } from '@/lib/tiers/tier-features';
 
+const EXTRA_FEATURES_BY_CAPABILITY: Record<string, string[]> = {
+  commerce_types: ['commerce_full_payment', 'commerce_deposit_only'],
+  featured_options: ['featured_store_selection', 'featured_new_arrival', 'featured_seasonal', 'featured_sale', 'featured_staff_pick', 'featured_clearance', 'featured_featured', 'featured_bestseller', 'featured_trending', 'featured_recommended', 'featured_random_featured', 'featured_expiry_monitor'],
+  directory_promotion: ['directory_promotion_level_basic', 'directory_promotion_level_premium', 'directory_promotion_level_featured'],
+};
+
 export const COMPARISON_TIERS = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'];
 
 export const CAPABILITY_GROUPS = [
@@ -30,6 +36,7 @@ export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: 
   { key: 'faq_options', label: 'FAQ', flexibleKeys: ['faq_flexible'], group: 'Management & Growth' },
   { key: 'directory_entry_options', label: 'Directory Entry', flexibleKeys: ['directory_entry_flexible'], group: 'Google Visibility' },
   { key: 'social_commerce_options', label: 'Social Commerce', flexibleKeys: ['social_commerce_flexible'], group: 'Management & Growth' },
+  { key: 'directory_promotion', label: 'Directory Promotion', flexibleKeys: ['directory_promotion_flexible'], group: 'Google Visibility' },
 ];
 
 export interface ResolvedCapSummary {
@@ -57,6 +64,7 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
   const faq = caps.faqOptions;
   const de = caps.directoryEntryOptions;
   const scc = caps.socialCommerceOptions;
+  const dp = caps.directoryPromotion;
 
   return [
     { key: 'commerce_types', label: 'Commerce', enabled: c.enabled, flexible: c.isFlexible, detail: c.effectivePaymentType !== 'none' ? `Payments: ${c.effectivePaymentType}` : 'Disabled' },
@@ -75,6 +83,7 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
     { key: 'faq_options', label: 'FAQ', enabled: faq.enabled, flexible: faq.isFlexible, detail: faq.enabled ? [faq.storefrontEnabled && 'Storefront', faq.productEnabled && 'Product', faq.templatesEnabled && 'Templates'].filter(Boolean).join(', ') || 'Basic' : 'Not available' },
     { key: 'directory_entry_options', label: 'Directory Entry', enabled: de.enabled, flexible: de.isFlexible, detail: de.enabled ? `${de.effectiveLayout ?? 'classic'} layout` : 'Not available' },
     { key: 'social_commerce_options', label: 'Social Commerce', enabled: scc.enabled, flexible: scc.isFlexible, detail: scc.enabled ? [scc.metaEnabled && 'Meta', scc.tiktokEnabled && 'TikTok', scc.canUseShareButtons && 'Share'].filter(Boolean).join(', ') || 'Available' : 'Not available' },
+    { key: 'directory_promotion', label: 'Directory Promotion', enabled: dp.enabled, flexible: dp.isFlexible, detail: dp.enabled ? (dp.allowedTiers ?? []).join(', ') : 'Not available' },
   ];
 }
 
@@ -99,6 +108,13 @@ const ALL_FEATURES_BY_CAPABILITY: Record<string, string[]> = (() => {
       if (!capKey) return;
       if (!map[capKey]) map[capKey] = new Set();
       map[capKey].add(f);
+    });
+  });
+  // Merge in DB-driven capability features not present in static TIER_FEATURES
+  Object.entries(EXTRA_FEATURES_BY_CAPABILITY).forEach(([capKey, features]) => {
+    if (!map[capKey]) map[capKey] = new Set();
+    features.forEach(f => {
+      if (!isGateKey(f) && !isFlexibleKey(f)) map[capKey].add(f);
     });
   });
   const result: Record<string, string[]> = {};
@@ -173,6 +189,7 @@ export function buildEffectiveFeatures(
   tierFeatures: string[],
   purchasedFeatureKeys: string[],
   resolvedCaps: ResolvedCapSummary[] | null,
+  allCaps?: AllCapabilitiesState | null,
 ): EffectiveFeatureRow[] {
   const purchasedSet = new Set(purchasedFeatureKeys);
   const tierSet = new Set(tierFeatures);
@@ -187,9 +204,41 @@ export function buildEffectiveFeatures(
       if (rc.flexible) capFlexibleSet.add(rc.key);
     });
   }
+  // For flexible capabilities, expand using static feature registry first
   capFlexibleSet.forEach(capKey => {
     getAllFeaturesForCapability(capKey).forEach(f => allFeatures.add(f));
   });
+  // Also expand using raw feature maps from resolved capabilities (DB-driven features)
+  if (allCaps) {
+    const rawFeatureMaps: Record<string, Record<string, boolean>> = {
+      commerce_types: allCaps.commerce?.features || {},
+      payment_gateway_options: allCaps.paymentGateway?.features || {},
+      storefront_types: allCaps.storefront?.features || {},
+      storefront_options: allCaps.storefrontOptions?.features || {},
+      fulfillment_options: allCaps.fulfillment?.features || {},
+      barcode_scan_options: allCaps.barcodeScan?.features || {},
+      product_types: allCaps.productType?.features || {},
+      product_options: allCaps.productOptions?.features || {},
+      featured_options: allCaps.featuredOptions?.features || {},
+      integration_options: allCaps.integrationOptions?.features || {},
+      quickstart_options: allCaps.quickstartOptions?.features || {},
+      chatbot_options: allCaps.chatbotOptions?.features || {},
+      crm_options: allCaps.crmOptions?.features || {},
+      faq_options: allCaps.faqOptions?.features || {},
+      directory_entry_options: allCaps.directoryEntryOptions?.features || {},
+      social_commerce_options: allCaps.socialCommerceOptions?.features || {},
+    };
+    capFlexibleSet.forEach(capKey => {
+      const rawMap = rawFeatureMaps[capKey];
+      if (rawMap) {
+        Object.keys(rawMap).forEach(f => {
+          if (rawMap[f] && !isGateKey(f) && !isFlexibleKey(f)) {
+            allFeatures.add(f);
+          }
+        });
+      }
+    });
+  }
   return Array.from(allFeatures).sort().map(feature => {
     const capKey = getCapabilityTypeForFeature(feature);
     if (!capKey) return null;

@@ -1,3 +1,9 @@
+/**
+ * @deprecated This component is DEPRECATED. Do NOT extend or modify.
+ * The active dashboard component is TenantDashboardV2.tsx.
+ * All new work should be done in:
+ *   apps/web/src/components/dashboard/TenantDashboardV2.tsx
+ */
 "use client";
 
 import { lazy, Suspense } from "react";
@@ -475,7 +481,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
           <div className="lg:col-span-2">
             <Suspense fallback={<ComponentLoader />}>
               <MantineCard padding="md" radius="md" withBorder className="p-4 sm:p-6">
-                <CrmTenantWidget tenantId={tenantId} />
+                <CrmTenantWidget tenantId={tenantId} isWritable={allCaps.data?.subscriptionContext?.writable ?? true} />
               </MantineCard>
             </Suspense>
           </div>

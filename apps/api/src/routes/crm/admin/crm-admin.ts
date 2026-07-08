@@ -17,6 +17,7 @@ import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmRequestReadService from '../../../services/CrmRequestReadService';
 import CrmRequestHubService from '../../../services/CrmRequestHubService';
 import CrmAlertService from '../../../services/CrmAlertService';
+import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
 
 interface RequestItem {
@@ -598,20 +599,39 @@ router.post('/alerts', async (req: Request, res: Response) => {
 });
 
 // POST /api/admin/crm/alerts/broadcast
-// Send the same alert to multiple tenants
+// Send the same alert to multiple tenants (or all tenants when send_to_all is true)
 router.post('/alerts/broadcast', async (req: Request, res: Response) => {
   try {
-    const { tenant_ids, type, title, body, icon, metadata } = req.body;
-    if (!Array.isArray(tenant_ids) || tenant_ids.length === 0 || !type || !title) {
-      return res.status(400).json({ error: 'invalid_input', message: 'tenant_ids array, type, and title are required' });
+    const { tenant_ids, send_to_all, type, title, body, icon, metadata } = req.body;
+    if (!type || !title) {
+      return res.status(400).json({ error: 'invalid_input', message: 'type and title are required' });
+    }
+
+    let targetIds: string[] = [];
+
+    if (send_to_all) {
+      const allTenants = await prisma.tenants.findMany({
+        where: { subscription_status: { notIn: ['cancelled'] } },
+        select: { id: true },
+      });
+      targetIds = allTenants.map((t: { id: string }) => t.id);
+    } else {
+      if (!Array.isArray(tenant_ids) || tenant_ids.length === 0) {
+        return res.status(400).json({ error: 'invalid_input', message: 'tenant_ids array or send_to_all is required' });
+      }
+      targetIds = tenant_ids;
+    }
+
+    if (targetIds.length === 0) {
+      return res.status(400).json({ error: 'no_tenants', message: 'No tenants found to broadcast to' });
     }
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const results = await Promise.all(
-      tenant_ids.map(tid => alertService.create({ tenant_id: tid, type, title, body, icon, metadata }))
+      targetIds.map(tid => alertService.create({ tenant_id: tid, type, title, body, icon, metadata }))
     );
-    await audit({ tenantId: 'broadcast', actor: actorId, action: 'create', payload: { entity_type: 'crm_alert_broadcast', count: results.length, type, title } });
-    res.json({ success: true, data: results });
+    await audit({ tenantId: 'broadcast', actor: actorId, action: 'create', payload: { entity_type: 'crm_alert_broadcast', count: results.length, send_to_all: !!send_to_all, type, title } });
+    res.json({ success: true, data: results, count: results.length });
   } catch (error) {
     console.error('[CRM Admin] Error broadcasting alerts:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to broadcast alerts' });

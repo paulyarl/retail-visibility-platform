@@ -53,6 +53,8 @@ export interface TenantProfile {
   subscriptionEndsAt?: string | null;
   organizationId?: string | null;
   locationStatus?: string | null;
+  isDemo?: boolean | null;
+  demoExpiresAt?: string | null;
   settings?: any;
   businessInfo: {
     address?: string;
@@ -177,7 +179,9 @@ export class TenantService {
           location_status: true,
           gbp_primary_category_id: true,
           gbp_primary_category_name: true,
-          gbp_secondary_categories: true
+          gbp_secondary_categories: true,
+          is_demo: true,
+          demo_expires_at: true
         }
       });
 
@@ -288,6 +292,8 @@ export class TenantService {
         subscriptionEndsAt: tenant?.subscription_ends_at ? tenant.subscription_ends_at.toISOString() : null,
         organizationId: tenant?.organization_id,
         locationStatus: tenant?.location_status,
+        isDemo: tenant.is_demo || false,
+        demoExpiresAt: tenant.demo_expires_at ? tenant.demo_expires_at.toISOString() : null,
       };
     } catch (error) {
       console.error(`[TenantService] Error getting profile for ${tenantId}:`, error);
@@ -323,7 +329,9 @@ export class TenantService {
             organization_id: true,
             org_standing_mode: true,
             organizations_list: { select: { subscription_status: true, subscription_tier: true } },
-            location_status: true
+            location_status: true,
+            is_demo: true,
+            demo_expires_at: true
           }
         }),
         
@@ -397,6 +405,8 @@ export class TenantService {
           subscriptionEndsAt: tenant?.subscription_ends_at ? tenant.subscription_ends_at.toISOString() : null,
           organizationId: tenant?.organization_id,
           locationStatus: tenant?.location_status,
+          isDemo: tenant.is_demo || false,
+          demoExpiresAt: tenant.demo_expires_at ? tenant.demo_expires_at.toISOString() : null,
           hasPublishedDirectory: hasDirectory
         },
         usage: {

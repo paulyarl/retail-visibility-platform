@@ -64,12 +64,12 @@ function relativeTime(dateStr: string | null | undefined): string {
 
 interface CrmTenantWidgetProps {
   tenantId?: string;
+  isWritable?: boolean;
 }
 
-export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
+export default function CrmTenantWidget({ tenantId, isWritable = true }: CrmTenantWidgetProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [crmDisabled, setCrmDisabled] = useState(false);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -108,7 +108,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
     }
   }, [tenantId, user?.id]);
 
-  const { data: stats, isLoading: loading, error: statsError } = useQuery({
+  const { data: stats, isLoading: loading } = useQuery({
     queryKey: ['crm', 'stats', tenantId],
     queryFn: async () => {
       const data = await crmTenantCrmService.getStats();
@@ -120,15 +120,6 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
     retry: 0,
     throwOnError: false,
   });
-
-  useEffect(() => {
-    if (statsError) {
-      const msg = (statsError as any)?.message || '';
-      if (msg.includes('merchant_gate_disabled') || msg.includes('CRM is disabled')) {
-        setCrmDisabled(true);
-      }
-    }
-  }, [statsError]);
 
   const { data: tenantUsers } = useQuery({
     queryKey: ['tenant', 'users', tenantId],
@@ -255,22 +246,6 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
     );
   }
 
-  if (crmDisabled) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm opacity-50">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Support</h3>
-        </div>
-        <p className="text-xs text-neutral-400 text-center py-4">CRM is not enabled for this account. Contact support or enable it in CRM Options settings.</p>
-      </div>
-    );
-  }
-
   const hasItems = tickets.length > 0 || tasks.length > 0 || activities.length > 0 || inquiries.length > 0 || alerts.length > 0;
 
   return (
@@ -299,6 +274,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
             )}
           </div>
         </div>
+        {isWritable && (
         <button
           onClick={() => setShowNewTicket(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm hover:shadow-md transition-all"
@@ -308,6 +284,7 @@ export default function CrmTenantWidget({ tenantId }: CrmTenantWidgetProps) {
           </svg>
           New Ticket
         </button>
+        )}
       </div>
 
       {/* Quick count pills */}

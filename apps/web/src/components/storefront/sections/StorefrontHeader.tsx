@@ -9,6 +9,7 @@ import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 import StickySearchBar from '@/app/tenant/[id]/layouts/shared/StickySearchBar';
 import TrustSignalsBar from '@/app/tenant/[id]/layouts/shared/TrustSignalsBar';
 import { StorefrontLayoutKey } from '@/app/products/[id]/layouts/types';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 interface StorefrontHeaderProps {
   tenantId: string;
@@ -65,6 +66,7 @@ export function StorefrontHeader({
     return (
       <ImmersiveHeader
         tenantId={tenantId}
+        tenant={tenant}
         businessName={businessName}
         logoUrl={logoUrl}
         storefrontStatus={storefrontStatus}
@@ -365,6 +367,7 @@ function EditorialHeader({
 
 function ImmersiveHeader({
   tenantId,
+  tenant,
   businessName,
   logoUrl,
   storefrontStatus,
@@ -375,7 +378,7 @@ function ImmersiveHeader({
   showsAnimatedHours,
   primaryColor,
   shippingText,
-}: Pick<StorefrontHeaderProps, 'tenantId' | 'businessName' | 'logoUrl' | 'storefrontStatus' | 'cartTotalItems' | 'handleViewCart' | 'showsHoursStatus' | 'hoursStatus' | 'showsAnimatedHours' | 'primaryColor' | 'shippingText'>) {
+}: Pick<StorefrontHeaderProps, 'tenantId' | 'tenant' | 'businessName' | 'logoUrl' | 'storefrontStatus' | 'cartTotalItems' | 'handleViewCart' | 'showsHoursStatus' | 'hoursStatus' | 'showsAnimatedHours' | 'primaryColor' | 'shippingText'>) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -405,6 +408,7 @@ function ImmersiveHeader({
               </div>
             )}
             <span className="font-semibold text-sm text-neutral-900 dark:text-white truncate hidden sm:block">{businessName}</span>
+            <DemoBadge isDemo={tenant?.isDemo} demoExpiresAt={tenant?.demoExpiresAt} size="sm" />
           </Link>
 
           <div className="hidden md:block flex-1 max-w-md mx-4">

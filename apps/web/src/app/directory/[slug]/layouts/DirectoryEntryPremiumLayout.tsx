@@ -23,6 +23,7 @@ import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
 
@@ -33,6 +34,7 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
+    isDemo, demoExpiresAt,
   } = props;
 
   return (
@@ -61,9 +63,10 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
                     <img src={listing.logoUrl} alt={listing.businessName} className="w-20 h-20 rounded-full object-cover ring-2 ring-amber-500/50" />
                   )}
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Crown className="w-5 h-5 text-amber-400" />
                       <h1 className="text-3xl font-light tracking-wide">{listing.businessName}</h1>
+                      <DemoBadge isDemo={isDemo} demoExpiresAt={demoExpiresAt} size="md" />
                     </div>
                     {listing.categories && listing.categories.length > 0 && (
                       <p className="text-stone-400 mt-1">

@@ -158,6 +158,8 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
           gbp_primary_category_id: true,
           gbp_primary_category_name: true,
           gbp_secondary_categories: true,
+          is_demo: true,
+          demo_expires_at: true,
         }
       } as any),
     ]);
@@ -281,6 +283,8 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         effectiveExpiresAt: effectiveExpiration?.expiresAt,
         effectiveExpiresType: effectiveExpiration?.type,
         effectiveExpiresSource: effectiveExpiration?.source,
+        isDemo: tenantData?.is_demo || false,
+        demoExpiresAt: tenantData?.demo_expires_at ? tenantData.demo_expires_at.toISOString() : null,
       },
       metadata: {
         tenant: {

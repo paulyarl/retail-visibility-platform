@@ -23,6 +23,7 @@ import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
 
@@ -33,6 +34,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
+    isDemo, demoExpiresAt,
   } = props;
 
   const coverImage = listing.coverImageUrl || listing.bannerImageUrl || listing.logoUrl;
@@ -70,7 +72,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
                       <img src={listing.logoUrl} alt="" className="w-24 h-24 rounded-2xl object-cover border-4 border-white/20 shadow-2xl hidden sm:block" />
                     )}
                     <div className="pb-2">
-                      <h1 className="text-4xl sm:text-6xl font-bold">{listing.businessName}</h1>
+                      <h1 className="text-4xl sm:text-6xl font-bold flex items-center gap-2 flex-wrap">{listing.businessName}<DemoBadge isDemo={isDemo} demoExpiresAt={demoExpiresAt} size="lg" /></h1>
                       {listing.categories && listing.categories.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-3">
                           {listing.categories.sort((a: any, b: any) => (a.isPrimary && !b.isPrimary ? -1 : 1)).map((c: any, i: number) => (

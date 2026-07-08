@@ -23,15 +23,17 @@ router.get('/stores', async (req: Request, res: Response) => {
     // Promoted listings are boosted to top, then sorted by selected criteria
     const promotionBoost = `CASE WHEN is_promoted AND promotion_expires_at IS NOT NULL AND promotion_expires_at > NOW() THEN CASE promotion_tier WHEN 'featured' THEN 0 WHEN 'premium' THEN 1 WHEN 'basic' THEN 2 ELSE 3 END ELSE 3 END`;
     const query = `
-      SELECT * FROM directory_listings_list
-       WHERE is_published = true
-         AND (business_hours IS NULL OR business_hours::text != 'null')
+      SELECT dl.*, t.is_demo, t.demo_expires_at
+       FROM directory_listings_list dl
+       LEFT JOIN tenants t ON t.id = dl.tenant_id
+       WHERE dl.is_published = true
+         AND (dl.business_hours IS NULL OR dl.business_hours::text != 'null')
        ORDER BY
          ${promotionBoost},
-         CASE WHEN $3 = 'name' THEN business_name END ASC,
-         CASE WHEN $3 = 'city' THEN city END ASC,
-         CASE WHEN $3 != 'name' AND $3 != 'city' THEN updated_at END DESC,
-         business_name ASC
+         CASE WHEN $3 = 'name' THEN dl.business_name END ASC,
+         CASE WHEN $3 = 'city' THEN dl.city END ASC,
+         CASE WHEN $3 != 'name' AND $3 != 'city' THEN dl.updated_at END DESC,
+         dl.business_name ASC
        LIMIT $1 OFFSET $2
     `;
     
@@ -43,12 +45,17 @@ router.get('/stores', async (req: Request, res: Response) => {
        WHERE is_published = true
          AND (business_hours IS NULL OR business_hours::text != 'null')
     `;
+    // Note: count query doesn't need tenants join — is_published is on the listing table
     const countResult = await getDirectPool().query(countQuery);
     const total = parseInt(countResult.rows[0].total);
 
     res.json({
       success: true,
-      listings: result.rows,
+      listings: result.rows.map((row: any) => ({
+        ...row,
+        isDemo: row.is_demo || false,
+        demoExpiresAt: row.demo_expires_at || null,
+      })),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -134,7 +141,9 @@ router.get('/search', async (req: Request, res: Response) => {
     const listingsQuery = `
       SELECT 
         dl.*,
-        t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name
+        t.metadata->'gbp_categories'->'primary'->>'name' as gbp_primary_category_name,
+        t.is_demo,
+        t.demo_expires_at
       FROM directory_listings_list dl
       LEFT JOIN tenants t ON t.id = dl.tenant_id
       WHERE ${whereClause}
@@ -191,6 +200,8 @@ router.get('/search', async (req: Request, res: Response) => {
       subscription_tier: row.subscription_tier || 'trial',
       useCustomWebsite: row.use_custom_website || false,
       isPublished: row.is_published || true,
+      isDemo: row.is_demo || false,
+      demoExpiresAt: row.demo_expires_at || null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

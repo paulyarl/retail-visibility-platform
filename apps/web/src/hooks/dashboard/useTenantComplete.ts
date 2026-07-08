@@ -51,6 +51,8 @@ interface TenantCompleteResponse {
     state?: string | null;
     countryCode?: string | null;
     bannerUrl?: string | null;
+    isDemo?: boolean;
+    demoExpiresAt?: string | null;
   };
   tier: {
     tier: string;

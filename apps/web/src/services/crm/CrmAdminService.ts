@@ -399,13 +399,14 @@ class CrmAdminService extends AdminApiSingleton {
     return this.unwrap<CrmAlert>(result);
   }
 
-  async broadcastAlert(data: { tenant_ids: string[]; type: string; title: string; body?: string; icon?: string; metadata?: Record<string, any> }): Promise<CrmAlert[]> {
-    const result = await this.makeDefaultRequest<CrmAlert[]>(
+  async broadcastAlert(data: { tenant_ids?: string[]; send_to_all?: boolean; type: string; title: string; body?: string; icon?: string; cta_label?: string; cta_href?: string; metadata?: Record<string, any> }): Promise<{ alerts: CrmAlert[]; count: number }> {
+    const result = await this.makeDefaultRequest<{ alerts: CrmAlert[]; count: number }>(
       '/api/admin/crm/alerts/broadcast',
       { method: 'POST', body: JSON.stringify(data) }
     );
     await this.invalidateServiceCaches();
-    return this.unwrap<CrmAlert[]>(result);
+    const unwrapped = this.unwrap<{ data: CrmAlert[]; count: number }>(result as any);
+    return { alerts: unwrapped.data, count: unwrapped.count };
   }
 
   // --- Global Inquiries ---

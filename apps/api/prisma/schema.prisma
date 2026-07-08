@@ -4632,6 +4632,52 @@ model tenant_storefront_policies {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model policy_templates {
+  id                           String                         @id @db.VarChar(255)
+  template_key                 String                         @unique @db.VarChar(100)
+  policy_type                  String                         @db.VarChar(50)
+  storefront_type              String                         @default("all") @db.VarChar(50)
+  product_type                 String                         @default("all") @db.VarChar(50)
+  fulfillment_mode             String                         @default("all") @db.VarChar(50)
+  jurisdiction                 String                         @default("GLOBAL") @db.VarChar(10)
+  platform                     String                         @default("generic") @db.VarChar(50)
+  title                        String                         @db.VarChar(200)
+  description                  String?
+  content_markdown             String
+  placeholder_schema           Json?                          @default("[]")
+  compliance_tags              String[]                       @default([])
+  version                      String                         @default("1.0.0") @db.VarChar(20)
+  regulatory_effective_date    DateTime?                      @db.Timestamptz(6)
+  is_active                    Boolean                        @default(true)
+  sort_order                   Int                            @default(0)
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  tenant_policy_template_usage tenant_policy_template_usage[]
+
+  @@index([storefront_type, policy_type, is_active], map: "idx_policy_templates_storefront_type")
+  @@index([jurisdiction, is_active], map: "idx_policy_templates_jurisdiction")
+  @@index([platform, is_active], map: "idx_policy_templates_platform")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_policy_template_usage {
+  id                 String           @id @db.VarChar(255)
+  tenant_id          String           @db.VarChar(255)
+  template_id        String           @db.VarChar(255)
+  policy_type        String           @db.VarChar(50)
+  template_version   String           @db.VarChar(20)
+  applied_at         DateTime         @default(now()) @db.Timestamptz(6)
+  customized         Boolean          @default(false)
+  placeholder_values Json?            @default("{}")
+  policy_templates   policy_templates @relation(fields: [template_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants            tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_policy_template_usage_tenant")
+  @@index([template_id], map: "idx_policy_template_usage_template")
+  @@index([tenant_id, policy_type], map: "idx_policy_template_usage_tenant_policy")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_storefront_type_settings {
   id                       String    @id @default(dbgenerated("(gen_random_uuid())::text"))
   tenant_id                String    @unique
@@ -4805,6 +4851,7 @@ model tenants {
   tenant_integration_settings                                                            tenant_integration_settings?
   tenant_payment_gateway_settings                                                        tenant_payment_gateway_settings?
   tenant_payment_gateways                                                                tenant_payment_gateways[]
+  tenant_policy_template_usage                                                           tenant_policy_template_usage[]
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_product_types_settings                                                          tenant_product_types_settings?
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?

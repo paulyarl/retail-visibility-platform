@@ -772,7 +772,9 @@ class ShopService extends UniversalSingleton {
           t.subscription_tier as fallback_subscription_tier,
           t.subdomain as fallback_subdomain,
           t.directory_visible as fallback_directory_visible,
-          t.metadata as fallback_metadata
+          t.metadata as fallback_metadata,
+          t.is_demo,
+          t.demo_expires_at
           
         FROM directory_settings_list dsl
         LEFT JOIN directory_listings_list dl ON dsl.tenant_id = dl.tenant_id
@@ -845,6 +847,8 @@ class ShopService extends UniversalSingleton {
         subdomain: rawShop.fallback_subdomain,
         directoryVisible: rawShop.fallback_directory_visible,
         metadata: rawShop.fallback_metadata,
+        isDemo: rawShop.is_demo || false,
+        demoExpiresAt: rawShop.demo_expires_at || null,
         
         // URLs for navigation
         urls: {

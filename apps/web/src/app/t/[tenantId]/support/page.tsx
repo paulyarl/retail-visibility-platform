@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/comp
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry, CrmAlert } from '@/types/crm';
 
@@ -38,6 +39,8 @@ export default function TenantSupportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'my-work'>('all');
   const { user } = useAuth();
+  const allCaps = useAllCapabilities(tenantId);
+  const isWritable = allCaps.data?.subscriptionContext?.writable ?? true;
   const [tenantUsers, setTenantUsers] = useState<User[]>([]);
 
   // Activity read tracking (per tenant, per browser)
@@ -140,7 +143,7 @@ export default function TenantSupportPage() {
         inquiries: inquiries.length,
         alerts: unreadAlertCount + unreadActivityCount,
       }}
-      actions={
+      actions={isWritable ? (
         <button
           onClick={() => setShowNewTicket(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-sm hover:shadow-md transition-all"
@@ -150,7 +153,7 @@ export default function TenantSupportPage() {
           </svg>
           New Ticket
         </button>
-      }
+      ) : undefined}
     >
       {/* View toggle */}
       <div className="flex items-center gap-2">

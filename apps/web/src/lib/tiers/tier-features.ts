@@ -295,6 +295,35 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'integration_flexible': 'Integration Flexible Mode',
   'integration_pos_enabled': 'POS Integrations',
   'integration_google_enabled': 'Google Integrations',
+
+  // Commerce types
+  'commerce_full_payment': 'Full Payment',
+  'commerce_deposit_only': 'Deposit Only',
+  'commerce_flexible': 'Commerce Flexible',
+
+  // Featured options
+  'featured_store_selection': 'Store Selection',
+  'featured_new_arrival': 'New Arrival',
+  'featured_seasonal': 'Seasonal',
+  'featured_sale': 'Sale',
+  'featured_staff_pick': 'Staff Pick',
+  'featured_clearance': 'Clearance',
+  'featured_featured': 'Featured',
+  'featured_bestseller': 'Bestseller',
+  'featured_trending': 'Trending',
+  'featured_recommended': 'Recommended',
+  'featured_random_featured': 'Random Featured',
+  'featured_expiry_monitor': 'Expiry Monitor',
+  'featured_tenant_enabled': 'Tenant Badges',
+  'featured_platform_enabled': 'Platform Badges',
+  'featured_flexible': 'Featured Flexible',
+
+  // Directory Promotion
+  'directory_promotion_level_basic': 'Promotion: Basic',
+  'directory_promotion_level_premium': 'Promotion: Premium',
+  'directory_promotion_level_featured': 'Promotion: Featured',
+  'directory_promotion_flexible': 'Directory Promotion Flexible',
+  'directory_promotion_enabled': 'Directory Promotion Enabled',
 };
 
 // Tier pricing (monthly)

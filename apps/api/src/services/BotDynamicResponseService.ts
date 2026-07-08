@@ -383,6 +383,23 @@ class BotDynamicResponseService {
           error: featuredPlacementError instanceof Error ? featuredPlacementError.message : String(featuredPlacementError),
         });
       }
+
+      // Policy template context
+      try {
+        const hasPolicyTemplate = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'policy_template');
+        if (hasPolicyTemplate) {
+          const policyTemplateResult = await knowledgeService.searchKnowledge(tenantId, message, ['policy_template'], 3);
+          if (policyTemplateResult.chunks.length > 0) {
+            knowledgeContext += '\n\nPolicy template recommendations context:\n' +
+              policyTemplateResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      } catch (policyTemplateError) {
+        logger.warn('[BotDynamicResponseService] Policy template RAG search failed, continuing without it', undefined, {
+          error: policyTemplateError instanceof Error ? policyTemplateError.message : String(policyTemplateError),
+        });
+      }
     } catch (knowledgeError) {
       logger.warn('[BotDynamicResponseService] Knowledge RAG search failed, continuing without knowledge context', undefined, {
         error: knowledgeError instanceof Error ? knowledgeError.message : String(knowledgeError),
