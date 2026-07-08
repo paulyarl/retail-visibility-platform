@@ -9,6 +9,7 @@ import {
   IconTicket,
   IconChecklist,
   IconInbox,
+  IconBroadcast,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/crm/tickets', label: 'Tickets', icon: IconTicket, emoji: '🎫' },
   { href: '/settings/admin/crm/tasks', label: 'Tasks', icon: IconChecklist, emoji: '✅' },
   { href: '/settings/admin/crm/requests', label: 'Requests', icon: IconInbox, emoji: '📥' },
+  { href: '/settings/admin/crm/broadcast', label: 'Broadcast', icon: IconBroadcast, emoji: '📢' },
 ] as const;
 
 interface CrmNavPanelProps {

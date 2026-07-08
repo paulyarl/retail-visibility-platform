@@ -655,6 +655,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
     actualProductCount,
     storeStatus,
     fullAddress,
+    isDemo: tenantInfo?.isDemo,
+    demoExpiresAt: tenantInfo?.demoExpiresAt,
   };
 
   switch (effectiveLayout) {

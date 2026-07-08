@@ -6,6 +6,7 @@ import { MapPin, Package, Star, ChevronRight } from 'lucide-react';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 interface Category {
   id: string;
@@ -45,6 +46,8 @@ interface Store {
   verifiedPurchaseCount?: number;
   lastReviewAt?: string | null;
   isFeatured?: boolean;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 interface EnhancedStoreCardProps {
@@ -135,6 +138,7 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
             className="text-lg font-semibold text-neutral-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
             <span>{store.name}</span>
+            {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
           </Link>
           
           {/* Store Category/Type */}

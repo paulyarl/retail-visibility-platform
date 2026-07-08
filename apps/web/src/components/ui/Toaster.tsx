@@ -20,6 +20,14 @@ const VARIANT_ICON_COLORS: Record<string, string> = {
   destructive: 'text-red-500',
 };
 
+const VARIANT_BAR_COLORS: Record<string, string> = {
+  default: 'bg-neutral-400',
+  success: 'bg-emerald-400',
+  warning: 'bg-amber-400',
+  info: 'bg-blue-400',
+  destructive: 'bg-red-400',
+};
+
 export function Toaster() {
   const { toasts, dismiss } = useToast();
 
@@ -28,14 +36,15 @@ export function Toaster() {
       <AnimatePresence mode="popLayout">
         {toasts.filter((t) => t.open !== false).map((t) => {
           const variant = t.variant || 'default';
+          const duration = t.duration ?? 5000;
           return (
             <motion.div
               key={t.id}
               layout
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 80, transition: { duration: 0.2 } }}
-              className={`flex items-start gap-3 p-4 rounded-lg border shadow-lg ${VARIANT_STYLES[variant]}`}
+              exit={{ opacity: 0, x: 80, transition: { duration: 0.3 } }}
+              className={`relative overflow-hidden flex items-start gap-3 p-4 rounded-lg border shadow-lg ${VARIANT_STYLES[variant]}`}
             >
               <div className="flex-1 min-w-0">
                 {t.title && (
@@ -51,6 +60,14 @@ export function Toaster() {
               >
                 <X className="w-3.5 h-3.5" />
               </button>
+              {duration > 0 && (
+                <motion.div
+                  className={`absolute bottom-0 left-0 h-0.5 ${VARIANT_BAR_COLORS[variant]}`}
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{ duration: duration / 1000, ease: 'linear' }}
+                />
+              )}
             </motion.div>
           );
         })}

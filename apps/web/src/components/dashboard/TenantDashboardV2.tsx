@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
+import DemoBadge from "@/components/shared/DemoBadge";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
@@ -280,8 +281,9 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
         {/* ── Page Title ── */}
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight flex items-center gap-2 flex-wrap">
             {tenantData?.name || "Store"} dashboard
+            <DemoBadge isDemo={tenantData?.isDemo} demoExpiresAt={tenantData?.demoExpiresAt} size="md" />
           </h1>
           <p className="text-gray-500 mt-1 text-sm sm:text-base">
             Welcome back, {firstName}. Here&apos;s what&apos;s happening today.
@@ -372,18 +374,8 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
                   </div>
                 </div>
 
-                {/* CRM Widget */}
-                {crmEnabled ? (
-                  <CrmTenantWidget tenantId={tenantId} />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 px-4 rounded-xl bg-gray-50 border border-gray-200">
-                    <Lock className="w-5 h-5 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500 text-center">CRM is unavailable with your current subscription plan.</p>
-                    <Link href={`/t/${tenantId}/settings/subscription`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 mt-2">
-                      Upgrade plan →
-                    </Link>
-                  </div>
-                )}
+                {/* CRM Widget — always available as platform communication channel */}
+                <CrmTenantWidget tenantId={tenantId} isWritable={isWritable} />
 
                 {/* Divider */}
                 <div className="border-t border-gray-100 my-4" />

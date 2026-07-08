@@ -28,6 +28,8 @@ DROP MATERIALIZED VIEW IF EXISTS mv_store_selection_products CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_recommended_products CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_bestseller_products CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_random_discovery_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_storefront_discovery CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS directory_category_products ;
 
 -- Drop the refresh function if it exists
 DROP FUNCTION IF EXISTS refresh_scope_aware_mvs();
@@ -233,6 +235,8 @@ SELECT
   t.gbp_primary_category_name as shop_category,
   t.gbp_primary_category_id as shop_category_id,
   t.gbp_primary_category_id as shop_google_category_id,
+  t.is_demo,
+  t.demo_expires_at,
   
   -- Location Information (from tenant_business_profiles_list - Phase 5C)
   COALESCE(tbp.city, dsl.city) as tenant_city,
@@ -682,6 +686,8 @@ SELECT
   t.gbp_primary_category_name as shop_category,
   t.gbp_primary_category_id as shop_category_id,
   t.gbp_primary_category_id as shop_google_category_id,
+  t.is_demo,
+  t.demo_expires_at,
   
   -- Location Information
   COALESCE(tbp.city, dsl.city) as tenant_city,
@@ -1157,6 +1163,163 @@ WHERE featured_type = 'random_featured'
   AND featured_is_active = true;
 
 -- ========================================
+-- 5. DIRECTORY CATEGORY PRODUCTS MV (Store listing cards per category)
+-- ========================================
+-- Aggregates product metrics per tenant per category for directory category pages.
+-- Uses platform_categories (CROSS JOIN) matching live DB schema.
+-- Includes is_demo / demo_expires_at from tenants for demo badge display on StoreCard.
+CREATE MATERIALIZED VIEW directory_category_products AS
+SELECT 
+  -- Category information
+  pc.id as category_id,
+  pc.name as category_name,
+  pc.slug as category_slug,
+  pc.google_category_id,
+  COALESCE(pc.icon_emoji, '') as category_icon,
+  pc.level as category_level,
+  pc.parent_id as category_parent_id,
+  
+  -- Store information
+  t.id as tenant_id,
+  t.name as tenant_name,
+  t.slug as tenant_slug,
+  t.subscription_tier,
+  t.location_status,
+  t.is_demo,
+  t.demo_expires_at,
+  dsl.city as city,
+  dsl.state as state,
+  
+  -- Directory settings
+  dsl.id as directory_listing_id,
+  dsl.is_published,
+  dsl.is_featured,
+  dsl.rating_avg,
+  dsl.rating_count,
+  dsl.product_count as directory_product_count,
+  
+  -- Product metrics (pre-computed for instant filtering)
+  COUNT(ii.id) as actual_product_count,
+  COUNT(ii.id) FILTER (WHERE ii.image_url IS NOT NULL) as products_with_images,
+  COUNT(ii.id) FILTER (WHERE ii.marketing_description IS NOT NULL) as products_with_descriptions,
+  COUNT(ii.id) FILTER (WHERE ii.brand IS NOT NULL) as products_with_brand,
+  COUNT(ii.id) FILTER (WHERE ii.price_cents > 0) as products_with_price,
+  COUNT(ii.id) FILTER (WHERE ii.stock > 0 OR ii.quantity > 0) as in_stock_products,
+  
+  -- Featured product metrics from junction table
+  COUNT(fp.id) as featured_products_count,
+  COUNT(fp.id) FILTER (WHERE fp.is_active = true AND (fp.featured_expires_at IS NULL OR fp.featured_expires_at > NOW())) as active_featured_products,
+  COUNT(fp.id) FILTER (WHERE fp.featured_type = 'store_selection') as store_selection_count,
+  COUNT(fp.id) FILTER (WHERE fp.featured_type = 'new_arrival') as new_arrival_count,
+  COUNT(fp.id) FILTER (WHERE fp.featured_type = 'seasonal') as seasonal_count,
+  COUNT(fp.id) FILTER (WHERE fp.featured_type = 'sale') as sale_count,
+  COUNT(fp.id) FILTER (WHERE fp.featured_type = 'staff_pick') as staff_pick_count,
+  
+  -- Quality metrics
+  CASE 
+    WHEN COUNT(ii.id) = 0 THEN 0
+    ELSE round(
+      (
+        (COUNT(ii.id) FILTER (WHERE ii.image_url IS NOT NULL) * 25) +
+        (COUNT(ii.id) FILTER (WHERE ii.marketing_description IS NOT NULL) * 25) +
+        (COUNT(ii.id) FILTER (WHERE ii.brand IS NOT NULL) * 20) +
+        (COUNT(ii.id) FILTER (WHERE ii.price_cents > 0) * 20) +
+        (COUNT(ii.id) FILTER (WHERE ii.stock > 0 OR ii.quantity > 0) * 10)
+      ) * 1.0 / NULLIF(COUNT(ii.id), 0), 2
+    )
+  END as quality_score,
+  
+  -- Pricing metrics
+  AVG(ii.price_cents) as avg_price_cents,
+  MIN(ii.price_cents) as min_price_cents,
+  MAX(ii.price_cents) as max_price_cents,
+  AVG(ii.price_cents / 100.0) as avg_price_dollars,
+  
+  -- Featured pricing metrics
+  AVG(ii.price_cents) FILTER (WHERE fp.is_active = true) as avg_featured_price_cents,
+  MIN(ii.price_cents) FILTER (WHERE fp.is_active = true) as min_featured_price_cents,
+  MAX(ii.price_cents) FILTER (WHERE fp.is_active = true) as max_featured_price_cents,
+  AVG(ii.price_cents / 100.0) FILTER (WHERE fp.is_active = true) as avg_featured_price_dollars,
+  
+  -- Geographic data
+  dsl.address,
+  dsl.city as listing_city,
+  dsl.state as listing_state,
+  dsl.zip_code,
+  dsl.latitude,
+  dsl.longitude,
+  
+  -- Computed flags for quick filtering
+  CASE 
+    WHEN COUNT(ii.id) > 50 THEN 'high'
+    WHEN COUNT(ii.id) > 10 THEN 'medium'
+    WHEN COUNT(ii.id) > 0 THEN 'low'
+    ELSE 'none'
+  END as product_volume_level,
+  
+  CASE 
+    WHEN dsl.rating_avg >= 4.5 THEN 'excellent'
+    WHEN dsl.rating_avg >= 4.0 THEN 'good'
+    WHEN dsl.rating_avg >= 3.5 THEN 'average'
+    WHEN dsl.rating_avg >= 3.0 THEN 'fair'
+    ELSE 'poor'
+  END as rating_tier,
+  
+  CASE 
+    WHEN dsl.is_featured = true THEN 'featured'
+    WHEN dsl.rating_count >= 10 THEN 'popular'
+    ELSE 'standard'
+  END as store_tier,
+  
+  -- Featured store tier
+  CASE 
+    WHEN COUNT(fp.id) FILTER (WHERE fp.is_active = true) >= 5 THEN 'featured_store'
+    WHEN COUNT(fp.id) FILTER (WHERE fp.is_active = true) >= 1 THEN 'has_featured'
+    ELSE 'standard'
+  END as featured_store_tier,
+  
+  -- Recent activity metrics
+  COUNT(ii.id) FILTER (WHERE ii.updated_at >= NOW() - INTERVAL '7 days') as recently_updated_products,
+  COUNT(ii.id) FILTER (WHERE ii.created_at >= NOW() - INTERVAL '30 days') as recently_added_products,
+  
+  -- Featured activity metrics
+  COUNT(fp.id) FILTER (WHERE fp.featured_at >= NOW() - INTERVAL '7 days') as recently_featured_products,
+  COUNT(fp.id) FILTER (WHERE fp.featured_expires_at >= NOW() AND fp.featured_expires_at <= NOW() + INTERVAL '7 days') as expiring_soon_products,
+  
+  -- Timestamps
+  MAX(ii.updated_at) as last_product_updated,
+  MIN(ii.created_at) as first_product_created,
+  MAX(fp.featured_at) as last_featured_at,
+  dsl.created_at as listing_created_at,
+  dsl.updated_at as listing_updated_at
+
+FROM platform_categories pc
+CROSS JOIN tenants t
+LEFT JOIN directory_listings_list dsl ON dsl.tenant_id = t.id
+LEFT JOIN directory_listing_categories dcl ON dcl.listing_id = dsl.id AND dcl.category_id = pc.id
+LEFT JOIN inventory_items ii ON (
+  ii.tenant_id = t.id 
+  AND ii.item_status = 'active'
+  AND ii.visibility = 'public'
+  AND (ii.directory_category_id = pc.id OR (ii.directory_category_id IS NULL AND pc.slug = 'uncategorized'))
+)
+LEFT JOIN featured_products fp ON (
+  fp.inventory_item_id = ii.id 
+  AND fp.tenant_id = t.id
+)
+WHERE t.location_status = 'active'
+  AND t.directory_visible = true
+  AND dsl.is_published = true
+GROUP BY 
+  pc.id, pc.name, pc.slug, pc.google_category_id, pc.icon_emoji, pc.level, pc.parent_id,
+  t.id, t.name, t.slug, t.subscription_tier, t.location_status, t.is_demo, t.demo_expires_at,
+  dsl.id, dsl.is_published, dsl.is_featured, 
+  dsl.rating_avg, dsl.rating_count, dsl.product_count,
+  dsl.address, dsl.city, dsl.state, dsl.zip_code, dsl.latitude, dsl.longitude,
+  dsl.created_at, dsl.updated_at
+HAVING COUNT(ii.id) > 0 OR dsl.product_count > 0;
+
+-- ========================================
 -- INDEXES FOR PERFORMANCE
 -- ========================================
 
@@ -1230,6 +1393,14 @@ CREATE INDEX idx_mv_recommended_products_priority ON mv_recommended_products(fea
 CREATE INDEX idx_mv_bestseller_products_priority ON mv_bestseller_products(featured_priority DESC);
 CREATE INDEX idx_mv_random_discovery_products_priority ON mv_random_discovery_products(featured_priority DESC);
 
+-- Directory category products indexes
+CREATE UNIQUE INDEX uq_directory_category_products_unique 
+ON directory_category_products(category_id, tenant_id);
+CREATE INDEX idx_directory_category_products_category 
+ON directory_category_products(category_id, actual_product_count DESC, quality_score DESC);
+CREATE INDEX idx_directory_category_products_featured 
+ON directory_category_products(category_id, active_featured_products DESC, featured_products_count DESC);
+
 -- ========================================
 -- INITIAL DATA POPULATION
 -- ========================================
@@ -1256,6 +1427,7 @@ REFRESH MATERIALIZED VIEW mv_store_selection_products;
 REFRESH MATERIALIZED VIEW mv_recommended_products;
 REFRESH MATERIALIZED VIEW mv_bestseller_products;
 REFRESH MATERIALIZED VIEW mv_random_discovery_products;
+REFRESH MATERIALIZED VIEW directory_category_products;
 
 -- ========================================
 -- REFRESH FUNCTIONS
@@ -1289,6 +1461,9 @@ BEGIN
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_recommended_products;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_bestseller_products;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_random_discovery_products;
+  
+  -- Refresh directory category products
+  REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products;
   
   RAISE NOTICE 'Scope-aware MVs refreshed successfully';
 END;

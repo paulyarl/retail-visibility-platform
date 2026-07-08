@@ -278,6 +278,8 @@ class StoreProviderSingleton {
             ratingDisplay: formatRating(store.ratingAvg, store.ratingCount),
             hasRatings: !!store.ratingAvg && store.ratingCount > 0,
             hasCategories: !!(store.categories && store.categories.length > 0),
+            isDemo: store.isDemo || false,
+            demoExpiresAt: store.demoExpiresAt || null,
           }));
 
           dispatch({ type: 'FETCH_SUCCESS', stores: universalStores });
@@ -495,6 +497,8 @@ export interface UniversalStore {
   ratingDisplay?: string;
   hasRatings?: boolean;
   hasCategories?: boolean;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 // ====================

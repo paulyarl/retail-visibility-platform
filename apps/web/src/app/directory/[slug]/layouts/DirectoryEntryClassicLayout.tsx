@@ -24,6 +24,7 @@ import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
 
@@ -53,6 +54,8 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     paymentGatewayStatus,
     actualProductCount,
     fullAddress,
+    isDemo,
+    demoExpiresAt,
   } = props;
 
   return (
@@ -119,7 +122,10 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
                       <img src={listing.logoUrl} alt={listing.businessName} className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
                     )}
                     <div className="flex-1">
-                      <h1 className="text-3xl font-bold text-gray-900">{listing.businessName}</h1>
+                      <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                        {listing.businessName}
+                        <DemoBadge isDemo={isDemo} demoExpiresAt={demoExpiresAt} size="md" />
+                      </h1>
                       {tenantInfo && listing.categories && listing.categories.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 mt-3">
                           {listing.categories.sort((a: any, b: any) => {

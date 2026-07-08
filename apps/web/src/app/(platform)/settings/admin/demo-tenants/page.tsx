@@ -12,7 +12,7 @@ import {
   DemoTenant,
   DemoTemplate,
 } from '@/services/DemoTenantAdminService';
-import { QrCode, Download, BarChart3, ExternalLink, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { QrCode, Download, BarChart3, ExternalLink, RefreshCw, ArrowRightLeft, Crown } from 'lucide-react';
 import { manualBillingService } from '@/services/ManualBillingService';
 
 export default function DemoTenantsAdminPage() {
@@ -50,6 +50,12 @@ export default function DemoTenantsAdminPage() {
   const [qrGenerating, setQrGenerating] = useState(false);
   const [qrAnalytics, setQrAnalytics] = useState<any>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  // Tier change modal state
+  const [tierOpen, setTierOpen] = useState(false);
+  const [tierTenant, setTierTenant] = useState<DemoTenant | null>(null);
+  const [tierValue, setTierValue] = useState('');
+  const [changingTier, setChangingTier] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -165,6 +171,34 @@ export default function DemoTenantsAdminPage() {
       }
     } catch (error: any) {
       notifications.show({ title: 'Error', message: error.message, color: 'red' });
+    }
+  }
+
+  async function handleChangeTier() {
+    if (!tierTenant || !tierValue) {
+      notifications.show({ title: 'Validation', message: 'Select a tier', color: 'orange' });
+      return;
+    }
+    setChangingTier(true);
+    try {
+      const result = await demoTenantAdminService.changeDemoTenantTier(tierTenant.id, tierValue);
+      if (result?.changed) {
+        notifications.show({
+          title: 'Tier Changed',
+          message: result.reason,
+          color: 'green',
+        });
+        setTierOpen(false);
+        setTierTenant(null);
+        setTierValue('');
+        fetchData();
+      } else {
+        notifications.show({ title: 'Tier Change Failed', message: result?.reason || 'Failed to change tier', color: 'red' });
+      }
+    } catch (error: any) {
+      notifications.show({ title: 'Error', message: error.message, color: 'red' });
+    } finally {
+      setChangingTier(false);
     }
   }
 
@@ -429,6 +463,9 @@ export default function DemoTenantsAdminPage() {
           <Button size="xs" variant="light" color="grape" onClick={() => handleRevokeDemo(t.id)} leftSection={<RefreshCw size={14} />}>
             Revoke Demo
           </Button>
+          <Button size="xs" variant="light" color="amber" onClick={() => { setTierTenant(t); setTierValue(''); setTierOpen(true); }} leftSection={<Crown size={14} />}>
+            Change Tier
+          </Button>
           <Button size="xs" variant="light" color="red" onClick={() => handleDelete(t.id)}>
             Delete
           </Button>
@@ -567,6 +604,49 @@ export default function DemoTenantsAdminPage() {
             </Button>
             <Button onClick={handleConvert} loading={converting}>
               Convert to Demo
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Tier Change Modal */}
+      <Modal
+        opened={tierOpen}
+        onClose={() => setTierOpen(false)}
+        title={
+          <Group gap="xs">
+            <Crown size={20} />
+            <span>Change Tier — {tierTenant?.name}</span>
+          </Group>
+        }
+        size="sm"
+      >
+        <Stack gap="md">
+          <Select
+            label="New Tier"
+            placeholder="Select a tier"
+            data={[
+              { value: 'discovery', label: 'Discovery ($29/mo)' },
+              { value: 'storefront', label: 'Storefront ($59/mo)' },
+              { value: 'commitment', label: 'Commitment ($79/mo)' },
+              { value: 'ecommerce', label: 'E-Commerce ($99/mo)' },
+              { value: 'omnichannel', label: 'Omnichannel ($149/mo)' },
+              { value: 'professional', label: 'Professional ($199/mo)' },
+              { value: 'chain_starter', label: 'Chain Starter ($299/mo)' },
+              { value: 'chain_professional', label: 'Chain Professional ($399/mo)' },
+              { value: 'enterprise', label: 'Enterprise ($499/mo)' },
+              { value: 'organization', label: 'Organization ($499/mo)' },
+            ]}
+            value={tierValue}
+            onChange={(val) => setTierValue(val || '')}
+            required
+          />
+          <Group justify="flex-end">
+            <Button variant="light" onClick={() => setTierOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleChangeTier} loading={changingTier}>
+              Change Tier
             </Button>
           </Group>
         </Stack>

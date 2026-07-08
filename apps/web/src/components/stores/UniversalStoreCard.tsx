@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { MapPin, Star, Package, ChevronRight, ExternalLink } from 'lucide-react';
 import { useStoreData, useStore } from '@/providers/StoreProviderSingleton';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 // ====================
 // UNIVERSAL STORE CARD
@@ -80,8 +81,9 @@ export function UniversalStoreCard({
             
             {/* Store Info */}
             <div className="ml-3 flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate flex items-center gap-1.5">
                 {store.name}
+                {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
               </h3>
               <div className="flex items-center justify-between mt-1">
                 <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
@@ -134,8 +136,9 @@ export function UniversalStoreCard({
               
               {/* Store Info */}
               <div className="ml-2 flex-1 min-w-0">
-                <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate flex items-center gap-1">
                   {store.name}
+                  {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
                 </h3>
                 <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                   <MapPin className="w-3 h-3 mr-1" />
@@ -214,8 +217,9 @@ export function UniversalStoreCard({
       <div className="p-6">
         {/* Store Name */}
         <Link href={`/tenant/${store.id}`}>
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5">
             {store.name}
+            {store.isDemo && <DemoBadge isDemo={store.isDemo} demoExpiresAt={store.demoExpiresAt} size="sm" />}
           </h2>
         </Link>
 

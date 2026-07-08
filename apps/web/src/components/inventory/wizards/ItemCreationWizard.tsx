@@ -138,6 +138,9 @@ interface WizardData {
     seoTitle?: string;
     seoDescription?: string;
     tags: string[];
+    // Structured enrichment data stored as metadata.* in inventory_items
+    // Aligns with scan.ts extractStructuredMetadata and item detail page reader
+    enrichedMetadata?: Record<string, any>;
   };
   
   // Step 5: Media & Visuals
@@ -274,7 +277,8 @@ const INITIAL_DATA: WizardData = {
     enhancedDescription: '',
     features: [],
     specifications: {},
-    tags: []
+    tags: [],
+    enrichedMetadata: {}
   },
   media: {
     primaryImage: null,
@@ -921,35 +925,87 @@ export default function ItemCreationWizard({
     const primaryImageUrl = enrichment.imageUrl || allImages[0] || null;
     const galleryUrls = allImages.filter((url: string) => url && url !== primaryImageUrl);
 
-    // Build specifications object from enrichment metadata
+    // Split enrichment metadata into two buckets:
+    // 1. specEntries — simple scalar values for the Specifications UI (weight, dimensions, etc.)
+    // 2. enrichedMetadata — structured objects stored as metadata.* in inventory_items,
+    //    aligned with scan.ts extractStructuredMetadata and the item detail page reader
+    const toSpecValue = (v: any): string | number | undefined => {
+      if (v == null) return undefined;
+      if (typeof v === 'string' || typeof v === 'number') return v;
+      if (typeof v === 'boolean') return String(v);
+      if (Array.isArray(v)) return v.join(', ');
+      return JSON.stringify(v);
+    };
+
+    // Structured enrichment fields that must stay as objects/arrays for metadata.* storage
+    const STRUCTURED_KEYS = new Set([
+      'nutrition', 'environmental', 'ingredients_analysis', 'allergens_tags',
+      'labels_tags', 'traces_tags', 'additives_tags', 'ingredients_tags',
+      'images', 'specifications', 'features',
+    ]);
+
     const specEntries: Record<string, any> = {};
-    if (specs.weight) specEntries.weight = specs.weight;
-    if (specs.length) specEntries.length = specs.length;
-    if (specs.width) specEntries.width = specs.width;
-    if (specs.height) specEntries.height = specs.height;
-    if (specs.color) specEntries.color = specs.color;
-    if (specs.size) specEntries.size = specs.size;
-    if (specs.material) specEntries.material = specs.material;
-    if (meta.manufacturer) specEntries.manufacturer = meta.manufacturer;
-    if (meta.warranty) specEntries.warranty = meta.warranty;
-    if (meta.ingredients) specEntries.ingredients = meta.ingredients;
-    if (meta.allergens) specEntries.allergens = meta.allergens;
-    if (meta.nutrition) specEntries.nutrition = meta.nutrition;
-    if (meta.packaging) specEntries.packaging = meta.packaging;
-    if (meta.quantity) specEntries.quantity = meta.quantity;
-    if (meta.origins) specEntries.origins = meta.origins;
-    if (meta.environmental) specEntries.environmental = meta.environmental;
-    if (meta.nova_group) specEntries.nova_group = meta.nova_group;
-    if (meta.labels) specEntries.labels = meta.labels;
-    if (meta.stores) specEntries.stores = meta.stores;
-    // Merge any remaining metadata keys not already captured
+    const enrichedMeta: Record<string, any> = {};
+
+    // Simple spec fields (scalars from specs sub-object)
+    if (specs.weight) specEntries.weight = toSpecValue(specs.weight);
+    if (specs.length) specEntries.length = toSpecValue(specs.length);
+    if (specs.width) specEntries.width = toSpecValue(specs.width);
+    if (specs.height) specEntries.height = toSpecValue(specs.height);
+    if (specs.color) specEntries.color = toSpecValue(specs.color);
+    if (specs.size) specEntries.size = toSpecValue(specs.size);
+    if (specs.material) specEntries.material = toSpecValue(specs.material);
+
+    // Scalar metadata fields → specifications for UI display
+    if (meta.manufacturer) specEntries.manufacturer = toSpecValue(meta.manufacturer);
+    if (meta.warranty) specEntries.warranty = toSpecValue(meta.warranty);
+    if (meta.quantity) specEntries.quantity = toSpecValue(meta.quantity);
+    if (meta.labels) specEntries.labels = toSpecValue(meta.labels);
+    if (meta.stores) specEntries.stores = toSpecValue(meta.stores);
+
+    // Structured metadata fields → enrichedMetadata for metadata.* storage
+    // These align with scan.ts extractStructuredMetadata and item detail page reader
+    if (meta.nutrition) enrichedMeta.nutrition = meta.nutrition;
+    if (meta.ingredients) enrichedMeta.ingredients = meta.ingredients;
+    if (meta.allergens) enrichedMeta.allergens = meta.allergens;
+    if (meta.allergens_tags) enrichedMeta.allergens_tags = meta.allergens_tags;
+    if (meta.environmental) enrichedMeta.environmental = meta.environmental;
+    if (meta.nova_group) enrichedMeta.nova_group = meta.nova_group;
+    if (meta.ingredients_analysis) enrichedMeta.ingredients_analysis = meta.ingredients_analysis;
+    if (meta.labels_tags) enrichedMeta.labels_tags = meta.labels_tags;
+    if (meta.traces) enrichedMeta.traces = meta.traces;
+    if (meta.traces_tags) enrichedMeta.traces_tags = meta.traces_tags;
+    if (meta.additives_tags) enrichedMeta.additives_tags = meta.additives_tags;
+    if (meta.ingredients_tags) enrichedMeta.ingredients_tags = meta.ingredients_tags;
+    if (meta.completeness) enrichedMeta.completeness = meta.completeness;
+    if (meta.countries) enrichedMeta.countries = meta.countries;
+    if (meta.packaging) enrichedMeta.packaging = meta.packaging;
+    if (meta.origins) enrichedMeta.origins = meta.origins;
+    if (meta.images) enrichedMeta.images = meta.images;
+    if (meta.created_t) enrichedMeta.created_t = meta.created_t;
+    if (meta.last_modified_t) enrichedMeta.last_modified_t = meta.last_modified_t;
+    if (meta.barcode) enrichedMeta.barcode = meta.barcode;
+
+    // Catch-all: any remaining keys not explicitly handled
+    const HANDLED_KEYS = new Set([
+      ...STRUCTURED_KEYS,
+      'manufacturer', 'warranty', 'quantity', 'labels', 'stores',
+      'allergens', 'nutrition', 'environmental', 'nova_group',
+      'ingredients_analysis', 'allergens_tags', 'labels_tags',
+      'traces', 'traces_tags', 'additives_tags', 'ingredients_tags',
+      'completeness', 'countries', 'packaging', 'origins', 'images',
+      'created_t', 'last_modified_t', 'barcode',
+      'features', 'upc', 'ean', 'asin', 'isbn', 'mpn', 'model', 'elid',
+      'pricing', 'offers',
+    ]);
     Object.entries(meta).forEach(([key, value]) => {
-      if (!['specifications', 'features', 'images', 'manufacturer', 'warranty',
-            'ingredients', 'allergens', 'nutrition', 'packaging', 'quantity',
-            'origins', 'environmental', 'nova_group', 'labels', 'stores',
-            'barcode', 'upc', 'ean', 'asin', 'isbn', 'mpn', 'model', 'elid',
-            'pricing', 'offers'].includes(key) && value != null) {
-        specEntries[key] = value;
+      if (!HANDLED_KEYS.has(key) && value != null) {
+        if (typeof value === 'object') {
+          enrichedMeta[key] = value;
+        } else {
+          const sv = toSpecValue(value);
+          if (sv != null) specEntries[key] = sv;
+        }
       }
     });
 
@@ -973,6 +1029,7 @@ export default function ItemCreationWizard({
         description: enrichment.description || prev.content.description,
         features: features.length > 0 ? features : prev.content.features,
         specifications: Object.keys(specEntries).length > 0 ? specEntries : prev.content.specifications,
+        enrichedMetadata: Object.keys(enrichedMeta).length > 0 ? enrichedMeta : prev.content.enrichedMetadata,
         tags: [
           ...prev.content.tags,
           ...(meta.labels && typeof meta.labels === 'string' ? meta.labels.split(',').map((l: string) => l.trim()) : []),

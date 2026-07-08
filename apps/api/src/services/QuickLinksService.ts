@@ -178,7 +178,7 @@ const LINKS: LinkDefinition[] = [
     id: 'product-type-setup',
     label: () => 'Select Product Type',
     description: () => 'Choose your product type to configure inventory',
-    href: (ctx) => `/t/${ctx.tenantId}/settings/product-options`,
+    href: (ctx) => `/t/${ctx.tenantId}/settings/product-types`,
     icon: 'Package',
     category: 'store',
     badge: () => 'Action needed',

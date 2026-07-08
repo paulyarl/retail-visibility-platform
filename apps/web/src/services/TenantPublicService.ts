@@ -56,6 +56,8 @@ export interface PublicTenantInfo {
   bannerUrl?: string;
   createdAt: string;
   updatedAt: string;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 export interface TenantProfile {

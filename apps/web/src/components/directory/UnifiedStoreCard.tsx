@@ -10,6 +10,7 @@ import { useStoreStatus } from "@/hooks/useStoreStatus";
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
 import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 export interface DirectoryListing {
   id: string;
@@ -40,6 +41,8 @@ export interface DirectoryListing {
   directoryPublished?: boolean;
   businessHours?: any; // Business hours object for status indicator
   reason?: string; // Recommendation reason (e.g., "Same category in Indianapolis")
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 interface UnifiedStoreCardProps {
@@ -183,8 +186,9 @@ export function UnifiedStoreCard({
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <Link href={linkHref} className={`block ${className}`} onClick={() => { if (isPromoted) DirectoryPromotionService.trackClick(listing.tenantId); }}>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate flex items-center gap-1.5">
                         {listing.businessName}
+                        {listing.isDemo && <DemoBadge isDemo={listing.isDemo} demoExpiresAt={listing.demoExpiresAt} size="sm" />}
                       </h3>
                     </Link>
 
@@ -355,6 +359,7 @@ export function UnifiedStoreCard({
                 className="text-gray-900 dark:text-white hover:text-blue-600 transition-colors"
               >
                 {listing.businessName}
+                {listing.isDemo && <DemoBadge isDemo={listing.isDemo} demoExpiresAt={listing.demoExpiresAt} size="sm" />}
               </Text></Link>
               <Group gap={4} mt={1}>
                 <MapPin size={14} className="text-gray-500" />

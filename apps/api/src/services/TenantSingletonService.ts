@@ -57,6 +57,8 @@ export interface TenantInfo {
     canonicalUrl: string;
   };
   metadata?: Record<string, any>;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 // Tenant Identifiers Interface
@@ -113,7 +115,9 @@ class TenantSingletonService extends UniversalSingleton {
           name: true,
           slug: true,
           metadata: true,
-          created_at: true
+          created_at: true,
+          is_demo: true,
+          demo_expires_at: true
         }
       });
 
@@ -169,7 +173,9 @@ class TenantSingletonService extends UniversalSingleton {
           country: businessProfile?.country_code
         },
         urls: this.generateUrls(tenantId, slug, autoId),
-        metadata: (tenant.metadata as Record<string, any>) || {}
+        metadata: (tenant.metadata as Record<string, any>) || {},
+        isDemo: tenant.is_demo || false,
+        demoExpiresAt: tenant.demo_expires_at ? tenant.demo_expires_at.toISOString() : null,
       };
 
       // Cache the result

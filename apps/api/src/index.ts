@@ -7627,6 +7627,11 @@ app.use('/api/tenants', storefrontPolicyRoutes);
 app.use('/api', storefrontPolicyRoutes);
 console.log('✅ Storefront policy routes mounted at /api/tenants/:tenantId/storefront-policies and /api/public/storefront-policies/:tenantId');
 
+/* ------------------------------ policy templates ------------------------------ */
+import policyTemplateRoutes from './routes/policy-templates';
+app.use('/api', policyTemplateRoutes);
+console.log('✅ Policy template routes mounted at /api/public/policy-templates, /api/tenants/:tenantId/storefront-policies/templates, and /api/admin/policy-templates');
+
 /* ------------------------------ barcode scan settings ------------------------------ */
 app.use('/api/tenants', barcodeScanSettingsRoutes);
 console.log('✅ Barcode scan settings routes mounted at /api/tenants/:tenantId/barcode-scan');

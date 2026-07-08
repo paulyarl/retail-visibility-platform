@@ -57,6 +57,8 @@ export interface DirectoryStore {
   businessHours?: any;
   distance?: number;
   canUseExternalLink?: boolean;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 export interface DirectoryCategory {

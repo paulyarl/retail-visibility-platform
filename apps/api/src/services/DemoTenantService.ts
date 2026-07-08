@@ -27,6 +27,13 @@ interface DemoTemplateConfig {
   subscriptionTier: string;
   gbpPrimaryCategory: string;
   defaultHours: Array<{ day: string; open: string; close: string }>;
+  defaultCity: string;
+  defaultState: string;
+  defaultCountry: string;
+  defaultPhone: string;
+  defaultEmail: string;
+  defaultWebsite: string;
+  defaultDescription: string;
 }
 
 const DEMO_TEMPLATES: Record<DemoTemplate, DemoTemplateConfig> = {
@@ -46,6 +53,13 @@ const DEMO_TEMPLATES: Record<DemoTemplate, DemoTemplateConfig> = {
       { day: 'SATURDAY', open: '08:00', close: '22:00' },
       { day: 'SUNDAY', open: '09:00', close: '20:00' },
     ],
+    defaultCity: 'New York',
+    defaultState: 'New York',
+    defaultCountry: 'US',
+    defaultPhone: '+1-555-0100',
+    defaultEmail: 'demo@demo-grocery.example.com',
+    defaultWebsite: 'https://demo-grocery.example.com',
+    defaultDescription: 'A demo grocery store showcasing the VisibleShelf platform with realistic product catalog.',
   },
   convenience: {
     scenario: 'grocery',
@@ -63,6 +77,13 @@ const DEMO_TEMPLATES: Record<DemoTemplate, DemoTemplateConfig> = {
       { day: 'SATURDAY', open: '06:00', close: '00:00' },
       { day: 'SUNDAY', open: '07:00', close: '23:00' },
     ],
+    defaultCity: 'New York',
+    defaultState: 'New York',
+    defaultCountry: 'US',
+    defaultPhone: '+1-555-0200',
+    defaultEmail: 'demo@demo-convenience.example.com',
+    defaultWebsite: 'https://demo-convenience.example.com',
+    defaultDescription: 'A demo convenience store showcasing the VisibleShelf platform with quick-commerce products.',
   },
   specialty_retail: {
     scenario: 'general',
@@ -80,6 +101,13 @@ const DEMO_TEMPLATES: Record<DemoTemplate, DemoTemplateConfig> = {
       { day: 'SATURDAY', open: '10:00', close: '18:00' },
       { day: 'SUNDAY', open: '12:00', close: '17:00' },
     ],
+    defaultCity: 'New York',
+    defaultState: 'New York',
+    defaultCountry: 'US',
+    defaultPhone: '+1-555-0300',
+    defaultEmail: 'demo@demo-specialty.example.com',
+    defaultWebsite: 'https://demo-specialty.example.com',
+    defaultDescription: 'A demo specialty retail store showcasing the VisibleShelf platform with curated products.',
   },
 };
 
@@ -145,7 +173,13 @@ class DemoTenantService {
 
     logger.info(`[DemoTenantService] Creating demo tenant: ${name} (${template})`, undefined, { tenantId, template });
 
-    const slug = await slugSingletonService.generateSlug(name, {}, tenantId);
+    const location = {
+      city: config.defaultCity,
+      state: config.defaultState,
+      country: config.defaultCountry,
+    };
+
+    const slug = await slugSingletonService.generateSlug(name, location, tenantId);
 
     const tenant = await prisma.tenants.create({
       data: {
@@ -178,6 +212,8 @@ class DemoTenantService {
         logger.warn(`[DemoTenantService] Failed to link owner ${createdBy} to demo tenant ${tenantId}`, undefined, { error: err });
       });
     }
+
+    await this.seedBusinessProfile(tenantId, name, config);
 
     await this.seedBusinessHours(tenantId, config.defaultHours);
 
@@ -243,6 +279,34 @@ class DemoTenantService {
       logger.info(`[DemoTenantService] Seeded business hours for tenant ${tenantId}`);
     } catch (err) {
       logger.warn(`[DemoTenantService] Failed to seed business hours for tenant ${tenantId}`, undefined, { error: err });
+    }
+  }
+
+  private async seedBusinessProfile(
+    tenantId: string,
+    businessName: string,
+    config: DemoTemplateConfig
+  ): Promise<void> {
+    try {
+      await prisma.tenant_business_profiles_list.create({
+        data: {
+          tenant_id: tenantId,
+          business_name: businessName,
+          address_line1: '123 Demo Street',
+          city: config.defaultCity,
+          state: config.defaultState,
+          postal_code: '10001',
+          country_code: config.defaultCountry,
+          phone_number: config.defaultPhone,
+          email: config.defaultEmail,
+          website: config.defaultWebsite,
+          business_description: config.defaultDescription,
+          updated_at: new Date(),
+        },
+      });
+      logger.info(`[DemoTenantService] Seeded business profile for tenant ${tenantId}`);
+    } catch (err) {
+      logger.warn(`[DemoTenantService] Failed to seed business profile for tenant ${tenantId}`, undefined, { error: err });
     }
   }
 
@@ -459,6 +523,60 @@ class DemoTenantService {
     logger.info(`[DemoTenantService] Revoked demo status from tenant ${tenantId} (${tenant.name})`);
 
     return { revoked: true, tenantId, reason: 'Demo status revoked successfully' };
+  }
+
+  async changeDemoTenantTier(
+    tenantId: string,
+    newTier: string
+  ): Promise<{ changed: boolean; tenantId: string; oldTier: string; newTier: string; reason: string }> {
+    const VALID_TIERS = [
+      'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel',
+      'professional', 'chain_starter', 'chain_professional', 'enterprise', 'organization',
+    ];
+
+    if (!VALID_TIERS.includes(newTier)) {
+      return {
+        changed: false,
+        tenantId,
+        oldTier: '',
+        newTier,
+        reason: `Invalid tier "${newTier}". Valid tiers: ${VALID_TIERS.join(', ')}`,
+      };
+    }
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { id: true, name: true, is_demo: true, subscription_tier: true },
+    });
+
+    if (!tenant) {
+      return { changed: false, tenantId, oldTier: '', newTier, reason: 'Tenant not found' };
+    }
+
+    if (!tenant.is_demo) {
+      return { changed: false, tenantId, oldTier: tenant.subscription_tier || '', newTier, reason: 'Tenant is not a demo tenant' };
+    }
+
+    const oldTier = tenant.subscription_tier || 'unknown';
+
+    if (oldTier === newTier) {
+      return { changed: false, tenantId, oldTier, newTier, reason: `Tier is already "${newTier}"` };
+    }
+
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: { subscription_tier: newTier },
+    });
+
+    logger.info(`[DemoTenantService] Changed demo tenant ${tenantId} (${tenant.name}) tier: ${oldTier} → ${newTier}`);
+
+    return {
+      changed: true,
+      tenantId,
+      oldTier,
+      newTier,
+      reason: `Tier changed from "${oldTier}" to "${newTier}"`,
+    };
   }
 
   async findExpiredDemoTenants(): Promise<Array<{ id: string; name: string; demo_expires_at: Date | null }>> {

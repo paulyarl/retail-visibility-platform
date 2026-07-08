@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { useAuth } from '@/contexts/AuthContext';
 import CrmPageShell from '@/components/crm/CrmPageShell';
+import { IconBroadcast } from '@tabler/icons-react';
 
 interface DashboardStats {
   openTickets: number;
@@ -87,6 +88,14 @@ export default function CrmDashboardPage() {
         tickets: stats?.openTickets,
         tasks: stats?.overdueTasks,
       }}
+      actions={
+        <Link href="/settings/admin/crm/broadcast">
+          <Button variant="default" size="sm">
+            <IconBroadcast size={16} />
+            Broadcast Alert
+          </Button>
+        </Link>
+      }
     >
       {/* View toggle */}
       <div className="flex items-center gap-2">

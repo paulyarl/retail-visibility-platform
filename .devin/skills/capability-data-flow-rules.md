@@ -504,6 +504,87 @@ The `org_standing_mode` column on `tenants` (`'independent'` default, `'inherite
 
 **`tier_catalog_permissions`**: Tier-level permissions for the global supplier catalog (browse, add, edit, remove). Separate from capability resolution — gates catalog management actions, not feature flags.
 
+### R28: Platform Communication Channels — Route-Level Create Gate, Not Blanket Disable
+
+Some capabilities are **platform communication channels** (e.g., CRM) that must remain accessible even for frozen/canceled/expired tenants. The `EffectiveCapabilityResolver` Step 6 override (R23) already keeps these capabilities `enabled = true` for read-only accounts. However, **route handlers MUST NOT independently re-gate access** by calling `CrmOptionsService.resolveCrmOptionsState()` or similar service-level checks that bypass the Step 6 override.
+
+**Problem pattern** (what NOT to do):
+```ts
+// ❌ Route handler calls CrmOptionsService directly — bypasses EffectiveCapabilityResolver Step 6
+async function checkCrmEnabled(tenantId, res) {
+  const state = await CrmOptionsService.getInstance().resolveCrmOptionsState(tenantId);
+  if (!state.enabled) return res.status(403).json({ error: 'merchant_gate_disabled' });
+}
+// Applied to ALL routes (GET, PUT, POST) — blocks read access for frozen tenants
+```
+
+**Correct pattern** — split into Read/Update (always allowed) vs Create (subscription-gated):
+```ts
+// ✅ No gate on GET/PUT routes — CRM is always accessible for viewing and responding
+router.get('/tickets', ...);
+router.put('/tickets/:ticketId', ...);
+router.post('/tickets/:ticketId/messages', ...);  // replying to existing tickets = Update, not Create
+
+// ✅ Create gate only on POST routes that create new entities
+async function checkCrmCreateAllowed(tenantId, res): Promise<boolean> {
+  const tenant = await prisma.tenants.findUnique({ where: { id: tenantId }, select: { ... } });
+  const internalStatus = deriveInternalStatus({ ... });
+  if (['frozen', 'canceled', 'expired'].includes(internalStatus)) {
+    res.status(403).json({ error: 'subscription_read_only', message: '...' });
+    return false;
+  }
+  return true;
+}
+
+router.post('/tickets', ...);  // checkCrmCreateAllowed gates this
+router.post('/contacts', ...); // checkCrmCreateAllowed gates this
+```
+
+**Key rules**:
+1. **GET and PUT routes**: No subscription-status gate. Frozen tenants can view tickets, tasks, alerts, inquiries, activities, and respond to existing tickets (POST messages = Update, not Create).
+2. **POST routes that create new entities**: Gate with `checkCrmCreateAllowed` which checks `deriveInternalStatus()`. Returns 403 `subscription_read_only` for frozen/canceled/expired.
+3. **POST routes that are responses** (e.g., `POST /tickets/:ticketId/messages`): NOT gated — these are Update operations (receive and respond), not Create.
+4. **Frontend**: Dashboard widgets and support pages MUST always render (no `crmEnabled` conditional). Pass `isWritable` prop from `subscriptionContext.writable` to conditionally hide create-action buttons (e.g., "New Ticket"). Do NOT set a `crmDisabled` state based on API error messages — the API no longer returns `merchant_gate_disabled` for CRM routes.
+
+**When to apply this pattern**: Any capability that serves as a platform-to-tenant communication channel (CRM, alerts, notifications). These are NOT feature benefits that should be revoked — they're the mechanism for resolving subscription issues. Apply the RU (Read/Update) vs C (Create) split rather than blanket CRUD disabling.
+
+### R29: Frontend `isWritable` Prop Pattern for Read-Only Capabilities
+
+When a capability remains visible but write-restricted for read-only accounts, frontend components MUST accept an `isWritable` prop (defaulting to `true`) and conditionally hide create-action UI elements — NOT hide the entire component.
+
+**Pattern**:
+```tsx
+interface WidgetProps {
+  tenantId?: string;
+  isWritable?: boolean;  // defaults to true
+}
+
+export default function Widget({ tenantId, isWritable = true }: WidgetProps) {
+  // Always render the widget — show data, allow interactions
+  return (
+    <div>
+      {/* Always show data */}
+      <TicketList tickets={tickets} />
+
+      {/* Conditionally show create button */}
+      {isWritable && <NewTicketButton onClick={...} />}
+    </div>
+  );
+}
+```
+
+**Parent components** pass `isWritable` from the capabilities hook:
+```tsx
+const allCaps = useAllCapabilities(tenantId);
+const isWritable = allCaps.data?.subscriptionContext?.writable ?? true;
+<Widget tenantId={tenantId} isWritable={isWritable} />
+```
+
+**Do NOT**:
+- Set a `disabled` state based on API error messages (`merchant_gate_disabled`, etc.)
+- Hide the entire widget/component when subscription is read-only
+- Block API calls preemptively — let the backend `checkCrmCreateAllowed` gate handle it
+
 ## File Reference
 
 ### Backend

@@ -43,7 +43,7 @@ export default function CapabilityFeatureList({
   const effectiveFeatures = useMemo(() => {
     if (!allCaps) return [];
     const tierFeatures = tierConfig.getTierFeatures(currentTierKey);
-    return buildEffectiveFeatures(tierFeatures, allCaps.purchasedFeatureKeys, resolvedCaps);
+    return buildEffectiveFeatures(tierFeatures, allCaps.purchasedFeatureKeys, resolvedCaps, allCaps);
   }, [allCaps, tierConfig, currentTierKey, resolvedCaps]);
 
   const effectiveFeaturesByCapability = useMemo(() => {

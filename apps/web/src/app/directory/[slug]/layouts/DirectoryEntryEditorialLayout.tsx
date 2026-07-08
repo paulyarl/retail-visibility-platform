@@ -23,6 +23,7 @@ import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
 
@@ -33,6 +34,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
     optFlags, showStatusPanel, hoursStatus, isRetailStore, showsHours,
     showsMap, showsLocation, currentUrl, baseUrl, faqFlags, crmFlags,
     paymentGatewayStatus, actualProductCount, fullAddress,
+    isDemo, demoExpiresAt,
   } = props;
 
   return (
@@ -68,7 +70,7 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
                     <img src={listing.logoUrl} alt={listing.businessName} className="w-20 h-20 rounded-xl object-cover border-2 border-white/20" />
                   )}
                   <div>
-                    <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">{listing.businessName}</h1>
+                    <h1 className="text-4xl sm:text-5xl font-bold tracking-tight flex items-center gap-2 flex-wrap">{listing.businessName}<DemoBadge isDemo={isDemo} demoExpiresAt={demoExpiresAt} size="md" /></h1>
                     {listing.categories && listing.categories.length > 0 && (
                       <p className="text-neutral-300 mt-2 text-lg">
                         {listing.categories.filter((c: any) => c.isPrimary).map((c: any) => c.name).join(', ') || listing.categories[0]?.name}

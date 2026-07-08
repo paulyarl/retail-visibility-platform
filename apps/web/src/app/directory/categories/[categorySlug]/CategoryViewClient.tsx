@@ -48,6 +48,8 @@ interface DirectoryListing {
   website?: string;
   distance?: number;
   isOpen?: boolean;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 interface DirectoryResponse {

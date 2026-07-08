@@ -1,13 +1,28 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import UnifiedSettings, { UnifiedSettingsConfig, transformToUnifiedConfig } from './UnifiedSettings';
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
+import { policyTemplateService } from '@/services/PolicyTemplateService';
 
 
 export default function TenantSettings({ tenantId }: { tenantId: string }) {
   // Legacy settings groups - will be transformed to unified format
    // Consolidated data fetching - replaces 3 separate API calls with 1
   const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError } = useTenantComplete(tenantId);
+
+  const [complianceBadge, setComplianceBadge] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    policyTemplateService.getCompleteness(tenantId).then(result => {
+      if (!result) return;
+      if (result.overallScore >= 80) setComplianceBadge('Compliant');
+      else if (result.overallScore >= 50) setComplianceBadge('Review');
+      else setComplianceBadge('Action needed');
+    }).catch(() => {});
+  }, [tenantId]);
+
   const legacySettingsGroups = [
     {
       title: 'Stores',
@@ -428,7 +443,7 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/policies`,
           color: 'bg-indigo-600',
-          badge: 'NEW',
+          badge: complianceBadge ?? 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
           capabilityKey: 'storefrontOptions',
         },

@@ -32,6 +32,8 @@ export interface TenantInfo {
     storefront?: boolean;
     [key: string]: any;
   };
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 export interface TenantTier {

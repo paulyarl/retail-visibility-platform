@@ -31,6 +31,8 @@ interface DirectoryListing {
   subscriptionTier?: string;
   directoryPublished?: boolean;
   businessHours?: any;
+  isDemo?: boolean;
+  demoExpiresAt?: string | null;
 }
 
 interface Pagination {
@@ -74,6 +76,8 @@ function transformListing(listing: DirectoryListing): StoreData {
     isFeatured: listing.isFeatured,
     subscriptionTier: listing.subscriptionTier,
     businessHours: listing.businessHours,
+    isDemo: listing.isDemo,
+    demoExpiresAt: listing.demoExpiresAt,
   };
 }
 

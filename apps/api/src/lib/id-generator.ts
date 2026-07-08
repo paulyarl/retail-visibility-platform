@@ -1338,3 +1338,23 @@ export function generatePromotionCatalogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `promcat-${nanoid()}`;
 }
+
+/**
+ * Generate policy template ID (global, not tenant-scoped)
+ * Format: polcat-{nanoid} (15 chars)
+ * URL-safe, readable, unique
+ */
+export function generatePolicyTemplateId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `polcat-${nanoid()}`;
+}
+
+/**
+ * Generate policy template usage ID (tenant-scoped)
+ * Format: poltu-{tk}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generatePolicyTemplateUsageId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `poltu-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useBadgeMeta } from '@/hooks/useBadgeRegistry';
 import { DirectoryPromotionService } from '@/services/DirectoryPromotionService';
+import DemoBadge from '@/components/shared/DemoBadge';
 
 interface StoreCardProps {
   listing: {
@@ -37,6 +38,8 @@ interface StoreCardProps {
     isOpening?: boolean;
     isClosing?: boolean;
     directoryPublished?: boolean; // Add directory publish status
+    isDemo?: boolean;
+    demoExpiresAt?: string | null;
     category?: {
       name: string;
       slug: string;
@@ -157,8 +160,9 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
           <div className="p-4 space-y-2">
             {/* Business Name & Rating */}
             <div className="flex items-start justify-between gap-2">
-              <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 flex-1">
-                {listing.businessName}
+              <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 flex-1 flex items-center gap-1.5">
+                <span className="line-clamp-2">{listing.businessName}</span>
+                {listing.isDemo && <DemoBadge isDemo={listing.isDemo} demoExpiresAt={listing.demoExpiresAt} size="sm" />}
               </h3>
               {listing.ratingAvg > 0 && (
                 <div className="flex items-center gap-1 shrink-0">

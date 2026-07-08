@@ -43,7 +43,8 @@ export type BillingNotificationType =
   | 'directory_promotion_renewal_success'
   | 'directory_promotion_renewal_failed'
   | 'directory_promotion_grace_period_warning'
-  | 'directory_promotion_expired';
+  | 'directory_promotion_expired'
+  | 'policy_template_updated';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -360,6 +361,14 @@ class BillingNotificationService {
           subject: `Directory Promotion Expired - ${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'} - ${businessName}`,
           html: this.buildDirectoryPromotionExpiredHtml(ownerName, businessName, data),
           text: this.buildDirectoryPromotionExpiredText(ownerName, businessName, data),
+        };
+
+      case 'policy_template_updated':
+        return {
+          to: toEmail,
+          subject: `Policy Template Update Available - ${data.metadata?.templateTitle || 'Template'} - ${businessName}`,
+          html: this.buildPolicyTemplateUpdatedHtml(ownerName, businessName, data),
+          text: this.buildPolicyTemplateUpdatedText(ownerName, businessName, data),
         };
 
       default:
@@ -1132,6 +1141,12 @@ Your new plan is now active.`;
           body: `Directory promotion "${data.metadata?.tierLabel || data.metadata?.tier || 'Promotion'}" for ${tenantName} has expired. Your store is no longer highlighted in the directory.`,
           icon: '⌛',
         };
+      case 'policy_template_updated':
+        return {
+          title: 'Policy template update available',
+          body: `A policy template you used for ${tenantName} has been updated. Template: "${data.metadata?.templateTitle || 'Policy'}" — version ${data.metadata?.appliedVersion || '?'} → ${data.metadata?.currentVersion || '?'}. Review and update your policies to stay compliant.`,
+          icon: '📋',
+        };
       default:
         return {
           title: 'Subscription update',
@@ -1695,6 +1710,54 @@ Thank you for keeping your payment information up to date!
 
 ${business}
 If you didn't add this payment method, please contact support immediately.
+    `.trim();
+  }
+
+  // Email templates - Policy Template Updated
+  private buildPolicyTemplateUpdatedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const templateTitle = data.metadata?.templateTitle || 'Policy Template';
+    const appliedVersion = data.metadata?.appliedVersion || 'unknown';
+    const currentVersion = data.metadata?.currentVersion || 'unknown';
+    const policyType = data.metadata?.policyType || 'policy';
+    const reason = data.metadata?.reason || 'regulatory changes';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a1a1a;">Hi ${name},</h2>
+        <p style="color: #444; font-size: 16px;">A policy template you previously applied to <strong>${business}</strong> has been updated due to ${reason}.</p>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Template: <strong>${templateTitle}</strong></p>
+          <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Policy Type: ${policyType.replace(/_/g, ' ')}</p>
+          <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Your version: ${appliedVersion}</p>
+          <p style="margin: 0; font-size: 14px; color: #666;">Current version: <strong>${currentVersion}</strong></p>
+        </div>
+        <p style="color: #444; font-size: 16px;">We recommend reviewing and updating your ${policyType.replace(/_/g, ' ')} to stay compliant with the latest requirements.</p>
+        <a href="${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/policies" style="display: inline-block; background: #4f46e5; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 16px; margin: 16px 0;">Review Policies</a>
+        <p style="color: #888; font-size: 12px; margin-top: 24px;">Templates are starting points, not legal advice. Consult your attorney before publishing updated policies.</p>
+      </div>
+    `;
+  }
+
+  private buildPolicyTemplateUpdatedText(name: string, business: string, data: BillingNotificationData): string {
+    const templateTitle = data.metadata?.templateTitle || 'Policy Template';
+    const appliedVersion = data.metadata?.appliedVersion || 'unknown';
+    const currentVersion = data.metadata?.currentVersion || 'unknown';
+    const policyType = data.metadata?.policyType || 'policy';
+    const reason = data.metadata?.reason || 'regulatory changes';
+    return `
+Hi ${name},
+
+A policy template you previously applied to ${business} has been updated due to ${reason}.
+
+Template: ${templateTitle}
+Policy Type: ${policyType.replace(/_/g, ' ')}
+Your version: ${appliedVersion}
+Current version: ${currentVersion}
+
+We recommend reviewing and updating your ${policyType.replace(/_/g, ' ')} to stay compliant with the latest requirements.
+
+Review at: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/policies
+
+Templates are starting points, not legal advice. Consult your attorney before publishing updated policies.
     `.trim();
   }
 }

@@ -46,6 +46,7 @@ interface ContentStepProps {
     seoTitle?: string;
     seoDescription?: string;
     tags: string[];
+    enrichedMetadata?: Record<string, any>;
   };
   errors: Record<string, string>;
   onChange: (data: any) => void;
@@ -467,7 +468,7 @@ export default function ContentStep({ data, errors, onChange }: ContentStepProps
             <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
               <div className="flex items-center space-x-3">
                 <span className="text-sm font-medium text-gray-700">{key}:</span>
-                <span className="text-sm">{value}</span>
+                <span className="text-sm">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
               </div>
               <Button
                 variant="ghost"
@@ -500,6 +501,35 @@ export default function ContentStep({ data, errors, onChange }: ContentStepProps
           Add Specification
         </Button>
       </div>
+
+      <Separator />
+
+      {/* Enrichment Data Summary (read-only, stored as metadata.*) */}
+      {data.enrichedMetadata && Object.keys(data.enrichedMetadata).length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-medium">Enrichment Data</Label>
+            <Badge variant="info">{Object.keys(data.enrichedMetadata).length} fields</Badge>
+          </div>
+          <div className="space-y-1.5">
+            {Object.entries(data.enrichedMetadata).map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-700">{key}:</span>
+                  <span className="text-sm text-gray-600 max-w-md truncate">
+                    {typeof value === 'object'
+                      ? Array.isArray(value)
+                        ? `${value.length} items`
+                        : Object.keys(value).join(', ')
+                      : String(value)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">Structured enrichment data (nutrition, allergens, environmental, etc.) is stored as metadata and displayed on the item detail page.</p>
+        </div>
+      )}
 
       <Separator />
 

@@ -8,6 +8,9 @@
 
 import { BaseService } from './BaseService';
 import { generateStorefrontPolicyId } from '../lib/id-generator';
+import policyTemplateService from './PolicyTemplateService';
+import { invalidateEffectiveCapabilities } from './EffectiveCapabilityResolver';
+import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
 
 export type PolicyType = 'return_policy' | 'shipping_policy' | 'privacy_policy' | 'terms_of_service' | 'refund_policy';
 
@@ -118,6 +121,58 @@ class StorefrontPolicyService extends BaseService {
         terms_of_service: record.terms_of_service,
         refund_policy: record.refund_policy,
       };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Apply a policy template to a tenant's storefront policies.
+   * Substitutes placeholders, upserts the policy, logs usage, and triggers embeddings.
+   */
+  async applyTemplate(
+    tenantId: string,
+    templateId: string,
+    placeholderValues: Record<string, string | number | null>
+  ): Promise<StorefrontPolicies> {
+    try {
+      const template = await policyTemplateService.getTemplate(templateId);
+      if (!template) {
+        throw new Error('Template not found');
+      }
+      if (!template.isActive) {
+        throw new Error('This template is no longer active');
+      }
+
+      // Substitute placeholders
+      const generatedContent = policyTemplateService.substitutePlaceholders(
+        template.contentMarkdown,
+        template.placeholderSchema,
+        placeholderValues
+      );
+
+      // Upsert the policy
+      const updated = await this.upsertPolicies(tenantId, {
+        [template.policyType]: generatedContent,
+      } as Partial<StorefrontPolicies>);
+
+      // Log usage
+      await policyTemplateService.logTemplateUsage(
+        tenantId,
+        template.id,
+        template.policyType,
+        template.version,
+        false,
+        placeholderValues
+      );
+
+      // Invalidate capabilities
+      invalidateEffectiveCapabilities(tenantId);
+
+      // Refresh bot embeddings (fire-and-forget)
+      BotKnowledgeEmbeddingService.getInstance().refreshPolicyEmbeddings(tenantId).catch(() => {});
+
+      return updated;
     } catch (error) {
       throw this.handleError(error);
     }

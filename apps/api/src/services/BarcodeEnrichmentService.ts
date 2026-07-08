@@ -33,7 +33,7 @@ export interface EnrichmentResult {
   imageUrl?: string;
   imageThumbnailUrl?: string;
   metadata?: Record<string, any>;
-  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback';
+  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback' | 'supplier_catalog';
 }
 
 interface CacheEntry {
@@ -154,7 +154,18 @@ export class BarcodeEnrichmentService {
 
       enrichmentCacheMiss.inc({ tenant: tenantId });
 
-      // 3. Try UPC Database API
+      // 3. Check supplier catalog (cross-tenant, persistent)
+      const supplierResult = await this.getFromSupplierCatalog(barcode);
+      if (supplierResult) {
+        await this.saveToDatabase(barcode, supplierResult);
+        this.saveToCache(barcode, supplierResult);
+        enrichmentCacheHit.inc({ tenant: tenantId });
+        enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'supplier_catalog' });
+        await this.logLookup(tenantId, barcode, 'supplier_catalog', 'success', supplierResult, Date.now() - startTime);
+        return supplierResult;
+      }
+
+      // 4. Try UPC Database API
       if (this.checkRateLimit('upc_database')) {
         try {
           const result = await this.enrichFromUPCDatabase(barcode);
@@ -172,7 +183,7 @@ export class BarcodeEnrichmentService {
         }
       }
 
-      // 4. Try Open Food Facts API
+      // 5. Try Open Food Facts API
       if (this.checkRateLimit('open_food_facts')) {
         try {
           const result = await this.enrichFromOpenFoodFacts(barcode);
@@ -190,7 +201,7 @@ export class BarcodeEnrichmentService {
         }
       }
 
-      // 5. Fallback to stub data
+      // 6. Fallback to stub data
       const fallback = this.createFallbackData(barcode);
       await this.saveToDatabase(barcode, fallback);
       this.saveToCache(barcode, fallback);
@@ -504,6 +515,50 @@ export class BarcodeEnrichmentService {
       if (oldestKey) {
         enrichmentCache.delete(oldestKey);
       }
+    }
+  }
+
+  /**
+   * Supplier catalog lookup (cross-tenant, persistent)
+   * Checks supplier_catalog_item table for a matching GTIN.
+   * If found, converts to EnrichmentResult so it gets cached in barcode_enrichment.
+   */
+  private async getFromSupplierCatalog(barcode: string): Promise<EnrichmentResult | null> {
+    try {
+      const items = await prisma.supplier_catalog_item.findMany({
+        where: { gtin: barcode },
+        orderBy: { updated_at: 'desc' },
+        take: 1,
+      });
+
+      if (items.length === 0) {
+        return null;
+      }
+
+      const item = items[0];
+      const msrpCents = item.msrp ? Number(item.msrp) * 100 : undefined;
+
+      return {
+        name: item.name || undefined,
+        brand: item.brand || undefined,
+        description: item.description || undefined,
+        categoryPath: item.category_path && item.category_path.length > 0
+          ? item.category_path
+          : (item.category ? [item.category] : []),
+        priceCents: msrpCents,
+        imageUrl: item.image_url || undefined,
+        metadata: {
+          supplier_catalog_item_id: item.id,
+          supplier_id: item.supplier_id,
+          supplier_sku: item.supplier_sku,
+          attrs: item.attrs,
+          availability: item.availability,
+        },
+        source: 'supplier_catalog',
+      };
+    } catch (error) {
+      console.error('[Enrichment] Supplier catalog lookup error:', error);
+      return null;
     }
   }
 

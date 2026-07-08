@@ -151,6 +151,7 @@ export default function CreateItemPage({
         metadata: {
           features: content.features || [],
           specifications: content.specifications || {},
+          ...(content.enrichedMetadata || {}),
           variantConfig: productType.variantConfig || {},
           variantMedia: media.variantMedia || {},
           inventorySettings: organization.inventorySettings || {},

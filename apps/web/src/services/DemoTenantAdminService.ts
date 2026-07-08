@@ -148,6 +148,18 @@ class DemoTenantAdminService extends AdminApiSingleton {
     return (result as any)?.data?.data ?? null;
   }
 
+  async changeDemoTenantTier(tenantId: string, tier: string): Promise<{ changed: boolean; oldTier: string; newTier: string; reason: string } | null> {
+    const result = await this.makeDefaultRequest<{ data: { changed: boolean; oldTier: string; newTier: string; reason: string } }>(
+      `/api/admin/demo-tenants/${encodeURIComponent(tenantId)}/tier`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      }
+    );
+    return (result as any)?.data?.data ?? null;
+  }
+
   async getQRAnalytics(tenantId: string): Promise<any | null> {
     const result = await this.makeDefaultRequest<any>(
       `/api/admin/demo-tenants/${encodeURIComponent(tenantId)}/qr-analytics`,

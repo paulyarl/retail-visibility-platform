@@ -807,7 +807,7 @@ class BotKnowledgeEmbeddingService {
    */
   async refreshKnowledgeEmbeddings(
     tenantId: string,
-    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement'
+    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement' | 'policy_template'
   ): Promise<{ processed: number; chunks: number }> {
     if (sourceType === 'badge_registry') {
       return this.refreshBadgeRegistryEmbeddings(tenantId);
@@ -833,6 +833,9 @@ class BotKnowledgeEmbeddingService {
     if (sourceType === 'featured_placement') {
       return this.refreshFeaturedPlacementEmbeddings(tenantId);
     }
+    if (sourceType === 'policy_template') {
+      return this.refreshPolicyTemplateEmbeddings(tenantId);
+    }
 
     const badgeResult = await this.refreshBadgeRegistryEmbeddings(tenantId);
     const policyResult = await this.refreshPolicyEmbeddings(tenantId);
@@ -842,10 +845,77 @@ class BotKnowledgeEmbeddingService {
     const promotionResult = await this.refreshPromotionEmbeddings(tenantId);
     const featurePurchaseResult = await this.refreshFeaturePurchaseEmbeddings(tenantId);
     const featuredPlacementResult = await this.refreshFeaturedPlacementEmbeddings(tenantId);
+    const policyTemplateResult = await this.refreshPolicyTemplateEmbeddings(tenantId);
     return {
-      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed,
-      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks,
+      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed + policyTemplateResult.processed,
+      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks + policyTemplateResult.chunks,
     };
+  }
+
+  // ─── Policy Template Embeddings ───
+
+  /**
+   * Refresh policy template embeddings for a tenant.
+   * Reads recommended templates for the tenant and chunks template metadata
+   * (title, description, compliance tags, policy type) into bot_knowledge_embeddings
+   * with source_type='policy_template'.
+   */
+  async refreshPolicyTemplateEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
+    const pool = getDirectPool();
+
+    // Delete existing policy template embeddings for this tenant
+    await pool.query(
+      "DELETE FROM bot_knowledge_embeddings WHERE tenant_id = $1 AND source_type = 'policy_template'",
+      [tenantId]
+    );
+
+    // Get recommended templates for this tenant
+    const { PolicyTemplateService } = await import('./PolicyTemplateService');
+    const service = PolicyTemplateService.getInstance();
+    const templates = await service.getRecommendedTemplates(tenantId);
+
+    if (templates.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const chunks: string[] = [];
+    for (const t of templates) {
+      const parts = [
+        `Policy Template: ${t.title}`,
+        `Policy Type: ${t.policyType.replace(/_/g, ' ')}`,
+        `Storefront: ${t.storefrontType}`,
+        `Version: ${t.version}`,
+      ];
+      if (t.description) parts.push(`Description: ${t.description}`);
+      if (t.complianceTags.length > 0) parts.push(`Compliance: ${t.complianceTags.join(', ')}`);
+      if (t.jurisdiction !== 'GLOBAL') parts.push(`Jurisdiction: ${t.jurisdiction}`);
+      if (t.fulfillmentMode !== 'all') parts.push(`Fulfillment: ${t.fulfillmentMode}`);
+      chunks.push(parts.join('\n'));
+    }
+
+    const embeddingModel = await BotRagService.getInstance().getEmbeddingModel();
+    const embeddings = await this.generateEmbeddings(chunks);
+
+    for (let i = 0; i < chunks.length; i++) {
+      const embeddingStr = `[${embeddings[i].join(',')}]`;
+      await pool.query(
+        `INSERT INTO bot_knowledge_embeddings (tenant_id, source_type, source_id, chunk_text, chunk_index, embedding, model)
+         VALUES ($1, 'policy_template', $2, $3, $4, $5::vector, $6)
+         ON CONFLICT (tenant_id, source_type, source_id, chunk_index) DO UPDATE SET
+           chunk_text = EXCLUDED.chunk_text,
+           embedding = EXCLUDED.embedding,
+           model = EXCLUDED.model,
+           updated_at = now()`,
+        [tenantId, templates[i].id, chunks[i], i, embeddingStr, embeddingModel]
+      );
+    }
+
+    logger.info('[BotKnowledgeEmbeddingService] Refreshed policy template embeddings', undefined, {
+      tenantId,
+      chunks: chunks.length,
+    });
+
+    return { processed: templates.length, chunks: chunks.length };
   }
 
   // ─── Search ───
