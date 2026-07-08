@@ -116,6 +116,20 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 - **No schema changes**: Reuses existing `tier_features_list → capability_features_list → capability_type_list` chain
 - **Frontend**: Ineligible items show locked card with "Upgrade Required" badge, reason text, and "Upgrade Plan" button linking to `/t/{tenantId}/settings/store?tab=plans`
 
+### Tier Status Check (Flexible Expansion)
+- **Function**: `checkTierFeatureStatus(tenantId, featureKey)` in `bsaas-purchases.ts`
+- **Purpose**: Determines if a feature is already included in the tenant's tier (so the catalog shows "Included in Plan" instead of a purchase button)
+- **Two-step resolution** (mirrors the MV's flexible CTEs from migration 089):
+  1. **Exact match**: Check `tier_features_list` for the exact `feature_key` with `is_enabled=true`
+  2. **Flexible fallback**: If no exact match, resolve the feature's capability type via `capability_features_list`, construct `{capability_key}_flexible`, and check if the tenant has that flexible key from **any source**:
+     - Tier-bundled: `tier_features_list` (tier has `{capability}_flexible` enabled)
+     - Purchased: `tenant_feature_purchases` (tenant purchased `{capability}_flexible`)
+     - Admin grant: `tenant_feature_overrides_list` (admin granted `{capability}_flexible`)
+     If any source has the flexible key, the feature is in-tier via flexible expansion.
+- **Why not use the MV directly?** `mv_tenant_effective_capabilities` has a 10-minute refresh cron, which creates a staleness risk for post-purchase confirmation and settings pages. The live query avoids this.
+- **Merchant gate**: After confirming in-tier, checks the merchant gate toggle for the capability domain (e.g., `tenant_chatbot_options_settings.chatbot_enabled`)
+- **Returns**: `{ inTier, merchantGateOn, capabilityKey }` → frontend maps to `in_tier_active`, `in_tier_gate_off`, or `not_in_tier`
+
 ### Phase 2: Frontend Purchase Page
 - **File**: `apps/web/src/app/(platform)/settings/feature-store/page.tsx`
 - Shows catalog with tier-aware UI (`in_tier_active`, `in_tier_gate_off`, `not_in_tier`)
@@ -298,7 +312,8 @@ Bundles group multiple flexible toggle features across capability domains into a
 
 - **`GET /api/subscription/bundle-catalog`** — Returns active bundles with component features, tier eligibility per component, purchase status, and trial info per tenant
 - Uses `checkBundleEngagement()` to verify the tenant's tier has ≥1 feature in EVERY capability type represented by the bundle's components
-- Filters out bundles where all components are already active (`allActive`)
+- Computes `allInTier` by calling `checkTierFeatureStatus()` for each component — if all are in-tier (including via flexible expansion), the bundle shows "Included in Plan" with a disabled button instead of "Start Trial"
+- Computes `allActive` by checking if all components have active purchases — filters out fully-purchased bundles
 
 ### Bundle Purchase Endpoint
 

@@ -383,9 +383,12 @@ async function checkTierFeatureStatus(
 
   let capabilityKey: string | null = tierFeature?.capability_type_list?.key || null;
 
-  // 3. If not an explicit tier feature, check flexible tier expansion:
-  //    If the tier has a {capability_key}_flexible feature, ALL features in that
-  //    capability type are included. This mirrors the MV's flexible_tier_features CTE.
+  // 3. If not an explicit tier feature, check flexible expansion from all sources:
+  //    - Tier-bundled: {capability_key}_flexible in tier_features_list
+  //    - Purchased: {capability_key}_flexible in tenant_feature_purchases
+  //    - Admin grant: {capability_key}_flexible in tenant_feature_overrides_list
+  //    This mirrors the MV's flexible_tier_features, flexible_purchase_features,
+  //    and flexible_override_features CTEs.
   if (!tierFeature) {
     // Resolve the feature's capability type
     const feature = await prisma.features_list.findUnique({
@@ -405,7 +408,7 @@ async function checkTierFeatureStatus(
     capabilityKey = capLink.capability_type_list.key;
     const flexibleKey = `${capabilityKey}_flexible`;
 
-    // Check if the tenant's tier has the {capability_key}_flexible feature enabled
+    // Check tier-bundled flexible
     const flexibleTierFeature = await prisma.tier_features_list.findFirst({
       where: {
         tier_id: { in: tierIds },
@@ -414,10 +417,30 @@ async function checkTierFeatureStatus(
       },
     });
 
-    if (!flexibleTierFeature) {
+    // Check purchased flexible
+    const flexiblePurchase = await prisma.tenant_feature_purchases.findFirst({
+      where: {
+        tenant_id: tenantId,
+        feature_key: flexibleKey,
+        status: { in: ['active', 'past_due', 'trial'] },
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+      },
+    });
+
+    // Check admin-granted flexible
+    const flexibleOverride = await prisma.tenant_feature_overrides_list.findFirst({
+      where: {
+        tenant_id: tenantId,
+        feature: flexibleKey,
+        granted: true,
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+      },
+    });
+
+    if (!flexibleTierFeature && !flexiblePurchase && !flexibleOverride) {
       return { inTier: false, merchantGateOn: null, capabilityKey: null };
     }
-    // Feature is in-tier via flexible expansion
+    // Feature is in-tier via flexible expansion (from any source)
   }
 
   // 4. Check merchant gate for the capability domain
