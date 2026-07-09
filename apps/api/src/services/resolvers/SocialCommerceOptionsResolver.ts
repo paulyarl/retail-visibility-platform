@@ -32,9 +32,9 @@ export function resolveSocialCommerceOptions(
 
   const allowedMeta: SocialCommerceMetaType[] = [];
   if (flexible || metaGroupOn) {
-    if (flexible || feat.social_commerce_meta_catalog) allowedMeta.push('social_commerce_meta_catalog');
-    if (flexible || feat.social_commerce_meta_shop) allowedMeta.push('social_commerce_meta_shop');
-    if (flexible || feat.social_commerce_meta_pixel) allowedMeta.push('social_commerce_meta_pixel');
+    if (flexible || metaGroupOn || feat.social_commerce_meta_catalog) allowedMeta.push('social_commerce_meta_catalog');
+    if (flexible || metaGroupOn || feat.social_commerce_meta_shop) allowedMeta.push('social_commerce_meta_shop');
+    if (flexible || metaGroupOn || feat.social_commerce_meta_pixel) allowedMeta.push('social_commerce_meta_pixel');
     if (flexible && allowedMeta.length === 0) {
       allowedMeta.push('social_commerce_meta_catalog', 'social_commerce_meta_shop', 'social_commerce_meta_pixel');
     }
@@ -45,9 +45,9 @@ export function resolveSocialCommerceOptions(
 
   const allowedTikTok: SocialCommerceTikTokType[] = [];
   if (flexible || tiktokGroupOn) {
-    if (flexible || feat.social_commerce_tiktok_catalog) allowedTikTok.push('social_commerce_tiktok_catalog');
-    if (flexible || feat.social_commerce_tiktok_shop) allowedTikTok.push('social_commerce_tiktok_shop');
-    if (flexible || feat.social_commerce_tiktok_pixel) allowedTikTok.push('social_commerce_tiktok_pixel');
+    if (flexible || tiktokGroupOn || feat.social_commerce_tiktok_catalog) allowedTikTok.push('social_commerce_tiktok_catalog');
+    if (flexible || tiktokGroupOn || feat.social_commerce_tiktok_shop) allowedTikTok.push('social_commerce_tiktok_shop');
+    if (flexible || tiktokGroupOn || feat.social_commerce_tiktok_pixel) allowedTikTok.push('social_commerce_tiktok_pixel');
     if (flexible && allowedTikTok.length === 0) {
       allowedTikTok.push('social_commerce_tiktok_catalog', 'social_commerce_tiktok_shop', 'social_commerce_tiktok_pixel');
     }

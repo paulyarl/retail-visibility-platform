@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, X, Sparkles, TrendingUp, Zap, ShoppingBag, LayoutGrid, List, Info, Boxes, Layers } from 'lucide-react';
+import { ArrowLeft, Check, X, Sparkles, TrendingUp, Settings, Zap, ShoppingBag, LayoutGrid, List, Info, Boxes, Layers } from 'lucide-react';
 import { useTenantComplete } from '@/hooks/dashboard/useTenantComplete';
 import { useTierConfig } from '@/lib/tiers/useTierConfig';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
@@ -10,6 +10,17 @@ import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 import { summarizeResolvedCapabilities } from '@/lib/tiers/capability-display';
 import CapabilityComparisonMatrix from '@/components/subscription/CapabilityComparisonMatrix';
 import CapabilityFeatureList from '@/components/subscription/CapabilityFeatureList';
+
+const TIER_UPGRADE_PATHS: string[][] = [
+  ['google_only', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'],
+  ['chain_starter', 'chain_professional', 'chain_enterprise'],
+];
+
+function isHighestTier(tierKey: string): boolean {
+  const path = TIER_UPGRADE_PATHS.find(p => p.includes(tierKey));
+  if (!path) return true;
+  return path[path.length - 1] === tierKey;
+}
 
 export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
   const { tenant, tier, loading } = useTenantComplete(tenantId);
@@ -67,13 +78,23 @@ export default function TierFeaturesClient({ tenantId }: { tenantId: string }) {
                   <div className="text-3xl font-bold text-blue-600">
                     ${currentTierPrice}<span className="text-base font-normal text-neutral-500">/mo</span>
                   </div>
-                  <Link
-                    href={`/t/${tenantId}/settings/subscription`}
-                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 mt-2"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    Upgrade Plan
-                  </Link>
+                  {isHighestTier(currentTierKey) ? (
+                    <Link
+                      href={`/t/${tenantId}/settings/subscription`}
+                      className="inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900 mt-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Manage Plan
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/t/${tenantId}/settings/subscription`}
+                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 mt-2"
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                      Upgrade Plan
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
