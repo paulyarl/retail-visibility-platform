@@ -12,13 +12,14 @@
 | 3 | `commitment` | Commitment | $79 | Physical retail | Deposit only |
 | 4 | `ecommerce` | E-commerce | $99 | Online-only | Full payment only |
 | 5 | `omnichannel` | Omnichannel | $149 | Physical + online | Both (deposit + full) |
-| 6 | `enterprise` | Enterprise | $499 | Multi-location | All options |
+| 6 | `professional` | Professional | $199 | Advanced single-location | Both |
+| 7 | `organization` | Organization | $499 | Multi-location (org type) | All options |
+| 8 | `enterprise` | Enterprise | $499 | Multi-location | All options |
 
 **Legacy/alias tiers** (map to the above):
 - `google_only` → maps to `discovery` level
 - `starter` → maps to `storefront` level (legacy)
 - `professional` → sits between `omnichannel` and `enterprise` in code (legacy)
-- `organization` → maps to `enterprise` level
 - `custom` → highest level (escape hatch)
 
 **Chain tiers** (multi-location variants):
@@ -32,9 +33,11 @@ Use this exact ordering in any code that compares tier levels:
 
 ```
 ['google_only', 'starter', 'discovery', 'storefront', 'commitment',
- 'ecommerce', 'omnichannel', 'professional', 'enterprise',
+ 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
  'chain_starter', 'chain_professional', 'chain_enterprise', 'custom']
 ```
+
+**Note:** `organization` is a real active tier (not a legacy alias). It sits between `professional` and `enterprise` in the hierarchy. It is an organization-type tier (not individual-type) and has its own features, pricing ($499/mo), and limits.
 
 ## Upgrade Path
 
@@ -84,18 +87,18 @@ discovery → storefront → commitment → ecommerce → omnichannel → enterp
 ### Backend (`apps/api/src/`)
 - `services/GrowthTipService.ts` — mirrors frontend tipEngine: `TIER_ORDER`, tier helpers, `nextTierName()`, tip definitions
 - `utils/tier-limits.ts` — `SubscriptionTier` type, `TIER_LIMITS` with `ecommerce` entry
-- `utils/trial-tier-transparency.ts` — trial-to-base tier mapping (includes `trial_ecommerce`)
+- `utils/trial-tier-transparency.ts` — trial-to-base tier mapping (includes `trial_ecommerce`, `trial_organization`)
 - `services/TierService.ts` — trial tier mapping
 - `routes/admin/tier-management.ts` — tier ordering, pricing, SKU limits
 - `utils/featured-product-scoring.ts` — tier-based scoring weights
 - `services/IntegrationOptionsService.ts` — `minTier` per integration type
 
 ### Critical pattern
-Any array or switch that enumerates tier levels MUST include `'ecommerce'` between `'commitment'` and `'omnichannel'`. Missing it causes `tierIndex('ecommerce')` to return `0` (fallback), treating E-commerce tenants as Discovery-level — showing wrong upgrade tips, wrong capability gates, and wrong tier comparisons.
+Any array or switch that enumerates tier levels MUST include `'ecommerce'` between `'commitment'` and `'omnichannel'`, and MUST include `'organization'` between `'professional'` and `'enterprise'`. Missing either causes `tierIndex()` to return `0` (fallback), treating the tenant as Discovery-level — showing wrong upgrade tips, wrong capability gates, and wrong tier comparisons.
 
-## Common bugs from missing `ecommerce` in tier arrays
+## Common bugs from missing `ecommerce` or `organization` in tier arrays
 
-1. **Wrong growth tips:** E-commerce users see "Upgrade to Storefront" (discovery tip) instead of "Add physical pickup with Omnichannel"
-2. **Wrong capability gating:** E-commerce users treated as discovery-level, denied commerce features they're paying for
-3. **Wrong tier comparisons:** `getHigherTierLevel()` can't compare ecommerce vs other tiers correctly
+1. **Wrong growth tips:** E-commerce users see "Upgrade to Storefront" (discovery tip) instead of "Add physical pickup with Omnichannel"; Organization users see no upgrade path
+2. **Wrong capability gating:** E-commerce users treated as discovery-level, denied commerce features they're paying for; Organization users treated as discovery-level, denied propagation and multi-location features
+3. **Wrong tier comparisons:** `getHigherTierLevel()` can't compare ecommerce or organization vs other tiers correctly
 4. **Wrong upgrade options:** `getUpgradeOptions()` skips valid upgrade paths

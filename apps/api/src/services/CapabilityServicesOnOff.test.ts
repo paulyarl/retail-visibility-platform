@@ -22,6 +22,24 @@ describe('Phase 5 services _on/_off fallback', () => {
       expect(result.showsGallery).toBe(true);
     });
 
+    it('enables capability when only a group _on gate is present without product_options_enabled', () => {
+      const result = ProductOptionsService.getInstance().resolveFromFeatures({
+        product_options_creation_on: true,
+      });
+      expect(result.enabled).toBe(true);
+      expect(result.creationEnabled).toBe(true);
+      expect(result.showsVariants).toBe(true);
+    });
+
+    it('enables capability when only a legacy group _enabled gate is present', () => {
+      const result = ProductOptionsService.getInstance().resolveFromFeatures({
+        product_options_layout_enabled: true,
+      });
+      expect(result.enabled).toBe(true);
+      expect(result.layoutEnabled).toBe(true);
+      expect(result.allowedLayouts).toContain('classic');
+    });
+
     it('falls back to _enabled group gates when _on is absent', () => {
       const result = ProductOptionsService.getInstance().resolveFromFeatures({
         product_options_enabled: true,

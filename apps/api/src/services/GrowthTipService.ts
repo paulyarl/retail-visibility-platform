@@ -140,7 +140,7 @@ function hasIntegrations(ctx: TipContext): boolean {
 
 const TIER_ORDER: string[] = [
   'google_only', 'starter', 'discovery', 'storefront', 'commitment',
-  'ecommerce', 'omnichannel', 'professional', 'enterprise',
+  'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];
 
@@ -183,6 +183,7 @@ function nextTierName(key: string): string | null {
     ecommerce: 'Omnichannel',
     omnichannel: 'Enterprise',
     professional: 'Enterprise',
+    organization: 'Enterprise',
   };
   return map[key] ?? null;
 }

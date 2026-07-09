@@ -21,6 +21,7 @@ function getBaseTierForTrial(tierKey: string): string | null {
     'trial_ecommerce': 'ecommerce',
     'trial_omnichannel': 'omnichannel',
     'trial_enterprise': 'enterprise',
+    'trial_organization': 'organization',
     'trial_chain_starter': 'chain_starter',
     'trial_chain_professional': 'chain_professional',
     'trial_chain_enterprise': 'chain_enterprise',

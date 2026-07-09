@@ -14,6 +14,7 @@ import CapabilityFeatureList from '@/components/subscription/CapabilityFeatureLi
 const TIER_UPGRADE_PATHS: string[][] = [
   ['google_only', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'],
   ['chain_starter', 'chain_professional', 'chain_enterprise'],
+  ['organization'],
 ];
 
 function isHighestTier(tierKey: string): boolean {

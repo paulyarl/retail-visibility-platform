@@ -158,15 +158,24 @@ export function resolveProductOptions(
 
 function hasAnyOptionsFeature(features: Record<string, boolean>): boolean {
   return !!(
+    // Group gates (new _on and legacy _enabled)
+    features.product_options_creation_on ||
+    features.product_options_creation_enabled ||
+    features.product_options_layout_on ||
+    features.product_options_layout_enabled ||
+    features.product_options_sections_on ||
+    features.product_options_sections_enabled ||
+    // Individual creation features
     features.product_options_creation_variants ||
     features.product_options_creation_gallery ||
     features.product_options_creation_video ||
+    features.product_options_creation_supplier_catalog ||
+    // Individual layout features
     features.product_options_layout_classic ||
     features.product_options_layout_editorial ||
     features.product_options_layout_immersive ||
-    features.product_options_sections_recently_viewed ||
-    features.product_options_sections_qr_codes ||
-    features.product_options_sections_recommended
+    // Any section feature
+    hasAnySectionFeature(features)
   );
 }
 

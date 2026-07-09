@@ -423,11 +423,11 @@ async function checkTierFeatureStatus(
       where: {
         capability_type_id: capabilityTypeId,
         is_active: true,
+        features_list: { is_active: true },
       },
       include: {
         features_list: {
           select: { key: true },
-          where: { is_active: true },
         },
       },
     });

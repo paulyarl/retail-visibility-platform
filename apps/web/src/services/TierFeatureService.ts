@@ -122,7 +122,7 @@ class TierFeatureService extends TenantApiSingleton {
       priceMonthly: TIER_PRICING[key] || 0,
       maxSkus: null,
       maxLocations: null,
-      tierType: key.startsWith('chain_') ? 'chain' : 'individual',
+      tierType: key.startsWith('chain_') ? 'chain' : key === 'organization' ? 'organization' : 'individual',
       sortOrder: 0,
       features: [...(features as readonly string[])],
     }));

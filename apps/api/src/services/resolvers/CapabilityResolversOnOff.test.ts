@@ -23,6 +23,23 @@ describe('Phase 5 resolvers _on/_off fallback', () => {
       expect(result.creation_enabled).toBe(true);
     });
 
+    it('enables capability when only a group _on gate is present without product_options_enabled', () => {
+      const result = resolveProductOptions({
+        product_options_creation_on: true,
+      }, {});
+      expect(result.enabled).toBe(true);
+      expect(result.creation_enabled).toBe(true);
+    });
+
+    it('enables capability when only a legacy group _enabled gate is present', () => {
+      const result = resolveProductOptions({
+        product_options_layout_enabled: true,
+      }, {});
+      expect(result.enabled).toBe(true);
+      expect(result.layout_enabled).toBe(true);
+      expect(result.allowed_layouts).toContain('classic');
+    });
+
     it('falls back to _enabled group gates when _on is absent', () => {
       const result = resolveProductOptions({
         product_options_enabled: true,
