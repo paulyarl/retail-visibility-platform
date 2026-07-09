@@ -234,9 +234,9 @@ class CrmOptionsService {
     const flexible = !!features.crm_flexible;
 
     // Scope group gates (inquiry channels)
-    const inquiryProductEnabled = flexible || !!features.crm_inquiry_product_enabled;
-    const inquiryStorefrontEnabled = flexible || !!features.crm_inquiry_storefront_enabled;
-    const inquiryDirectoryEnabled = flexible || !!features.crm_inquiry_directory_enabled;
+    const inquiryProductEnabled = flexible || !!features.crm_inquiry_product_on || !!features.crm_inquiry_product_enabled;
+    const inquiryStorefrontEnabled = flexible || !!features.crm_inquiry_storefront_on || !!features.crm_inquiry_storefront_enabled;
+    const inquiryDirectoryEnabled = flexible || !!features.crm_inquiry_directory_on || !!features.crm_inquiry_directory_enabled;
 
     // Feature group gates
     const contactsEnabled = flexible || !!features.crm_contact_management;

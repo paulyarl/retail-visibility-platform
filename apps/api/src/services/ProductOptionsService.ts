@@ -163,8 +163,8 @@ class ProductOptionsService {
     const isFlexible = flexible;
 
     // ── Creation group (R16) ──
-    const creationGroupEnabled = !!features.product_options_creation_enabled;
-    const creationGroupDisabled = !!features.product_options_creation_disabled;
+    const creationGroupEnabled = !!features.product_options_creation_on || !!features.product_options_creation_enabled;
+    const creationGroupDisabled = !!features.product_options_creation_off || !!features.product_options_creation_disabled;
     const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants;
     const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery;
     const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video;
@@ -172,8 +172,8 @@ class ProductOptionsService {
     const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
 
     // ── Layout group (R16) ──
-    const layoutGroupEnabled = !!features.product_options_layout_enabled;
-    const layoutGroupDisabled = !!features.product_options_layout_disabled;
+    const layoutGroupEnabled = !!features.product_options_layout_on || !!features.product_options_layout_enabled;
+    const layoutGroupDisabled = !!features.product_options_layout_off || !!features.product_options_layout_disabled;
     const layoutEnabled = !layoutGroupDisabled && (isFlexible || layoutGroupEnabled);
 
     const allowedLayouts: ProductLayoutType[] = [];
@@ -188,8 +188,8 @@ class ProductOptionsService {
     }
 
     // ── Sections group (R16) ──
-    const sectionsGroupEnabled = !!features.product_options_sections_enabled;
-    const sectionsGroupDisabled = !!features.product_options_sections_disabled;
+    const sectionsGroupEnabled = !!features.product_options_sections_on || !!features.product_options_sections_enabled;
+    const sectionsGroupDisabled = !!features.product_options_sections_off || !!features.product_options_sections_disabled;
     const sectionsEnabled = !sectionsGroupDisabled && (isFlexible || sectionsGroupEnabled || hasAnySectionFeature(features));
 
     const showsRecentlyViewed = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recently_viewed;

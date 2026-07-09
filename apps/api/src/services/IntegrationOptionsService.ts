@@ -169,10 +169,10 @@ class IntegrationOptionsService {
     const enabled = !!features.integration_enabled;
     const disabled = !!features.integration_disabled;
     const flexible = !!features.integration_flexible;
-    const posGroupEnabled = !!features.integration_pos_enabled;
-    const posGroupDisabled = !!features.integration_pos_disabled;
-    const googleGroupEnabled = !!features.integration_google_enabled;
-    const googleGroupDisabled = !!features.integration_google_disabled;
+    const posGroupEnabled = !!features.integration_pos_on || !!features.integration_pos_enabled;
+    const posGroupDisabled = !!features.integration_pos_off || !!features.integration_pos_disabled;
+    const googleGroupEnabled = !!features.integration_google_on || !!features.integration_google_enabled;
+    const googleGroupDisabled = !!features.integration_google_off || !!features.integration_google_disabled;
 
     // Three states per group: enabled → all types, untouched → individual features, disabled → none
     const posEnabled = posGroupEnabled && !posGroupDisabled;

@@ -376,6 +376,8 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         location_status: true,
         subdomain: true,
         created_at: true,
+        is_demo: true,
+        demo_expires_at: true,
         tenant_business_profiles_list: {
           select: {
             logo_url: true,
@@ -495,6 +497,8 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       state: (tenant as any).tenant_business_profiles_list?.state || null,
       countryCode: (tenant as any).tenant_business_profiles_list?.country_code || null,
       bannerUrl: (tenant as any).tenant_business_profiles_list?.banner_url || null,
+      isDemo: (tenant as any).is_demo || false,
+      demoExpiresAt: (tenant as any).demo_expires_at ? (tenant as any).demo_expires_at.toISOString() : null,
     };
 
     console.log(`[TENANTS] Returning tenant data:`, {

@@ -220,26 +220,26 @@ class FaqOptionsService {
     const flexible = !!features.faq_flexible;
 
     // Scope group gates (storefront, product, templates)
-    const storefrontGroupEnabled = !!features.faq_storefront_enabled;
-    const storefrontGroupDisabled = !!features.faq_storefront_disabled;
-    const productGroupEnabled = !!features.faq_product_enabled;
-    const productGroupDisabled = !!features.faq_product_disabled;
-    const templatesGroupEnabled = !!features.faq_templates_enabled;
-    const templatesGroupDisabled = !!features.faq_templates_disabled;
+    const storefrontGroupEnabled = !!features.faq_storefront_on || !!features.faq_storefront_enabled;
+    const storefrontGroupDisabled = !!features.faq_storefront_off || !!features.faq_storefront_disabled;
+    const productGroupEnabled = !!features.faq_product_on || !!features.faq_product_enabled;
+    const productGroupDisabled = !!features.faq_product_off || !!features.faq_product_disabled;
+    const templatesGroupEnabled = !!features.faq_templates_on || !!features.faq_templates_enabled;
+    const templatesGroupDisabled = !!features.faq_templates_off || !!features.faq_templates_disabled;
 
     const storefrontEnabled = flexible || (storefrontGroupEnabled && !storefrontGroupDisabled);
     const productEnabled = flexible || (productGroupEnabled && !productGroupDisabled);
     const templatesEnabled = flexible || (templatesGroupEnabled && !templatesGroupDisabled);
 
     // Feature group gates (management, preview, display, kb)
-    const managementGroupEnabled = !!features.faq_management_enabled;
-    const managementGroupDisabled = !!features.faq_management_disabled;
-    const previewGroupEnabled = !!features.faq_preview_enabled;
-    const previewGroupDisabled = !!features.faq_preview_disabled;
-    const displayGroupEnabled = !!features.faq_display_enabled;
-    const displayGroupDisabled = !!features.faq_display_disabled;
-    const kbGroupEnabled = !!features.faq_kb_enabled;
-    const kbGroupDisabled = !!features.faq_kb_disabled;
+    const managementGroupEnabled = !!features.faq_management_on || !!features.faq_management_enabled;
+    const managementGroupDisabled = !!features.faq_management_off || !!features.faq_management_disabled;
+    const previewGroupEnabled = !!features.faq_preview_on || !!features.faq_preview_enabled;
+    const previewGroupDisabled = !!features.faq_preview_off || !!features.faq_preview_disabled;
+    const displayGroupEnabled = !!features.faq_display_on || !!features.faq_display_enabled;
+    const displayGroupDisabled = !!features.faq_display_off || !!features.faq_display_disabled;
+    const kbGroupEnabled = !!features.faq_kb_on || !!features.faq_kb_enabled;
+    const kbGroupDisabled = !!features.faq_kb_off || !!features.faq_kb_disabled;
 
     const managementEnabled = managementGroupEnabled && !managementGroupDisabled;
     const managementUntouched = !managementGroupEnabled && !managementGroupDisabled;

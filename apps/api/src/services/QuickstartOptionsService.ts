@@ -174,8 +174,8 @@ class QuickstartOptionsService {
 
     // --- Product feature gate ---
     // Gates: wizard (static product wizard), image_gen (attach image to product)
-    const productGroupEnabled = !!features.quickstart_product_enabled;
-    const productGroupDisabled = !!features.quickstart_product_disabled;
+    const productGroupEnabled = !!features.quickstart_product_on || !!features.quickstart_product_enabled;
+    const productGroupDisabled = !!features.quickstart_product_off || !!features.quickstart_product_disabled;
     const productEnabled = productGroupEnabled && !productGroupDisabled;
     const productUntouched = !productGroupEnabled && !productGroupDisabled;
 
@@ -189,8 +189,8 @@ class QuickstartOptionsService {
 
     // --- Category feature gate ---
     // Gates: category_generator
-    const categoryGroupEnabled = !!features.quickstart_category_enabled;
-    const categoryGroupDisabled = !!features.quickstart_category_disabled;
+    const categoryGroupEnabled = !!features.quickstart_category_on || !!features.quickstart_category_enabled;
+    const categoryGroupDisabled = !!features.quickstart_category_off || !!features.quickstart_category_disabled;
     const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
     const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
 
@@ -203,8 +203,8 @@ class QuickstartOptionsService {
 
     // --- AI feature gate ---
     // Gates: ai_openai, ai_gemini, wizard_ai (AI wizard), image_hd (HD quality)
-    const aiGroupEnabled = !!features.quickstart_ai_enabled;
-    const aiGroupDisabled = !!features.quickstart_ai_disabled;
+    const aiGroupEnabled = !!features.quickstart_ai_on || !!features.quickstart_ai_enabled;
+    const aiGroupDisabled = !!features.quickstart_ai_off || !!features.quickstart_ai_disabled;
     const aiGroupOn = aiGroupEnabled && !aiGroupDisabled;
     const aiUntouched = !aiGroupEnabled && !aiGroupDisabled;
 

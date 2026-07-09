@@ -236,7 +236,7 @@ class StorefrontOptionsService {
     } else if (features.storefront_opt_hours_animated || features.storefront_opt_hours_status) {
       if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
       if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
-    } else if (features.storefront_opt_hours_enabled && !features.storefront_opt_hours_disabled) {
+    } else if ((features.storefront_opt_hours_on || features.storefront_opt_hours_enabled) && !(features.storefront_opt_hours_off || features.storefront_opt_hours_disabled)) {
       allowedHoursTypes.push('hours_animated', 'hours_status');
     }
 
@@ -247,7 +247,7 @@ class StorefrontOptionsService {
     } else if (features.storefront_opt_category_store || features.storefront_opt_category_product) {
       if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
       if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
-    } else if (features.storefront_opt_category_enabled && !features.storefront_opt_category_disabled) {
+    } else if ((features.storefront_opt_category_on || features.storefront_opt_category_enabled) && !(features.storefront_opt_category_off || features.storefront_opt_category_disabled)) {
       allowedCategoryTypes.push('category_store', 'category_product');
     }
 
@@ -258,7 +258,7 @@ class StorefrontOptionsService {
     } else if (features.storefront_opt_recommend_store || features.storefront_opt_recommend_products) {
       if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
       if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
-    } else if (features.storefront_opt_recommend_enabled && !features.storefront_opt_recommend_disabled) {
+    } else if ((features.storefront_opt_recommend_on || features.storefront_opt_recommend_enabled) && !(features.storefront_opt_recommend_off || features.storefront_opt_recommend_disabled)) {
       allowedRecommendTypes.push('recommend_store', 'recommend_products');
     }
 
@@ -267,9 +267,9 @@ class StorefrontOptionsService {
 
     // --- Info: consolidated key (new) with fallback to old group gate + individual keys ---
     const allowedInfoTypes: StorefrontOptInfoType[] = [];
-    if (flexible || features.storefront_opt_info) {
+    if (flexible || features.storefront_opt_info || features.storefront_opt_info_on) {
       allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
-    } else if (features.storefront_opt_info_enabled && !features.storefront_opt_info_disabled) {
+    } else if ((features.storefront_opt_info_on || features.storefront_opt_info_enabled) && !(features.storefront_opt_info_off || features.storefront_opt_info_disabled)) {
       allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
     } else {
       if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
@@ -279,7 +279,7 @@ class StorefrontOptionsService {
 
     // --- QR: new consolidated keys (qr, qr_resolution, qr_content) with fallback to old keys ---
     const qrGroupOn = flexible || !!features.storefront_opt_qr
-      || (!!features.storefront_opt_qr_enabled && !features.storefront_opt_qr_disabled);
+      || ((!!features.storefront_opt_qr_on || !!features.storefront_opt_qr_enabled) && !(!!features.storefront_opt_qr_off || !!features.storefront_opt_qr_disabled));
     const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
     const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
     if (qrGroupOn) {
@@ -305,9 +305,9 @@ class StorefrontOptionsService {
 
     // --- Gallery: new consolidated key with fallback to old group gate + individual keys ---
     const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
-    if (flexible || features.storefront_opt_gallery) {
+    if (flexible || features.storefront_opt_gallery || features.storefront_opt_gallery_on) {
       allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
-    } else if (features.storefront_opt_gallery_enabled && !features.storefront_opt_gallery_disabled) {
+    } else if ((features.storefront_opt_gallery_on || features.storefront_opt_gallery_enabled) && !(features.storefront_opt_gallery_off || features.storefront_opt_gallery_disabled)) {
       allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
     } else {
       if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
@@ -322,15 +322,15 @@ class StorefrontOptionsService {
     } else if (features.storefront_opt_enhanced_seo || features.storefront_opt_storefront_actions) {
       if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
       if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
-    } else if (features.storefront_opt_advanced_enabled && !features.storefront_opt_advanced_disabled) {
+    } else if ((features.storefront_opt_advanced_on || features.storefront_opt_advanced_enabled) && !(features.storefront_opt_advanced_off || features.storefront_opt_advanced_disabled)) {
       allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
     }
 
     // --- Layout: new consolidated key with fallback to old group gate + individual keys ---
     const allowedLayouts: StorefrontOptLayoutType[] = [];
-    if (flexible || features.storefront_opt_layout) {
+    if (flexible || features.storefront_opt_layout || features.storefront_opt_layout_on) {
       allowedLayouts.push('classic', 'editorial', 'immersive');
-    } else if (features.storefront_opt_layout_enabled && !features.storefront_opt_layout_disabled) {
+    } else if ((features.storefront_opt_layout_on || features.storefront_opt_layout_enabled) && !(features.storefront_opt_layout_off || features.storefront_opt_layout_disabled)) {
       allowedLayouts.push('classic', 'editorial', 'immersive');
     } else {
       if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
