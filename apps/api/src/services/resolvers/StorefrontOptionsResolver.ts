@@ -35,7 +35,7 @@ export function resolveStorefrontOptions(
   } else if (features.storefront_opt_hours_animated || features.storefront_opt_hours_status) {
     if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
     if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
-  } else if (features.storefront_opt_hours_enabled) {
+  } else if (features.storefront_opt_hours_on || features.storefront_opt_hours_enabled) {
     allowedHoursTypes.push('hours_animated', 'hours_status');
   }
 
@@ -46,7 +46,7 @@ export function resolveStorefrontOptions(
   } else if (features.storefront_opt_category_store || features.storefront_opt_category_product) {
     if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
     if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
-  } else if (features.storefront_opt_category_enabled) {
+  } else if (features.storefront_opt_category_on || features.storefront_opt_category_enabled) {
     allowedCategoryTypes.push('category_store', 'category_product');
   }
 
@@ -57,15 +57,15 @@ export function resolveStorefrontOptions(
   } else if (features.storefront_opt_recommend_store || features.storefront_opt_recommend_products) {
     if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
     if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
-  } else if (features.storefront_opt_recommend_enabled) {
+  } else if (features.storefront_opt_recommend_on || features.storefront_opt_recommend_enabled) {
     allowedRecommendTypes.push('recommend_store', 'recommend_products');
   }
 
   // Info — consolidated key (new) with fallback to old group gate + individual keys
   const allowedInfoTypes: StorefrontOptInfoType[] = [];
-  if (flexible || features.storefront_opt_info) {
+  if (flexible || features.storefront_opt_info || features.storefront_opt_info_on) {
     allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
-  } else if (features.storefront_opt_info_enabled) {
+  } else if (features.storefront_opt_info_on || features.storefront_opt_info_enabled) {
     allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
   } else {
     if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
@@ -74,11 +74,11 @@ export function resolveStorefrontOptions(
   }
 
   // QR — new consolidated keys (qr, qr_resolution, qr_content) with fallback to old keys
-  const qrGroupEnabled = flexible || !!features.storefront_opt_qr || !!features.storefront_opt_qr_enabled;
+  const qrGroupEnabled = flexible || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr || !!features.storefront_opt_qr_enabled;
   const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
   const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
   if (qrGroupEnabled) {
-    if (flexible || features.storefront_opt_qr || features.storefront_opt_qr_enabled) {
+    if (flexible || features.storefront_opt_qr_on || features.storefront_opt_qr || features.storefront_opt_qr_enabled) {
       allowedQRResolutions.push('qr_codes_512', 'qr_codes_1024', 'qr_codes_2048');
       allowedQRContentTypes.push('qr_product', 'qr_store', 'qr_logo', 'qr_directory');
     }
@@ -102,9 +102,9 @@ export function resolveStorefrontOptions(
 
   // Gallery — new consolidated key with fallback to old group gate + individual keys
   const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
-  if (flexible || features.storefront_opt_gallery) {
+  if (flexible || features.storefront_opt_gallery_on || features.storefront_opt_gallery) {
     allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
-  } else if (features.storefront_opt_gallery_enabled) {
+  } else if (features.storefront_opt_gallery_on || features.storefront_opt_gallery_enabled) {
     allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
   } else {
     if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
@@ -119,15 +119,15 @@ export function resolveStorefrontOptions(
   } else if (features.storefront_opt_enhanced_seo || features.storefront_opt_storefront_actions) {
     if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
     if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
-  } else if (features.storefront_opt_advanced_enabled) {
+  } else if (features.storefront_opt_advanced_on || features.storefront_opt_advanced_enabled) {
     allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
   }
 
   // Layout — new consolidated key with fallback to old group gate + individual keys
   const allowedLayouts: StorefrontOptLayoutType[] = [];
-  if (flexible || features.storefront_opt_layout) {
+  if (flexible || features.storefront_opt_layout_on || features.storefront_opt_layout) {
     allowedLayouts.push('classic', 'editorial', 'immersive');
-  } else if (features.storefront_opt_layout_enabled) {
+  } else if (features.storefront_opt_layout_on || features.storefront_opt_layout_enabled) {
     allowedLayouts.push('classic', 'editorial', 'immersive');
   } else {
     if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');

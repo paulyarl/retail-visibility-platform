@@ -190,7 +190,12 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Check for cross-capability constraints.** Will the new feature depend on or conflict with another capability? If yes, plan a constraint entry in `capability_constraints_list` and `CapabilityConstraintRegistry.ts`.
 
-- [ ] **Verify naming conventions.** Feature keys must be `snake_case` with domain prefix: `<capability_key>_enabled` or `<capability_key>_<group>_<feature>`. Group gates required for options (R16 in `capability-data-flow-rules.md`).
+- [ ] **Verify naming conventions.** Feature keys must be `snake_case` with domain prefix.
+  - Type gates: `<capability_key>_enabled` or `<capability_key>_disabled`.
+  - Group controls in options capabilities: `<capability_key>_<group>_on` or `<capability_key>_<group>_off` (R15 and R16 in `capability-data-flow-rules.md`).
+  - Do not introduce new `<capability_key>_<group>_enabled` / `_disabled` group gates that would be ambiguous with the type gate.
+  - If a new `_enabled` / `_disabled` feature key is required, confirm it is the capability type gate and does not collide with an existing group gate.
+  - Reference `docs/ENABLED_DISABLED_NAMING_CONFLICT_MIGRATION_PLAN.md` until the migration is fully deployed.
 
 ---
 

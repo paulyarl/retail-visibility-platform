@@ -289,39 +289,42 @@ Feature keys MUST follow this canonical pattern:
 <capability_key>_disabled           # master OFF gate
 <capability_key>_flexible           # unlock all features in this capability
 
-<capability_key>_<group>_enabled    # group ON gate (options capabilities only)
-<capability_key>_<group>_disabled   # group OFF gate (options capabilities only)
+<capability_key>_<group>_on         # group ON gate (options capabilities only)
+<capability_key>_<group>_off        # group OFF gate (options capabilities only)
 
 <capability_key>_<group>_<feature>  # individual feature within a group
 ```
 
 **Examples**:
 - `product_types_enabled`, `product_types_physical`, `product_types_flexible`
-- `product_options_sections_enabled`, `product_options_sections_reviews`
-- `storefront_options_qr_enabled`, `storefront_options_qr_codes_512`
+- `product_options_sections_on`, `product_options_sections_reviews`
+- `storefront_options_qr_on`, `storefront_options_qr_codes_512`
 
 **Forbidden patterns**:
 - Mixing prefixes within a capability (e.g., `product_opt_*` in `product_options` — use `product_options_*`)
 - Abbreviated prefixes (e.g., `storefront_opt_*` — use `storefront_options_*`)
 - Flat keys without group prefix in an options capability (e.g., `product_variant` — use `product_options_creation_variants`)
 - Using `_tier_` for internal capability levels (confusing with platform subscription tiers) — use `_level_` instead (e.g., `directory_promotion_level_basic`, not `directory_promotion_tier_basic`)
+- Using `_enabled` / `_disabled` for group gates — group controls must use `_on` / `_off` to avoid ambiguity with type gates
 
-**Backward compatibility**: Legacy keys MAY be retained as aliases during migration. Resolvers check new keys first, then fall back to legacy keys. See `docs/CAPABILITY_TYPES_TARGET_ARCHITECTURE.md` §5 for the complete alias mapping.
+**Backward compatibility**: Legacy `_enabled` / `_disabled` group-gate keys MAY be retained as aliases during migration. Resolvers check new `_on` / `_off` keys first, then fall back to legacy `_enabled` / `_disabled` keys. See `docs/ENABLED_DISABLED_NAMING_CONFLICT_MIGRATION_PLAN.md` for the current migration.
 
 ### R16: Group Gates Required for Options Capabilities
 Options capabilities MUST use group gates to organize features into logical clusters. A group gate is a pair of feature keys:
 
-- `<capability_key>_<group>_enabled` — when true, all features in the group are tier-allowed
-- `<capability_key>_<group>_disabled` — when true, all features in the group are tier-blocked (overrides individual features)
+- `<capability_key>_<group>_on` — when true, all features in the group are tier-allowed
+- `<capability_key>_<group>_off` — when true, all features in the group are tier-blocked (overrides individual features)
+
+When a negative gate is not required, a single `_on` key may be used as a positive group switch.
 
 **Resolver pattern for each group**:
 ```ts
-const groupEnabled = !!features[`${capKey}_${group}_enabled`];
-const groupDisabled = !!features[`${capKey}_${group}_disabled`];
+const groupOn = !!features[`${capKey}_${group}_on`];
+const groupOff = !!features[`${capKey}_${group}_off`];
 const allowedTypes: Type[] = [];
-if (flexible || (groupEnabled && !groupDisabled)) {
+if (flexible || (groupOn && !groupOff)) {
   allowedTypes.push(...allTypesInGroup);
-} else if (!groupDisabled) {
+} else if (!groupOff) {
   if (features[`${capKey}_${group}_${feature}`]) allowedTypes.push(feature);
   // ... other features
 }

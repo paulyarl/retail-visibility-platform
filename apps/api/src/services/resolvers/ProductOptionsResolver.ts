@@ -33,24 +33,24 @@ export function resolveProductOptions(
   const isFlexible = flexible;
 
   // ── Creation group (R16: group gates) ──
-  const creationGroupEnabled = !!features.product_options_creation_enabled;
-  const creationGroupDisabled = !!features.product_options_creation_disabled;
+  const creationGroupOn = !!features.product_options_creation_on || !!features.product_options_creation_enabled;
+  const creationGroupOff = !!features.product_options_creation_off || !!features.product_options_creation_disabled;
 
-  const showsVariants = isFlexible || creationGroupEnabled || !!features.product_options_creation_variants;
-  const showsGallery = isFlexible || creationGroupEnabled || !!features.product_options_creation_gallery;
-  const showsVideo = isFlexible || creationGroupEnabled || !!features.product_options_creation_video;
-  const showsSupplierCatalog = isFlexible || creationGroupEnabled || !!features.product_options_creation_supplier_catalog;
+  const showsVariants = isFlexible || creationGroupOn || !!features.product_options_creation_variants;
+  const showsGallery = isFlexible || creationGroupOn || !!features.product_options_creation_gallery;
+  const showsVideo = isFlexible || creationGroupOn || !!features.product_options_creation_video;
+  const showsSupplierCatalog = isFlexible || creationGroupOn || !!features.product_options_creation_supplier_catalog;
 
-  const creationEnabled = !creationGroupDisabled && (isFlexible || creationGroupEnabled || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
+  const creationEnabled = !creationGroupOff && (isFlexible || creationGroupOn || showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
 
   // ── Layout group (R16: group gates) ──
-  const layoutGroupEnabled = !!features.product_options_layout_enabled;
-  const layoutGroupDisabled = !!features.product_options_layout_disabled;
+  const layoutGroupOn = !!features.product_options_layout_on || !!features.product_options_layout_enabled;
+  const layoutGroupOff = !!features.product_options_layout_off || !!features.product_options_layout_disabled;
 
-  const layoutEnabled = !layoutGroupDisabled && (isFlexible || layoutGroupEnabled);
+  const layoutEnabled = !layoutGroupOff && (isFlexible || layoutGroupOn);
   const allowedLayouts: ProductLayoutType[] = [];
-  if (isFlexible || (layoutEnabled && !layoutGroupDisabled)) {
-    if (isFlexible || layoutGroupEnabled) {
+  if (isFlexible || (layoutEnabled && !layoutGroupOff)) {
+    if (isFlexible || layoutGroupOn) {
       allowedLayouts.push('classic', 'editorial', 'immersive');
     } else {
       if (features.product_options_layout_classic) allowedLayouts.push('classic');
@@ -60,23 +60,23 @@ export function resolveProductOptions(
   }
 
   // ── Sections group (R16: group gates) ──
-  const sectionsGroupEnabled = !!features.product_options_sections_enabled;
-  const sectionsGroupDisabled = !!features.product_options_sections_disabled;
+  const sectionsGroupOn = !!features.product_options_sections_on || !!features.product_options_sections_enabled;
+  const sectionsGroupOff = !!features.product_options_sections_off || !!features.product_options_sections_disabled;
 
-  const sectionsEnabled = !sectionsGroupDisabled && (isFlexible || sectionsGroupEnabled || hasAnySectionFeature(features));
+  const sectionsEnabled = !sectionsGroupOff && (isFlexible || sectionsGroupOn || hasAnySectionFeature(features));
 
-  const showsRecentlyViewed = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recently_viewed;
-  const showsQrCodes = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_codes;
-  const showsQrLogo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_qr_logo;
-  const showsRecommended = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_recommended;
-  const showsMapDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_map_display;
-  const showsLocationDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_display;
-  const showsHoursDisplay = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_hours_display;
-  const showsEnhancedSeo = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_enhanced_seo;
-  const showsReviews = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_reviews;
-  const showsFulfillment = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_fulfillment;
-  const showsCategories = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_categories;
-  const showsLocationAvailability = isFlexible || sectionsGroupEnabled || !!features.product_options_sections_location_availability;
+  const showsRecentlyViewed = isFlexible || sectionsGroupOn || !!features.product_options_sections_recently_viewed;
+  const showsQrCodes = isFlexible || sectionsGroupOn || !!features.product_options_sections_qr_codes;
+  const showsQrLogo = isFlexible || sectionsGroupOn || !!features.product_options_sections_qr_logo;
+  const showsRecommended = isFlexible || sectionsGroupOn || !!features.product_options_sections_recommended;
+  const showsMapDisplay = isFlexible || sectionsGroupOn || !!features.product_options_sections_map_display;
+  const showsLocationDisplay = isFlexible || sectionsGroupOn || !!features.product_options_sections_location_display;
+  const showsHoursDisplay = isFlexible || sectionsGroupOn || !!features.product_options_sections_hours_display;
+  const showsEnhancedSeo = isFlexible || sectionsGroupOn || !!features.product_options_sections_enhanced_seo;
+  const showsReviews = isFlexible || sectionsGroupOn || !!features.product_options_sections_reviews;
+  const showsFulfillment = isFlexible || sectionsGroupOn || !!features.product_options_sections_fulfillment;
+  const showsCategories = isFlexible || sectionsGroupOn || !!features.product_options_sections_categories;
+  const showsLocationAvailability = isFlexible || sectionsGroupOn || !!features.product_options_sections_location_availability;
 
   // ── Merchant preferences (soft toggles, default true when unset) ──
   const prefs = {

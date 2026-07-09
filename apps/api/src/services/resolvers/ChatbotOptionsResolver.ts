@@ -50,18 +50,18 @@ export function resolveChatbotOptions(
   const flexible = !!feat.chatbot_flexible;
 
   // Tier-allowed group flags
-  const staticTier = flexible || !!feat.chatbot_static_enabled;
-  const dynamicTier = flexible || !!feat.chatbot_dynamic_enabled;
-  const skillsTier = flexible || !!feat.chatbot_skills_enabled;
-  const kbTier = flexible || !!feat.chatbot_kb_enabled;
-  const widgetTier = flexible || !!feat.chatbot_widget_enabled;
+  const staticTier = flexible || !!feat.chatbot_static_on || !!feat.chatbot_static_enabled;
+  const dynamicTier = flexible || !!feat.chatbot_dynamic_on || !!feat.chatbot_dynamic_enabled;
+  const skillsTier = flexible || !!feat.chatbot_skills_on || !!feat.chatbot_skills_enabled;
+  const kbTier = flexible || !!feat.chatbot_kb_on || !!feat.chatbot_kb_enabled;
+  const widgetTier = flexible || !!feat.chatbot_widget_on || !!feat.chatbot_widget_enabled;
 
   // Effective flags: tier allows AND merchant enabled (merchant defaults to true when unset)
-  const staticEnabled = staticTier && (merchantPrefs?.chatbot_static_enabled !== false);
-  const dynamicEnabled = dynamicTier && (merchantPrefs?.chatbot_dynamic_enabled !== false);
-  const skillsEnabled = skillsTier && (merchantPrefs?.chatbot_skills_enabled !== false);
-  const kbEnabled = kbTier && (merchantPrefs?.chatbot_kb_enabled !== false);
-  const widgetEnabled = widgetTier && (merchantPrefs?.chatbot_widget_enabled !== false);
+  const staticEnabled = staticTier && ((merchantPrefs?.chatbot_static_on ?? merchantPrefs?.chatbot_static_enabled) !== false);
+  const dynamicEnabled = dynamicTier && ((merchantPrefs?.chatbot_dynamic_on ?? merchantPrefs?.chatbot_dynamic_enabled) !== false);
+  const skillsEnabled = skillsTier && ((merchantPrefs?.chatbot_skills_on ?? merchantPrefs?.chatbot_skills_enabled) !== false);
+  const kbEnabled = kbTier && ((merchantPrefs?.chatbot_kb_on ?? merchantPrefs?.chatbot_kb_enabled) !== false);
+  const widgetEnabled = widgetTier && ((merchantPrefs?.chatbot_widget_on ?? merchantPrefs?.chatbot_widget_enabled) !== false);
 
   const allowedResponseEngines: ChatbotResponseEngineType[] = [];
   if (flexible) {

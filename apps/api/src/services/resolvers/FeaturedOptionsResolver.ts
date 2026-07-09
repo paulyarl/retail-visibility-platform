@@ -24,9 +24,13 @@ export function resolveFeaturedOptions(
   const tenantControlled: FeaturedType[] = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'clearance', 'featured'];
   const platformControlled: FeaturedType[] = ['bestseller', 'trending', 'recommended', 'random_featured'];
 
-  // Check if any individual featured feature is enabled (implicit enable)
+  // Group on switches (new _on keys with legacy _enabled fallback)
+  const tenantGroupOn = !!features.featured_tenant_on || !!features.featured_tenant_enabled;
+  const platformGroupOn = !!features.featured_platform_on || !!features.featured_platform_enabled;
+
+  // Check if any individual featured feature or group on switch is enabled (implicit enable)
   const allFeaturedTypes = [...tenantControlled, ...platformControlled];
-  const hasAnyFeaturedFeature = allFeaturedTypes.some(t => !!features[`featured_${t}`]);
+  const hasAnyFeaturedFeature = allFeaturedTypes.some(t => !!features[`featured_${t}`]) || tenantGroupOn || platformGroupOn;
   const enabled = !disabled && (!!features.featured_enabled || hasAnyFeaturedFeature);
 
   const allowedTenantTypes: FeaturedType[] = [];
@@ -34,10 +38,10 @@ export function resolveFeaturedOptions(
 
   if (flexible || enabled) {
     for (const t of tenantControlled) {
-      if (flexible || features[`featured_${t}`]) allowedTenantTypes.push(t);
+      if (flexible || tenantGroupOn || features[`featured_${t}`]) allowedTenantTypes.push(t);
     }
     for (const t of platformControlled) {
-      if (flexible || features[`featured_${t}`]) allowedPlatformTypes.push(t);
+      if (flexible || platformGroupOn || features[`featured_${t}`]) allowedPlatformTypes.push(t);
     }
   }
 

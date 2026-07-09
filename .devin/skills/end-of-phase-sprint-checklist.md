@@ -128,7 +128,11 @@ cd apps/web && npx tsc --noEmit
 
 **Skills**: `capability-deployment-flow.md`, `capability-data-flow-rules.md`, `capability-constraint-relationships.md`
 
-- [ ] **New feature keys registered.** If the session added a capability feature, it must be in `canonical-features.ts` and `tier-hierarchies.ts`. Follow the naming convention: `<capability_key>_enabled` or `<capability_key>_<group>_<feature>`.
+- [ ] **New feature keys registered and follow naming convention.** If the session added a capability feature, it must be in `canonical-features.ts` and `tier-hierarchies.ts`.
+  - Type gates: `<capability_key>_enabled` or `<capability_key>_disabled`.
+  - Group controls in options capabilities: `<capability_key>_<group>_on` or `<capability_key>_<group>_off`. Do not register new `<capability_key>_<group>_enabled` / `_disabled` group gates.
+  - Individual features: `<capability_key>_<group>_<feature>`.
+  - If the session touched capability feature keys, verify no new `_enabled` / `_disabled` group gates were introduced that are ambiguous with an existing type gate.
 - [ ] **Cross-capability constraints.** If the new feature interacts with other capabilities (e.g., requires another feature to be enabled first), add a constraint to `capability_constraints_list` and `CapabilityConstraintRegistry.ts`.
 - [ ] **Constraint metadata updated.** If a new capability domain was added, update `CONSTRAINT_METADATA` in `apps/api/src/routes/admin/capability-constraints.ts` with the new capability's key, label, fields, operators, and values (derived from the `EffectiveXxx` interface in `types.ts`). Without this, the capability won't appear in the constraint form dropdowns.
 - [ ] **Resolver updated.** New features must flow through the resolver → orchestrator → API route → frontend service → hook → dashboard pipeline. See `capability-deployment-flow.md` for the 8-phase checklist.

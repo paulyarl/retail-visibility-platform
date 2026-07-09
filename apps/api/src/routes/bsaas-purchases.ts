@@ -389,6 +389,11 @@ async function checkTierFeatureStatus(
   //    - Admin grant: {capability_key}_flexible in tenant_feature_overrides_list
   //    This mirrors the MV's flexible_tier_features, flexible_purchase_features,
   //    and flexible_override_features CTEs.
+  //    IMPORTANT: Look up the actual flexible feature key from capability_features_list
+  //    instead of guessing the naming convention (e.g., chatbot_flexible vs chatbot_options_flexible).
+  //    NOTE: Type gate precedence (_disabled > _enabled > _flexible) is NOT implemented here
+  //    due to naming ambiguity — _enabled/_disabled matches both type gates and group gates.
+  //    Future migration should rename group gate keys to _on/_off to enable safe type gate implementation.
   if (!tierFeature) {
     // Resolve the feature's capability type
     const feature = await prisma.features_list.findUnique({
@@ -406,7 +411,26 @@ async function checkTierFeatureStatus(
     }
 
     capabilityKey = capLink.capability_type_list.key;
-    const flexibleKey = `${capabilityKey}_flexible`;
+    const capabilityTypeId = capLink.capability_type_list.id;
+
+    // Look up the actual flexible feature key for this capability type
+    const flexibleFeature = await prisma.capability_features_list.findFirst({
+      where: {
+        capability_type_id: capabilityTypeId,
+        is_active: true,
+      },
+      include: {
+        features_list: {
+          select: { key: true },
+          where: { is_active: true, key: { endsWith: '_flexible' } },
+        },
+      },
+    });
+
+    const flexibleKey = flexibleFeature?.features_list?.key;
+    if (!flexibleKey) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
 
     // Check tier-bundled flexible
     const flexibleTierFeature = await prisma.tier_features_list.findFirst({

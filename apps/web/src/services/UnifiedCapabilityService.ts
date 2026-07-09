@@ -432,10 +432,15 @@ interface BackendEffectiveChatbot {
   can_use_widget_after_hours: boolean;
   merchant_preferences: {
     chatbot_enabled?: boolean | null;
+    chatbot_static_on?: boolean | null;
     chatbot_static_enabled?: boolean | null;
+    chatbot_dynamic_on?: boolean | null;
     chatbot_dynamic_enabled?: boolean | null;
+    chatbot_skills_on?: boolean | null;
     chatbot_skills_enabled?: boolean | null;
+    chatbot_kb_on?: boolean | null;
     chatbot_kb_enabled?: boolean | null;
+    chatbot_widget_on?: boolean | null;
     chatbot_widget_enabled?: boolean | null;
     chatbot_widget_custom_theme?: boolean | null;
     chatbot_widget_skill_cards?: boolean | null;
