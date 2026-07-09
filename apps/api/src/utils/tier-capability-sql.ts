@@ -37,15 +37,17 @@ export const TIER_FEATURED_ACCESS_CTE = `
       MAX(CASE WHEN tfl.feature_key = 'featured_enabled' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS featured_enabled,
       MAX(CASE WHEN tfl.feature_key = 'featured_disabled' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS featured_disabled,
       MAX(CASE WHEN tfl.feature_key = 'featured_flexible' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS is_flexible,
-      MAX(CASE WHEN tfl.feature_key = 'featured_tenant_enabled' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS tenant_enabled,
-      MAX(CASE WHEN tfl.feature_key = 'featured_tenant_disabled' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS tenant_disabled,
-      MAX(CASE WHEN tfl.feature_key = 'featured_platform_enabled' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS platform_enabled,
-      MAX(CASE WHEN tfl.feature_key = 'featured_platform_disabled' AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS platform_disabled,
+      MAX(CASE WHEN tfl.feature_key IN ('featured_tenant_on', 'featured_tenant_enabled') AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS tenant_enabled,
+      MAX(CASE WHEN tfl.feature_key IN ('featured_tenant_off', 'featured_tenant_disabled') AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS tenant_disabled,
+      MAX(CASE WHEN tfl.feature_key IN ('featured_platform_on', 'featured_platform_enabled') AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS platform_enabled,
+      MAX(CASE WHEN tfl.feature_key IN ('featured_platform_off', 'featured_platform_disabled') AND tfl.is_enabled = true THEN 1 ELSE 0 END) = 1 AS platform_disabled,
       array_agg(tfl.feature_key) FILTER (
         WHERE tfl.feature_key LIKE 'featured_%'
           AND tfl.feature_key NOT IN (
             'featured_enabled', 'featured_disabled', 'featured_flexible',
+            'featured_tenant_on', 'featured_tenant_off',
             'featured_tenant_enabled', 'featured_tenant_disabled',
+            'featured_platform_on', 'featured_platform_off',
             'featured_platform_enabled', 'featured_platform_disabled'
           )
           AND tfl.is_enabled = true
