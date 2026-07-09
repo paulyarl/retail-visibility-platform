@@ -1380,24 +1380,37 @@ export function resolveProductOptionsState(
   const enabled = !!features.product_options_enabled;
   const disabled = !!features.product_options_disabled;
   const flexible = !!features.product_options_flexible;
+
   // Creation group gates
-  const creationGroupEnabled = !!features.product_options_creation_on || !!features.product_options_creation_enabled || flexible;
+  const creationGroupOn = !!features.product_options_creation_on || !!features.product_options_creation_enabled;
+  const creationGroupOff = !!features.product_options_creation_off || !!features.product_options_creation_disabled;
+  const creationGroupEnabled = (creationGroupOn || flexible) && !creationGroupOff;
   const variant = !!features.product_options_creation_variants;
   const gallery = !!features.product_options_creation_gallery;
   const video = !!features.product_options_creation_video;
 
-  // Product page layout feature gates
+  // Product page layout group gates
+  const layoutGroupOn = !!features.product_options_layout_on || !!features.product_options_layout_enabled;
+  const layoutGroupOff = !!features.product_options_layout_off || !!features.product_options_layout_disabled;
+  const layoutGroupEnabled = (layoutGroupOn || flexible) && !layoutGroupOff;
+
   const layoutClassic = !!features.product_options_layout_classic;
   const layoutEditorial = !!features.product_options_layout_editorial;
   const layoutImmersive = !!features.product_options_layout_immersive;
 
   const allowedLayouts: ProductLayoutType[] = [];
-  if (flexible || layoutClassic) allowedLayouts.push('classic');
-  if (flexible || layoutEditorial) allowedLayouts.push('editorial');
-  if (flexible || layoutImmersive) allowedLayouts.push('immersive');
+  if (flexible || layoutGroupEnabled) {
+    allowedLayouts.push('classic', 'editorial', 'immersive');
+  } else if (!layoutGroupOff) {
+    if (layoutClassic) allowedLayouts.push('classic');
+    if (layoutEditorial) allowedLayouts.push('editorial');
+    if (layoutImmersive) allowedLayouts.push('immersive');
+  }
 
   // Sections group gate
-  const sectionsGroupEnabled = !!features.product_options_sections_on || !!features.product_options_sections_enabled || flexible;
+  const sectionsGroupOn = !!features.product_options_sections_on || !!features.product_options_sections_enabled;
+  const sectionsGroupOff = !!features.product_options_sections_off || !!features.product_options_sections_disabled;
+  const sectionsGroupEnabled = (sectionsGroupOn || flexible) && !sectionsGroupOff;
 
   // Product page section feature gates
   const showsRecentlyViewed = sectionsGroupEnabled && (flexible || !!features.product_options_sections_recently_viewed);

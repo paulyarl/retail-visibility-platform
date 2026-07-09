@@ -180,7 +180,6 @@ export default function TenantScopeHeader({
 
   const displayTitle = pageTitle || autoPageTitle;
   const tenantName = tenantData?.name || businessProfile?.business_name || 'Loading...';
-  console.log(`tenantData: ${JSON.stringify(tenantData)}`);
   const logoUrl = businessProfile?.logo_url;
 
   if (loading && !tenantData) {

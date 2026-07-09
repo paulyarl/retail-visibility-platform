@@ -790,11 +790,35 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         directory_visible: true,
         metadata: true,
         data_policy_accepted: true,
+        is_demo: true,
+        demo_expires_at: true,
         ...(true as any && {
           manual_subscription_control: true,
           manual_subscription_expires_at: true,
           manual_subscription_reason: true,
         }),
+        tenant_business_profiles_list: {
+          select: {
+            logo_url: true,
+            city: true,
+            state: true,
+            country_code: true,
+            banner_url: true,
+          },
+        },
+        _count: {
+          select: {
+            inventory_items: true,
+            user_tenants: true,
+          },
+        },
+        organizations_list: {
+          select: {
+            id: true,
+            name: true,
+            subscription_tier: true,
+          },
+        },
       }
     });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
@@ -890,6 +914,10 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
 
     // console.log('[INDEX TENANTS] Debug: Calculated effective expiration:', effectiveExpiration);
 
+    // Determine effective tier (org tier overrides tenant tier for chain members)
+    const effectiveTier = (tenant as any).organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const isChainMember = !!(tenant as any).organizations_list;
+
     res.json({
       ...tenant,
       slug: currentSlug, // Use slug from directory_settings_list (source of truth)
@@ -902,7 +930,26 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
       // Effective expiration fields
       effectiveExpiresAt: effectiveExpiration?.expiresAt,
       effectiveExpiresType: effectiveExpiration?.type,
-      effectiveExpiresSource: effectiveExpiration?.source
+      effectiveExpiresSource: effectiveExpiration?.source,
+      isDemo: (tenant as any).is_demo || false,
+      demoExpiresAt: (tenant as any).demo_expires_at ? (tenant as any).demo_expires_at.toISOString() : null,
+      // Enriched fields from tenants.ts handler (previously dead code)
+      organization: (tenant as any).organizations_list ? {
+        id: (tenant as any).organizations_list.id,
+        name: (tenant as any).organizations_list.name,
+        tier: (tenant as any).organizations_list.subscription_tier,
+      } : null,
+      subscriptionTier: effectiveTier,
+      isChainMember,
+      logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
+      stats: {
+        productCount: (tenant as any)._count?.inventory_items || 0,
+        userCount: (tenant as any)._count?.user_tenants || 0,
+      },
+      city: (tenant as any).tenant_business_profiles_list?.city || null,
+      state: (tenant as any).tenant_business_profiles_list?.state || null,
+      countryCode: (tenant as any).tenant_business_profiles_list?.country_code || null,
+      bannerUrl: (tenant as any).tenant_business_profiles_list?.banner_url || null,
     });
   } catch (e: any) {
     console.error('[GET /tenants/:id] Error:', e);

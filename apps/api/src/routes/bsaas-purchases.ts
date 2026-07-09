@@ -383,17 +383,22 @@ async function checkTierFeatureStatus(
 
   let capabilityKey: string | null = tierFeature?.capability_type_list?.key || null;
 
-  // 3. If not an explicit tier feature, check flexible expansion from all sources:
-  //    - Tier-bundled: {capability_key}_flexible in tier_features_list
-  //    - Purchased: {capability_key}_flexible in tenant_feature_purchases
-  //    - Admin grant: {capability_key}_flexible in tenant_feature_overrides_list
+  // 3. If not an explicit tier feature, check type gate precedence and flexible expansion from all sources:
+  //    Type gate precedence (R17 in capability-data-flow-rules.md):
+  //      1. {capability_key}_disabled → OFF (highest priority)
+  //      2. {capability_key}_enabled → ON (explicit enable)
+  //      3. {capability_key}_flexible → ON (flexible expansion)
+  //      4. Individual features → ON (implicit enable)
+  //      5. Else → OFF (default disabled)
+  //    Flexible expansion sources:
+  //      - Tier-bundled: {capability_key}_flexible in tier_features_list
+  //      - Purchased: {capability_key}_flexible in tenant_feature_purchases
+  //      - Admin grant: {capability_key}_flexible in tenant_feature_overrides_list
   //    This mirrors the MV's flexible_tier_features, flexible_purchase_features,
   //    and flexible_override_features CTEs.
-  //    IMPORTANT: Look up the actual flexible feature key from capability_features_list
+  //    IMPORTANT: Look up the actual flexible and type gate keys from capability_features_list
   //    instead of guessing the naming convention (e.g., chatbot_flexible vs chatbot_options_flexible).
-  //    NOTE: Type gate precedence (_disabled > _enabled > _flexible) is NOT implemented here
-  //    due to naming ambiguity — _enabled/_disabled matches both type gates and group gates.
-  //    Future migration should rename group gate keys to _on/_off to enable safe type gate implementation.
+  //    Note: Group gate keys now use _on/_off, eliminating naming ambiguity with type gates.
   if (!tierFeature) {
     // Resolve the feature's capability type
     const feature = await prisma.features_list.findUnique({
@@ -412,6 +417,52 @@ async function checkTierFeatureStatus(
 
     capabilityKey = capLink.capability_type_list.key;
     const capabilityTypeId = capLink.capability_type_list.id;
+
+    // Look up type gate keys (_disabled, _enabled) for this capability type
+    const typeGateFeatures = await prisma.capability_features_list.findMany({
+      where: {
+        capability_type_id: capabilityTypeId,
+        is_active: true,
+      },
+      include: {
+        features_list: {
+          select: { key: true },
+          where: { is_active: true },
+        },
+      },
+    });
+
+    const disabledKey = typeGateFeatures
+      .find(f => f.features_list?.key === `${capabilityKey}_disabled`)
+      ?.features_list?.key;
+    const enabledKey = typeGateFeatures
+      .find(f => f.features_list?.key === `${capabilityKey}_enabled`)
+      ?.features_list?.key;
+
+    // Check type gate precedence: _disabled > _enabled
+    const disabledTierFeature = disabledKey ? await prisma.tier_features_list.findFirst({
+      where: {
+        tier_id: { in: tierIds },
+        feature_key: disabledKey,
+        is_enabled: true,
+      },
+    }) : null;
+
+    if (disabledTierFeature) {
+      // Capability is disabled at type level — feature is not in-tier
+      return { inTier: false, merchantGateOn: null, capabilityKey };
+    }
+
+    const enabledTierFeature = enabledKey ? await prisma.tier_features_list.findFirst({
+      where: {
+        tier_id: { in: tierIds },
+        feature_key: enabledKey,
+        is_enabled: true,
+      },
+    }) : null;
+
+    // If _enabled is present, proceed with feature-level checks (no special handling needed)
+    // If neither _disabled nor _enabled, proceed to flexible expansion check
 
     // Look up the actual flexible feature key for this capability type
     const flexibleFeature = await prisma.capability_features_list.findFirst({

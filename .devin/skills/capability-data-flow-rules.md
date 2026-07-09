@@ -317,10 +317,13 @@ Options capabilities MUST use group gates to organize features into logical clus
 
 When a negative gate is not required, a single `_on` key may be used as a positive group switch.
 
-**Resolver pattern for each group**:
+**Legacy fallback**: During the migration from `_enabled`/`_disabled` to `_on`/`_off`, resolvers MUST check the new `_on`/`_off` keys first and fall back to legacy `_enabled`/`_disabled` keys if the new keys are not present. The two keys are evaluated as an OR for the ON gate and an OR for the OFF gate:
+
 ```ts
-const groupOn = !!features[`${capKey}_${group}_on`];
-const groupOff = !!features[`${capKey}_${group}_off`];
+const groupOn = !!features[`${capKey}_${group}_on`]
+  || !!features[`${capKey}_${group}_enabled`];
+const groupOff = !!features[`${capKey}_${group}_off`]
+  || !!features[`${capKey}_${group}_disabled`];
 const allowedTypes: Type[] = [];
 if (flexible || (groupOn && !groupOff)) {
   allowedTypes.push(...allTypesInGroup);
@@ -344,12 +347,12 @@ All resolvers MUST determine the `enabled` state using this precedence:
 1. If `*_disabled` is true → **OFF** (hard disable, highest priority)
 2. Else if `*_enabled` is true → **ON** (explicit enable)
 3. Else if `*_flexible` is true → **ON** (flexible implies enabled)
-4. Else if any individual feature or group gate in the domain is enabled → **ON** (implicit enable)
+4. Else if any individual feature or group gate in the domain is enabled (`*_on` or legacy `*_enabled`) → **ON** (implicit enable)
 5. Else → **OFF** (default disabled — nothing enabled at all)
 
-**Key rule**: The default is **disabled** only when nothing at all is enabled in the capability domain — no `_enabled`, no `_disabled`, no `_flexible`, and no individual features. If any individual feature is enabled (e.g., `payment_gateway_stripe`), the capability is implicitly enabled even without the `_enabled` meta-key.
+**Key rule**: The default is **disabled** only when nothing at all is enabled in the capability domain — no `_enabled`, no `_disabled`, no `_flexible`, no `_on`/`_off` group gates, and no individual features. If any individual feature is enabled (e.g., `payment_gateway_stripe`), the capability is implicitly enabled even without the `_enabled` meta-key.
 
-The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
+The same precedence applies at the group level: `*_off` or legacy `*_disabled` > `*_on` or legacy `*_enabled` > individual features.
 
 **`_disabled` meta-keys**: Every capability type MUST have a `{prefix}_disabled` feature key in `features_list`, linked via `capability_features_list`. This allows admins to explicitly disengage a capability type from a tier without enabling any features. When `_disabled` is the only enabled feature for a capability type on a tier, `checkCapabilityEngagement` blocks purchases within that capability type.
 

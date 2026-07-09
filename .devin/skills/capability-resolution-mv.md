@@ -109,7 +109,7 @@ WHERE tfl.feature_key = fkm.flexible_feature_key
 
 **Key insight**: Only 4 of 18 flexible keys matched the `{capability_key}_flexible` pattern (directory_entry, directory_promotion, product_options, product_types). The other 14 use shortened names. The `flexible_key_map` lookup ensures flexible expansion works for all capability types regardless of naming convention.
 
-### Type Gate Key Precedence (Deferred)
+### Type Gate Key Precedence
 
 **Purpose**: Type gate keys (`{capability_key}_disabled`, `{capability_key}_enabled`) control whether an entire capability type is available to a tenant, regardless of individual feature assignments or flexible expansion.
 
@@ -120,17 +120,19 @@ WHERE tfl.feature_key = fkm.flexible_feature_key
 4. Individual features → **ON** (implicit enable — capability is available if any individual feature is enabled)
 5. Else → **OFF** (default disabled — nothing enabled at all)
 
-**Status**: Type gate precedence is **NOT implemented** in the MV or `checkTierFeatureStatus` due to naming ambiguity. The `_enabled`/`_disabled` suffix matches both:
-- Type gate keys: `directory_entry_disabled`, `directory_entry_enabled`
-- Group gate keys: `chatbot_dynamic_enabled`, `chatbot_widget_enabled`
+**Implementation in MV** (migration 090):
+- The `type_gate_map` CTE looks up the actual `_disabled` and `_enabled` keys for each capability type from `capability_features_list`
+- The `tenant_type_gates` CTE determines the gate status per tenant from tier sources only
+- All flexible expansion CTEs (`flexible_tier_features`, `flexible_purchase_features`, `flexible_override_features`) exclude features when the capability type has `gate_status = 'disabled'`
+- This ensures that even if a tenant has `_flexible` or individual feature assignments, a `_disabled` type gate blocks all features in that capability type
+- Type gate keys are excluded from the MV's final output via WHERE clause — they are control keys, not features
 
-Without a safe way to distinguish type gates from group gates, the MV cannot reliably apply type gate precedence.
-
-**Future implementation**: A future migration should rename group gate keys to `_on`/`_off` (e.g., `chatbot_dynamic_on`, `chatbot_widget_on`) to eliminate the naming conflict. Once group gates use `_on`/`_off`, type gate precedence can be safely implemented by:
-1. Adding a `type_gate_map` CTE to look up actual `_disabled`/`_enabled` keys from `capability_features_list`
-2. Adding a `tenant_type_gates` CTE to determine gate status per tenant from tier sources
-3. Excluding features from flexible expansion CTEs when the capability type has `gate_status = 'disabled'`
-4. Updating `checkTierFeatureStatus` to check `_disabled` before `_enabled` before flexible expansion
+**Implementation in `checkTierFeatureStatus`** (apps/api/src/routes/bsaas-purchases.ts):
+- Looks up type gate keys (`_disabled`, `_enabled`) from `capability_features_list` for the feature's capability type
+- Checks `_disabled` first — if present and enabled in the tenant's tier, returns `inTier: false` immediately
+- If `_disabled` is not present, checks `_enabled` — if present, proceeds with feature-level checks (no special handling)
+- If neither `_disabled` nor `_enabled` is present, proceeds to flexible expansion check
+- This ensures the same precedence order as the MV: `_disabled > _enabled > _flexible > individual`
 
 **Type gate keys** (only 4 capability types have these):
 | Capability Type | Disabled Key | Enabled Key |
@@ -139,6 +141,8 @@ Without a safe way to distinguish type gates from group gates, the MV cannot rel
 | directory_promotion | directory_promotion_disabled | directory_promotion_enabled |
 | product_options | product_options_disabled | product_options_enabled |
 | product_types | product_types_disabled | product_types_enabled |
+
+**Note**: Type gate keys are tier-level controls only. They are NOT checked for purchases or overrides — only tier sources are considered for type gate precedence. This is intentional: a merchant can purchase a flexible feature even if their tier has the capability type disabled, giving them the ability to opt-in to capabilities their tier doesn't grant by default.
 
 ### Schema
 
