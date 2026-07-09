@@ -6,6 +6,8 @@ description: How to audit and restructure an Express route layer to eliminate sh
 
 Use this skill when the backend has grown into an unplanned route registry, `index.ts` is full of `app.use()` and inline handlers, and there are reports of endpoints being shadowed, returning 404s unexpectedly, or behaving differently after small changes. This is an audit-and-reshape process, not a feature addition.
 
+This skill is also an **ongoing control**. It is embedded in the pre-flight (`start-of-phase-sprint-checklist.md`) and post-flight (`end-of-phase-sprint-checklist.md`) checklists. Use it at the start of any phase that adds routes or reorders mount points, and at the end of any phase to verify route order, catch-all placement, and duplicate mounts.
+
 ## Symptoms That Trigger This Skill
 
 - `apps/api/src/index.ts` is 2,000+ lines and contains many `app.use('/api/...')` calls.

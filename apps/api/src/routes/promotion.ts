@@ -57,13 +57,23 @@ router.get('/tenants/:tenantId/promotion/status', async (req: Request, res: Resp
       [tenantId]
     );
 
+    const activePurchase = await DirectoryPromotionService.getInstance().getActivePurchase(tenantId);
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
+      // Tenant exists but has no directory listing yet; return default status
+      // so the promotion UI can still render and explain the state.
+      return res.json({
+        isPromoted: false,
+        promotionTier: null,
+        promotionStartedAt: null,
+        promotionExpiresAt: null,
+        promotionImpressions: 0,
+        promotionClicks: 0,
+        activePurchase: activePurchase || null,
+      });
     }
 
     const listing = result.rows[0];
-
-    const activePurchase = await DirectoryPromotionService.getInstance().getActivePurchase(tenantId);
 
     res.json({
       isPromoted: listing.is_promoted || false,
@@ -246,7 +256,19 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req: Request, res: R
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
+      // Tenant exists but has no directory listing yet; return empty analytics
+      return res.json({
+        isPromoted: false,
+        promotionTier: null,
+        promotionStartedAt: null,
+        promotionExpiresAt: null,
+        impressions: 0,
+        clicks: 0,
+        clickThroughRate: 0,
+        daysActive: 0,
+        avgImpressionsPerDay: 0,
+        avgClicksPerDay: 0,
+      });
     }
 
     const listing = result.rows[0];

@@ -96,6 +96,8 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Routes mounted in `index.ts`.** Any new route file must be imported and mounted in `apps/api/src/index.ts`. Verify the mount path matches the route prefix.
 
+- [ ] **Route order and catch-all ordering.** If the session added or reordered routes, verify no static sub-route is mounted after a catch-all (`/:id`, `/:slug`, `/:tenantId`) in the same `Router()`. Run the route-order verification script and review `api-route-architecture-audit.md` if the count of `app.use` in `index.ts` has grown significantly.
+
 - [ ] **Background jobs wired into startup.** Any new scheduled job (e.g., `*-sync.ts`, `*-renewal.ts`) must be imported and started in `apps/api/src/index.ts` server startup.
 
 - [ ] **Zod validation on route inputs.** New API routes should validate request bodies/params with Zod schemas. Low priority for internal routes, but required for public-facing endpoints.
@@ -162,6 +164,7 @@ cd apps/web && npx tsc --noEmit
 
 | Session touched... | Review this skill |
 |---|---|
+| Route architecture / mount order / shadowed endpoints | `api-route-architecture-audit.md` |
 | Frontend API calls | `deploy-service-extending-base-singleton.md` |
 | New entity / DB table | `tenant-scoped-id-generation.md` |
 | New page / route | `database-navigation-system.md` |

@@ -124,6 +124,7 @@ cd apps/web && npx tsc --noEmit
   - Auth level (public, authenticated, tenant, admin)
   - RBAC gates (`requirePermission`, `requireRole`, `requireGroup`)
   - Zod validation schemas needed for inputs
+  - **Route order risk:** Will it be mounted under a prefix that already has a catch-all (`/:id`, `/:slug`, `/:tenantId`)? If yes, review `api-route-architecture-audit.md` first.
 
 - [ ] **List all new background jobs.** For each:
   - Schedule (interval/cron)
@@ -244,6 +245,7 @@ This checklist is the **planning mirror** of `end-of-phase-sprint-checklist.md`.
 | IDs | Plan generators and prefixes | Verify no raw UUIDs in new code |
 | Navigation | Plan SQL INSERTs and icon registration | Verify links appear in UI |
 | Backend | Plan routes, jobs, logger usage | Verify mounting, wiring, signatures |
+| Route architecture | Review `api-route-architecture-audit.md` if touching mount order or catch-alls | Run route-order verification and catch-all ordering checks |
 | Database | Plan migration, RLS, triggers, indexes | Verify idempotency and Prisma sync |
 | Frontend | Plan components, cache keys, SSR safety | Verify states, no orphaned imports |
 | Capabilities | Plan 8-phase deployment | Verify feature keys and constraints |
