@@ -558,6 +558,12 @@ export const routeRegistry: RouteEntry[] = [
 
   // ── Tenants ──────────────────────────────────────────────────────────
   {
+    path: '/api',
+    router: platformSettingsRoutes,
+    domain: 'infrastructure',
+    comment: 'Platform settings at /api/platform-settings',
+  },
+  {
     path: '/api/tenants',
     router: tenantsRoutes,
     domain: 'tenant',
@@ -817,7 +823,7 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Tenant orders at /api/tenants/:tenantId/orders',
   },
   {
-    path: '/api/tenants',
+    path: '/api/tenants/:tenantId/shipments',
     router: shipmentRoutes,
     domain: 'checkout',
     comment: 'Shipments at /api/tenants/:tenantId/shipments',
