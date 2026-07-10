@@ -368,7 +368,6 @@ function buildTenantNav(
         { label: 'Manage Locations', href: `/t/${currentTenantId}/settings/organization/locations`, requiredOrgAdmin: true },
         { label: 'Org Team', href: `/t/${currentTenantId}/settings/organization/users`, requiredOrgAdmin: true },
         { label: 'Propagation Settings', href: `/t/${currentTenantId}/settings/propagation`, requiredOrgAdmin: true },
-        { label: 'Propagation Center', href: `/t/${currentTenantId}/propagation`, requiredOrgAdmin: true },
       ],
     },
     {

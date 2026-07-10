@@ -463,9 +463,11 @@ model bsaas_bundles {
   updated_at         DateTime             @default(now()) @db.Timestamptz(6)
   trial_eligible     Boolean              @default(false)
   demo_eligible      Boolean              @default(true)
+  is_private         Boolean              @default(false)
   bsaas_bundle_items bsaas_bundle_items[]
 
   @@index([is_active, sort_order], map: "idx_bsaas_bundles_active")
+  @@index([is_private], map: "idx_bsaas_bundles_is_private")
 }
 
 model bsaas_bundle_items {
