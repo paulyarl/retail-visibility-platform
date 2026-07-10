@@ -16,6 +16,8 @@ export interface BsaasCatalogItem {
   priceCents: number;
   billingCycle: 'one_time' | 'weekly' | 'monthly' | 'annual';
   trialDays: number;
+  trialEligible: boolean;
+  demoEligible: boolean;
   purchase: {
     id: string;
     feature_key: string;
@@ -67,6 +69,8 @@ export interface BsaasBundleCatalogItem {
   priceCents: number;
   billingCycle: 'one_time' | 'weekly' | 'monthly' | 'annual';
   trialDays: number;
+  trialEligible: boolean;
+  demoEligible: boolean;
   items: BsaasBundleItem[];
   tierEligible: boolean;
   ineligibleReason: string | null;

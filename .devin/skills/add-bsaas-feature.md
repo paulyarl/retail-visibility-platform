@@ -20,6 +20,55 @@ The BSaaS system has **5 layers**, all of which must be understood when adding a
 
 **Key insight**: The resolver, per-domain resolvers, and frontend are **source-agnostic**. They only ask "is this feature in the allowed list?" — not "how did it get there?" The purchase mechanism simply adds feature keys to the same `mergedFeatures` map that tier features populate. No downstream changes are needed for most features.
 
+## Private Features
+
+Private features are catalog entries that are **not visible to merchants** in the Feature Store but can be **granted by admins** via the Grant Access modal. They are useful for:
+
+- Complimentary feature grants (beta testers, partnerships, goodwill credits)
+- Internal-only features not ready for public sale
+- Custom features for specific tenants
+
+**How private features work:**
+
+1. **Database**: `bsaas_catalog.is_private` column (boolean, default false)
+2. **Admin catalog** (`GET /api/admin/bsaas-catalog`): Returns all features including private ones
+3. **Merchant catalog** (`GET /api/subscription/feature-catalog`): Filters `is_private: false` — private features are hidden
+4. **Grant Access modal**: Uses admin catalog endpoint, so private features are available for granting
+5. **BSaaS purchase flow**: Private features cannot be purchased by merchants (they're not in the merchant catalog)
+
+**Adding a private feature:**
+
+When creating a catalog entry via the admin UI at `/settings/admin/bsaas-catalog` or via `POST /api/admin/bsaas-catalog`, set `is_private: true`:
+
+```json
+{
+  "feature_key": "my_private_feature",
+  "marketing_name": "My Private Feature",
+  "price_cents": 0,
+  "is_private": true,
+  "is_active": true
+}
+```
+
+**Key differences from regular BSaaS features:**
+
+| Aspect | Regular BSaaS Feature | Private Feature |
+|--------|---------------------|------------------|
+| Visible in merchant Feature Store | Yes | No |
+| Purchasable by merchants | Yes | No |
+| Visible in admin BSaaS Catalog | Yes | Yes (with "Private" badge) |
+| Grantable via Grant Access modal | Yes | Yes |
+| Flows through EffectiveCapabilityResolver | Yes | Yes (once granted) |
+
+**Implementation files:**
+
+- Migration: `database/migrations/096_bsaas_catalog_private_flag.sql`
+- Prisma schema: `bsaas_catalog.is_private` field
+- Admin routes: `apps/api/src/routes/admin/bsaas-catalog.ts` (validation schemas include `is_private`)
+- Merchant catalog: `apps/api/src/routes/bsaas-purchases.ts` (filters `is_private: false`)
+- Admin UI: `apps/web/src/admin/components/BsaasFeaturesTab.tsx` (checkbox + badge)
+- Service types: `apps/web/src/services/AdminBsaasCatalogService.ts` (interfaces include `is_private`)
+
 ## The Three Feature Sources
 
 ```
@@ -320,6 +369,9 @@ When adding a new purchasable feature, verify:
 - [ ] Expired purchases (`expires_at < NOW()`) are not included in the capabilities output
 - [ ] `GET /api/subscription/feature-catalog` returns `tierEligible: true` for tenants whose tier is engaged in the feature's capability type, and `tierEligible: false` with `ineligibleReason` for tenants whose tier is not engaged
 - [ ] `POST /api/subscription/feature-purchase` returns `403 upgrade_required` for tenants whose tier is not engaged in the capability type
+- [ ] **Trial eligibility**: If `trial_eligible` is false, trials are not allowed even if `trial_days > 0`. Set `trial_eligible = true` in `bsaas_catalog` to enable trials.
+- [ ] **Demo eligibility**: If `demo_eligible` is false, demo tenants (`tenants.is_demo = true`) receive `403 demo_tenant_blocked` when attempting to purchase. Default is true (demo tenants can purchase).
+- [ ] **Private features**: If `is_private` is true, the feature is hidden from `GET /api/subscription/feature-catalog` and `GET /api/subscription/bundle-catalog`. It can only be activated via admin grant.
 - [ ] **Flexible tier expansion**: For tiers with `{capability_key}_flexible` enabled, `GET /api/subscription/feature-catalog` returns `tierAvailability: 'in_tier_active'` (not `not_in_tier`) — feature shows as "Included in Plan" without explicit `tier_features_list` assignment
 - [ ] `npx tsc --noEmit --project apps/api` passes
 - [ ] `npx tsc --noEmit --project apps/web` passes

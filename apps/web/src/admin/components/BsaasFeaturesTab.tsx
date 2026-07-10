@@ -52,32 +52,9 @@ interface Props {
 }
 
 function filterCapabilityGates(features: string[]): string[] {
-  const gateSuffixes = ['_enabled', '_disabled', '_flexible'];
-  const gatePrefixes = new Map<string, number>();
-  for (const key of features) {
-    for (const suffix of gateSuffixes) {
-      if (key.endsWith(suffix)) {
-        const prefix = key.slice(0, -suffix.length);
-        const segs = prefix.split('_').length;
-        if (!gatePrefixes.has(prefix) || segs < gatePrefixes.get(prefix)!) {
-          gatePrefixes.set(prefix, segs);
-        }
-        break;
-      }
-    }
-  }
-  let capPrefix = '';
-  let minSegs = Infinity;
-  for (const [prefix, segs] of gatePrefixes) {
-    if (segs < minSegs) {
-      minSegs = segs;
-      capPrefix = prefix;
-    }
-  }
-  if (!capPrefix) return features;
-  return features.filter(
-    (f) => f !== `${capPrefix}_enabled` && f !== `${capPrefix}_disabled`,
-  );
+  // Exclude capability type gate keys from being purchasable
+  const gateSuffixes = ['_enabled', '_disabled', '_on', '_off'];
+  return features.filter((f) => !gateSuffixes.some((suffix) => f.endsWith(suffix)));
 }
 
 function humanizeFeatureKey(key: string): string {
@@ -108,8 +85,11 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
     price_cents: 0,
     billing_cycle: 'monthly',
     trial_days: 0,
+    trial_eligible: false,
+    demo_eligible: true,
     is_active: true,
     sort_order: 0,
+    is_private: false,
   });
 
   const loadData = useCallback(async () => {
@@ -140,8 +120,11 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
       price_cents: 0,
       billing_cycle: 'monthly',
       trial_days: 0,
+      trial_eligible: false,
+      demo_eligible: true,
       is_active: true,
       sort_order: 0,
+      is_private: false,
     });
     setEditingEntry(null);
     setSelectedCapType('');
@@ -161,8 +144,11 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
       price_cents: entry.price_cents,
       billing_cycle: entry.billing_cycle,
       trial_days: entry.trial_days,
+      trial_eligible: entry.trial_eligible,
+      demo_eligible: entry.demo_eligible,
       is_active: entry.is_active,
       sort_order: entry.sort_order,
+      is_private: entry.is_private || false,
     });
     const matchingCapType = capabilityTypes.find((ct) =>
       ct.allowed_features?.includes(entry.feature_key),
@@ -258,7 +244,10 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Price</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Cycle</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Trial</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Trial Elig.</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Demo Elig.</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Order</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Private</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Active</th>
                 <th className="text-right px-4 py-3 font-medium text-neutral-600">Actions</th>
               </tr>
@@ -291,7 +280,28 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                       <Badge variant="secondary">{entry.billing_cycle}</Badge>
                     </td>
                     <td className="px-4 py-3">{entry.trial_days > 0 ? `${entry.trial_days}d` : '—'}</td>
+                    <td className="px-4 py-3">
+                      {entry.trial_eligible ? (
+                        <Badge variant="secondary" className="bg-teal-100 text-teal-800">Yes</Badge>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {entry.demo_eligible ? (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Yes</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-red-100 text-red-800">No</Badge>
+                      )}
+                    </td>
                     <td className="px-4 py-3">{entry.sort_order}</td>
+                    <td className="px-4 py-3">
+                      {entry.is_private ? (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800">Private</Badge>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <Switch
                         checked={entry.is_active}
@@ -480,6 +490,57 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                 onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
               />
               <label className="text-sm">Active (visible in Feature Store)</label>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={formData.is_private}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_private: checked })}
+              />
+              <label className="text-sm">Private (hidden from Feature Store, available for Grant Access)</label>
+            </div>
+
+            {/* Eligibility Toggles */}
+            <div className="border border-neutral-200 rounded-lg p-4 space-y-3">
+              <label className="text-sm font-medium block">Eligibility Settings</label>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Trial Eligible</p>
+                  <p className="text-xs text-neutral-400">Allow merchants to start a free trial (requires trial days &gt; 0)</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, trial_eligible: true })}
+                    className={`px-3 py-1 text-xs rounded-md border ${formData.trial_eligible ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                  >Yes</button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, trial_eligible: false })}
+                    className={`px-3 py-1 text-xs rounded-md border ${!formData.trial_eligible ? 'bg-neutral-200 text-neutral-700 border-neutral-300' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                  >No</button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Demo Eligible</p>
+                  <p className="text-xs text-neutral-400">Allow demo tenants to purchase this feature</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, demo_eligible: true })}
+                    className={`px-3 py-1 text-xs rounded-md border ${formData.demo_eligible ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                  >Yes</button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, demo_eligible: false })}
+                    className={`px-3 py-1 text-xs rounded-md border ${!formData.demo_eligible ? 'bg-neutral-200 text-neutral-700 border-neutral-300' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                  >No</button>
+                </div>
+              </div>
             </div>
           </div>
 

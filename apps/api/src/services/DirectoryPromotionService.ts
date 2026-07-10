@@ -226,14 +226,17 @@ export class DirectoryPromotionService extends BaseService {
       throw new Error('tenant_already_has_active_promotion');
     }
 
-    // Verify tenant has a directory listing
+    // Verify tenant has a published directory listing
     const pool = getDirectPool();
     const listingCheck = await pool.query(
-      'SELECT id FROM directory_listings_list WHERE tenant_id = $1 LIMIT 1',
+      'SELECT id, is_published FROM directory_listings_list WHERE tenant_id = $1 LIMIT 1',
       [tenantId]
     );
     if (listingCheck.rows.length === 0) {
       throw new Error('tenant_has_no_directory_listing');
+    }
+    if (listingCheck.rows[0].is_published !== true) {
+      throw new Error('tenant_directory_not_published');
     }
 
     const purchaseId = generatePromotionPurchaseId(tenantId);
@@ -410,14 +413,17 @@ export class DirectoryPromotionService extends BaseService {
       throw new Error('tenant_already_has_active_promotion');
     }
 
-    // Verify tenant has a directory listing
+    // Verify tenant has a published directory listing
     const pool = getDirectPool();
     const listingCheck = await pool.query(
-      'SELECT id FROM directory_listings_list WHERE tenant_id = $1 LIMIT 1',
+      'SELECT id, is_published FROM directory_listings_list WHERE tenant_id = $1 LIMIT 1',
       [tenantId]
     );
     if (listingCheck.rows.length === 0) {
       throw new Error('tenant_has_no_directory_listing');
+    }
+    if (listingCheck.rows[0].is_published !== true) {
+      throw new Error('tenant_directory_not_published');
     }
 
     const purchaseId = generatePromotionPurchaseId(tenantId);
@@ -583,6 +589,19 @@ export class DirectoryPromotionService extends BaseService {
     });
     if (!plan || !plan.is_active) {
       throw new Error('plan_not_found_or_inactive');
+    }
+
+    // Verify tenant still has a published directory listing before renewing
+    const pool = getDirectPool();
+    const listingCheck = await pool.query(
+      'SELECT id, is_published FROM directory_listings_list WHERE tenant_id = $1 LIMIT 1',
+      [existing.tenant_id]
+    );
+    if (listingCheck.rows.length === 0) {
+      throw new Error('tenant_has_no_directory_listing');
+    }
+    if (listingCheck.rows[0].is_published !== true) {
+      throw new Error('tenant_directory_not_published');
     }
 
     const newPurchaseId = generatePromotionPurchaseId(existing.tenant_id);

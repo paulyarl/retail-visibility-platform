@@ -21,6 +21,9 @@ export interface BsaasBundleEntry {
   price_cents: number;
   billing_cycle: string;
   trial_days: number;
+  trial_eligible: boolean;
+  demo_eligible: boolean;
+  is_private: boolean;
   is_active: boolean;
   sort_order: number;
   bsaas_bundle_items: BsaasBundleItem[];
@@ -35,6 +38,9 @@ export interface BsaasBundleInput {
   price_cents: number;
   billing_cycle?: string;
   trial_days?: number;
+  trial_eligible?: boolean;
+  demo_eligible?: boolean;
+  is_private?: boolean;
   is_active?: boolean;
   sort_order?: number;
   items: Array<{ feature_key: string; sort_order?: number }>;

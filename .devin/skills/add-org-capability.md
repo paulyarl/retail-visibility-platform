@@ -200,6 +200,16 @@ When `bsaasEligible` is true, shows "Purchase for $49/mo" button alongside "Upgr
 4. `purchased_feature_keys` array is returned in the API response
 5. Frontend uses `purchasedFeatureKeys` to show amber "Purchased" badges
 
+### Bundle Engagement Caveat for Org Features
+
+The `checkBundleEngagement()` function in `bsaas-purchases.ts` runs `checkCapabilityEngagement()` for **every** component in a bundle. If a bundle includes `org_flexible` (capability type `organization_options`), any tenant whose tier has **zero** features in `organization_options` will be blocked from purchasing the **entire bundle** — not just the org component.
+
+This is why the Everything Pack was split into two variants:
+- **Everything Pack** (16 components, no `org_flexible`) — purchasable by non-org tiers (e.g., Professional)
+- **Everything Pack + Org** (17 components, with `org_flexible`) — only purchasable by tiers with org engagement (e.g., chain tiers)
+
+When creating bundles that include org features, consider whether all target tiers have `organization_options` engagement. Non-chain tiers (Starter, Professional, etc.) typically have no org features in their `tier_features_list`, so any bundle containing `org_flexible` will be blocked for them.
+
 ### Adding a New BSaaS Org Feature
 
 1. **SQL migration**: Insert feature key into `features_list` with `category: 'organization'`

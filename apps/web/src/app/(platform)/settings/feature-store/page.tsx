@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem, type BsaasBundleCatalogItem } from '@/services/BsaasPurchaseService';
 import { subscriptionBillingService, type PaymentMethod } from '@/services/SubscriptionBillingService';
+import { tenantPublicService } from '@/services/TenantPublicService';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [showConfirm, setShowConfirm] = useState(false);
   const [showBundleConfirm, setShowBundleConfirm] = useState(false);
   const [promoCode, setPromoCode] = useState('');
+  const [isDemoTenant, setIsDemoTenant] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!tenantId) {
@@ -46,14 +48,16 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
 
     try {
       setLoading(true);
-      const [catalogData, bundleData, methodsData] = await Promise.all([
+      const [catalogData, bundleData, methodsData, tenantInfo] = await Promise.all([
         bsaasPurchaseService.getFeatureCatalog(),
         bsaasPurchaseService.getBundleCatalog(),
         subscriptionBillingService.getPaymentMethods(),
+        tenantPublicService.getPublicTenantInfo(tenantId),
       ]);
       setCatalog(catalogData);
       setBundleCatalog(bundleData);
       setPaymentMethods(methodsData || []);
+      setIsDemoTenant(tenantInfo?.isDemo || false);
     } catch (err: any) {
       setError(err.message || 'Failed to load feature store');
     } finally {
@@ -125,6 +129,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           setError(result.message || 'Your current plan does not support purchasing this feature. Please upgrade your plan.');
         } else if (result.error === 'already_active') {
           setError('This feature is already active for your tenant.');
+        } else if (result.error === 'demo_tenant_blocked') {
+          setError(result.message || 'This feature is not available for demo tenants.');
         } else {
           setError(result.message || result.error || 'Failed to purchase feature');
         }
@@ -189,6 +195,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           setError(result.message || 'Your current plan does not support purchasing this bundle. Please upgrade your plan.');
         } else if (result.error === 'already_active') {
           setError('All components of this bundle are already active for your tenant.');
+        } else if (result.error === 'demo_tenant_blocked') {
+          setError(result.message || 'This bundle is not available for demo tenants.');
         } else {
           setError(result.message || result.error || 'Failed to purchase bundle');
         }
@@ -218,6 +226,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
       setProcessing(false);
     }
   };
+
+  const hasPaymentMethod = paymentMethods.length > 0;
 
   const formatPrice = (cents: number, cycle: string) => {
     const dollars = (cents / 100).toFixed(2);
@@ -268,6 +278,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
             <Grid>
               {bundleCatalog.filter(b => !b.allActive).map((bundle) => {
                 const notEligible = bundle.tierEligible === false;
+                const demoBlocked = isDemoTenant && !bundle.demoEligible;
                 const allInTier = bundle.allInTier;
                 const componentSum = bundle.items.reduce((sum, _item) => sum, 0);
                 const savingsPercent = componentSum > 0 && bundle.priceCents < componentSum
@@ -281,11 +292,15 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                         <Group gap="sm">
                           <Text fw={700} size="lg">{bundle.name}</Text>
                           <Badge color="violet" variant="filled" size="sm">Bundle</Badge>
-                          {bundle.trialDays > 0 && (
+                          {bundle.items.some(item => item.featureKey.startsWith('org_')) && (
+                            <Badge color="orange" variant="light" size="sm">ORG</Badge>
+                          )}
+                          {bundle.trialEligible && bundle.trialDays > 0 && (
                             <Badge color="teal" variant="light" size="sm">{bundle.trialDays}-day trial</Badge>
                           )}
                         </Group>
                         {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
+                        {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
                       </Group>
 
                       <Text size="sm" c="dimmed" className="flex-grow" mb="sm">
@@ -313,9 +328,21 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                       </Stack>
 
                       {notEligible && (
-                        <Text size="xs" c="dimmed" className="mb-md" style={{ fontStyle: 'italic' }}>
-                          {bundle.ineligibleReason}
-                        </Text>
+                        <div className="mb-md space-y-1">
+                          <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
+                            {bundle.ineligibleReason}
+                          </Text>
+                          {bundle.ineligibleDomains && bundle.ineligibleDomains.length > 0 && (
+                            <Group gap="xs">
+                              <Text size="xs" fw={500} c="dimmed">Blocked domains:</Text>
+                              {bundle.ineligibleDomains.map((domain) => (
+                                <Badge key={domain} color="red" variant="light" size="xs">
+                                  {domain.replace(/_options$/, '').replace(/_/g, ' ')}
+                                </Badge>
+                              ))}
+                            </Group>
+                          )}
+                        </div>
                       )}
 
                       <Group justify="space-between" mt="auto">
@@ -334,10 +361,23 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                               Upgrade Plan
                             </Button>
                           </Link>
+                        ) : demoBlocked ? (
+                          <Button variant="light" color="red" size="sm" disabled>
+                            Not Available for Demo
+                          </Button>
                         ) : allInTier ? (
                           <Button variant="light" color="blue" size="sm" disabled>
                             Included in Plan
                           </Button>
+                        ) : !hasPaymentMethod ? (
+                          <Group gap="xs">
+                            <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
+                            <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
+                              <Button variant="light" color="orange" size="sm">
+                                Add Payment Method
+                              </Button>
+                            </Link>
+                          </Group>
                         ) : (
                           <Button
                             variant="gradient"
@@ -347,7 +387,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                             onClick={() => handleBundlePurchaseClick(bundle)}
                             leftSection={<IconBolt size={16} />}
                           >
-                            {bundle.trialDays > 0 ? 'Start Trial' : 'Purchase Bundle'}
+                            {bundle.trialEligible && bundle.trialDays > 0 ? 'Start Trial' : 'Purchase Bundle'}
                           </Button>
                         )}
                       </Group>
@@ -370,6 +410,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
             const inTier = item.tierAvailability === 'in_tier_active';
             const gateOff = item.tierAvailability === 'in_tier_gate_off';
             const notEligible = item.tierEligible === false && !isActive && !inTier && !gateOff;
+            const demoBlocked = isDemoTenant && !item.demoEligible;
 
             return (
               <Grid.Col key={item.key} span={{ base: 12, md: 6, lg: 4 }}>
@@ -381,6 +422,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                     {inTier && !isActive && <Badge color="blue" variant="light">In Your Plan</Badge>}
                     {gateOff && !isActive && <Badge color="yellow" variant="light">Disabled in Settings</Badge>}
                     {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
+                    {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
                   </Group>
 
                   <Text size="sm" c="dimmed" className="flex-grow" mb="md">
@@ -423,6 +465,19 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                           Upgrade Plan
                         </Button>
                       </Link>
+                    ) : demoBlocked ? (
+                      <Button variant="light" color="red" size="sm" disabled>
+                        Not Available for Demo
+                      </Button>
+                    ) : !hasPaymentMethod ? (
+                      <Group gap="xs">
+                        <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
+                        <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
+                          <Button variant="light" color="orange" size="sm">
+                            Add Payment Method
+                          </Button>
+                        </Link>
+                      </Group>
                     ) : (
                       <Button 
                         variant="gradient"
@@ -611,11 +666,14 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                   <Group gap="sm">
                     <Text fw={600}>{bundleTarget.name}</Text>
                     <Badge color="violet" variant="filled" size="sm">Bundle</Badge>
+                    {bundleTarget.items.some(item => item.featureKey.startsWith('org_')) && (
+                      <Badge color="orange" variant="light" size="sm">ORG</Badge>
+                    )}
                   </Group>
                   <Text fw={700} c="violet">{formatPrice(bundleTarget.priceCents, bundleTarget.billingCycle)}</Text>
                 </Group>
                 <Text size="sm" c="dimmed" mt="xs">{bundleTarget.description}</Text>
-                {bundleTarget.trialDays > 0 && (
+                {bundleTarget.trialEligible && bundleTarget.trialDays > 0 && (
                   <Text size="xs" c="teal" mt="xs" fw={500}>
                     Includes {bundleTarget.trialDays}-day free trial. No charge until trial ends.
                   </Text>
@@ -692,7 +750,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                   onClick={handleConfirmBundlePurchase}
                   disabled={!selectedPaymentMethodId}
                 >
-                  {bundleTarget.trialDays > 0 ? 'Start Trial' : 'Confirm Purchase'}
+                  {bundleTarget.trialEligible && bundleTarget.trialDays > 0 ? 'Start Trial' : 'Confirm Purchase'}
                 </Button>
               </Group>
             </Stack>

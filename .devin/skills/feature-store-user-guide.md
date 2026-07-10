@@ -22,13 +22,19 @@ The Feature Store (`/settings/feature-store`) allows tenants to purchase à la c
 
 ```
 Tenant views Feature Store
-  → GET /api/subscription/feature-catalog
+  → GET /api/subscription/feature-catalog (filters: is_active=true, is_private=false)
     → Returns bsaas_catalog entries + tenant's tier status + existing purchases
-  → Tenant clicks "Purchase"
+    → Each item includes trialEligible and demoEligible flags
+  → GET /api/subscription/bundle-catalog (filters: is_active=true, is_private=false)
+    → Returns active bundles with component features and trial info
+  → Frontend fetches tenant isDemo status via tenantPublicService.getPublicTenantInfo()
+  → Tenant clicks "Purchase" or "Start Trial" (trial button only if trialEligible && trialDays > 0)
   → POST /api/subscription/feature-purchase { featureKey, paymentMethodId }
     → Validates feature is in catalog
     → Checks not already in tier (in_tier_already / in_tier_gate_off)
-    → Charges via Stripe (or creates trial if trial_days > 0)
+    → Checks demo_eligible — blocks demo tenants with 403 demo_tenant_blocked
+    → Checks trial_eligible — only enters trial branch if true AND trial_days > 0
+    → Charges via Stripe (or creates trial if eligible)
     → Creates tenant_feature_purchases record
     → Ensures companion purchase for parent-gate feature (see below)
     → invalidateEffectiveCapabilities(tenantId)
@@ -153,7 +159,7 @@ When adding a new purchasable feature, ensure its capability type is in `MERCHAN
 ## Purchase Lifecycle
 
 ```
-trial (if trial_days > 0)
+trial (if trial_eligible === true AND trial_days > 0)
   → expires_at = now + trial_days
   → renewal job converts to active (charges) or enters grace period
 
@@ -171,15 +177,40 @@ companion (source='companion')
   → cancelled automatically when last real purchase in same capability type is cancelled
 ```
 
+### Eligibility Flags
+
+Both `bsaas_catalog` and `bsaas_bundles` have three eligibility flags (migration `094_trial_eligible_flag.sql`):
+
+| Flag | Default | Type | Effect |
+|------|---------|------|--------|
+| `trial_eligible` | `false` | Opt-in | Must be `true` for trials to be allowed (also requires `trial_days > 0`) |
+| `demo_eligible` | `true` | Opt-out | When `false`, demo tenants (`tenants.is_demo = true`) are blocked with `403 demo_tenant_blocked` |
+| `is_private` | `false` | Opt-in | When `true`, item is hidden from Feature Store catalog endpoints (admin grant only) |
+
+The Feature Store page fetches the tenant's `isDemo` status via `tenantPublicService.getPublicTenantInfo()` to enforce `demo_eligible` restrictions client-side. The backend also enforces this check server-side before processing purchases.
+
 ## Feature Store UI States
 
 | State | Badge | Button | Condition |
 |-------|-------|--------|-----------|
-| Purchasable | (none) | "Purchase" (blue) | Not in tier, no active purchase |
+| Purchasable | (none) | "Purchase" (blue) | Not in tier, no active purchase, `demo_eligible` not blocking |
 | Active | "Active" (green) | "Cancel" (red light) | `purchase.status === 'active'` |
 | Suspended | "Suspended" (orange) | (none) | `purchase.status === 'suspended'` |
 | In Tier | "In Your Plan" (blue) | "Included in Plan" (disabled) | Tier includes feature, merchant gate on |
 | Gate Off | "Disabled in Settings" (yellow) | "Enable in Settings" (disabled) | Tier includes feature, merchant gate off |
+| Demo Restricted | "Demo Restricted" (red) | "Not Available for Demo" (disabled) | `isDemoTenant && !demoEligible` |
+
+### Bundle-Specific UI States
+
+| State | Badge | Button | Condition |
+|-------|-------|--------|-----------|
+| Bundle Eligible | (none) | "Purchase Bundle" / "Start Trial" (violet gradient) | `tierEligible === true`, not all active, not all in tier, `trialEligible && trialDays > 0` for trial label |
+| Bundle Ineligible | "Upgrade Required" (gray) | "Upgrade Plan" (gray) | `tierEligible === false` — shows blocked domain badges |
+| Bundle Demo Restricted | "Demo Restricted" (red) | "Not Available for Demo" (disabled) | `isDemoTenant && !bundle.demoEligible` |
+| Bundle All Active | (filtered out) | (filtered out) | All components already active — bundle card hidden |
+| Bundle All In Tier | "Included in Plan" (blue) | "Included in Plan" (disabled) | All components in tier |
+
+**Ineligible bundle cards** display red badges listing each blocked capability domain (from `ineligibleDomains` array) so merchants can see exactly which domains their tier doesn't engage. For example, a Professional tier seeing the "Everything Pack + Org" would see a red "organization" badge indicating that domain is the blocker.
 
 ## File Reference
 

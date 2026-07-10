@@ -116,6 +116,27 @@ The BSaaS purchase flow layers on top of the existing subscription billing syste
 - **No schema changes**: Reuses existing `tier_features_list → capability_features_list → capability_type_list` chain
 - **Frontend**: Ineligible items show locked card with "Upgrade Required" badge, reason text, and "Upgrade Plan" button linking to `/t/{tenantId}/settings/store?tab=plans`
 
+### Phase 6: Eligibility Flags (trial_eligible, demo_eligible, is_private)
+- **Migration**: `database/migrations/094_trial_eligible_flag.sql` — Adds three columns to both `bsaas_catalog` and `bsaas_bundles`:
+  - `trial_eligible` (BOOLEAN, default false, opt-in) — Must be true AND `trial_days > 0` for trial purchases to be allowed
+  - `demo_eligible` (BOOLEAN, default true, opt-out) — When false, demo tenants (`tenants.is_demo = true`) are blocked from purchasing with `403 demo_tenant_blocked`
+  - `is_private` (BOOLEAN, default false, opt-in) — When true, item is hidden from public Feature Store catalog endpoints
+- **Prisma schema**: `bsaas_catalog` and `bsaas_bundles` models include all three fields with `@@index([is_private])`
+- **Backend purchase logic** (`bsaas-purchases.ts`):
+  - `getCatalogEntry()` returns `trial_eligible` and `demo_eligible`
+  - Feature catalog endpoint: `where: { is_active: true, is_private: false }` — filters private items
+  - Bundle catalog endpoint: `where: { is_active: true, is_private: false }` — filters private bundles
+  - Feature purchase: checks `demo_eligible` (blocks demo tenants), checks `trial_eligible` (only enters trial branch if true + trial_days > 0)
+  - Bundle purchase: same checks for bundles
+- **Admin routes**: `admin/bsaas-catalog.ts` and `admin/bsaas-bundles.ts` — all three flags in Zod create/update schemas
+- **Frontend types**: `BsaasPurchaseService.ts` (`trialEligible`, `demoEligible` on catalog items), `AdminBsaasCatalogService.ts` and `AdminBsaasBundleService.ts` (all three flags on entries + inputs)
+- **Feature Store UI** (`feature-store/page.tsx`):
+  - Fetches tenant's `isDemo` status via `tenantPublicService.getPublicTenantInfo()`
+  - `trialEligible` controls trial badges and "Start Trial" vs "Purchase" button labels
+  - `demoEligible` blocks demo tenants (shows "Demo Restricted" badge + disabled "Not Available for Demo" button)
+  - `demo_tenant_blocked` error handling in both feature and bundle purchase handlers
+- **Admin UI**: Radio toggle switches (Yes/No) for all three flags in `BundleEditModal.tsx` and `BsaasFeaturesTab.tsx`; table columns for Trial Elig. and Demo Elig. in both features and bundles tables
+
 ### Tier Status Check (Flexible Expansion)
 - **Function**: `checkTierFeatureStatus(tenantId, featureKey)` in `bsaas-purchases.ts`
 - **Purpose**: Determines if a feature is already included in the tenant's tier (so the catalog shows "Included in Plan" instead of a purchase button)
@@ -225,6 +246,10 @@ Feature pricing is stored in the `bsaas_catalog` table (migration `047_bsaas_cat
 | `feature_key` | VARCHAR(100) | References `features_list.key` |
 | `price_cents` | INTEGER | Price in cents (e.g., 1900 = $19.00) |
 | `billing_cycle` | VARCHAR(20) | `monthly`, `annual`, or `one_time` |
+| `trial_days` | INTEGER | Trial period in days (0 = no trial) |
+| `trial_eligible` | BOOLEAN | Opt-in flag — must be true for trials to be allowed (default false) |
+| `demo_eligible` | BOOLEAN | Opt-out flag — when false, demo tenants cannot purchase (default true) |
+| `is_private` | BOOLEAN | When true, hidden from Feature Store (default false) |
 | `is_active` | BOOLEAN | Whether feature is available for purchase |
 | `sort_order` | INTEGER | Display ordering |
 | `marketing_name` | VARCHAR(255) | Display name in Feature Store |
@@ -257,6 +282,8 @@ Admins manage the catalog via the admin UI at `/settings/admin/bsaas-catalog`.
 | `database/migrations/047_bsaas_catalog.sql` | Catalog table migration |
 | `database/migrations/087_bsaas_bundles.sql` | Bundle tables + Customer Engagement Suite seed |
 | `database/migrations/088_bsaas_bundle_seeds.sql` | Commerce Power Pack, Operations, Growth, Everything Pack seeds |
+| `database/migrations/093_everything_pack_split.sql` | Splits Everything Pack into no-org (16 components) + org (17 components) variants |
+| `database/migrations/094_trial_eligible_flag.sql` | Adds `trial_eligible`, `demo_eligible`, `is_private` columns to `bsaas_catalog` and `bsaas_bundles` |
 
 ## Expansion Opportunities
 
@@ -303,7 +330,7 @@ Bundles group multiple flexible toggle features across capability domains into a
 
 ### Schema
 
-- **`bsaas_bundles`** table — `bundle_key`, `marketing_name`, `description`, `price_cents`, `billing_cycle`, `trial_days`, `is_active`, `sort_order`
+- **`bsaas_bundles`** table — `bundle_key`, `marketing_name`, `description`, `price_cents`, `billing_cycle`, `trial_days`, `trial_eligible`, `demo_eligible`, `is_private`, `is_active`, `sort_order`
 - **`bsaas_bundle_items`** table — `bundle_id`, `feature_key`, `sort_order` (junction table linking bundles to feature keys)
 - **Migrations**: `087_bsaas_bundles.sql` (tables + Customer Engagement Suite seed), `088_bsaas_bundle_seeds.sql` (Commerce Power Pack, Operations Bundle, Growth Bundle, Everything Pack seeds)
 - **Prisma models**: `bsaas_bundles`, `bsaas_bundle_items`
@@ -358,7 +385,18 @@ The `EffectiveCapabilityResolver` treats all sources equally — it merges any a
 | Commerce Power Pack | `commerce_power_pack` | social_commerce_flexible + storefront_opt_flexible + product_options_flexible | $69/mo | 29% | 14 days |
 | Operations Bundle | `operations_bundle` | integration_flexible + fulfillment_flexible + payment_gateway_flexible | $49/mo | 29% | 14 days |
 | Growth Bundle | `growth_bundle` | featured_flexible + directory_entry_flexible + quickstart_flexible | $39/mo | 32% | 14 days |
-| Everything Pack | `everything_pack` | All 17 flexible toggles | $299/mo | 31% | 14 days |
+| Everything Pack | `everything_pack` | 16 flexible toggles (no org) | $279/mo | ~30% | 14 days |
+| Everything Pack + Org | `everything_pack_org` | All 17 flexible toggles (includes org_flexible) | $299/mo | 31% | 14 days |
+
+### Bundle Engagement Caveat (Critical)
+
+`checkBundleEngagement()` runs `checkCapabilityEngagement()` for **every** component in the bundle. If the tenant's tier has **zero** features in **any** capability type represented by the bundle's components, the **entire bundle** is blocked — not just the individual component.
+
+This means a bundle containing `org_flexible` will be blocked for any tenant whose tier has no `organization_options` features. To solve this, the Everything Pack was split into two variants:
+- **Everything Pack** (16 components, no `org_flexible`) — purchasable by any tier with engagement in the 16 included domains
+- **Everything Pack + Org** (17 components, with `org_flexible`) — only purchasable by tiers with org engagement (e.g., chain tiers)
+
+When creating new bundles that span many capability domains, consider whether all target tiers have engagement in every included domain. If not, either split the bundle or create domain-specific sub-bundles.
 
 ### Admin Management
 
@@ -366,6 +404,7 @@ The `EffectiveCapabilityResolver` treats all sources equally — it merges any a
 - **Admin service**: `apps/web/src/services/AdminBsaasBundleService.ts`
 - **Admin UI**: `apps/web/src/admin/components/BundlesTab.tsx` + `BundleEditModal.tsx` (tab in BsaasCatalogManagement)
 - **Admin page**: `apps/web/src/app/(platform)/settings/admin/bsaas-catalog/page.tsx`
+- **Clone Bundle**: BundlesTab has a Copy icon button per row that opens BundleEditModal in clone mode — pre-fills all fields from the source bundle with `_copy` suffix on bundle_key and `(Copy)` suffix on marketing_name. Bundle key is editable (new bundle). Useful for testing bundle behavior without modifying the original.
 
 ### Frontend Bundle Purchase
 

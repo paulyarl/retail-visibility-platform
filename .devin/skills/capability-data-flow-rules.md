@@ -591,6 +591,25 @@ const isWritable = allCaps.data?.subscriptionContext?.writable ?? true;
 - Hide the entire widget/component when subscription is read-only
 - Block API calls preemptively — let the backend `checkCrmCreateAllowed` gate handle it
 
+### R30: Frontend Fallback Resolver Must Mirror Backend Resolver Logic
+
+`apps/web/src/services/CapabilityResolutionService.ts` contains fallback resolver functions (e.g., `resolveProductOptionsState`) used when the unified `effective-capabilities` endpoint is unavailable. These functions are **not** simple mappers; they perform the same `(features, merchantPrefs) -> state` resolution as backend `XxxResolver.ts` functions.
+
+**Rule**: When a backend resolver changes for `_on`/`_off` group gates, `_enabled`/`_disabled` legacy fallback, or `effective_*` computation, the corresponding frontend fallback resolver in `CapabilityResolutionService.ts` MUST be updated in the same PR.
+
+**Required parity**:
+1. **Master gate precedence**: `*_disabled` > `*_enabled` > `*_flexible` > `*_on`/`*_off` group gates > individual features. Frontend `enabled` must use the same precedence as the backend (R17).
+2. **Group gate fallback**: `groupOn = *_on || *_enabled`; `groupOff = *_off || *_disabled`.
+3. **Enabled fallback helper**: `enabled = disabled ? false : enabled ? true : flexible ? true : hasAnyXxxFeature(features)`, where `hasAnyXxxFeature` checks every group gate (`*_on` and legacy `*_enabled`) and every individual feature in the domain.
+4. **`shows*` flags**: `showsX = isFlexible || groupOn || featureFlag`. Do not gate `showsX` on `groupEnabled` unless the backend does.
+5. **Effective flags**: `effectiveShowsX = showsX && merchantPref`. Do NOT use `(isFlexible || featureFlag) && merchantPref` — that ignores the group gate and differs from the backend.
+6. **Allowed-type arrays**: Build them with the same `groupEnabled` and `!groupOff` logic as the backend.
+7. **Return `merchantPreferences` and `features`**: Fallback resolvers must include `merchantPreferences` (or `null`) and `features` to satisfy state interfaces.
+
+**Example**: When `ProductOptionsResolver.ts` changes, `resolveProductOptionsState` in `CapabilityResolutionService.ts` must be updated to match the `creation`, `layout`, and `sections` group gate logic, including the `hasAnyProductOptionsFeature` helper that drives the `enabled` fallback.
+
+**Verification**: Run `pnpm checkweb` and add/update `CapabilityResolutionService` tests covering `_on` only, `_enabled` only, `_off` override, `_on` + `_off`, and `enabled` derived from a group gate without the master `_enabled` key.
+
 ## File Reference
 
 ### Backend

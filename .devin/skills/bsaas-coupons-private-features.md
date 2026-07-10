@@ -1,0 +1,402 @@
+---
+description: How BSaaS promotional discounts (Stripe coupons/promo codes), coupon targeting, and private features work — admin management, checkout validation, targeting rules, renewal behavior, and private feature grant flow
+---
+
+# BSaaS Coupons & Private Features
+
+This skill documents two BSaaS capabilities:
+1. **Promotional Discounts** — Stripe Coupons + Promotion Codes for BSaaS checkout discounts
+2. **Private Features** — Catalog entries hidden from the Feature Store, available only via admin grant
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Admin UI                                                 │
+│  /settings/admin/bsaas-promotions  → Coupon/Promo CRUD   │
+│  /settings/admin/bsaas-catalog     → is_private toggle   │
+│  /settings/admin/feature-purchases → Grant Access        │
+└────────────────────────┬─────────────────────────────────┘
+                         │
+┌────────────────────────▼─────────────────────────────────┐
+│  Admin API                                                │
+│  /api/admin/bsaas-promotions     → Stripe coupon CRUD    │
+│  /api/admin/bsaas-catalog        → Catalog CRUD (private)│
+│  /api/admin/feature-purchases    → Grant complimentary   │
+└────────────────────────┬─────────────────────────────────┘
+                         │
+┌────────────────────────▼─────────────────────────────────┐
+│  Stripe API                                               │
+│  coupons.create / promotionCodes.create / list / update  │
+└────────────────────────┬─────────────────────────────────┘
+                         │
+┌────────────────────────▼─────────────────────────────────┐
+│  Tenant Checkout (bsaas-purchases.ts)                     │
+│  POST /feature-purchase  → validates promo + targets      │
+│  POST /bundle-purchase   → validates promo + targets      │
+│  CouponTargetService     → target rule validation         │
+└──────────────────────────────────────────────────────────┘
+```
+
+## Part 1: Promotional Discounts (Coupons & Promo Codes)
+
+### What It Does
+
+Integrates Stripe Coupons and Promotion Codes into the BSaaS checkout flow. Admins create coupons (percentage or fixed amount off) and promotion codes (shareable codes referencing a coupon). Tenants enter a promo code at checkout to receive a discount.
+
+### Two-Layer Stripe Model
+
+Stripe uses a two-layer model for discounts:
+
+| Layer | Purpose | Admin Creates | Tenant Uses |
+|-------|---------|---------------|-------------|
+| **Coupon** | Defines the discount (percent_off or amount_off, duration) | Yes | No (internal) |
+| **Promotion Code** | A shareable code that references a coupon | Yes | Yes (at checkout) |
+
+A coupon defines the discount terms. A promotion code is the user-facing code (e.g., `SUMMER50`) that activates the coupon. Multiple promotion codes can reference the same coupon.
+
+### Admin Management
+
+#### Admin API (`apps/api/src/routes/admin/bsaas-promotions.ts`)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/admin/bsaas-promotions` | GET | List all coupons + promotion codes from Stripe (includes targets) |
+| `/api/admin/bsaas-promotions/coupon` | POST | Create a Stripe coupon (with optional target fields) |
+| `/api/admin/bsaas-promotions/coupon/:id/targets` | PUT | Update coupon targeting rules |
+| `/api/admin/bsaas-promotions/promotion` | POST | Create a Stripe promotion code for an existing coupon |
+| `/api/admin/bsaas-promotions/promotion/:id` | DELETE | Deactivate a promotion code (sets `active: false`) |
+
+**Auth**: `authenticateToken` + `requireAdmin` on all routes.
+**Route mount**: `apps/api/src/routes/mounts/admin-routes.ts` — mounted at `/api/admin/bsaas-promotions`.
+
+#### Coupon Creation Schema (Zod)
+
+```typescript
+{
+  percent_off: number (1-100),   // OR
+  amount_off: number (positive), // cents
+  duration: 'once' | 'repeating' | 'forever',
+  duration_in_months: number,    // only if 'repeating'
+  name: string (1-100 chars)
+}
+```
+
+Must have exactly one of `percent_off` or `amount_off` (enforced by Zod `.refine()`).
+
+**Optional target fields** (all nullable, `null` = no restriction):
+```typescript
+{
+  target_features: string[] | null,              // feature keys (e.g. chatbot_flexible)
+  target_tiers: string[] | null,                 // tier keys (e.g. discovery, storefront)
+  target_capability_types: string[] | null,      // capability type keys (e.g. chatbot_options)
+  target_tier_types: string[] | null,            // 'individual' | 'organization'
+  target_demo_status: string[] | null,           // 'demo' | 'non_demo'
+  target_subscription_statuses: string[] | null, // 'trial' | 'active' | 'past_due' | 'canceled' | 'incomplete'
+}
+```
+
+#### Promotion Code Creation Schema (Zod)
+
+```typescript
+{
+  coupon_id: string,             // required — must reference an existing coupon
+  code: string,                  // optional — auto-generated by Stripe if blank
+  max_redemptions: number,       // optional — usage limit
+  expires_at: string (ISO date)  // optional — expiry date
+}
+```
+
+#### Admin Frontend Service (`AdminBsaasPromotionsService.ts`)
+
+- **File**: `apps/web/src/services/AdminBsaasPromotionsService.ts`
+- **Pattern**: Singleton extending `AdminApiSingleton`
+- **Methods**: `getPromotions()`, `createCoupon()`, `createPromotionCode()`, `deactivatePromotionCode()`, `updateCouponTargets()`
+- **Types**: `BsaasCoupon`, `BsaasPromotionCode`, `BsaasPromotionsData`, `CreateCouponRequest`, `CreatePromotionCodeRequest`, `CouponTargets`, `UpdateCouponTargetsRequest`
+
+#### Admin UI (`BsaasPromotionManagement.tsx`)
+
+- **File**: `apps/web/src/admin/components/BsaasPromotionManagement.tsx`
+- **Page**: `apps/web/src/app/(platform)/settings/admin/bsaas-promotions/page.tsx`
+- **Admin settings card**: In admin `page.tsx` — labeled "BSAAS Promotions" with tag icon
+- **Features**:
+  - Coupons table: name, discount type, duration, **targets column** (badges showing target restrictions), valid/expired badge, creation date, **Edit Targets** button
+  - Promotion codes table: code, coupon ID, redemption count, max, active/inactive badge, expiry, deactivate button
+  - Inline create forms for both coupons and promotion codes (coupon form includes targeting section)
+  - **Edit Targets modal**: Full targeting editor with toggle buttons for tiers, tier types, demo status, subscription statuses; comma-separated inputs for features and capability types
+  - Deactivation is irreversible (confirm dialog)
+
+### Tenant Checkout Flow (Individual Features)
+
+#### Frontend
+
+- **File**: `apps/web/src/app/(platform)/settings/feature-store/page.tsx`
+- The purchase confirmation modal includes a **Promo Code (optional)** input field with a tag icon
+- The promo code is passed to `BsaasPurchaseService.purchaseFeature(featureKey, paymentMethodId, promotionCode?)`
+- **Service**: `apps/web/src/services/BsaasPurchaseService.ts` — `purchaseFeature()` accepts optional `promotionCode` parameter
+
+#### Backend Validation (`bsaas-purchases.ts` lines 959-1000)
+
+The `POST /api/subscription/feature-purchase` endpoint validates promo codes **before charging**:
+
+1. **Stripe lookup**: `stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 })`
+2. **Not found** → `400 invalid_promo_code`
+3. **Redemption limit reached** (`max_redemptions && times_redeemed >= max_redemptions`) → `400 promo_expired`
+4. **Expiry passed** (`expires_at * 1000 < Date.now()`) → `400 promo_expired`
+5. **Retrieve coupon**: `stripe.coupons.retrieve(promo.coupon)`
+6. **Calculate discount**:
+   - `percent_off` → `discountCents = Math.round(priceCents * percent_off / 100)`
+   - `amount_off` → `discountCents = Math.min(amount_off, priceCents)`
+7. **Charged amount**: `chargedAmount = Math.max(0, priceCents - discountCents)`
+
+#### Metadata Storage
+
+When a promo code is applied, the purchase metadata includes:
+```json
+{
+  "promotion_code": "SUMMER50",
+  "promotion_code_id": "promo_xxx",
+  "coupon_id": "coupon_xxx",
+  "discount_cents": 950,
+  "charged_amount": 950,
+  "price_cents": 1900
+}
+```
+
+This enables audit trails and revenue analytics on discounted purchases.
+
+### Bundle Purchase Promo Code Validation (FIXED)
+
+The `POST /api/subscription/bundle-purchase` endpoint now **fully validates** promo codes and applies discounts, matching the feature-purchase flow:
+
+1. **Stripe lookup**: `stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 })`
+2. **Not found** → `400 invalid_promo_code`
+3. **Redemption limit reached** → `400 promo_expired`
+4. **Expiry passed** → `400 promo_expired`
+5. **Retrieve coupon**: `stripe.coupons.retrieve(promo.coupon)`
+6. **Calculate discount**: `percent_off` or `amount_off` applied to bundle `priceCents`
+7. **Charged amount**: `chargedAmount = Math.max(0, priceCents - discountCents)`
+8. **Coupon target validation**: `CouponTargetService.validateCouponTargets()` called with `featureKeys`, `bundleKey`, and `tenantId`
+
+The charge, metadata, audit log, and response all include discount and promo code information.
+
+### Coupon Targeting
+
+Coupons can be restricted to specific purchase contexts via target rules stored in the `coupon_target_rules` table.
+
+#### Target Types (AND logic between types, OR logic within each type)
+
+| Target | Field | Values | Effect |
+|--------|-------|--------|--------|
+| **Features** | `target_features` | Feature keys (e.g. `chatbot_flexible`) | Coupon only valid for listed features |
+| **Tiers** | `target_tiers` | Tier keys (e.g. `discovery`, `storefront`) | Coupon only valid for tenants on listed tiers |
+| **Capability Types** | `target_capability_types` | Capability type keys (e.g. `chatbot_options`) | Coupon only valid for features in listed capability types |
+| **Tier Types** | `target_tier_types` | `individual` \| `organization` | Coupon only valid for tenants on individual or organization tiers |
+| **Demo Status** | `target_demo_status` | `demo` \| `non_demo` | Coupon only valid for demo or non-demo tenants |
+| **Subscription Status** | `target_subscription_statuses` | `trial`, `active`, `past_due`, `canceled`, `incomplete` | Coupon only valid for tenants with listed subscription statuses |
+
+**null/empty = no restriction** for that target type.
+
+#### CouponTargetService (`apps/api/src/services/CouponTargetService.ts`)
+
+- **Pattern**: Singleton extending `BaseService` with 60-second cache
+- **Methods**: `getTargets(couponId)`, `setTargets(couponId, targets)`, `validateCouponTargets(couponId, context)`
+- **Validation context**: `{ featureKey?, featureKeys?, tenantId, bundleKey? }`
+- **Tenant data sources**: `tenants.subscription_tier`, `tenants.subscription_status`, `tenants.is_demo`, `tenants.organization_id` → `organizations_list.subscription_tier` → `subscription_tiers_list.tier_type`
+
+#### Checkout Integration
+
+Both `feature-purchase` and `bundle-purchase` routes call `CouponTargetService.validateCouponTargets()` after Stripe promo code validation but **before charging**. If targets don't match, returns `400 coupon_target_mismatch`.
+
+#### Admin API for Targets
+
+- **POST `/api/admin/bsaas-promotions/coupon`**: Accepts optional target fields in creation body; stores them via `CouponTargetService.setTargets()`
+- **PUT `/api/admin/bsaas-promotions/coupon/:id/targets`**: Updates target rules for an existing coupon
+- **GET `/api/admin/bsaas-promotions`**: Response includes `targets` object on each coupon
+
+#### Database
+
+- **Migration**: `database/migrations/097_coupon_target_rules.sql`
+- **Table**: `coupon_target_rules` with `coupon_id` (unique), JSONB target fields, RLS (admin-only + service bypass)
+- **Prisma model**: `coupon_target_rules` in `schema.prisma`
+- **ID generator**: `generateCouponTargetId()` with prefix `ctgt-`
+
+### Renewal Behavior with Coupons
+
+The renewal job (`apps/api/src/jobs/bsaas-renewal.ts`) does **not** re-apply promo codes during renewal. It charges the full `priceCents` from the purchase metadata:
+
+- **`duration: 'once'`** coupons: Only the first charge is discounted. Renewals charge full price. ✅ Correct behavior.
+- **`duration: 'repeating'`** coupons: The Stripe coupon would apply the discount for N months, but since renewals use `chargePaymentMethod` (not Stripe Subscriptions), the discount is **not automatically applied**. The renewal job charges full price every cycle.
+- **`duration: 'forever'`** coupons: Same issue — the renewal job does not apply the discount.
+
+**Root cause**: The platform uses synchronous `chargePaymentMethod` (one-time PaymentIntents) for renewals, not Stripe Subscriptions. Stripe coupon durations only work with Stripe Subscriptions/invoices. The discount metadata is stored for audit but not re-applied.
+
+**Practical impact**: Promo codes effectively only discount the **initial purchase**. For recurring discounts, admins would need to manually adjust the renewal charge or migrate to Stripe Subscriptions (see "Remaining Future Opportunities" in `bsaas-purchase-flow.md`).
+
+### Audit Trail
+
+All admin coupon/promo code actions are audited:
+- `bsaas_coupon.create` — Coupon created
+- `bsaas_promotion.create` — Promotion code created
+- `bsaas_promotion.deactivate` — Promotion code deactivated
+
+### Error Responses
+
+| Error Code | HTTP | Cause |
+|------------|------|-------|
+| `invalid_promo_code` | 400 | Code not found, not active, or Stripe API error |
+| `promo_expired` | 400 | Redemption limit reached or expiry date passed |
+| `coupon_target_mismatch` | 400 | Coupon targets don't match the purchase context (feature, tier, capability type, etc.) |
+| `stripe_not_configured` | 503 | `STRIPE_SECRET_KEY` not set |
+
+---
+
+## Part 2: Private BSaaS Features
+
+### What It Does
+
+The `is_private` field on `bsaas_catalog` **and `bsaas_bundles`** entries allows admins to mark an item as **hidden from the merchant Feature Store** while still making it available for **admin complimentary grant**. This is useful for:
+
+- **Beta features** — not ready for self-service purchase but testable via admin grant
+- **Enterprise-only features** — only available through sales/admin action, not self-service
+- **Internal features** — platform tooling that shouldn't be purchasable by merchants
+- **Custom deal features** — features negotiated individually with specific tenants
+
+### How It Works
+
+#### Catalog Filtering
+
+The tenant-facing catalog endpoints filter out private items:
+
+```typescript
+// bsaas-purchases.ts — feature catalog
+const catalogEntries = await prisma.bsaas_catalog.findMany({
+  where: { is_active: true, is_private: false },  // ← private features excluded
+  orderBy: { sort_order: 'asc' },
+});
+
+// bsaas-purchases.ts — bundle catalog
+const bundles = await prisma.bsaas_bundles.findMany({
+  where: { is_active: true, is_private: false },  // ← private bundles excluded
+  orderBy: { sort_order: 'asc' },
+});
+```
+
+This means private features and bundles **never appear** in the Feature Store page (`/settings/feature-store`), regardless of the tenant's tier or purchase status.
+
+#### Admin Catalog Management
+
+Admins can toggle `is_private` when creating or editing a catalog entry or bundle:
+
+- **Admin API**: `apps/api/src/routes/admin/bsaas-catalog.ts` and `apps/api/src/routes/admin/bsaas-bundles.ts` — `is_private` in Zod schemas (create + update)
+- **Admin UI (features)**: `apps/web/src/admin/components/BsaasFeaturesTab.tsx` — Switch toggle labeled "Private (hidden from Feature Store, available for Grant Access)"
+- **Admin UI (bundles)**: `apps/web/src/admin/components/BundleEditModal.tsx` — Radio toggle (Yes/No) in Eligibility Settings section
+- **Table display**: Private entries show an amber "Private" badge in both the features and bundles catalog tables
+- **Admin services**: `apps/web/src/services/AdminBsaasCatalogService.ts` and `apps/web/src/services/AdminBsaasBundleService.ts` — `is_private` in entry and input interfaces
+
+#### Admin Grant Flow (Complimentary Access)
+
+Private features are activated for tenants via the **Grant Complimentary Access** endpoint:
+
+- **Endpoint**: `POST /api/admin/feature-purchases/grant-complimentary`
+- **File**: `apps/api/src/routes/admin/feature-purchases.ts`
+- **Schema**: `{ tenant_id, feature_key, duration_days?, reason? }`
+- **Behavior**: Creates a `tenant_feature_purchases` record with `source='admin_grant'`, `status='active'`, `price_cents=0` (no charge), `billing_cycle='manual'`
+- **No `is_private` check in grant endpoint**: The grant endpoint validates that the feature exists in `features_list` but does **not** check `bsaas_catalog.is_private`. This is by design — admins can grant any feature, whether private or public. The `is_private` flag only controls Feature Store visibility.
+
+#### Grant Flow (Step by Step)
+
+1. Admin navigates to **Settings → Admin → BSaaS Catalog**
+2. Creates or edits a catalog entry with `is_private = true`
+3. Admin navigates to **Settings → Admin → Feature Purchases** (grant complimentary access section)
+4. Selects tenant, enters the feature key, optional duration and reason
+5. Backend creates purchase with `source='admin_grant'`, `status='active'`
+6. `invalidateEffectiveCapabilities(tenantId)` is called — feature is immediately active
+7. Audit log: `feature_purchase.grant_complimentary`
+8. Notification: `bsaas_purchase_success` sent to tenant
+
+#### Renewal Job Behavior
+
+The renewal job (`bsaas-renewal.ts`) skips admin grants:
+- `source='admin_grant'` purchases have `billing_cycle='manual'` in metadata
+- The renewal job only processes `source: { in: ['bsaas', 'bsaas_bundle'] }` — admin grants are excluded
+- No charges, no suspension, no expiry processing (unless `expires_at` is set and `duration_days` was specified)
+
+### Private Feature Benefits for Coupon Handling
+
+Private features complement the coupon system in several ways:
+
+1. **Targeted discounts without public promo codes**: Admins can grant a private feature to a specific tenant at no cost instead of creating a public promo code that anyone could use. This is more secure for negotiated deals.
+
+2. **Beta access with discount tracking**: A feature can be private (not self-service purchasable) but still have a `bsaas_catalog` entry with pricing. When ready to go public, the admin flips `is_private` to `false` and the feature appears in the Feature Store with its configured price. If a promo code campaign is planned for the launch, the coupon can be created in advance.
+
+3. **Trial-like access without trial infrastructure**: Admins can grant a private feature for `duration_days` (e.g., 30 days) as a complimentary access period. When the grant expires, the feature is deactivated. This bypasses the need for a promo code for short-term promotional access.
+
+4. **Revenue-protected feature gating**: Private features ensure that features intended for specific tiers or enterprise customers cannot be purchased à la carte by any tenant. Combined with the capability engagement gate, this creates a double layer of protection — the feature is invisible to merchants AND cannot be self-purchased even if the API is called directly.
+
+---
+
+## Part 3: Trial & Demo Eligibility Flags
+
+In addition to `is_private`, both `bsaas_catalog` and `bsaas_bundles` have two more eligibility flags (migration `094_trial_eligible_flag.sql`):
+
+| Flag | Default | Type | Effect |
+|------|---------|------|--------|
+| `trial_eligible` | `false` | Opt-in | Must be `true` for trials to be allowed (also requires `trial_days > 0`) |
+| `demo_eligible` | `true` | Opt-out | When `false`, demo tenants (`tenants.is_demo = true`) are blocked with `403 demo_tenant_blocked` |
+
+### Admin Management
+
+- **Admin API**: `admin/bsaas-catalog.ts` and `admin/bsaas-bundles.ts` — both flags in Zod create/update schemas
+- **Admin UI (features)**: `BsaasFeaturesTab.tsx` — radio toggles (Yes/No) in Eligibility Settings section; table columns for Trial Elig. and Demo Elig.
+- **Admin UI (bundles)**: `BundleEditModal.tsx` — radio toggles (Yes/No) in Eligibility Settings section; table columns in `BundlesTab.tsx`
+
+### Backend Enforcement
+
+- `getCatalogEntry()` returns `trial_eligible` and `demo_eligible`
+- Purchase endpoints check `demo_eligible` before processing — returns `403 demo_tenant_blocked` for demo tenants
+- Trial branch only entered when `trial_eligible === true` AND `trial_days > 0`
+
+### Frontend Enforcement
+
+- Feature Store page fetches `isDemo` via `tenantPublicService.getPublicTenantInfo()`
+- `trialEligible` controls trial badges and "Start Trial" vs "Purchase" button labels
+- `demoEligible` blocks demo tenants (shows "Demo Restricted" badge + disabled button)
+- `demo_tenant_blocked` error handling in purchase confirmation handlers
+
+---
+
+## File Reference
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/routes/admin/bsaas-promotions.ts` | Admin API for Stripe coupon/promo code CRUD + targeting |
+| `apps/api/src/services/CouponTargetService.ts` | Coupon target rule service (cache, CRUD, validation) |
+| `apps/api/src/routes/admin/bsaas-catalog.ts` | Admin API for catalog CRUD (includes `is_private` field) |
+| `apps/api/src/routes/admin/feature-purchases.ts` | Admin API for grant-complimentary endpoint |
+| `apps/api/src/routes/bsaas-purchases.ts` | Tenant-facing purchase API (promo + target validation) |
+| `database/migrations/097_coupon_target_rules.sql` | Migration for coupon_target_rules table |
+| `apps/api/src/routes/mounts/admin-routes.ts` | Route mount for bsaas-promotions at `/api/admin/bsaas-promotions` |
+| `apps/api/src/jobs/bsaas-renewal.ts` | Daily renewal job (does NOT re-apply promo codes) |
+| `apps/web/src/services/AdminBsaasPromotionsService.ts` | Frontend admin service for promotions |
+| `apps/web/src/services/AdminBsaasCatalogService.ts` | Frontend admin service for catalog (includes `is_private`) |
+| `apps/web/src/services/BsaasPurchaseService.ts` | Frontend tenant service (passes `promotionCode` to purchase endpoints) |
+| `apps/web/src/admin/components/BsaasPromotionManagement.tsx` | Admin UI for coupon/promo code management |
+| `apps/web/src/admin/components/BsaasFeaturesTab.tsx` | Admin UI for catalog management (includes Private toggle + badge) |
+| `apps/web/src/app/(platform)/settings/admin/bsaas-promotions/page.tsx` | Admin promotions page |
+| `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | Tenant Feature Store page (promo code input in purchase modal) |
+
+## Related Documents
+
+- **`bsaas-purchase-flow.md`** — Full BSaaS purchase flow architecture (individual + bundle purchases, renewals, companion pattern)
+- **`docs/BSAAS_EXPANSION_USER_GUIDE.md`** — User guide for E1-E5 expansion features (includes coupon section)
+- **`store-purchases-capability-checklist.md`** — Checklist for store purchase capability awareness
+- **`add-bsaas-feature.md`** — How to add a purchasable feature to the platform
+
+## Anti-Patterns
+
+- **Do NOT assume promo code discounts apply on renewal** — The renewal job charges full price from metadata. Only the initial purchase is discounted.
+- **Do NOT create target rules without understanding AND/OR logic** — All non-empty target fields must match (AND). Within each field, any value matching passes (OR). An empty/null field means no restriction for that dimension.
+- **Do NOT create private features without a grant plan** — Private features are invisible to merchants. If no admin grants them, they will never be activated for any tenant.
+- **Do NOT use `is_private` as a security gate** — The `is_private` flag only controls Feature Store visibility. The grant-complimentary endpoint does not check it. If a feature must never be activated, do not add it to `bsaas_catalog` at all.
+- **Do NOT deactivate a promo code expecting to revoke past discounts** — Deactivation only prevents future use. Purchases already made with the code retain their discount metadata.

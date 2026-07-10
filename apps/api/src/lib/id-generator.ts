@@ -1358,3 +1358,13 @@ export function generatePolicyTemplateUsageId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `poltu-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+/**
+ * Generate coupon target rule ID (platform-level, no tenant scope)
+ * Format: ctgt-{nanoid} (13 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCouponTargetId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ctgt-${nanoid()}`;
+}

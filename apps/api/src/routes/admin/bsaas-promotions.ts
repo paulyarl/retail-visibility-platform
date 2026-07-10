@@ -17,6 +17,8 @@ import { z } from 'zod';
 import Stripe from 'stripe';
 import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { audit } from '../../audit';
+import CouponTargetService from '../../services/CouponTargetService';
+import { prisma } from '../../prisma';
 
 const router = Router();
 
@@ -39,8 +41,23 @@ const createCouponSchema = z.object({
   duration: z.enum(['once', 'repeating', 'forever']).default('once'),
   duration_in_months: z.number().int().min(1).optional(),
   name: z.string().min(1).max(100),
+  target_features: z.array(z.string()).nullable().optional(),
+  target_tiers: z.array(z.string()).nullable().optional(),
+  target_capability_types: z.array(z.string()).nullable().optional(),
+  target_tier_types: z.array(z.string()).nullable().optional(),
+  target_demo_status: z.array(z.string()).nullable().optional(),
+  target_subscription_statuses: z.array(z.string()).nullable().optional(),
 }).refine(data => data.percent_off || data.amount_off, {
   message: 'Either percent_off or amount_off is required',
+});
+
+const updateTargetsSchema = z.object({
+  target_features: z.array(z.string()).nullable().optional(),
+  target_tiers: z.array(z.string()).nullable().optional(),
+  target_capability_types: z.array(z.string()).nullable().optional(),
+  target_tier_types: z.array(z.string()).nullable().optional(),
+  target_demo_status: z.array(z.string()).nullable().optional(),
+  target_subscription_statuses: z.array(z.string()).nullable().optional(),
 });
 
 const createPromotionCodeSchema = z.object({
@@ -67,29 +84,55 @@ router.get('/', async (req: Request, res: Response) => {
       stripe.promotionCodes.list({ limit: 100 }),
     ]);
 
+    // Fetch all target rules in one query
+    const targetRules = await prisma.coupon_target_rules.findMany();
+    const targetMap = new Map(targetRules.map(r => [r.coupon_id, r]));
+
     res.json({
       success: true,
       data: {
-        coupons: coupons.data.map(c => ({
-          id: c.id,
-          name: c.name,
-          percent_off: c.percent_off,
-          amount_off: c.amount_off,
-          duration: c.duration,
-          duration_in_months: c.duration_in_months,
-          valid: c.valid,
-          created: c.created,
-        })),
-        promotionCodes: promotionCodes.data.map(p => ({
-          id: p.id,
-          code: p.code,
-          coupon_id: (p as any).coupon,
-          max_redemptions: p.max_redemptions,
-          times_redeemed: p.times_redeemed,
-          active: p.active,
-          expires_at: p.expires_at,
-          created: p.created,
-        })),
+        coupons: coupons.data.map(c => {
+          const rules = targetMap.get(c.id);
+          return {
+            id: c.id,
+            name: c.name,
+            percent_off: c.percent_off,
+            amount_off: c.amount_off,
+            duration: c.duration,
+            duration_in_months: c.duration_in_months,
+            valid: c.valid,
+            created: c.created,
+            targets: rules ? {
+              target_features: rules.target_features as string[] | null,
+              target_tiers: rules.target_tiers as string[] | null,
+              target_capability_types: rules.target_capability_types as string[] | null,
+              target_tier_types: rules.target_tier_types as string[] | null,
+              target_demo_status: rules.target_demo_status as string[] | null,
+              target_subscription_statuses: rules.target_subscription_statuses as string[] | null,
+            } : null,
+          };
+        }),
+        promotionCodes: promotionCodes.data.map(p => {
+          const rules = targetMap.get((p as any).coupon);
+          return {
+            id: p.id,
+            code: p.code,
+            coupon_id: (p as any).coupon,
+            max_redemptions: p.max_redemptions,
+            times_redeemed: p.times_redeemed,
+            active: p.active,
+            expires_at: p.expires_at,
+            created: p.created,
+            targets: rules ? {
+              target_features: rules.target_features as string[] | null,
+              target_tiers: rules.target_tiers as string[] | null,
+              target_capability_types: rules.target_capability_types as string[] | null,
+              target_tier_types: rules.target_tier_types as string[] | null,
+              target_demo_status: rules.target_demo_status as string[] | null,
+              target_subscription_statuses: rules.target_subscription_statuses as string[] | null,
+            } : null,
+          };
+        }),
       },
     });
   } catch (error: any) {
@@ -111,7 +154,9 @@ router.post('/coupon', async (req: Request, res: Response) => {
       return res.status(503).json({ error: 'stripe_not_configured', message: 'Stripe is not configured' });
     }
 
-    const { percent_off, amount_off, duration, duration_in_months, name } = validation.data;
+    const { percent_off, amount_off, duration, duration_in_months, name,
+            target_features, target_tiers, target_capability_types,
+            target_tier_types, target_demo_status, target_subscription_statuses } = validation.data;
 
     const coupon = await stripe.coupons.create({
       name,
@@ -122,11 +167,29 @@ router.post('/coupon', async (req: Request, res: Response) => {
       duration_in_months: duration === 'repeating' ? duration_in_months : undefined,
     });
 
+    // Store target rules if any were provided
+    const hasTargets = target_features || target_tiers || target_capability_types ||
+                       target_tier_types || target_demo_status || target_subscription_statuses;
+    if (hasTargets) {
+      try {
+        await CouponTargetService.getInstance().setCouponTargets(coupon.id, {
+          target_features: target_features ?? null,
+          target_tiers: target_tiers ?? null,
+          target_capability_types: target_capability_types ?? null,
+          target_tier_types: target_tier_types ?? null,
+          target_demo_status: target_demo_status ?? null,
+          target_subscription_statuses: target_subscription_statuses ?? null,
+        });
+      } catch (targetErr: any) {
+        console.error('[BSaaS Promotions] Failed to store coupon targets:', targetErr);
+      }
+    }
+
     await audit({
       tenantId: (req as any).user?.tenantId || 'system',
       actor: (req as any).user?.id || null,
       action: 'bsaas_coupon.create',
-      payload: { id: coupon.id, entity_type: 'other', name, percent_off, amount_off, duration },
+      payload: { id: coupon.id, entity_type: 'other', name, percent_off, amount_off, duration, hasTargets },
     });
 
     res.status(201).json({ success: true, data: coupon });
@@ -169,6 +232,40 @@ router.post('/promotion', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[BSaaS Promotions] Error creating promotion code:', error);
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to create promotion code' });
+  }
+});
+
+// PUT /api/admin/bsaas-promotions/coupon/:id/targets
+router.put('/coupon/:id/targets', async (req: Request, res: Response) => {
+  try {
+    const validation = updateTargetsSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', message: 'Invalid target rules', details: validation.error.issues });
+    }
+
+    const { id } = req.params;
+    const targets = validation.data;
+
+    await CouponTargetService.getInstance().setCouponTargets(id, {
+      target_features: targets.target_features ?? null,
+      target_tiers: targets.target_tiers ?? null,
+      target_capability_types: targets.target_capability_types ?? null,
+      target_tier_types: targets.target_tier_types ?? null,
+      target_demo_status: targets.target_demo_status ?? null,
+      target_subscription_statuses: targets.target_subscription_statuses ?? null,
+    });
+
+    await audit({
+      tenantId: (req as any).user?.tenantId || 'system',
+      actor: (req as any).user?.id || null,
+      action: 'bsaas_coupon.update_targets',
+      payload: { id, entity_type: 'other', targets },
+    });
+
+    res.json({ success: true, message: 'Coupon targets updated' });
+  } catch (error: any) {
+    console.error('[BSaaS Promotions] Error updating coupon targets:', error);
+    res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to update coupon targets' });
   }
 });
 
