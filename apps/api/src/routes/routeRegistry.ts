@@ -43,6 +43,7 @@ import cacheMonitoringRoutes from '../routes/cache-monitoring';
 import cacheInvalidationRoutes from '../routes/cache-invalidation';
 import cacheRoutes from '../routes/cache';
 import publicApiRoutes from '../routes/public-api';
+import platformDashboardRoutes from '../routes/platform-dashboard';
 
 // Tenant
 import universalTenantsRoutes from '../routes/universal-tenants';
@@ -554,6 +555,15 @@ export const routeRegistry: RouteEntry[] = [
     router: inlineGbpCategoriesRoutes,
     domain: 'integration',
     comment: 'GBP categories inline handlers (popular + search)',
+  },
+
+  // ── Platform Dashboard ─────────────────────────────────────────────
+  {
+    path: '/api/platform',
+    router: platformDashboardRoutes,
+    middleware: [authenticateToken],
+    domain: 'admin',
+    comment: 'Platform dashboard at /api/platform/dashboard and /api/platform/stats',
   },
 
   // ── Tenants ──────────────────────────────────────────────────────────
