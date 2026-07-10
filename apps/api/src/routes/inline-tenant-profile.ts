@@ -311,9 +311,9 @@ router.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
       select: {
         id: true,
         gateway_type: true,
-        display_name: true,
         is_active: true,
-        is_test_mode: true,
+        is_default: true,
+        config: true,
       }
     });
 

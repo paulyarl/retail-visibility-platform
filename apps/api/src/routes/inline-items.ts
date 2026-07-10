@@ -62,7 +62,9 @@ router.get("/api/items/complete", authenticateToken, checkTenantAccess, async (r
       where.directory_category_id = null;
     }
 
-    const [itemsResult, statsResult, totalCountResult] = await Promise.all([
+    const storewideWhere = { tenant_id, item_status: { not: 'trashed' as const } };
+
+    const [itemsResult, totalCountResult, activeCount, inactiveCount, syncingCount, publicCount, privateCount, lowStockCount] = await Promise.all([
       prisma.inventory_items.findMany({
         where,
         orderBy: { created_at: 'desc' },
@@ -92,22 +94,34 @@ router.get("/api/items/complete", authenticateToken, checkTenantAccess, async (r
           updated_at: true,
         }
       }),
-      prisma.inventory_items.aggregate({
-        where,
-        _count: { id: true },
-        _sum: { stock: true },
-      }),
       prisma.inventory_items.count({ where }),
+      prisma.inventory_items.count({ where: { ...storewideWhere, item_status: 'active' } }),
+      prisma.inventory_items.count({ where: { ...storewideWhere, item_status: 'inactive' } }),
+      prisma.inventory_items.count({ where: { ...storewideWhere, sync_status: 'pending' } }),
+      prisma.inventory_items.count({ where: { ...storewideWhere, visibility: 'public' } }),
+      prisma.inventory_items.count({ where: { ...storewideWhere, visibility: 'private' } }),
+      prisma.inventory_items.count({ where: { ...storewideWhere, stock: { lte: 5 } } }),
     ]);
+
+    const totalPages = Math.ceil(totalCountResult / limitNum);
 
     res.json({
       items: itemsResult,
       stats: {
         total: totalCountResult,
+        active: activeCount,
+        inactive: inactiveCount,
+        syncing: syncingCount,
+        public: publicCount,
+        private: privateCount,
+        lowStock: lowStockCount,
+      },
+      pagination: {
         page: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(totalCountResult / limitNum),
-        totalStock: statsResult._sum.stock || 0,
+        totalItems: totalCountResult,
+        totalPages,
+        hasMore: offset + limitNum < totalCountResult,
       },
     });
   } catch (error) {

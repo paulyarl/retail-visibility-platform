@@ -127,10 +127,12 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
       }); */
 
       if (data) {
-        setItems(data.items);
-        setStats(data.stats);
-        setTotalItems(data.pagination.totalItems);
-        setTotalPages(data.pagination.totalPages);
+        setItems(data.items ?? []);
+        setStats(data.stats ?? {
+          total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0
+        });
+        setTotalItems(data.pagination?.totalItems ?? data.stats?.total ?? 0);
+        setTotalPages(data.pagination?.totalPages ?? 1);
 
         /* console.log('[useItemsComplete] fetchItems - state updated:', {
           itemsCount: data.items.length,
