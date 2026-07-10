@@ -37,9 +37,12 @@ Source tables                         MV                      API routes
 └─────────────────────┘        └──────────────┘
 
 Flexible expansion (×3 sources):
-  tier_features_list     → {capability_key}_flexible → expand to all features in capability type
-  tenant_feature_purchases → {capability_key}_flexible → expand to all features in capability type
-  tenant_feature_overrides_list → {capability_key}_flexible → expand to all features in capability type
+  tier_features_list     → {actual_flexible_key} → expand to all features in capability type
+  tenant_feature_purchases → {actual_flexible_key} → expand to all features in capability type
+  tenant_feature_overrides_list → {actual_flexible_key} → expand to all features in capability type
+
+IMPORTANT: The flexible key is looked up from capability_features_list, not guessed.
+See "Flexible Key Naming Convention" below.
 ```
 
 ### MV Definition
@@ -55,6 +58,91 @@ The MV mirrors the `EffectiveCapabilityResolver` merge logic exactly:
 7. **Admin override merging**: Adds `tenant_feature_overrides_list` rows where `granted = true` and not expired. Admin can grant any feature through the OverrideService.
 8. **Flexible override expansion**: When an admin grants a `{capability_key}_flexible` override, expands to ALL features in that capability type.
 9. **Most-permissive-wins union**: `UNION` of all six sources — one row per `(tenant_id, feature_key)` that is effectively enabled.
+
+### Flexible Key Naming Convention
+
+**Problem**: The original MV definition guessed flexible feature keys by concatenating `{capability_key}_flexible` (e.g., `chatbot_options_flexible`). However, actual data uses shortened keys (e.g., `chatbot_flexible`). This mismatch caused flexible expansion to fail for 14 of 18 capability types.
+
+**Solution**: Use a `flexible_key_map` CTE to look up the actual flexible feature key from `capability_features_list` instead of guessing the naming convention.
+
+**flexible_key_map CTE**:
+```sql
+flexible_key_map AS (
+  SELECT ctl.id AS capability_type_id, fl.key AS flexible_feature_key
+  FROM capability_type_list ctl
+  JOIN capability_features_list cfl ON cfl.capability_type_id = ctl.id AND cfl.is_active = true
+  JOIN features_list fl ON fl.id = cfl.feature_id AND fl.is_active = true AND fl.key LIKE '%_flexible'
+)
+```
+
+**Usage in flexible expansion CTEs**:
+```sql
+-- Instead of: WHERE tfl.feature_key = (ctl.key || '_flexible')
+-- Now use:
+JOIN flexible_key_map fkm ON fkm.capability_type_id = tfl.capability_type_id
+WHERE tfl.feature_key = fkm.flexible_feature_key
+```
+
+**Migration**: Fixed in `database/migrations/090_fix_mv_flexible_expansion.sql` (drops and recreates MV with `flexible_key_map` CTE).
+
+**Actual flexible keys** (from capability_features_list):
+| Capability Type | Flexible Feature Key |
+|-----------------|---------------------|
+| barcode_scan_options | barcode_flexible |
+| chatbot_options | chatbot_flexible |
+| commerce_types | commerce_flexible |
+| crm_options | crm_flexible |
+| directory_entry | directory_entry_flexible |
+| directory_promotion | directory_promotion_flexible |
+| faq_options | faq_flexible |
+| featured_options | featured_flexible |
+| fulfillment_options | fulfillment_flexible |
+| integration_options | integration_flexible |
+| organization_options | org_flexible |
+| payment_gateway_options | payment_gateway_flexible |
+| product_options | product_options_flexible |
+| product_types | product_types_flexible |
+| quickstart_options | quickstart_flexible |
+| social_commerce_options | social_commerce_flexible |
+| storefront_options | storefront_opt_flexible |
+| storefront_types | storefront_flexible |
+
+**Key insight**: Only 4 of 18 flexible keys matched the `{capability_key}_flexible` pattern (directory_entry, directory_promotion, product_options, product_types). The other 14 use shortened names. The `flexible_key_map` lookup ensures flexible expansion works for all capability types regardless of naming convention.
+
+### Type Gate Key Precedence
+
+**Purpose**: Type gate keys (`{capability_key}_disabled`, `{capability_key}_enabled`) control whether an entire capability type is available to a tenant, regardless of individual feature assignments or flexible expansion.
+
+**Precedence order** (R17 in `capability-data-flow-rules.md`):
+1. `{capability_key}_disabled` → **OFF** (highest priority — blocks all features in the capability type)
+2. `{capability_key}_enabled` → **ON** (explicit enable — capability is available)
+3. `{capability_key}_flexible` → **ON** (flexible expansion — all features in the capability type are available)
+4. Individual features → **ON** (implicit enable — capability is available if any individual feature is enabled)
+5. Else → **OFF** (default disabled — nothing enabled at all)
+
+**Implementation in MV** (migration 090):
+- The `type_gate_map` CTE looks up the actual `_disabled` and `_enabled` keys for each capability type from `capability_features_list`
+- The `tenant_type_gates` CTE determines the gate status per tenant from tier sources only
+- All flexible expansion CTEs (`flexible_tier_features`, `flexible_purchase_features`, `flexible_override_features`) exclude features when the capability type has `gate_status = 'disabled'`
+- This ensures that even if a tenant has `_flexible` or individual feature assignments, a `_disabled` type gate blocks all features in that capability type
+- Type gate keys are excluded from the MV's final output via WHERE clause — they are control keys, not features
+
+**Implementation in `checkTierFeatureStatus`** (apps/api/src/routes/bsaas-purchases.ts):
+- Looks up type gate keys (`_disabled`, `_enabled`) from `capability_features_list` for the feature's capability type
+- Checks `_disabled` first — if present and enabled in the tenant's tier, returns `inTier: false` immediately
+- If `_disabled` is not present, checks `_enabled` — if present, proceeds with feature-level checks (no special handling)
+- If neither `_disabled` nor `_enabled` is present, proceeds to flexible expansion check
+- This ensures the same precedence order as the MV: `_disabled > _enabled > _flexible > individual`
+
+**Type gate keys** (only 4 capability types have these):
+| Capability Type | Disabled Key | Enabled Key |
+|-----------------|--------------|-------------|
+| directory_entry | directory_entry_disabled | directory_entry_enabled |
+| directory_promotion | directory_promotion_disabled | directory_promotion_enabled |
+| product_options | product_options_disabled | product_options_enabled |
+| product_types | product_types_disabled | product_types_enabled |
+
+**Note**: Type gate keys are tier-level controls only. They are NOT checked for purchases or overrides — only tier sources are considered for type gate precedence. This is intentional: a merchant can purchase a flexible feature even if their tier has the capability type disabled, giving them the ability to opt-in to capabilities their tier doesn't grant by default.
 
 ### Schema
 
@@ -215,7 +303,13 @@ If a new trial tier is added, update both the MV definition and `getEffectiveTie
 
 ## Migration File
 
-The MV was created in `database/migrations/089_directory_entry_external_link.sql` (Part 3). The migration file also includes verification queries at the bottom.
+The MV was created in `database/migrations/089_directory_entry_external_link.sql` (Part 3). The flexible key naming convention was fixed in `database/migrations/090_fix_mv_flexible_expansion.sql` (drops and recreates MV with `flexible_key_map` CTE).
+
+## Backend Functions Using Flexible Key Lookup
+
+The `checkTierFeatureStatus()` function in `apps/api/src/routes/bsaas-purchases.ts` uses the same flexible key lookup pattern as the MV (via `capability_features_list` query) to determine if a feature is in-tier via flexible expansion. This ensures the BSaaS feature catalog correctly shows "Included in Plan" for flexible tiers, purchased flexibles, and admin-granted flexibles — regardless of naming convention.
+
+See `bsaas-purchase-flow.md` for details on the tier status check and flexible expansion logic.
 
 ## Org Standing Mode & the MV
 

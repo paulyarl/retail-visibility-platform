@@ -212,12 +212,20 @@ export interface CrmOptionsMerchantSettings {
   crm_enabled?: boolean | null;
 }
 
+// CRM group-gate feature keys are tracked as tier features; these types reflect the
+// canonical _on naming and legacy _enabled aliases used in allowed_inquiry_types.
+
 export interface ChatbotOptionsMerchantSettings {
   chatbot_enabled?: boolean | null;
+  chatbot_static_on?: boolean | null;
   chatbot_static_enabled?: boolean | null;
+  chatbot_dynamic_on?: boolean | null;
   chatbot_dynamic_enabled?: boolean | null;
+  chatbot_skills_on?: boolean | null;
   chatbot_skills_enabled?: boolean | null;
+  chatbot_kb_on?: boolean | null;
   chatbot_kb_enabled?: boolean | null;
+  chatbot_widget_on?: boolean | null;
   chatbot_widget_enabled?: boolean | null;
   chatbot_widget_custom_theme?: boolean | null;
   chatbot_widget_skill_cards?: boolean | null;
@@ -234,10 +242,12 @@ export interface BarcodeScanMerchantSettings {
 
 export interface SocialCommerceOptionsMerchantSettings {
   social_commerce_enabled?: boolean | null;
+  social_commerce_meta_on?: boolean | null;
   social_commerce_meta_enabled?: boolean | null;
   social_commerce_meta_catalog?: boolean | null;
   social_commerce_meta_shop?: boolean | null;
   social_commerce_meta_pixel?: boolean | null;
+  social_commerce_tiktok_on?: boolean | null;
   social_commerce_tiktok_enabled?: boolean | null;
   social_commerce_tiktok_catalog?: boolean | null;
   social_commerce_tiktok_shop?: boolean | null;
@@ -585,8 +595,10 @@ export interface EffectiveFaq {
 }
 
 export type CrmInquiryType =
-  | 'crm_inquiry_product_enabled' | 'crm_inquiry_storefront_enabled'
-  | 'crm_inquiry_directory_enabled' | 'crm_inquiry_anonymous'
+  | 'crm_inquiry_product_on' | 'crm_inquiry_product_enabled'
+  | 'crm_inquiry_storefront_on' | 'crm_inquiry_storefront_enabled'
+  | 'crm_inquiry_directory_on' | 'crm_inquiry_directory_enabled'
+  | 'crm_inquiry_anonymous'
   | 'crm_inquiry_customer' | 'crm_inquiry_assignment' | 'crm_inquiry_auto_response';
 
 export type CrmContactType = 'crm_contact_management' | 'crm_contact_import' | 'crm_contact_sync';

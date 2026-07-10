@@ -6,6 +6,15 @@
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
+export interface CouponTargets {
+  target_features: string[] | null;
+  target_tiers: string[] | null;
+  target_capability_types: string[] | null;
+  target_tier_types: string[] | null;
+  target_demo_status: string[] | null;
+  target_subscription_statuses: string[] | null;
+}
+
 export interface BsaasCoupon {
   id: string;
   name: string;
@@ -15,6 +24,7 @@ export interface BsaasCoupon {
   duration_in_months: number | null;
   valid: boolean;
   created: number;
+  targets?: CouponTargets | null;
 }
 
 export interface BsaasPromotionCode {
@@ -26,6 +36,7 @@ export interface BsaasPromotionCode {
   active: boolean;
   expires_at: number | null;
   created: number;
+  targets?: CouponTargets | null;
 }
 
 export interface BsaasPromotionsData {
@@ -39,6 +50,21 @@ export interface CreateCouponRequest {
   duration: 'once' | 'repeating' | 'forever';
   duration_in_months?: number;
   name: string;
+  target_features?: string[] | null;
+  target_tiers?: string[] | null;
+  target_capability_types?: string[] | null;
+  target_tier_types?: string[] | null;
+  target_demo_status?: string[] | null;
+  target_subscription_statuses?: string[] | null;
+}
+
+export interface UpdateCouponTargetsRequest {
+  target_features?: string[] | null;
+  target_tiers?: string[] | null;
+  target_capability_types?: string[] | null;
+  target_tier_types?: string[] | null;
+  target_demo_status?: string[] | null;
+  target_subscription_statuses?: string[] | null;
 }
 
 export interface CreatePromotionCodeRequest {
@@ -113,6 +139,19 @@ class AdminBsaasPromotionsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to deactivate promotion code');
+    }
+  }
+
+  async updateCouponTargets(couponId: string, req: UpdateCouponTargetsRequest): Promise<void> {
+    const result = await this.makeDefaultRequest<void>(
+      `/api/admin/bsaas-promotions/coupon/${couponId}/targets`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(req),
+      },
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update coupon targets');
     }
   }
 }

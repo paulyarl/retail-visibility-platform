@@ -673,8 +673,11 @@ export function toPublicFaqOptionsFlags(state: FaqOptionsState): PublicFaqOption
 // --- CRM Options ---
 
 export type CrmInquiryType =
+  | 'crm_inquiry_product_on'
   | 'crm_inquiry_product_enabled'
+  | 'crm_inquiry_storefront_on'
   | 'crm_inquiry_storefront_enabled'
+  | 'crm_inquiry_directory_on'
   | 'crm_inquiry_directory_enabled'
   | 'crm_inquiry_anonymous'
   | 'crm_inquiry_customer'
@@ -813,10 +816,15 @@ export interface ChatbotOptionsState {
   canUseWidgetAfterHours: boolean;
   merchantPreferences: {
     chatbot_enabled?: boolean | null;
+    chatbot_static_on?: boolean | null;
     chatbot_static_enabled?: boolean | null;
+    chatbot_dynamic_on?: boolean | null;
     chatbot_dynamic_enabled?: boolean | null;
+    chatbot_skills_on?: boolean | null;
     chatbot_skills_enabled?: boolean | null;
+    chatbot_kb_on?: boolean | null;
     chatbot_kb_enabled?: boolean | null;
+    chatbot_widget_on?: boolean | null;
     chatbot_widget_enabled?: boolean | null;
     chatbot_widget_custom_theme?: boolean | null;
     chatbot_widget_skill_cards?: boolean | null;
@@ -1342,6 +1350,40 @@ export function resolveProductTypeState(
 }
 
 /**
+ * Detect whether any product options feature/group gate is present.
+ * Mirrors the backend hasAnyOptionsFeature fallback for the main enabled gate.
+ */
+function hasAnyProductOptionsFeature(features: Record<string, boolean>): boolean {
+  return !!(
+    features.product_options_creation_on ||
+    features.product_options_creation_enabled ||
+    features.product_options_creation_variants ||
+    features.product_options_creation_gallery ||
+    features.product_options_creation_video ||
+    features.product_options_creation_supplier_catalog ||
+    features.product_options_layout_on ||
+    features.product_options_layout_enabled ||
+    features.product_options_layout_classic ||
+    features.product_options_layout_editorial ||
+    features.product_options_layout_immersive ||
+    features.product_options_sections_on ||
+    features.product_options_sections_enabled ||
+    features.product_options_sections_recently_viewed ||
+    features.product_options_sections_qr_codes ||
+    features.product_options_sections_qr_logo ||
+    features.product_options_sections_recommended ||
+    features.product_options_sections_map_display ||
+    features.product_options_sections_location_display ||
+    features.product_options_sections_hours_display ||
+    features.product_options_sections_enhanced_seo ||
+    features.product_options_sections_reviews ||
+    features.product_options_sections_fulfillment ||
+    features.product_options_sections_categories ||
+    features.product_options_sections_location_availability
+  );
+}
+
+/**
  * Resolve product options state from raw capability features
  */
 export function resolveProductOptionsState(
@@ -1369,41 +1411,83 @@ export function resolveProductOptionsState(
     product_hybrid_enabled?: boolean;
   } | null
 ): ProductOptionsState {
-  const enabled = !!features.product_options_enabled;
-  const disabled = !!features.product_options_disabled;
-  const flexible = !!features.product_options_flexible;
-  // Creation group gates
-  const creationGroupEnabled = !!features.product_options_creation_enabled || flexible;
-  const variant = !!features.product_options_creation_variants;
-  const gallery = !!features.product_options_creation_gallery;
-  const video = !!features.product_options_creation_video;
+  const masterEnabled = !!features.product_options_enabled;
+  const masterDisabled = !!features.product_options_disabled;
+  const isFlexible = !!features.product_options_flexible;
 
-  // Product page layout feature gates
+  const enabled = masterDisabled
+    ? false
+    : masterEnabled
+      ? true
+      : isFlexible
+        ? true
+        : hasAnyProductOptionsFeature(features);
+
+  // Creation group gates
+  const creationGroupOn = !!features.product_options_creation_on || !!features.product_options_creation_enabled;
+  const creationGroupOff = !!features.product_options_creation_off || !!features.product_options_creation_disabled;
+
+  const showsVariants = isFlexible || creationGroupOn || !!features.product_options_creation_variants;
+  const showsGallery = isFlexible || creationGroupOn || !!features.product_options_creation_gallery;
+  const showsVideo = isFlexible || creationGroupOn || !!features.product_options_creation_video;
+  const showsSupplierCatalog = isFlexible || creationGroupOn || !!features.product_options_creation_supplier_catalog;
+
+  const creationEnabled = !creationGroupOff && (showsVariants || showsGallery || showsVideo || showsSupplierCatalog);
+
+  // Product page layout group gates
+  const layoutGroupOn = !!features.product_options_layout_on || !!features.product_options_layout_enabled;
+  const layoutGroupOff = !!features.product_options_layout_off || !!features.product_options_layout_disabled;
+
   const layoutClassic = !!features.product_options_layout_classic;
   const layoutEditorial = !!features.product_options_layout_editorial;
   const layoutImmersive = !!features.product_options_layout_immersive;
 
+  const layoutEnabled = !layoutGroupOff && (isFlexible || layoutGroupOn);
+
   const allowedLayouts: ProductLayoutType[] = [];
-  if (flexible || layoutClassic) allowedLayouts.push('classic');
-  if (flexible || layoutEditorial) allowedLayouts.push('editorial');
-  if (flexible || layoutImmersive) allowedLayouts.push('immersive');
+  if (isFlexible || (layoutEnabled && !layoutGroupOff)) {
+    if (isFlexible || layoutGroupOn) {
+      allowedLayouts.push('classic', 'editorial', 'immersive');
+    } else {
+      if (layoutClassic) allowedLayouts.push('classic');
+      if (layoutEditorial) allowedLayouts.push('editorial');
+      if (layoutImmersive) allowedLayouts.push('immersive');
+    }
+  }
 
   // Sections group gate
-  const sectionsGroupEnabled = !!features.product_options_sections_enabled || flexible;
+  const sectionsGroupOn = !!features.product_options_sections_on || !!features.product_options_sections_enabled;
+  const sectionsGroupOff = !!features.product_options_sections_off || !!features.product_options_sections_disabled;
 
-  // Product page section feature gates
-  const showsRecentlyViewed = sectionsGroupEnabled && (flexible || !!features.product_options_sections_recently_viewed);
-  const showsQRCodes = sectionsGroupEnabled && (flexible || !!features.product_options_sections_qr_codes);
-  const showsQRLogo = sectionsGroupEnabled && (flexible || !!features.product_options_sections_qr_logo);
-  const showsRecommended = sectionsGroupEnabled && (flexible || !!features.product_options_sections_recommended);
-  const showsMapDisplay = sectionsGroupEnabled && (flexible || !!features.product_options_sections_map_display);
-  const showsLocationDisplay = sectionsGroupEnabled && (flexible || !!features.product_options_sections_location_display);
-  const showsHoursDisplay = sectionsGroupEnabled && (flexible || !!features.product_options_sections_hours_display);
-  const showsEnhancedSEO = sectionsGroupEnabled && (flexible || !!features.product_options_sections_enhanced_seo);
-  const showsReviews = sectionsGroupEnabled && (flexible || !!features.product_options_sections_reviews);
-  const showsFulfillment = sectionsGroupEnabled && (flexible || !!features.product_options_sections_fulfillment);
-  const showsCategories = sectionsGroupEnabled && (flexible || !!features.product_options_sections_categories);
-  const showsLocationAvailability = sectionsGroupEnabled && (flexible || !!features.product_options_sections_location_availability);
+  const hasAnySectionFeature = !!(
+    features.product_options_sections_recently_viewed ||
+    features.product_options_sections_qr_codes ||
+    features.product_options_sections_qr_logo ||
+    features.product_options_sections_recommended ||
+    features.product_options_sections_map_display ||
+    features.product_options_sections_location_display ||
+    features.product_options_sections_hours_display ||
+    features.product_options_sections_enhanced_seo ||
+    features.product_options_sections_reviews ||
+    features.product_options_sections_fulfillment ||
+    features.product_options_sections_categories ||
+    features.product_options_sections_location_availability
+  );
+
+  const sectionsEnabled = !sectionsGroupOff && (isFlexible || sectionsGroupOn || hasAnySectionFeature);
+
+  const showsRecentlyViewed = isFlexible || sectionsGroupOn || !!features.product_options_sections_recently_viewed;
+  const showsQRCodes = isFlexible || sectionsGroupOn || !!features.product_options_sections_qr_codes;
+  const showsQRLogo = isFlexible || sectionsGroupOn || !!features.product_options_sections_qr_logo;
+  const showsRecommended = isFlexible || sectionsGroupOn || !!features.product_options_sections_recommended;
+  const showsMapDisplay = isFlexible || sectionsGroupOn || !!features.product_options_sections_map_display;
+  const showsLocationDisplay = isFlexible || sectionsGroupOn || !!features.product_options_sections_location_display;
+  const showsHoursDisplay = isFlexible || sectionsGroupOn || !!features.product_options_sections_hours_display;
+  const showsEnhancedSEO = isFlexible || sectionsGroupOn || !!features.product_options_sections_enhanced_seo;
+  const showsReviews = isFlexible || sectionsGroupOn || !!features.product_options_sections_reviews;
+  const showsFulfillment = isFlexible || sectionsGroupOn || !!features.product_options_sections_fulfillment;
+  const showsCategories = isFlexible || sectionsGroupOn || !!features.product_options_sections_categories;
+  const showsLocationAvailability = isFlexible || sectionsGroupOn || !!features.product_options_sections_location_availability;
 
   // Merchant preferences (soft toggle, defaults to true if not set)
   const prefs = {
@@ -1430,14 +1514,13 @@ export function resolveProductOptionsState(
   };
 
   // Effective variant/gallery/video = tier allows AND merchant enabled
-  const effectiveShowsVariants = (flexible || variant) && prefs.product_variant_enabled;
-  const effectiveShowsGallery = (flexible || gallery) && prefs.product_gallery_enabled;
-  const effectiveShowsVideo = (flexible || video) && prefs.product_video_enabled;
-  const showsSupplierCatalog = creationGroupEnabled && (flexible || !!features.product_options_creation_supplier_catalog);
+  const effectiveShowsVariants = showsVariants && prefs.product_variant_enabled;
+  const effectiveShowsGallery = showsGallery && prefs.product_gallery_enabled;
+  const effectiveShowsVideo = showsVideo && prefs.product_video_enabled;
 
   // Effective layout = tier allows AND merchant preference
-  const effectiveLayout = allowedLayouts.includes(prefs.product_layout)
-    ? prefs.product_layout
+  const effectiveLayout = allowedLayouts.includes(prefs.product_layout as ProductLayoutType)
+    ? prefs.product_layout as ProductLayoutType
     : (allowedLayouts[0] || 'classic');
 
   // Effective product page section gates = tier allows AND merchant enabled
@@ -1455,20 +1538,20 @@ export function resolveProductOptionsState(
   const effectiveShowsLocationAvailability = showsLocationAvailability && prefs.product_opt_location_availability;
 
   return {
-    enabled: enabled && !disabled,
-    creationEnabled: creationGroupEnabled,
-    showsVariants: creationGroupEnabled && (flexible || variant),
-    showsGallery: creationGroupEnabled && (flexible || gallery),
-    showsVideo: creationGroupEnabled && (flexible || video),
+    enabled,
+    creationEnabled,
+    showsVariants,
+    showsGallery,
+    showsVideo,
     effectiveShowsVariants,
     effectiveShowsGallery,
     effectiveShowsVideo,
-    layoutEnabled: allowedLayouts.length > 0,
+    layoutEnabled,
     allowedLayouts,
     effectiveLayout,
-    canUseLayoutClassic: flexible || layoutClassic,
-    canUseLayoutEditorial: flexible || layoutEditorial,
-    canUseLayoutImmersive: flexible || layoutImmersive,
+    canUseLayoutClassic: allowedLayouts.includes('classic'),
+    canUseLayoutEditorial: allowedLayouts.includes('editorial'),
+    canUseLayoutImmersive: allowedLayouts.includes('immersive'),
     showsRecentlyViewed,
     showsQRCodes,
     showsQRLogo,
@@ -1481,7 +1564,7 @@ export function resolveProductOptionsState(
     showsFulfillment,
     showsCategories,
     showsLocationAvailability,
-    sectionsEnabled: sectionsGroupEnabled,
+    sectionsEnabled,
     effectiveShowsRecentlyViewed,
     effectiveShowsQRCodes,
     effectiveShowsQRLogo,
@@ -1497,7 +1580,7 @@ export function resolveProductOptionsState(
     showsSupplierCatalog,
     effectiveShowsSupplierCatalog: showsSupplierCatalog && prefs.product_opt_supplier_catalog,
     merchantPreferences: prefs,
-    isFlexible: flexible,
+    isFlexible,
     features,
   };
 }
@@ -1526,10 +1609,10 @@ export function resolveFeaturedOptionsState(
   const enabled = !!features.featured_enabled;
   const disabled = !!features.featured_disabled;
   const flexible = !!features.featured_flexible;
-  const tenantGroupEnabled = !!features.featured_tenant_enabled;
-  const tenantGroupDisabled = !!features.featured_tenant_disabled;
-  const platformGroupEnabled = !!features.featured_platform_enabled;
-  const platformGroupDisabled = !!features.featured_platform_disabled;
+  const tenantGroupEnabled = !!features.featured_tenant_on || !!features.featured_tenant_enabled;
+  const tenantGroupDisabled = !!features.featured_tenant_off || !!features.featured_tenant_disabled;
+  const platformGroupEnabled = !!features.featured_platform_on || !!features.featured_platform_enabled;
+  const platformGroupDisabled = !!features.featured_platform_off || !!features.featured_platform_disabled;
 
   // Fail-open: when no tier config exists at all, allow all types.
   // This matches the SQL gate behavior in tier-capability-sql.ts.
@@ -1656,10 +1739,10 @@ export function resolveIntegrationState(
   const enabled = capabilityEnabled ?? !!features.integration_enabled;
   const disabled = !!features.integration_disabled;
   const flexible = !!features.integration_flexible;
-  const posGroupEnabled = !!features.integration_pos_enabled;
-  const posGroupDisabled = !!features.integration_pos_disabled;
-  const googleGroupEnabled = !!features.integration_google_enabled;
-  const googleGroupDisabled = !!features.integration_google_disabled;
+  const posGroupEnabled = !!features.integration_pos_on || !!features.integration_pos_enabled;
+  const posGroupDisabled = !!features.integration_pos_off || !!features.integration_pos_disabled;
+  const googleGroupEnabled = !!features.integration_google_on || !!features.integration_google_enabled;
+  const googleGroupDisabled = !!features.integration_google_off || !!features.integration_google_disabled;
 
   // Three states per group: enabled → all types, untouched → individual features, disabled → none
   const posEnabled = posGroupEnabled && !posGroupDisabled;
@@ -1784,8 +1867,8 @@ export function resolveQuickstartOptionsState(
 
   // --- Product feature gate ---
   // Gates: wizard (static product wizard), image_gen (attach image to product)
-  const productGroupEnabled = !!features.quickstart_product_enabled;
-  const productGroupDisabled = !!features.quickstart_product_disabled;
+  const productGroupEnabled = !!features.quickstart_product_on || !!features.quickstart_product_enabled;
+  const productGroupDisabled = !!features.quickstart_product_off || !!features.quickstart_product_disabled;
   const productEnabled = productGroupEnabled && !productGroupDisabled;
   const productUntouched = !productGroupEnabled && !productGroupDisabled;
 
@@ -1799,8 +1882,8 @@ export function resolveQuickstartOptionsState(
 
   // --- Category feature gate ---
   // Gates: category_generator
-  const categoryGroupEnabled = !!features.quickstart_category_enabled;
-  const categoryGroupDisabled = !!features.quickstart_category_disabled;
+  const categoryGroupEnabled = !!features.quickstart_category_on || !!features.quickstart_category_enabled;
+  const categoryGroupDisabled = !!features.quickstart_category_off || !!features.quickstart_category_disabled;
   const categoryEnabled = categoryGroupEnabled && !categoryGroupDisabled;
   const categoryUntouched = !categoryGroupEnabled && !categoryGroupDisabled;
 
@@ -1813,8 +1896,8 @@ export function resolveQuickstartOptionsState(
 
   // --- AI feature gate ---
   // Gates: ai_openai, ai_gemini, wizard_ai (AI wizard), image_hd (HD quality)
-  const aiGroupEnabled = !!features.quickstart_ai_enabled;
-  const aiGroupDisabled = !!features.quickstart_ai_disabled;
+  const aiGroupEnabled = !!features.quickstart_ai_on || !!features.quickstart_ai_enabled;
+  const aiGroupDisabled = !!features.quickstart_ai_off || !!features.quickstart_ai_disabled;
   const aiGroupOn = aiGroupEnabled && !aiGroupDisabled;
   const aiUntouched = !aiGroupEnabled && !aiGroupDisabled;
 
@@ -1953,7 +2036,7 @@ export function resolveStorefrontOptionsState(
   } else if (features.storefront_opt_hours_animated || features.storefront_opt_hours_status) {
     if (features.storefront_opt_hours_animated) allowedHoursTypes.push('hours_animated');
     if (features.storefront_opt_hours_status) allowedHoursTypes.push('hours_status');
-  } else if (features.storefront_opt_hours_enabled && !features.storefront_opt_hours_disabled) {
+  } else if ((features.storefront_opt_hours_on || features.storefront_opt_hours_enabled) && !(features.storefront_opt_hours_off || features.storefront_opt_hours_disabled)) {
     allowedHoursTypes.push('hours_animated', 'hours_status');
   }
 
@@ -1964,7 +2047,7 @@ export function resolveStorefrontOptionsState(
   } else if (features.storefront_opt_category_store || features.storefront_opt_category_product) {
     if (features.storefront_opt_category_store) allowedCategoryTypes.push('category_store');
     if (features.storefront_opt_category_product) allowedCategoryTypes.push('category_product');
-  } else if (features.storefront_opt_category_enabled && !features.storefront_opt_category_disabled) {
+  } else if ((features.storefront_opt_category_on || features.storefront_opt_category_enabled) && !(features.storefront_opt_category_off || features.storefront_opt_category_disabled)) {
     allowedCategoryTypes.push('category_store', 'category_product');
   }
 
@@ -1975,13 +2058,13 @@ export function resolveStorefrontOptionsState(
   } else if (features.storefront_opt_recommend_store || features.storefront_opt_recommend_products) {
     if (features.storefront_opt_recommend_store) allowedRecommendTypes.push('recommend_store');
     if (features.storefront_opt_recommend_products) allowedRecommendTypes.push('recommend_products');
-  } else if (features.storefront_opt_recommend_enabled && !features.storefront_opt_recommend_disabled) {
+  } else if ((features.storefront_opt_recommend_on || features.storefront_opt_recommend_enabled) && !(features.storefront_opt_recommend_off || features.storefront_opt_recommend_disabled)) {
     allowedRecommendTypes.push('recommend_store', 'recommend_products');
   }
 
   // --- Section Display (standalone, no group gate) ---
   const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
-  const infoTierAllowed = flexible || !!features.storefront_opt_info || !!features.storefront_opt_info_enabled
+  const infoTierAllowed = flexible || !!features.storefront_opt_info || !!features.storefront_opt_info_on || !!features.storefront_opt_info_enabled
     || !!features.storefront_opt_storefront_social_media || !!features.storefront_opt_storefront_contact
     || !!features.storefront_opt_interactive_maps || !!features.storefront_opt_map_display || !!features.storefront_opt_location_display;
 
@@ -1990,9 +2073,9 @@ export function resolveStorefrontOptionsState(
 
   // --- Info: consolidated key (new) with fallback to old group gate + individual keys ---
   const allowedInfoTypes: StorefrontOptInfoType[] = [];
-  if (flexible || features.storefront_opt_info) {
+  if (flexible || features.storefront_opt_info || features.storefront_opt_info_on) {
     allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
-  } else if (features.storefront_opt_info_enabled && !features.storefront_opt_info_disabled) {
+  } else if ((features.storefront_opt_info_on || features.storefront_opt_info_enabled) && !(features.storefront_opt_info_off || features.storefront_opt_info_disabled)) {
     allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
   } else {
     if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
@@ -2001,7 +2084,7 @@ export function resolveStorefrontOptionsState(
   }
 
   // --- QR: new consolidated keys (qr, qr_resolution, qr_content) with fallback to old keys ---
-  const qrGroupOn = flexible || !!features.storefront_opt_qr
+  const qrGroupOn = flexible || !!features.storefront_opt_qr || !!features.storefront_opt_qr_on
     || (!!features.storefront_opt_qr_enabled && !features.storefront_opt_qr_disabled);
   const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
   const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
@@ -2028,9 +2111,9 @@ export function resolveStorefrontOptionsState(
 
   // --- Gallery: new consolidated key with fallback to old group gate + individual keys ---
   const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
-  if (flexible || features.storefront_opt_gallery) {
+  if (flexible || features.storefront_opt_gallery || features.storefront_opt_gallery_on) {
     allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
-  } else if (features.storefront_opt_gallery_enabled && !features.storefront_opt_gallery_disabled) {
+  } else if ((features.storefront_opt_gallery_on || features.storefront_opt_gallery_enabled) && !(features.storefront_opt_gallery_off || features.storefront_opt_gallery_disabled)) {
     allowedGalleryTypes.push('image_gallery_5', 'image_gallery_10', 'image_gallery_15');
   } else {
     if (features.storefront_opt_image_gallery_5) allowedGalleryTypes.push('image_gallery_5');
@@ -2045,15 +2128,15 @@ export function resolveStorefrontOptionsState(
   } else if (features.storefront_opt_enhanced_seo || features.storefront_opt_storefront_actions) {
     if (features.storefront_opt_enhanced_seo) allowedAdvancedTypes.push('enhanced_seo');
     if (features.storefront_opt_storefront_actions) allowedAdvancedTypes.push('storefront_actions');
-  } else if (features.storefront_opt_advanced_enabled && !features.storefront_opt_advanced_disabled) {
+  } else if ((features.storefront_opt_advanced_on || features.storefront_opt_advanced_enabled) && !(features.storefront_opt_advanced_off || features.storefront_opt_advanced_disabled)) {
     allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
   }
 
   // --- Layout: new consolidated key with fallback to old group gate + individual keys ---
   const allowedLayouts: StorefrontOptLayoutType[] = [];
-  if (flexible || features.storefront_opt_layout) {
+  if (flexible || features.storefront_opt_layout || features.storefront_opt_layout_on) {
     allowedLayouts.push('classic', 'editorial', 'immersive');
-  } else if (features.storefront_opt_layout_enabled && !features.storefront_opt_layout_disabled) {
+  } else if ((features.storefront_opt_layout_on || features.storefront_opt_layout_enabled) && !(features.storefront_opt_layout_off || features.storefront_opt_layout_disabled)) {
     allowedLayouts.push('classic', 'editorial', 'immersive');
   } else {
     if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
@@ -2262,25 +2345,25 @@ export function resolveFaqOptionsState(
   const flexible = !!features.faq_flexible;
 
   // Scope group gates (storefront, product, templates)
-  const storefrontGroupEnabled = !!features.faq_storefront_enabled;
-  const storefrontGroupDisabled = !!features.faq_storefront_disabled;
-  const productGroupEnabled = !!features.faq_product_enabled;
-  const productGroupDisabled = !!features.faq_product_disabled;
-  const templatesGroupEnabled = !!features.faq_templates_enabled;
-  const templatesGroupDisabled = !!features.faq_templates_disabled;
+  const storefrontGroupEnabled = !!features.faq_storefront_on || !!features.faq_storefront_enabled;
+  const storefrontGroupDisabled = !!features.faq_storefront_off || !!features.faq_storefront_disabled;
+  const productGroupEnabled = !!features.faq_product_on || !!features.faq_product_enabled;
+  const productGroupDisabled = !!features.faq_product_off || !!features.faq_product_disabled;
+  const templatesGroupEnabled = !!features.faq_templates_on || !!features.faq_templates_enabled;
+  const templatesGroupDisabled = !!features.faq_templates_off || !!features.faq_templates_disabled;
 
   const storefrontEnabled = flexible || (storefrontGroupEnabled && !storefrontGroupDisabled);
   const productEnabled = flexible || (productGroupEnabled && !productGroupDisabled);
   const templatesEnabled = flexible || (templatesGroupEnabled && !templatesGroupDisabled);
 
-  const managementGroupEnabled = !!features.faq_management_enabled;
-  const managementGroupDisabled = !!features.faq_management_disabled;
-  const previewGroupEnabled = !!features.faq_preview_enabled;
-  const previewGroupDisabled = !!features.faq_preview_disabled;
-  const displayGroupEnabled = !!features.faq_display_enabled;
-  const displayGroupDisabled = !!features.faq_display_disabled;
-  const kbGroupEnabled = !!features.faq_kb_enabled;
-  const kbGroupDisabled = !!features.faq_kb_disabled;
+  const managementGroupEnabled = !!features.faq_management_on || !!features.faq_management_enabled;
+  const managementGroupDisabled = !!features.faq_management_off || !!features.faq_management_disabled;
+  const previewGroupEnabled = !!features.faq_preview_on || !!features.faq_preview_enabled;
+  const previewGroupDisabled = !!features.faq_preview_off || !!features.faq_preview_disabled;
+  const displayGroupEnabled = !!features.faq_display_on || !!features.faq_display_enabled;
+  const displayGroupDisabled = !!features.faq_display_off || !!features.faq_display_disabled;
+  const kbGroupEnabled = !!features.faq_kb_on || !!features.faq_kb_enabled;
+  const kbGroupDisabled = !!features.faq_kb_off || !!features.faq_kb_disabled;
 
   const managementEnabled = managementGroupEnabled && !managementGroupDisabled;
   const managementUntouched = !managementGroupEnabled && !managementGroupDisabled;
@@ -2377,9 +2460,9 @@ export function resolveCrmOptionsState(
   const disabled = !!feat.crm_disabled;
   const flexible = !!feat.crm_flexible;
 
-  const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_enabled;
-  const inquiryStorefrontEnabled = flexible || !!feat.crm_inquiry_storefront_enabled;
-  const inquiryDirectoryEnabled = flexible || !!feat.crm_inquiry_directory_enabled;
+  const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_on || !!feat.crm_inquiry_product_enabled;
+  const inquiryStorefrontEnabled = flexible || !!feat.crm_inquiry_storefront_on || !!feat.crm_inquiry_storefront_enabled;
+  const inquiryDirectoryEnabled = flexible || !!feat.crm_inquiry_directory_on || !!feat.crm_inquiry_directory_enabled;
 
   const contactsEnabled = flexible || !!feat.crm_contact_management;
   const ticketFeaturesEnabled = flexible || (!!feat.crm_ticket_priority || !!feat.crm_ticket_assignment || !!feat.crm_ticket_templates || !!feat.crm_ticket_escalation);
@@ -2391,9 +2474,9 @@ export function resolveCrmOptionsState(
   if (flexible) {
     allInquiry.push('crm_inquiry_product_enabled', 'crm_inquiry_storefront_enabled', 'crm_inquiry_directory_enabled', 'crm_inquiry_anonymous', 'crm_inquiry_customer', 'crm_inquiry_assignment', 'crm_inquiry_auto_response');
   } else {
-    if (feat.crm_inquiry_product_enabled) allInquiry.push('crm_inquiry_product_enabled');
-    if (feat.crm_inquiry_storefront_enabled) allInquiry.push('crm_inquiry_storefront_enabled');
-    if (feat.crm_inquiry_directory_enabled) allInquiry.push('crm_inquiry_directory_enabled');
+    if (feat.crm_inquiry_product_on || feat.crm_inquiry_product_enabled) allInquiry.push('crm_inquiry_product_enabled');
+    if (feat.crm_inquiry_storefront_on || feat.crm_inquiry_storefront_enabled) allInquiry.push('crm_inquiry_storefront_enabled');
+    if (feat.crm_inquiry_directory_on || feat.crm_inquiry_directory_enabled) allInquiry.push('crm_inquiry_directory_enabled');
     if (feat.crm_inquiry_anonymous) allInquiry.push('crm_inquiry_anonymous');
     if (feat.crm_inquiry_customer) allInquiry.push('crm_inquiry_customer');
     if (feat.crm_inquiry_assignment) allInquiry.push('crm_inquiry_assignment');

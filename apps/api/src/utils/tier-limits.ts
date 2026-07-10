@@ -20,6 +20,7 @@ function getBaseTierForTrial(tier: string): SubscriptionTier {
     'trial_commitment': 'commitment',
     'trial_ecommerce': 'ecommerce',
     'trial_omnichannel': 'omnichannel',
+    'trial_organization': 'organization',
     'trial_starter': 'starter',
     'trial_professional': 'professional',
     'trial_chain_starter': 'starter', // Use starter as base for chain trial

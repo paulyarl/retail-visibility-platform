@@ -15,8 +15,11 @@ export interface BsaasCatalogEntry {
   price_cents: number;
   billing_cycle: string;
   trial_days: number;
+  trial_eligible: boolean;
+  demo_eligible: boolean;
   is_active: boolean;
   sort_order: number;
+  is_private: boolean;
   capability_types?: string[];
   created_at: string;
   updated_at: string;
@@ -29,8 +32,11 @@ export interface BsaasCatalogInput {
   price_cents: number;
   billing_cycle?: string;
   trial_days?: number;
+  trial_eligible?: boolean;
+  demo_eligible?: boolean;
   is_active?: boolean;
   sort_order?: number;
+  is_private?: boolean;
 }
 
 class AdminBsaasCatalogService extends AdminApiSingleton {

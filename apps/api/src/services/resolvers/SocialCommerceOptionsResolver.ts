@@ -28,26 +28,26 @@ export function resolveSocialCommerceOptions(
   const flexible = !!feat.social_commerce_flexible;
 
   // Meta Commerce group
-  const metaGroupEnabled = flexible || !!feat.social_commerce_meta_enabled;
+  const metaGroupOn = flexible || !!feat.social_commerce_meta_on || !!feat.social_commerce_meta_enabled;
 
   const allowedMeta: SocialCommerceMetaType[] = [];
-  if (flexible || metaGroupEnabled) {
-    if (flexible || feat.social_commerce_meta_catalog) allowedMeta.push('social_commerce_meta_catalog');
-    if (flexible || feat.social_commerce_meta_shop) allowedMeta.push('social_commerce_meta_shop');
-    if (flexible || feat.social_commerce_meta_pixel) allowedMeta.push('social_commerce_meta_pixel');
+  if (flexible || metaGroupOn) {
+    if (flexible || metaGroupOn || feat.social_commerce_meta_catalog) allowedMeta.push('social_commerce_meta_catalog');
+    if (flexible || metaGroupOn || feat.social_commerce_meta_shop) allowedMeta.push('social_commerce_meta_shop');
+    if (flexible || metaGroupOn || feat.social_commerce_meta_pixel) allowedMeta.push('social_commerce_meta_pixel');
     if (flexible && allowedMeta.length === 0) {
       allowedMeta.push('social_commerce_meta_catalog', 'social_commerce_meta_shop', 'social_commerce_meta_pixel');
     }
   }
 
   // TikTok Commerce group
-  const tiktokGroupEnabled = flexible || !!feat.social_commerce_tiktok_enabled;
+  const tiktokGroupOn = flexible || !!feat.social_commerce_tiktok_on || !!feat.social_commerce_tiktok_enabled;
 
   const allowedTikTok: SocialCommerceTikTokType[] = [];
-  if (flexible || tiktokGroupEnabled) {
-    if (flexible || feat.social_commerce_tiktok_catalog) allowedTikTok.push('social_commerce_tiktok_catalog');
-    if (flexible || feat.social_commerce_tiktok_shop) allowedTikTok.push('social_commerce_tiktok_shop');
-    if (flexible || feat.social_commerce_tiktok_pixel) allowedTikTok.push('social_commerce_tiktok_pixel');
+  if (flexible || tiktokGroupOn) {
+    if (flexible || tiktokGroupOn || feat.social_commerce_tiktok_catalog) allowedTikTok.push('social_commerce_tiktok_catalog');
+    if (flexible || tiktokGroupOn || feat.social_commerce_tiktok_shop) allowedTikTok.push('social_commerce_tiktok_shop');
+    if (flexible || tiktokGroupOn || feat.social_commerce_tiktok_pixel) allowedTikTok.push('social_commerce_tiktok_pixel');
     if (flexible && allowedTikTok.length === 0) {
       allowedTikTok.push('social_commerce_tiktok_catalog', 'social_commerce_tiktok_shop', 'social_commerce_tiktok_pixel');
     }
@@ -71,11 +71,13 @@ export function resolveSocialCommerceOptions(
   // Merchant preferences (soft toggles, default to false for opt-in features)
   const prefs = {
     social_commerce_enabled: merchantSettings?.social_commerce_enabled !== false,
-    social_commerce_meta_enabled: !!merchantSettings?.social_commerce_meta_enabled,
+    social_commerce_meta_on: merchantSettings?.social_commerce_meta_on !== false || !!merchantSettings?.social_commerce_meta_enabled,
+    social_commerce_meta_enabled: merchantSettings?.social_commerce_meta_on !== false || !!merchantSettings?.social_commerce_meta_enabled,
     social_commerce_meta_catalog: !!merchantSettings?.social_commerce_meta_catalog,
     social_commerce_meta_shop: !!merchantSettings?.social_commerce_meta_shop,
     social_commerce_meta_pixel: !!merchantSettings?.social_commerce_meta_pixel,
-    social_commerce_tiktok_enabled: !!merchantSettings?.social_commerce_tiktok_enabled,
+    social_commerce_tiktok_on: merchantSettings?.social_commerce_tiktok_on !== false || !!merchantSettings?.social_commerce_tiktok_enabled,
+    social_commerce_tiktok_enabled: merchantSettings?.social_commerce_tiktok_on !== false || !!merchantSettings?.social_commerce_tiktok_enabled,
     social_commerce_tiktok_catalog: !!merchantSettings?.social_commerce_tiktok_catalog,
     social_commerce_tiktok_shop: !!merchantSettings?.social_commerce_tiktok_shop,
     social_commerce_tiktok_pixel: !!merchantSettings?.social_commerce_tiktok_pixel,
@@ -96,9 +98,9 @@ export function resolveSocialCommerceOptions(
   return {
     enabled: mainOn,
     is_flexible: flexible,
-    meta_enabled: mainOn && metaGroupEnabled && prefs.social_commerce_meta_enabled,
+    meta_enabled: mainOn && metaGroupOn && prefs.social_commerce_meta_on,
     allowed_meta_types: allowedMeta,
-    tiktok_enabled: mainOn && tiktokGroupEnabled && prefs.social_commerce_tiktok_enabled,
+    tiktok_enabled: mainOn && tiktokGroupOn && prefs.social_commerce_tiktok_on,
     allowed_tiktok_types: allowedTikTok,
     experience_enabled: mainOn && experienceGroupEnabled,
     allowed_experience_types: allowedExperience,

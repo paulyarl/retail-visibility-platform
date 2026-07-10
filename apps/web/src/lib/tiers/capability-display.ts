@@ -7,7 +7,7 @@ const EXTRA_FEATURES_BY_CAPABILITY: Record<string, string[]> = {
   directory_promotion: ['directory_promotion_level_basic', 'directory_promotion_level_premium', 'directory_promotion_level_featured'],
 };
 
-export const COMPARISON_TIERS = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise'];
+export const COMPARISON_TIERS = ['discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise'];
 
 export const CAPABILITY_GROUPS = [
   'Clover & Inventory',

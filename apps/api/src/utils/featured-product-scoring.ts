@@ -153,6 +153,7 @@ function calculateEngagementScore(metrics: StoreQualityMetrics): number {
   // Subscription tier (0-7 pts)
   switch (metrics.subscriptionTier?.toLowerCase()) {
     case 'enterprise':
+    case 'organization':
       score += 7;
       break;
     case 'omnichannel':
@@ -215,7 +216,7 @@ export const FEATURED_PRODUCTS_WITH_SCORING_QUERY = `
       
       -- Engagement (10 pts max)
       (CASE 
-        WHEN subscription_tier = 'enterprise' THEN 7
+        WHEN subscription_tier IN ('enterprise', 'organization') THEN 7
         WHEN subscription_tier = 'omnichannel' THEN 6
         WHEN subscription_tier = 'professional' THEN 5
         WHEN subscription_tier = 'ecommerce' THEN 4

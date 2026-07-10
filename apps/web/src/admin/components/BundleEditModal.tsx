@@ -34,6 +34,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingBundle: BsaasBundleEntry | null;
+  cloningFrom?: BsaasBundleEntry | null;
   availableFeatures: AvailableFeature[];
   onSave: (input: BsaasBundleInput) => Promise<void>;
   saving: boolean;
@@ -43,6 +44,7 @@ export default function BundleEditModal({
   open,
   onOpenChange,
   editingBundle,
+  cloningFrom,
   availableFeatures,
   onSave,
   saving,
@@ -54,6 +56,9 @@ export default function BundleEditModal({
     price_cents: 0,
     billing_cycle: 'monthly',
     trial_days: 0,
+    trial_eligible: false,
+    demo_eligible: true,
+    is_private: false,
     is_active: true,
     sort_order: 200,
     items: [],
@@ -70,9 +75,30 @@ export default function BundleEditModal({
         price_cents: editingBundle.price_cents,
         billing_cycle: editingBundle.billing_cycle,
         trial_days: editingBundle.trial_days,
+        trial_eligible: editingBundle.trial_eligible,
+        demo_eligible: editingBundle.demo_eligible,
+        is_private: editingBundle.is_private,
         is_active: editingBundle.is_active,
         sort_order: editingBundle.sort_order,
         items: editingBundle.bsaas_bundle_items.map(item => ({
+          feature_key: item.feature_key,
+          sort_order: item.sort_order,
+        })),
+      });
+    } else if (cloningFrom) {
+      setFormData({
+        bundle_key: cloningFrom.bundle_key,
+        marketing_name: cloningFrom.marketing_name,
+        description: cloningFrom.description || '',
+        price_cents: cloningFrom.price_cents,
+        billing_cycle: cloningFrom.billing_cycle,
+        trial_days: cloningFrom.trial_days,
+        trial_eligible: cloningFrom.trial_eligible,
+        demo_eligible: cloningFrom.demo_eligible,
+        is_private: cloningFrom.is_private,
+        is_active: cloningFrom.is_active,
+        sort_order: cloningFrom.sort_order,
+        items: cloningFrom.bsaas_bundle_items.map(item => ({
           feature_key: item.feature_key,
           sort_order: item.sort_order,
         })),
@@ -85,6 +111,9 @@ export default function BundleEditModal({
         price_cents: 0,
         billing_cycle: 'monthly',
         trial_days: 0,
+        trial_eligible: false,
+        demo_eligible: true,
+        is_private: false,
         is_active: true,
         sort_order: 200,
         items: [],
@@ -92,7 +121,7 @@ export default function BundleEditModal({
     }
     setSearchQuery('');
     setShowFeaturePicker(false);
-  }, [editingBundle, open]);
+  }, [editingBundle, cloningFrom, open]);
 
   const selectedItemKeys = useMemo(
     () => new Set(formData.items.map(i => i.feature_key)),
@@ -151,11 +180,13 @@ export default function BundleEditModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingBundle ? 'Edit Bundle' : 'Create Bundle'}</DialogTitle>
+          <DialogTitle>{editingBundle ? 'Edit Bundle' : cloningFrom ? 'Clone Bundle' : 'Create Bundle'}</DialogTitle>
           <DialogDescription>
             {editingBundle
               ? 'Update the bundle definition. Bundle key cannot be changed after creation.'
-              : 'Create a new cross-domain feature bundle. All component feature keys must exist in features_list.'}
+              : cloningFrom
+                ? 'Clone this bundle with a new unique bundle key. Adjust the key, name, price, and components as needed.'
+                : 'Create a new cross-domain feature bundle. All component feature keys must exist in features_list.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -246,6 +277,68 @@ export default function BundleEditModal({
                 onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
               />
               <label className="text-sm">Active (visible in Feature Store)</label>
+            </div>
+          </div>
+
+          {/* Eligibility Toggles */}
+          <div className="border border-neutral-200 rounded-lg p-4 space-y-3">
+            <label className="text-sm font-medium block">Eligibility Settings</label>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Trial Eligible</p>
+                <p className="text-xs text-neutral-400">Allow merchants to start a free trial (requires trial days &gt; 0)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, trial_eligible: true })}
+                  className={`px-3 py-1 text-xs rounded-md border ${formData.trial_eligible ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                >Yes</button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, trial_eligible: false })}
+                  className={`px-3 py-1 text-xs rounded-md border ${!formData.trial_eligible ? 'bg-neutral-200 text-neutral-700 border-neutral-300' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                >No</button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Demo Eligible</p>
+                <p className="text-xs text-neutral-400">Allow demo tenants to purchase this bundle</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, demo_eligible: true })}
+                  className={`px-3 py-1 text-xs rounded-md border ${formData.demo_eligible ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                >Yes</button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, demo_eligible: false })}
+                  className={`px-3 py-1 text-xs rounded-md border ${!formData.demo_eligible ? 'bg-neutral-200 text-neutral-700 border-neutral-300' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                >No</button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Private</p>
+                <p className="text-xs text-neutral-400">Hide from the Feature Store (admin-assigned only)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, is_private: true })}
+                  className={`px-3 py-1 text-xs rounded-md border ${formData.is_private ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                >Yes</button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, is_private: false })}
+                  className={`px-3 py-1 text-xs rounded-md border ${!formData.is_private ? 'bg-neutral-200 text-neutral-700 border-neutral-300' : 'bg-white text-neutral-600 border-neutral-200'}`}
+                >No</button>
+              </div>
             </div>
           </div>
 
@@ -368,7 +461,7 @@ export default function BundleEditModal({
             onClick={handleSave}
             disabled={saving || !formData.bundle_key || !formData.marketing_name || formData.price_cents <= 0 || formData.items.length === 0}
           >
-            {saving ? 'Saving...' : editingBundle ? 'Update' : 'Create'}
+            {saving ? 'Saving...' : editingBundle ? 'Update' : cloningFrom ? 'Clone' : 'Create'}
           </Button>
         </DialogFooter>
       </DialogContent>

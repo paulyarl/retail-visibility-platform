@@ -31,17 +31,17 @@ export function resolveFaqOptions(
   const enabled = !disabled && !!features.faq_enabled && (merchantPrefs?.faq_enabled !== false);
   const flexible = !!features.faq_flexible;
 
-  const storefrontEnabled = flexible || !!features.faq_storefront_enabled;
-  const productEnabled = flexible || !!features.faq_product_enabled;
-  const templatesEnabled = flexible || !!features.faq_templates_enabled;
+  const storefrontEnabled = flexible || !!features.faq_storefront_on || !!features.faq_storefront_enabled;
+  const productEnabled = flexible || !!features.faq_product_on || !!features.faq_product_enabled;
+  const templatesEnabled = flexible || !!features.faq_templates_on || !!features.faq_templates_enabled;
 
-  const managementGroupEnabled = !!features.faq_management_enabled;
-  const previewGroupEnabled = !!features.faq_preview_enabled;
-  const displayGroupEnabled = !!features.faq_display_enabled;
-  const kbGroupEnabled = !!features.faq_kb_enabled;
+  const managementGroupOn = !!features.faq_management_on || !!features.faq_management_enabled;
+  const previewGroupOn = !!features.faq_preview_on || !!features.faq_preview_enabled;
+  const displayGroupOn = !!features.faq_display_on || !!features.faq_display_enabled;
+  const kbGroupOn = !!features.faq_kb_on || !!features.faq_kb_enabled;
 
   const allowedManagementTypes: FaqManagementType[] = [];
-  if (flexible || managementGroupEnabled) {
+  if (flexible || managementGroupOn) {
     allowedManagementTypes.push(
       'faq_management_hub', 'faq_management_templates', 'faq_management_import',
       'faq_management_wizard_inline', 'faq_management_bulk_actions',
@@ -58,7 +58,7 @@ export function resolveFaqOptions(
   }
 
   const allowedPreviewTypes: FaqPreviewType[] = [];
-  if (flexible || previewGroupEnabled) {
+  if (flexible || previewGroupOn) {
     allowedPreviewTypes.push('faq_preview_bot', 'faq_preview_gap_report', 'faq_preview_auto_suggest');
   } else {
     if (features.faq_preview_bot) allowedPreviewTypes.push('faq_preview_bot');
@@ -67,7 +67,7 @@ export function resolveFaqOptions(
   }
 
   const allowedDisplayTypes: FaqDisplayType[] = [];
-  if (flexible || displayGroupEnabled) {
+  if (flexible || displayGroupOn) {
     allowedDisplayTypes.push(
       'faq_display_storefront_accordion', 'faq_display_product_accordion',
       'faq_display_search_overlay', 'faq_display_feedback',
@@ -84,7 +84,7 @@ export function resolveFaqOptions(
   }
 
   const allowedKbTypes: FaqKnowledgeBaseType[] = [];
-  if (flexible || kbGroupEnabled) {
+  if (flexible || kbGroupOn) {
     allowedKbTypes.push(
       'faq_kb_static_lookup', 'faq_kb_rag_retrieval', 'faq_kb_product_scoped',
       'faq_kb_auto_sync', 'faq_kb_coverage_metrics'
@@ -104,10 +104,10 @@ export function resolveFaqOptions(
     storefront_enabled: enabled && storefrontEnabled,
     product_enabled: enabled && productEnabled,
     templates_enabled: enabled && templatesEnabled,
-    management_enabled: enabled && managementGroupEnabled,
-    preview_enabled: enabled && previewGroupEnabled,
-    display_enabled: enabled && displayGroupEnabled,
-    kb_enabled: enabled && kbGroupEnabled,
+    management_enabled: enabled && managementGroupOn,
+    preview_enabled: enabled && previewGroupOn,
+    display_enabled: enabled && displayGroupOn,
+    kb_enabled: enabled && kbGroupOn,
     allowed_management_types: allowedManagementTypes,
     allowed_preview_types: allowedPreviewTypes,
     allowed_display_types: allowedDisplayTypes,

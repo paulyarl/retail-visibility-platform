@@ -60,7 +60,9 @@ pending → active → (grace_period → expired | cancelled)
 Key methods:
 - `getAvailableLevels()` — queries `features_list` for `directory_promotion_level_*` keys, returns available promotion levels (falls back to `['basic', 'premium', 'featured']` if none found)
 - `listPlans(tenantId)` — active plans from catalog
-- `createPurchase(tenantId, planKey)` — creates pending purchase + Stripe payment intent
+- `createPurchase(tenantId, planKey)` — creates pending purchase + Stripe payment intent; validates the tenant has a published `directory_listings_list` row (`is_published = true`), throws `tenant_directory_not_published` if not
+- `renewPurchase(purchaseId, ...)` — creates a new pending purchase for renewal; validates the tenant still has a published `directory_listings_list` row
+- `grantComplimentary(tenantId, planKey, reason)` — admin grant; validates the tenant has a published `directory_listings_list` row
 - `activatePurchase(purchaseId, stripePaymentIntentId?)` — sets active, updates `directory_listings_list`, fires billing notification + bot embedding refresh
 - `deactivatePurchase(purchaseId, reason)` — sets expired/cancelled, clears promotion columns, fires notification + embedding refresh
 - `enterGracePeriod(purchaseId)` — sets grace_period status, fires warning notification
@@ -196,8 +198,8 @@ Each transition fires the appropriate billing notification via `sendBillingNotif
 - `POST /api/tenants/:tenantId/promotion/purchase` — create purchase + Stripe intent
 - `POST /api/tenants/:tenantId/promotion/activate/:purchaseId` — activate after payment
 - `POST /api/tenants/:tenantId/promotion/cancel` — cancel auto-renewal
-- `GET /api/tenants/:tenantId/promotion/status` — current promotion status
-- `GET /api/tenants/:tenantId/promotion/analytics` — impressions, clicks, CTR, daily averages
+- `GET /api/tenants/:tenantId/promotion/status` — current promotion status; returns a default `isPromoted: false` payload with `activePurchase: null` when the tenant has no `directory_listings_list` row (no `404`)
+- `GET /api/tenants/:tenantId/promotion/analytics` — impressions, clicks, CTR, daily averages; returns zeroed metrics when the tenant has no `directory_listings_list` row (no `404`)
 - `POST /api/tenants/:tenantId/promotion/track-impression` — increment + badge event
 - `POST /api/tenants/:tenantId/promotion/track-click` — increment + badge event
 
@@ -333,9 +335,11 @@ Shows current promotion status (tier, status badge, price, dates, auto-renew) an
 
 6. **Analytics is read-only on `directory_listings_list`** — The `promotion_impressions` and `promotion_clicks` columns are incremented via `UPDATE ... SET col = col + 1` in the track endpoints. The analytics endpoint reads them and computes CTR/daily averages in SQL.
 
-7. **Bot knowledge is optional** — If `BotKnowledgeEmbeddingService.refreshPromotionEmbeddings` fails, the bot still works — it just won't have promotion context in its RAG. The fire-and-forget pattern ensures this.
+7. **Directory listing must be published before purchase** — `createPurchase`, `renewPurchase`, and `grantComplimentary` reject with `tenant_directory_not_published` if `directory_listings_list.is_published` is not `true`. The `GET /api/tenants/:tenantId/promotion/status` and `/analytics` endpoints do not enforce this; they return default/empty payloads so the UI can render the unpublished state.
 
-8. **Settings cards + nav links are separate concerns** — Settings cards go on the landing page (`admin/page.tsx` or tenant settings). Nav links go in the sidebar (DB-driven via `navigation_links` table + file-based fallback). Both are needed for discoverability.
+8. **Bot knowledge is optional** — If `BotKnowledgeEmbeddingService.refreshPromotionEmbeddings` fails, the bot still works — it just won't have promotion context in its RAG. The fire-and-forget pattern ensures this.
+
+9. **Settings cards + nav links are separate concerns** — Settings cards go on the landing page (`admin/page.tsx` or tenant settings). Nav links go in the sidebar (DB-driven via `navigation_links` table + file-based fallback). Both are needed for discoverability.
 
 ---
 

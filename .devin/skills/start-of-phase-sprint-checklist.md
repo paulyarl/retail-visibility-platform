@@ -124,6 +124,7 @@ cd apps/web && npx tsc --noEmit
   - Auth level (public, authenticated, tenant, admin)
   - RBAC gates (`requirePermission`, `requireRole`, `requireGroup`)
   - Zod validation schemas needed for inputs
+  - **Route order risk:** Will it be mounted under a prefix that already has a catch-all (`/:id`, `/:slug`, `/:tenantId`)? If yes, review `api-route-architecture-audit.md` first.
 
 - [ ] **List all new background jobs.** For each:
   - Schedule (interval/cron)
@@ -190,7 +191,16 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Check for cross-capability constraints.** Will the new feature depend on or conflict with another capability? If yes, plan a constraint entry in `capability_constraints_list` and `CapabilityConstraintRegistry.ts`.
 
-- [ ] **Verify naming conventions.** Feature keys must be `snake_case` with domain prefix: `<capability_key>_enabled` or `<capability_key>_<group>_<feature>`. Group gates required for options (R16 in `capability-data-flow-rules.md`).
+- [ ] **Verify naming conventions.** Feature keys must be `snake_case` with domain prefix.
+  - Type gates: `<capability_key>_enabled` or `<capability_key>_disabled`.
+  - Group controls in options capabilities: `<capability_key>_<group>_on` or `<capability_key>_<group>_off` (R15 and R16 in `capability-data-flow-rules.md`).
+  - Do not introduce new `<capability_key>_<group>_enabled` / `_disabled` group gates that would be ambiguous with the type gate.
+  - If a new `_enabled` / `_disabled` feature key is required, confirm it is the capability type gate and does not collide with an existing group gate.
+  - Reference `docs/ENABLED_DISABLED_NAMING_CONFLICT_MIGRATION_PLAN.md` until the migration is fully deployed.
+
+- [ ] **Check for frontend fallback resolver impact in `CapabilityResolutionService.ts`.** If the phase changes any resolver logic in `apps/api/src/services/resolvers/XxxResolver.ts`, update the matching frontend fallback resolver in `apps/web/src/services/CapabilityResolutionService.ts` (R30 in `capability-data-flow-rules.md`). Verify parity for `_on`/`_off` group gate fallback, `enabled` derivation, and `effective_*` computation. Run `pnpm checkweb` after changes.
+
+- [ ] **Plan regression tests for group gate fallback.** Include cases for `_on` only, `_enabled` only, `_off` override, `_on` + `_off`, and `enabled` derived from a group gate without the master `_enabled` key.
 
 ---
 
@@ -239,6 +249,7 @@ This checklist is the **planning mirror** of `end-of-phase-sprint-checklist.md`.
 | IDs | Plan generators and prefixes | Verify no raw UUIDs in new code |
 | Navigation | Plan SQL INSERTs and icon registration | Verify links appear in UI |
 | Backend | Plan routes, jobs, logger usage | Verify mounting, wiring, signatures |
+| Route architecture | Review `api-route-architecture-audit.md` if touching mount order or catch-alls | Run route-order verification and catch-all ordering checks |
 | Database | Plan migration, RLS, triggers, indexes | Verify idempotency and Prisma sync |
 | Frontend | Plan components, cache keys, SSR safety | Verify states, no orphaned imports |
 | Capabilities | Plan 8-phase deployment | Verify feature keys and constraints |

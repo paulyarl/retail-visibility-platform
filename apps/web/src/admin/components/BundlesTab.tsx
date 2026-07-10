@@ -25,7 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/Dialog';
-import { Plus, Pencil, Trash2, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Copy } from 'lucide-react';
 import BundleEditModal from './BundleEditModal';
 
 function formatPrice(cents: number, cycle: string) {
@@ -49,6 +49,7 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingBundle, setEditingBundle] = useState<BsaasBundleEntry | null>(null);
+  const [cloningFrom, setCloningFrom] = useState<BsaasBundleEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BsaasBundleEntry | null>(null);
 
   const loadData = useCallback(async () => {
@@ -73,11 +74,24 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
 
   const handleAdd = () => {
     setEditingBundle(null);
+    setCloningFrom(null);
     setShowEditModal(true);
   };
 
   const handleEdit = (bundle: BsaasBundleEntry) => {
     setEditingBundle(bundle);
+    setShowEditModal(true);
+  };
+
+  const handleClone = (bundle: BsaasBundleEntry) => {
+    const cloned: BsaasBundleEntry = {
+      ...bundle,
+      id: '',
+      bundle_key: `${bundle.bundle_key}_copy`,
+      marketing_name: `${bundle.marketing_name} (Copy)`,
+    };
+    setEditingBundle(null);
+    setCloningFrom(cloned);
     setShowEditModal(true);
   };
 
@@ -93,6 +107,7 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
       }
       setShowEditModal(false);
       setEditingBundle(null);
+      setCloningFrom(null);
       await loadData();
     } catch (err: any) {
       onError(err.message || 'Failed to save bundle');
@@ -178,6 +193,9 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Price</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Cycle</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Trial</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Trial Elig.</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Demo Elig.</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Private</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Discount</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Order</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Active</th>
@@ -209,6 +227,27 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
                     </td>
                     <td className="px-4 py-3">{bundle.trial_days > 0 ? `${bundle.trial_days}d` : '—'}</td>
                     <td className="px-4 py-3">
+                      {bundle.trial_eligible ? (
+                        <Badge variant="secondary" className="bg-teal-100 text-teal-800">Yes</Badge>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {bundle.demo_eligible ? (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Yes</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-red-100 text-red-800">No</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {bundle.is_private ? (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800">Private</Badge>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       {discount !== null ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                           Save {discount}%
@@ -226,6 +265,9 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleClone(bundle)} title="Clone bundle">
+                          <Copy className="w-3.5 h-3.5" />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(bundle)}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
@@ -245,8 +287,12 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
       {/* Edit/Create Modal */}
       <BundleEditModal
         open={showEditModal}
-        onOpenChange={setShowEditModal}
+        onOpenChange={(open) => {
+          setShowEditModal(open);
+          if (!open) { setEditingBundle(null); setCloningFrom(null); }
+        }}
         editingBundle={editingBundle}
+        cloningFrom={cloningFrom}
         availableFeatures={availableFeatures}
         onSave={handleSave}
         saving={saving}

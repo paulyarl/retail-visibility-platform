@@ -34,8 +34,11 @@ const createCatalogSchema = z.object({
   price_cents: z.number().int().positive(),
   billing_cycle: z.enum(['one_time', 'weekly', 'monthly', 'annual']).default('monthly'),
   trial_days: z.number().int().min(0).default(0),
+  trial_eligible: z.boolean().default(false),
+  demo_eligible: z.boolean().default(true),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().default(0),
+  is_private: z.boolean().default(false),
 });
 
 const updateCatalogSchema = z.object({
@@ -44,8 +47,11 @@ const updateCatalogSchema = z.object({
   price_cents: z.number().int().positive().optional(),
   billing_cycle: z.enum(['one_time', 'weekly', 'monthly', 'annual']).optional(),
   trial_days: z.number().int().min(0).optional(),
+  trial_eligible: z.boolean().optional(),
+  demo_eligible: z.boolean().optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
+  is_private: z.boolean().optional(),
 });
 
 // ====================

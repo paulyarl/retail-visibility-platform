@@ -37,6 +37,7 @@ import crmTenantRoutes from '../crm/tenant/crm-tenant';
 import { authenticateCustomer } from '../../middleware/auth';
 import crmCustomerRoutes from '../crm/customer/crm-customer';
 import tenantSupplierRoutes from '../tenant/suppliers';
+import brandingRoutes from '../branding';
 
 /**
  * Mount core business routes
@@ -107,6 +108,9 @@ export function mountCoreRoutes(app: Express) {
 
   // Supplier catalog tenant routes (catalog search, import, mappings)
   app.use('/api/tenants/:tenantId', tenantSupplierRoutes);
+
+  // Branding routes (public GET for storefront, auth PUT for merchant)
+  app.use('/api/branding', brandingRoutes);
 
   console.log('✅ Core business routes mounted');
 }

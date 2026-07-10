@@ -24,6 +24,7 @@ import { getBillingNotificationService } from '../services/subscription/BillingN
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 import CrmAlertService from '../services/CrmAlertService';
+import CouponTargetService from '../services/CouponTargetService';
 import { audit } from '../audit';
 
 const router = Router();
@@ -42,6 +43,8 @@ async function getCatalogEntry(featureKey: string): Promise<{
   price_cents: number;
   billing_cycle: string;
   trial_days: number;
+  trial_eligible: boolean;
+  demo_eligible: boolean;
 } | null> {
   const entry = await prisma.bsaas_catalog.findFirst({
     where: { feature_key: featureKey, is_active: true },
@@ -54,6 +57,8 @@ async function getCatalogEntry(featureKey: string): Promise<{
     price_cents: entry.price_cents,
     billing_cycle: entry.billing_cycle,
     trial_days: entry.trial_days,
+    trial_eligible: entry.trial_eligible,
+    demo_eligible: entry.demo_eligible,
   };
 }
 
@@ -383,12 +388,22 @@ async function checkTierFeatureStatus(
 
   let capabilityKey: string | null = tierFeature?.capability_type_list?.key || null;
 
-  // 3. If not an explicit tier feature, check flexible expansion from all sources:
-  //    - Tier-bundled: {capability_key}_flexible in tier_features_list
-  //    - Purchased: {capability_key}_flexible in tenant_feature_purchases
-  //    - Admin grant: {capability_key}_flexible in tenant_feature_overrides_list
+  // 3. If not an explicit tier feature, check type gate precedence and flexible expansion from all sources:
+  //    Type gate precedence (R17 in capability-data-flow-rules.md):
+  //      1. {capability_key}_disabled → OFF (highest priority)
+  //      2. {capability_key}_enabled → ON (explicit enable)
+  //      3. {capability_key}_flexible → ON (flexible expansion)
+  //      4. Individual features → ON (implicit enable)
+  //      5. Else → OFF (default disabled)
+  //    Flexible expansion sources:
+  //      - Tier-bundled: {capability_key}_flexible in tier_features_list
+  //      - Purchased: {capability_key}_flexible in tenant_feature_purchases
+  //      - Admin grant: {capability_key}_flexible in tenant_feature_overrides_list
   //    This mirrors the MV's flexible_tier_features, flexible_purchase_features,
   //    and flexible_override_features CTEs.
+  //    IMPORTANT: Look up the actual flexible and type gate keys from capability_features_list
+  //    instead of guessing the naming convention (e.g., chatbot_flexible vs chatbot_options_flexible).
+  //    Note: Group gate keys now use _on/_off, eliminating naming ambiguity with type gates.
   if (!tierFeature) {
     // Resolve the feature's capability type
     const feature = await prisma.features_list.findUnique({
@@ -406,7 +421,75 @@ async function checkTierFeatureStatus(
     }
 
     capabilityKey = capLink.capability_type_list.key;
-    const flexibleKey = `${capabilityKey}_flexible`;
+    const capabilityTypeId = capLink.capability_type_list.id;
+
+    // Look up type gate keys (_disabled, _enabled) for this capability type
+    const typeGateFeatures = await prisma.capability_features_list.findMany({
+      where: {
+        capability_type_id: capabilityTypeId,
+        is_active: true,
+        features_list: { is_active: true },
+      },
+      include: {
+        features_list: {
+          select: { key: true },
+        },
+      },
+    });
+
+    const disabledKey = typeGateFeatures
+      .find(f => f.features_list?.key === `${capabilityKey}_disabled`)
+      ?.features_list?.key;
+    const enabledKey = typeGateFeatures
+      .find(f => f.features_list?.key === `${capabilityKey}_enabled`)
+      ?.features_list?.key;
+
+    // Check type gate precedence: _disabled > _enabled
+    const disabledTierFeature = disabledKey ? await prisma.tier_features_list.findFirst({
+      where: {
+        tier_id: { in: tierIds },
+        feature_key: disabledKey,
+        is_enabled: true,
+      },
+    }) : null;
+
+    if (disabledTierFeature) {
+      // Capability is disabled at type level — feature is not in-tier
+      return { inTier: false, merchantGateOn: null, capabilityKey };
+    }
+
+    const enabledTierFeature = enabledKey ? await prisma.tier_features_list.findFirst({
+      where: {
+        tier_id: { in: tierIds },
+        feature_key: enabledKey,
+        is_enabled: true,
+      },
+    }) : null;
+
+    // If _enabled is present, proceed with feature-level checks (no special handling needed)
+    // If neither _disabled nor _enabled, proceed to flexible expansion check
+
+    // Look up the actual flexible feature key for this capability type
+    const flexibleFeature = await prisma.capability_features_list.findFirst({
+      where: {
+        capability_type_id: capabilityTypeId,
+        is_active: true,
+        features_list: {
+          is_active: true,
+          key: { endsWith: '_flexible' },
+        },
+      },
+      include: {
+        features_list: {
+          select: { key: true },
+        },
+      },
+    });
+
+    const flexibleKey = flexibleFeature?.features_list?.key;
+    if (!flexibleKey) {
+      return { inTier: false, merchantGateOn: null, capabilityKey: null };
+    }
 
     // Check tier-bundled flexible
     const flexibleTierFeature = await prisma.tier_features_list.findFirst({
@@ -474,8 +557,9 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
     }
 
     // Build catalog from bsaas_catalog table + features_list for display names
+    // Private features are not visible to merchants in the Feature Store
     const catalogEntries = await prisma.bsaas_catalog.findMany({
-      where: { is_active: true },
+      where: { is_active: true, is_private: false },
       orderBy: { sort_order: 'asc' },
     });
 
@@ -498,6 +582,8 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
           priceCents: entry.price_cents,
           billingCycle: entry.billing_cycle as 'one_time' | 'weekly' | 'monthly' | 'annual',
           trialDays: entry.trial_days,
+          trialEligible: entry.trial_eligible,
+          demoEligible: entry.demo_eligible,
         };
       });
 
@@ -563,7 +649,7 @@ router.get('/bundle-catalog', async (req: Request, res: Response) => {
     }
 
     const bundles = await prisma.bsaas_bundles.findMany({
-      where: { is_active: true },
+      where: { is_active: true, is_private: false },
       orderBy: { sort_order: 'asc' },
       include: { bsaas_bundle_items: { orderBy: { sort_order: 'asc' } } },
     });
@@ -599,6 +685,8 @@ router.get('/bundle-catalog', async (req: Request, res: Response) => {
           priceCents: bundle.price_cents,
           billingCycle: bundle.billing_cycle as 'one_time' | 'weekly' | 'monthly' | 'annual',
           trialDays: bundle.trial_days,
+          trialEligible: bundle.trial_eligible,
+          demoEligible: bundle.demo_eligible,
           items: featureKeys.map((fk, i) => ({
             featureKey: fk,
             name: bundle.bsaas_bundle_items[i]?.feature_key || fk,
@@ -699,6 +787,23 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
     const priceCents = catalogEntry.price_cents;
     const billingCycle = catalogEntry.billing_cycle;
     const trialDays = catalogEntry.trial_days || 0;
+    const trialEligible = catalogEntry.trial_eligible;
+    const demoEligible = catalogEntry.demo_eligible;
+
+    // 1b. Check if tenant is a demo tenant and this item is not demo-eligible
+    if (!demoEligible) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { is_demo: true },
+      });
+      if (tenant?.is_demo) {
+        return res.status(403).json({
+          success: false,
+          error: 'demo_tenant_blocked',
+          message: 'This feature is not available for demo tenants.',
+        });
+      }
+    }
 
     // 2. Check for existing active purchase
     const existing = await prisma.tenant_feature_purchases.findUnique({
@@ -745,8 +850,8 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
     // 2d. For trial branch, also ensure companion purchase
     // (handled after trial creation below)
 
-    // 3. Trial branch: if trial_days > 0, create trial purchase without charging
-    if (trialDays > 0 && billingCycle !== 'one_time') {
+    // 3. Trial branch: if trial_eligible AND trial_days > 0, create trial purchase without charging
+    if (trialEligible && trialDays > 0 && billingCycle !== 'one_time') {
       const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
       const purchase = await prisma.tenant_feature_purchases.upsert({
@@ -892,6 +997,17 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
         chargedAmount = Math.max(0, priceCents - discountCents);
       } catch (err: any) {
         return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Failed to validate promotion code' });
+      }
+
+      // 4a-2. Validate coupon targets against this purchase context
+      if (couponId) {
+        const targetResult = await CouponTargetService.getInstance().validateCouponTargets(couponId, {
+          featureKey,
+          tenantId,
+        });
+        if (!targetResult.valid) {
+          return res.status(400).json({ success: false, error: targetResult.reason || 'coupon_target_mismatch', message: 'This promo code is not valid for this purchase context' });
+        }
       }
     }
 
@@ -1074,6 +1190,23 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
     const priceCents = bundle.price_cents;
     const billingCycle = bundle.billing_cycle;
     const trialDays = bundle.trial_days || 0;
+    const trialEligible = bundle.trial_eligible;
+    const demoEligible = bundle.demo_eligible;
+
+    // 1b. Check if tenant is a demo tenant and this bundle is not demo-eligible
+    if (!demoEligible) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { is_demo: true },
+      });
+      if (tenant?.is_demo) {
+        return res.status(403).json({
+          success: false,
+          error: 'demo_tenant_blocked',
+          message: 'This bundle is not available for demo tenants.',
+        });
+      }
+    }
 
     // 2. Check for existing active purchases of ALL components
     const existingPurchases = await prisma.tenant_feature_purchases.findMany({
@@ -1100,7 +1233,7 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
     }
 
     // 4. Trial branch
-    if (trialDays > 0 && billingCycle !== 'one_time') {
+    if (trialEligible && trialDays > 0 && billingCycle !== 'one_time') {
       const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
       // Create trial purchase for each component feature
@@ -1184,12 +1317,68 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'payment_required', message: 'Payment method is required for non-trial purchases' });
     }
 
+    // 5a. Validate promotion code and calculate discount (fixes bundle promo code gap)
+    let chargedAmount = priceCents;
+    let promotionCodeId: string | null = null;
+    let discountCents = 0;
+    let couponId: string | null = null;
+
+    if (promotionCode) {
+      try {
+        const stripeKey = process.env.STRIPE_SECRET_KEY;
+        if (!stripeKey) {
+          return res.status(503).json({ success: false, error: 'stripe_not_configured', message: 'Promo codes require Stripe' });
+        }
+        const Stripe = (await import('stripe')).default;
+        const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' as any });
+
+        const promoCodes = await stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 });
+        if (promoCodes.data.length === 0) {
+          return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Invalid or expired promotion code' });
+        }
+
+        const promo = promoCodes.data[0];
+        if (promo.max_redemptions && promo.times_redeemed >= promo.max_redemptions) {
+          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has reached its usage limit' });
+        }
+        if (promo.expires_at && promo.expires_at * 1000 < Date.now()) {
+          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has expired' });
+        }
+
+        promotionCodeId = promo.id;
+        const coupon = await stripe.coupons.retrieve((promo as any).coupon);
+        couponId = coupon.id;
+
+        if (coupon.percent_off) {
+          discountCents = Math.round(priceCents * coupon.percent_off / 100);
+        } else if (coupon.amount_off) {
+          discountCents = Math.min(coupon.amount_off, priceCents);
+        }
+        chargedAmount = Math.max(0, priceCents - discountCents);
+      } catch (err: any) {
+        return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Failed to validate promotion code' });
+      }
+
+      // 5a-2. Validate coupon targets against this bundle purchase context
+      if (couponId) {
+        const targetResult = await CouponTargetService.getInstance().validateCouponTargets(couponId, {
+          featureKey: featureKeys[0],
+          featureKeys,
+          tenantId,
+          bundleKey,
+        });
+        if (!targetResult.valid) {
+          return res.status(400).json({ success: false, error: targetResult.reason || 'coupon_target_mismatch', message: 'This promo code is not valid for this purchase context' });
+        }
+      }
+    }
+
     const billingService = getSubscriptionBillingService();
     const chargeResult = await billingService.chargePaymentMethod(
       tenantId,
       paymentMethodId,
-      priceCents,
-      `BSaaS Bundle: ${bundle.marketing_name}`
+      chargedAmount,
+      `BSaaS Bundle: ${bundle.marketing_name}${promotionCode ? ` (promo: ${promotionCode})` : ''}`
     );
 
     if (!chargeResult.success) {
@@ -1217,6 +1406,11 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
               bundle_key: bundleKey,
               bundle_name: bundle.marketing_name,
               price_cents: priceCents,
+              charged_cents: chargedAmount,
+              discount_cents: discountCents || undefined,
+              promotion_code: promotionCode || undefined,
+              promotion_code_id: promotionCodeId || undefined,
+              coupon_id: couponId || undefined,
               billing_cycle: billingCycle,
               transaction_id: chargeResult.transactionId,
               payment_method_id: paymentMethodId,
@@ -1234,6 +1428,11 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
               bundle_key: bundleKey,
               bundle_name: bundle.marketing_name,
               price_cents: priceCents,
+              charged_cents: chargedAmount,
+              discount_cents: discountCents || undefined,
+              promotion_code: promotionCode || undefined,
+              promotion_code_id: promotionCodeId || undefined,
+              coupon_id: couponId || undefined,
               billing_cycle: billingCycle,
               transaction_id: chargeResult.transactionId,
               payment_method_id: paymentMethodId,
@@ -1264,6 +1463,10 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
         bundle_name: bundle.marketing_name,
         feature_keys: featureKeys,
         price_cents: priceCents,
+        charged_cents: chargedAmount,
+        discount_cents: discountCents || undefined,
+        promotion_code: promotionCode || undefined,
+        coupon_id: couponId || undefined,
         billing_cycle: billingCycle,
         transaction_id: chargeResult.transactionId,
         purchase_ids: purchases.map(p => p.id),
@@ -1286,6 +1489,9 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
         bundle_key: bundleKey,
         status: 'active',
         price_cents: priceCents,
+        charged_cents: chargedAmount,
+        discount_cents: discountCents || undefined,
+        promotion_code: promotionCode || undefined,
         billing_cycle: billingCycle,
         transaction_id: chargeResult.transactionId,
         expires_at: expiresAt,

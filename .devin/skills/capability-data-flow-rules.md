@@ -289,39 +289,45 @@ Feature keys MUST follow this canonical pattern:
 <capability_key>_disabled           # master OFF gate
 <capability_key>_flexible           # unlock all features in this capability
 
-<capability_key>_<group>_enabled    # group ON gate (options capabilities only)
-<capability_key>_<group>_disabled   # group OFF gate (options capabilities only)
+<capability_key>_<group>_on         # group ON gate (options capabilities only)
+<capability_key>_<group>_off        # group OFF gate (options capabilities only)
 
 <capability_key>_<group>_<feature>  # individual feature within a group
 ```
 
 **Examples**:
 - `product_types_enabled`, `product_types_physical`, `product_types_flexible`
-- `product_options_sections_enabled`, `product_options_sections_reviews`
-- `storefront_options_qr_enabled`, `storefront_options_qr_codes_512`
+- `product_options_sections_on`, `product_options_sections_reviews`
+- `storefront_options_qr_on`, `storefront_options_qr_codes_512`
 
 **Forbidden patterns**:
 - Mixing prefixes within a capability (e.g., `product_opt_*` in `product_options` — use `product_options_*`)
 - Abbreviated prefixes (e.g., `storefront_opt_*` — use `storefront_options_*`)
 - Flat keys without group prefix in an options capability (e.g., `product_variant` — use `product_options_creation_variants`)
 - Using `_tier_` for internal capability levels (confusing with platform subscription tiers) — use `_level_` instead (e.g., `directory_promotion_level_basic`, not `directory_promotion_tier_basic`)
+- Using `_enabled` / `_disabled` for group gates — group controls must use `_on` / `_off` to avoid ambiguity with type gates
 
-**Backward compatibility**: Legacy keys MAY be retained as aliases during migration. Resolvers check new keys first, then fall back to legacy keys. See `docs/CAPABILITY_TYPES_TARGET_ARCHITECTURE.md` §5 for the complete alias mapping.
+**Backward compatibility**: Legacy `_enabled` / `_disabled` group-gate keys MAY be retained as aliases during migration. Resolvers check new `_on` / `_off` keys first, then fall back to legacy `_enabled` / `_disabled` keys. See `docs/ENABLED_DISABLED_NAMING_CONFLICT_MIGRATION_PLAN.md` for the current migration.
 
 ### R16: Group Gates Required for Options Capabilities
 Options capabilities MUST use group gates to organize features into logical clusters. A group gate is a pair of feature keys:
 
-- `<capability_key>_<group>_enabled` — when true, all features in the group are tier-allowed
-- `<capability_key>_<group>_disabled` — when true, all features in the group are tier-blocked (overrides individual features)
+- `<capability_key>_<group>_on` — when true, all features in the group are tier-allowed
+- `<capability_key>_<group>_off` — when true, all features in the group are tier-blocked (overrides individual features)
 
-**Resolver pattern for each group**:
+When a negative gate is not required, a single `_on` key may be used as a positive group switch.
+
+**Legacy fallback**: During the migration from `_enabled`/`_disabled` to `_on`/`_off`, resolvers MUST check the new `_on`/`_off` keys first and fall back to legacy `_enabled`/`_disabled` keys if the new keys are not present. The two keys are evaluated as an OR for the ON gate and an OR for the OFF gate:
+
 ```ts
-const groupEnabled = !!features[`${capKey}_${group}_enabled`];
-const groupDisabled = !!features[`${capKey}_${group}_disabled`];
+const groupOn = !!features[`${capKey}_${group}_on`]
+  || !!features[`${capKey}_${group}_enabled`];
+const groupOff = !!features[`${capKey}_${group}_off`]
+  || !!features[`${capKey}_${group}_disabled`];
 const allowedTypes: Type[] = [];
-if (flexible || (groupEnabled && !groupDisabled)) {
+if (flexible || (groupOn && !groupOff)) {
   allowedTypes.push(...allTypesInGroup);
-} else if (!groupDisabled) {
+} else if (!groupOff) {
   if (features[`${capKey}_${group}_${feature}`]) allowedTypes.push(feature);
   // ... other features
 }
@@ -341,12 +347,12 @@ All resolvers MUST determine the `enabled` state using this precedence:
 1. If `*_disabled` is true → **OFF** (hard disable, highest priority)
 2. Else if `*_enabled` is true → **ON** (explicit enable)
 3. Else if `*_flexible` is true → **ON** (flexible implies enabled)
-4. Else if any individual feature or group gate in the domain is enabled → **ON** (implicit enable)
+4. Else if any individual feature or group gate in the domain is enabled (`*_on` or legacy `*_enabled`) → **ON** (implicit enable)
 5. Else → **OFF** (default disabled — nothing enabled at all)
 
-**Key rule**: The default is **disabled** only when nothing at all is enabled in the capability domain — no `_enabled`, no `_disabled`, no `_flexible`, and no individual features. If any individual feature is enabled (e.g., `payment_gateway_stripe`), the capability is implicitly enabled even without the `_enabled` meta-key.
+**Key rule**: The default is **disabled** only when nothing at all is enabled in the capability domain — no `_enabled`, no `_disabled`, no `_flexible`, no `_on`/`_off` group gates, and no individual features. If any individual feature is enabled (e.g., `payment_gateway_stripe`), the capability is implicitly enabled even without the `_enabled` meta-key.
 
-The same precedence applies at the group level: `*_disabled` > `*_enabled` > individual features.
+The same precedence applies at the group level: `*_off` or legacy `*_disabled` > `*_on` or legacy `*_enabled` > individual features.
 
 **`_disabled` meta-keys**: Every capability type MUST have a `{prefix}_disabled` feature key in `features_list`, linked via `capability_features_list`. This allows admins to explicitly disengage a capability type from a tier without enabling any features. When `_disabled` is the only enabled feature for a capability type on a tier, `checkCapabilityEngagement` blocks purchases within that capability type.
 
@@ -584,6 +590,25 @@ const isWritable = allCaps.data?.subscriptionContext?.writable ?? true;
 - Set a `disabled` state based on API error messages (`merchant_gate_disabled`, etc.)
 - Hide the entire widget/component when subscription is read-only
 - Block API calls preemptively — let the backend `checkCrmCreateAllowed` gate handle it
+
+### R30: Frontend Fallback Resolver Must Mirror Backend Resolver Logic
+
+`apps/web/src/services/CapabilityResolutionService.ts` contains fallback resolver functions (e.g., `resolveProductOptionsState`) used when the unified `effective-capabilities` endpoint is unavailable. These functions are **not** simple mappers; they perform the same `(features, merchantPrefs) -> state` resolution as backend `XxxResolver.ts` functions.
+
+**Rule**: When a backend resolver changes for `_on`/`_off` group gates, `_enabled`/`_disabled` legacy fallback, or `effective_*` computation, the corresponding frontend fallback resolver in `CapabilityResolutionService.ts` MUST be updated in the same PR.
+
+**Required parity**:
+1. **Master gate precedence**: `*_disabled` > `*_enabled` > `*_flexible` > `*_on`/`*_off` group gates > individual features. Frontend `enabled` must use the same precedence as the backend (R17).
+2. **Group gate fallback**: `groupOn = *_on || *_enabled`; `groupOff = *_off || *_disabled`.
+3. **Enabled fallback helper**: `enabled = disabled ? false : enabled ? true : flexible ? true : hasAnyXxxFeature(features)`, where `hasAnyXxxFeature` checks every group gate (`*_on` and legacy `*_enabled`) and every individual feature in the domain.
+4. **`shows*` flags**: `showsX = isFlexible || groupOn || featureFlag`. Do not gate `showsX` on `groupEnabled` unless the backend does.
+5. **Effective flags**: `effectiveShowsX = showsX && merchantPref`. Do NOT use `(isFlexible || featureFlag) && merchantPref` — that ignores the group gate and differs from the backend.
+6. **Allowed-type arrays**: Build them with the same `groupEnabled` and `!groupOff` logic as the backend.
+7. **Return `merchantPreferences` and `features`**: Fallback resolvers must include `merchantPreferences` (or `null`) and `features` to satisfy state interfaces.
+
+**Example**: When `ProductOptionsResolver.ts` changes, `resolveProductOptionsState` in `CapabilityResolutionService.ts` must be updated to match the `creation`, `layout`, and `sections` group gate logic, including the `hasAnyProductOptionsFeature` helper that drives the `enabled` fallback.
+
+**Verification**: Run `pnpm checkweb` and add/update `CapabilityResolutionService` tests covering `_on` only, `_enabled` only, `_off` override, `_on` + `_off`, and `enabled` derived from a group gate without the master `_enabled` key.
 
 ## File Reference
 

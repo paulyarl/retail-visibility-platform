@@ -295,7 +295,7 @@ export const FEATURE_CATALOG: PlatformFeature[] = [
     pillar: 'scale',
     category: 'locations',
     requiredTier: 'starter',
-    route: '/propagation',
+    route: '/settings/propagation',
     isNew: true
   },
   {

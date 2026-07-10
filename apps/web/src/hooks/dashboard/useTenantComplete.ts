@@ -318,6 +318,8 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     state: publicProfileData?.address?.state || businessProfile?.state || rawProfile.state || null,
     countryCode: publicProfileData?.country_code || businessProfile?.country_code || rawProfile.country_code || rawProfile.countryCode || null,
     bannerUrl: publicProfileData?.banner || businessProfile?.banner || rawProfile.banner || null,
+    isDemo: rawProfile.isDemo || rawProfile.is_demo || false,
+    demoExpiresAt: rawProfile.demoExpiresAt || rawProfile.demo_expires_at || null,
   } : null, [rawProfile, businessProfile, publicProfileData, usageData, tenantId]);
 
   // Build resolved tier from secondary query

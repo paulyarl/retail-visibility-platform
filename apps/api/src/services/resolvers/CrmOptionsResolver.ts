@@ -7,8 +7,10 @@
 import type { EffectiveCrm, CrmOptionsMerchantSettings } from './types';
 
 export type CrmInquiryType =
-  | 'crm_inquiry_product_enabled' | 'crm_inquiry_storefront_enabled'
-  | 'crm_inquiry_directory_enabled' | 'crm_inquiry_anonymous'
+  | 'crm_inquiry_product_on' | 'crm_inquiry_product_enabled'
+  | 'crm_inquiry_storefront_on' | 'crm_inquiry_storefront_enabled'
+  | 'crm_inquiry_directory_on' | 'crm_inquiry_directory_enabled'
+  | 'crm_inquiry_anonymous'
   | 'crm_inquiry_customer' | 'crm_inquiry_assignment' | 'crm_inquiry_auto_response';
 
 export type CrmContactType = 'crm_contact_management' | 'crm_contact_import' | 'crm_contact_sync';
@@ -32,9 +34,9 @@ export function resolveCrmOptions(
   const enabled = tierEnabled && (merchantPrefs?.crm_enabled !== false);
   const flexible = !!feat.crm_flexible;
 
-  const inquiryProductEnabled = flexible || !!feat.crm_inquiry_product_enabled;
-  const inquiryStorefrontEnabled = flexible || !!feat.crm_inquiry_storefront_enabled;
-  const inquiryDirectoryEnabled = flexible || !!feat.crm_inquiry_directory_enabled;
+  const inquiryProductOn = flexible || !!feat.crm_inquiry_product_on || !!feat.crm_inquiry_product_enabled;
+  const inquiryStorefrontOn = flexible || !!feat.crm_inquiry_storefront_on || !!feat.crm_inquiry_storefront_enabled;
+  const inquiryDirectoryOn = flexible || !!feat.crm_inquiry_directory_on || !!feat.crm_inquiry_directory_enabled;
 
   const contactsEnabled = flexible || !!feat.crm_contact_management;
   const ticketFeaturesEnabled = flexible || (!!feat.crm_ticket_priority || !!feat.crm_ticket_assignment || !!feat.crm_ticket_templates || !!feat.crm_ticket_escalation);
@@ -50,9 +52,12 @@ export function resolveCrmOptions(
       'crm_inquiry_customer', 'crm_inquiry_assignment', 'crm_inquiry_auto_response'
     );
   } else {
-    if (feat.crm_inquiry_product_enabled) allowedInquiry.push('crm_inquiry_product_enabled');
-    if (feat.crm_inquiry_storefront_enabled) allowedInquiry.push('crm_inquiry_storefront_enabled');
-    if (feat.crm_inquiry_directory_enabled) allowedInquiry.push('crm_inquiry_directory_enabled');
+    if (feat.crm_inquiry_product_on) allowedInquiry.push('crm_inquiry_product_on');
+    else if (feat.crm_inquiry_product_enabled) allowedInquiry.push('crm_inquiry_product_enabled');
+    if (feat.crm_inquiry_storefront_on) allowedInquiry.push('crm_inquiry_storefront_on');
+    else if (feat.crm_inquiry_storefront_enabled) allowedInquiry.push('crm_inquiry_storefront_enabled');
+    if (feat.crm_inquiry_directory_on) allowedInquiry.push('crm_inquiry_directory_on');
+    else if (feat.crm_inquiry_directory_enabled) allowedInquiry.push('crm_inquiry_directory_enabled');
     if (feat.crm_inquiry_anonymous) allowedInquiry.push('crm_inquiry_anonymous');
     if (feat.crm_inquiry_customer) allowedInquiry.push('crm_inquiry_customer');
     if (feat.crm_inquiry_assignment) allowedInquiry.push('crm_inquiry_assignment');
@@ -104,9 +109,9 @@ export function resolveCrmOptions(
 
   return {
     enabled,
-    inquiry_product_enabled: enabled && inquiryProductEnabled,
-    inquiry_storefront_enabled: enabled && inquiryStorefrontEnabled,
-    inquiry_directory_enabled: enabled && inquiryDirectoryEnabled,
+    inquiry_product_enabled: enabled && inquiryProductOn,
+    inquiry_storefront_enabled: enabled && inquiryStorefrontOn,
+    inquiry_directory_enabled: enabled && inquiryDirectoryOn,
     contacts_enabled: enabled && contactsEnabled,
     ticket_features_enabled: enabled && ticketFeaturesEnabled,
     message_features_enabled: enabled && messageFeaturesEnabled,

@@ -142,8 +142,8 @@ export async function resolveActiveFeatured(query: ActiveFeaturedQuery): Promise
       : `1=1`;
 
     const params = query.tenantId ? [query.tenantId, limit] : [limit];
-    const paramPlaceholders = query.tenantId
-      ? `$1, $2`
+    const limitPlaceholder = query.tenantId
+      ? `$2`
       : `$1`;
 
     const sql = `
@@ -182,7 +182,7 @@ export async function resolveActiveFeatured(query: ActiveFeaturedQuery): Promise
         promotional_priority DESC,
         fp.featured_priority DESC,
         fp.featured_at ASC
-      LIMIT ${paramPlaceholders}
+      LIMIT ${limitPlaceholder}
     `;
 
     const rows = await prisma.$queryRawUnsafe(sql, ...params);

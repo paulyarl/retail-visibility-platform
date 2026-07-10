@@ -86,7 +86,7 @@ interface TipDefinition {
 // ====================
 
 const TIER_ORDER: TierInfo['level'][] = [
-  'google_only', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'enterprise',
+  'google_only', 'starter', 'discovery', 'storefront', 'commitment', 'ecommerce', 'omnichannel', 'professional', 'organization', 'enterprise',
   'chain_starter', 'chain_professional', 'chain_enterprise', 'custom',
 ];
 
@@ -129,6 +129,7 @@ function nextTierName(level: TierInfo['level']): string | null {
     'ecommerce': 'Omnichannel',
     'omnichannel': 'Enterprise',
     'professional': 'Enterprise',
+    'organization': 'Enterprise',
   };
   return map[level] ?? null;
 }

@@ -31,12 +31,15 @@ export function resolveIntegrationOptions(
   const allowedPosTypes: IntegrationType[] = [];
   const allowedGoogleTypes: IntegrationType[] = [];
 
+  const posGroupOn = !!features.integration_pos_on || !!features.integration_pos_enabled;
+  const googleGroupOn = !!features.integration_google_on || !!features.integration_google_enabled;
+
   if (flexible || enabled) {
     for (const t of posTypes) {
-      if (flexible || features[`integration_${t}`]) allowedPosTypes.push(t);
+      if (flexible || posGroupOn || features[`integration_${t}`]) allowedPosTypes.push(t);
     }
     for (const t of googleTypes) {
-      if (flexible || features[`integration_${t}`]) allowedGoogleTypes.push(t);
+      if (flexible || googleGroupOn || features[`integration_${t}`]) allowedGoogleTypes.push(t);
     }
   }
 

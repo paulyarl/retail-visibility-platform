@@ -426,9 +426,28 @@ model bsaas_catalog {
   sort_order     Int      @default(0)
   created_at     DateTime @default(now()) @db.Timestamptz(6)
   updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  trial_eligible Boolean  @default(false)
+  demo_eligible  Boolean  @default(true)
+  is_private     Boolean  @default(false)
 
   @@index([is_active, sort_order], map: "idx_bsaas_catalog_active")
   @@index([feature_key], map: "idx_bsaas_catalog_feature_key")
+  @@index([is_private], map: "idx_bsaas_catalog_is_private")
+}
+
+model coupon_target_rules {
+  id                           String    @id @db.VarChar(255)
+  coupon_id                    String    @unique @db.VarChar(255)
+  target_features              Json?
+  target_tiers                 Json?
+  target_capability_types      Json?
+  target_tier_types            Json?
+  target_demo_status           Json?
+  target_subscription_statuses Json?
+  created_at                   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([coupon_id], map: "idx_coupon_target_rules_coupon_id")
 }
 
 model bsaas_bundles {
@@ -443,9 +462,13 @@ model bsaas_bundles {
   sort_order         Int                  @default(0)
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
   updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  trial_eligible     Boolean              @default(false)
+  demo_eligible      Boolean              @default(true)
+  is_private         Boolean              @default(false)
   bsaas_bundle_items bsaas_bundle_items[]
 
   @@index([is_active, sort_order], map: "idx_bsaas_bundles_active")
+  @@index([is_private], map: "idx_bsaas_bundles_is_private")
 }
 
 model bsaas_bundle_items {
@@ -4148,6 +4171,11 @@ model tenant_chatbot_options_settings {
   chatbot_widget_after_hours  Boolean?  @default(false)
   created_at                  DateTime? @default(now()) @db.Timestamp(6)
   updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+  chatbot_static_on           Boolean?  @default(true)
+  chatbot_dynamic_on          Boolean?  @default(false)
+  chatbot_skills_on           Boolean?  @default(false)
+  chatbot_kb_on               Boolean?  @default(false)
+  chatbot_widget_on           Boolean?  @default(true)
   tenants                     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id], map: "idx_chatbot_options_tenant")
@@ -4552,6 +4580,8 @@ model tenant_social_commerce_options_settings {
   social_commerce_abandoned_cart Boolean?  @default(false)
   created_at                     DateTime? @default(now()) @db.Timestamptz(6)
   updated_at                     DateTime? @default(now()) @db.Timestamptz(6)
+  social_commerce_meta_on        Boolean?  @default(false)
+  social_commerce_tiktok_on      Boolean?  @default(false)
   tenants                        tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_social_commerce_options_tenant")
 
   @@index([tenant_id], map: "idx_social_commerce_options_tenant")

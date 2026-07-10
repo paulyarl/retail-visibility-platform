@@ -57,13 +57,23 @@ router.get('/tenants/:tenantId/promotion/status', async (req: Request, res: Resp
       [tenantId]
     );
 
+    const activePurchase = await DirectoryPromotionService.getInstance().getActivePurchase(tenantId);
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
+      // Tenant exists but has no directory listing yet; return default status
+      // so the promotion UI can still render and explain the state.
+      return res.json({
+        isPromoted: false,
+        promotionTier: null,
+        promotionStartedAt: null,
+        promotionExpiresAt: null,
+        promotionImpressions: 0,
+        promotionClicks: 0,
+        activePurchase: activePurchase || null,
+      });
     }
 
     const listing = result.rows[0];
-
-    const activePurchase = await DirectoryPromotionService.getInstance().getActivePurchase(tenantId);
 
     res.json({
       isPromoted: listing.is_promoted || false,
@@ -129,6 +139,9 @@ router.post('/tenants/:tenantId/promotion/purchase', async (req: Request, res: R
     if (message === 'tenant_has_no_directory_listing') {
       return res.status(404).json({ error: 'Tenant has no directory listing' });
     }
+    if (message === 'tenant_directory_not_published') {
+      return res.status(400).json({ error: 'Directory listing must be published before purchasing a promotion. Publish your directory listing first.' });
+    }
     if (message === 'stripe_not_configured') {
       return res.status(503).json({ error: 'Payment system not configured' });
     }
@@ -168,6 +181,12 @@ router.post('/tenants/:tenantId/promotion/renew', async (req: Request, res: Resp
     }
     if (message === 'plan_not_found_or_inactive') {
       return res.status(404).json({ error: 'Plan not found or inactive' });
+    }
+    if (message === 'tenant_has_no_directory_listing') {
+      return res.status(404).json({ error: 'Tenant has no directory listing' });
+    }
+    if (message === 'tenant_directory_not_published') {
+      return res.status(400).json({ error: 'Directory listing must be published before renewing a promotion. Publish your directory listing first.' });
     }
     if (message === 'stripe_not_configured') {
       return res.status(503).json({ error: 'Payment system not configured' });
@@ -246,7 +265,19 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req: Request, res: R
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' });
+      // Tenant exists but has no directory listing yet; return empty analytics
+      return res.json({
+        isPromoted: false,
+        promotionTier: null,
+        promotionStartedAt: null,
+        promotionExpiresAt: null,
+        impressions: 0,
+        clicks: 0,
+        clickThroughRate: 0,
+        daysActive: 0,
+        avgImpressionsPerDay: 0,
+        avgClicksPerDay: 0,
+      });
     }
 
     const listing = result.rows[0];
@@ -541,9 +572,12 @@ router.post('/admin/promotion/grant-complimentary', async (req: Request, res: Re
     res.json({ success: true, purchaseId: result.purchaseId });
   } catch (error: any) {
     const message = error?.message || 'Failed to grant complimentary promotion';
-    const status = ['plan_not_found_or_inactive', 'tenant_already_has_active_promotion', 'tenant_has_no_directory_listing'].includes(message)
+    const status = ['plan_not_found_or_inactive', 'tenant_already_has_active_promotion', 'tenant_has_no_directory_listing', 'tenant_directory_not_published'].includes(message)
       ? 400 : 500;
-    res.status(status).json({ error: message });
+    const errorMessage = message === 'tenant_directory_not_published'
+      ? 'Directory listing must be published before granting a promotion. Publish the directory listing first.'
+      : message;
+    res.status(status).json({ error: errorMessage });
   }
 });
 

@@ -171,10 +171,10 @@ class FeaturedOptionsService {
     const enabled = !!features.featured_enabled;
     const disabled = !!features.featured_disabled;
     const flexible = !!features.featured_flexible;
-    const tenantGroupEnabled = !!features.featured_tenant_enabled;
-    const tenantGroupDisabled = !!features.featured_tenant_disabled;
-    const platformGroupEnabled = !!features.featured_platform_enabled;
-    const platformGroupDisabled = !!features.featured_platform_disabled;
+    const tenantGroupEnabled = !!features.featured_tenant_on || !!features.featured_tenant_enabled;
+    const tenantGroupDisabled = !!features.featured_tenant_off || !!features.featured_tenant_disabled;
+    const platformGroupEnabled = !!features.featured_platform_on || !!features.featured_platform_enabled;
+    const platformGroupDisabled = !!features.featured_platform_off || !!features.featured_platform_disabled;
 
     // Three states per group: enabled → all types, untouched → individual features, disabled → none
     const tenantEnabled = tenantGroupEnabled && !tenantGroupDisabled;

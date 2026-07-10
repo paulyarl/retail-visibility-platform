@@ -32,9 +32,9 @@ export function resolveDirectoryEntryOptions(
   const mainOn = enabled;
 
   // Layout gates
-  const layoutGroupEnabled = !!features.directory_entry_layout_enabled;
+  const layoutGroupOn = !!features.directory_entry_layout_on || !!features.directory_entry_layout_enabled;
   const allowedLayouts: DirectoryEntryLayoutType[] = [];
-  if (flexible || layoutGroupEnabled) {
+  if (flexible || layoutGroupOn) {
     allowedLayouts.push('classic', 'editorial', 'immersive', 'premium');
   } else {
     if (features.directory_entry_layout_classic) allowedLayouts.push('classic');
@@ -69,7 +69,7 @@ export function resolveDirectoryEntryOptions(
   return {
     enabled: mainOn,
     is_flexible: flexible,
-    layout_enabled: mainOn && (layoutGroupEnabled || allowedLayouts.length > 0),
+    layout_enabled: mainOn && (layoutGroupOn || allowedLayouts.length > 0),
     allowed_layouts: allowedLayouts,
     effective_layout: effectiveLayout,
     can_use_layout_classic: mainOn && allowedLayouts.includes('classic'),
@@ -77,21 +77,21 @@ export function resolveDirectoryEntryOptions(
     can_use_layout_immersive: mainOn && allowedLayouts.includes('immersive'),
     can_use_layout_premium: mainOn && allowedLayouts.includes('premium'),
     // Section effective flags — tier feature OR flexible; merchant pref gates (default true if tier allows)
-    hours_enabled: mainOn && (flexible || !!features.directory_entry_hours_enabled) && (merchantPrefs?.hours_display !== false),
-    map_enabled: mainOn && (flexible || !!features.directory_entry_map_enabled) && (merchantPrefs?.map_display !== false),
-    contact_enabled: mainOn && (flexible || !!features.directory_entry_contact_enabled) && (merchantPrefs?.storefront_contact !== false),
-    gallery_enabled: mainOn && (flexible || !!features.directory_entry_gallery_enabled) && (hasGalleryPref !== false),
-    qr_enabled: mainOn && (flexible || !!features.directory_entry_qr_enabled) && (hasQrPref !== false),
-    social_enabled: mainOn && (flexible || !!features.directory_entry_social_enabled) && (merchantPrefs?.storefront_social_media !== false),
-    seo_enabled: mainOn && (flexible || !!features.directory_entry_seo_enabled) && (merchantPrefs?.enhanced_seo !== false),
+    hours_enabled: mainOn && (flexible || !!features.directory_entry_hours_on || !!features.directory_entry_hours_enabled) && (merchantPrefs?.hours_display !== false),
+    map_enabled: mainOn && (flexible || !!features.directory_entry_map_on || !!features.directory_entry_map_enabled) && (merchantPrefs?.map_display !== false),
+    contact_enabled: mainOn && (flexible || !!features.directory_entry_contact_on || !!features.directory_entry_contact_enabled) && (merchantPrefs?.storefront_contact !== false),
+    gallery_enabled: mainOn && (flexible || !!features.directory_entry_gallery_on || !!features.directory_entry_gallery_enabled) && (hasGalleryPref !== false),
+    qr_enabled: mainOn && (flexible || !!features.directory_entry_qr_on || !!features.directory_entry_qr_enabled) && (hasQrPref !== false),
+    social_enabled: mainOn && (flexible || !!features.directory_entry_social_on || !!features.directory_entry_social_enabled) && (merchantPrefs?.storefront_social_media !== false),
+    seo_enabled: mainOn && (flexible || !!features.directory_entry_seo_on || !!features.directory_entry_seo_enabled) && (merchantPrefs?.enhanced_seo !== false),
     // Tier-gated availability flags (for UI disable states)
-    can_show_hours: mainOn && (flexible || !!features.directory_entry_hours_enabled),
-    can_show_map: mainOn && (flexible || !!features.directory_entry_map_enabled),
-    can_show_contact: mainOn && (flexible || !!features.directory_entry_contact_enabled),
-    can_show_gallery: mainOn && (flexible || !!features.directory_entry_gallery_enabled),
-    can_show_qr: mainOn && (flexible || !!features.directory_entry_qr_enabled),
-    can_show_social: mainOn && (flexible || !!features.directory_entry_social_enabled),
-    can_show_seo: mainOn && (flexible || !!features.directory_entry_seo_enabled),
+    can_show_hours: mainOn && (flexible || !!features.directory_entry_hours_on || !!features.directory_entry_hours_enabled),
+    can_show_map: mainOn && (flexible || !!features.directory_entry_map_on || !!features.directory_entry_map_enabled),
+    can_show_contact: mainOn && (flexible || !!features.directory_entry_contact_on || !!features.directory_entry_contact_enabled),
+    can_show_gallery: mainOn && (flexible || !!features.directory_entry_gallery_on || !!features.directory_entry_gallery_enabled),
+    can_show_qr: mainOn && (flexible || !!features.directory_entry_qr_on || !!features.directory_entry_qr_enabled),
+    can_show_social: mainOn && (flexible || !!features.directory_entry_social_on || !!features.directory_entry_social_enabled),
+    can_show_seo: mainOn && (flexible || !!features.directory_entry_seo_on || !!features.directory_entry_seo_enabled),
     // External link — tier feature OR flexible grants availability; merchant pref gates effective state
     can_show_external_link: externalLinkTierAllowed,
     external_link_enabled: externalLinkTierAllowed && (merchantPrefs?.external_link_enabled === true),

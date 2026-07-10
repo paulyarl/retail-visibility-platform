@@ -169,6 +169,7 @@ The admin page at `/settings/admin/demo-tenants` provides:
 7. **Revokeable** — Demo status can be revoked, converting back to regular tenant
 8. **Convertible** — Regular tenants can be converted to demo in-place
 9. **Tier changeable** — Admin can change subscription tier on demo tenants via API or UI
+10. **BSaaS purchase restrictions** — Demo tenants are blocked from purchasing features/bundles where `demo_eligible = false` (see `bsaas-purchase-flow.md` Phase 6). The backend returns `403 demo_tenant_blocked`; the Feature Store UI shows "Demo Restricted" badge and disabled "Not Available for Demo" button. The `demo_eligible` flag defaults to `true` (opt-out), so demo tenants can purchase all features unless an admin explicitly sets `demo_eligible = false` on a catalog entry or bundle.
 
 ## What Demo Tenants Share with Regular Tenants
 

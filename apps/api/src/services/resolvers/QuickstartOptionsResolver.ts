@@ -21,9 +21,9 @@ export function resolveQuickstartOptions(
   const enabled = !disabled && !!features.quickstart_enabled;
   const flexible = !!features.quickstart_flexible;
 
-  const productEnabled = flexible || !!features.quickstart_product_enabled;
-  const categoryEnabled = flexible || !!features.quickstart_category_enabled;
-  const aiEnabled = flexible || !!features.quickstart_ai_enabled;
+  const productEnabled = flexible || !!features.quickstart_product_on || !!features.quickstart_product_enabled;
+  const categoryEnabled = flexible || !!features.quickstart_category_on || !!features.quickstart_category_enabled;
+  const aiEnabled = flexible || !!features.quickstart_ai_on || !!features.quickstart_ai_enabled;
 
   const allowedProductTypes: QuickstartProductType[] = [];
   if (flexible || productEnabled) {

@@ -265,6 +265,7 @@ function getIndividualPriceForTier(tierName: string): number {
     'E-commerce': 99,   // V2 new tier
     'Omnichannel': 149, // V2 new tier
     'Professional': 199,
+    'Organization': 499,
     'Enterprise': 499   // V2 pricing
   };
   return prices[tierName] || 99;

@@ -299,20 +299,6 @@ export class DynamicNavTemplates {
           childrenKeys: [],
         },
       },
-      {
-        ...item,
-        id: `${item.id}-${orgId}-${tenant.id}-propagation`,
-        label: 'Propagation Center',
-        href: `/t/${tenant.id}/propagation`,
-        icon: DynamicNavIconNames.Integrations,
-        metadata: {
-          ...item.metadata,
-          parentKey: `${item.id}-${orgId}-${tenant.id}`,
-          nestingLevel: (item.metadata?.nestingLevel || 0) + 3,
-          hasChildren: false,
-          childrenKeys: [],
-        },
-      },
     ].map(child => ({
       id: child.id,
       label: child.label,
