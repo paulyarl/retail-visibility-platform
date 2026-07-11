@@ -32,10 +32,10 @@ router.post('/enrich', async (req, res) => {
     }
 
     // Validate provider
-    if (provider && !['upc_database', 'open_food_facts'].includes(provider)) {
+    if (provider && !['upc_database', 'open_food_facts', 'barcodelookup', 'goupc', 'kroger'].includes(provider)) {
       return res.status(400).json({
         success: false,
-        message: 'provider must be either "upc_database" or "open_food_facts"'
+        message: 'provider must be one of: "upc_database", "open_food_facts", "barcodelookup", "goupc", "kroger"'
       });
     }
 
@@ -50,7 +50,7 @@ router.post('/enrich', async (req, res) => {
     const result = await barcodeEnrichmentService.enrichBarcode(
       barcode,
       tenantId,
-      provider || 'upc_database'
+      provider as any || 'upc_database'
     );
     
     res.json({
@@ -103,10 +103,10 @@ router.post('/batch', async (req, res) => {
     }
 
     // Validate provider
-    if (provider && !['upc_database', 'open_food_facts'].includes(provider)) {
+    if (provider && !['upc_database', 'open_food_facts', 'barcodelookup', 'goupc', 'kroger'].includes(provider)) {
       return res.status(400).json({
         success: false,
-        message: 'provider must be either "upc_database" or "open_food_facts"'
+        message: 'provider must be one of: "upc_database", "open_food_facts", "barcodelookup", "goupc", "kroger"'
       });
     }
 
@@ -121,7 +121,7 @@ router.post('/batch', async (req, res) => {
     const results = await barcodeEnrichmentService.enrichBatchBarcodes(
       barcodes,
       tenantId,
-      provider || 'upc_database'
+      provider as any || 'upc_database'
     );
     
     res.json({
@@ -244,6 +244,27 @@ router.delete('/cache', async (req, res) => {
 router.get('/providers', async (req, res) => {
   try {
     const providers = [
+      {
+        name: 'barcodelookup',
+        displayName: 'BarcodeLookup.com',
+        description: 'Commercial barcode database with 1B+ items across all industries',
+        rateLimit: '500 requests per hour',
+        features: ['product_info', 'images', 'pricing', 'categories', 'store_prices', 'mpn', 'asin']
+      },
+      {
+        name: 'goupc',
+        displayName: 'Go-UPC',
+        description: 'Commercial barcode lookup with rich specs and ingredients data',
+        rateLimit: '500 requests per hour',
+        features: ['product_info', 'images', 'specs', 'ingredients', 'categories']
+      },
+      {
+        name: 'kroger',
+        displayName: 'Kroger Developer API',
+        description: 'Kroger grocery catalog with OAuth2 authentication',
+        rateLimit: '500 requests per hour',
+        features: ['product_info', 'images', 'pricing', 'categories', 'fulfillment_types']
+      },
       {
         name: 'upc_database',
         displayName: 'UPC Database',

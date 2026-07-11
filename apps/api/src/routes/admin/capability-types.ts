@@ -13,12 +13,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { authenticateToken } from '../../middleware/auth';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticateToken);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * Middleware to check if user is platform staff (admin, support, or viewer)

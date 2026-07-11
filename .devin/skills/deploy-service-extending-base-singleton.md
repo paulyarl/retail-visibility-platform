@@ -266,7 +266,11 @@ export class CrmTicketService extends BaseService {
 3. **Cache invalidation is the service’s responsibility.**  After a mutation (POST/PUT/PATCH/DELETE), call `this.invalidateCache(key)` or implement `invalidateServiceCaches` for tenant-scoped services.
 4. **Context/isolation are not optional for tenant services.**  The `TenantApiSingleton` cache contract exists so the platform can evict caches automatically when data changes.
 5. **SSR safety:**  Frontend singletons must guard `localStorage` / `window` access with `typeof window !== 'undefined'`.  The base classes already do this for auth headers, but service-specific localStorage reads need manual guards.
-6. **Backend route mounting for public endpoints:**  Public tenant-scoped routes must be mounted at `/api/public/tenants/:tenantId/*` using a `mergeParams` router — **never** at `/api/tenants/:tenantId/*`.  The `/api/tenants` path has blanket `authenticateToken` middleware (from `trialSetupRoutes`, `tenantNotificationsRoutes`, etc.) that intercepts ALL routes under `/api/tenants/*`, even public ones.  See `troubleshooting-public-page-api-leaks.md` Pattern 4 for details.
+6. **Backend route mounting for public endpoints:**  Public tenant-scoped routes must be mounted at `/api/public/tenants/:tenantId/*` using a `mergeParams` router — **never** at `/api/tenants/:tenantId/*`.  The `/api/tenants` path has blanket `authenticateToken` middleware (from `trialSetupRoutes`, `tenantNotificationsRoutes`, etc.) that intercepts ALL routes under `/api/tenants/*`, even public ones.  See `troubleshooting-public-page-api-leaks.md` Pattern 4 and `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1 for details.
+
+7. **URL prefix determines auth scope.**  A `PublicApiSingleton` service MUST call `/api/public/...` endpoints.  A `TenantApiSingleton` service MUST call `/api/tenants/...` endpoints.  The URL prefix is the authoritative indicator of auth scope — see `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1.
+
+8. **Dual-scope pattern.**  When a route serves both public and private consumers (e.g., `effective-capabilities`), create two endpoints: a public summary at `/api/public/tenants/:tenantId/*` (no auth, `detail=full` ignored) and a private full-detail endpoint at `/api/tenants/:tenantId/*` (auth required, `?detail=full` returns raw gates).  The `PublicApiSingleton` service calls the public endpoint; a separate `TenantApiSingleton` service calls the private endpoint.  See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-2 for the dual-scope pattern.
 
 ### 3.1 Backend route pattern for public tenant-scoped endpoints
 
@@ -306,3 +310,4 @@ app.use('/api/public/tenants/:tenantId', myPublicRouter); // public tenant-scope
 | Background / cron / system jobs | `ApiSystemSingleton` | `UniversalSingleton` |
 | Third-party API wrapper (Google, weather, etc.) | `ExternalApiSingleton` | N/A |
 | Capability-gated feature | `TenantApiSingleton` + client-side tier check | `PermissionEnhancedBaseService` |
+| Dual-scope (public summary + private full) | `PublicApiSingleton` (public reads) + `TenantApiSingleton` (auth reads) | `BaseService` / `UniversalSingleton` |

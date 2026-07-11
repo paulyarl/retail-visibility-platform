@@ -4,14 +4,11 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { basePrisma } from '../../prisma';
 
 const router = Router();
 
-// All routes require admin authentication
-router.use(authenticateToken);
-// router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * GET /api/admin/security/sessions

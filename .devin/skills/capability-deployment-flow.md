@@ -270,6 +270,12 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
 3. Implement PUT endpoint: validates against tier, persists merchant prefs, invalidates cache
 4. Add Zod validation schema for all fields including enum values
 
+**URL namespace selection** (from `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2):
+- **Public capability routes** (readable by storefront/product pages without auth) MUST be mounted at `/api/public/tenants/:tenantId/*` using a `mergeParams` router.
+- **Private capability routes** (dashboard/settings only) MUST stay at `/api/tenants/:tenantId/*` with per-route `authenticateToken`.
+- **Dual-scope routes** (e.g., `effective-capabilities`) get two endpoints: public summary at `/api/public/tenants/:tenantId/*` (no auth, `detail=full` ignored) + private full detail at `/api/tenants/:tenantId/*` (auth required, `?detail=full` returns raw gates).
+- **Never** use `router.use(authenticateToken)` at the router level in orchestrator-mounted sub-routers — use per-route `authenticateToken` only. See `AUTH_SCOPE_ISOLATION_SPEC.md` FR-3.
+
 **GET endpoint pattern**:
 ```ts
 router.get('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
@@ -321,9 +327,11 @@ router.put('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
 - `features` on every state object is always `{}` (legacy compatibility) — use `enabled` instead
 - Fallback resolvers in `CapabilityResolutionService.ts` MUST include `merchantPreferences: null`
 
-**Frontend service pattern** (from `deploy-service-extending-base-singleton.md`):
-- Use `TenantApiSingleton` for merchant-scoped services
-- Use `PublicApiSingleton` for public storefront reads
+**Frontend service pattern** (from `deploy-service-extending-base-singleton.md` + `AUTH_SCOPE_ISOLATION_SPEC.md` FR-2a):
+- Use `TenantApiSingleton` for merchant-scoped services — MUST call `/api/tenants/...` endpoints
+- Use `PublicApiSingleton` for public storefront reads — MUST call `/api/public/...` endpoints
+- **URL prefix MUST match base class auth scope**: a `PublicApiSingleton` service MUST NOT call `/api/tenants/...` endpoints. A `TenantApiSingleton` service MUST NOT call `/api/public/...` endpoints.
+- For dual-scope data (e.g., `effective-capabilities`): the `PublicApiSingleton` service calls `/api/public/tenants/...` (summary), and a separate `TenantApiSingleton` service calls `/api/tenants/...` (full detail with auth).
 - Never use direct `fetch` calls — always extend the singleton base
 
 ---
@@ -498,5 +506,8 @@ When deploying a capability change, verify ALL of these:
 - [ ] Settings page `isTierAllowed` uses `allowed*Types` arrays, not effective flags or `isFlexible`-only (R25)
 - [ ] Settings page group toggles use `allowed*Types.length > 0`, not `*Enabled` effective flags (R25)
 - [ ] `CAPABILITY_DISPLAY` `settingsPath` points to actual settings page URL, not parent route (R26)
+- [ ] **Route URL namespace matches auth scope**: public routes at `/api/public/tenants/:tenantId/*`, private routes at `/api/tenants/:tenantId/*` (see `AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2)
+- [ ] **Frontend service base class matches route auth scope**: `PublicApiSingleton` → `/api/public/...` URL, `TenantApiSingleton` → `/api/tenants/...` URL (see `AUTH_SCOPE_ISOLATION_SPEC.md` FR-2a)
+- [ ] **No `router.use(authenticateToken)` at router level** in orchestrator-mounted sub-routers — use per-route `authenticateToken` only (see `AUTH_SCOPE_ISOLATION_SPEC.md` FR-3)
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors

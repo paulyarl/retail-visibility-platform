@@ -9,13 +9,11 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { BsaasAnalyticsService } from '../../services/BsaasAnalyticsService';
 
 const router = Router();
 
-router.use(authenticateToken);
-router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // GET /api/admin/bsaas-analytics
 router.get('/', async (req: Request, res: Response) => {

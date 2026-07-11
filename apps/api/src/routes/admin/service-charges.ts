@@ -10,15 +10,12 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requirePlatformAdmin } from '../../middleware/auth';
 import { getServiceChargeService } from '../../services/subscription/ServiceChargeService';
 import { prisma } from '../../prisma';
 
 const router = Router();
 
-// Apply authentication and admin requirements to all routes
-router.use(requireAuth);
-router.use(requirePlatformAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * POST /api/admin/service-charges

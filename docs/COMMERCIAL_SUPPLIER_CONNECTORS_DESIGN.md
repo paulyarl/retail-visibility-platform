@@ -1057,6 +1057,27 @@ This component:
 
 Each step is independently verifiable — extract one component, run `checkweb`, commit. No behavior changes during decomposition, only structural.
 
+#### 12.4.5 ItemCreationWizard: No Decomposition Required
+
+The `ItemCreationWizard` (`apps/web/src/components/inventory/wizards/ItemCreationWizard.tsx`, 1365 lines) is **already step-decomposed** — 10 separate step components in `wizards/steps/` handle all field rendering. The orchestrator's bulk is types/defaults (~270 lines), the `handleEnrichmentMatch` mapping function (~170 lines), and business logic — not inline JSX.
+
+**Already spec-ready:**
+- GTIN field exists in `BasicInfoStep` (via `wizardData.basicInfo.gtin`)
+- Barcode enrichment exists via `CatalogSearchStep` → `SupplierImportService.enrichBarcode()`
+- `handleEnrichmentMatch` maps `BarcodeEnrichment` → all wizard fields (same pattern `EditItemModal` will adopt post-decomposition)
+- `catalogMatch` tracking with `source_type`
+
+**Spec alignment is additive — no decomposition needed:**
+- Add `SupplierMatchSection` to `ReviewStep.tsx` — calls `checkSupplierMatch(gtin)`, renders "Order Bulk" / "Find Supplier"
+- Add affiliate click tracking on "Order Bulk" click
+
+**Optional polish (non-blocking):**
+- Extract `WizardData` + `INITIAL_DATA` → `wizards/types.ts` (~270 lines)
+- Extract `handleEnrichmentMatch` → `wizards/utils/enrichmentMapper.ts` (~170 lines)
+- Extract draft auto-save/recovery → `wizards/hooks/useWizardDraft.ts` (~100 lines)
+
+These would reduce the orchestrator from ~1365 to ~825 lines but are convenience refactors, not prerequisites.
+
 ---
 
 ## 13. Implementation Plan
@@ -1106,22 +1127,25 @@ Create `apps/api/src/jobs/supplier-commercial-sync.ts`:
 
 ### Phase 4: Wholesale Matching Backend
 
-- Migration `093_product_suppliers.sql` — `product_suppliers` table
-- Migration `094_affiliate_clicks.sql` — `affiliate_clicks` table
-- Migration `095_brand_partner_claims.sql` — `brand_partner_claims` table
+- Migration `098_product_suppliers.sql` — `product_suppliers` table
+- Migration `099_affiliate_clicks.sql` — `affiliate_clicks` table
+- Migration `100_brand_partner_claims.sql` — `brand_partner_claims` table
 - `WholesaleMatchingService.ts` — supplier check, Faire search, affiliate link builder, brand partner claim lookup
 - `WholesaleMatchingResolver.ts` — capability resolver for `wholesale_matching_options`
 - Wire resolver into `EffectiveCapabilityResolver.ts` as `effective[18]`
-- Routes: `wholesale-matching.ts` (check, search, suppliers, dashboard)
-- Webhook: `POST /api/webhooks/faire` — Faire order confirmation callback
-- Admin routes: `brand-partners.ts` — CRUD for brand partner claims, affiliate analytics
+- Routes: `wholesale-matching.ts` (check, search, suppliers, dashboard) — mount in `tenant.routes.ts` orchestrator
+- Webhook: `POST /api/webhooks/faire` — Faire order confirmation callback — mount as `preMiddleware: true` in `routeRegistry.ts`
+- Admin routes: `admin/brand-partners.ts` — CRUD for brand partner claims, affiliate analytics — mount in `admin.routes.ts` orchestrator
+- Brand self-service: `brand-partners.ts` — mount as standalone entry in `routeRegistry.ts`
 
 ### Phase 5: Route & Provider Updates
 
 - Update `GET /api/barcode-enrichment-singleton/providers` to include new providers
 - Update provider validation in `POST /enrich` and `POST /batch` to accept new provider names
-- Mount wholesale routes in `index.ts`
-- Mount brand partner admin routes in `index.ts`
+- **Mount wholesale routes in `tenant.routes.ts` orchestrator** (NOT `index.ts`) — as sub-resource router before `tenantsRoutes` catch-all
+- **Mount admin wholesale + brand partner routes in `admin.routes.ts` orchestrator** — as specific sub-path routers before generic root mounts
+- **Mount Faire webhook in `routeRegistry.ts`** as `preMiddleware: true` entry (before JSON parsing, same as Stripe webhooks)
+- **Mount brand self-service in `routeRegistry.ts`** as standalone `/api/brand-partners` entry
 
 ### Phase 6: EditItemModal Decomposition (Prerequisite to Phase 7)
 
@@ -1169,21 +1193,42 @@ Execute the 10-step decomposition in §12.4.4:
 | `apps/api/src/services/resolvers/types.ts` | Modify | Add `EffectiveWholesaleMatching` type |
 | `apps/api/src/services/EffectiveCapabilityResolver.ts` | Modify | Wire `resolveWholesaleMatching` as `effective[18]` |
 | `apps/api/src/jobs/supplier-commercial-sync.ts` | Create | Nightly sync job for commercial suppliers |
-| `apps/api/src/routes/wholesale-matching.ts` | Create | Wholesale check, search, suppliers, dashboard routes |
-| `apps/api/src/routes/brand-partners.ts` | Create | Admin CRUD for brand partner claims + affiliate analytics |
+| `apps/api/src/routes/wholesale-matching.ts` | Create | Wholesale check, search, suppliers, dashboard routes (mounted in `tenant.routes.ts`) |
+| `apps/api/src/routes/wholesale-matching-options-settings.ts` | Create | Capability settings routes (mounted in `tenant.routes.ts`) |
+| `apps/api/src/routes/admin/wholesale-matching.ts` | Create | Admin wholesale + affiliate analytics (mounted in `admin.routes.ts`) |
+| `apps/api/src/routes/admin/brand-partners.ts` | Create | Admin brand partner claims CRUD (mounted in `admin.routes.ts`) |
+| `apps/api/src/routes/brand-partners.ts` | Create | Brand self-service claim submission (mounted in `routeRegistry.ts`) |
+| `apps/api/src/routes/webhooks/faire.ts` | Create | Faire webhook (mounted as `preMiddleware: true` in `routeRegistry.ts`) |
+| `apps/api/src/routes/tenant.routes.ts` | Modify | Add wholesale sub-resource routers before `tenantsRoutes` catch-all |
+| `apps/api/src/routes/admin.routes.ts` | Modify | Add wholesale + brand-partner sub-path routers before generic root mounts |
+| `apps/api/src/routes/routeRegistry.ts` | Modify | Add Faire webhook (preMiddleware) + brand-partners standalone entry |
 | `apps/api/src/routes/barcode-enrichment-singleton.ts` | Modify | Update providers list, extend provider validation |
-| `apps/api/src/index.ts` | Modify | Wire sync job + wholesale routes + brand partner routes + Faire webhook |
+| `apps/api/src/index.ts` | Modify | Wire sync job startup only (routes handled by orchestrators + registry) |
 | `apps/api/prisma/schema.prisma` | Modify | Add `product_suppliers`, `affiliate_clicks`, `brand_partner_claims` models |
-| `database/migrations/093_product_suppliers.sql` | Create | `product_suppliers` table |
-| `database/migrations/094_affiliate_clicks.sql` | Create | `affiliate_clicks` table |
-| `database/migrations/095_brand_partner_claims.sql` | Create | `brand_partner_claims` table |
+| `database/migrations/098_product_suppliers.sql` | Create | `product_suppliers` table |
+| `database/migrations/099_affiliate_clicks.sql` | Create | `affiliate_clicks` table |
+| `database/migrations/100_brand_partner_claims.sql` | Create | `brand_partner_claims` table |
 | `apps/api/.env.example` | Modify | Add commercial API + Faire env vars |
-| `apps/web/src/components/products/OrderBulkButton.tsx` | Create | "Order Bulk" button for matched suppliers |
-| `apps/web/src/components/products/FindSupplierUpsell.tsx` | Create | Tier-aware "Find Supplier via Faire" upsell |
+| `apps/web/src/components/products/OrderBulkButton.tsx` | Create | "Order Bulk" button for matched suppliers (shared: modal + wizard) |
+| `apps/web/src/components/products/FindSupplierUpsell.tsx` | Create | Tier-aware "Find Supplier via Faire" upsell (shared: modal + wizard) |
 | `apps/web/src/app/t/[tenantId]/settings/wholesale/page.tsx` | Create | Distributor dashboard page |
 | `apps/web/src/app/t/[tenantId]/settings/wholesale/DistributorDashboardClient.tsx` | Create | Dashboard client with product table, filters, earnings |
 | `apps/web/src/hooks/tenant-access/useWholesaleMatchingCapability.ts` | Create | Capability hook for wholesale matching |
 | `apps/web/src/services/WholesaleMatchingService.ts` | Create | Frontend singleton for wholesale API calls |
+| `apps/web/src/components/items/EditItemModal.tsx` | Modify | Reduce to ~150-line orchestrator (decomposition) |
+| `apps/web/src/components/items/CategoryNameDisplay.tsx` | Move | Move out of EditItemModal to items/ root |
+| `apps/web/src/components/items/edit-modal/EditItemForm.tsx` | Create | Form context provider + sub-component orchestrator |
+| `apps/web/src/components/items/edit-modal/ItemStatusSelector.tsx` | Create | Draft/Active/Archived toggle |
+| `apps/web/src/components/items/edit-modal/ItemBasicFields.tsx` | Create | SKU, name, brand, manufacturer, condition, MPN, GTIN (spec) |
+| `apps/web/src/components/items/edit-modal/ItemPricingFields.tsx` | Create | List price, sale price, stock |
+| `apps/web/src/components/items/edit-modal/ItemContentFields.tsx` | Create | Description, enhanced description, features, specifications |
+| `apps/web/src/components/items/edit-modal/ItemCategorySection.tsx` | Create | Category display + assignment trigger |
+| `apps/web/src/components/items/edit-modal/ItemPhotoPlaceholder.tsx` | Create | Current photo display |
+| `apps/web/src/components/items/edit-modal/ItemCurrentValues.tsx` | Create | Read-only current values debug panel |
+| `apps/web/src/components/items/edit-modal/SupplierMatchSection.tsx` | Create | "Order Bulk" / "Find Supplier" upsell in modal (spec) |
+| `apps/web/src/components/items/edit-modal/useItemFormState.ts` | Create | Custom hook: form state + init + save + barcode enrichment (spec) |
+| `apps/web/src/components/items/edit-modal/useVariantManagement.ts` | Create | Custom hook: variant state, change detection, CRUD |
+| `apps/web/src/components/items/edit-modal/types.ts` | Create | Shared types for decomposed components |
 
 ---
 
@@ -1201,3 +1246,4 @@ Execute the 10-step decomposition in §12.4.4:
 | Brand partner claim disputes | `claim_type` hierarchy (exclusive > preferred > verified) + admin approval workflow. Only one exclusive claim per barcode enforced by DB unique constraint |
 | Affiliate click attribution loss | Faire webhook may not fire if merchant doesn't complete order. `affiliate_clicks.status` has `expired` state for clicks with no conversion after 30 days |
 | Parallel API cost doubling | Both BarcodeLookup.com and Go-UPC are called on every cache miss. Acceptable — cache hit rate is typically >90% after initial population. Rate limiting prevents runaway costs |
+| EditItemModal decomposition regression | 1180-line monolith split into 10+ files. Mitigated by 10-step incremental extraction — each step verified with `pnpm checkweb`, no behavior changes during decomposition, only structural. Rollback is per-step git revert. |

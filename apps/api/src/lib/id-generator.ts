@@ -1368,3 +1368,33 @@ export function generateCouponTargetId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `ctgt-${nanoid()}`;
 }
+
+/**
+ * Generate product supplier ID (global, no tenant scope)
+ * Format: psup-{nanoid} (14 chars)
+ * URL-safe, readable, unique
+ */
+export function generateProductSupplierId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `psup-${nanoid()}`;
+}
+
+/**
+ * Generate affiliate click ID (tenant-scoped)
+ * Format: ac-{tk}-{nanoid} (16 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateAffiliateClickId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `ac-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate brand partner claim ID (global, no tenant scope)
+ * Format: bpc-{nanoid} (13 chars)
+ * URL-safe, readable, unique
+ */
+export function generateBrandPartnerClaimId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `bpc-${nanoid()}`;
+}

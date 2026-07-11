@@ -53,6 +53,7 @@ export interface MerchantSettingsBundle {
   chatbotOptions: ChatbotOptionsMerchantSettings | null;
   barcodeScan: BarcodeScanMerchantSettings | null;
   socialCommerceOptions: SocialCommerceOptionsMerchantSettings | null;
+  wholesaleMatching: WholesaleMatchingMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -760,6 +761,22 @@ export type ConstraintStatusMap = Record<string, ConstraintStatus>;
 
 export type PromotionTier = 'basic' | 'premium' | 'featured';
 
+export type WholesaleMatchingTier = 'none' | 'search' | 'full';
+
+export interface EffectiveWholesaleMatching {
+  enabled: boolean;
+  tier: WholesaleMatchingTier;
+  can_check_supplier_match: boolean;
+  can_search_faire: boolean;
+  can_build_affiliate_link: boolean;
+  can_view_brand_partners: boolean;
+  is_flexible: boolean;
+}
+
+export interface WholesaleMatchingMerchantSettings {
+  wholesale_matching_enabled?: boolean | null;
+}
+
 export interface EffectiveDirectoryPromotion {
   enabled: boolean;
   allowed_tiers: PromotionTier[];
@@ -805,6 +822,7 @@ export interface EffectiveCapabilities {
     org_options: EffectiveOrgOptions;
     social_commerce_options: EffectiveSocialCommerceOptions;
     directory_promotion: EffectiveDirectoryPromotion;
+    wholesale_matching: EffectiveWholesaleMatching;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

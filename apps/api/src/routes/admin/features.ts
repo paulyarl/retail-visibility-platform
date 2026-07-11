@@ -5,10 +5,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { authenticateToken } from '../../middleware/auth';
 
 const router = Router();
-router.use(authenticateToken);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 const requirePlatformStaff = (req: any, res: any, next: any) => {
   if (!['PLATFORM_ADMIN','PLATFORM_SUPPORT','PLATFORM_VIEWER'].includes(req.user?.role)) {

@@ -10,19 +10,7 @@ import { AnalyticsService } from '../services/analytics/AnalyticsService';
 const router = express.Router();
 const analyticsService = AnalyticsService.getInstance();
 
-// Middleware to check admin permissions
-const requireAdmin = async (req: any, res: any, next: any) => {
-  try {
-    // TODO: Implement admin permission check
-    // For now, allow all requests - add proper auth later
-    next();
-  } catch (error) {
-    res.status(403).json({ error: 'Admin access required' });
-  }
-};
-
-// Apply admin middleware to all routes
-router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * GET /api/admin/analytics/overview

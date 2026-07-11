@@ -13,13 +13,11 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requirePlatformAdmin } from '../../middleware/auth';
 import demoTenantService, { DemoTemplate } from '../../services/DemoTenantService';
 
 const router = Router();
 
-router.use(authenticateToken);
-router.use(requirePlatformAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * GET /api/admin/demo-tenants/templates

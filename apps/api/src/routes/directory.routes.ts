@@ -38,7 +38,7 @@ import directoryMapRoutes from './directory-map';
 // Root-mounted routers with catch-all params that call next() when unresolved
 import directoryCategoriesRoutes from './directory-categories';
 import directoryPhotosRouter from './directory-photos';
-import enhancedDirectoryRoutes from './ENHANCED_DIRECTORY_ROUTES';
+import enhancedDirectoryRoutes from './directory-enhanced';
 
 // Terminal catch-all (must be LAST — /:slug returns 404, does NOT call next())
 import directoryRoutes from './directory';

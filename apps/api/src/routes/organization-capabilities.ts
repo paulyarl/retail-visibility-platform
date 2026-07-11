@@ -29,7 +29,7 @@ import { generateCorrelationId } from '../lib/id-generator';
 
 const router = Router({ mergeParams: true });
 
-router.use(authenticateToken);
+// Auth applied per-route — no router-level auth to avoid scope bleed
 
 const CAPABILITY_DOMAINS = [
   'commerce', 'payment_gateway', 'storefront', 'fulfillment', 'product_options',
@@ -58,7 +58,7 @@ const DOMAIN_LABELS: Record<string, string> = {
 /**
  * GET /api/organizations/:orgId/effective-capabilities
  */
-router.get('/:orgId/effective-capabilities', async (req: Request, res: Response) => {
+router.get('/:orgId/effective-capabilities', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     if (!orgId) {
@@ -252,7 +252,7 @@ router.get('/:orgId/effective-capabilities', async (req: Request, res: Response)
  * Aggregates per-tenant capability status across all locations in the org.
  * Returns counts per capability domain: enabled, gated, tier-blocked.
  */
-router.get('/:orgId/capability-rollup', async (req: Request, res: Response) => {
+router.get('/:orgId/capability-rollup', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     if (!orgId) {
@@ -371,7 +371,7 @@ router.get('/:orgId/capability-rollup', async (req: Request, res: Response) => {
  * GET /api/organizations/:orgId/product-type-rollup
  * Returns per-tenant product type capability state across all locations.
  */
-router.get('/:orgId/product-type-rollup', async (req: Request, res: Response) => {
+router.get('/:orgId/product-type-rollup', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     if (!orgId) {
@@ -401,7 +401,7 @@ router.get('/:orgId/product-type-rollup', async (req: Request, res: Response) =>
  * GET /api/organizations/:orgId/product-mix
  * Returns SKU counts grouped by product_type across all locations.
  */
-router.get('/:orgId/product-mix', async (req: Request, res: Response) => {
+router.get('/:orgId/product-mix', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     if (!orgId) {
@@ -432,7 +432,7 @@ router.get('/:orgId/product-mix', async (req: Request, res: Response) => {
  * Aggregates chatbot status across all locations in the org.
  * For each location: bot active/inactive, conversation count, FAQ/product KB status.
  */
-router.get('/:orgId/bot-status', async (req: Request, res: Response) => {
+router.get('/:orgId/bot-status', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { orgId } = req.params;
     if (!orgId) {

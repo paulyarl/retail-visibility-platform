@@ -7,36 +7,30 @@
  *
  * This enforces that specific admin paths always win over any generic catch-all.
  *
- * ── Auth Middleware Strategy ──────────────────────────────────────────────
- * - Routes with internal auth (router.use(requireAuth/requirePlatformAdmin)):
- *     service-charges, paypal-connect, manual-billing, platform-revenue,
- *     platform-fee-invoices, notification-logs, inventory-transfers,
- *     slug-registry, catalog, inventory-stats, google-product-taxonomy,
- *     demo-tenants, cached-products, scan-metrics
- *   → No mount-level auth needed (would be redundant).
+ * ── Auth Middleware Strategy (Auth Scope Isolation) ──────────────────────
+ * All admin sub-routers are mounted with authenticateToken + requireAdmin at
+ * the mount level. No sub-router uses router.use(authenticateToken) or
+ * router.use(requireAdmin) internally — this prevents auth scope bleed between
+ * sibling routers (per docs/AUTH_SCOPE_ISOLATION_SPEC.md).
  *
- * - Routes with mount-level auth (authenticateToken, requireAdmin):
- *     security (admin-security), tier-system, capabilities, users, tools,
- *     sentry, errors
- *   → These routes have no internal auth, so mount-level is required.
+ * Sub-routers that need finer-grained role checks (e.g. requirePlatformStaff
+ * for PLATFORM_SUPPORT/PLATFORM_VIEWER access) apply those per-route.
  *
- * - Routes with mount-level authenticateToken only:
- *     platform-categories, gbp-categories, feature-overrides, tenants,
- *     ticker-config, ticker-messages, tiers, trials, analytics,
- *     navigation-links, categories, billing, capability-types, features,
- *     capabilities, tier-capabilities, taxonomy, crm, bot, feature-purchases,
- *     bot-embed-licenses, bsaas-*, capability-constraints, suppliers,
- *     platform-settings
- *   → authenticateToken at mount; requireAdmin/requirePlatformAdmin is
- *     applied per-route inside some of these routers.
+ * paypal-connect is mounted with authenticateToken only (not requireAdmin)
+ * because it has tenant-facing order/capture routes that need auth but not
+ * admin access. Its admin routes have requireAdmin per-route.
  *
- * - Generic root-mounted routers (tenant-flags, platform-flags,
- *   effective-flags, admin-users, admin-tools):
- *   → authenticateToken at mount. These define specific sub-paths internally.
+ * notification-logs is mounted with authenticateToken only because it uses
+ * requirePlatformAdmin per-route (which checks req.user for 401).
  *
- * - PRE-EXISTING issues (not introduced by this refactor):
- *   - performance.ts: no auth at all (was unauthenticated in original registry)
- *   - security-monitoring.ts: requireAdmin is commented out internally
+ * scan-metrics is mounted with authenticateToken only because it does its
+ * own canViewAllTenants() role check per-route.
+ *
+ * security-monitoring is mounted with authenticateToken only; requireAdmin
+ * is applied per-route where needed.
+ *
+ * google-product-taxonomy is mounted with authenticateToken only; it's a
+ * read-only taxonomy search that any authenticated admin can access.
  */
 
 import { Router } from 'express';
@@ -97,6 +91,8 @@ import bsaasPromotionsRoutes from './admin/bsaas-promotions';
 import capabilityConstraintsRoutes from './admin/capability-constraints';
 import supplierAdminRoutes from './admin/suppliers';
 import adminPlatformSettingsRoutes from './admin/platform-settings';
+import adminWholesaleMatchingRoutes from './admin/wholesale-matching';
+import adminBrandPartnersRoutes from './admin/brand-partners';
 
 // Generic root-mounted routers (mounted at bare /api/admin)
 import tenantFlagsRoutes from './tenant-flags';
@@ -106,68 +102,70 @@ import effectiveFlagsRoutes from './effective-flags';
 const router = Router();
 
 // ── 1. Specific sub-path routers ────────────────────────────────────────
-router.use('/service-charges', serviceChargesRoutes);
-router.use('/paypal-connect', paypalConnectRoutes);
-router.use('/security', adminSecurityMonitoringRoutes);
+router.use('/service-charges', authenticateToken, requireAdmin, serviceChargesRoutes);
+router.use('/paypal-connect', authenticateToken, paypalConnectRoutes);
+router.use('/security', authenticateToken, adminSecurityMonitoringRoutes);
 router.use('/security', authenticateToken, requireAdmin, adminSecurityRoutes);
-router.use('/tier-system', authenticateToken, requireAdmin, tierSystemRoutes); // Note: tier-system also has internal router.use(authenticateToken) — redundant but harmless
+router.use('/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
 router.use('/capabilities', authenticateToken, requireAdmin, capabilityRoutes);
-router.use('/tiers', authenticateToken, tierManagementRoutes);
-router.use('/scan-metrics', scanMetricsRoutes);
-router.use('/cached-products', cachedProductsRoutes);
+router.use('/tiers', authenticateToken, requireAdmin, tierManagementRoutes);
+router.use('/scan-metrics', authenticateToken, scanMetricsRoutes);
+router.use('/cached-products', authenticateToken, requireAdmin, cachedProductsRoutes);
 router.use('/users', authenticateToken, requireAdmin, adminUsersRoutes);
 router.use('/tools', authenticateToken, requireAdmin, adminToolsRoutes);
 router.use('/sentry', authenticateToken, requireAdmin, sentryRoutes);
 router.use('/errors', authenticateToken, requireAdmin, errorLogRoutes);
-router.use('/manual-billing', manualBillingRoutes);
-router.use('/platform-revenue', platformRevenueRoutes);
-router.use('/platform-fee-invoices', platformFeeInvoiceRoutes);
-router.use('/notification-logs', notificationLogsRoutes);
-router.use('/inventory-transfers', adminInventoryTransferRoutes);
-router.use('/slug-registry', adminSlugRegistryRoutes);
-router.use('/catalog', adminCatalogRoutes);
-router.use('/inventory', adminInventoryStatsRoutes);
-router.use('/google-product-taxonomy', googleProductTaxonomyRoutes);
-router.use('/demo-tenants', adminDemoTenantRoutes);
-router.use('/performance', performanceApi);
-router.use('/platform-categories', authenticateToken, platformCategoriesRoutes);
-router.use('/gbp-categories', authenticateToken, gbpCategoriesSyncRoutes);
-router.use('/feature-overrides', authenticateToken, featureOverridesRoutes);
-router.use('/tenants', authenticateToken, adminTenantsRoutes);
-router.use('/ticker-config', authenticateToken, tickerConfigRoutes);
-router.use('/ticker-messages', authenticateToken, tickerMessagesRoutes);
-router.use('/tiers', authenticateToken, adminTiersRoutes);
-router.use('/trials', authenticateToken, trialManagementRoutes);
-router.use('/analytics', authenticateToken, adminAnalyticsRoutes);
-router.use('/navigation-links', authenticateToken, navigationLinksRoutes);
-router.use('/categories', authenticateToken, categoriesPropagateRoutes);
-router.use('/billing', authenticateToken, adminTenantBillingRoutes);
-router.use('/billing', authenticateToken, adminPlatformBillingRoutes);
-router.use('/billing', authenticateToken, adminAutomationRoutes);
-router.use('/capability-types', authenticateToken, capabilityTypesRoutes);
-router.use('/features', authenticateToken, featuresRoutes);
-router.use('/capabilities', authenticateToken, capabilitiesRoutes);
-router.use('/tier-capabilities', authenticateToken, tierCapabilitiesRoutes);
-router.use('/taxonomy', authenticateToken, taxonomyAdminRoutes);
-router.use('/crm', authenticateToken, crmAdminRoutes);
-router.use('/bot', authenticateToken, botPlatformRoutes);
-router.use('/feature-purchases', authenticateToken, featurePurchasesRoutes);
-router.use('/bot-embed-licenses', authenticateToken, botEmbedLicensesRoutes);
-router.use('/bsaas-catalog', authenticateToken, bsaasCatalogRoutes);
-router.use('/bsaas-bundles', authenticateToken, bsaasBundlesRoutes);
-router.use('/bsaas-analytics', authenticateToken, bsaasAnalyticsRoutes);
-router.use('/bsaas-promotions', authenticateToken, bsaasPromotionsRoutes);
-router.use('/capability-constraints', authenticateToken, capabilityConstraintsRoutes);
-router.use('/suppliers', authenticateToken, supplierAdminRoutes);
-router.use('/platform-settings', authenticateToken, adminPlatformSettingsRoutes);
+router.use('/manual-billing', authenticateToken, requireAdmin, manualBillingRoutes);
+router.use('/platform-revenue', authenticateToken, requireAdmin, platformRevenueRoutes);
+router.use('/platform-fee-invoices', authenticateToken, requireAdmin, platformFeeInvoiceRoutes);
+router.use('/notification-logs', authenticateToken, notificationLogsRoutes);
+router.use('/inventory-transfers', authenticateToken, requireAdmin, adminInventoryTransferRoutes);
+router.use('/slug-registry', authenticateToken, requireAdmin, adminSlugRegistryRoutes);
+router.use('/catalog', authenticateToken, requireAdmin, adminCatalogRoutes);
+router.use('/inventory', authenticateToken, requireAdmin, adminInventoryStatsRoutes);
+router.use('/google-product-taxonomy', authenticateToken, googleProductTaxonomyRoutes);
+router.use('/demo-tenants', authenticateToken, requireAdmin, adminDemoTenantRoutes);
+router.use('/performance', authenticateToken, requireAdmin, performanceApi);
+router.use('/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
+router.use('/gbp-categories', authenticateToken, requireAdmin, gbpCategoriesSyncRoutes);
+router.use('/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);
+router.use('/tenants', authenticateToken, requireAdmin, adminTenantsRoutes);
+router.use('/ticker-config', authenticateToken, requireAdmin, tickerConfigRoutes);
+router.use('/ticker-messages', authenticateToken, requireAdmin, tickerMessagesRoutes);
+router.use('/tiers', authenticateToken, requireAdmin, adminTiersRoutes);
+router.use('/trials', authenticateToken, requireAdmin, trialManagementRoutes);
+router.use('/analytics', authenticateToken, requireAdmin, adminAnalyticsRoutes);
+router.use('/navigation-links', authenticateToken, requireAdmin, navigationLinksRoutes);
+router.use('/categories', authenticateToken, requireAdmin, categoriesPropagateRoutes);
+router.use('/billing', authenticateToken, requireAdmin, adminTenantBillingRoutes);
+router.use('/billing', authenticateToken, requireAdmin, adminPlatformBillingRoutes);
+router.use('/billing', authenticateToken, requireAdmin, adminAutomationRoutes);
+router.use('/capability-types', authenticateToken, requireAdmin, capabilityTypesRoutes);
+router.use('/features', authenticateToken, requireAdmin, featuresRoutes);
+router.use('/capabilities', authenticateToken, requireAdmin, capabilitiesRoutes);
+router.use('/tier-capabilities', authenticateToken, requireAdmin, tierCapabilitiesRoutes);
+router.use('/taxonomy', authenticateToken, requireAdmin, taxonomyAdminRoutes);
+router.use('/crm', authenticateToken, requireAdmin, crmAdminRoutes);
+router.use('/bot', authenticateToken, requireAdmin, botPlatformRoutes);
+router.use('/feature-purchases', authenticateToken, requireAdmin, featurePurchasesRoutes);
+router.use('/bot-embed-licenses', authenticateToken, requireAdmin, botEmbedLicensesRoutes);
+router.use('/bsaas-catalog', authenticateToken, requireAdmin, bsaasCatalogRoutes);
+router.use('/bsaas-bundles', authenticateToken, requireAdmin, bsaasBundlesRoutes);
+router.use('/bsaas-analytics', authenticateToken, requireAdmin, bsaasAnalyticsRoutes);
+router.use('/bsaas-promotions', authenticateToken, requireAdmin, bsaasPromotionsRoutes);
+router.use('/capability-constraints', authenticateToken, requireAdmin, capabilityConstraintsRoutes);
+router.use('/suppliers', authenticateToken, requireAdmin, supplierAdminRoutes);
+router.use('/wholesale', authenticateToken, requireAdmin, adminWholesaleMatchingRoutes);
+router.use('/brand-partners', authenticateToken, requireAdmin, adminBrandPartnersRoutes);
+router.use('/platform-settings', authenticateToken, requireAdmin, adminPlatformSettingsRoutes);
 
 // ── 2. Generic root-mounted routers LAST ──────────────────────────────────
 // These use specific sub-paths internally (/tenant-flags, /platform-flags, /effective-flags, /users, /tools)
 // but are mounted at bare /api/admin. They must come after all specific sub-path routers.
-router.use('/', authenticateToken, tenantFlagsRoutes);
-router.use('/', authenticateToken, adminUsersRoutes);
-router.use('/', authenticateToken, platformFlagsRoutes);
-router.use('/', authenticateToken, effectiveFlagsRoutes);
-router.use('/', authenticateToken, adminToolsRoutes);
+router.use('/', authenticateToken, requireAdmin, tenantFlagsRoutes);
+router.use('/', authenticateToken, requireAdmin, adminUsersRoutes);
+router.use('/', authenticateToken, requireAdmin, platformFlagsRoutes);
+router.use('/', authenticateToken, requireAdmin, effectiveFlagsRoutes);
+router.use('/', authenticateToken, requireAdmin, adminToolsRoutes);
 
 export default router;

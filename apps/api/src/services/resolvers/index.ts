@@ -21,6 +21,7 @@ export { resolveChatbotOptions } from './ChatbotOptionsResolver';
 export { resolveOrgOptions } from './OrgOptionsResolver';
 export { resolveSocialCommerceOptions } from './SocialCommerceOptionsResolver';
 export { resolveDirectoryPromotion } from './DirectoryPromotionResolver';
+export { resolveWholesaleMatching } from './WholesaleMatchingResolver';
 export { applyCrossCapabilityConstraints, validateProposedChange } from './CapabilityConstraintResolver';
 export { CAPABILITY_CONSTRAINTS, getConstraintsForSource, getConstraintsForTarget, getConstraintsInvolving } from './CapabilityConstraintRegistry';
 export { getActiveConstraints, invalidateConstraintCache } from './CapabilityConstraintService';

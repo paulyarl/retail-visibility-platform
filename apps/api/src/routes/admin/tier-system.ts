@@ -11,13 +11,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { authenticateToken } from '../../middleware/auth';
 import { generateFeatureId, generateTierChangeId, generateTierId } from '../../lib/id-generator';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticateToken);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * Helper to transform tier data from Prisma format to frontend format

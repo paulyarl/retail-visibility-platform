@@ -199,7 +199,7 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
   }
 });
 
-// NOTE: Public endpoint moved to routes/public-api.ts (mounted at /api/public)
+// NOTE: Public endpoint moved to routes/public-catalog.ts (mounted at /api/public)
 // to match the frontend URL /api/public/tenant/:tenantId/storefront-options
 
 // Update storefront options settings for a tenant

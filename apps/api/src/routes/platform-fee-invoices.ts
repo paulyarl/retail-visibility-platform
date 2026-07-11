@@ -8,14 +8,12 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { requireAuth, requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { platformFeeInvoiceService } from '../services/PlatformFeeInvoiceService';
 
 const router = Router();
 
-// All routes require admin auth
-router.use(requireAuth, requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * GET /api/admin/platform-fee-invoices

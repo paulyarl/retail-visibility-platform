@@ -1,14 +1,11 @@
 import { Router } from 'express';
 import { prisma } from '../../prisma';
-import { requireAuth, requireAdmin } from '../../middleware/auth';
 import { SubscriptionBillingService } from '../../services/subscription/SubscriptionBillingService';
 
 const router = Router();
 const subscriptionBillingService = new SubscriptionBillingService();
 
-// Apply authentication and admin requirements
-router.use(requireAuth);
-router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // GET /api/admin/billing/tenants/:tenantId/financial-metrics
 router.get('/tenants/:tenantId/financial-metrics', async (req, res) => {

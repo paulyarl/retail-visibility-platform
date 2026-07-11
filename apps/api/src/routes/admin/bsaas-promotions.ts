@@ -15,15 +15,13 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import Stripe from 'stripe';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { audit } from '../../audit';
 import CouponTargetService from '../../services/CouponTargetService';
 import { prisma } from '../../prisma';
 
 const router = Router();
 
-router.use(authenticateToken);
-router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 function getStripe(): Stripe | null {
   const key = process.env.STRIPE_SECRET_KEY;

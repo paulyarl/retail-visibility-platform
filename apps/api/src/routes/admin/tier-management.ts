@@ -8,14 +8,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { authenticateToken } from '../../middleware/auth';
 import { audit } from '../../audit';
 import { TRIAL_CONFIG } from '../../config/tenant-limits';
 
 const router = Router();
 
-// All routes require platform admin access
-router.use(authenticateToken);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * GET /api/admin/tiers

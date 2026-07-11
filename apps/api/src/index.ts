@@ -5,36 +5,22 @@ import * as Sentry from '@sentry/node';
 import './newrelic';
 
 // Platform-level structured logger — available before any other code runs
-import { requestLogger, logger } from "./logger";
+import { logger } from "./logger";
 
 import express from 'express';
-import cors from 'cors';
-import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
 
 // Fix for Supabase SSL certificate issues in production
-// This allows Node.js to accept Supabase's SSL certificates
 if (process.env.NODE_ENV === 'production') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   logger.warn('SSL certificate validation disabled for Supabase compatibility');
 }
 import { prisma } from "./prisma";
-import { setRequestContext } from "./context";
-import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
-import { applyRateLimit } from "./middleware/rate-limit";
-import { securityHeaders, additionalSecurityHeaders } from "./middleware/security-headers";
-import { inputValidationMiddleware } from "./middleware/input-validation";
-
-// Security middleware imports
-import { validateInput, securityLogger } from "./middleware/security";
-
-import { ssrfProtection, blockIotRequests } from "./middleware/ssrf-protection";
+import { bootstrapMiddleware } from "./middleware/bootstrap";
 
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 // Force rebuild v3: Railway build cache bypass
 import fs from "fs";
 import path from "path";
-import { performanceMonitoring } from "./services/alerting";
 
 const app = express();
 
@@ -73,109 +59,8 @@ if (sentryEnabled) {
   logger.warn('Sentry DSN not found - error tracking disabled');
 }
 
-/* ------------------------- middleware ------------------------- */
-// Security headers - applied first for maximum protection
-app.use(securityHeaders);
-app.use(additionalSecurityHeaders);
-
-// Security middleware - applied early for protection
-app.use(securityLogger); // Log suspicious requests
-
-// Rate limiting middleware using RateLimitingService (database-driven with priority logic)
-app.use(async (req, res, next) => {
-  try {
-    const { rateLimitingService } = await import('./services/RateLimitingService');
-
-    // Check if rate limiting is globally enabled (Environment Variable > Database > Default OFF)
-    const isEnabled = await rateLimitingService.isRateLimitingEnabled();
-    if (!isEnabled) {
-      return next(); // Rate limiting disabled globally
-    }
-
-    // Get client IP and path
-    const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
-    const path = req.path || req.url || '/';
-
-    // Check rate limit
-    const result = await rateLimitingService.checkRateLimit(ip, 'standard', path);
-
-    if (!result.allowed) {
-      logger.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for standard on ${path}`);
-
-      return res.status(429).json({
-        error: 'Too Many Requests',
-        message: `Rate limit exceeded. Please try again after ${result.rule?.windowMinutes || 15} minutes.`,
-        retryAfter: (result.rule?.windowMinutes || 15) * 60,
-        priority: 'Environment Variable > Database > Default OFF'
-      });
-    }
-
-    next();
-  } catch (error) {
-    logger.error('[RateLimitingService] Middleware error', undefined, { error: { name: error instanceof Error ? error.name : 'Error', message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } });
-    next(); // Allow request on error
-  }
-});
-
-app.use(blockIotRequests); // Block ONVIF/IoT attacks
-app.use(validateInput); // Input validation and sanitization
-app.use(ssrfProtection); // SSRF protection
-
-app.use(cors({
-  origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/, /www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
-  credentials: true,
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['content-type', 'authorization', 'x-csrf-token', 'x-tenant-id', 'x-no-retry', 'x-device-info', 'x-admin-request', 'x-tenant-request', 'x-request-group', 'x-request-groups', 'x-require-all', 'x-admin-roles', 'x-audit-id', 'x-request-context', 'x-organization-id', 'x-organization-validation', 'x-audit-operation', 'x-audit-reason', 'x-service', 'x-service-key', 'x-auth0-email', 'x-auth0-id', 'x-session-id', 'x-customer-id', 'x-correlation-id', 'cache-control', 'x-platform-cache', 'x-service-admin'],
-}));
-
-// Client error reporting — mounted BEFORE auth middleware (errors can occur pre-login)
-import clientErrorRoutes from './routes/client-errors';
-app.use('/api/client-errors', express.json({ limit: '1mb' }), clientErrorRoutes);
-console.log('✅ Client error reporting mounted at /api/client-errors');
-
-// IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
-// Stripe signature verification requires raw body access
-import webhooksRoutes from './routes/webhooks';
-app.use('/api/webhooks', webhooksRoutes);
-console.log('Webhooks routes mounted at /api/webhooks (Phase 3B: Payment Event Processing)');
-
-// Stripe Connect webhooks - requires raw body for signature verification
-import stripeConnectWebhooks from './routes/stripe-connect-webhooks';
-app.use('/api/webhooks/stripe-connect', express.raw({ type: 'application/json' }), stripeConnectWebhooks);
-console.log('Stripe Connect webhooks mounted at /api/webhooks/stripe-connect');
-
-app.use(cookieParser()); // Parse cookies for customer session auth
-app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-
-// Rate limiting middleware - applied early for security
-app.use(applyRateLimit);
-
-// Input validation and sanitization middleware
-app.use(inputValidationMiddleware);
-
-// Performance monitoring middleware
-app.use(performanceMonitoring);
-
-// 🌟 UNIVERSAL TRANSFORM MIDDLEWARE - Makes naming conventions irrelevant!
-// Both snake_case AND camelCase work everywhere - API code and frontend get what they expect
-// import { universalTransformMiddleware } from './middleware/universal-transform';
-// app.use(universalTransformMiddleware);
-
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-app.use(setRequestContext);
-app.use(requestLogger);
-// CSRF: issue cookie and enforce on write operations when FF_ENFORCE_CSRF=true
-app.use(setCsrfCookie);
-app.use(csrfProtect);
-
-// Ensure audit table exists if auditing is enabled
-// TEMP: Commented out due to Prisma JsonBody error in Railway
-// ensureAuditTable().catch(() => {});
-// Ensure helper view exists for feed category resolution
-// TEMP: Commented out due to Prisma JsonBody error in Railway
-// ensureFeedCategoryView().catch(() => {});
-
+/* ------------------------- middleware bootstrap ------------------------- */
+bootstrapMiddleware(app);
 
 /* -------------------- static uploads (filesystem for MVP) -------------------- */
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
@@ -389,6 +274,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Supplier open-source sync job started (hourly incremental + nightly backfill)');
       } catch (err) {
         logger.error('Failed to start supplier open-source sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start supplier commercial sync job (nightly backfill + Kroger token refresh)
+      try {
+        const { startSupplierCommercialSync } = await import('./jobs/supplier-commercial-sync');
+        startSupplierCommercialSync();
+        logger.info('Supplier commercial sync job started (nightly backfill)');
+      } catch (err) {
+        logger.error('Failed to start supplier commercial sync job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
       // Start supplier auto-sync job (every 1 hour)

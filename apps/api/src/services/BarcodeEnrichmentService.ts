@@ -1,5 +1,6 @@
 import { prisma } from '../prisma';
 import { generateSessionId } from '../lib/id-generator';
+import { logger } from '../logger';
 import {
   enrichmentCacheHit,
   enrichmentCacheMiss,
@@ -33,7 +34,7 @@ export interface EnrichmentResult {
   imageUrl?: string;
   imageThumbnailUrl?: string;
   metadata?: Record<string, any>;
-  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback' | 'supplier_catalog';
+  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback' | 'supplier_catalog' | 'barcodelookup' | 'goupc' | 'kroger';
 }
 
 interface CacheEntry {
@@ -165,7 +166,39 @@ export class BarcodeEnrichmentService {
         return supplierResult;
       }
 
-      // 4. Try UPC Database API
+      // 4. Try commercial APIs in parallel (BarcodeLookup.com + Go-UPC)
+      const commercialResults = await this.tryCommercialParallel(barcode, tenantId);
+      if (commercialResults) {
+        await this.saveToDatabase(barcode, commercialResults);
+        this.saveToCache(barcode, commercialResults);
+        enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: commercialResults.source });
+        await this.logLookup(tenantId, barcode, commercialResults.source, 'success', commercialResults, Date.now() - startTime);
+        return commercialResults;
+      }
+
+      // 5. Try Kroger API (sequential — grocery-only, OAuth2)
+      if (this.checkRateLimit('kroger')) {
+        try {
+          const result = await this.enrichFromKroger(barcode);
+          if (result) {
+            await this.saveToDatabase(barcode, result);
+            this.saveToCache(barcode, result);
+            enrichmentApiSuccess.inc({ tenant: tenantId, provider: 'kroger' });
+            enrichmentDurationMs.observe(Date.now() - startTime, { tenant: tenantId, source: 'kroger' });
+            await this.logLookup(tenantId, barcode, 'kroger', 'success', result, Date.now() - startTime);
+            return result;
+          }
+        } catch (error) {
+          enrichmentApiFail.inc({ tenant: tenantId, provider: 'kroger' });
+          logger.warn('Kroger enrichment failed', undefined, {
+            tenantId,
+            barcode,
+            error: { name: (error as Error)?.name, message: (error as Error)?.message },
+          });
+        }
+      }
+
+      // 6. Try UPC Database API
       if (this.checkRateLimit('upc_database')) {
         try {
           const result = await this.enrichFromUPCDatabase(barcode);
@@ -179,11 +212,15 @@ export class BarcodeEnrichmentService {
           }
         } catch (error) {
           enrichmentApiFail.inc({ tenant: tenantId, provider: 'upc_database' });
-          console.warn('[Enrichment] UPC Database failed:', error);
+          logger.warn('UPC Database enrichment failed', undefined, {
+            tenantId,
+            barcode,
+            error: { name: (error as Error)?.name, message: (error as Error)?.message },
+          });
         }
       }
 
-      // 5. Try Open Food Facts API
+      // 7. Try Open Food Facts API
       if (this.checkRateLimit('open_food_facts')) {
         try {
           const result = await this.enrichFromOpenFoodFacts(barcode);
@@ -197,11 +234,15 @@ export class BarcodeEnrichmentService {
           }
         } catch (error) {
           enrichmentApiFail.inc({ tenant: tenantId, provider: 'open_food_facts' });
-          console.warn('[Enrichment] Open Food Facts failed:', error);
+          logger.warn('Open Food Facts enrichment failed', undefined, {
+            tenantId,
+            barcode,
+            error: { name: (error as Error)?.name, message: (error as Error)?.message },
+          });
         }
       }
 
-      // 6. Fallback to stub data
+      // 8. Fallback to stub data
       const fallback = this.createFallbackData(barcode);
       await this.saveToDatabase(barcode, fallback);
       this.saveToCache(barcode, fallback);
@@ -211,7 +252,11 @@ export class BarcodeEnrichmentService {
       return fallback;
 
     } catch (error: any) {
-      console.error('[Enrichment] All providers failed:', error);
+      logger.error('All enrichment providers failed', undefined, {
+        tenantId,
+        barcode,
+        error: { name: error?.name, message: error?.message, stack: error?.stack },
+      });
       await this.logLookup(tenantId, barcode, 'fallback', 'error', null, Date.now() - startTime, error.message);
       
       // Return minimal fallback
@@ -227,7 +272,7 @@ export class BarcodeEnrichmentService {
     const apiKey = process.env.UPC_DATABASE_API_KEY;
     
     if (!apiKey) {
-      console.warn('[Enrichment] UPC_DATABASE_API_KEY not configured');
+      logger.warn('UPC_DATABASE_API_KEY not configured');
       return null;
     }
 
@@ -463,6 +508,314 @@ export class BarcodeEnrichmentService {
   }
 
   /**
+   * Try BarcodeLookup.com and Go-UPC in parallel via Promise.allSettled.
+   * Merge results if both succeed, preferring the richer payload.
+   * Returns null if both fail or are unconfigured.
+   */
+  private async tryCommercialParallel(
+    barcode: string,
+    tenantId: string
+  ): Promise<EnrichmentResult | null> {
+    const tasks: Promise<EnrichmentResult | null>[] = [];
+    const taskNames: string[] = [];
+
+    if (this.checkRateLimit('barcodelookup')) {
+      tasks.push(this.enrichFromBarcodeLookup(barcode));
+      taskNames.push('barcodelookup');
+    }
+
+    if (this.checkRateLimit('goupc')) {
+      tasks.push(this.enrichFromGoUpc(barcode));
+      taskNames.push('goupc');
+    }
+
+    if (tasks.length === 0) return null;
+
+    const settled = await Promise.allSettled(tasks);
+
+    let blResult: EnrichmentResult | null = null;
+    let goupcResult: EnrichmentResult | null = null;
+
+    settled.forEach((result, idx) => {
+      const name = taskNames[idx];
+      if (result.status === 'fulfilled' && result.value) {
+        if (name === 'barcodelookup') blResult = result.value;
+        if (name === 'goupc') goupcResult = result.value;
+        enrichmentApiSuccess.inc({ tenant: tenantId, provider: name });
+      } else if (result.status === 'rejected') {
+        enrichmentApiFail.inc({ tenant: tenantId, provider: name });
+        logger.warn(`${name} enrichment rejected`, undefined, {
+          tenantId,
+          barcode,
+          error: { name: (result.reason as Error)?.name, message: (result.reason as Error)?.message },
+        });
+      } else if (result.status === 'fulfilled' && !result.value) {
+        enrichmentApiFail.inc({ tenant: tenantId, provider: name });
+      }
+    });
+
+    if (blResult && goupcResult) {
+      return this.mergeParallelResults(blResult, goupcResult);
+    }
+
+    return blResult || goupcResult;
+  }
+
+  /**
+   * Merge BarcodeLookup.com and Go-UPC results per §1.3 payload merge strategy.
+   * - name: Prefer BarcodeLookup.com
+   * - brand: Prefer whichever is non-empty
+   * - description: Prefer longer description
+   * - imageUrl: Prefer BarcodeLookup.com
+   * - categoryPath: Merge unique entries from both
+   * - priceCents: Prefer BarcodeLookup.com
+   * - metadata: Deep merge — attrs from both preserved under separate keys
+   */
+  private mergeParallelResults(
+    bl: EnrichmentResult,
+    goupc: EnrichmentResult
+  ): EnrichmentResult {
+    const blDesc = bl.description || '';
+    const goupcDesc = goupc.description || '';
+
+    const mergedCategoryPath = [
+      ...(bl.categoryPath || []),
+      ...(goupc.categoryPath || []),
+    ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+    return {
+      name: bl.name || goupc.name,
+      brand: bl.brand || goupc.brand || undefined,
+      description: blDesc.length >= goupcDesc.length ? bl.description : goupc.description,
+      categoryPath: mergedCategoryPath.length > 0 ? mergedCategoryPath : undefined,
+      priceCents: bl.priceCents || goupc.priceCents,
+      imageUrl: bl.imageUrl || goupc.imageUrl,
+      imageThumbnailUrl: bl.imageThumbnailUrl || goupc.imageThumbnailUrl,
+      metadata: {
+        ...(bl.metadata || {}),
+        ...(goupc.metadata || {}),
+        barcodelookup: bl.metadata || undefined,
+        goupc: goupc.metadata || undefined,
+      },
+      source: 'barcodelookup',
+    };
+  }
+
+  /**
+   * BarcodeLookup.com API integration
+   * https://api.barcodelookup.com/v3
+   */
+  private async enrichFromBarcodeLookup(barcode: string): Promise<EnrichmentResult | null> {
+    const apiKey = process.env.BARCODELOOKUP_API_KEY;
+    if (!apiKey) return null;
+
+    const url = `https://api.barcodelookup.com/v3/products?barcode=${encodeURIComponent(barcode)}&formatted=y&key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`BarcodeLookup.com API error: ${response.status}`);
+    }
+
+    const data = await response.json() as { products?: any[] };
+    const p = data.products?.[0];
+    if (!p) return null;
+
+    const stores = Array.isArray(p.stores) ? p.stores : [];
+    const lowestPrice = stores.length > 0
+      ? stores.reduce((min: number, s: any) => {
+          const price = parseFloat(s.price?.replace(/[^0-9.]/g, '') || '0');
+          return price > 0 && (min === 0 || price < min) ? price : min;
+        }, 0)
+      : 0;
+
+    return {
+      name: p.title || 'Unknown Product',
+      description: p.description || undefined,
+      brand: p.brand || undefined,
+      categoryPath: p.category ? [p.category] : [],
+      priceCents: lowestPrice > 0 ? Math.round(lowestPrice * 100) : undefined,
+      imageUrl: p.images?.[0] || undefined,
+      metadata: {
+        mpn: p.mpn,
+        model: p.model,
+        asin: p.asin,
+        manufacturer: p.manufacturer,
+        color: p.color,
+        size: p.size,
+        weight: p.weight,
+        dimensions: p.dimensions,
+        ingredients: p.ingredients,
+        nutrition_facts: p.nutrition_facts,
+        features: p.features,
+        stores,
+        barcode_formats: p.barcode_formats,
+      },
+      source: 'barcodelookup',
+    };
+  }
+
+  /**
+   * Go-UPC API integration
+   * https://go-upc.com/api/v1
+   */
+  private async enrichFromGoUpc(barcode: string): Promise<EnrichmentResult | null> {
+    const apiKey = process.env.GOUPC_API_KEY;
+    if (!apiKey) return null;
+
+    const url = `https://go-upc.com/api/v1/code/${encodeURIComponent(barcode)}?key=${encodeURIComponent(apiKey)}&format=true`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Go-UPC API error: ${response.status}`);
+    }
+
+    const data = await response.json() as { code?: string; product?: any };
+    const p = data.product;
+    if (!p) return null;
+
+    const categoryPath = Array.isArray(p.categoryPath)
+      ? p.categoryPath
+      : (p.category ? [p.category] : []);
+
+    return {
+      name: p.name || 'Unknown Product',
+      description: p.description || undefined,
+      brand: p.brand || undefined,
+      categoryPath: categoryPath.length > 0 ? categoryPath : [],
+      imageUrl: p.imageUrl || undefined,
+      metadata: {
+        codeType: p.codeType,
+        specs: p.specs,
+        ingredients: p.ingredients,
+        barcodeUrl: p.barcodeUrl,
+        inferred: p.inferred,
+      },
+      source: 'goupc',
+    };
+  }
+
+  /**
+   * Kroger Developer API integration
+   * https://api.kroger.com/v1
+   * Uses OAuth2 client credentials flow with token caching and transparent re-auth.
+   */
+  private krogerToken: string | null = null;
+  private krogerTokenExpiresAt = 0;
+
+  private async getKrogerToken(): Promise<string | null> {
+    const clientId = process.env.KROGER_CLIENT_ID;
+    const clientSecret = process.env.KROGER_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return null;
+
+    const now = Date.now();
+    const safetyMarginMs = 5 * 60 * 1000;
+    if (this.krogerToken && now < this.krogerTokenExpiresAt - safetyMarginMs) {
+      return this.krogerToken;
+    }
+
+    try {
+      const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      const response = await fetch('https://api.kroger.com/v1/connect/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${authHeader}`,
+        },
+        body: 'grant_type=client_credentials&scope=product.compact',
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        logger.warn('Kroger OAuth2 token request failed', undefined, {
+          statusCode: response.status,
+        });
+        return null;
+      }
+
+      const tokenData = await response.json() as { access_token?: string; expires_in?: number };
+      if (!tokenData.access_token) return null;
+
+      this.krogerToken = tokenData.access_token;
+      this.krogerTokenExpiresAt = now + (tokenData.expires_in || 3600) * 1000;
+      return this.krogerToken;
+    } catch (error: any) {
+      logger.warn('Kroger OAuth2 token fetch failed', undefined, {
+        error: { name: error?.name, message: error?.message },
+      });
+      return null;
+    }
+  }
+
+  private async enrichFromKroger(barcode: string): Promise<EnrichmentResult | null> {
+    const clientId = process.env.KROGER_CLIENT_ID;
+    if (!clientId) return null;
+
+    const token = await this.getKrogerToken();
+    if (!token) return null;
+
+    const doFetch = async (authToken: string): Promise<Response> => {
+      return fetch(`https://api.kroger.com/v1/products/${encodeURIComponent(barcode)}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+    };
+
+    let response = await doFetch(token);
+
+    if (response.status === 401) {
+      this.krogerToken = null;
+      this.krogerTokenExpiresAt = 0;
+      const newToken = await this.getKrogerToken();
+      if (newToken) {
+        response = await doFetch(newToken);
+      }
+    }
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Kroger API error: ${response.status}`);
+    }
+
+    const data = await response.json() as { data?: any };
+    const p = data.data;
+    if (!p) return null;
+
+    const categories = Array.isArray(p.categories) ? p.categories : [];
+    const images = Array.isArray(p.images) ? p.images : [];
+    const items = Array.isArray(p.items) ? p.items : [];
+    const largeImage = images.find((img: any) => img.size === 'large') || images[0];
+
+    return {
+      name: p.description || 'Unknown Product',
+      brand: p.brand || undefined,
+      categoryPath: categories.length > 0 ? categories.map((c: any) => c.name) : [],
+      priceCents: items[0]?.price?.price
+        ? Math.round(parseFloat(items[0].price.price) * 100)
+        : undefined,
+      imageUrl: largeImage?.url || undefined,
+      metadata: {
+        productId: p.productId,
+        fulfillmentTypes: p.fulfillmentTypes,
+        aisleLocation: p.aisleLocation,
+        temperature: p.temperature,
+        priceRequiresLocation: items.length === 0,
+      },
+      source: 'kroger',
+    };
+  }
+
+  /**
    * Create fallback data when all APIs fail
    */
   private createFallbackData(barcode: string): EnrichmentResult {
@@ -557,7 +910,10 @@ export class BarcodeEnrichmentService {
         source: 'supplier_catalog',
       };
     } catch (error) {
-      console.error('[Enrichment] Supplier catalog lookup error:', error);
+      logger.error('Supplier catalog lookup error', undefined, {
+        barcode,
+        error: { name: (error as Error)?.name, message: (error as Error)?.message },
+      });
       return null;
     }
   }
@@ -597,7 +953,10 @@ export class BarcodeEnrichmentService {
         source: cached.source as any,
       };
     } catch (error) {
-      console.error('[Enrichment] Database cache read error:', error);
+      logger.error('Database cache read error', undefined, {
+        barcode,
+        error: { name: (error as Error)?.name, message: (error as Error)?.message },
+      });
       return null;
     }
   }
@@ -638,7 +997,10 @@ export class BarcodeEnrichmentService {
       });
     } catch (error) {
       // Don't fail enrichment if database save fails
-      console.error('[Enrichment] Database cache write error:', error);
+      logger.error('Database cache write error', undefined, {
+        barcode,
+        error: { name: (error as Error)?.name, message: (error as Error)?.message },
+      });
     }
   }
 
@@ -659,7 +1021,7 @@ export class BarcodeEnrichmentService {
     }
 
     if (state.count >= RATE_LIMIT_MAX_REQUESTS) {
-      console.warn(`[Enrichment] Rate limit exceeded for ${provider}`);
+      logger.warn('Rate limit exceeded for provider', undefined, { provider });
       return false;
     }
 
@@ -693,7 +1055,11 @@ export class BarcodeEnrichmentService {
         } as any,
       });
     } catch (err) {
-      console.error('[Enrichment] Failed to log lookup:', err);
+      logger.error('Failed to log barcode lookup', undefined, {
+        tenantId,
+        barcode,
+        error: { name: (err as Error)?.name, message: (err as Error)?.message },
+      });
     }
   }
 

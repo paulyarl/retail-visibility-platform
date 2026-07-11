@@ -47,8 +47,8 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
     const cacheKey = `resolved-${type}:${identifier}`;
     
     // Use tenant-specific resolver (queries tenants table, no directory dependency)
-    const endpoint = type === AppContext.TENANT 
-      ? `/api/tenants/resolve/${identifier}`
+    const endpoint = type === AppContext.TENANT
+      ? `/api/public/tenants/resolve/${identifier}`
       : `/api/resolver/${type}/${identifier}`; // Fallback for other types
     
   //  console.log(`[PublicApiSingleton] Resolving ${type}/${identifier} via endpoint: ${endpoint}`);

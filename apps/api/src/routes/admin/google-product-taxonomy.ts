@@ -5,13 +5,12 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken } from '../../middleware/auth';
 import { getGoogleProductTaxonomy, searchGoogleProductTaxonomy } from '../../services/GoogleProductTaxonomyService';
 import { getDirectPool } from '../../utils/db-pool';
 
 const router = Router();
 
-router.use(authenticateToken);
+// Auth: authenticateToken applied at mount level in admin.routes.ts
 
 /**
  * GET /api/admin/google-product-taxonomy

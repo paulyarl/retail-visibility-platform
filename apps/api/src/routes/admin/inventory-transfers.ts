@@ -6,16 +6,13 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requirePlatformAdmin } from '../../middleware/auth';
 import { InventoryTransferService } from '../../services/InventoryTransferService';
 import { prisma } from '../../prisma';
 
 const router = Router();
 const inventoryTransferService = InventoryTransferService.getInstance();
 
-// All routes require platform admin authentication
-router.use(authenticateToken);
-router.use(requirePlatformAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // ========================================
 // Inventory Transfer Management

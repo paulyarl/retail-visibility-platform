@@ -6,13 +6,12 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
+import { requireAdmin } from '../../middleware/auth';
 import { prisma } from '../../prisma';
 
 const router = Router();
 
-// Apply authentication middleware to all routes
-router.use(authenticateToken);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // GET /api/admin/ticker-messages - Get all ticker messages (admin only)
 router.get('/', requireAdmin, async (req: Request, res: Response) => {

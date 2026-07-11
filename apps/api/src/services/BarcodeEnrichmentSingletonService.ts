@@ -28,7 +28,7 @@ export interface EnrichmentResult {
   imageUrl?: string;
   imageThumbnailUrl?: string;
   metadata?: Record<string, any>;
-  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback';
+  source: 'cache' | 'upc_database' | 'open_food_facts' | 'stub' | 'fallback' | 'barcodelookup' | 'goupc' | 'kroger';
 }
 
 export interface BarcodeStats {
@@ -99,7 +99,7 @@ class BarcodeEnrichmentSingletonService extends UniversalSingleton {
   async enrichBarcode(
     barcode: string,
     tenantId: string,
-    provider: 'upc_database' | 'open_food_facts' = 'upc_database'
+    provider: 'upc_database' | 'open_food_facts' | 'barcodelookup' | 'goupc' | 'kroger' = 'upc_database'
   ): Promise<EnrichmentResult> {
     const startTime = Date.now();
     
@@ -156,7 +156,7 @@ class BarcodeEnrichmentSingletonService extends UniversalSingleton {
   async enrichBatchBarcodes(
     barcodes: string[],
     tenantId: string,
-    provider: 'upc_database' | 'open_food_facts' = 'upc_database'
+    provider: 'upc_database' | 'open_food_facts' | 'barcodelookup' | 'goupc' | 'kroger' = 'upc_database'
   ): Promise<Map<string, EnrichmentResult>> {
     const results = new Map<string, EnrichmentResult>();
     

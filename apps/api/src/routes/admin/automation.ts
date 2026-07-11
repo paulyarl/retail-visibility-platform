@@ -1,11 +1,8 @@
 import { Router } from 'express';
-import { requireAuth, requireAdmin } from '../../middleware/auth';
 
 const router = Router();
 
-// Apply authentication and admin requirements
-router.use(requireAuth);
-router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // GET /api/admin/billing/workflows
 router.get('/workflows', async (req, res) => {

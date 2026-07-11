@@ -9,14 +9,14 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { paypalConnectService } from '../services/payments/PayPalConnectService';
 
 const router = Router();
 
-// Admin routes require admin auth
-router.use(requireAuth);
+// Auth: authenticateToken applied at mount level in admin.routes.ts
+// Admin routes have requireAdmin per-route; tenant-facing routes (orders/capture) only need authenticateToken
 
 /**
  * GET /api/admin/paypal-connect/status

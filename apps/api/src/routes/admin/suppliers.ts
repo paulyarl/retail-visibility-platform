@@ -18,14 +18,12 @@
  */
 
 import express from 'express';
-import { requirePlatformAdmin } from '../../middleware/auth';
 import SupplierService from '../../services/SupplierService';
 import SupplierCatalogService from '../../services/SupplierCatalogService';
 
 const router = express.Router();
 
-// All admin supplier routes require platform admin
-router.use(requirePlatformAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // List all suppliers
 router.get('/', async (req, res) => {

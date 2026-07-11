@@ -74,6 +74,21 @@ grep -n "app\.use(" apps/api/src/index.ts | awk -F"'" '/\.use\(.+\'/{print $2}' 
 
 5. **Look for inline handlers in `index.ts`.** Any `app.get('/api/...', ...)` that is not in `routes/` is a hidden endpoint.
 
+6. **Inventory auth scope — find public routes under private URL prefix (spec violation).**
+
+```bash
+# Find routes under /api/tenants/ that don't use authenticateToken (potential public routes in private namespace)
+grep -rn "router\.(get|post|put|delete|patch)" apps/api/src/routes/ \
+  | grep -i tenant \
+  | grep -v authenticateToken \
+  | grep -v public
+
+# Find router.use(authenticateToken) in orchestrator-mounted sub-routers (FR-3 violation)
+grep -rn "router\.use(authenticateToken)" apps/api/src/routes/ \
+  | grep -v admin.routes.ts \
+  | grep -v test
+```
+
 ### Phase 2: Score the Risks
 
 Rank each risk as **Critical**, **High**, **Medium**, or **Low**.
@@ -85,6 +100,7 @@ Rank each risk as **Critical**, **High**, **Medium**, or **Low**.
 | **Duplicate mounts** | The same router is mounted at two prefixes or the same prefix twice. | `billingRoutes` in `core-routes.ts` and `index.ts` |
 | **Prefix dumping** | A router is mounted at `/api` with a catch-all. | `app.use('/api', someRouterWithCatchAll)` |
 | **Auth inconsistency** | Same route family protected by different middleware combinations. | Some admin routes use `requireAdmin` at mount, others internally |
+| **Auth scope collision** | Public route mounted under private URL prefix (`/api/tenants/...`). Automatically Critical. | `effective-capabilities` at `/api/tenants/:tenantId/` without auth, blocked by sibling router's `router.use(authenticateToken)` |
 
 **Risk scoring rule:** Any prefix with 3+ routers mounted at the same path is automatically a collision risk. Any catch-all in a router mounted at a prefix with sub-routers is automatically Critical.
 
@@ -253,6 +269,9 @@ These skills directly influence the quality and speed of the route refactor. Rea
 - [ ] Every domain orchestrator mounts static sub-paths before catch-alls.
 - [ ] Every catch-all calls `next()` when it cannot resolve the request.
 - [ ] `pnpm checkapi` and `pnpm checkweb` pass.
+- [ ] No public routes under `/api/tenants/` (all public routes at `/api/public/...`). See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1.
+- [ ] No `router.use(authenticateToken)` in orchestrator-mounted sub-routers. See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-3.
+- [ ] `authLevel` in route registry matches URL prefix. See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-5.
 - [ ] Route-order verification script passes.
 - [ ] Route-coverage smoke tests pass.
 - [ ] OpenAPI spec is generated and valid.
@@ -261,6 +280,7 @@ These skills directly influence the quality and speed of the route refactor. Rea
 
 - `docs/API_ROUTE_ARCHITECTURE_AUDIT.md` — Full audit findings and risk register.
 - `docs/API_ROUTE_ARCHITECTURE_SPRINT_PLAN.md` — Prioritized implementation plan.
+- `docs/AUTH_SCOPE_ISOLATION_SPEC.md` — Auth scope isolation functional spec (URL namespace isolation + per-route auth rules).
 - `.agents/skills/backend-dev-guidelines/SKILL.md` — Backend coding standards.
 - `.agents/skills/architecture-patterns/SKILL.md` — Clean/Hexagonal/DDD patterns.
 

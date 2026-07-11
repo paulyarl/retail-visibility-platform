@@ -33,6 +33,7 @@ import {
   resolveOrgOptions,
   resolveSocialCommerceOptions,
   resolveDirectoryPromotion,
+  resolveWholesaleMatching,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -204,6 +205,10 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.directory_promotion?.features || {},
       rawCaps.capabilities.directory_promotion?.capability_enabled
     ),
+    resolveWholesaleMatching(
+      rawCaps.capabilities.wholesale_matching_options?.features || {},
+      merchantBundle.wholesaleMatching
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -235,6 +240,7 @@ export async function resolveEffectiveCapabilities(
       org_options: effective[15],
       social_commerce_options: effective[16],
       directory_promotion: effective[17],
+      wholesale_matching: effective[18],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -639,6 +645,10 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.directory_promotion?.features || {},
       rawCaps.capabilities.directory_promotion?.capability_enabled
     ),
+    resolveWholesaleMatching(
+      rawCaps.capabilities.wholesale_matching_options?.features || {},
+      merchantBundle.wholesaleMatching
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -670,6 +680,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       org_options: effective[15],
       social_commerce_options: effective[16],
       directory_promotion: effective[17],
+      wholesale_matching: effective[18],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -1058,6 +1069,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     chatbotOptions,
     barcodeScan,
     socialCommerceOptions,
+    wholesaleMatching,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1075,6 +1087,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_chatbot_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_barcode_scan_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_social_commerce_options_settings.findUnique({ where: { tenant_id: tenantId } })),
+    null,
   ]);
 
   return {
@@ -1094,6 +1107,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     chatbotOptions: chatbotOptions as any,
     barcodeScan: barcodeScan as any,
     socialCommerceOptions: socialCommerceOptions as any,
+    wholesaleMatching: wholesaleMatching as any,
   };
 }
 
@@ -1138,6 +1152,11 @@ function buildMerchantSoftGates(bundle: MerchantSettingsBundle): Record<string, 
       pickup_enabled: bundle.fulfillment.pickup_enabled ?? true,
       delivery_enabled: bundle.fulfillment.delivery_enabled ?? true,
       shipping_enabled: bundle.fulfillment.shipping_enabled ?? true,
+    };
+  }
+  if (bundle.wholesaleMatching) {
+    gates.wholesale_matching = {
+      wholesale_matching_enabled: bundle.wholesaleMatching.wholesale_matching_enabled ?? true,
     };
   }
 

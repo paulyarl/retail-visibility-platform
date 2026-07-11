@@ -67,9 +67,13 @@ cd apps/web && npx tsc --noEmit
 | Feature flags | `feature-flag-catalog.md` |
 | Badge system | `meaningful-badge-architecture.md` + `badge-architecture-insights.md` |
 
-- [ ] **Note any skills that may need updates after this phase.** If the phase will introduce a new pattern, change a convention, or add a step to an existing workflow, flag it now so the end-of-phase checklist catches it.
+- [ ] **Flag skills that will need updates after this phase.** This is a mandatory planning task, not optional. As you read each skill, note:
+  - Which specific section(s) will need updates (e.g., "Phase 5 route section — add URL namespace rule")
+  - What new insight from this phase's work should be captured (e.g., "discovered that X pattern causes Y bug")
+  - Whether a new skill is needed for a recurring pattern or workflow that doesn't fit any existing skill
+  - **This list will be consumed at phase end** — the end-of-phase checklist requires the agent to proactively update/create skills without being asked by the user.
 
-- [ **Determine if a new skill document will be needed.** If the phase introduces a reusable multi-step workflow or a recurring pattern that doesn't fit any existing skill, plan to create one at the end. Note the proposed filename and scope.
+- [ ] **Determine if a new skill document will be needed.** If the phase introduces a reusable multi-step workflow or a recurring pattern that doesn't fit any existing skill, plan to create one at the end. Note the proposed filename, scope, and which insights from this phase it should capture.
 
 ---
 
@@ -125,6 +129,7 @@ cd apps/web && npx tsc --noEmit
   - RBAC gates (`requirePermission`, `requireRole`, `requireGroup`)
   - Zod validation schemas needed for inputs
   - **Route order risk:** Will it be mounted under a prefix that already has a catch-all (`/:id`, `/:slug`, `/:tenantId`)? If yes, review `api-route-architecture-audit.md` first.
+  - **Auth scope URL namespace** (from `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2): Public routes → `/api/public/tenants/:tenantId/*`. Private routes → `/api/tenants/:tenantId/*` with per-route `authenticateToken`. Dual-scope routes → two endpoints (public summary + private full). Never use `router.use(authenticateToken)` in orchestrator-mounted sub-routers.
 
 - [ ] **List all new background jobs.** For each:
   - Schedule (interval/cron)
@@ -232,7 +237,8 @@ New migration: _______________
 New background jobs: _______________
 New capability features: _______________
 Skills to read before starting: _______________
-Skills to update after completion: _______________
+Skills to update after completion (mandatory — list specific sections): _______________
+Insights to capture in skills (patterns, pitfalls, conventions learned): _______________
 New skill to create (if any): _______________
 ```
 
@@ -245,11 +251,12 @@ This checklist is the **planning mirror** of `end-of-phase-sprint-checklist.md`.
 | Concern | Start-of-phase | End-of-phase |
 |---|---|---|
 | Singletons | Pick the right base class | Verify no direct `fetch` was used |
-| Skills | Read relevant skills before starting | Update/create skills if patterns changed |
+| Skills | Read relevant skills; flag specific skills/sections for update; note insights to capture | Proactively update/create skills capturing phase insights — mandatory, no user prompt needed |
 | IDs | Plan generators and prefixes | Verify no raw UUIDs in new code |
 | Navigation | Plan SQL INSERTs and icon registration | Verify links appear in UI |
 | Backend | Plan routes, jobs, logger usage | Verify mounting, wiring, signatures |
 | Route architecture | Review `api-route-architecture-audit.md` if touching mount order or catch-alls | Run route-order verification and catch-all ordering checks |
+| Auth scope | Plan URL namespace (`/api/public/` vs `/api/tenants/`) and per-route auth | Verify URL prefix matches auth scope, no router-level auth in orchestrator sub-routers |
 | Database | Plan migration, RLS, triggers, indexes | Verify idempotency and Prisma sync |
 | Frontend | Plan components, cache keys, SSR safety | Verify states, no orphaned imports |
 | Capabilities | Plan 8-phase deployment | Verify feature keys and constraints |

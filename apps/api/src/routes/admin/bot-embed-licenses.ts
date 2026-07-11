@@ -14,14 +14,14 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
+import { requireAdmin } from '../../middleware/auth';
 import { audit } from '../../audit';
 import { generateEmbedKey } from '../../lib/id-generator';
 
 const router = Router();
 
-router.use(authenticateToken);
-router.use(requireAdmin);
+// Auth: authenticateToken applied at mount level in admin.routes.ts
+// requireAdmin applied per-route below
 
 // ====================
 // Validation Schemas
@@ -47,7 +47,7 @@ const updateLicenseSchema = z.object({
 // ====================
 
 // GET /api/admin/bot-embed-licenses
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { tenantId, status, source } = req.query;
 
@@ -72,7 +72,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/admin/bot-embed-licenses
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const validation = createLicenseSchema.safeParse(req.body);
     if (!validation.success) {
@@ -113,7 +113,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/admin/bot-embed-licenses/:id
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const validation = updateLicenseSchema.safeParse(req.body);
     if (!validation.success) {
@@ -151,7 +151,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/admin/bot-embed-licenses/:id
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const existing = await prisma.tenant_bot_embed_licenses.findUnique({ where: { id: req.params.id } });
     if (!existing) {

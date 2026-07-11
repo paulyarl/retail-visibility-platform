@@ -31,6 +31,9 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck || true
 
+      - name: Verify auth scope isolation
+        run: npx ts-node scripts/verify-auth-scope.ts
+
       - name: Lint
         run: pnpm -r lint || true
 

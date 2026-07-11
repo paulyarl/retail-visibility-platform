@@ -11,13 +11,11 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { prisma, basePrisma } from '../../prisma';
 
 const router = Router();
 
-router.use(authenticateToken);
-// router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

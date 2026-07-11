@@ -40,16 +40,29 @@ cd apps/web && npx tsc --noEmit
 
 ---
 
-## 2. Skill Document Hygiene
+## 2. Skill Document Hygiene (Mandatory — Do Not Skip)
 
-- [ ] **Does this session's implementation require updates to existing skills?** Review the skills in `.devin/skills/` that are related to the work done. If the session introduced a new pattern, changed a convention, or added a new step to an existing workflow, update the relevant skill document.
-  - **Common candidates**: `capability-deployment-flow.md`, `capability-data-flow-rules.md`, `database-navigation-system.md`, `deploy-service-extending-base-singleton.md`, `tenant-scoped-id-generation.md`
-  - **How to decide**: If a future agent doing similar work would benefit from knowing what changed, update the skill.
+**The agent MUST proactively review, update, and create skills at the end of every phase or sprint. This is not optional and does not require the user to ask.** The skills in `.devin/skills/` are the institutional memory of the platform — if insights from this phase are not captured, future agents will repeat the same mistakes and rediscover the same patterns.
 
-- [ ] **Does this session's insight require a new skill document?** If the session discovered a recurring pattern, a common pitfall, or a multi-step workflow that doesn't fit any existing skill, create a new `.md` file in `.devin/skills/`.
+- [ ] **Review all skills related to this phase's work and update them.** Go through each skill that was read at the start of the phase (see pre-flight checklist Section 2) and check:
+  - Did the implementation follow the skill's documented pattern? If it deviated, update the skill to reflect the new pattern — or add a note explaining when to use the deviation.
+  - Did the implementation surface a new pitfall, edge case, or debugging insight? Add it to the skill's "Common Pitfalls" or troubleshooting section.
+  - Did the implementation change a convention (naming, routing, auth, caching, etc.)? Update all skills that reference the old convention.
+  - **Common candidates**: `capability-deployment-flow.md`, `capability-data-flow-rules.md`, `database-navigation-system.md`, `deploy-service-extending-base-singleton.md`, `tenant-scoped-id-generation.md`, `start-of-phase-sprint-checklist.md`, `end-of-phase-sprint-checklist.md`
+  - **Decision rule**: If a future agent doing similar work would benefit from knowing what was learned, update the skill. When in doubt, update.
+
+- [ ] **Capture phase insights in skills.** Review the work done this phase and extract reusable insights:
+  - **Patterns discovered**: New architectural patterns, refactoring approaches, or workflows that worked well.
+  - **Pitfalls encountered**: Bugs, edge cases, or gotchas that cost debugging time. Add to the relevant skill's pitfall/troubleshooting section so future agents avoid them.
+  - **Conventions established**: New naming rules, auth patterns, URL conventions, or coding standards that should be followed going forward.
+  - **Cross-skill impacts**: If a change in one skill affects another (e.g., auth scope rules affect capability deployment, route architecture, and singleton selection), update all affected skills.
+
+- [ ] **Create a new skill document if the phase introduced a reusable workflow.** If the session discovered a recurring pattern or multi-step workflow that doesn't fit any existing skill, create a new `.md` file in `.devin/skills/`.
   - **Naming**: kebab-case, descriptive (e.g., `bot-widget-troubleshooting.md`, `lazy-bot-conversation-creation.md`).
   - **Format**: YAML frontmatter with `description:`, then markdown sections.
-  - **Threshold**: Create a new skill only if the insight is reusable across future sessions. One-off fixes don't need a skill.
+  - **Threshold**: Create a new skill only if the insight is reusable across future sessions. One-off fixes don't need a skill — but if the same one-off has happened twice, it's a pattern and needs a skill.
+
+- [ ] **Verify the pre-flight skill update plan was executed.** The pre-flight checklist (Section 2) asked the agent to flag specific skills and sections for update. Confirm each flagged item was addressed. If a planned update turned out to be unnecessary, note why.
 
 ---
 
@@ -103,6 +116,13 @@ cd apps/web && npx tsc --noEmit
 - [ ] **Zod validation on route inputs.** New API routes should validate request bodies/params with Zod schemas. Low priority for internal routes, but required for public-facing endpoints.
 
 - [ ] **RBAC gates on protected routes.** New routes should have appropriate `requirePermission`, `requireRole`, or `requireGroup` middleware. Public routes should be explicitly marked as public.
+
+- [ ] **Auth scope URL namespace compliance** (from `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2):
+  - **Public routes mounted at `/api/public/...`**: Any route accessible without authentication MUST be under `/api/public/tenants/:tenantId/*` (or `/api/public/...`). No public routes under `/api/tenants/...`.
+  - **Private routes use per-route auth**: Routes under `/api/tenants/:tenantId/*` MUST have `authenticateToken` applied per-route, NOT via `router.use(authenticateToken)` at the router level in orchestrator-mounted sub-routers.
+  - **Dual-scope routes have two endpoints**: If a route serves both public and private consumers, verify a public summary endpoint exists at `/api/public/tenants/...` (no auth, `detail=full` ignored) and a private full-detail endpoint at `/api/tenants/...` (auth required).
+  - **Frontend service URL matches base class**: `PublicApiSingleton` services call `/api/public/...` endpoints. `TenantApiSingleton` services call `/api/tenants/...` endpoints. No cross-scope URL/base-class mismatch.
+  - **How to check**: `grep -rn "router\.use(authenticateToken)" apps/api/src/routes/ | grep -v admin.routes.ts | grep -v test` — should return empty (or only standalone mounts). `grep -rn "/api/tenants/" apps/web/src/services/ --include="*.ts" | grep -i public` — should return empty (no PublicApiSingleton service calling private URLs).
 
 ---
 
@@ -165,6 +185,7 @@ cd apps/web && npx tsc --noEmit
 | Session touched... | Review this skill |
 |---|---|
 | Route architecture / mount order / shadowed endpoints | `api-route-architecture-audit.md` |
+| Auth scope / public vs private routes | `docs/AUTH_SCOPE_ISOLATION_SPEC.md` + `troubleshooting-public-page-api-leaks.md` |
 | Frontend API calls | `deploy-service-extending-base-singleton.md` |
 | New entity / DB table | `tenant-scoped-id-generation.md` |
 | New page / route | `database-navigation-system.md` |

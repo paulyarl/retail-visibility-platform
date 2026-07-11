@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { authenticateToken, checkTenantAccess } from '../middleware/auth';
+import { checkTenantAccess } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import { user_tenant_role } from '@prisma/client';
 import { isPlatformAdmin, isPlatformUser } from '../utils/platform-admin';
@@ -13,8 +13,8 @@ import { audit } from '../audit';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticateToken);
+// Auth is applied per-route via checkTenantAccess / requireTenantAdmin
+// (both check req.user and return 401 if not authenticated)
 
 /**
  * Check if a tenant can add more users (seat limit enforcement)

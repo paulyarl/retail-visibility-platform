@@ -16,15 +16,13 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { invalidateEffectiveCapabilities } from '../../services/EffectiveCapabilityResolver';
 import { getBillingNotificationService } from '../../services/subscription/BillingNotificationService';
 import { audit } from '../../audit';
 
 const router = Router();
 
-router.use(authenticateToken);
-router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // ====================
 // Validation Schemas

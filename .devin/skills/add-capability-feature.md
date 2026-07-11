@@ -220,16 +220,18 @@ WHERE fl.key = '<feature_key>';
 After completing the checklist, confirm the resolved state is available from the single source of truth:
 
 ```bash
-# Public endpoint (no auth)
-curl -s "http://localhost:3001/api/tenants/<tenantId>/effective-capabilities" \
+# Public endpoint (no auth) — summary only
+curl -s "http://localhost:3001/api/public/tenants/<tenantId>/effective-capabilities" \
   | jq '.data.effective.<domain>.<new_field>'
 
 # Example: verify a new product option
-curl -s "http://localhost:3001/api/tenants/tid-xxx/effective-capabilities" \
+curl -s "http://localhost:3001/api/public/tenants/tid-xxx/effective-capabilities" \
   | jq '.data.effective.product_options.recently_viewed_enabled'
 
-# Full detail (includes merchant preferences)
+# Full detail (includes merchant preferences) — requires auth headers
+# This is the PRIVATE endpoint; detail=full is blocked on the public endpoint.
 curl -s "http://localhost:3001/api/tenants/<tenantId>/effective-capabilities?detail=full" \
+  -H 'x-auth0-id: <auth0Id>' -H 'x-auth0-email: <email>' \
   | jq '.data.gates.tier_hard.<domain>'
 ```
 
@@ -273,3 +275,4 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the TierFeaturesClient** — a capability missing from `CAPABILITY_META` and `summarizeResolvedCapabilities` in `TierFeaturesClient.tsx` will not appear in the tier comparison table or the "Your Resolved Capabilities" section on the `/t/[tenantId]/settings/tier-features` page, even though it works functionally. This is the page where tenants compare what they have vs what higher tiers offer.
 - **Do not forget the `_disabled` meta-key** — when adding a new capability type, you MUST create a `{prefix}_disabled` feature key in `features_list` and link it via `capability_features_list`. Without it, admins cannot explicitly disengage the capability from a tier, and `checkCapabilityEngagement` cannot block purchases for disabled capabilities. See migration `086_capability_type_disabled_keys.sql` for the pattern.
 - **Do not fail-open when nothing is enabled** — resolvers MUST default to `enabled = false` when no `_enabled`, no `_disabled`, no `_flexible`, AND no individual features are enabled in the domain. However, if any individual feature is enabled, the capability is implicitly enabled (R17 step 4). See R17 in `capability-data-flow-rules.md`.
+- **Do not mount public capability routes under `/api/tenants/`** — public routes (readable by storefront/product pages without auth) MUST be at `/api/public/tenants/:tenantId/*`. A public route at `/api/tenants/...` will be blocked by router-level auth middleware from sibling routers (e.g., `tenant-users.ts` applies `router.use(authenticateToken)` which bleeds into all subsequent routes). See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2.

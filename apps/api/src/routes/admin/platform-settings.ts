@@ -1,13 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { basePrisma } from '../../prisma';
 import { z } from 'zod';
 
 const router = Router();
 
-// All routes require admin authentication
-router.use(authenticateToken);
-// router.use(requireAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 // Schema for rate limiting configuration
 const rateLimitConfigSchema = z.object({

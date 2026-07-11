@@ -10,7 +10,6 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requirePlatformAdmin } from '../../middleware/auth';
 import { getManualBillingService } from '../../services/subscription/ManualBillingService';
 import { getServiceChargeService } from '../../services/subscription/ServiceChargeService';
 import { audit } from '../../audit';
@@ -18,9 +17,7 @@ import { prisma } from '../../prisma';
 
 const router = Router();
 
-// Apply authentication and admin requirements
-router.use(requireAuth);
-router.use(requirePlatformAdmin);
+// Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 /**
  * POST /api/admin/manual-billing/invoices

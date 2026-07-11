@@ -90,6 +90,8 @@ Even though the public route handler itself has no auth middleware, Express proc
 
 **This affects ALL routes under `/api/tenants/*`**, regardless of which router defines them. The blanket middleware on the mount path runs before any individual route handler.
 
+**Root cause note:** The blanket auth middleware is the amplifier, but the root cause is a URL namespace collision — a public route mounted under a private URL prefix. URL namespace isolation (`/api/public/...` vs `/api/tenants/...`) is the primary fix. See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1 for the comprehensive spec.
+
 **Fix**: Move public tenant-scoped endpoints to `/api/public/tenants/:tenantId/*` — a path that never matches the `/api/tenants` mount point. Use a separate `publicTenantRouter` with `mergeParams: true`:
 
 ```ts
@@ -162,11 +164,13 @@ Then update the frontend service to call `/api/public/tenants/:tenantId/active-f
 
 4. **Public pages should only call `/api/public/*` endpoints.** No exceptions. If a public page needs data that's behind an admin/tenant endpoint, create a public proxy endpoint at `/api/public/tenants/:tenantId/*` using a `mergeParams` router.
 
-5. **Never mount public routes under `/api/tenants`.** The `/api/tenants` path has blanket `authenticateToken` middleware from `trialSetupRoutes`, `tenantNotificationsRoutes`, and other routers. Public tenant-scoped endpoints must be mounted at `/api/public/tenants/:tenantId/*` instead. See **Pattern 4**.
+5. **Never mount public routes under `/api/tenants`.** The `/api/tenants` path has blanket `authenticateToken` middleware from `trialSetupRoutes`, `tenantNotificationsRoutes`, and other routers. Public tenant-scoped endpoints must be mounted at `/api/public/tenants/:tenantId/*` instead. See **Pattern 4** and `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1.
 
-6. **When adding a new global component**, audit every hook and service call it makes. Trace each one to the API endpoint it hits. If any endpoint is admin/tenant-scoped, add a guard in the wrapper.
+6. **The URL prefix (`/api/public/` vs `/api/tenants/`) is the authoritative indicator of auth scope.** A public route at `/api/tenants/...` is a spec violation regardless of middleware configuration. See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1.
 
-7. **When adding a new public tenant-scoped backend route**, always mount it at `/api/public/tenants/:tenantId/*` using a `mergeParams` router. Never define public routes at `/tenants/:tenantId/*` on a router mounted at `/api` — the blanket auth middleware on `/api/tenants` will intercept them.
+7. **When adding a new global component**, audit every hook and service call it makes. Trace each one to the API endpoint it hits. If any endpoint is admin/tenant-scoped, add a guard in the wrapper.
+
+8. **When adding a new public tenant-scoped backend route**, always mount it at `/api/public/tenants/:tenantId/*` using a `mergeParams` router. Never define public routes at `/tenants/:tenantId/*` on a router mounted at `/api` — the blanket auth middleware on `/api/tenants` will intercept them. See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2.
 
 ---
 
