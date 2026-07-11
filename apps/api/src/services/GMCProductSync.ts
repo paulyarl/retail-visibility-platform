@@ -316,7 +316,7 @@ export async function syncProduct(
     const catPath = (item as any).category_path as string[] | undefined;
     if (catPath && catPath.length > 0 && !(item as any).google_product_category_id) {
       const platformCats = await prisma.platform_categories.findMany({
-        where: { is_active: true, google_category_id: { not: null } as any },
+        where: { is_active: true },
         select: { name: true, google_category_id: true },
       });
       const googleCatByPlatformName = new Map<string, string>();
@@ -574,7 +574,7 @@ export async function batchSyncProducts(
     // Resolve Google product category IDs from platform_categories
     // Match item.category_path entries against platform_categories.name → google_category_id
     const platformCats = await prisma.platform_categories.findMany({
-      where: { is_active: true, google_category_id: { not: null } as any },
+      where: { is_active: true },
       select: { name: true, google_category_id: true },
     });
     const googleCatByPlatformName = new Map<string, string>();

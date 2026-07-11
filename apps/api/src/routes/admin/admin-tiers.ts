@@ -66,6 +66,21 @@ router.get('/', requirePlatformStaff, async (req, res) => {
   }
 });
 
+/** GET /api/admin/tiers/list — lightweight list of tier keys for dropdowns/targeting */
+router.get('/list', requirePlatformStaff, async (req, res) => {
+  try {
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: { is_active: true },
+      select: { tier_key: true },
+      orderBy: { sort_order: 'asc' },
+    });
+    res.json(tiers.map(t => t.tier_key));
+  } catch (error) {
+    console.error('[GET /api/admin/tiers/list] Error:', error);
+    res.status(500).json({ error: 'failed_to_list_tier_keys' });
+  }
+});
+
 /** PUT /api/admin/tiers — partial update */
 router.put('/', requirePlatformAdmin, async (req, res) => {
   try {

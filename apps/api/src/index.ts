@@ -187,9 +187,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 app.use("/uploads", express.static(UPLOAD_DIR));
 
 /* ------------------------------ route registry ------------------------------ */
-import { mountAllRoutes } from './routes';
 import { mountFromRegistry } from './routes/routeRegistry';
-mountAllRoutes(app);
 mountFromRegistry(app);
 
 // Sentry error handler must be after all routes but before other error handlers

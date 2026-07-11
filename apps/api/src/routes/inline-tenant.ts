@@ -815,11 +815,32 @@ router.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAcce
 
     const pool = getDirectPool();
     const result = await pool.query(
-      'SELECT * FROM tenant_status_history WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2',
+      'SELECT * FROM location_status_logs WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2',
       [id, limit]
     );
 
-    res.json({ history: result.rows });
+    const statusInfoMap: Record<string, { label: string; icon: string }> = {
+      pending: { label: 'Pending', icon: '⏳' },
+      active: { label: 'Active', icon: '✅' },
+      inactive: { label: 'Inactive', icon: '⏸️' },
+      closed: { label: 'Closed', icon: '🔒' },
+      archived: { label: 'Archived', icon: '📦' },
+    };
+
+    const history = result.rows.map((row: any) => ({
+      id: row.id,
+      oldStatus: row.old_status,
+      newStatus: row.new_status,
+      changedBy: row.changed_by,
+      reason: row.reason,
+      reopeningDate: row.reopening_date,
+      createdAt: row.created_at,
+      metadata: row.metadata,
+      oldStatusInfo: statusInfoMap[row.old_status] ?? { label: row.old_status, icon: '❓' },
+      newStatusInfo: statusInfoMap[row.new_status] ?? { label: row.new_status, icon: '❓' },
+    }));
+
+    res.json({ history });
   } catch (error) {
     console.error('[GET /tenants/:id/status-history] Error:', error);
     res.status(500).json({ error: "failed_to_get_status_history" });

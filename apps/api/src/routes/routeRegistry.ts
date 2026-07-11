@@ -47,14 +47,10 @@ import platformDashboardRoutes from '../routes/platform-dashboard';
 
 // Tenant
 import universalTenantsRoutes from '../routes/universal-tenants';
-import tenantsRoutes from '../routes/tenants';
+import tenantOrchestrator from '../routes/tenant.routes';
+import adminOrchestrator from '../routes/admin.routes';
 import tenantCategoriesRoutes from '../routes/tenant-categories';
-import trialSetupRoutes from '../routes/tenant/trial-setup';
-import tenantNotificationsRoutes from '../routes/tenant-notifications';
-import digitalDownloadPagesRoutes from '../routes/tenant/digital-download-pages';
 import tenantInventoryTransferRoutes from '../routes/tenant-inventory-transfers';
-import tenantStripeConnectRoutes from '../routes/tenant-stripe-connect';
-import serviceChargesRoutes from '../routes/admin/service-charges';
 
 // Items / Products
 import variantsRoutes from '../routes/variants';
@@ -64,17 +60,12 @@ import productFeaturingRoutes from '../routes/product-featuring';
 import productCacheSingletonRoutes from '../routes/product-cache-singleton';
 
 // Directory
-import directoryConsolidatedRoutes from '../routes/directory-consolidated';
-import directoryRandomFeaturedRoutes from '../routes/directory-random-featured';
-import directoryRandomFeaturedGlobalRoutes from '../routes/directory-random-featured-global';
-import directoryFeaturedStoresRoutes from '../routes/directory-featured-stores';
-import directoryPhotosRouter from '../routes/directory-photos';
+import directoryOrchestrator from '../routes/directory.routes';
 import directoryOptimizedRoutes from '../routes/directory-optimized';
-import directoryCategoriesOptimizedRoutes from '../routes/directory-categories-optimized';
-import directoryCategoriesEnhancedRoutes from '../routes/directory-categories-enhanced';
-import directoryMapRoutes from '../routes/directory-map';
-import directoryRoutes from '../routes/directory';
 import slugGenerationRoutes from '../routes/slug-generation';
+
+// Shops (public shop directory browsing)
+import shopsRoutes from '../routes/shops';
 
 // Storefront
 import storefrontRoutes from '../routes/storefront';
@@ -99,33 +90,12 @@ import shoppingCartsRoutes from '../routes/shopping-carts';
 import paymentsRoutes from '../routes/payments';
 import tenantOrdersRoutes from '../routes/tenant-orders';
 import shipmentRoutes from '../routes/shipments';
-import abandonedCartRoutes from '../routes/abandoned-carts';
 import orderManagementRoutes from '../routes/order-management';
 import fulfillmentRoutes from '../routes/fulfillment';
 
-// Admin
-import adminUsersRoutes from '../routes/admin-users';
-import adminToolsRoutes from '../routes/admin-tools';
-import cachedProductsRoutes from '../routes/cached-products';
+// Admin (individual admin route imports now in admin.routes.ts orchestrator)
+// These imports are kept because they're also used at non-admin paths:
 import scanMetricsRoutes from '../routes/scan-metrics';
-import sentryRoutes from '../routes/admin/sentry';
-import errorLogRoutes from '../routes/admin/errors';
-import manualBillingRoutes from '../routes/admin/manual-billing';
-import platformRevenueRoutes from '../routes/platform-revenue';
-import platformFeeInvoiceRoutes from '../routes/platform-fee-invoices';
-import notificationLogsRoutes from '../routes/admin/notification-logs';
-import adminInventoryTransferRoutes from '../routes/admin/inventory-transfers';
-import adminSlugRegistryRoutes from '../routes/admin/slug-registry';
-import adminCatalogRoutes from '../routes/admin/catalog';
-import adminInventoryStatsRoutes from '../routes/admin/inventory-stats';
-import googleProductTaxonomyRoutes from '../routes/admin/google-product-taxonomy';
-import adminDemoTenantRoutes from '../routes/admin/demo-tenants';
-import tierManagementRoutes from '../routes/admin/tier-management';
-import tierSystemRoutes from '../routes/admin/tier-system';
-import capabilityRoutes from '../routes/admin/capability-routes';
-import featureOverridesRoutes from '../routes/admin/feature-overrides';
-import adminSecurityMonitoringRoutes from '../routes/admin/security-monitoring';
-import adminSecurityRoutes from '../routes/admin-security';
 import platformSettingsRoutes from '../routes/platform-settings';
 import performanceApi from '../routes/performance';
 
@@ -141,7 +111,6 @@ import cloverRoutes from '../routes/integrations/clover';
 import squareRoutes from '../routes/integrations/square';
 import gbpRoutes from '../routes/gbp';
 import scanRoutes from '../routes/scan';
-import paypalConnectRoutes from '../routes/paypal-connect';
 
 // Singleton system
 import categoriesSingletonRoutes from '../routes/categories-singleton';
@@ -164,11 +133,7 @@ import reviewsSingletonRoutes from '../routes/reviews-singleton';
 import fulfillmentSettingsRoutes from '../routes/fulfillment-settings';
 import commerceSettingsRoutes from '../routes/commerce-settings';
 import taxRoutes from '../routes/tax';
-import productOptionsSettingsRoutes from '../routes/product-options-settings';
 import featuredOptionsSettingsRoutes from '../routes/featured-options-settings';
-import quickstartOptionsSettingsRoutes from '../routes/quickstart-options-settings';
-import storefrontOptionsSettingsRoutes from '../routes/storefront-options-settings';
-import directoryEntryOptionsSettingsRoutes from '../routes/directory-entry-options-settings';
 import storefrontTypeSettingsRoutes from '../routes/storefront-type-settings';
 import productTypeSettingsRoutes from '../routes/product-type-settings';
 import storefrontPolicyRoutes from '../routes/storefront-policies';
@@ -179,11 +144,8 @@ import socialCommerceOptionsSettingsRoutes from '../routes/social-commerce-optio
 import chatbotOptionsSettingsRoutes from '../routes/chatbot-options-settings';
 import botPublicRoutes from '../routes/bot-public';
 import botMerchantRoutes from '../routes/bot-merchant';
-import barcodeScanSettingsRoutes from '../routes/barcode-scan-settings';
-import integrationOptionsSettingsRoutes from '../routes/integration-options-settings';
 import paymentGatewaySettingsRoutes from '../routes/payment-gateway-settings';
 import organizationCommerceSettingsRoutes from '../routes/organization-commerce-settings';
-import paymentGatewaysRoutes from '../routes/payment-gateways';
 
 // Social
 import socialProofRoutes from '../routes/social-proof';
@@ -221,7 +183,6 @@ import customerPaymentMethodsRoutes from '../routes/customer-payment-methods';
 // Misc
 import billingRoutes from '../routes/billing';
 import rateLimitWarningsRoutes from '../routes/rate-limit-warnings';
-import taxonomyAdminRoutes from '../routes/taxonomy-admin';
 import feedValidationRoutes from '../routes/feed-validation';
 import businessProfileValidationRoutes from '../routes/business-profile-validation';
 import quickStartRoutes from '../routes/quick-start';
@@ -253,8 +214,69 @@ import inlineGoogleOAuthRoutes from '../routes/inline-google-oauth';
 import inlineTenantUploadRoutes from '../routes/inline-tenant-upload';
 import inlineItemsCrudRoutes from '../routes/inline-items-crud';
 
-// Middleware
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+// ─── Routes from mount files (being consolidated) ─────────────────────────
+
+// Auth mounts
+import authRoutes from '../auth/auth.routes';
+import onboardingRoutes from '../routes/onboarding';
+
+// Core mounts
+import auditRoutes from '../routes/audit';
+import policyRoutes from '../routes/policy';
+import subscriptionRoutes from '../routes/subscriptions';
+import categoryRoutes from '../routes/categories';
+import userRoutes from '../routes/users';
+import platformStatsRoutes from '../routes/platform-stats';
+import businessHoursRoutes from '../routes/business-hours';
+import taxonomyRoutes from '../routes/taxonomy';
+import analyticsRoutes from '../routes/analytics';
+import shopCategoriesRoutes from '../routes/shop-categories';
+import tenantLogoRoutes from '../routes/tenant-logo';
+import globalCatalogRoutes from '../routes/global-catalog';
+import catalogSlugsRoutes from '../routes/catalog-slugs';
+import catalogAdoptionRoutes from '../routes/catalog-adoption';
+import locationAvailabilityRoutes from '../routes/location-availability';
+import crossTenantProductsRoutes from '../routes/cross-tenant-products';
+import digitalDownloadsRoutes from '../routes/digital-downloads';
+import crmTenantRoutes from '../routes/crm/tenant/crm-tenant';
+import crmCustomerRoutes from '../routes/crm/customer/crm-customer';
+import tenantSupplierRoutes from '../routes/tenant/suppliers';
+import brandingRoutes from '../routes/branding';
+import tenantTierRoutes from '../routes/tenant-tier';
+
+// Dashboard mounts
+import dashboardRoutes from '../routes/dashboard';
+import dashboardConsolidatedRoutes from '../routes/dashboard-consolidated';
+import promotionRoutes from '../routes/promotion';
+import tenantLimitsRoutes from '../routes/tenant-limits';
+import feedJobsRoutes from '../routes/feed-jobs';
+import feedbackRoutes from '../routes/feedback';
+import cacheStatsRoutes from '../routes/cache-stats';
+import categoriesPlatformRoutes from '../routes/categories.platform';
+import categoriesTenantRoutes from '../routes/categories.tenant';
+import categoriesMirrorRoutes from '../routes/categories.mirror';
+import mirrorAdminRoutes from '../routes/mirror.admin';
+import syncLogsRoutes from '../routes/sync-logs';
+
+// Admin mounts (individual admin route imports now in admin.routes.ts orchestrator)
+// These imports are kept because they're used at /admin (non-api) paths:
+import securityRoutes from '../routes/security';
+import tenantFlagsRoutes from '../routes/tenant-flags';
+import platformFlagsRoutes from '../routes/platform-flags';
+import effectiveFlagsRoutes from '../routes/effective-flags';
+import adminUsersRoutes from '../routes/admin-users';
+
+// Integration mounts
+import emailTestRoutes from '../routes/email-test';
+import testGbpRoutes from '../routes/test-gbp';
+
+// Directory mounts (routes at other paths — not part of the /api/directory orchestrator)
+import directoryAdminRoutes from '../routes/directory-admin';
+import directorySupportRoutes from '../routes/directory-support';
+
+// Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
+import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
+import { auditLogger } from '../middleware/audit-logger';
 
 // ─── Registry Types ────────────────────────────────────────────────────────
 
@@ -299,10 +321,10 @@ export const routeRegistry: RouteEntry[] = [
 
   // ── Infrastructure ────────────────────────────────────────────────────
   {
-    path: '/api/admin/service-charges',
-    router: serviceChargesRoutes,
+    path: '/api/admin',
+    router: adminOrchestrator,
     domain: 'admin',
-    comment: 'Mounted BEFORE universal tenants to prevent interception',
+    comment: 'Admin orchestrator — mounts all admin sub-routers in strict order (specific sub-paths before generic root mounts)',
   },
   {
     path: '/api',
@@ -329,36 +351,20 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Public API routes (Singleton System)',
   },
 
-  // ── Directory (specific routes BEFORE catch-all) ─────────────────────
+  // ── Shops (public shop browsing — must be before /api/directory to avoid catch-all) ──
+  {
+    path: '/api/shops',
+    router: shopsRoutes,
+    domain: 'shops',
+    comment: 'Public shop directory, trending, categories, featured products, shop details',
+  },
+
+  // ── Directory (orchestrator handles all /api/directory sub-routes) ───
   {
     path: '/api/directory',
-    router: directoryConsolidatedRoutes,
+    router: directoryOrchestrator,
     domain: 'directory',
-    comment: 'Consolidated route - mounted BEFORE any other /api/directory routes',
-  },
-  {
-    path: '/api/directory',
-    router: directoryRandomFeaturedRoutes,
-    domain: 'directory',
-    comment: 'Random featured products route',
-  },
-  {
-    path: '/api/directory',
-    router: directoryRandomFeaturedGlobalRoutes,
-    domain: 'directory',
-    comment: 'Global random featured products route',
-  },
-  {
-    path: '/api/directory/featured-stores',
-    router: directoryFeaturedStoresRoutes,
-    domain: 'directory',
-    comment: 'Featured stores - mounted BEFORE other directory routes to avoid conflicts',
-  },
-  {
-    path: '/api/directory',
-    router: directoryPhotosRouter,
-    domain: 'directory',
-    comment: 'Directory photos router (handles all photo endpoints with position support)',
+    comment: 'Directory orchestrator — mounts all sub-routers in strict static-first order',
   },
   {
     path: '/api/directory-optimized',
@@ -367,35 +373,10 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Directory optimized (materialized view - 6.7x faster)',
   },
   {
-    path: '/api/directory/categories-optimized',
-    router: directoryCategoriesOptimizedRoutes,
-    domain: 'directory',
-    comment: 'Directory categories optimized (category statistics - 10x faster)',
-  },
-  {
-    path: '/api/directory',
-    router: directoryCategoriesEnhancedRoutes,
-    domain: 'directory',
-    comment: 'Enhanced directory categories - BEFORE store-types to avoid catch-all conflicts',
-  },
-  {
     path: '/api/slugs',
     router: slugGenerationRoutes,
     domain: 'directory',
     comment: 'Slug generation (Platform Standard - SlugSingletonService)',
-  },
-  {
-    path: '/api/directory',
-    router: directoryMapRoutes,
-    domain: 'directory',
-    comment: 'Directory map routes',
-  },
-  {
-    path: '/api/directory',
-    router: directoryRoutes,
-    domain: 'directory',
-    comment: 'Directory main routes (includes /:identifier catch-all)',
-    isCatchAll: true,
   },
 
   // ── Public routes (must be before authenticated catch-alls) ──────────
@@ -566,7 +547,7 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Platform dashboard at /api/platform/dashboard and /api/platform/stats',
   },
 
-  // ── Tenants ──────────────────────────────────────────────────────────
+  // ── Tenants (orchestrator handles all /api/tenants sub-routes) ──────
   {
     path: '/api',
     router: platformSettingsRoutes,
@@ -575,53 +556,16 @@ export const routeRegistry: RouteEntry[] = [
   },
   {
     path: '/api/tenants',
-    router: tenantsRoutes,
+    router: tenantOrchestrator,
     domain: 'tenant',
-    comment: 'Tenants routes',
+    comment: 'Tenant orchestrator — mounts all tenant sub-routers in strict order (sub-resources before /:id)',
   },
-  {
-    path: '/api/tenants',
-    router: paymentGatewaysRoutes,
-    domain: 'tenant',
-    comment: 'Payment gateway routes at /api/tenants/:tenantId/payment-gateways',
-  },
-  {
-    path: '/api/tenants',
-    router: tenantStripeConnectRoutes,
-    domain: 'tenant',
-    comment: 'Tenant Stripe Connect at /api/tenants/:tenantId/stripe-connect',
-  },
-  {
-    path: '/api/tenants',
-    router: paypalConnectRoutes,
-    domain: 'tenant',
-    comment: 'PayPal Connect at /api/tenants (also at /api/admin/paypal-connect)',
-  },
-  {
-    path: '/api/admin/paypal-connect',
-    router: paypalConnectRoutes,
-    domain: 'admin',
-    comment: 'PayPal Connect admin',
-  },
-
-  // ── Settings (tenant-scoped) ─────────────────────────────────────────
-  {
-    path: '/api/tenants',
-    router: fulfillmentSettingsRoutes,
-    domain: 'settings',
-    comment: 'Fulfillment settings at /api/tenants/:tenantId/fulfillment-settings',
-  },
+  // ── Settings (public endpoints at /api) ──────────────────────────────
   {
     path: '/api',
     router: fulfillmentSettingsRoutes,
     domain: 'settings',
     comment: 'Fulfillment settings public at /api/public/tenant/:tenantId/fulfillment-settings',
-  },
-  {
-    path: '/api/tenants',
-    router: commerceSettingsRoutes,
-    domain: 'settings',
-    comment: 'Commerce settings at /api/tenants/:tenantId/commerce-settings',
   },
   {
     path: '/api',
@@ -636,52 +580,10 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Tax engine at /api/tax/calculate',
   },
   {
-    path: '/api/tenants',
-    router: taxRoutes,
-    domain: 'settings',
-    comment: 'Tax settings at /api/tenants/:tenantId/tax-settings',
-  },
-  {
-    path: '/api/tenants',
-    router: productOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Product options at /api/tenants/:tenantId/product-options',
-  },
-  {
-    path: '/api/tenants',
-    router: featuredOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Featured options at /api/tenants/:tenantId/featured-options',
-  },
-  {
     path: '/api',
     router: featuredOptionsSettingsRoutes,
     domain: 'settings',
     comment: 'Featured options public at /api/public/tenant/:tenantId/featured-options',
-  },
-  {
-    path: '/api/tenants',
-    router: quickstartOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Quickstart options at /api/tenants/:tenantId/quickstart-options',
-  },
-  {
-    path: '/api/tenants',
-    router: storefrontOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Storefront options at /api/tenants/:tenantId/storefront-options',
-  },
-  {
-    path: '/api/tenants',
-    router: directoryEntryOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Directory entry options at /api/tenants/:tenantId/directory-entry-options',
-  },
-  {
-    path: '/api/tenants',
-    router: storefrontTypeSettingsRoutes,
-    domain: 'settings',
-    comment: 'Storefront type at /api/tenants/:tenantId/storefront-type',
   },
   {
     path: '/api',
@@ -690,22 +592,10 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Storefront type public at /api/public/tenant/:tenantId/storefront-type',
   },
   {
-    path: '/api/tenants',
-    router: productTypeSettingsRoutes,
-    domain: 'settings',
-    comment: 'Product type at /api/tenants/:tenantId/product-type',
-  },
-  {
     path: '/api',
     router: productTypeSettingsRoutes,
     domain: 'settings',
     comment: 'Product type public at /api/public/tenant/:tenantId/product-type',
-  },
-  {
-    path: '/api/tenants',
-    router: storefrontPolicyRoutes,
-    domain: 'settings',
-    comment: 'Storefront policies at /api/tenants/:tenantId/storefront-policies',
   },
   {
     path: '/api',
@@ -720,22 +610,10 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Policy templates at /api/public/policy-templates, /api/tenants/:tenantId/storefront-policies/templates, and /api/admin/policy-templates',
   },
   {
-    path: '/api/tenants',
-    router: faqOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'FAQ options at /api/tenants/:tenantId/faq-options',
-  },
-  {
     path: '/api',
     router: faqOptionsSettingsRoutes,
     domain: 'settings',
     comment: 'FAQ options public at /api/public/tenant/:tenantId/faq-options',
-  },
-  {
-    path: '/api/tenants',
-    router: crmOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'CRM options at /api/tenants/:tenantId/crm-options',
   },
   {
     path: '/api',
@@ -744,22 +622,10 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'CRM options public at /api/public/tenant/:tenantId/crm-options',
   },
   {
-    path: '/api/tenants',
-    router: socialCommerceOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Social commerce options at /api/tenants/:tenantId/social-commerce-options',
-  },
-  {
     path: '/api',
     router: socialCommerceOptionsSettingsRoutes,
     domain: 'settings',
     comment: 'Social commerce options public',
-  },
-  {
-    path: '/api/tenants',
-    router: chatbotOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Chatbot options at /api/tenants/:tenantId/chatbot-options',
   },
   {
     path: '/api',
@@ -779,24 +645,6 @@ export const routeRegistry: RouteEntry[] = [
     middleware: [authenticateToken],
     domain: 'social',
     comment: 'Bot merchant routes at /api/tenants/:tenantId/bot/*',
-  },
-  {
-    path: '/api/tenants',
-    router: barcodeScanSettingsRoutes,
-    domain: 'settings',
-    comment: 'Barcode scan settings at /api/tenants/:tenantId/barcode-scan',
-  },
-  {
-    path: '/api/tenants',
-    router: integrationOptionsSettingsRoutes,
-    domain: 'settings',
-    comment: 'Integration options at /api/tenants/:tenantId/integration-options',
-  },
-  {
-    path: '/api/tenants',
-    router: paymentGatewaySettingsRoutes,
-    domain: 'settings',
-    comment: 'Payment gateway settings at /api/tenants/:tenantId/payment-gateway-settings',
   },
   {
     path: '/api',
@@ -825,6 +673,14 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Billing routes at /api/billing',
   },
 
+  // ── Rate Limit Warnings ─────────────────────────────────────────────
+  {
+    path: '/api',
+    router: rateLimitWarningsRoutes,
+    domain: 'security',
+    comment: 'Rate limit warning tracking at /api/rate-limit-warnings',
+  },
+
   // ── Orders (tenant-scoped) ───────────────────────────────────────────
   {
     path: '/api',
@@ -837,12 +693,6 @@ export const routeRegistry: RouteEntry[] = [
     router: shipmentRoutes,
     domain: 'checkout',
     comment: 'Shipments at /api/tenants/:tenantId/shipments',
-  },
-  {
-    path: '/api/tenants',
-    router: abandonedCartRoutes,
-    domain: 'checkout',
-    comment: 'Abandoned carts at /api/tenants/:tenantId/abandoned-carts',
   },
   {
     path: '/api/tenant/inventory-transfers',
@@ -866,27 +716,7 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Auth RBAC endpoints (role-groups, user-groups, permissions, user-access, role-protected routes)',
   },
 
-  // ── Tenant trial, notifications, categories ──────────────────────────
-  {
-    path: '/api/tenants',
-    router: trialSetupRoutes,
-    middleware: [authenticateToken],
-    domain: 'tenant',
-    comment: 'Tenant trial setup',
-  },
-  {
-    path: '/api/tenants',
-    router: tenantNotificationsRoutes,
-    middleware: [authenticateToken],
-    domain: 'tenant',
-    comment: 'Tenant notifications at /api/tenants/:tenantId/notifications',
-  },
-  {
-    path: '/api/tenants',
-    router: digitalDownloadPagesRoutes,
-    domain: 'tenant',
-    comment: 'Digital download pages at /api/tenants/:tenantId/digital-download-pages',
-  },
+  // ── Tenant categories ────────────────────────────────────────────────
   {
     path: '/api/tenant',
     router: tenantCategoriesRoutes,
@@ -919,12 +749,6 @@ export const routeRegistry: RouteEntry[] = [
     router: photosRouter,
     domain: 'items',
     comment: 'Photos routes at /api/items',
-  },
-  {
-    path: '/api/directory',
-    router: directoryPhotosRouter,
-    domain: 'directory',
-    comment: 'Directory photos routes (second mount for directory-specific photo endpoints)',
   },
 
   // ── Cache ────────────────────────────────────────────────────────────
@@ -998,20 +822,6 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'security',
     comment: 'Security alerts at /api/security/security-alerts',
   },
-  {
-    path: '/api/admin/security',
-    router: adminSecurityMonitoringRoutes,
-    domain: 'admin',
-    comment: 'Admin security monitoring',
-  },
-  {
-    path: '/api/admin/security',
-    router: adminSecurityRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin security analytics (auth + admin required)',
-  },
-
   // ── Clone ────────────────────────────────────────────────────────────
   {
     path: '/api/clone',
@@ -1193,12 +1003,6 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Social Proof / UGC at /api/public/social-proof',
   },
   {
-    path: '/api/tenants',
-    router: socialProofRoutes,
-    domain: 'social',
-    comment: 'Social Proof / UGC at /api/tenants/:tenantId/social-proof',
-  },
-  {
     path: '/api',
     router: shippingRateRoutes,
     domain: 'social',
@@ -1209,12 +1013,6 @@ export const routeRegistry: RouteEntry[] = [
     router: returnsRoutes,
     domain: 'social',
     comment: 'Returns portal at /api/public/returns',
-  },
-  {
-    path: '/api/tenants',
-    router: returnsRoutes,
-    domain: 'social',
-    comment: 'Returns portal at /api/tenants/:tenantId/returns',
   },
   {
     path: '/api',
@@ -1291,134 +1089,6 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'admin',
     comment: 'Tier config routes (tenant-accessible)',
   },
-  {
-    path: '/api/admin/tier-system',
-    router: tierSystemRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin tier system routes',
-  },
-  {
-    path: '/api/admin/capabilities',
-    router: capabilityRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin capabilities routes',
-  },
-  {
-    path: '/api/admin/tiers',
-    router: tierManagementRoutes,
-    middleware: [authenticateToken],
-    domain: 'admin',
-    comment: 'Admin tier management routes',
-  },
-  {
-    path: '/api/admin/scan-metrics',
-    router: scanMetricsRoutes,
-    domain: 'admin',
-    comment: 'Admin scan metrics routes',
-  },
-  {
-    path: '/api/admin/cached-products',
-    router: cachedProductsRoutes,
-    domain: 'admin',
-    comment: 'Admin cached products routes',
-  },
-  {
-    path: '/api/admin/users',
-    router: adminUsersRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin users routes',
-  },
-  {
-    path: '/api/admin/tools',
-    router: adminToolsRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin tools routes',
-  },
-  {
-    path: '/api/admin/sentry',
-    router: sentryRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin sentry routes',
-  },
-  {
-    path: '/api/admin/errors',
-    router: errorLogRoutes,
-    middleware: [authenticateToken, requireAdmin],
-    domain: 'admin',
-    comment: 'Admin error log routes',
-  },
-  {
-    path: '/api/admin/manual-billing',
-    router: manualBillingRoutes,
-    domain: 'admin',
-    comment: 'Admin manual billing routes',
-  },
-  {
-    path: '/api/admin/platform-revenue',
-    router: platformRevenueRoutes,
-    domain: 'admin',
-    comment: 'Admin platform revenue routes',
-  },
-  {
-    path: '/api/admin/platform-fee-invoices',
-    router: platformFeeInvoiceRoutes,
-    domain: 'admin',
-    comment: 'Platform fee invoice routes',
-  },
-  {
-    path: '/api/admin/notification-logs',
-    router: notificationLogsRoutes,
-    domain: 'admin',
-    comment: 'Admin notification logs routes',
-  },
-  {
-    path: '/api/admin/inventory-transfers',
-    router: adminInventoryTransferRoutes,
-    domain: 'admin',
-    comment: 'Admin inventory transfer routes',
-  },
-  {
-    path: '/api/admin/slug-registry',
-    router: adminSlugRegistryRoutes,
-    domain: 'admin',
-    comment: 'Admin slug registry routes',
-  },
-  {
-    path: '/api/admin/catalog',
-    router: adminCatalogRoutes,
-    domain: 'admin',
-    comment: 'Admin catalog routes',
-  },
-  {
-    path: '/api/admin/inventory',
-    router: adminInventoryStatsRoutes,
-    domain: 'admin',
-    comment: 'Admin inventory stats routes',
-  },
-  {
-    path: '/api/admin/google-product-taxonomy',
-    router: googleProductTaxonomyRoutes,
-    domain: 'admin',
-    comment: 'Google Product Taxonomy routes',
-  },
-  {
-    path: '/api/admin/demo-tenants',
-    router: adminDemoTenantRoutes,
-    domain: 'admin',
-    comment: 'Admin demo tenant routes',
-  },
-  {
-    path: '/api/admin/performance',
-    router: performanceApi,
-    domain: 'admin',
-    comment: 'Performance routes',
-  },
-
   // ── Singleton system routes ──────────────────────────────────────────
   {
     path: '/api/categories-singleton',
@@ -1591,6 +1261,377 @@ export const routeRegistry: RouteEntry[] = [
     router: inlineMiscRoutes,
     domain: 'infrastructure',
     comment: 'Health, ping, __routes, and jobs endpoints',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── Routes consolidated from mounts/*.ts ─────────────────────────────
+  // These were previously mounted via mountAllRoutes(app) and are now
+  // registered here so mountAllRoutes can be removed.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── Audit middleware (global) ────────────────────────────────────────
+  {
+    path: '/',
+    router: auditLogger,
+    domain: 'infrastructure',
+    comment: 'Global audit logger middleware (logs all write operations)',
+  },
+
+  // ── Auth routes (from auth-routes.ts) ────────────────────────────────
+  {
+    path: '/auth',
+    router: authRoutes,
+    domain: 'auth',
+    comment: 'Auth0 login/callback routes at /auth',
+  },
+  {
+    path: '/api/auth',
+    router: authRoutes,
+    domain: 'auth',
+    comment: 'Auth0 login/callback routes at /api/auth',
+  },
+  {
+    path: '/api/auth/onboarding',
+    router: onboardingRoutes,
+    domain: 'auth',
+    comment: 'Onboarding routes (requires authentication)',
+  },
+
+  // ── Core business routes (from core-routes.ts) ───────────────────────
+  {
+    path: '/',
+    router: auditRoutes,
+    domain: 'admin',
+    comment: 'Audit routes',
+  },
+  {
+    path: '/',
+    router: policyRoutes,
+    domain: 'admin',
+    comment: 'Policy routes',
+  },
+  {
+    path: '/subscriptions',
+    router: subscriptionRoutes,
+    domain: 'billing',
+    comment: 'Subscription routes at /subscriptions',
+  },
+  {
+    path: '/api/categories',
+    router: categoryRoutes,
+    middleware: [authenticateToken],
+    domain: 'items',
+    comment: 'Category routes at /api/categories',
+  },
+  {
+    path: '/performance',
+    router: performanceApi,
+    domain: 'infrastructure',
+    comment: 'Performance routes at /performance',
+  },
+  {
+    path: '/organization-requests',
+    router: organizationRequestRoutes,
+    domain: 'organization',
+    comment: 'Organization requests at /organization-requests (no /api prefix)',
+  },
+  {
+    path: '/upgrade-requests',
+    router: upgradeRequestsRoutes,
+    domain: 'organization',
+    comment: 'Upgrade requests at /upgrade-requests (no /api prefix)',
+  },
+  {
+    path: '/permissions',
+    router: permissionRoutes,
+    domain: 'security',
+    comment: 'Permission routes at /permissions',
+  },
+  {
+    path: '/users',
+    router: userRoutes,
+    domain: 'admin',
+    comment: 'User routes at /users (no /api prefix)',
+  },
+  {
+    path: '/api/user',
+    router: userRoutes,
+    domain: 'admin',
+    comment: 'User routes at /api/user',
+  },
+  {
+    path: '/api',
+    router: tenantTierRoutes,
+    domain: 'tenant',
+    comment: 'Tenant tier routes (public tier endpoints mounted BEFORE authenticated tenant routes)',
+  },
+  {
+    path: '/api/download',
+    router: digitalDownloadsRoutes,
+    domain: 'tenant',
+    comment: 'Digital downloads (no global auth - uses access tokens)',
+  },
+  {
+    path: '/api/platform-stats',
+    router: platformStatsRoutes,
+    domain: 'admin',
+    comment: 'Platform stats at /api/platform-stats',
+  },
+  {
+    path: '/api',
+    router: businessHoursRoutes,
+    domain: 'settings',
+    comment: 'Business hours management at /api',
+  },
+  {
+    path: '/api/taxonomy',
+    router: taxonomyRoutes,
+    domain: 'items',
+    comment: 'Taxonomy routes at /api/taxonomy',
+  },
+  {
+    path: '/api/analytics',
+    router: analyticsRoutes,
+    domain: 'admin',
+    comment: 'Analytics routes at /api/analytics',
+  },
+  {
+    path: '/api/shop-categories',
+    router: shopCategoriesRoutes,
+    domain: 'items',
+    comment: 'Shop categories at /api/shop-categories',
+  },
+  {
+    path: '/api/public/tenant',
+    router: tenantLogoRoutes,
+    domain: 'tenant',
+    comment: 'Tenant logo routes at /api/public/tenant',
+  },
+  {
+    path: '/api/catalog',
+    router: globalCatalogRoutes,
+    domain: 'items',
+    comment: 'Global catalog routes (public access for browsing)',
+  },
+  {
+    path: '/api/catalog/slugs',
+    router: catalogSlugsRoutes,
+    domain: 'items',
+    comment: 'Catalog slugs at /api/catalog/slugs',
+  },
+  {
+    path: '/api/catalog',
+    router: catalogAdoptionRoutes,
+    domain: 'items',
+    comment: 'Catalog adoption at /api/catalog',
+  },
+  {
+    path: '/api/catalog/availability',
+    router: locationAvailabilityRoutes,
+    domain: 'items',
+    comment: 'Location availability at /api/catalog/availability',
+  },
+  {
+    path: '/api/cross-tenant',
+    router: crossTenantProductsRoutes,
+    domain: 'items',
+    comment: 'Cross-tenant product routes at /api/cross-tenant',
+  },
+  {
+    path: '/api/tenant/crm',
+    router: crmTenantRoutes,
+    middleware: [authenticateToken, checkTenantAccess],
+    domain: 'tenant',
+    comment: 'CRM tenant routes (tenant-scoped, requires tenant access)',
+  },
+  {
+    path: '/api/customer/crm',
+    router: crmCustomerRoutes,
+    middleware: [authenticateCustomer],
+    domain: 'customer',
+    comment: 'CRM customer routes (customer-scoped, requires customer JWT auth)',
+  },
+  {
+    path: '/api/tenants/:tenantId',
+    router: tenantSupplierRoutes,
+    domain: 'tenant',
+    comment: 'Supplier catalog tenant routes at /api/tenants/:tenantId',
+  },
+  {
+    path: '/api/branding',
+    router: brandingRoutes,
+    domain: 'tenant',
+    comment: 'Branding routes (public GET for storefront, auth PUT for merchant)',
+  },
+
+  // ── Dashboard routes (from dashboard-routes.ts) ──────────────────────
+  {
+    path: '/api/dashboard',
+    router: dashboardRoutes,
+    domain: 'admin',
+    comment: 'Dashboard routes at /api/dashboard',
+  },
+  {
+    path: '/api/dashboard',
+    router: dashboardConsolidatedRoutes,
+    domain: 'admin',
+    comment: 'Consolidated dashboard routes at /api/dashboard',
+  },
+  {
+    path: '/api',
+    router: promotionRoutes,
+    domain: 'admin',
+    comment: 'Promotion endpoints at /api',
+  },
+  {
+    path: '/api/tenant-limits',
+    router: tenantLimitsRoutes,
+    domain: 'tenant',
+    comment: 'Tenant creation limits at /api/tenant-limits',
+  },
+  {
+    path: '/api/feed-jobs',
+    router: feedJobsRoutes,
+    domain: 'admin',
+    comment: 'Feed jobs at /api/feed-jobs',
+  },
+  {
+    path: '/api/feedback',
+    router: feedbackRoutes,
+    domain: 'admin',
+    comment: 'Feedback at /api/feedback',
+  },
+  {
+    path: '/api/v1/tenants',
+    router: tenantCategoriesRoutes,
+    middleware: [authenticateToken, checkTenantAccess],
+    domain: 'tenant',
+    comment: 'Tenant categories at /api/v1/tenants/:tenantId/categories',
+  },
+  {
+    path: '/api/v1',
+    router: quickStartRoutes,
+    domain: 'tenant',
+    comment: 'Quick start at /api/v1',
+  },
+  {
+    path: '/api/v1',
+    router: cacheStatsRoutes,
+    domain: 'infrastructure',
+    comment: 'Cache statistics at /api/v1',
+  },
+  {
+    path: '/api/platform',
+    router: categoriesPlatformRoutes,
+    domain: 'admin',
+    comment: 'Category scaffold platform routes at /api/platform',
+  },
+  {
+    path: '/',
+    router: categoriesTenantRoutes,
+    domain: 'items',
+    comment: 'Category scaffold tenant routes',
+  },
+  {
+    path: '/',
+    router: categoriesMirrorRoutes,
+    domain: 'items',
+    comment: 'Category scaffold mirror routes',
+  },
+  {
+    path: '/',
+    router: mirrorAdminRoutes,
+    domain: 'admin',
+    comment: 'Mirror admin routes',
+  },
+  {
+    path: '/',
+    router: syncLogsRoutes,
+    domain: 'admin',
+    comment: 'Sync logs routes',
+  },
+
+  // ── Security route (not under /api/admin) ────────────────────────────
+  {
+    path: '/api/security',
+    router: securityRoutes,
+    domain: 'admin',
+    comment: 'Security routes (skips /telemetry which has its own mounting)',
+  },
+  // ── Legacy /admin mounts (not at /api/admin — kept for backward compatibility) ──
+  {
+    path: '/admin',
+    router: tenantFlagsRoutes,
+    middleware: [authenticateToken],
+    domain: 'admin',
+    comment: 'Tenant flags at /admin (platform admin or store owners)',
+  },
+  {
+    path: '/admin',
+    router: adminUsersRoutes,
+    middleware: [authenticateToken],
+    domain: 'admin',
+    comment: 'Admin users at /admin',
+  },
+  {
+    path: '/admin',
+    router: platformFlagsRoutes,
+    middleware: [authenticateToken],
+    domain: 'admin',
+    comment: 'Platform flags at /admin',
+  },
+  {
+    path: '/admin',
+    router: effectiveFlagsRoutes,
+    middleware: [authenticateToken],
+    domain: 'admin',
+    comment: 'Effective flags at /admin',
+  },
+
+  // ── Integration routes (from integration-routes.ts) ──────────────────
+  {
+    path: '/api/integrations',
+    router: cloverRoutes,
+    domain: 'integration',
+    comment: 'Clover POS integration at /api/integrations',
+  },
+  {
+    path: '/api/google-business',
+    router: googleBusinessOAuthRoutes,
+    domain: 'integration',
+    comment: 'Google Business Profile OAuth at /api/google-business',
+  },
+  {
+    path: '/',
+    router: scanMetricsRoutes,
+    domain: 'admin',
+    comment: 'Scan metrics routes (mounted at root, routes define their own paths)',
+  },
+  {
+    path: '/api/email',
+    router: emailTestRoutes,
+    domain: 'integration',
+    comment: 'Email test routes at /api/email',
+  },
+  {
+    path: '/test',
+    router: testGbpRoutes,
+    domain: 'integration',
+    comment: 'Test GBP routes at /test',
+  },
+
+  // ── Directory routes at other paths (not part of /api/directory orchestrator) ──
+  {
+    path: '/api/admin/directory',
+    router: directoryAdminRoutes,
+    domain: 'directory',
+    comment: 'Admin directory management (auth in routes)',
+  },
+  {
+    path: '/api/support/directory',
+    router: directorySupportRoutes,
+    domain: 'directory',
+    comment: 'Support directory tools (auth in routes)',
   },
 ];
 

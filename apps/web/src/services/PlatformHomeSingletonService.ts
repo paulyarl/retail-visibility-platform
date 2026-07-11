@@ -2949,7 +2949,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    */
   async getSentryConfig(): Promise<SentryConfig | null> {
     const result = await this.makeDefaultRequest<SentryConfig>(
-      '/api/admin/sentry/config',
+      '/api/admin/sentry',
       {},
       'platform-sentry-config',
       this.cacheTTL

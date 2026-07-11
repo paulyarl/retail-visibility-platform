@@ -874,7 +874,7 @@ router.get('/google/merchant/validation-report', async (req, res) => {
 
     // Resolve Google category IDs from platform_categories
     const platformCats = await prisma.platform_categories.findMany({
-      where: { is_active: true, google_category_id: { not: null } as any },
+      where: { is_active: true },
       select: { name: true, google_category_id: true },
     });
     const googleCatByPlatformName = new Map<string, string>();
