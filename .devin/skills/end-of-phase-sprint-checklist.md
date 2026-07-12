@@ -174,6 +174,16 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **No orphaned imports.** Check that removed code didn't leave unused imports. `tsc --noEmit` catches most, but review manually for barrel-exported modules.
 
+- [ ] **E2E batch test passes.** If the sprint created or modified services, endpoints, or jobs, create or update a sprint batch test at `apps/api/src/tests/sprint-e2e-batch.test.ts` (or a sprint-specific test file). The batch test should cover all sprint-implemented services and endpoints with mocked dependencies (no DB/Stripe required). Run it before marking complete:
+  ```bash
+  doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose
+  ```
+  - Use `vi.hoisted()` for mock functions that need to be available in `vi.mock` factories
+  - Mock `prisma`, `logger`, `unifiedConfig`, and any external SDKs (stripe, etc.)
+  - Cover success paths, error paths, edge cases, and integration points between services
+  - Group tests by service/feature section for readability
+  - Reference: `barcode-wholesale-integration.md` §13 for the established pattern
+
 - [ ] **Memory updated.** If the session completed a significant milestone (phase, sprint, feature), create or update a memory entry summarizing what was built, key files, and next steps. Use `create_memory` with appropriate tags.
 
 - [ ] **Commit message documents the work.** Include a summary of what was built, files changed, and any design decisions in the commit message. Reference the design doc if one exists.

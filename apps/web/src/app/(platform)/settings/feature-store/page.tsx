@@ -37,6 +37,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [promoDiscount, setPromoDiscount] = useState<{ discountCents: number; chargedAmount: number } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [isDemoTenant, setIsDemoTenant] = useState(false);
+  const [urlPromoCode, setUrlPromoCode] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!tenantId) {
@@ -72,6 +73,14 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const promoFromUrl = searchParams?.get('promo');
+    if (promoFromUrl) {
+      setUrlPromoCode(promoFromUrl);
+      setPromoCode(promoFromUrl);
+    }
+  }, [searchParams]);
+
   const handlePurchaseClick = (item: BsaasCatalogItem) => {
     if (item.tierAvailability === 'in_tier_active') {
       setError(`"${item.name}" is already included in your subscription tier — no purchase needed.`);
@@ -98,7 +107,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
 
     setPurchaseTarget(item);
     setSelectedPaymentMethodId(defaultMethod.id);
-    setPromoCode('');
+    setPromoCode(urlPromoCode || '');
     setPromoDiscount(null);
     setPromoError(null);
     setShowConfirm(true);
@@ -169,7 +178,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
 
     setBundleTarget(bundle);
     setSelectedPaymentMethodId(defaultMethod.id);
-    setPromoCode('');
+    setPromoCode(urlPromoCode || '');
     setPromoDiscount(null);
     setPromoError(null);
     setShowBundleConfirm(true);
@@ -298,6 +307,12 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
         {success && (
           <Alert icon={<IconCheck size={16} />} color="green" onClose={() => setSuccess(null)} withCloseButton>
             {success}
+          </Alert>
+        )}
+
+        {urlPromoCode && (
+          <Alert icon={<IconTag size={16} />} color="blue" withCloseButton onClose={() => setUrlPromoCode(null)}>
+            Promo code <strong>{urlPromoCode}</strong> applied — click a feature or bundle to purchase with discount.
           </Alert>
         )}
 

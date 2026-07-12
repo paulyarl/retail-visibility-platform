@@ -49,7 +49,12 @@
     "migration:check": "node scripts/pre-migration-check.js",
     "migration:dev": "node scripts/migration-wrapper.js dev",
     "migration:deploy": "node scripts/migration-wrapper.js deploy",
-    "migration:reset": "node scripts/migration-wrapper.js reset"
+    "migration:reset": "node scripts/migration-wrapper.js reset",
+    "gen:route-map": "tsx src/scripts/generate-route-map.ts",
+    "gen:openapi": "tsx src/scripts/generate-openapi.ts",
+    "gen:routes": "tsx src/scripts/generate-route-map.ts && tsx src/scripts/generate-openapi.ts",
+    "test:routes": "vitest run src/tests/route-coverage.test.ts",
+    "lint:catchall": "tsx src/scripts/lint-catchall-order.ts"
   },
   "keywords": [],
   "author": "",

@@ -778,6 +778,7 @@ export interface WholesaleMatchingState {
   canCheckSupplierMatch: boolean;
   canSearchFaire: boolean;
   canBuildAffiliateLink: boolean;
+  canViewBrandPartners: boolean;
   isFlexible: boolean;
   features: Record<string, boolean>;
 }

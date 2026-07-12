@@ -18,6 +18,49 @@ import { getSubscriptionBillingService } from '../services/subscription/Subscrip
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
+/**
+ * Calculate the renewal charge amount based on coupon metadata.
+ *
+ * - No coupon → full price (current behavior)
+ * - `once` + renewalCount > 0 → full price (discount was initial-only)
+ * - `repeating` + renewalCount < duration_in_months → discounted
+ * - `repeating` + renewalCount >= duration_in_months → full price
+ * - `forever` → always discounted
+ */
+export function calculateRenewalCharge(
+  metadata: any,
+  renewalCount: number
+): { chargedAmount: number; discountCents: number; couponActive: boolean } {
+  const originalPriceCents = metadata.original_price_cents ?? metadata.price_cents;
+  const couponDuration = metadata.coupon_duration;
+  const renewalCount_ = renewalCount || 0;
+
+  if (!metadata.coupon_id || !couponDuration) {
+    return { chargedAmount: originalPriceCents, discountCents: 0, couponActive: false };
+  }
+
+  if (couponDuration === 'once' && renewalCount_ > 0) {
+    return { chargedAmount: originalPriceCents, discountCents: 0, couponActive: false };
+  }
+
+  if (couponDuration === 'repeating') {
+    const durationInMonths = metadata.coupon_duration_in_months || 0;
+    if (renewalCount_ >= durationInMonths) {
+      return { chargedAmount: originalPriceCents, discountCents: 0, couponActive: false };
+    }
+  }
+
+  // Apply discount (for 'forever', 'once' with renewalCount===0, or 'repeating' within duration)
+  let discountCents = 0;
+  if (metadata.coupon_percent_off) {
+    discountCents = Math.round(originalPriceCents * metadata.coupon_percent_off / 100);
+  } else if (metadata.coupon_amount_off) {
+    discountCents = Math.min(metadata.coupon_amount_off, originalPriceCents);
+  }
+  const chargedAmount = Math.max(0, originalPriceCents - discountCents);
+  return { chargedAmount, discountCents, couponActive: true };
+}
+
 export interface BsaasRenewalResult {
   renewed: number;
   pastDue: number;
@@ -93,13 +136,15 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         continue;
       }
 
-      // Charge once for the entire bundle
+      // Charge once for the entire bundle (with coupon awareness)
+      const renewalCount = metadata.renewal_count || 0;
+      const renewalCharge = calculateRenewalCharge(metadata, renewalCount);
       const billingService = getSubscriptionBillingService();
       const chargeResult = await billingService.chargePaymentMethod(
         firstPurchase.tenant_id,
         paymentMethodId,
-        priceCents,
-        `BSaaS Bundle renewal: ${bundleName}`
+        renewalCharge.chargedAmount,
+        `BSaaS Bundle renewal: ${bundleName}${renewalCharge.couponActive ? ' (coupon applied)' : ''}`
       );
 
       if (chargeResult.success) {
@@ -120,6 +165,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
                 ...((p.metadata as any) || {}),
                 last_renewed_at: new Date().toISOString(),
                 last_transaction_id: chargeResult.transactionId,
+                renewal_count: ((p.metadata as any)?.renewal_count || 0) + 1,
               },
             },
           })
@@ -132,14 +178,14 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         notificationService.sendNotification({
           tenantId: firstPurchase.tenant_id,
           type: 'bsaas_renewal_success',
-          amount: priceCents,
+          amount: renewalCharge.chargedAmount,
           billingCycle: billingCycle as 'monthly' | 'annual',
           metadata: { bundleKey, bundleName, featureKeys: purchases.map(p => p.feature_key) },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send bundle renewal notification:', err));
       } else {
         // Bundle charge failed — enter grace period for all components
         for (const p of purchases) {
-          await enterGracePeriod(p, chargeResult.error || 'Payment declined', result, bundleName, priceCents, billingCycle);
+          await enterGracePeriod(p, chargeResult.error || 'Payment declined', result, bundleName, renewalCharge.chargedAmount, billingCycle);
         }
       }
     } catch (error: any) {
@@ -174,13 +220,15 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
       });
       const featureName = feature?.name || purchase.feature_key;
 
-      // Re-charge the payment method
+      // Re-charge the payment method (with coupon awareness)
+      const renewalCount = metadata.renewal_count || 0;
+      const renewalCharge = calculateRenewalCharge(metadata, renewalCount);
       const billingService = getSubscriptionBillingService();
       const chargeResult = await billingService.chargePaymentMethod(
         purchase.tenant_id,
         paymentMethodId,
-        priceCents,
-        `BSaaS renewal: ${featureName}`
+        renewalCharge.chargedAmount,
+        `BSaaS renewal: ${featureName}${renewalCharge.couponActive ? ' (coupon applied)' : ''}`
       );
 
       if (chargeResult.success) {
@@ -200,6 +248,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
               ...metadata,
               last_renewed_at: new Date().toISOString(),
               last_transaction_id: chargeResult.transactionId,
+              renewal_count: renewalCount + 1,
             },
           },
         });
@@ -212,13 +261,13 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         notificationService.sendNotification({
           tenantId: purchase.tenant_id,
           type: 'bsaas_renewal_success',
-          amount: priceCents,
+          amount: renewalCharge.chargedAmount,
           billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { featureKey: purchase.feature_key, featureName },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send renewal notification:', err));
       } else {
         // Payment failed — enter grace period instead of immediate suspension
-        await enterGracePeriod(purchase, chargeResult.error || 'Payment declined', result, featureName, priceCents, billingCycle);
+        await enterGracePeriod(purchase, chargeResult.error || 'Payment declined', result, featureName, renewalCharge.chargedAmount, billingCycle);
       }
     } catch (error: any) {
       console.error(`[BSaaS Renewal] Error processing purchase ${purchase.id}:`, error);
@@ -271,12 +320,14 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         continue;
       }
 
+      // Trial conversion — first charge, renewalCount === 0
+      const renewalCharge = calculateRenewalCharge(metadata, 0);
       const billingService = getSubscriptionBillingService();
       const chargeResult = await billingService.chargePaymentMethod(
         firstPurchase.tenant_id,
         paymentMethodId,
-        priceCents,
-        `BSaaS Bundle trial conversion: ${bundleName}`
+        renewalCharge.chargedAmount,
+        `BSaaS Bundle trial conversion: ${bundleName}${renewalCharge.couponActive ? ' (coupon applied)' : ''}`
       );
 
       if (chargeResult.success) {
@@ -297,6 +348,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
                 ...((p.metadata as any) || {}),
                 trial_converted_at: new Date().toISOString(),
                 last_transaction_id: chargeResult.transactionId,
+                renewal_count: 0,
               },
             },
           })
@@ -309,13 +361,13 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         notificationService.sendNotification({
           tenantId: firstPurchase.tenant_id,
           type: 'bsaas_purchase_success',
-          amount: priceCents,
+          amount: renewalCharge.chargedAmount,
           billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { bundleKey, bundleName, featureKeys: purchases.map(p => p.feature_key) },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send bundle trial conversion notification:', err));
       } else {
         for (const p of purchases) {
-          await enterGracePeriod(p, chargeResult.error || 'Payment declined during trial conversion', result, bundleName, priceCents, billingCycle);
+          await enterGracePeriod(p, chargeResult.error || 'Payment declined during trial conversion', result, bundleName, renewalCharge.chargedAmount, billingCycle);
         }
       }
     } catch (error: any) {
@@ -344,12 +396,14 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         continue;
       }
 
+      // Trial conversion — first charge, renewalCount === 0
+      const renewalCharge = calculateRenewalCharge(metadata, 0);
       const billingService = getSubscriptionBillingService();
       const chargeResult = await billingService.chargePaymentMethod(
         purchase.tenant_id,
         paymentMethodId,
-        priceCents,
-        `BSaaS trial conversion: ${featureName}`
+        renewalCharge.chargedAmount,
+        `BSaaS trial conversion: ${featureName}${renewalCharge.couponActive ? ' (coupon applied)' : ''}`
       );
 
       if (chargeResult.success) {
@@ -369,6 +423,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
               ...metadata,
               trial_converted_at: new Date().toISOString(),
               last_transaction_id: chargeResult.transactionId,
+              renewal_count: 0,
             },
           },
         });
@@ -380,13 +435,13 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         notificationService.sendNotification({
           tenantId: purchase.tenant_id,
           type: 'bsaas_purchase_success',
-          amount: priceCents,
+          amount: renewalCharge.chargedAmount,
           billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { featureKey: purchase.feature_key, featureName },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send trial conversion notification:', err));
       } else {
         // Trial conversion charge failed — enter grace period
-        await enterGracePeriod(purchase, chargeResult.error || 'Payment declined during trial conversion', result, featureName, priceCents, billingCycle);
+        await enterGracePeriod(purchase, chargeResult.error || 'Payment declined during trial conversion', result, featureName, renewalCharge.chargedAmount, billingCycle);
       }
     } catch (error: any) {
       console.error(`[BSaaS Renewal] Error converting trial ${purchase.id}:`, error);
@@ -430,7 +485,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         continue;
       }
 
-      // Still within grace period — attempt retry
+      // Still within grace period — attempt retry (with coupon awareness)
       const priceCents = metadata.price_cents;
       const billingCycle = metadata.billing_cycle;
       const paymentMethodId = metadata.payment_method_id;
@@ -446,12 +501,14 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
       });
       const featureName = feature?.name || purchase.feature_key;
 
+      const renewalCount = metadata.renewal_count || 0;
+      const renewalCharge = calculateRenewalCharge(metadata, renewalCount);
       const billingService = getSubscriptionBillingService();
       const chargeResult = await billingService.chargePaymentMethod(
         purchase.tenant_id,
         paymentMethodId,
-        priceCents,
-        `BSaaS renewal retry: ${featureName}`
+        renewalCharge.chargedAmount,
+        `BSaaS renewal retry: ${featureName}${renewalCharge.couponActive ? ' (coupon applied)' : ''}`
       );
 
       if (chargeResult.success) {
@@ -473,6 +530,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
               grace_ends_at: null,
               last_renewed_at: new Date().toISOString(),
               last_transaction_id: chargeResult.transactionId,
+              renewal_count: renewalCount + 1,
             },
           },
         });
@@ -484,7 +542,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         notificationService.sendNotification({
           tenantId: purchase.tenant_id,
           type: 'bsaas_renewal_success',
-          amount: priceCents,
+          amount: renewalCharge.chargedAmount,
           billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           metadata: { featureKey: purchase.feature_key, featureName },
         }).catch(err => console.error('[BSaaS Renewal] Failed to send retry success notification:', err));
@@ -500,7 +558,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         notificationService.sendNotification({
           tenantId: purchase.tenant_id,
           type: 'bsaas_grace_period_warning',
-          amount: priceCents,
+          amount: renewalCharge.chargedAmount,
           billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
           gracePeriodDaysRemaining: daysRemaining,
           reason: chargeResult.error || 'Payment declined',

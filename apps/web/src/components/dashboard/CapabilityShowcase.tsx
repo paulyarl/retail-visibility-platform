@@ -25,6 +25,7 @@ import {
   Share2,
   Layers,
   Sparkles,
+  Link2,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -246,6 +247,16 @@ export default function CapabilityShowcase({
     if (dp?.allowedTiers.includes('premium')) dpDetailParts.push('Premium');
     if (dp?.allowedTiers.includes('featured')) dpDetailParts.push('Featured');
 
+    // --- Wholesale Matching ---
+    const wm = cap.wholesaleMatching;
+    const wmTier = wm?.enabled ?? false;
+    const wmMerchantGated = false;
+    const wmDetailParts: string[] = [];
+    if (wm?.canCheckSupplierMatch) wmDetailParts.push('Supplier Match');
+    if (wm?.canSearchFaire) wmDetailParts.push('Faire Search');
+    if (wm?.canBuildAffiliateLink) wmDetailParts.push('Affiliate Links');
+    if (wm?.canViewBrandPartners) wmDetailParts.push('Brand Partners');
+
     return [
       {
         key: "commerce",
@@ -457,6 +468,18 @@ export default function CapabilityShowcase({
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/promotion`,
         constraintWarning: getConstraintWarning('directory_promotion'),
+      },
+      {
+        key: "wholesaleMatching",
+        label: "Wholesale Matching",
+        icon: <Link2 className="w-4 h-4" />,
+        enabled: wmTier,
+        status: getStatus(wmTier, wmMerchantGated),
+        detail: wmTier
+          ? (wmDetailParts.length > 0 ? wmDetailParts.join(', ') : 'Available')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/wholesale`,
+        constraintWarning: getConstraintWarning('wholesale_matching'),
       },
     ];
   }, [capabilities, tenantId]);

@@ -311,6 +311,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.integrations.enabled = false;
     result.effective.payment_gateway.enabled = false;
     result.effective.directory_promotion.enabled = false;
+    result.effective.wholesale_matching.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -337,6 +338,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.featured.enabled = false;
     result.effective.chatbot.enabled = false;
     result.effective.directory_promotion.enabled = false;
+    result.effective.wholesale_matching.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance
@@ -745,6 +747,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.integrations.enabled = false;
     result.effective.payment_gateway.enabled = false;
     result.effective.directory_promotion.enabled = false;
+    result.effective.wholesale_matching.enabled = false;
   }
 
   if (isLimited) {
@@ -753,6 +756,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.featured.enabled = false;
     result.effective.chatbot.enabled = false;
     result.effective.directory_promotion.enabled = false;
+    result.effective.wholesale_matching.enabled = false;
   }
 
   // Org-level subscription status check

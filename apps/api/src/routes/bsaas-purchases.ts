@@ -1050,6 +1050,10 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
     let promotionCodeId: string | null = null;
     let discountCents = 0;
     let couponId: string | null = null;
+    let couponDuration: 'once' | 'repeating' | 'forever' | null = null;
+    let couponDurationInMonths: number | null = null;
+    let couponPercentOff: number | null = null;
+    let couponAmountOff: number | null = null;
 
     if (promotionCode) {
       const promoResult = await validatePromoCode(promotionCode, priceCents, { featureKey, tenantId });
@@ -1061,6 +1065,10 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       couponId = promoResult.couponId;
       discountCents = promoResult.discountCents;
       chargedAmount = promoResult.chargedAmount;
+      couponDuration = promoResult.couponDuration;
+      couponDurationInMonths = promoResult.couponDurationInMonths;
+      couponPercentOff = promoResult.couponPercentOff;
+      couponAmountOff = promoResult.couponAmountOff;
     }
 
     const billingService = getSubscriptionBillingService();
@@ -1102,6 +1110,12 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
             coupon_id: couponId,
             discount_cents: discountCents,
             charged_amount: chargedAmount,
+            coupon_duration: couponDuration,
+            coupon_duration_in_months: couponDurationInMonths,
+            coupon_percent_off: couponPercentOff,
+            coupon_amount_off: couponAmountOff,
+            original_price_cents: priceCents,
+            renewal_count: 0,
           }),
         },
         updated_at: new Date(),
@@ -1124,6 +1138,12 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
             coupon_id: couponId,
             discount_cents: discountCents,
             charged_amount: chargedAmount,
+            coupon_duration: couponDuration,
+            coupon_duration_in_months: couponDurationInMonths,
+            coupon_percent_off: couponPercentOff,
+            coupon_amount_off: couponAmountOff,
+            original_price_cents: priceCents,
+            renewal_count: 0,
           }),
         },
       },
@@ -1374,6 +1394,10 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
     let promotionCodeId: string | null = null;
     let discountCents = 0;
     let couponId: string | null = null;
+    let couponDuration: 'once' | 'repeating' | 'forever' | null = null;
+    let couponDurationInMonths: number | null = null;
+    let couponPercentOff: number | null = null;
+    let couponAmountOff: number | null = null;
 
     if (promotionCode) {
       const promoResult = await validatePromoCode(promotionCode, priceCents, {
@@ -1390,6 +1414,10 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       couponId = promoResult.couponId;
       discountCents = promoResult.discountCents;
       chargedAmount = promoResult.chargedAmount;
+      couponDuration = promoResult.couponDuration;
+      couponDurationInMonths = promoResult.couponDurationInMonths;
+      couponPercentOff = promoResult.couponPercentOff;
+      couponAmountOff = promoResult.couponAmountOff;
     }
 
     const billingService = getSubscriptionBillingService();
@@ -1430,6 +1458,12 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
               promotion_code: promotionCode || undefined,
               promotion_code_id: promotionCodeId || undefined,
               coupon_id: couponId || undefined,
+              coupon_duration: couponDuration || undefined,
+              coupon_duration_in_months: couponDurationInMonths || undefined,
+              coupon_percent_off: couponPercentOff || undefined,
+              coupon_amount_off: couponAmountOff || undefined,
+              original_price_cents: priceCents,
+              renewal_count: 0,
               billing_cycle: billingCycle,
               transaction_id: chargeResult.transactionId,
               payment_method_id: paymentMethodId,
@@ -1452,6 +1486,12 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
               promotion_code: promotionCode || undefined,
               promotion_code_id: promotionCodeId || undefined,
               coupon_id: couponId || undefined,
+              coupon_duration: couponDuration || undefined,
+              coupon_duration_in_months: couponDurationInMonths || undefined,
+              coupon_percent_off: couponPercentOff || undefined,
+              coupon_amount_off: couponAmountOff || undefined,
+              original_price_cents: priceCents,
+              renewal_count: 0,
               billing_cycle: billingCycle,
               transaction_id: chargeResult.transactionId,
               payment_method_id: paymentMethodId,
@@ -1486,6 +1526,10 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
         discount_cents: discountCents || undefined,
         promotion_code: promotionCode || undefined,
         coupon_id: couponId || undefined,
+        coupon_duration: couponDuration || undefined,
+        coupon_duration_in_months: couponDurationInMonths || undefined,
+        coupon_percent_off: couponPercentOff || undefined,
+        coupon_amount_off: couponAmountOff || undefined,
         billing_cycle: billingCycle,
         transaction_id: chargeResult.transactionId,
         purchase_ids: purchases.map(p => p.id),
@@ -1738,5 +1782,7 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to cancel purchase' });
   }
 });
+
+export { validatePromoCode, type PromoValidationResult, type PromoValidation };
 
 export default router;

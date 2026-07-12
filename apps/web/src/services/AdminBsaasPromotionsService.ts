@@ -74,6 +74,27 @@ export interface CreatePromotionCodeRequest {
   expires_at?: string;
 }
 
+export interface PromoQRTargetIcon {
+  type: string;
+  feature_key: string | null;
+  icon_name: string | null;
+  marketing_name: string;
+}
+
+export interface PromoQRData {
+  qr_url: string;
+  promotion_code: string;
+  promotion_code_id: string;
+  coupon_id: string;
+  coupon_name: string | null;
+  percent_off: number | null;
+  amount_off: number | null;
+  duration: 'once' | 'repeating' | 'forever';
+  duration_in_months: number | null;
+  targets: CouponTargets | null;
+  target_icon: PromoQRTargetIcon | null;
+}
+
 class AdminBsaasPromotionsService extends AdminApiSingleton {
   private static instance: AdminBsaasPromotionsService;
 
@@ -140,6 +161,20 @@ class AdminBsaasPromotionsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to deactivate promotion code');
     }
+  }
+
+  async getQRData(promotionCodeId: string): Promise<PromoQRData> {
+    const result = await this.makeDefaultRequest<PromoQRData>(
+      `/api/admin/bsaas-promotions/promotion/${promotionCodeId}/qr`,
+      {},
+      'admin-bsaas-promotions-qr',
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch QR data');
+    }
+    const data = (result.data as any)?.data || result.data;
+    return data;
   }
 
   async updateCouponTargets(couponId: string, req: UpdateCouponTargetsRequest): Promise<void> {

@@ -268,6 +268,112 @@ router.put('/coupon/:id/targets', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/bsaas-promotions/promotion/:id/qr
+// Returns QR code data: deep-link URL, promotion code, coupon targets, and resolved target icon
+router.get('/promotion/:id/qr', async (req: Request, res: Response) => {
+  try {
+    const stripe = getStripe();
+    if (!stripe) {
+      return res.status(503).json({ error: 'stripe_not_configured', message: 'Stripe is not configured' });
+    }
+
+    const { id } = req.params;
+
+    // Fetch the promotion code from Stripe
+    const promoCodes = await stripe.promotionCodes.list({ limit: 100 });
+    const promo = promoCodes.data.find(p => p.id === id);
+    if (!promo) {
+      return res.status(404).json({ error: 'not_found', message: 'Promotion code not found' });
+    }
+
+    const couponId = (promo as any).coupon as string;
+    const coupon = await stripe.coupons.retrieve(couponId);
+
+    // Fetch coupon target rules
+    const targets = await CouponTargetService.getInstance().getTargetsForCoupon(couponId);
+
+    // Resolve target icon
+    let targetIcon: { type: string; feature_key: string | null; icon_name: string | null; marketing_name: string } | null = null;
+
+    if (targets?.target_features && targets.target_features.length === 1) {
+      const featureKey = targets.target_features[0];
+      const feature = await prisma.features_list.findUnique({
+        where: { key: featureKey },
+        select: { icon_name: true, marketing_name: true, name: true },
+      });
+      if (feature) {
+        targetIcon = {
+          type: 'feature',
+          feature_key: featureKey,
+          icon_name: feature.icon_name || null,
+          marketing_name: feature.marketing_name || feature.name || featureKey,
+        };
+      }
+    } else if (targets?.target_features && targets.target_features.length > 1) {
+      targetIcon = { type: 'bundle', feature_key: null, icon_name: 'IconPackage', marketing_name: 'Multiple Features' };
+    } else if (targets?.target_capability_types && targets.target_capability_types.length > 0) {
+      const capType = targets.target_capability_types[0];
+      const capIconMap: Record<string, string> = {
+        chatbot: 'IconRobot',
+        analytics: 'IconChartBar',
+        crm: 'IconUsers',
+        inventory: 'IconPackage',
+        storefront: 'IconStore',
+        marketing: 'IconMegaphone',
+      };
+      const iconName = capIconMap[capType] || 'IconCircle';
+      targetIcon = { type: 'capability', feature_key: capType, icon_name: iconName, marketing_name: capType };
+    } else if (targets?.target_tiers && targets.target_tiers.length > 0) {
+      const tier = targets.target_tiers[0];
+      const tierIconMap: Record<string, string> = {
+        enterprise: 'IconCrown',
+        professional: 'IconStar',
+        chain_professional: 'IconStar',
+        chain_starter: 'IconBuilding',
+        organization: 'IconBuilding2',
+        omnichannel: 'IconLayers',
+        ecommerce: 'IconShoppingCart',
+        commitment: 'IconHandshake',
+        storefront: 'IconStore',
+        discovery: 'IconCompass',
+      };
+      const iconName = tierIconMap[tier] || 'IconTag';
+      targetIcon = { type: 'tier', feature_key: tier, icon_name: iconName, marketing_name: tier };
+    }
+
+    // Construct the deep-link URL
+    const appDomain = unifiedConfig.webUrl || (req as any).headers?.origin || 'https://app.visibleshelf.com';
+    const qrUrl = `${appDomain}/settings/feature-store?promo=${encodeURIComponent(promo.code)}`;
+
+    res.json({
+      success: true,
+      data: {
+        qr_url: qrUrl,
+        promotion_code: promo.code,
+        promotion_code_id: promo.id,
+        coupon_id: couponId,
+        coupon_name: coupon.name,
+        percent_off: coupon.percent_off ?? null,
+        amount_off: coupon.amount_off ?? null,
+        duration: coupon.duration,
+        duration_in_months: (coupon as any).duration_in_months ?? null,
+        targets: targets ? {
+          target_features: targets.target_features as string[] | null,
+          target_tiers: targets.target_tiers as string[] | null,
+          target_capability_types: targets.target_capability_types as string[] | null,
+          target_tier_types: targets.target_tier_types as string[] | null,
+          target_demo_status: targets.target_demo_status as string[] | null,
+          target_subscription_statuses: targets.target_subscription_statuses as string[] | null,
+        } : null,
+        target_icon: targetIcon,
+      },
+    });
+  } catch (error: any) {
+    console.error('[BSaaS Promotions] Error generating QR data:', error);
+    res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to generate QR data' });
+  }
+});
+
 // DELETE /api/admin/bsaas-promotions/promotion/:id
 router.delete('/promotion/:id', async (req: Request, res: Response) => {
   try {

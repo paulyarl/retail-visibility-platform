@@ -900,6 +900,7 @@ interface BackendEffectiveWholesaleMatching {
   can_check_supplier_match: boolean;
   can_search_faire: boolean;
   can_build_affiliate_link: boolean;
+  can_view_brand_partners: boolean;
   is_flexible: boolean;
 }
 
@@ -910,6 +911,7 @@ function mapWholesaleMatching(b: BackendEffectiveWholesaleMatching): WholesaleMa
     canCheckSupplierMatch: b.can_check_supplier_match,
     canSearchFaire: b.can_search_faire,
     canBuildAffiliateLink: b.can_build_affiliate_link,
+    canViewBrandPartners: b.can_view_brand_partners,
     isFlexible: b.is_flexible,
     features: {},
   };

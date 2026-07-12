@@ -1,5 +1,5 @@
 ---
-description: How to implement barcode-driven product enrichment with commercial APIs and B2B wholesale matching — connector patterns, parallel orchestration, tier gating, affiliate tracking, and modal decomposition
+description: How to implement barcode-driven product enrichment with commercial APIs and B2B wholesale matching — connector patterns, parallel orchestration, tier gating, affiliate tracking, brand partner claims, affiliate analytics, click expiry job, capability system integration, and modal decomposition
 ---
 
 # Barcode-Driven Product Onboarding & B2B Wholesale Matching
@@ -239,6 +239,62 @@ buildAffiliateLink(supplier, tenantId):
 | `wholesale_matching_direct` | Direct partner matching | Scale+ |
 | `wholesale_matching_dashboard` | Distributor dashboard | Scale+ |
 | `wholesale_matching_flexible` | All sub-features + API access | Enterprise |
+
+### 5.1.1 Implemented Resolver (`WholesaleMatchingResolver.ts`)
+
+The resolver is implemented at `apps/api/src/services/resolvers/WholesaleMatchingResolver.ts` and determines the effective wholesale matching state from tier features + merchant preferences:
+
+```typescript
+export function resolveWholesaleMatching(
+  features: Record<string, boolean>,
+  merchantPrefs: WholesaleMatchingMerchantSettings | null
+): EffectiveWholesaleMatching {
+  const disabled = !!features.wholesale_matching_disabled;
+  const flexible = !!features.wholesale_matching_flexible;
+
+  let tier: WholesaleMatchingTier = 'none';
+  if (!disabled) {
+    if (flexible || !!features.wholesale_matching_full) {
+      tier = 'full';
+    } else if (!!features.wholesale_matching_search) {
+      tier = 'search';
+    }
+  }
+
+  const enabled = !disabled && tier !== 'none';
+  const prefEnabled = merchantPrefs?.wholesale_matching_enabled !== false;
+  const effectiveEnabled = enabled && prefEnabled;
+
+  return {
+    enabled: effectiveEnabled,
+    tier: effectiveEnabled ? tier : 'none',
+    can_check_supplier_match: effectiveEnabled,
+    can_search_faire: effectiveEnabled && (tier === 'search' || tier === 'full'),
+    can_build_affiliate_link: effectiveEnabled && tier === 'full',
+    can_view_brand_partners: effectiveEnabled,
+    is_flexible: flexible,
+  };
+}
+```
+
+**Key flags returned:** `enabled`, `tier` (`none`/`search`/`full`), `can_check_supplier_match`, `can_search_faire`, `can_build_affiliate_link`, `can_view_brand_partners`, `is_flexible`.
+
+**Merchant preference override:** `merchantPrefs.wholesale_matching_enabled === false` disables the feature even if the tier allows it. Default is enabled when `null`.
+
+### 5.1.2 Capability System Integration (Completed)
+
+The `wholesale_matching` capability is fully wired through the 8-phase deployment flow:
+
+- **`EffectiveCapabilityResolver.ts`**: Added to `buildExpiredCapabilitiesResponse`, `isReadOnly` override block, and `isLimited` override block (R13, R23, R27)
+- **`CAPABILITY_META`** (`apps/web/src/lib/tiers/capability-display.ts`): Entry with label, icon, and summary fields
+- **`summarizeResolvedCapabilities`**: Includes `wholesale_matching` in the summary output
+- **`PlanSummaryPanel.tsx`** (`CAPABILITY_DISPLAY` map): Display entry for the plan summary panel
+- **`CapabilityShowcase.tsx`** (rows array): Row with icon, label, enabled check, status, detail, settings link, and constraint warning
+- **`CONSTRAINT_METADATA`** (`apps/api/src/routes/admin/capability-constraints.ts`): Entry with capability key, label, fields, operators, and values
+- **`UnifiedCapabilityService.ts`**: Backend interface mapping including `can_view_brand_partners`
+- **`CapabilityResolutionService.ts`**: `WholesaleMatchingState` interface mapping
+- **`useCapabilityAccess.ts`** (`useWholesaleMatchingCapability` hook): Fetches wholesale matching state with loading/error handling
+- **`wholesale-matching-options-settings.ts`**: GET returns `tierState`, PUT uses `requireWritableSubscription` middleware
 
 ### 5.2 Tier Access Matrix
 
@@ -509,7 +565,68 @@ Brands pay monthly fee to pin as "Official Fulfillment Partner" for specific UPC
 
 When `checkSupplierMatch()` runs, `brand_partner_claims` is checked **first** (before `product_suppliers`). Exclusive claims suppress all other results.
 
-### 10.4 Revenue Summary
+#### Claim Type Priority Hierarchy
+
+The `checkSupplierMatch()` method sorts results by `claim_type` priority:
+1. `exclusive` (highest)
+2. `preferred`
+3. `verified`
+4. Any unknown type (lowest)
+
+This sorting is applied in `WholesaleMatchingService.checkSupplierMatch()` after fetching from `product_suppliers`.
+
+#### Admin Brand Partner Claim Workflow (Implemented)
+
+The following endpoints are implemented in `apps/api/src/routes/admin/brand-partners.ts`:
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/brand-partners/claims` | List all claims with filters (gtin, brand_name, claim_type, approved) + pagination |
+| POST | `/api/admin/brand-partners/claims` | Create a claim (brand_name, gtin, claim_type, contact_email) |
+| PUT | `/api/admin/brand-partners/claims/:id/approve` | Approve a claim (sets `admin_approved = true`) |
+| DELETE | `/api/admin/brand-partners/claims/:id` | Reject a claim (deletes the record) |
+
+**Service methods** in `WholesaleMatchingService.ts`:
+- `createBrandPartnerClaim(brandName, gtin, claimType, contactEmail)` — creates claim, default type `verified`
+- `approveBrandPartnerClaim(id)` — sets `admin_approved = true`
+- `rejectBrandPartnerClaim(id)` — deletes the claim
+- `listAllBrandPartnerClaims(filters, limit, offset)` — paginated list with filters
+- `getBrandPartnerClaims(gtin)` — get claims for a specific GTIN
+
+All service methods handle errors gracefully (return `null`/`false`/empty array on DB errors).
+
+### 10.4 Affiliate Analytics (Implemented)
+
+The `WholesaleMatchingService.getAffiliateAnalytics(tenantId?)` method aggregates click data:
+
+```typescript
+{
+  total_clicks: number,
+  pending: number,
+  converted: number,
+  expired: number,
+  total_commission: number  // sum of commission_amount for converted clicks
+}
+```
+
+- Handles Prisma `Decimal` commission amounts via `.toNumber()` fallback
+- Works with or without `tenantId` (platform-wide when omitted)
+- Returns all zeros on error
+
+**Dashboard endpoint**: `GET /api/tenants/:tenantId/wholesale/dashboard` returns both analytics and recent suppliers in a single call.
+
+### 10.5 Affiliate Click Expiry Job (Implemented)
+
+**File**: `apps/api/src/jobs/affiliate-click-expiry.ts`
+
+Daily job that marks `affiliate_clicks` with `status = 'pending'` as `expired` when `expires_at < now()`:
+
+- `processClickExpiry()` — calls `wholesaleMatchingService.expireStaleClicks()`, returns count
+- `startAffiliateClickExpiryJob()` — runs immediately on start, then every 24 hours
+- `stopAffiliateClickExpiryJob()` — clears the interval
+- Error handling: logs error and returns 0 on failure (never crashes)
+
+### 10.6 Revenue Summary
 
 | Stream | Source | Pricing | Scaling |
 |---|---|---|---|
@@ -642,7 +759,36 @@ Sprint 5 (Monetization & Polish)  3-4 days
 
 ---
 
-## 13. Skills to Read Before Implementation
+## 13. E2E Batch Test
+
+### Sprint Batch Test File
+
+**File**: `apps/api/src/tests/sprint-e2e-batch.test.ts` (68 tests, all passing)
+
+Comprehensive test covering all sprint-implemented services and endpoints:
+
+| Section | Tests | Coverage |
+|---|---|---|
+| **WholesaleMatchingService** | 18 | `checkSupplierMatch`, `buildAffiliateLink`, `trackAffiliateClick`, `getBrandPartnerClaims`, `createBrandPartnerClaim`, `approveBrandPartnerClaim`, `rejectBrandPartnerClaim`, `listAllBrandPartnerClaims`, `expireStaleClicks`, `getAffiliateAnalytics`, `getAllSuppliers`, `saveSupplierMatch` |
+| **WholesaleMatchingResolver** | 9 | Tier gating: none/search/full, disabled flag, flexible flag, merchant pref override, `can_view_brand_partners` |
+| **calculateRenewalCharge** | 8 | `once`/`repeating`/`forever` durations, `renewalCount` boundaries, `amount_off` cap, fallback |
+| **validatePromoCode** | 10 | Stripe not configured, invalid/expired/maxed promo codes, `percent_off`/`amount_off` calc, target validation, Stripe API error |
+| **Affiliate Click Expiry Job** | 3 | `processClickExpiry` success, empty, error |
+| **CouponTargetService integration** | 3 | Target mismatch, target match, no rules pass-through |
+| **Claim Type Priority** | 2 | exclusive > preferred > verified sorting, unknown type fallback |
+| **Affiliate Link URL Construction** | 2 | URL with/without existing query params, tracking param injection |
+| **Affiliate Analytics Aggregation** | 3 | Mixed statuses, Decimal commission, empty, platform-wide |
+
+**Run command**:
+```bash
+doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose
+```
+
+The test uses `vi.hoisted()` for mock functions available in `vi.mock` factories, mocks `prisma`, `logger`, `unifiedConfig`, `CouponTargetService`, `stripe`, `EffectiveCapabilityResolver`, and `SubscriptionBillingService`. All tests are pure unit tests with no DB or Stripe dependencies.
+
+---
+
+## 14. Skills to Read Before Implementation
 
 | Skill | When to Read |
 |---|---|
@@ -662,7 +808,7 @@ Sprint 5 (Monetization & Polish)  3-4 days
 
 ---
 
-## 14. Anti-Patterns to Avoid
+## 15. Anti-Patterns to Avoid
 
 1. **Don't add spec features to EditItemModal before decomposing** — The 1180-line monolith will become unmaintainable. Decompose first, then add features to focused components.
 2. **Don't call `fetch` directly in frontend components** — Use `WholesaleMatchingService` (extends `TenantApiSingleton`) with `makeDefaultRequest`.

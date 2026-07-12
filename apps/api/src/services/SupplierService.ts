@@ -4,6 +4,20 @@
  * CRUD operations for supplier records.
  * Manages both built-in open-source suppliers (Open Food Facts, UPC Database,
  * Open Beauty Facts) and custom supplier connections (CSV, SFTP, custom API).
+ *
+ * Related services:
+ * - SupplierImportService — imports supplier catalog items into tenant inventory,
+ *   barcode/GTIN enrichment via open-source and commercial APIs
+ * - WholesaleMatchingService — B2B wholesale supplier matching by GTIN, Faire
+ *   supplier search, affiliate link generation with click tracking, brand
+ *   partner claim management (verified/preferred/exclusive hierarchy)
+ *
+ * Database tables:
+ * - suppliers — supplier connection records (open-source, CSV, commercial APIs)
+ * - supplier_mappings — tenant-to-supplier sync mappings
+ * - product_suppliers — GTIN-indexed wholesale supplier matches (global)
+ * - affiliate_clicks — tenant-scoped affiliate click tracking (pending → converted → expired)
+ * - brand_partner_claims — brand partner ownership claims (admin-approved)
  */
 
 import { prisma } from '../prisma';

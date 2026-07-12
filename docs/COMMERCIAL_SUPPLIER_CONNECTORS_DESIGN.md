@@ -1247,3 +1247,37 @@ Execute the 10-step decomposition in §12.4.4:
 | Affiliate click attribution loss | Faire webhook may not fire if merchant doesn't complete order. `affiliate_clicks.status` has `expired` state for clicks with no conversion after 30 days |
 | Parallel API cost doubling | Both BarcodeLookup.com and Go-UPC are called on every cache miss. Acceptable — cache hit rate is typically >90% after initial population. Rate limiting prevents runaway costs |
 | EditItemModal decomposition regression | 1180-line monolith split into 10+ files. Mitigated by 10-step incremental extraction — each step verified with `pnpm checkweb`, no behavior changes during decomposition, only structural. Rollback is per-step git revert. |
+
+---
+
+## Implementation Deviations (Post-Sprint Notes)
+
+**Implemented:** 2026-07-11 — All 5 sprints complete.
+
+### Deviations from Original Design
+
+1. **Brand partner claims — no email notification on approval/rejection**
+   - Design specified email notification via `BillingNotificationService` for claim approval/rejection.
+   - Implementation: Claims are approved/rejected via admin UI only. Email notification was deferred as a future enhancement. The `contact_email` field is captured for future use.
+
+2. **Affiliate analytics — admin dashboard embedded in tenant-scoped page**
+   - Design implied a separate platform-level admin analytics page.
+   - Implementation: Affiliate analytics summary cards (total clicks, pending, converted, commission) are embedded in the admin brand partner claims page at `/t/[tenantId]/settings/admin/brand-partners`. This co-locates claim review with affiliate performance data.
+
+3. **Brand partner self-service form — integrated into wholesale dashboard**
+   - Design specified a separate public/authenticated route for brand self-service.
+   - Implementation: The `BrandPartnerClaimForm` component is embedded in the existing wholesale dashboard at `/t/[tenantId]/settings/wholesale`. This keeps all wholesale/brand features in one location. The component is reusable and can be placed on a separate page if needed.
+
+4. **Affiliate click expiry job — uses existing `expireStaleClicks` method**
+   - The `WholesaleMatchingService.expireStaleClicks()` method was already implemented in Sprint 2.
+   - Sprint 5 added the `affiliate-click-expiry.ts` job wrapper that calls this method daily and wired it into `index.ts` startup.
+
+5. **Admin route — `prisma` import removed from `admin/brand-partners.ts`**
+   - Original admin route file imported `prisma` directly for the list endpoint.
+   - Refactored to use `wholesaleMatchingService.listAllBrandPartnerClaims()` service method for consistency, removing the direct `prisma` import.
+
+### Items Not Implemented (Deferred)
+
+- Email notifications for claim approval/rejection (requires `BillingNotificationService` template additions)
+- Optional wizard refactors: `WizardData` extraction to `wizards/types.ts`, `handleEnrichmentMatch` to `wizards/utils/enrichmentMapper.ts` (§12.4.5)
+- Platform-level (non-tenant-scoped) admin analytics page

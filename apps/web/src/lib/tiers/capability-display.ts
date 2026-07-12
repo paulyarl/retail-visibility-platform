@@ -37,6 +37,7 @@ export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: 
   { key: 'directory_entry_options', label: 'Directory Entry', flexibleKeys: ['directory_entry_flexible'], group: 'Google Visibility' },
   { key: 'social_commerce_options', label: 'Social Commerce', flexibleKeys: ['social_commerce_flexible'], group: 'Management & Growth' },
   { key: 'directory_promotion', label: 'Directory Promotion', flexibleKeys: ['directory_promotion_flexible'], group: 'Google Visibility' },
+  { key: 'wholesale_matching_options', label: 'Wholesale Matching', flexibleKeys: ['wholesale_matching_flexible'], group: 'Commerce & Conversion' },
 ];
 
 export interface ResolvedCapSummary {
@@ -65,6 +66,7 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
   const de = caps.directoryEntryOptions;
   const scc = caps.socialCommerceOptions;
   const dp = caps.directoryPromotion;
+  const wm = caps.wholesaleMatching;
 
   return [
     { key: 'commerce_types', label: 'Commerce', enabled: c.enabled, flexible: c.isFlexible, detail: c.effectivePaymentType !== 'none' ? `Payments: ${c.effectivePaymentType}` : 'Disabled' },
@@ -84,6 +86,7 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
     { key: 'directory_entry_options', label: 'Directory Entry', enabled: de.enabled, flexible: de.isFlexible, detail: de.enabled ? `${de.effectiveLayout ?? 'classic'} layout` : 'Not available' },
     { key: 'social_commerce_options', label: 'Social Commerce', enabled: scc.enabled, flexible: scc.isFlexible, detail: scc.enabled ? [scc.metaEnabled && 'Meta', scc.tiktokEnabled && 'TikTok', scc.canUseShareButtons && 'Share'].filter(Boolean).join(', ') || 'Available' : 'Not available' },
     { key: 'directory_promotion', label: 'Directory Promotion', enabled: dp.enabled, flexible: dp.isFlexible, detail: dp.enabled ? (dp.allowedTiers ?? []).join(', ') : 'Not available' },
+    { key: 'wholesale_matching_options', label: 'Wholesale Matching', enabled: wm.enabled, flexible: wm.isFlexible, detail: wm.enabled ? `Tier: ${wm.tier}` : 'Not available' },
   ];
 }
 

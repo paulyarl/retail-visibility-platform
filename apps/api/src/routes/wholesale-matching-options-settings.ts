@@ -10,8 +10,9 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
+import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
-import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
 
@@ -22,12 +23,19 @@ const wholesaleMatchingSettingsSchema = z.object({
 // GET /:tenantId/wholesale-matching-options
 router.get('/:tenantId/wholesale-matching-options', authenticateToken, async (req, res) => {
   try {
+    const { tenantId } = req.params;
+
+    // Resolve tier-gated state
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    const tierState = caps?.effective?.wholesale_matching ?? { enabled: false, tier: 'none', can_check_supplier_match: false, can_search_faire: false, can_build_affiliate_link: false, can_view_brand_partners: false, is_flexible: false };
+
     // No merchant settings table yet — return defaults
     res.json({
       success: true,
       settings: {
         wholesale_matching_enabled: true,
       },
+      tierState,
     });
   } catch (error) {
     res.status(500).json({
@@ -38,7 +46,7 @@ router.get('/:tenantId/wholesale-matching-options', authenticateToken, async (re
 });
 
 // PUT /:tenantId/wholesale-matching-options
-router.put('/:tenantId/wholesale-matching-options', authenticateToken, requireTenantAdmin, async (req, res) => {
+router.put('/:tenantId/wholesale-matching-options', authenticateToken, requireTenantAdmin, requireWritableSubscription, async (req, res) => {
   try {
     const parsed = wholesaleMatchingSettingsSchema.safeParse(req.body);
     if (!parsed.success) {

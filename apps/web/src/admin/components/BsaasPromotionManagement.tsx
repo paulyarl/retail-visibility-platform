@@ -16,7 +16,8 @@ import {
   type CouponTargets,
 } from '@/services/AdminBsaasPromotionsService';
 import { Badge } from '@/components/ui/Badge';
-import { AlertCircle, Tag, Ticket, Plus, Trash2, RefreshCw, Target, X } from 'lucide-react';
+import { AlertCircle, Tag, Ticket, Plus, Trash2, RefreshCw, Target, X, QrCode } from 'lucide-react';
+import PromoCodeQRDialog from './PromoCodeQRDialog';
 
 function formatStripeDate(timestamp: number | null): string {
   if (!timestamp) return '—';
@@ -124,6 +125,7 @@ export default function BsaasPromotionManagement() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [qrDialogFor, setQrDialogFor] = useState<{ id: string; code: string } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -689,16 +691,25 @@ export default function BsaasPromotionManagement() {
                   </td>
                   <td className="px-4 py-3 text-neutral-500">{formatStripeDate(p.expires_at)}</td>
                   <td className="px-4 py-3">
-                    {p.active && (
+                    <div className="flex items-center gap-3">
                       <button
-                        onClick={() => handleDeactivate(p.id, p.code)}
-                        disabled={submitting}
-                        className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800"
+                        onClick={() => setQrDialogFor({ id: p.id, code: p.code })}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Deactivate
+                        <QrCode className="w-3.5 h-3.5" />
+                        QR Code
                       </button>
-                    )}
+                      {p.active && (
+                        <button
+                          onClick={() => handleDeactivate(p.id, p.code)}
+                          disabled={submitting}
+                          className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Deactivate
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -847,6 +858,16 @@ export default function BsaasPromotionManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR Code Dialog */}
+      {qrDialogFor && (
+        <PromoCodeQRDialog
+          promotionCodeId={qrDialogFor.id}
+          promotionCode={qrDialogFor.code}
+          open={true}
+          onClose={() => setQrDialogFor(null)}
+        />
       )}
     </div>
   );

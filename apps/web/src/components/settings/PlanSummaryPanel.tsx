@@ -259,6 +259,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
   chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot/options' },
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
+  wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -808,6 +809,40 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'social_commerce_options',
       settingsPath: CAPABILITY_DISPLAY.social_commerce_options.settingsPath ?? null,
+    });
+  }
+
+  // Wholesale Matching
+  const wm = caps.wholesaleMatching;
+  if (wm && wm.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (wm.canCheckSupplierMatch) {
+      specifics.push('Supplier Match');
+      statuses.push({ label: 'Supplier Match', status: 'enabled' });
+    }
+    if (wm.canSearchFaire) {
+      specifics.push('Faire Search');
+      statuses.push({ label: 'Faire Search', status: 'enabled' });
+    }
+    if (wm.canBuildAffiliateLink) {
+      specifics.push('Affiliate Links');
+      statuses.push({ label: 'Affiliate Links', status: 'enabled' });
+    }
+    if (wm.canViewBrandPartners) {
+      specifics.push('Brand Partners');
+      statuses.push({ label: 'Brand Partners', status: 'enabled' });
+    }
+    summaries.push({
+      key: 'wholesale_matching_options',
+      label: CAPABILITY_DISPLAY.wholesale_matching_options.label,
+      icon: CAPABILITY_DISPLAY.wholesale_matching_options.icon,
+      enabled: wm.enabled,
+      merchantGated: merchantGates?.['wholesale_matching_options'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'wholesale_matching_options',
+      settingsPath: CAPABILITY_DISPLAY.wholesale_matching_options.settingsPath ?? null,
     });
   }
 

@@ -135,19 +135,26 @@ Must have exactly one of `percent_off` or `amount_off` (enforced by Zod `.refine
 - The promo code is passed to `BsaasPurchaseService.purchaseFeature(featureKey, paymentMethodId, promotionCode?)`
 - **Service**: `apps/web/src/services/BsaasPurchaseService.ts` — `purchaseFeature()` accepts optional `promotionCode` parameter
 
-#### Backend Validation (`bsaas-purchases.ts` lines 959-1000)
+#### Shared `validatePromoCode` Helper (`bsaas-purchases.ts`)
 
-The `POST /api/subscription/feature-purchase` endpoint validates promo codes **before charging**:
+Both `feature-purchase` and `bundle-purchase` routes use a shared `validatePromoCode()` helper (exported from `bsaas-purchases.ts`) that:
 
 1. **Stripe lookup**: `stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 })`
-2. **Not found** → `400 invalid_promo_code`
-3. **Redemption limit reached** (`max_redemptions && times_redeemed >= max_redemptions`) → `400 promo_expired`
-4. **Expiry passed** (`expires_at * 1000 < Date.now()`) → `400 promo_expired`
+2. **Not found** → `{ error: 'invalid_promo_code' }`
+3. **Redemption limit reached** (`max_redemptions && times_redeemed >= max_redemptions`) → `{ error: 'promo_expired' }`
+4. **Expiry passed** (`expires_at * 1000 < Date.now()`) → `{ error: 'promo_expired' }`
 5. **Retrieve coupon**: `stripe.coupons.retrieve(promo.coupon)`
 6. **Calculate discount**:
    - `percent_off` → `discountCents = Math.round(priceCents * percent_off / 100)`
    - `amount_off` → `discountCents = Math.min(amount_off, priceCents)`
 7. **Charged amount**: `chargedAmount = Math.max(0, priceCents - discountCents)`
+8. **Coupon target validation**: `CouponTargetService.validateCouponTargets(couponId, context)`
+9. **Fetch targets**: `CouponTargetService.getTargetsForCoupon(couponId)` for downstream QR icon embedding
+10. **Returns**: `{ promotionCodeId, couponId, discountCents, chargedAmount, couponDuration, couponDurationInMonths, couponPercentOff, couponAmountOff, targets }` or `{ error, message }`
+
+The helper returns coupon duration/percent_off/amount_off for Phase 2 renewal logic, and targets for Phase 3 QR icon embedding.
+
+**Unit tests**: `apps/api/src/routes/bsaas-purchases.test.ts` — 10 tests covering valid, expired, max redemptions, targeting match/mismatch, no Stripe key, and API exceptions. Also covered in the sprint batch test (`apps/api/src/tests/sprint-e2e-batch.test.ts` — Section 4, 10 tests).
 
 #### Metadata Storage
 
@@ -165,20 +172,9 @@ When a promo code is applied, the purchase metadata includes:
 
 This enables audit trails and revenue analytics on discounted purchases.
 
-### Bundle Purchase Promo Code Validation (FIXED)
+### Bundle Purchase Promo Code Application
 
-The `POST /api/subscription/bundle-purchase` endpoint now **fully validates** promo codes and applies discounts, matching the feature-purchase flow:
-
-1. **Stripe lookup**: `stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 })`
-2. **Not found** → `400 invalid_promo_code`
-3. **Redemption limit reached** → `400 promo_expired`
-4. **Expiry passed** → `400 promo_expired`
-5. **Retrieve coupon**: `stripe.coupons.retrieve(promo.coupon)`
-6. **Calculate discount**: `percent_off` or `amount_off` applied to bundle `priceCents`
-7. **Charged amount**: `chargedAmount = Math.max(0, priceCents - discountCents)`
-8. **Coupon target validation**: `CouponTargetService.validateCouponTargets()` called with `featureKeys`, `bundleKey`, and `tenantId`
-
-The charge, metadata, audit log, and response all include discount and promo code information.
+The `POST /api/subscription/bundle-purchase` endpoint uses the shared `validatePromoCode()` helper with bundle context (`featureKeys`, `bundleKey`, `tenantId`). The discounted `chargedAmount` is passed to `chargePaymentMethod`, and the charge description includes the promo code. The notification sends `chargedAmount` (not `priceCents`).
 
 ### Coupon Targeting
 
@@ -223,15 +219,56 @@ Both `feature-purchase` and `bundle-purchase` routes call `CouponTargetService.v
 
 ### Renewal Behavior with Coupons
 
-The renewal job (`apps/api/src/jobs/bsaas-renewal.ts`) does **not** re-apply promo codes during renewal. It charges the full `priceCents` from the purchase metadata:
+The renewal job (`apps/api/src/jobs/bsaas-renewal.ts`) uses a `calculateRenewalCharge()` helper to apply coupon discounts during renewal based on metadata stored at purchase time. No Stripe Subscriptions needed.
 
-- **`duration: 'once'`** coupons: Only the first charge is discounted. Renewals charge full price. ✅ Correct behavior.
-- **`duration: 'repeating'`** coupons: The Stripe coupon would apply the discount for N months, but since renewals use `chargePaymentMethod` (not Stripe Subscriptions), the discount is **not automatically applied**. The renewal job charges full price every cycle.
-- **`duration: 'forever'`** coupons: Same issue — the renewal job does not apply the discount.
+#### Coupon Duration Behavior on Renewal
 
-**Root cause**: The platform uses synchronous `chargePaymentMethod` (one-time PaymentIntents) for renewals, not Stripe Subscriptions. Stripe coupon durations only work with Stripe Subscriptions/invoices. The discount metadata is stored for audit but not re-applied.
+| Duration | Initial Charge | Renewal Charges | Behavior |
+|----------|---------------|-----------------|----------|
+| **`once`** | Discounted | Full price | Discount applies only to the first charge (renewalCount === 0) |
+| **`repeating`** | Discounted | Discounted for N months, then full price | `coupon_duration_in_months` controls how many renewals get the discount |
+| **`forever`** | Discounted | Always discounted | Every renewal charge includes the discount |
+| **No coupon** | Full price | Full price | Standard behavior, no change |
 
-**Practical impact**: Promo codes effectively only discount the **initial purchase**. For recurring discounts, admins would need to manually adjust the renewal charge or migrate to Stripe Subscriptions (see "Remaining Future Opportunities" in `bsaas-purchase-flow.md`).
+#### Metadata Fields for Coupon Tracking
+
+At purchase time, the following fields are stored in purchase metadata:
+```json
+{
+  "coupon_id": "coupon_xxx",
+  "coupon_duration": "repeating",
+  "coupon_duration_in_months": 3,
+  "coupon_percent_off": 25,
+  "coupon_amount_off": null,
+  "original_price_cents": 6900,
+  "renewal_count": 0
+}
+```
+
+The `renewal_count` is incremented each time the renewal job successfully charges. The `calculateRenewalCharge()` helper reads these fields to determine whether to apply the discount.
+
+#### Integration Points
+
+The `calculateRenewalCharge()` helper is used in all 5 charge points in the renewal job:
+1. **Bundle renewal** — charges discounted amount, increments `renewal_count` for all components
+2. **Individual renewal** — charges discounted amount, increments `renewal_count`
+3. **Bundle trial conversion** — first charge (renewalCount=0), applies discount if coupon metadata present
+4. **Individual trial conversion** — same as above
+5. **Past-due retry** — uses current `renewal_count` to determine discount eligibility
+
+**Migration script**: `scripts/migrate_bsaas_coupon_metadata.js` — one-time script to backfill coupon metadata fields for existing purchases that have `coupon_id` but lack the new duration fields. Idempotent.
+
+**Unit tests**: `apps/api/src/jobs/bsaas-renewal.test.ts` — 9 tests covering all duration/renewalCount combinations. Also covered in the sprint batch test (`apps/api/src/tests/sprint-e2e-batch.test.ts` — Section 3, 8 tests).
+
+### Promo Code Discount Preview (Frontend)
+
+Both the individual feature and bundle purchase modals include an **Apply** button next to the promo code input. Clicking it calls `POST /api/subscription/validate-promo` (the lightweight preview endpoint) which runs the same `validatePromoCode()` helper without making a purchase. The modal shows:
+
+- ~~Original price~~ → **Discounted price** (e.g., ~~$69.00~~ → **$59.50**) with a green badge showing the applied code
+- Inline error messages for invalid/expired/target-mismatched codes without closing the modal
+- "No discount applied" message for valid codes with zero discount
+
+**Frontend service**: `BsaasPurchaseService.validatePromoCode(promotionCode, priceCents, opts?)` — calls the `/validate-promo` endpoint.
 
 ### Audit Trail
 
@@ -377,14 +414,19 @@ In addition to `is_private`, both `bsaas_catalog` and `bsaas_bundles` have two m
 | `apps/api/src/routes/bsaas-purchases.ts` | Tenant-facing purchase API (promo + target validation) |
 | `database/migrations/097_coupon_target_rules.sql` | Migration for coupon_target_rules table |
 | `apps/api/src/routes/mounts/admin-routes.ts` | Route mount for bsaas-promotions at `/api/admin/bsaas-promotions` |
-| `apps/api/src/jobs/bsaas-renewal.ts` | Daily renewal job (does NOT re-apply promo codes) |
+| `apps/api/src/routes/bsaas-purchases.test.ts` | Unit tests for `validatePromoCode` helper (10 tests) |
+| `apps/api/src/tests/sprint-e2e-batch.test.ts` | Sprint E2E batch test (68 tests covering `validatePromoCode`, `calculateRenewalCharge`, `CouponTargetService` integration, wholesale matching, affiliate analytics, click expiry job, resolver tier gating) |
+| `scripts/migrate_bsaas_coupon_metadata.js` | One-time migration script to backfill coupon duration metadata on existing purchases |
+| `apps/api/src/jobs/bsaas-renewal.ts` | Daily renewal job (applies coupon discounts via `calculateRenewalCharge`) |
+| `apps/api/src/jobs/bsaas-renewal.test.ts` | Unit tests for `calculateRenewalCharge` helper (9 tests) |
+| `apps/api/src/jobs/affiliate-click-expiry.ts` | Daily affiliate click expiry job (marks pending clicks as expired after 30 days) |
 | `apps/web/src/services/AdminBsaasPromotionsService.ts` | Frontend admin service for promotions |
 | `apps/web/src/services/AdminBsaasCatalogService.ts` | Frontend admin service for catalog (includes `is_private`) |
-| `apps/web/src/services/BsaasPurchaseService.ts` | Frontend tenant service (passes `promotionCode` to purchase endpoints) |
+| `apps/web/src/services/BsaasPurchaseService.ts` | Frontend tenant service (passes `promotionCode` to purchase endpoints, `validatePromoCode()` for discount preview) |
 | `apps/web/src/admin/components/BsaasPromotionManagement.tsx` | Admin UI for coupon/promo code management |
 | `apps/web/src/admin/components/BsaasFeaturesTab.tsx` | Admin UI for catalog management (includes Private toggle + badge) |
 | `apps/web/src/app/(platform)/settings/admin/bsaas-promotions/page.tsx` | Admin promotions page |
-| `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | Tenant Feature Store page (promo code input in purchase modal) |
+| `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | Tenant Feature Store page (promo code input + Apply button + discount preview in both modals) |
 
 ## Related Documents
 
@@ -395,8 +437,9 @@ In addition to `is_private`, both `bsaas_catalog` and `bsaas_bundles` have two m
 
 ## Anti-Patterns
 
-- **Do NOT assume promo code discounts apply on renewal** — The renewal job charges full price from metadata. Only the initial purchase is discounted.
+- **Do NOT assume promo code discounts are lost on renewal** — The renewal job now uses `calculateRenewalCharge()` to apply `repeating` and `forever` coupon discounts. Only `once` coupons expire after the initial charge.
 - **Do NOT create target rules without understanding AND/OR logic** — All non-empty target fields must match (AND). Within each field, any value matching passes (OR). An empty/null field means no restriction for that dimension.
 - **Do NOT create private features without a grant plan** — Private features are invisible to merchants. If no admin grants them, they will never be activated for any tenant.
 - **Do NOT use `is_private` as a security gate** — The `is_private` flag only controls Feature Store visibility. The grant-complimentary endpoint does not check it. If a feature must never be activated, do not add it to `bsaas_catalog` at all.
 - **Do NOT deactivate a promo code expecting to revoke past discounts** — Deactivation only prevents future use. Purchases already made with the code retain their discount metadata.
+- **Do NOT skip the sprint E2E batch test** — `apps/api/src/tests/sprint-e2e-batch.test.ts` covers all sprint-implemented services in one run (68 tests). Run it before marking a sprint complete: `doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose`
