@@ -6,28 +6,13 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { RefreshCw, Check, X, ShieldCheck, MousePointerClick, TrendingUp, DollarSign, Clock } from 'lucide-react';
+import { adminBrandPartnerService, AdminBrandPartnerClaim } from '@/services/AdminBrandPartnerService';
+import { WholesaleMatchingService, AffiliateAnalytics } from '@/services/WholesaleMatchingService';
 
 interface BrandPartnerAdminClientProps {
   tenantId: string;
 }
 
-interface BrandPartnerClaim {
-  id: string;
-  brand_name: string;
-  gtin: string;
-  claim_type: string;
-  supplier_id: string | null;
-  admin_approved: boolean;
-  contact_email: string | null;
-}
-
-interface AffiliateAnalytics {
-  total_clicks: number;
-  pending: number;
-  converted: number;
-  expired: number;
-  total_commission: number;
-}
 
 const CLAIM_TYPE_COLORS: Record<string, string> = {
   exclusive: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
@@ -36,7 +21,7 @@ const CLAIM_TYPE_COLORS: Record<string, string> = {
 };
 
 export default function BrandPartnerAdminClient({ tenantId }: BrandPartnerAdminClientProps) {
-  const [claims, setClaims] = useState<BrandPartnerClaim[]>([]);
+  const [claims, setClaims] = useState<AdminBrandPartnerClaim[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchGtin, setSearchGtin] = useState('');
@@ -48,14 +33,12 @@ export default function BrandPartnerAdminClient({ tenantId }: BrandPartnerAdminC
   const fetchClaims = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (searchGtin) params.set('gtin', searchGtin);
-      if (searchBrand) params.set('brand_name', searchBrand);
-      if (filterApproved !== 'all') params.set('approved', filterApproved);
-      params.set('limit', '100');
-
-      const res = await fetch(`/api/admin/brand-partners/claims?${params}`, { credentials: 'include' });
-      const data = await res.json();
+      const data = await adminBrandPartnerService.listClaims({
+        gtin: searchGtin || undefined,
+        brand_name: searchBrand || undefined,
+        approved: filterApproved,
+        limit: 100,
+      });
       if (data.success) {
         setClaims(data.claims || []);
         setTotal(data.total || 0);
@@ -69,9 +52,8 @@ export default function BrandPartnerAdminClient({ tenantId }: BrandPartnerAdminC
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tenants/${tenantId}/wholesale/dashboard`, { credentials: 'include' });
-      const data = await res.json();
-      if (data.success && data.analytics) {
+      const data = await WholesaleMatchingService.getDashboard(tenantId);
+      if (data.analytics) {
         setAnalytics(data.analytics);
       }
     } catch {
@@ -87,12 +69,8 @@ export default function BrandPartnerAdminClient({ tenantId }: BrandPartnerAdminC
   const handleApprove = async (claimId: string) => {
     setActionLoading(claimId);
     try {
-      const res = await fetch(`/api/admin/brand-partners/claims/${claimId}/approve`, {
-        method: 'PUT',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
+      const success = await adminBrandPartnerService.approveClaim(claimId);
+      if (success) {
         setClaims((prev) =>
           prev.map((c) => (c.id === claimId ? { ...c, admin_approved: true } : c))
         );
@@ -107,12 +85,8 @@ export default function BrandPartnerAdminClient({ tenantId }: BrandPartnerAdminC
   const handleReject = async (claimId: string) => {
     setActionLoading(claimId);
     try {
-      const res = await fetch(`/api/admin/brand-partners/claims/${claimId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) {
+      const success = await adminBrandPartnerService.rejectClaim(claimId);
+      if (success) {
         setClaims((prev) => prev.filter((c) => c.id !== claimId));
         setTotal((prev) => Math.max(0, prev - 1));
       }

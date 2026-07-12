@@ -442,4 +442,111 @@ In addition to `is_private`, both `bsaas_catalog` and `bsaas_bundles` have two m
 - **Do NOT create private features without a grant plan** — Private features are invisible to merchants. If no admin grants them, they will never be activated for any tenant.
 - **Do NOT use `is_private` as a security gate** — The `is_private` flag only controls Feature Store visibility. The grant-complimentary endpoint does not check it. If a feature must never be activated, do not add it to `bsaas_catalog` at all.
 - **Do NOT deactivate a promo code expecting to revoke past discounts** — Deactivation only prevents future use. Purchases already made with the code retain their discount metadata.
-- **Do NOT skip the sprint E2E batch test** — `apps/api/src/tests/sprint-e2e-batch.test.ts` covers all sprint-implemented services in one run (68 tests). Run it before marking a sprint complete: `doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose`
+- **Do NOT skip the sprint E2E batch test** — `apps/api/src/tests/sprint-e2e-batch.test.ts` covers all sprint-implemented services in one run (68 tests). Run it before marking a sprint complete: `cd apps/api && doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose`
+
+---
+
+## Part 3: Sharable QR Codes for Promo Codes
+
+### What It Does
+
+Admins can generate **styled QR codes** for any promotion code. The QR code deep-links to the Feature Store with the promo code pre-filled, so merchants can scan and immediately apply the discount. The QR code's visual style is **target-aware** — when a coupon has targeting rules (e.g., `target_features: ['chatbot_skill_crm_assistant']`), the QR code embeds the target feature's icon in the center instead of the platform logo.
+
+### URL Scheme
+
+```
+https://{appDomain}/settings/feature-store?promo={promotionCode}
+```
+
+The Feature Store page reads the `promo` query param and auto-fills the promo code input in both feature and bundle purchase modals. A blue banner displays the applied promo code.
+
+### Backend Endpoint
+
+**`GET /api/admin/bsaas-promotions/promotion/:id/qr`** — Returns QR data for a promotion code:
+
+```json
+{
+  "success": true,
+  "data": {
+    "qr_url": "https://app.visibleshelf.com/settings/feature-store?promo=SAVE20",
+    "promotion_code": "SAVE20",
+    "promotion_code_id": "promo_abc123",
+    "coupon_id": "coupon_xyz",
+    "coupon_name": "20% Off Chatbot",
+    "percent_off": 20,
+    "amount_off": null,
+    "duration": "once",
+    "duration_in_months": null,
+    "targets": { "target_features": ["chatbot_skill_crm_assistant"], ... },
+    "target_icon": {
+      "type": "feature",
+      "feature_key": "chatbot_skill_crm_assistant",
+      "icon_name": "IconRobot",
+      "marketing_name": "AI Chatbot"
+    }
+  }
+}
+```
+
+### Target Icon Resolution
+
+Icons are resolved in priority order:
+1. **Single feature target** → Look up `features_list.icon_name` and `marketing_name`
+2. **Multiple feature targets** → Bundle icon (`IconPackage`)
+3. **Capability type target** → Mapped icon (chatbot→IconRobot, analytics→IconChartBar, etc.)
+4. **Tier target** → Mapped icon (enterprise→IconCrown, professional→IconStar, etc.)
+5. **No targets** → `null` (frontend uses platform logo as fallback)
+
+**Exported helpers** (for unit testing):
+- `resolveTargetIcon(targets, featureLookup?)` — Pure function, no DB/Stripe calls
+- `buildPromoQRUrl(appDomain, promotionCode)` — Constructs the deep-link URL
+
+### QR Style Themes
+
+Shared config at `apps/web/src/lib/qr-style-config.ts` defines 4 theme presets:
+
+| Theme | Label | Dot Color | Use Case |
+|-------|-------|-----------|----------|
+| `promo` | Promo (Default) | Blue `#1a56db` | General marketing |
+| `promo-sale` | Promo (Sale) | Red `#dc2626` | Flash sales, limited-time |
+| `bundle-promo` | Bundle Promo | Green `#16a34a` | Bundle discount campaigns |
+| `private-grant` | Private Grant | Purple `#7c3aed` | Enterprise deals, trade shows |
+
+Each theme configures dot type, corner square style, colors, and background via `qr-code-styling` library.
+
+### Frontend Components
+
+- **`PromoCodeQRDialog.tsx`** — Modal dialog showing styled QR code with:
+  - Theme selector (4 presets)
+  - Promo code text with copy button
+  - Deep-link URL with copy button
+  - Target info badge (feature/tier/capability)
+  - Discount info (percent off, amount off, duration)
+  - Download as PNG or SVG
+- **QR Code button** in `BsaasPromotionManagement.tsx` promotion codes table (next to Deactivate)
+- **`AdminBsaasPromotionsService.getQRData(promotionCodeId)`** — Fetches QR data from backend
+
+### Feature Store Auto-Fill
+
+The Feature Store page (`/settings/feature-store`) reads the `promo` query param:
+- Sets `urlPromoCode` state and pre-fills `promoCode` input
+- Shows blue banner: "Promo code **SAVE20** applied — click a feature or bundle to purchase with discount."
+- Both `handlePurchaseClick` and `handleBundlePurchaseClick` pre-fill `promoCode` from `urlPromoCode` when opening purchase modals
+
+### Unit Tests
+
+**`apps/api/src/routes/admin/bsaas-promotions.test.ts`** — 20 tests covering:
+- `resolveTargetIcon`: null targets, empty arrays, single feature with lookup, fallback chains, bundle, capability, tier, priority order (15 tests)
+- `buildPromoQRUrl`: simple codes, special characters, slashes, localhost, empty code (5 tests)
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/routes/admin/bsaas-promotions.ts` | Backend QR endpoint + `resolveTargetIcon`/`buildPromoQRUrl` helpers |
+| `apps/api/src/routes/admin/bsaas-promotions.test.ts` | Unit tests for QR helpers (20 tests) |
+| `apps/web/src/lib/qr-style-config.ts` | Shared QR theme presets + `buildQROptions` helper |
+| `apps/web/src/admin/components/PromoCodeQRDialog.tsx` | QR code dialog with theme selector, download, copy |
+| `apps/web/src/admin/components/BsaasPromotionManagement.tsx` | QR Code button in promotion codes table |
+| `apps/web/src/services/AdminBsaasPromotionsService.ts` | `getQRData()` method + `PromoQRData` interface |
+| `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | URL `?promo=` auto-fill + banner |

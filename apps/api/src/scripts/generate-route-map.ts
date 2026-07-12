@@ -71,7 +71,10 @@ function introspectRouter(
   for (const layer of router.stack) {
     if (layer.route) {
       // This is a terminal route (GET, POST, etc.)
-      const routePath = layer.route.path;
+      const rawPath = layer.route.path;
+      const routePath = rawPath instanceof RegExp
+        ? extractPathFromRegexp(rawPath) || rawPath.source
+        : String(rawPath ?? '');
       const fullPath = normalizePath(basePath, routePath);
 
       for (const method of Object.keys(layer.route.methods)) {

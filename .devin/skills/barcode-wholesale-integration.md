@@ -779,8 +779,9 @@ Comprehensive test covering all sprint-implemented services and endpoints:
 | **Affiliate Link URL Construction** | 2 | URL with/without existing query params, tracking param injection |
 | **Affiliate Analytics Aggregation** | 3 | Mixed statuses, Decimal commission, empty, platform-wide |
 
-**Run command**:
+**Run command** (must run from `apps/api`, not project root — root doesn't have `vitest`/`tsx` installed):
 ```bash
+cd apps/api
 doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose
 ```
 

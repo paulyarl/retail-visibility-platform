@@ -6,19 +6,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { CheckCircle2, Loader2, Send, ShieldCheck } from 'lucide-react';
+import { brandPartnerService, BrandPartnerClaim } from '@/services/BrandPartnerService';
 
 interface BrandPartnerClaimFormProps {
   gtin?: string;
   onSuccess?: (claimId: string) => void;
-}
-
-interface BrandPartnerClaim {
-  id: string;
-  brand_name: string;
-  gtin: string;
-  claim_type: string;
-  admin_approved: boolean;
-  contact_email: string | null;
 }
 
 export function BrandPartnerClaimForm({ gtin: initialGtin, onSuccess }: BrandPartnerClaimFormProps) {
@@ -38,26 +30,20 @@ export function BrandPartnerClaimForm({ gtin: initialGtin, onSuccess }: BrandPar
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/brand-partners/claims', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          brand_name: brandName.trim(),
-          gtin: gtin.trim(),
-          claim_type: claimType,
-          contact_email: contactEmail.trim() || undefined,
-        }),
+      const result = await brandPartnerService.createClaim({
+        brand_name: brandName.trim(),
+        gtin: gtin.trim(),
+        claim_type: claimType,
+        contact_email: contactEmail.trim() || undefined,
       });
 
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to submit claim');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit claim');
       }
 
       setSuccess(true);
-      if (onSuccess && data.claim?.id) {
-        onSuccess(data.claim.id);
+      if (onSuccess && result.claim?.id) {
+        onSuccess(result.claim.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit claim');
@@ -69,11 +55,8 @@ export function BrandPartnerClaimForm({ gtin: initialGtin, onSuccess }: BrandPar
   const checkExistingClaims = async () => {
     if (!gtin.trim()) return;
     try {
-      const res = await fetch(`/api/brand-partners/claims?gtin=${encodeURIComponent(gtin.trim())}`);
-      const data = await res.json();
-      if (data.success && data.claims) {
-        setExistingClaims(data.claims);
-      }
+      const claims = await brandPartnerService.getClaimsByGtin(gtin.trim());
+      setExistingClaims(claims);
     } catch {
       // silently ignore
     }

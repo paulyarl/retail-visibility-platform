@@ -176,8 +176,10 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **E2E batch test passes.** If the sprint created or modified services, endpoints, or jobs, create or update a sprint batch test at `apps/api/src/tests/sprint-e2e-batch.test.ts` (or a sprint-specific test file). The batch test should cover all sprint-implemented services and endpoints with mocked dependencies (no DB/Stripe required). Run it before marking complete:
   ```bash
+  cd apps/api
   doppler run --config local -- npx vitest run src/tests/sprint-e2e-batch.test.ts --reporter=verbose
   ```
+  **Must run from `apps/api`**, not project root — root doesn't have `vitest`/`tsx` installed.
   - Use `vi.hoisted()` for mock functions that need to be available in `vi.mock` factories
   - Mock `prisma`, `logger`, `unifiedConfig`, and any external SDKs (stripe, etc.)
   - Cover success paths, error paths, edge cases, and integration points between services

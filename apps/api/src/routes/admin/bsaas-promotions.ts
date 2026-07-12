@@ -67,6 +67,86 @@ const createPromotionCodeSchema = z.object({
 });
 
 // ====================
+// QR Helper Functions (exported for unit testing)
+// ====================
+
+const CAP_ICON_MAP: Record<string, string> = {
+  chatbot: 'IconRobot',
+  analytics: 'IconChartBar',
+  crm: 'IconUsers',
+  inventory: 'IconPackage',
+  storefront: 'IconStore',
+  marketing: 'IconMegaphone',
+};
+
+const TIER_ICON_MAP: Record<string, string> = {
+  enterprise: 'IconCrown',
+  professional: 'IconStar',
+  chain_professional: 'IconStar',
+  chain_starter: 'IconBuilding',
+  organization: 'IconBuilding2',
+  omnichannel: 'IconLayers',
+  ecommerce: 'IconShoppingCart',
+  commitment: 'IconHandshake',
+  storefront: 'IconStore',
+  discovery: 'IconCompass',
+};
+
+export interface TargetIcon {
+  type: string;
+  feature_key: string | null;
+  icon_name: string | null;
+  marketing_name: string;
+}
+
+export interface FeatureLookup {
+  icon_name: string | null;
+  marketing_name: string | null;
+  name: string | null;
+}
+
+/**
+ * Resolve target icon from coupon targets + optional feature lookup.
+ * Pure function — no DB/Stripe calls. The caller provides feature data.
+ */
+export function resolveTargetIcon(
+  targets: { target_features?: string[] | null; target_capability_types?: string[] | null; target_tiers?: string[] | null } | null,
+  featureLookup?: (key: string) => FeatureLookup | null,
+): TargetIcon | null {
+  if (targets?.target_features && targets.target_features.length === 1) {
+    const featureKey = targets.target_features[0];
+    const feature = featureLookup ? featureLookup(featureKey) : null;
+    if (feature) {
+      return {
+        type: 'feature',
+        feature_key: featureKey,
+        icon_name: feature.icon_name || null,
+        marketing_name: feature.marketing_name || feature.name || featureKey,
+      };
+    }
+    return null;
+  } else if (targets?.target_features && targets.target_features.length > 1) {
+    return { type: 'bundle', feature_key: null, icon_name: 'IconPackage', marketing_name: 'Multiple Features' };
+  } else if (targets?.target_capability_types && targets.target_capability_types.length > 0) {
+    const capType = targets.target_capability_types[0];
+    const iconName = CAP_ICON_MAP[capType] || 'IconCircle';
+    return { type: 'capability', feature_key: capType, icon_name: iconName, marketing_name: capType };
+  } else if (targets?.target_tiers && targets.target_tiers.length > 0) {
+    const tier = targets.target_tiers[0];
+    const iconName = TIER_ICON_MAP[tier] || 'IconTag';
+    return { type: 'tier', feature_key: tier, icon_name: iconName, marketing_name: tier };
+  }
+  return null;
+}
+
+/**
+ * Build the deep-link QR URL for a promotion code.
+ */
+export function buildPromoQRUrl(appDomain: string, promotionCode: string): string {
+  return `${appDomain}/settings/feature-store?promo=${encodeURIComponent(promotionCode)}`;
+}
+
+// ====================
 // Routes
 // ====================
 
@@ -292,9 +372,21 @@ router.get('/promotion/:id/qr', async (req: Request, res: Response) => {
     // Fetch coupon target rules
     const targets = await CouponTargetService.getInstance().getTargetsForCoupon(couponId);
 
-    // Resolve target icon
-    let targetIcon: { type: string; feature_key: string | null; icon_name: string | null; marketing_name: string } | null = null;
+    // Resolve target icon using the extracted helper
+    const targetIcon = resolveTargetIcon(
+      targets ? {
+        target_features: targets.target_features as string[] | null,
+        target_capability_types: targets.target_capability_types as string[] | null,
+        target_tiers: targets.target_tiers as string[] | null,
+      } : null,
+      (key: string) => {
+        // Synchronous lookup — we'll fetch the feature in advance
+        return null;
+      },
+    );
 
+    // If single feature target, fetch feature data and re-resolve
+    let resolvedIcon = targetIcon;
     if (targets?.target_features && targets.target_features.length === 1) {
       const featureKey = targets.target_features[0];
       const feature = await prisma.features_list.findUnique({
@@ -302,48 +394,16 @@ router.get('/promotion/:id/qr', async (req: Request, res: Response) => {
         select: { icon_name: true, marketing_name: true, name: true },
       });
       if (feature) {
-        targetIcon = {
-          type: 'feature',
-          feature_key: featureKey,
-          icon_name: feature.icon_name || null,
-          marketing_name: feature.marketing_name || feature.name || featureKey,
-        };
+        resolvedIcon = resolveTargetIcon(
+          { target_features: [featureKey] },
+          () => ({ icon_name: feature.icon_name, marketing_name: feature.marketing_name, name: feature.name }),
+        );
       }
-    } else if (targets?.target_features && targets.target_features.length > 1) {
-      targetIcon = { type: 'bundle', feature_key: null, icon_name: 'IconPackage', marketing_name: 'Multiple Features' };
-    } else if (targets?.target_capability_types && targets.target_capability_types.length > 0) {
-      const capType = targets.target_capability_types[0];
-      const capIconMap: Record<string, string> = {
-        chatbot: 'IconRobot',
-        analytics: 'IconChartBar',
-        crm: 'IconUsers',
-        inventory: 'IconPackage',
-        storefront: 'IconStore',
-        marketing: 'IconMegaphone',
-      };
-      const iconName = capIconMap[capType] || 'IconCircle';
-      targetIcon = { type: 'capability', feature_key: capType, icon_name: iconName, marketing_name: capType };
-    } else if (targets?.target_tiers && targets.target_tiers.length > 0) {
-      const tier = targets.target_tiers[0];
-      const tierIconMap: Record<string, string> = {
-        enterprise: 'IconCrown',
-        professional: 'IconStar',
-        chain_professional: 'IconStar',
-        chain_starter: 'IconBuilding',
-        organization: 'IconBuilding2',
-        omnichannel: 'IconLayers',
-        ecommerce: 'IconShoppingCart',
-        commitment: 'IconHandshake',
-        storefront: 'IconStore',
-        discovery: 'IconCompass',
-      };
-      const iconName = tierIconMap[tier] || 'IconTag';
-      targetIcon = { type: 'tier', feature_key: tier, icon_name: iconName, marketing_name: tier };
     }
 
     // Construct the deep-link URL
     const appDomain = unifiedConfig.webUrl || (req as any).headers?.origin || 'https://app.visibleshelf.com';
-    const qrUrl = `${appDomain}/settings/feature-store?promo=${encodeURIComponent(promo.code)}`;
+    const qrUrl = buildPromoQRUrl(appDomain, promo.code);
 
     res.json({
       success: true,
@@ -365,7 +425,7 @@ router.get('/promotion/:id/qr', async (req: Request, res: Response) => {
           target_demo_status: targets.target_demo_status as string[] | null,
           target_subscription_statuses: targets.target_subscription_statuses as string[] | null,
         } : null,
-        target_icon: targetIcon,
+        target_icon: resolvedIcon,
       },
     });
   } catch (error: any) {
