@@ -80,9 +80,64 @@ await prisma.features_list.create({
 - **`_disabled` meta-key**: Every capability type MUST have a `{prefix}_disabled` feature key in `features_list`, linked via `capability_features_list`. This allows explicit disengagement of a capability from a tier. See R17 in `capability-data-flow-rules.md` for the full precedence rules.
 - **Default disabled when nothing is enabled**: When neither `_enabled` nor `_disabled` is set AND no individual feature in the domain is enabled, the resolver returns `enabled = false`. However, if any individual feature is enabled, the capability is implicitly enabled. See R17 in `capability-data-flow-rules.md`.
 
+## Step 0: Seed Feature Keys into the Database (Mandatory — Do Not Skip)
+
+**Before writing any resolver logic, frontend mapper code, or type definitions, you MUST create a SQL migration to seed the new feature keys into `features_list` and link them to their capability type in `capability_features_list`.**
+
+This is the most commonly missed step. Without it, the feature keys exist only in code — the Admin UI cannot see them, admins cannot assign them to tiers, and the capability type shows no features for the new group.
+
+### What to seed
+
+For every feature key referenced in a resolver (`!!features.<key>`), insert a row into `features_list`:
+
+```sql
+INSERT INTO features_list (key, name, description, category, is_active, sort_order, created_at, updated_at)
+VALUES
+  ('<capability_key>_<group>',              '<Group Name>',         'Group gate description',     '<capability_type>', true, <n>, NOW(), NOW()),
+  ('<capability_key>_<group>_on',           '<Group> (On)',         'Group ON gate',              '<capability_type>', true, <n>, NOW(), NOW()),
+  ('<capability_key>_<group>_off',          '<Group> (Off)',        'Group OFF gate',             '<capability_type>', true, <n>, NOW(), NOW()),
+  ('<capability_key>_<group>_<feature>',    '<Feature Name>',       'Individual feature',         '<capability_type>', true, <n>, NOW(), NOW())
+ON CONFLICT (key) DO UPDATE SET
+  name = EXCLUDED.name, description = EXCLUDED.description, updated_at = NOW();
+```
+
+Then link them to the capability type:
+
+```sql
+DO $$
+DECLARE
+  v_cap_id TEXT;
+  v_key    TEXT;
+  v_feat_id TEXT;
+BEGIN
+  SELECT id INTO v_cap_id FROM capability_type_list WHERE key = '<capability_type>';
+  IF v_cap_id IS NULL THEN RAISE NOTICE 'Capability type not found'; RETURN; END IF;
+  FOREACH v_key IN ARRAY ARRAY['<key1>', '<key2>', ...] LOOP
+    SELECT id INTO v_feat_id FROM features_list WHERE key = v_key;
+    IF v_feat_id IS NOT NULL THEN
+      INSERT INTO capability_features_list (capability_type_id, feature_id)
+      VALUES (v_cap_id, v_feat_id) ON CONFLICT DO NOTHING;
+    END IF;
+  END LOOP;
+END $$;
+```
+
+### Where to put the migration
+
+Create a numbered SQL file in `database/migrations/` (e.g., `102_storefront_opt_qr_styled_features.sql`). Follow the idempotent pattern with `ON CONFLICT (key) DO UPDATE`.
+
+### Verification
+
+After running the migration, verify in the Admin UI at `/settings/admin/capabilities`:
+- The new feature keys appear in the feature list
+- The capability type shows the new features in its feature list
+- The features are available for tier assignment in the tier management UI
+
+**If you skip this step, the resolver will silently return `false` for all new features because the keys are not in any tier's `tier_features_list` — and admins have no way to add them because they don't appear in the UI.**
+
 ## Post-Insert Checklist (Unified Resolver Architecture)
 
-After adding to `features_list`, the feature is **not automatically available to any tier or merchant**. You must wire it up:
+After seeding feature keys into `features_list`, the feature is **not automatically available to any tier or merchant**. You must wire it up:
 
 1. **Link to a capability type** (if applicable):
    ```sql
@@ -276,3 +331,4 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the `_disabled` meta-key** — when adding a new capability type, you MUST create a `{prefix}_disabled` feature key in `features_list` and link it via `capability_features_list`. Without it, admins cannot explicitly disengage the capability from a tier, and `checkCapabilityEngagement` cannot block purchases for disabled capabilities. See migration `086_capability_type_disabled_keys.sql` for the pattern.
 - **Do not fail-open when nothing is enabled** — resolvers MUST default to `enabled = false` when no `_enabled`, no `_disabled`, no `_flexible`, AND no individual features are enabled in the domain. However, if any individual feature is enabled, the capability is implicitly enabled (R17 step 4). See R17 in `capability-data-flow-rules.md`.
 - **Do not mount public capability routes under `/api/tenants/`** — public routes (readable by storefront/product pages without auth) MUST be at `/api/public/tenants/:tenantId/*`. A public route at `/api/tenants/...` will be blocked by router-level auth middleware from sibling routers (e.g., `tenant-users.ts` applies `router.use(authenticateToken)` which bleeds into all subsequent routes). See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2.
+- **Do not write resolver logic before seeding feature keys into `features_list`** — The most common capability implementation miss is adding resolver code, frontend mappers, and type definitions without creating the SQL migration to insert the feature keys into `features_list` and link them via `capability_features_list`. The resolver silently returns `false` for all unseeded keys, and the Admin UI shows no new features for the capability type. Always create the migration FIRST (see Step 0 above), run it, verify in the Admin UI, then proceed with resolver and frontend work.

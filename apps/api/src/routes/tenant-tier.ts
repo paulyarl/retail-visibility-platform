@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import TierService from '../services/TierService';
@@ -6,13 +6,19 @@ import TierService from '../services/TierService';
 const router = Router();
 
 /**
- * GET /tenants/:id/tier/public
+ * Public tenant-scoped router for /api/public/tenants/:tenantId/*
+ * Mounted BEFORE any authenticateToken middleware.
+ */
+const publicTenantRouter = Router({ mergeParams: true });
+
+/**
+ * GET /api/public/tenants/:tenantId/tier
  * Get public tier information for a specific tenant (no auth required)
  * Used by storefront for QR code features
  */
-router.get('/tenants/:id/tier/public', async (req, res) => {
+publicTenantRouter.get('/tier', async (req: express.Request<{ tenantId: string }>, res) => {
   try {
-    const { id: tenantId } = req.params;
+    const { tenantId } = req.params;
 
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
@@ -124,10 +130,12 @@ router.get('/tenants/:id/tier/public', async (req, res) => {
       effectiveExpiresSource: effectiveExpiration?.source,
     });
   } catch (error) {
-    console.error('[GET /tenants/:id/tier/public] Error:', error);
+    console.error('[GET /api/public/tenants/:tenantId/tier] Error:', error);
     res.status(500).json({ error: 'Failed to fetch tier information' });
   }
 });
+
+export { publicTenantRouter };
 
 /**
  * GET /tenants/:id/tier

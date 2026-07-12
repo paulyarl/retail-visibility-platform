@@ -635,6 +635,167 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
         </Card>
       )}
 
+      {/* QR Code Style Group — gated by storefront_opt_qr_styled capability */}
+      {cap?.qrStyledEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Paintbrush className="h-5 w-5" />
+              QR Code Style
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Customize the visual style of your QR codes. Styled QR codes use rounded dots, custom colors, and your logo for a branded look.
+            </p>
+
+            {/* Dot Style Selector */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Dot Style</h4>
+              <div className="flex flex-wrap gap-2">
+                {cap.allowedQRDotStyles.map((style: string) => (
+                  <button
+                    key={style}
+                    onClick={() => setSettings(prev => ({ ...prev, qr_dot_type: style }))}
+                    disabled={!settings.storefront_opt_enabled}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
+                      settings.qr_dot_type === style
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {style.replace(/-/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Corner Style Selector */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Corner Style</h4>
+              <div className="flex flex-wrap gap-2">
+                {cap.allowedQRCornerStyles.map((style: string) => (
+                  <button
+                    key={style}
+                    onClick={() => setSettings(prev => ({ ...prev, qr_corner_type: style }))}
+                    disabled={!settings.storefront_opt_enabled}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
+                      settings.qr_corner_type === style
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {style.replace(/-/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Colors — gated by qrCustomColors */}
+            {cap.qrCustomColors && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Custom Colors</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Dot Color</label>
+                    <input
+                      type="color"
+                      value={settings.qr_dot_color}
+                      onChange={(e) => setSettings(prev => ({ ...prev, qr_dot_color: e.target.value }))}
+                      disabled={!settings.storefront_opt_enabled}
+                      className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Corner Color</label>
+                    <input
+                      type="color"
+                      value={settings.qr_corner_color}
+                      onChange={(e) => setSettings(prev => ({ ...prev, qr_corner_color: e.target.value }))}
+                      disabled={!settings.storefront_opt_enabled}
+                      className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Background</label>
+                    <input
+                      type="color"
+                      value={settings.qr_bg_color}
+                      onChange={(e) => setSettings(prev => ({ ...prev, qr_bg_color: e.target.value }))}
+                      disabled={!settings.storefront_opt_enabled}
+                      className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Gradient Toggle — gated by qrGradients */}
+            {cap.qrGradients && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-medium">Gradient Fill</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Apply a gradient to QR dots</p>
+                  </div>
+                  <Switch
+                    checked={settings.qr_gradient_enabled}
+                    onCheckedChange={() => handleToggle('qr_gradient_enabled')}
+                    disabled={!settings.storefront_opt_enabled}
+                  />
+                </div>
+                {settings.qr_gradient_enabled && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Gradient Start</label>
+                      <input
+                        type="color"
+                        value={settings.qr_gradient_start}
+                        onChange={(e) => setSettings(prev => ({ ...prev, qr_gradient_start: e.target.value }))}
+                        disabled={!settings.storefront_opt_enabled}
+                        className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Gradient End</label>
+                      <input
+                        type="color"
+                        value={settings.qr_gradient_end}
+                        onChange={(e) => setSettings(prev => ({ ...prev, qr_gradient_end: e.target.value }))}
+                        disabled={!settings.storefront_opt_enabled}
+                        className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reset Button */}
+            <div className="border-t pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSettings(prev => ({
+                  ...prev,
+                  qr_dot_type: 'rounded',
+                  qr_corner_type: 'extra-rounded',
+                  qr_dot_color: '#1a56db',
+                  qr_corner_color: '#1a56db',
+                  qr_bg_color: '#ffffff',
+                  qr_gradient_enabled: false,
+                  qr_gradient_start: '#1a56db',
+                  qr_gradient_end: '#7c3aed',
+                }))}
+                disabled={!settings.storefront_opt_enabled}
+              >
+                Reset to Default
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Gallery Display Group — Radio */}
       {tierAllowsGallery && (
         <Card>

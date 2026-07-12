@@ -203,7 +203,11 @@ cd apps/web && npx tsc --noEmit
   - If a new `_enabled` / `_disabled` feature key is required, confirm it is the capability type gate and does not collide with an existing group gate.
   - Reference `docs/ENABLED_DISABLED_NAMING_CONFLICT_MIGRATION_PLAN.md` until the migration is fully deployed.
 
-- [ ] **Check for frontend fallback resolver impact in `CapabilityResolutionService.ts`.** If the phase changes any resolver logic in `apps/api/src/services/resolvers/XxxResolver.ts`, update the matching frontend fallback resolver in `apps/web/src/services/CapabilityResolutionService.ts` (R30 in `capability-data-flow-rules.md`). Verify parity for `_on`/`_off` group gate fallback, `enabled` derivation, and `effective_*` computation. Run `pnpm checkweb` after changes.
+- [ ] **Check for frontend fallback resolver impact in `CapabilityResolutionService.ts`.** If the phase changes any resolver logic in `apps/api/src/services/resolvers/XxxResolver.ts`, update the matching frontend fallback resolver in `apps/web/src/services/CapabilityResolutionService.ts` (R30 in `capability-data-flow-rules.md`). Verify parity for `_on`/`_off` group gate fallback, `enabled` derivation, and `effective_*` computation. Run `pnpm checkweb` **and** `pnpm checkapi` after changes.
+
+- [ ] **Plan API route settings file updates (R32).** If the phase adds new merchant preference fields to a capability domain, plan updates to **four** places in the settings route file (`apps/api/src/routes/xxx-options-settings.ts`): (1) Zod validation schema, (2) `DEFAULT_SETTINGS` export, (3) all-false fallback when tier-disabled, (4) tier-filtered settings in the GET handler. See R32 in `capability-data-flow-rules.md`.
+
+- [ ] **Plan `buildExpiredCapabilitiesResponse` updates (R13).** If the phase adds new fields to an existing capability domain's `EffectiveXxx` interface (not just new domains), plan to add those fields (disabled/empty/false) to that domain's entry in `buildExpiredCapabilitiesResponse` in `public-tenant-capabilities.ts`. Missing fields cause frontend mapper crashes for expired tenants.
 
 - [ ] **Plan regression tests for group gate fallback.** Include cases for `_on` only, `_enabled` only, `_off` override, `_on` + `_off`, and `enabled` derived from a group gate without the master `_enabled` key.
 

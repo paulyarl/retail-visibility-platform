@@ -145,6 +145,9 @@ export function resolveStorefrontOptions(
     if (features.storefront_opt_image_gallery_15) allowedGalleryTypes.push('image_gallery_15');
   }
 
+  // Gallery Magazine — magazine/mosaic display mode (tier-gated feature)
+  const galleryMagazineEnabled = flexible || !!features.storefront_opt_gallery_magazine;
+
   // Advanced — individual features (group gate removed, fallback to old group gate)
   const allowedAdvancedTypes: StorefrontOptAdvancedType[] = [];
   if (flexible) {
@@ -193,6 +196,7 @@ export function resolveStorefrontOptions(
     image_gallery_5: merchantPrefs?.image_gallery_5 !== false,
     image_gallery_10: merchantPrefs?.image_gallery_10 ?? false,
     image_gallery_15: merchantPrefs?.image_gallery_15 ?? false,
+    gallery_display_mode: merchantPrefs?.gallery_display_mode || 'carousel',
     enhanced_seo: merchantPrefs?.enhanced_seo ?? false,
     storefront_actions: merchantPrefs?.storefront_actions ?? false,
     storefront_layout: merchantPrefs?.storefront_layout || 'classic',
@@ -267,6 +271,8 @@ export function resolveStorefrontOptions(
     can_use_layout_classic: mainOn && allowedLayouts.includes('classic'),
     can_use_layout_editorial: mainOn && allowedLayouts.includes('editorial'),
     can_use_layout_immersive: mainOn && allowedLayouts.includes('immersive'),
+    gallery_magazine_enabled: mainOn && galleryMagazineEnabled,
+    can_use_magazine_gallery: mainOn && galleryMagazineEnabled && prefs.gallery_display_mode === 'magazine',
     merchant_preferences: prefs,
   };
 }

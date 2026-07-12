@@ -446,7 +446,8 @@ class TenantInfoService extends TenantApiSingleton {
         return null;
       }
 
-      return result.data || null;
+      const responseData = result.data;
+      return responseData?.data || responseData || null;
     } catch (error) {
       console.error('[TenantInfoService] Failed to get tenant info:', error);
       return null;
@@ -1354,7 +1355,8 @@ class TenantInfoService extends TenantApiSingleton {
         throw new Error(getErrorMessage(result.error) || 'Failed to get tenant data with cache busting');
       }
 
-      return result.data;
+      const responseData = result.data;
+      return responseData?.data || responseData;
     } catch (error) {
       console.error('[TenantInfoService] Failed to get tenant data with cache busting:', error);
       throw error;

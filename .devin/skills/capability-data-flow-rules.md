@@ -263,7 +263,7 @@ When `resolveEffectiveCapabilities` returns null (tenant exists but has no resol
 2. If found: return **200** with `buildExpiredCapabilitiesResponse(tenant)` — a complete disabled `effective` manifest with the tenant's actual `subscription_context` (e.g., `internalStatus: 'expired'`, `isReadOnly: true`, `writable: false`)
 3. If not found: return **404** `tenant_not_found`
 
-**`buildExpiredCapabilitiesResponse` MUST include every capability domain** with all fields set to disabled/falsy values. When adding a new capability domain, add a disabled entry to this function matching the `EffectiveXxx` interface. A missing domain will cause frontend mappers (`mapAll()` in `UnifiedCapabilityService.ts`) to crash on `undefined` fields.
+**`buildExpiredCapabilitiesResponse` MUST include every capability domain** with all fields set to disabled/falsy values. When adding a new capability domain, add a disabled entry to this function matching the `EffectiveXxx` interface. **When adding new fields to an existing capability domain's `EffectiveXxx` interface**, add those same fields (disabled/empty/false) to that domain's entry in `buildExpiredCapabilitiesResponse`. A missing domain OR missing fields within a domain will cause frontend mappers (`mapAll()` in `UnifiedCapabilityService.ts`) to crash on `undefined` fields.
 
 **`resolveTenantIdentifier` MUST try ID lookup first** for any identifier format (not just `tid-*`). Tenant IDs like `tenant-*` are valid and must be resolved via `prisma.tenants.findUnique({ where: { id: identifier } })` before falling back to slug lookup.
 
@@ -608,7 +608,46 @@ const isWritable = allCaps.data?.subscriptionContext?.writable ?? true;
 
 **Example**: When `ProductOptionsResolver.ts` changes, `resolveProductOptionsState` in `CapabilityResolutionService.ts` must be updated to match the `creation`, `layout`, and `sections` group gate logic, including the `hasAnyProductOptionsFeature` helper that drives the `enabled` fallback.
 
-**Verification**: Run `pnpm checkweb` and add/update `CapabilityResolutionService` tests covering `_on` only, `_enabled` only, `_off` override, `_on` + `_off`, and `enabled` derived from a group gate without the master `_enabled` key.
+**Verification**: Run `pnpm checkweb` **and** `pnpm checkapi` and add/update `CapabilityResolutionService` tests covering `_on` only, `_enabled` only, `_off` override, `_on` + `_off`, and `enabled` derived from a group gate without the master `_enabled` key. Both type checks MUST pass — the API project catches Prisma schema mismatches and missing fields in route handlers that the web project cannot see.
+
+### R31: Feature Keys Must Be Seeded into `features_list` Before Resolver Implementation
+
+**The most common capability implementation miss**: adding resolver logic, frontend mappers, and type definitions that reference feature keys (`!!features.<key>`) without first creating a SQL migration to insert those keys into `features_list` and link them via `capability_features_list`.
+
+**Without DB seeding**:
+- The resolver silently returns `false` for all new features (the key doesn't exist in any tier's `tier_features_list`)
+- The Admin UI at `/settings/admin/capabilities` shows no new features for the capability type
+- Admins cannot assign the features to tiers because the features don't appear in the tier management UI
+- The capability appears "broken" even though all code is correct
+
+**Required order of operations**:
+1. **Create migration** in `database/migrations/` — insert all feature keys into `features_list` with `ON CONFLICT (key) DO UPDATE`, then link them to the capability type via `capability_features_list`
+2. **Run migration** against the target database
+3. **Verify in Admin UI** — navigate to `/settings/admin/capabilities`, confirm the new features appear under the capability type
+4. **Then** proceed with resolver implementation, frontend mapper, type definitions, and settings UI
+
+**What to seed for each new feature group**:
+- Group gate keys: `<cap_key>_<group>`, `<cap_key>_<group>_on`, `<cap_key>_<group>_off`
+- Legacy aliases (if using `_on`/`_off` migration): `<cap_key>_<group>_enabled`, `<cap_key>_<group>_disabled`
+- Individual features: `<cap_key>_<group>_<feature>` for each feature in the group
+- Master disabled key: `<cap_key>_disabled` (if not already present for the capability type)
+
+**See**: `add-capability-feature.md` Step 0 for the migration template and `102_storefront_opt_qr_styled_features.sql` for a real example.
+
+### R32: API Route Settings File Must Update for New Merchant Preference Fields
+
+When adding new merchant preference fields to a capability domain (e.g., adding `qr_dot_type`, `qr_dot_color` to `storefront_options`), the settings route file (`apps/api/src/routes/xxx-options-settings.ts`) MUST be updated in **four** places:
+
+1. **Zod validation schema**: Add the new fields to `xxxOptionsSettingsSchema` so the PUT handler accepts them. Without this, fields are silently stripped on save.
+2. **`DEFAULT_SETTINGS` export**: Add the new fields with sensible defaults so new tenants get correct initial values.
+3. **All-false fallback** (tier-disabled return): Add the new fields with disabled/default values to the object returned when `!tierState.enabled`. Without this, the frontend receives a settings object missing fields that the UI expects.
+4. **Tier-filtered settings** (GET handler): Add tier-gating logic for the new fields in the `tierFilteredSettings` construction. If the tier doesn't allow the feature, reset to defaults. If the tier allows it, pass through the merchant's value (with fallback to defaults).
+
+**Additionally**: If the new merchant prefs have tier-gated write restrictions (e.g., magazine mode requires a tier feature), add a tier-gate check in the PUT handler similar to the layout selection gate.
+
+**Common pitfall**: Developers focus on the resolver, types, and frontend mapper but forget the settings route file. This causes `pnpm checkapi` to fail (Prisma type mismatches when accessing `rawSettings.newField`) and runtime issues (settings silently dropped on save, missing fields in tier-disabled response).
+
+**Verification**: Run `pnpm checkapi` after updating the settings route. The API TypeScript project validates against the Prisma schema — if a field doesn't exist on the Prisma model, `tsc` will catch it. If the field exists in the DB but not in the Zod schema, the PUT handler will silently strip it.
 
 ## File Reference
 

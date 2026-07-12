@@ -191,6 +191,14 @@ export interface StorefrontOptionsMerchantSettings {
   qr_store?: boolean | null;
   qr_logo?: boolean | null;
   qr_directory?: boolean | null;
+  qr_dot_type?: string | null;
+  qr_corner_type?: string | null;
+  qr_dot_color?: string | null;
+  qr_corner_color?: string | null;
+  qr_bg_color?: string | null;
+  qr_gradient_enabled?: boolean | null;
+  qr_gradient_start?: string | null;
+  qr_gradient_end?: string | null;
   image_gallery_5?: boolean | null;
   image_gallery_10?: boolean | null;
   image_gallery_15?: boolean | null;
@@ -201,6 +209,7 @@ export interface StorefrontOptionsMerchantSettings {
   default_qr_resolution?: string | null;
   default_gallery_limit?: number | null;
   external_link_enabled?: boolean | null;
+  gallery_display_mode?: string | null;
 }
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
@@ -564,6 +573,8 @@ export interface EffectiveStorefrontOptions {
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
+  gallery_magazine_enabled: boolean;
+  can_use_magazine_gallery: boolean;
   merchant_preferences: Record<string, any>;
 }
 

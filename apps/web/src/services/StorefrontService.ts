@@ -264,7 +264,7 @@ class StorefrontService extends PublicApiSingleton {
 
   /**
    * Get public tier information for a tenant
-   * Uses the /api/tenants/:tenantId/tier/public endpoint
+   * Uses the /api/public/tenants/:tenantId/tier endpoint
    */
   async getPublicTier(tenantId: string): Promise<any> {
     try {
@@ -273,7 +273,7 @@ class StorefrontService extends PublicApiSingleton {
       }
 
       const result = await super.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/tier/public`,
+        `/api/public/tenants/${tenantId}/tier`,
         {},
         `public-tier-${tenantId}`,
         10 * 60 * 1000 // 10 minutes TTL for tier information

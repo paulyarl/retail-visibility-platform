@@ -241,6 +241,33 @@ The admin QR modal in the demo tenant page does **not** use `TenantQRCode` — i
 - Admin QR codes need multiple download sizes on demand
 - The landing page URL (`/qr/{tenantId}`) is different from storefront QR URLs
 
+### 2.7.1 QR Code Styling (Phase 5 BSaaS Pilot)
+
+`TenantQRCode` supports **styled QR codes** via the `qr-code-styling` library, gated by tier-level capability flags. When `showQRStyled` is true in `StorefrontOptionFlags`, the component dynamically imports `qr-code-styling` and renders a branded QR with:
+- **Dot styles**: `rounded`, `dots`, `classy`, `classy-rounded`, `extra-rounded` (controlled by `allowedQRDotStyles`)
+- **Corner styles**: `dot`, `extra-rounded`, `rounded` (controlled by `allowedQRCornerStyles`)
+- **Custom colors**: dot color, corner color, background (gated by `qrCustomColors`)
+- **Gradient fill**: linear gradient on dots (gated by `qrGradients` + `qrGradientEnabled` merchant pref)
+- **Embedded logo**: tenant logo with `hideBackgroundDots` for clean overlay
+
+**Feature keys** (resolved by `StorefrontOptionsResolver`):
+- `storefront_opt_qr_styled` / `storefront_opt_qr_styled_on` — master gate for styled QR
+- `storefront_opt_qr_dot_styles` — grants all dot styles at once
+- `storefront_opt_qr_dot_rounded`, `_dots`, `_classy`, `_classy_rounded`, `_extra_rounded` — individual dot styles
+- `storefront_opt_qr_corner_styles` — grants all corner styles at once
+- `storefront_opt_qr_corner_dot`, `_extra_rounded`, `_rounded` — individual corner styles
+- `storefront_opt_qr_custom_colors` — enables custom color picker
+- `storefront_opt_qr_gradients` — enables gradient fill option
+
+**Merchant preferences** stored in `storefront_options` JSON:
+- `qr_dot_type`, `qr_corner_type` — selected styles
+- `qr_dot_color`, `qr_corner_color`, `qr_bg_color` — color values
+- `qr_gradient_enabled`, `qr_gradient_start`, `qr_gradient_end` — gradient config
+
+**Settings UI**: `StorefrontOptionsSettingsClient.tsx` renders a "QR Code Style" card gated by `cap?.qrStyledEnabled`, with style selector buttons, color pickers, gradient toggle, and reset button.
+
+**API note**: `qr-code-styling` exposes `getRawData('png')` (returns `Blob`), not `getDataUrl`. Convert via `FileReader.readAsDataURL(blob)`.
+
 ### 2.8 Demo Tenant Admin Panel Integration
 
 The demo tenant admin page at `apps/web/src/app/(platform)/settings/admin/demo-tenants/page.tsx` was extended with:

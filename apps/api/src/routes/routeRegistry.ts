@@ -245,7 +245,7 @@ import crmTenantRoutes from '../routes/crm/tenant/crm-tenant';
 import crmCustomerRoutes from '../routes/crm/customer/crm-customer';
 import tenantSupplierRoutes from '../routes/tenant/suppliers';
 import brandingRoutes from '../routes/branding';
-import tenantTierRoutes from '../routes/tenant-tier';
+import tenantTierRoutes, { publicTenantRouter as tenantTierPublicRouter } from '../routes/tenant-tier';
 
 // Dashboard mounts
 import dashboardRoutes from '../routes/dashboard';
@@ -1540,11 +1540,18 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'User routes at /api/user',
   },
   {
+    path: '/api/public/tenants/:tenantId',
+    router: tenantTierPublicRouter,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Public tier endpoint at /api/public/tenants/:tenantId/tier (no auth)',
+  },
+  {
     path: '/api',
     router: tenantTierRoutes,
     domain: 'tenant',
     authLevel: 'tenant',
-    comment: 'Tenant tier routes (public tier endpoints mounted BEFORE authenticated tenant routes)',
+    comment: 'Tenant tier routes (authenticated tenant routes only)',
   },
   {
     path: '/api/download',

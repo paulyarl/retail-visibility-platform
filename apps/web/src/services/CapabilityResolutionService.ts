@@ -534,6 +534,14 @@ export interface StorefrontOptionsState {
     qr_store: boolean;
     qr_logo: boolean;
     qr_directory: boolean;
+    qr_dot_type?: string;
+    qr_corner_type?: string;
+    qr_dot_color?: string;
+    qr_corner_color?: string;
+    qr_bg_color?: string;
+    qr_gradient_enabled?: boolean;
+    qr_gradient_start?: string;
+    qr_gradient_end?: string;
     image_gallery_5: boolean;
     image_gallery_10: boolean;
     image_gallery_15: boolean;
@@ -574,6 +582,14 @@ export interface StorefrontOptionFlags {
   allowedQRCornerStyles: string[];
   qrCustomColors: boolean;
   qrGradients: boolean;
+  qrDotType?: string;
+  qrCornerType?: string;
+  qrDotColor?: string;
+  qrCornerColor?: string;
+  qrBgColor?: string;
+  qrGradientEnabled?: boolean;
+  qrGradientStart?: string;
+  qrGradientEnd?: string;
   galleryLimit: number;
   showEnhancedSEO: boolean;
   showStorefrontActions: boolean;
@@ -609,6 +625,14 @@ export function toStorefrontOptionFlags(state: StorefrontOptionsState): Storefro
     allowedQRCornerStyles: state.allowedQRCornerStyles,
     qrCustomColors: state.qrCustomColors,
     qrGradients: state.qrGradients,
+    qrDotType: p?.qr_dot_type,
+    qrCornerType: p?.qr_corner_type,
+    qrDotColor: p?.qr_dot_color,
+    qrCornerColor: p?.qr_corner_color,
+    qrBgColor: p?.qr_bg_color,
+    qrGradientEnabled: p?.qr_gradient_enabled,
+    qrGradientStart: p?.qr_gradient_start,
+    qrGradientEnd: p?.qr_gradient_end,
     galleryLimit: p?.default_gallery_limit ?? 5,
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,

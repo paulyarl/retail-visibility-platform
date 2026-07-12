@@ -90,11 +90,18 @@ export interface StorefrontOptionsState {
   canUseContact: boolean;
   canUseInteractiveMaps: boolean;
   canUseQRCodes: boolean;
+  // QR Style
+  qrStyledEnabled: boolean;
+  qrGradients: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
   canUseLayoutClassic: boolean;
   canUseLayoutEditorial: boolean;
   canUseLayoutImmersive: boolean;
+  // Gallery Magazine
+  galleryMagazineEnabled: boolean;
+  canUseMagazineGallery: boolean;
+  galleryDisplayMode: string;
   // Raw features
   features: Record<string, boolean>;
 }
@@ -303,6 +310,15 @@ class StorefrontOptionsService {
       }
     }
 
+    // --- QR Style: styled QR renderer, gated by storefront_opt_qr_styled feature key ---
+    const qrStyledOn = flexible
+      || !!features.storefront_opt_qr_styled
+      || !!features.storefront_opt_qr_styled_on
+      || (!!features.storefront_opt_qr_styled_enabled && !features.storefront_opt_qr_styled_disabled);
+    const qrStyledOff = !!features.storefront_opt_qr_styled_off || !!features.storefront_opt_qr_styled_disabled;
+    const qrStyledEnabled = mainOn && qrStyledOn && !qrStyledOff;
+    const qrGradients = qrStyledEnabled && (flexible || !!features.storefront_opt_qr_gradients);
+
     // --- Gallery: new consolidated key with fallback to old group gate + individual keys ---
     const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
     if (flexible || features.storefront_opt_gallery || features.storefront_opt_gallery_on) {
@@ -314,6 +330,9 @@ class StorefrontOptionsService {
       if (features.storefront_opt_image_gallery_10) allowedGalleryTypes.push('image_gallery_10');
       if (features.storefront_opt_image_gallery_15) allowedGalleryTypes.push('image_gallery_15');
     }
+
+    // --- Gallery Magazine: magazine/mosaic display mode (tier-gated feature) ---
+    const galleryMagazineEnabled = flexible || !!features.storefront_opt_gallery_magazine;
 
     // --- Advanced: individual features (group gate removed, fallback to old group gate) ---
     const allowedAdvancedTypes: StorefrontOptAdvancedType[] = [];
@@ -371,11 +390,16 @@ class StorefrontOptionsService {
       canUseContact: mainOn && allowedInfoTypes.includes('storefront_contact'),
       canUseInteractiveMaps: mainOn && allowedInfoTypes.includes('interactive_maps'),
       canUseQRCodes: mainOn && (allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
+      qrStyledEnabled,
+      qrGradients,
       canUseEnhancedSEO: mainOn && allowedAdvancedTypes.includes('enhanced_seo'),
       canUseStorefrontActions: mainOn && allowedAdvancedTypes.includes('storefront_actions'),
       canUseLayoutClassic: mainOn && allowedLayouts.includes('classic'),
       canUseLayoutEditorial: mainOn && allowedLayouts.includes('editorial'),
       canUseLayoutImmersive: mainOn && allowedLayouts.includes('immersive'),
+      galleryMagazineEnabled: mainOn && galleryMagazineEnabled,
+      canUseMagazineGallery: mainOn && galleryMagazineEnabled, // Service-level: tier-allowed. Effective use also requires merchant pref 'magazine'
+      galleryDisplayMode: 'carousel', // Default; route layer reads merchant pref for actual value
       features,
     };
   }
@@ -460,11 +484,16 @@ class StorefrontOptionsService {
       canUseContact: false,
       canUseInteractiveMaps: false,
       canUseQRCodes: false,
+      qrStyledEnabled: false,
+      qrGradients: false,
       canUseEnhancedSEO: false,
       canUseStorefrontActions: false,
       canUseLayoutClassic: false,
       canUseLayoutEditorial: false,
       canUseLayoutImmersive: false,
+      galleryMagazineEnabled: false,
+      canUseMagazineGallery: false,
+      galleryDisplayMode: 'carousel',
       features: {},
     };
   }

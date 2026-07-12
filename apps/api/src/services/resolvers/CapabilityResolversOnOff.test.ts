@@ -239,6 +239,141 @@ describe('Phase 5 resolvers _on/_off fallback', () => {
       expect(legacyResult.allowed_hours_types).toEqual(['hours_animated', 'hours_status']);
       expect(legacyResult.allowed_layouts).toEqual(['classic', 'editorial', 'immersive']);
     });
+
+    it('enables QR styled when storefront_opt_qr_styled is on', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled: true,
+      }, {});
+      expect(result.qr_styled_enabled).toBe(true);
+      expect(result.allowed_qr_dot_styles).toEqual(['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded']);
+      expect(result.allowed_qr_corner_styles).toEqual(['dot', 'extra-rounded', 'rounded']);
+    });
+
+    it('enables QR styled with _on suffix key', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled_on: true,
+      }, {});
+      expect(result.qr_styled_enabled).toBe(true);
+    });
+
+    it('disables QR styled when _off key is present', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled_on: true,
+        storefront_opt_qr_styled_off: true,
+      }, {});
+      expect(result.qr_styled_enabled).toBe(false);
+      expect(result.allowed_qr_dot_styles).toEqual([]);
+    });
+
+    it('enables custom colors and gradients with flexible', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_flexible: true,
+      }, {});
+      expect(result.qr_styled_enabled).toBe(true);
+      expect(result.qr_custom_colors).toBe(true);
+      expect(result.qr_gradients).toBe(true);
+    });
+
+    it('enables custom colors only when storefront_opt_qr_custom_colors is set', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled: true,
+        storefront_opt_qr_custom_colors: true,
+      }, {});
+      expect(result.qr_custom_colors).toBe(true);
+      expect(result.qr_gradients).toBe(false);
+    });
+
+    it('enables gradients only when storefront_opt_qr_gradients is set', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled: true,
+        storefront_opt_qr_gradients: true,
+      }, {});
+      expect(result.qr_gradients).toBe(true);
+      expect(result.qr_custom_colors).toBe(false);
+    });
+
+    it('respects individual dot style feature keys', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled: true,
+        storefront_opt_qr_dot_rounded: true,
+        storefront_opt_qr_dot_dots: true,
+      }, {});
+      expect(result.allowed_qr_dot_styles).toContain('rounded');
+      expect(result.allowed_qr_dot_styles).toContain('dots');
+      expect(result.allowed_qr_dot_styles).not.toContain('classy');
+    });
+
+    it('respects individual corner style feature keys', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_qr_styled: true,
+        storefront_opt_qr_corner_dot: true,
+        storefront_opt_qr_corner_rounded: true,
+      }, {});
+      expect(result.allowed_qr_corner_styles).toContain('dot');
+      expect(result.allowed_qr_corner_styles).toContain('rounded');
+      expect(result.allowed_qr_corner_styles).not.toContain('extra-rounded');
+    });
+
+    it('disables QR styled when storefront_opt_enabled is false', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: false,
+        storefront_opt_qr_styled: true,
+      }, {});
+      expect(result.qr_styled_enabled).toBe(false);
+    });
+
+    it('enables magazine gallery when storefront_opt_gallery_magazine feature is on', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_gallery_magazine: true,
+      }, {});
+      expect(result.gallery_magazine_enabled).toBe(true);
+    });
+
+    it('enables magazine gallery with flexible key', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_flexible: true,
+      }, {});
+      expect(result.gallery_magazine_enabled).toBe(true);
+    });
+
+    it('can_use_magazine_gallery requires both tier feature and merchant pref magazine', () => {
+      const withMagazinePref = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_gallery_magazine: true,
+      }, { gallery_display_mode: 'magazine' } as any);
+      expect(withMagazinePref.can_use_magazine_gallery).toBe(true);
+
+      const withCarouselPref = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+        storefront_opt_gallery_magazine: true,
+      }, { gallery_display_mode: 'carousel' } as any);
+      expect(withCarouselPref.can_use_magazine_gallery).toBe(false);
+
+      const withoutTierFeature = resolveStorefrontOptions({
+        storefront_opt_enabled: true,
+      }, { gallery_display_mode: 'magazine' } as any);
+      expect(withoutTierFeature.can_use_magazine_gallery).toBe(false);
+      expect(withoutTierFeature.gallery_magazine_enabled).toBe(false);
+    });
+
+    it('disables magazine gallery when storefront_opt_enabled is false', () => {
+      const result = resolveStorefrontOptions({
+        storefront_opt_enabled: false,
+        storefront_opt_gallery_magazine: true,
+      }, {});
+      expect(result.gallery_magazine_enabled).toBe(false);
+      expect(result.can_use_magazine_gallery).toBe(false);
+    });
   });
 
   describe('SocialCommerceOptionsResolver', () => {

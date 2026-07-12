@@ -127,6 +127,89 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
 }
 ```
 
+### 1.3 Response unwrapping contract — the #1 pitfall
+
+**The bug that triggered this section:** Tenant dashboard displayed "Unknown dashboard" instead of the real tenant name. Root cause: double-wrapping of API responses.
+
+#### How the wrapping works
+
+1. **Backend `handleSuccess`** (in `BaseController`) sends:
+   ```json
+   { "success": true, "data": <actualObject> }
+   ```
+
+2. **`makeDefaultRequest`** on the frontend parses the HTTP response body as JSON and wraps it again:
+   ```ts
+   return { success: true, data: <parsed JSON body> }
+   // i.e. { success: true, data: { success: true, data: <actualObject> } }
+   ```
+
+3. **Your service method** returns `result.data` — which is `{ success: true, data: <actualObject> }`, **not** `<actualObject>`.
+
+#### The correct unwrapping pattern
+
+When the backend endpoint uses `handleSuccess` (which wraps in `{ success: true, data: ... }`), your service must unwrap **two levels**:
+
+```ts
+// CORRECT — handles both wrapped and unwrapped responses
+const result = await this.makeDefaultRequest<any>('/api/tenants/${tenantId}', ...);
+if (!result.success) throw new Error(...);
+
+const responseData = result.data;
+return responseData?.data || responseData;
+//                     ^^^^^^^^^^^^^^^   ^^^^^^^^^^^^
+//                     unwrap inner      fallback if API doesn't wrap
+```
+
+The `responseData?.data || responseData` pattern is backward-compatible: if the API ever stops wrapping (e.g., a raw Prisma object returned directly), it still works.
+
+#### The WRONG pattern (causes the bug)
+
+```ts
+// WRONG — returns { success: true, data: <actualObject> } instead of <actualObject>
+return result.data;
+```
+
+Callers that access `result.data.name` get `undefined` because `result.data` is the wrapper, not the tenant object. The name is at `result.data.data.name`.
+
+#### How to tell if an endpoint wraps
+
+| Backend pattern | Response shape | Unwrapping needed |
+|---|---|---|
+| `this.handleSuccess(res, obj)` | `{ success: true, data: obj }` | Yes — `result.data.data` |
+| `res.json(obj)` (raw) | `obj` directly | No — `result.data` is `obj` |
+| `res.json({ success: true, data: obj })` (manual) | `{ success: true, data: obj }` | Yes — `result.data.data` |
+
+**Rule of thumb:** If the backend controller extends `BaseController` and calls `handleSuccess`, you need double-unwrap. If it calls `res.json()` directly with the raw object, single-unwrap (`result.data`) is correct.
+
+#### Incident report: "Unknown dashboard" (2025-07)
+
+**Symptom:** `TenantDashboardV2.tsx` displayed "Unknown dashboard" despite the API returning the correct tenant name.
+
+**Data flow:**
+```
+API endpoint GET /api/tenants/:id
+  → tenantController.getTenant → handleSuccess(res, tenant)
+  → HTTP body: { success: true, data: { id, name, ... } }
+
+Frontend makeDefaultRequest
+  → returns { success: true, data: { success: true, data: { id, name, ... } } }
+
+TenantInfoService.getTenantDataWithCacheBusting
+  → return result.data  ← BUG: returns the wrapper, not the tenant
+
+useTenantComplete hook
+  → rawProfile = tenantData.tenant = { success: true, data: { id, name, ... } }
+  → rawProfile.name = undefined  ← name is at rawProfile.data.name
+  → fallback: 'Unknown'
+```
+
+**Fix:** Changed `return result.data` to `const responseData = result.data; return responseData?.data || responseData;` in both `getTenantInfo` and `getTenantDataWithCacheBusting`.
+
+**Affected callers:** Every component accessing `.name`, `.slug`, `.metadata`, `.subdomain` on the return value of `getTenantInfo` / `getTenantDataWithCacheBusting` — including `useTenantComplete`, `ChangeLocationStatusModal`, `useAccessControl`, `useAppNavigation`, `TenantScopeHeader`, `OrgTeamOverview`, and several settings pages.
+
+**Key lesson:** When tracing "data is undefined" bugs, check whether the service method unwraps the API's `{ success: true, data: ... }` envelope. The `makeDefaultRequest` return value has **two** levels of wrapping when the backend uses `handleSuccess`.
+
 ---
 
 ## 2. Backend (API) Hierarchy

@@ -373,11 +373,14 @@ export function TenantQRCode({
       if (resolvedFlags?.showQRStyled) {
         const { default: QRCodeStyling } = await import('qr-code-styling');
 
-        const dotType = (resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
-        const cornerType = (resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-        const dotColor = resolvedFlags.qrCustomColors ? '#1a56db' : '#1a56db';
-        const cornerColor = resolvedFlags.qrCustomColors ? '#1a56db' : '#1a56db';
-        const bgColor = resolvedFlags.qrCustomColors ? '#ffffff' : '#ffffff';
+        const dotType = (resolvedFlags.qrDotType || resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
+        const cornerType = (resolvedFlags.qrCornerType || resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+        const dotColor = resolvedFlags.qrDotColor || '#1a56db';
+        const cornerColor = resolvedFlags.qrCornerColor || '#1a56db';
+        const bgColor = resolvedFlags.qrBgColor || '#ffffff';
+        const useGradient = resolvedFlags.qrGradients && resolvedFlags.qrGradientEnabled;
+        const gradientStart = resolvedFlags.qrGradientStart || '#1a56db';
+        const gradientEnd = resolvedFlags.qrGradientEnd || '#7c3aed';
 
         const qr = new QRCodeStyling({
           width: qrSettings.exportSize,
@@ -389,9 +392,9 @@ export function TenantQRCode({
           dotsOptions: {
             color: dotColor,
             type: dotType,
-            gradient: resolvedFlags.qrGradients ? {
+            gradient: useGradient ? {
               type: 'linear', rotation: 45,
-              colorStops: [{ offset: 0, color: '#1a56db' }, { offset: 1, color: '#7c3aed' }],
+              colorStops: [{ offset: 0, color: gradientStart }, { offset: 1, color: gradientEnd }],
             } : undefined,
           },
           cornersSquareOptions: {
@@ -403,8 +406,16 @@ export function TenantQRCode({
           qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
         });
 
-        const dataUrl = await qr.getDataUrl('png');
-        setQrImageUrl(dataUrl);
+        const blob = await qr.getRawData('png');
+        if (blob instanceof Blob) {
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          setQrImageUrl(dataUrl);
+        }
         return;
       }
 
@@ -487,8 +498,14 @@ export function TenantQRCode({
     if (resolvedFlags?.showQRStyled) {
       const { default: QRCodeStyling } = await import('qr-code-styling');
 
-      const dotType = (resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
-      const cornerType = (resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+      const dotType = (resolvedFlags.qrDotType || resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
+      const cornerType = (resolvedFlags.qrCornerType || resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+      const dotColor = resolvedFlags.qrDotColor || '#1a56db';
+      const cornerColor = resolvedFlags.qrCornerColor || '#1a56db';
+      const bgColor = resolvedFlags.qrBgColor || '#ffffff';
+      const useGradient = resolvedFlags.qrGradients && resolvedFlags.qrGradientEnabled;
+      const gradientStart = resolvedFlags.qrGradientStart || '#1a56db';
+      const gradientEnd = resolvedFlags.qrGradientEnd || '#7c3aed';
 
       const qr = new QRCodeStyling({
         width: targetSize,
@@ -498,23 +515,32 @@ export function TenantQRCode({
         image: tenantLogo || undefined,
         imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
         dotsOptions: {
-          color: '#1a56db',
+          color: dotColor,
           type: dotType,
-          gradient: resolvedFlags.qrGradients ? {
+          gradient: useGradient ? {
             type: 'linear', rotation: 45,
-            colorStops: [{ offset: 0, color: '#1a56db' }, { offset: 1, color: '#7c3aed' }],
+            colorStops: [{ offset: 0, color: gradientStart }, { offset: 1, color: gradientEnd }],
           } : undefined,
         },
         cornersSquareOptions: {
-          color: '#1a56db',
+          color: cornerColor,
           type: cornerType,
         },
         cornersDotOptions: { color: '#ffffff', type: 'dot' },
-        backgroundOptions: { color: '#ffffff' },
+        backgroundOptions: { color: bgColor },
         qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
       });
 
-      return await qr.getDataUrl('png');
+      const blob = await qr.getRawData('png');
+      if (blob instanceof Blob) {
+        return await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+      throw new Error('Failed to generate styled QR data URL');
     }
 
     // Plain QR path: existing qrcode library

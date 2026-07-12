@@ -55,6 +55,8 @@ import {
   StorefrontOptInfoType,
   StorefrontOptQRResolutionType,
   StorefrontOptQRContentType,
+  StorefrontOptQRDotStyleType,
+  StorefrontOptQRCornerStyleType,
   StorefrontOptGalleryType,
   StorefrontOptAdvancedType,
   StorefrontOptLayoutType,
@@ -319,6 +321,11 @@ interface BackendEffectiveStorefrontOptions {
   qr_enabled: boolean;
   allowed_qr_resolutions: StorefrontOptQRResolutionType[];
   allowed_qr_content_types: StorefrontOptQRContentType[];
+  qr_styled_enabled: boolean;
+  allowed_qr_dot_styles: string[];
+  allowed_qr_corner_styles: string[];
+  qr_custom_colors: boolean;
+  qr_gradients: boolean;
   gallery_enabled: boolean;
   allowed_gallery_types: StorefrontOptGalleryType[];
   advanced_enabled: boolean;
@@ -699,6 +706,11 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     qrEnabled: b.qr_enabled,
     allowedQRResolutions: b.allowed_qr_resolutions,
     allowedQRContentTypes: b.allowed_qr_content_types,
+    qrStyledEnabled: b.qr_styled_enabled ?? false,
+    allowedQRDotStyles: (b.allowed_qr_dot_styles ?? []) as StorefrontOptQRDotStyleType[],
+    allowedQRCornerStyles: (b.allowed_qr_corner_styles ?? []) as StorefrontOptQRCornerStyleType[],
+    qrCustomColors: b.qr_custom_colors ?? false,
+    qrGradients: b.qr_gradients ?? false,
     galleryEnabled: b.gallery_enabled,
     allowedGalleryTypes: b.allowed_gallery_types,
     advancedEnabled: b.advanced_enabled,

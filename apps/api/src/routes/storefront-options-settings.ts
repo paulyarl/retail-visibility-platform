@@ -40,10 +40,21 @@ const storefrontOptionsSettingsSchema = z.object({
   qr_store: z.boolean().optional(),
   qr_logo: z.boolean().optional(),
   qr_directory: z.boolean().optional(),
+  // QR Code Style group
+  qr_dot_type: z.string().optional(),
+  qr_corner_type: z.string().optional(),
+  qr_dot_color: z.string().optional(),
+  qr_corner_color: z.string().optional(),
+  qr_bg_color: z.string().optional(),
+  qr_gradient_enabled: z.boolean().optional(),
+  qr_gradient_start: z.string().optional(),
+  qr_gradient_end: z.string().optional(),
   // Gallery Display group
   image_gallery_5: z.boolean().optional(),
   image_gallery_10: z.boolean().optional(),
   image_gallery_15: z.boolean().optional(),
+  // Gallery Display Mode
+  gallery_display_mode: z.enum(['carousel', 'magazine']).optional(),
   // Advanced group
   enhanced_seo: z.boolean().optional(),
   storefront_actions: z.boolean().optional(),
@@ -77,9 +88,18 @@ export const DEFAULT_SETTINGS = {
   qr_store: true,
   qr_logo: false,
   qr_directory: false,
+  qr_dot_type: 'rounded',
+  qr_corner_type: 'extra-rounded',
+  qr_dot_color: '#1a56db',
+  qr_corner_color: '#1a56db',
+  qr_bg_color: '#ffffff',
+  qr_gradient_enabled: false,
+  qr_gradient_start: '#1a56db',
+  qr_gradient_end: '#7c3aed',
   image_gallery_5: true,
   image_gallery_10: false,
   image_gallery_15: false,
+  gallery_display_mode: 'carousel',
   enhanced_seo: false,
   storefront_actions: false,
   storefront_layout: 'classic',
@@ -119,9 +139,18 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
           qr_store: false,
           qr_logo: false,
           qr_directory: false,
+          qr_dot_type: 'rounded',
+          qr_corner_type: 'extra-rounded',
+          qr_dot_color: '#1a56db',
+          qr_corner_color: '#1a56db',
+          qr_bg_color: '#ffffff',
+          qr_gradient_enabled: false,
+          qr_gradient_start: '#1a56db',
+          qr_gradient_end: '#7c3aed',
           image_gallery_5: false,
           image_gallery_10: false,
           image_gallery_15: false,
+          gallery_display_mode: 'carousel',
           enhanced_seo: false,
           storefront_actions: false,
           storefront_layout: 'classic',
@@ -166,10 +195,32 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
     tierFilteredSettings.qr_store = tierState.allowedQRContentTypes.includes('qr_store') ? !!rawSettings.qr_store : false;
     tierFilteredSettings.qr_logo = tierState.allowedQRContentTypes.includes('qr_logo') ? !!rawSettings.qr_logo : false;
     tierFilteredSettings.qr_directory = tierState.allowedQRContentTypes.includes('qr_directory') ? !!rawSettings.qr_directory : false;
+    // QR Style group (pass through merchant prefs, but reset to defaults if tier doesn't allow styled QR)
+    if (tierState.qrStyledEnabled) {
+      tierFilteredSettings.qr_dot_type = rawSettings.qr_dot_type || 'rounded';
+      tierFilteredSettings.qr_corner_type = rawSettings.qr_corner_type || 'extra-rounded';
+      tierFilteredSettings.qr_dot_color = rawSettings.qr_dot_color || '#1a56db';
+      tierFilteredSettings.qr_corner_color = rawSettings.qr_corner_color || '#1a56db';
+      tierFilteredSettings.qr_bg_color = rawSettings.qr_bg_color || '#ffffff';
+      tierFilteredSettings.qr_gradient_enabled = tierState.qrGradients ? !!rawSettings.qr_gradient_enabled : false;
+      tierFilteredSettings.qr_gradient_start = rawSettings.qr_gradient_start || '#1a56db';
+      tierFilteredSettings.qr_gradient_end = rawSettings.qr_gradient_end || '#7c3aed';
+    } else {
+      tierFilteredSettings.qr_dot_type = 'rounded';
+      tierFilteredSettings.qr_corner_type = 'extra-rounded';
+      tierFilteredSettings.qr_dot_color = '#1a56db';
+      tierFilteredSettings.qr_corner_color = '#1a56db';
+      tierFilteredSettings.qr_bg_color = '#ffffff';
+      tierFilteredSettings.qr_gradient_enabled = false;
+      tierFilteredSettings.qr_gradient_start = '#1a56db';
+      tierFilteredSettings.qr_gradient_end = '#7c3aed';
+    }
     // Gallery group
     tierFilteredSettings.image_gallery_5 = tierState.allowedGalleryTypes.includes('image_gallery_5') ? !!rawSettings.image_gallery_5 : false;
     tierFilteredSettings.image_gallery_10 = tierState.allowedGalleryTypes.includes('image_gallery_10') ? !!rawSettings.image_gallery_10 : false;
     tierFilteredSettings.image_gallery_15 = tierState.allowedGalleryTypes.includes('image_gallery_15') ? !!rawSettings.image_gallery_15 : false;
+    // Gallery display mode (tier-gated: magazine requires galleryMagazineEnabled)
+    tierFilteredSettings.gallery_display_mode = (tierState.galleryMagazineEnabled && rawSettings.gallery_display_mode === 'magazine') ? 'magazine' : 'carousel';
     // Advanced group
     tierFilteredSettings.enhanced_seo = tierState.allowedAdvancedTypes.includes('enhanced_seo') ? !!rawSettings.enhanced_seo : false;
     tierFilteredSettings.storefront_actions = tierState.allowedAdvancedTypes.includes('storefront_actions') ? !!rawSettings.storefront_actions : false;
@@ -228,6 +279,18 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
           success: false,
           error: 'tier_restricted',
           message: `Layout '${data.storefront_layout}' is not available on your current plan`,
+        });
+      }
+    }
+
+    // Enforce tier gate for gallery display mode
+    if (data.gallery_display_mode === 'magazine') {
+      const tierState = await StorefrontOptionsService.getInstance().resolveStorefrontOptionsState(tenantId);
+      if (!tierState.enabled || !tierState.galleryMagazineEnabled) {
+        return res.status(403).json({
+          success: false,
+          error: 'tier_restricted',
+          message: 'Magazine gallery display mode is not available on your current plan',
         });
       }
     }
@@ -298,6 +361,7 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
         image_gallery_5: settings.image_gallery_5,
         image_gallery_10: settings.image_gallery_10,
         image_gallery_15: settings.image_gallery_15,
+        gallery_display_mode: settings.gallery_display_mode || 'carousel',
         enhanced_seo: settings.enhanced_seo,
         storefront_actions: settings.storefront_actions,
         storefront_layout: settings.storefront_layout || 'classic',
