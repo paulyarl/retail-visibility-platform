@@ -59,7 +59,7 @@ class PublicBrandingService extends PublicApiSingleton {
   async getPublicBrandingSettings(): Promise<PublicBrandingSettings | null> {
     try {
       const response = await super.makeDefaultRequest<PublicBrandingSettings>(
-        '/platform-settings',
+        '/api/platform-settings',
         {},
         'public-platform-branding'
       );

@@ -30,6 +30,14 @@ interface StorefrontOptionsSettings {
   qr_store: boolean;
   qr_logo: boolean;
   qr_directory: boolean;
+  qr_dot_type: string;
+  qr_corner_type: string;
+  qr_dot_color: string;
+  qr_corner_color: string;
+  qr_bg_color: string;
+  qr_gradient_enabled: boolean;
+  qr_gradient_start: string;
+  qr_gradient_end: string;
   image_gallery_5: boolean;
   image_gallery_10: boolean;
   image_gallery_15: boolean;
@@ -63,6 +71,14 @@ const DEFAULT_SETTINGS: StorefrontOptionsSettings = {
   qr_store: true,
   qr_logo: false,
   qr_directory: false,
+  qr_dot_type: 'rounded',
+  qr_corner_type: 'extra-rounded',
+  qr_dot_color: '#1a56db',
+  qr_corner_color: '#1a56db',
+  qr_bg_color: '#ffffff',
+  qr_gradient_enabled: false,
+  qr_gradient_start: '#1a56db',
+  qr_gradient_end: '#7c3aed',
   image_gallery_5: true,
   image_gallery_10: false,
   image_gallery_15: false,

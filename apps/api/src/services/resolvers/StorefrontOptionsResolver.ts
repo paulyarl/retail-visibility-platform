@@ -15,6 +15,8 @@ export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products
 export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
+export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
+export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
@@ -99,6 +101,37 @@ export function resolveStorefrontOptions(
       if (features.storefront_opt_qr_directory) allowedQRContentTypes.push('qr_directory');
     }
   }
+
+  // QR Style — styled QR renderer, gated by storefront_opt_qr_styled feature key
+  const qrStyledOn = flexible
+    || !!features.storefront_opt_qr_styled
+    || !!features.storefront_opt_qr_styled_on
+    || (!!features.storefront_opt_qr_styled_enabled && !features.storefront_opt_qr_styled_disabled);
+  const qrStyledOff = !!features.storefront_opt_qr_styled_off || !!features.storefront_opt_qr_styled_disabled;
+  const showQRStyled = qrStyledOn && !qrStyledOff;
+
+  const allowedQRDotStyles: StorefrontOptQRDotStyleType[] = [];
+  if (showQRStyled && (flexible || features.storefront_opt_qr_dot_styles || features.storefront_opt_qr_dot_styles_on)) {
+    allowedQRDotStyles.push('rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded');
+  } else if (showQRStyled) {
+    if (features.storefront_opt_qr_dot_rounded) allowedQRDotStyles.push('rounded');
+    if (features.storefront_opt_qr_dot_dots) allowedQRDotStyles.push('dots');
+    if (features.storefront_opt_qr_dot_classy) allowedQRDotStyles.push('classy');
+    if (features.storefront_opt_qr_dot_classy_rounded) allowedQRDotStyles.push('classy-rounded');
+    if (features.storefront_opt_qr_dot_extra_rounded) allowedQRDotStyles.push('extra-rounded');
+  }
+
+  const allowedQRCornerStyles: StorefrontOptQRCornerStyleType[] = [];
+  if (showQRStyled && (flexible || features.storefront_opt_qr_corner_styles || features.storefront_opt_qr_corner_styles_on)) {
+    allowedQRCornerStyles.push('dot', 'extra-rounded', 'rounded');
+  } else if (showQRStyled) {
+    if (features.storefront_opt_qr_corner_dot) allowedQRCornerStyles.push('dot');
+    if (features.storefront_opt_qr_corner_extra_rounded) allowedQRCornerStyles.push('extra-rounded');
+    if (features.storefront_opt_qr_corner_rounded) allowedQRCornerStyles.push('rounded');
+  }
+
+  const qrCustomColors = showQRStyled && (flexible || !!features.storefront_opt_qr_custom_colors);
+  const qrGradients = showQRStyled && (flexible || !!features.storefront_opt_qr_gradients);
 
   // Gallery — new consolidated key with fallback to old group gate + individual keys
   const allowedGalleryTypes: StorefrontOptGalleryType[] = [];
@@ -203,6 +236,11 @@ export function resolveStorefrontOptions(
     qr_enabled: mainOn && (qrGroupEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
     allowed_qr_resolutions: allowedQRResolutions,
     allowed_qr_content_types: allowedQRContentTypes,
+    qr_styled_enabled: mainOn && showQRStyled,
+    allowed_qr_dot_styles: allowedQRDotStyles,
+    allowed_qr_corner_styles: allowedQRCornerStyles,
+    qr_custom_colors: mainOn && qrCustomColors,
+    qr_gradients: mainOn && qrGradients,
     gallery_enabled: mainOn && allowedGalleryTypes.length > 0,
     allowed_gallery_types: allowedGalleryTypes,
     advanced_enabled: mainOn && allowedAdvancedTypes.length > 0,

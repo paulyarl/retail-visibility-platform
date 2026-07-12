@@ -362,14 +362,54 @@ export function TenantQRCode({
 
     setIsGenerating(true);
     try {
-      const QRCode = (await import('qrcode')).default;
-
       // Extract organization tier from effective tier logic (same as TierGainsWelcome)
       const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
         tenantTier === 'organization' ? 'enterprise' : undefined;
 
       // Get capability-aware QR settings
       const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
+
+      // Styled QR path: use qr-code-styling when showQRStyled capability is enabled
+      if (resolvedFlags?.showQRStyled) {
+        const { default: QRCodeStyling } = await import('qr-code-styling');
+
+        const dotType = (resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
+        const cornerType = (resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+        const dotColor = resolvedFlags.qrCustomColors ? '#1a56db' : '#1a56db';
+        const cornerColor = resolvedFlags.qrCustomColors ? '#1a56db' : '#1a56db';
+        const bgColor = resolvedFlags.qrCustomColors ? '#ffffff' : '#ffffff';
+
+        const qr = new QRCodeStyling({
+          width: qrSettings.exportSize,
+          height: qrSettings.exportSize,
+          type: 'svg',
+          data: url,
+          image: tenantLogo || undefined,
+          imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
+          dotsOptions: {
+            color: dotColor,
+            type: dotType,
+            gradient: resolvedFlags.qrGradients ? {
+              type: 'linear', rotation: 45,
+              colorStops: [{ offset: 0, color: '#1a56db' }, { offset: 1, color: '#7c3aed' }],
+            } : undefined,
+          },
+          cornersSquareOptions: {
+            color: cornerColor,
+            type: cornerType,
+          },
+          cornersDotOptions: { color: '#ffffff', type: 'dot' },
+          backgroundOptions: { color: bgColor },
+          qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
+        });
+
+        const dataUrl = await qr.getDataUrl('png');
+        setQrImageUrl(dataUrl);
+        return;
+      }
+
+      // Plain QR path: existing qrcode library for tiers without styled QR
+      const QRCode = (await import('qrcode')).default;
 
       // Create high-resolution canvas for export
       const exportCanvas = document.createElement('canvas');
@@ -420,9 +460,6 @@ export function TenantQRCode({
       // Generate high-quality PNG with maximum quality
       const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
       setQrImageUrl(dataUrl);
-
-      // Log quality level for debugging
-      // console.log(`[TenantQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
     } catch (error) {
       console.error('Failed to generate QR code:', error);
     } finally {
@@ -439,14 +476,49 @@ export function TenantQRCode({
 
   // Generate QR code at specific size for download
   const generateQRCodeAtSize = async (targetSize: number): Promise<string> => {
-    const QRCode = (await import('qrcode')).default;
-
     // Extract organization tier from effective tier logic (same as TierGainsWelcome)
     const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
       tenantTier === 'organization' ? 'enterprise' : undefined;
 
     // Get capability-aware QR settings
     const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
+
+    // Styled QR path: use qr-code-styling when showQRStyled capability is enabled
+    if (resolvedFlags?.showQRStyled) {
+      const { default: QRCodeStyling } = await import('qr-code-styling');
+
+      const dotType = (resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
+      const cornerType = (resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+
+      const qr = new QRCodeStyling({
+        width: targetSize,
+        height: targetSize,
+        type: 'svg',
+        data: url,
+        image: tenantLogo || undefined,
+        imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
+        dotsOptions: {
+          color: '#1a56db',
+          type: dotType,
+          gradient: resolvedFlags.qrGradients ? {
+            type: 'linear', rotation: 45,
+            colorStops: [{ offset: 0, color: '#1a56db' }, { offset: 1, color: '#7c3aed' }],
+          } : undefined,
+        },
+        cornersSquareOptions: {
+          color: '#1a56db',
+          type: cornerType,
+        },
+        cornersDotOptions: { color: '#ffffff', type: 'dot' },
+        backgroundOptions: { color: '#ffffff' },
+        qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
+      });
+
+      return await qr.getDataUrl('png');
+    }
+
+    // Plain QR path: existing qrcode library
+    const QRCode = (await import('qrcode')).default;
 
     // Create canvas for requested size
     const canvas = document.createElement('canvas');
