@@ -9,6 +9,7 @@ import { prisma } from '../prisma';
 import { user_role } from '@prisma/client';
 import { generateUserId, generateUserTenantId } from '../lib/id-generator';
 import { audit } from '../audit';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
     // Verify service key
     const serviceKeyRaw = req.headers['x-service-key'];
     const serviceKey = Array.isArray(serviceKeyRaw) ? serviceKeyRaw[0] : serviceKeyRaw;
-    const expectedKey = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    const expectedKey = unifiedConfig.vercelAutomationBypassSecret;
     
     console.log('[AuthSync API] Request received', {
       hasServiceKey: !!serviceKey,
@@ -103,7 +104,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
     });
     
     // In development, allow requests without service key if no key is configured
-    const isDevelopment = process.env.NODE_ENV === 'development' || !expectedKey;
+    const isDevelopment = unifiedConfig.isDevelopment || !expectedKey;
     
     if (!isDevelopment && (!serviceKey || serviceKey !== expectedKey)) {
       console.log('[AuthSync API] Service key validation failed', {

@@ -47,6 +47,7 @@ import { Separator } from '@/components/ui/Separator';
 import { Progress } from '@/components/ui/Progress';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/shadcn-select';
+import { SupplierMatchSection } from '@/components/items/wholesale/SupplierMatchSection';
 
 // Helper component to display category name by ID using TenantCategoriesService (consistent with OrganizationStep)
 function CategoryNameDisplay({ categoryId, tenantId, categoryPath, categoryName: providedName, googleCategoryId }: { categoryId: string; tenantId?: string; categoryPath?: string; categoryName?: string; googleCategoryId?: string }) {
@@ -908,6 +909,13 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
           </Card>
         </div>
       </div>
+
+      {/* Wholesale Supplier Matches */}
+      {tenantId && data.productType.type !== 'digital' && data.basicInfo.gtin && (
+        <div className="space-y-3">
+          <SupplierMatchSection tenantId={tenantId} gtin={data.basicInfo.gtin} />
+        </div>
+      )}
 
       <Separator />
 

@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { StripeGateway } from '../services/payments/gateways/StripeGateway';
 import { generatePaymentId } from '../lib/id-generator';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -50,9 +51,9 @@ router.post('/payments/charge', async (req: Request, res: Response) => {
 
     // Initialize Stripe directly for PaymentIntent creation
     const Stripe = require('stripe');
-    console.log('STRIPE_SECRET_KEY loaded:', !!process.env.STRIPE_SECRET_KEY);
-    console.log('STRIPE_SECRET_KEY length:', process.env.STRIPE_SECRET_KEY?.length || 0);
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    console.log('STRIPE_SECRET_KEY loaded:', !!unifiedConfig.stripeSecretKey);
+    console.log('STRIPE_SECRET_KEY length:', unifiedConfig.stripeSecretKey?.length || 0);
+    const stripe = new Stripe(unifiedConfig.stripeSecretKey, {
       // Let Stripe use default API version to avoid conflicts
     });
 

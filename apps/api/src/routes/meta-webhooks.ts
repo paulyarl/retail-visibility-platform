@@ -14,10 +14,11 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
-const META_APP_SECRET = process.env.META_APP_SECRET || '';
+const META_APP_SECRET = unifiedConfig.metaAppSecret;
 
 /**
  * Verify Meta webhook signature using X-Hub-Signature-256 header
@@ -55,7 +56,7 @@ router.get('/meta/webhooks', (req: Request, res: Response) => {
   const verifyToken = req.query['hub.verify_token'];
 
   if (mode === 'subscribe' && challenge) {
-    const expectedToken = process.env.META_WEBHOOK_VERIFY_TOKEN || '';
+    const expectedToken = unifiedConfig.metaWebhookVerifyToken;
     if (expectedToken && verifyToken === expectedToken) {
       logger.info('Meta webhook verification successful');
       return res.status(200).send(challenge as string);

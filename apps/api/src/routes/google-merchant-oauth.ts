@@ -10,10 +10,11 @@ import {
 import { listMerchantAccounts } from '../lib/google/gmc';
 import { generateQuickStart } from '../lib/id-generator';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
-const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
+const WEB_URL = unifiedConfig.webUrl;
 
 /**
  * Get Google Merchant Center connection status

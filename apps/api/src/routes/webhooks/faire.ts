@@ -12,6 +12,7 @@ import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import wholesaleMatchingService from '../../services/WholesaleMatchingService';
 import { logger } from '../../logger';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ router.post(
   express.raw({ type: 'application/json' }),
   async (req: Request, res: Response) => {
     const signature = req.headers['x-faire-signature'] as string | undefined;
-    const webhookSecret = process.env.FAIRE_WEBHOOK_SECRET;
+    const webhookSecret = unifiedConfig.faireWebhookSecret;
 
     if (!webhookSecret) {
       logger.error('Faire webhook secret not configured', undefined, {

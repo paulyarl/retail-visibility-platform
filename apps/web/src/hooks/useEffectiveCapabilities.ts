@@ -92,3 +92,8 @@ export function useEffectiveBarcodeScan(tenantId?: string) {
   const { data, ...rest } = useEffectiveCapabilities(tenantId);
   return { data: data?.barcodeScan, ...rest };
 }
+
+export function useEffectiveWholesaleMatching(tenantId?: string) {
+  const { data, ...rest } = useEffectiveCapabilities(tenantId);
+  return { data: data?.wholesaleMatching, ...rest };
+}

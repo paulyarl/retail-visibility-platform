@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { checkImageSearchLimit } from '../middleware/image-search-limits';
 import { requireTierFeature } from '../middleware/tier-access';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Unsplash API configuration
-const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || '';
-const PEXELS_API_KEY = process.env.PEXELS_API_KEY || '';
+const UNSPLASH_ACCESS_KEY = unifiedConfig.unsplashAccessKey;
+const PEXELS_API_KEY = unifiedConfig.pexelsApiKey;
 
 interface ImageResult {
   id: string;

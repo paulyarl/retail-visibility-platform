@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { checkDatabaseConnection } from '../prisma';
 import { prisma } from '../prisma';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', (_req: Request, res: Response) => {
     healthy: true,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0'
+    version: unifiedConfig.appVersion
   });
 });
 
@@ -31,7 +32,7 @@ router.get('/db', async (_req: Request, res: Response) => {
     const latency = Date.now() - start;
     
     // Get connection info (without sensitive data)
-    const dbUrl = process.env.DATABASE_URL || '';
+    const dbUrl = unifiedConfig.databaseUrl;
     const hostname = dbUrl.match(/@([^:]+):/)?.[1] || 'unknown';
     const port = dbUrl.match(/:(\d+)\//)?.[1] || 'unknown';
     

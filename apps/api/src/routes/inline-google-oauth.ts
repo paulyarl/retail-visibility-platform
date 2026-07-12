@@ -13,6 +13,7 @@ import {
   listProducts,
   getProductStats,
 } from '../lib/google/gmc';
+import { unifiedConfig } from '../config/unifiedConfig';
 import {
   listBusinessAccounts,
   listLocations,
@@ -68,7 +69,7 @@ router.get('/google/callback', async (req, res) => {
 
     if (error) {
       console.error('[Google OAuth] Authorization error:', error);
-      return res.redirect(`${process.env.WEB_URL || 'http://localhost:3000'}/settings/tenant?google_error=${error}`);
+      return res.redirect(`${unifiedConfig.webUrl}/settings/tenant?google_error=${error}`);
     }
 
     if (!code || !state) {
@@ -122,7 +123,7 @@ router.get('/google/callback', async (req, res) => {
 
     console.log('[Google OAuth] Account connected:', account.email);
 
-    res.redirect(`${process.env.WEB_URL || 'http://localhost:3000'}/settings/tenant?google_connected=true`);
+    res.redirect(`${unifiedConfig.webUrl}/settings/tenant?google_connected=true`);
   } catch (error) {
     console.error('[Google OAuth] Callback error:', error);
     res.status(500).json({ error: 'oauth_callback_failed' });

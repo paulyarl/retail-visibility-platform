@@ -25,10 +25,11 @@ import {
 import { fullCatalogSync } from '../services/TikTokCatalogSyncService';
 import { generateTikTokOAuthAccountId, generateTikTokOAuthTokenId } from '../lib/id-generator';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
-const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
+const WEB_URL = unifiedConfig.webUrl;
 
 /**
  * Get TikTok Shop connection status

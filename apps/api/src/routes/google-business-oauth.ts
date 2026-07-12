@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
 import { isGBPSyncAllowed } from '../lib/google/capability-gate';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -66,8 +67,8 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
     if (tenant.google_business_token_expiry && new Date(tenant.google_business_token_expiry) < new Date()) {
       if (tenant.google_business_refresh_token) {
         const oauth2Client = new google.auth.OAuth2(
-          process.env.GOOGLE_BUSINESS_CLIENT_ID,
-          process.env.GOOGLE_BUSINESS_CLIENT_SECRET
+          unifiedConfig.googleBusinessClientId,
+          unifiedConfig.googleBusinessClientSecret
         );
         oauth2Client.setCredentials({ refresh_token: tenant.google_business_refresh_token });
 
@@ -183,9 +184,9 @@ router.get('/google/business', async (req, res) => {
       });
     }
 
-    const clientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
+    const clientId = unifiedConfig.googleBusinessClientId;
+    const clientSecret = unifiedConfig.googleBusinessClientSecret;
+    const redirectUri = unifiedConfig.googleBusinessRedirectUri;
 
     if (!clientId || !clientSecret || !redirectUri) {
       return res.status(500).json({
@@ -236,7 +237,7 @@ router.get('/google/business/callback', async (req, res) => {
     // Handle OAuth errors
     if (error) {
       console.error('[Google Business OAuth] OAuth error:', error);
-      return res.redirect(`${process.env.WEB_URL}/settings?error=oauth_denied`);
+      return res.redirect(`${unifiedConfig.webUrl}/settings?error=oauth_denied`);
     }
 
     if (!code || typeof code !== 'string') {
@@ -260,9 +261,9 @@ router.get('/google/business/callback', async (req, res) => {
       });
     }
 
-    const clientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
+    const clientId = unifiedConfig.googleBusinessClientId;
+    const clientSecret = unifiedConfig.googleBusinessClientSecret;
+    const redirectUri = unifiedConfig.googleBusinessRedirectUri;
 
     if (!clientId || !clientSecret || !redirectUri) {
       return res.status(500).json({
@@ -353,10 +354,10 @@ router.get('/google/business/callback', async (req, res) => {
     console.log(`[Google Business OAuth] Successfully connected tenant ${tenantId} (unified token store)`);
 
     // Redirect back to frontend with success
-    res.redirect(`${process.env.WEB_URL}/t/${tenantId}/settings/integrations/google?success=business_connected`);
+    res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations/google?success=business_connected`);
   } catch (error) {
     console.error('[Google Business OAuth] Error in callback:', error);
-    res.redirect(`${process.env.WEB_URL}/settings/integrations/google?error=oauth_failed`);
+    res.redirect(`${unifiedConfig.webUrl}/settings/integrations/google?error=oauth_failed`);
   }
 });
 

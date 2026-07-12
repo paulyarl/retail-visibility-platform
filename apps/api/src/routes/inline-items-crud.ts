@@ -16,9 +16,10 @@ import { FeaturedProductsService } from '../services/FeaturedProductsService';
 import { generatePhotoId, generateTenantItemId, generateTenantVariantId, generateVariantSkuFromParent, generateSKU, generateTenantKey } from '../lib/id-generator';
 import { migrateTempPhotos } from '../photos';
 import { StorageBuckets } from '../storage-config';
+import { unifiedConfig } from '../config/unifiedConfig';
 
-const DEV = process.env.NODE_ENV !== 'production';
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+const DEV = unifiedConfig.isDevelopment;
+const UPLOAD_DIR = unifiedConfig.uploadDir || path.resolve(process.cwd(), 'uploads');
 const router = Router();
 
 /* ----------------------------- PHOTOS (MOUNTED BEFORE /items) ----------------------------- */
@@ -42,8 +43,8 @@ const dataUrlSchema = z.object({
 });
 
 // Supabase (server-side)
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = unifiedConfig.supabaseUrl;
+const SUPABASE_SERVICE_ROLE_KEY = unifiedConfig.supabaseServiceRoleKey;
 const supabase =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)

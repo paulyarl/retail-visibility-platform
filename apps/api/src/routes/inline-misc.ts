@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getAlertStatus } from '../services/alerting';
 import { dailyRatesJob } from '../jobs/rates';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -11,8 +12,8 @@ const healthRoutes = (req: any, res: any) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || 'unknown',
+    environment: unifiedConfig.nodeEnv,
+    version: unifiedConfig.appVersion,
     alerts: alertStatus,
     memory: process.memoryUsage(),
   });

@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { generalRateLimit } from '../../middleware/rate-limit';
 import { DigitalDownloadPageService } from '../../services/DigitalDownloadPageService';
 import { prisma } from '../../prisma';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 // Tenant authentication middleware
 const authenticateTenant = async (req: Request, res: Response, next: NextFunction) => {
@@ -142,7 +143,7 @@ router.get('/:tenantId/digital-download-pages', authenticateTenant, generalRateL
     res.status(500).json({
       success: false,
       error: 'Failed to fetch download pages',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -186,7 +187,7 @@ router.get('/:tenantId/digital-download-pages/digital-items', authenticateTenant
     res.status(500).json({
       success: false,
       error: 'Failed to fetch digital items',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -269,7 +270,7 @@ router.post('/:tenantId/digital-download-pages', authenticateTenant, generalRate
     res.status(500).json({
       success: false,
       error: 'Failed to create download page',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -304,7 +305,7 @@ router.get('/:tenantId/digital-download-pages/:id', authenticateTenant, generalR
     res.status(500).json({
       success: false,
       error: 'Failed to fetch download page',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -353,7 +354,7 @@ router.put('/:tenantId/digital-download-pages/:id', authenticateTenant, generalR
     res.status(500).json({
       success: false,
       error: 'Failed to update download page',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -389,7 +390,7 @@ router.delete('/:tenantId/digital-download-pages/:id', authenticateTenant, gener
     res.status(500).json({
       success: false,
       error: 'Failed to delete download page',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -436,7 +437,7 @@ router.post('/:tenantId/digital-download-pages/:id/preview-token', authenticateT
     res.status(500).json({
       success: false,
       error: 'Failed to generate preview token',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -473,7 +474,7 @@ router.get('/:tenantId/digital-download-pages/:id/assets', authenticateTenant, g
     res.status(500).json({
       success: false,
       error: 'Failed to fetch page assets',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -516,7 +517,7 @@ router.put('/:tenantId/digital-download-pages/:id/assets/reorder', authenticateT
     res.status(500).json({
       success: false,
       error: 'Failed to reorder page assets',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -554,7 +555,7 @@ router.post('/:tenantId/digital-download-pages/:id/assets', authenticateTenant, 
     res.status(500).json({
       success: false,
       error: 'Failed to add page asset',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -584,7 +585,7 @@ router.put('/:tenantId/digital-download-pages/:id/assets/:assetId', authenticate
     res.status(500).json({
       success: false,
       error: 'Failed to update page asset',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });
@@ -613,7 +614,7 @@ router.delete('/:tenantId/digital-download-pages/:id/assets/:assetId', authentic
     res.status(500).json({
       success: false,
       error: 'Failed to delete page asset',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: unifiedConfig.isDevelopment ? error.message : undefined
     });
   }
 });

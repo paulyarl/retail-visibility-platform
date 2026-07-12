@@ -28,10 +28,11 @@ import {
 } from '../lib/meta/oauth';
 import { fullCatalogSync } from '../services/MetaCatalogSyncService';
 import { generateMetaOAuthAccountId, generateMetaOAuthTokenId } from '../lib/id-generator';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
-const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
+const WEB_URL = unifiedConfig.webUrl;
 
 /**
  * Get Meta Commerce connection status

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { StripeWebhookHandler } from '../services/payments/webhooks/StripeWebhookHandler';
 import { prisma } from '../prisma';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = express.Router();
 
@@ -31,7 +32,7 @@ router.post(
       // Get webhook secret from tenant configuration
       // For now, we'll use environment variable, but in production
       // you'd look up the tenant's webhook secret from the database
-      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      const webhookSecret = unifiedConfig.stripeWebhookSecret;
 
       if (!webhookSecret) {
         console.error('[Webhook] STRIPE_WEBHOOK_SECRET not configured');
@@ -43,7 +44,7 @@ router.post(
       }
 
       // Verify webhook signature
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      const stripe = new Stripe(unifiedConfig.stripeSecretKey, {
         apiVersion: '2026-06-24.dahlia',
       });
 
@@ -143,7 +144,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
   const transmissionId = req.headers['paypal-transmission-id'] as string;
   const transmissionSig = req.headers['paypal-transmission-sig'] as string;
   const transmissionTime = req.headers['paypal-transmission-time'] as string;
-  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  const webhookId = unifiedConfig.paypalWebhookId;
 
   if (!transmissionId || !transmissionSig || !certUrl) {
     console.error('[PayPal Webhook] Missing required headers');

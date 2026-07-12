@@ -14,12 +14,13 @@ import { Router, Request, Response } from 'express';
 import { requireAuth, checkTenantAccess } from '../middleware/auth';
 import { prisma } from '../prisma';
 import Stripe from 'stripe';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Get Stripe client from Doppler env vars (same as webhook handler)
 const getStripeClient = (): Stripe | null => {
-  const secretKey = process.env.STRIPE_PLATFORM_SECRET_KEY;
+  const secretKey = unifiedConfig.stripePlatformSecretKey;
   if (!secretKey) {
     return null;
   }
@@ -144,7 +145,7 @@ router.post('/:tenantId/stripe-connect/onboard', requireAuth, checkTenantAccess,
     }
 
     // Build return URL (tenant-facing, not admin)
-    const webUrl = process.env.WEB_URL || 'http://localhost:3000';
+    const webUrl = unifiedConfig.webUrl;
     const defaultReturnUrl = `${webUrl}/t/${tenantId}/settings/payment-gateways?stripe_connect=complete`;
     const finalReturnUrl = return_url || defaultReturnUrl;
 

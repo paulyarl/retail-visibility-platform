@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { optionalAuth } from '../middleware/auth';
 import { basePrisma } from '../prisma';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -257,7 +258,7 @@ router.post('/alerts/test', optionalAuth, async (req, res) => {
     }
 
     // Only allow in development
-    if (process.env.NODE_ENV === 'production') {
+    if (unifiedConfig.isProduction) {
       return res.status(403).json({ error: 'Test alerts not allowed in production' });
     }
 

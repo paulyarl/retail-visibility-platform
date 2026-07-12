@@ -8,11 +8,12 @@ import { prisma } from '../prisma';
 import { requireAuth, checkTenantAccess } from '../middleware/auth';
 import crypto from 'crypto';
 import { generatePaymentGatewayId } from '../lib/id-generator';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Encryption helpers (simple example - use proper encryption in production)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-character-secret-key-here!!';
+const ENCRYPTION_KEY = unifiedConfig.encryptionKey;
 const ALGORITHM = 'aes-256-cbc';
 
 function encrypt(text: string): string {

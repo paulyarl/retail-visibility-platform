@@ -420,6 +420,94 @@ class WholesaleMatchingServiceClass {
   }
 
   /**
+   * Reject (delete) a brand partner claim (admin only).
+   */
+  async rejectBrandPartnerClaim(claimId: string): Promise<boolean> {
+    try {
+      await prisma.brand_partner_claims.delete({
+        where: { id: claimId },
+      });
+      return true;
+    } catch (err) {
+      logger.error('Failed to reject brand partner claim', undefined, {
+        claimId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * List all brand partner claims with optional filtering and pagination.
+   */
+  async listAllBrandPartnerClaims(
+    filters?: { gtin?: string; brandName?: string; claimType?: string; approved?: boolean },
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ items: BrandPartnerClaimDTO[]; total: number }> {
+    try {
+      const where: any = {};
+      if (filters?.gtin) where.gtin = filters.gtin;
+      if (filters?.brandName) where.brand_name = { contains: filters.brandName, mode: 'insensitive' };
+      if (filters?.claimType) where.claim_type = filters.claimType;
+      if (filters?.approved !== undefined) where.admin_approved = filters.approved;
+
+      const [rows, total] = await Promise.all([
+        prisma.brand_partner_claims.findMany({
+          where,
+          orderBy: { created_at: 'desc' },
+          take: Math.min(limit, 200),
+          skip: offset,
+        }),
+        prisma.brand_partner_claims.count({ where }),
+      ]);
+
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          brand_name: r.brand_name,
+          gtin: r.gtin,
+          claim_type: r.claim_type,
+          supplier_id: r.supplier_id,
+          admin_approved: r.admin_approved,
+          contact_email: r.contact_email,
+        })),
+        total,
+      };
+    } catch (err) {
+      logger.error('Failed to list brand partner claims', undefined, {
+        filters,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { items: [], total: 0 };
+    }
+  }
+
+  /**
+   * Expire stale affiliate clicks (pending clicks older than 30 days).
+   */
+  async expireStaleClicks(): Promise<number> {
+    try {
+      const result = await prisma.affiliate_clicks.updateMany({
+        where: {
+          status: 'pending',
+          expires_at: { lt: new Date() },
+        },
+        data: { status: 'expired' },
+      });
+      if (result.count > 0) {
+        logger.info('Expired stale affiliate clicks', undefined, { count: result.count });
+      }
+      return result.count;
+    } catch (err) {
+      logger.error('Failed to expire stale affiliate clicks', undefined, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return 0;
+    }
+  }
+
+  /**
    * Get affiliate click analytics for admin dashboard.
    */
   async getAffiliateAnalytics(tenantId?: string): Promise<AffiliateAnalytics> {

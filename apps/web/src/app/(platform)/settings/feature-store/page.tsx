@@ -33,6 +33,9 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [showConfirm, setShowConfirm] = useState(false);
   const [showBundleConfirm, setShowBundleConfirm] = useState(false);
   const [promoCode, setPromoCode] = useState('');
+  const [promoValidating, setPromoValidating] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState<{ discountCents: number; chargedAmount: number } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
   const [isDemoTenant, setIsDemoTenant] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -96,6 +99,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
     setPurchaseTarget(item);
     setSelectedPaymentMethodId(defaultMethod.id);
     setPromoCode('');
+    setPromoDiscount(null);
+    setPromoError(null);
     setShowConfirm(true);
     setError(null);
   };
@@ -165,6 +170,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
     setBundleTarget(bundle);
     setSelectedPaymentMethodId(defaultMethod.id);
     setPromoCode('');
+    setPromoDiscount(null);
+    setPromoError(null);
     setShowBundleConfirm(true);
     setError(null);
   };
@@ -205,6 +212,41 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
       setError(err.message || 'Failed to process bundle purchase');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    const target = purchaseTarget || bundleTarget;
+    if (!target) return;
+
+    const priceCents = 'bundleKey' in target ? target.priceCents : target.priceCents;
+    const featureKey = 'key' in target ? target.key : undefined;
+    const bundleKey = 'bundleKey' in target ? target.bundleKey : undefined;
+
+    try {
+      setPromoValidating(true);
+      setPromoError(null);
+      setPromoDiscount(null);
+
+      const result = await bsaasPurchaseService.validatePromoCode(
+        promoCode.trim(),
+        priceCents,
+        { featureKey, bundleKey }
+      );
+
+      if (result.success && result.data) {
+        setPromoDiscount({
+          discountCents: result.data.discount_cents,
+          chargedAmount: result.data.charged_amount,
+        });
+      } else {
+        setPromoError(result.message || result.error || 'Invalid promo code');
+      }
+    } catch (err: any) {
+      setPromoError(err.message || 'Failed to validate promo code');
+    } finally {
+      setPromoValidating(false);
     }
   };
 
@@ -629,12 +671,35 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                     <input
                       type="text"
                       value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
+                      onChange={(e) => { setPromoCode(e.target.value); setPromoDiscount(null); setPromoError(null); }}
                       placeholder="Enter promo code"
                       className="flex-1 h-38 px-3 border border-neutral-200 rounded-r-md text-sm focus:outline-none focus:border-blue-500"
                     />
                   </div>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    loading={promoValidating}
+                    onClick={handleApplyPromo}
+                    disabled={!promoCode.trim()}
+                  >
+                    Apply
+                  </Button>
                 </div>
+                {promoError && (
+                  <Text size="xs" c="red" mt={4}>{promoError}</Text>
+                )}
+                {promoDiscount && purchaseTarget && promoDiscount.discountCents > 0 && (
+                  <Group gap="xs" mt={4}>
+                    <Text size="sm" c="dimmed" td="line-through">{formatPrice(purchaseTarget.priceCents, purchaseTarget.billingCycle)}</Text>
+                    <IconBolt size={14} className="text-green-600" />
+                    <Text size="sm" fw={700} c="green.7">{formatPrice(promoDiscount.chargedAmount, purchaseTarget.billingCycle)}</Text>
+                    <Badge size="xs" variant="light" color="green">{promoCode.trim()} applied</Badge>
+                  </Group>
+                )}
+                {promoDiscount && promoDiscount.discountCents === 0 && (
+                  <Text size="xs" c="dimmed" mt={4}>No discount applied for this code.</Text>
+                )}
               </div>
 
               <Group justify="flex-end">
@@ -734,12 +799,36 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                     <input
                       type="text"
                       value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
+                      onChange={(e) => { setPromoCode(e.target.value); setPromoDiscount(null); setPromoError(null); }}
                       placeholder="Enter promo code"
                       className="flex-1 h-38 px-3 border border-neutral-200 rounded-r-md text-sm focus:outline-none focus:border-violet-500"
                     />
                   </div>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="violet"
+                    loading={promoValidating}
+                    onClick={handleApplyPromo}
+                    disabled={!promoCode.trim()}
+                  >
+                    Apply
+                  </Button>
                 </div>
+                {promoError && (
+                  <Text size="xs" c="red" mt={4}>{promoError}</Text>
+                )}
+                {promoDiscount && bundleTarget && promoDiscount.discountCents > 0 && (
+                  <Group gap="xs" mt={4}>
+                    <Text size="sm" c="dimmed" td="line-through">{formatPrice(bundleTarget.priceCents, bundleTarget.billingCycle)}</Text>
+                    <IconBolt size={14} className="text-green-600" />
+                    <Text size="sm" fw={700} c="green.7">{formatPrice(promoDiscount.chargedAmount, bundleTarget.billingCycle)}</Text>
+                    <Badge size="xs" variant="light" color="green">{promoCode.trim()} applied</Badge>
+                  </Group>
+                )}
+                {promoDiscount && promoDiscount.discountCents === 0 && (
+                  <Text size="xs" c="dimmed" mt={4}>No discount applied for this code.</Text>
+                )}
               </div>
 
               <Group justify="flex-end">

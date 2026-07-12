@@ -11,7 +11,7 @@
  * .agents/skills/backend-dev-guidelines (§8 Async & Error Handling).
  */
 
-import { Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 
@@ -84,9 +84,9 @@ export class ConflictError extends HttpError {
 export function asyncErrorWrapper(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<any>,
 ): RequestHandler {
-  return (req, res, next) => {
+  return ((req: any, res: any, next: any) => {
     Promise.resolve(fn(req, res, next)).catch(next);
-  };
+  }) as RequestHandler;
 }
 
 // ─── Global error handler (terminal middleware) ───────────────────────────
@@ -98,7 +98,7 @@ export function asyncErrorWrapper(
  *   app.use(Sentry.setupExpressErrorHandler(app));  // if Sentry enabled
  *   app.use(globalErrorHandler);
  */
-export const globalErrorHandler: ErrorRequestHandler = (
+export const globalErrorHandler = (
   err: any,
   req: Request,
   res: Response,
@@ -158,7 +158,7 @@ export const globalErrorHandler: ErrorRequestHandler = (
 
 // ─── 404 handler (for unmatched routes) ───────────────────────────────────
 
-export const notFoundHandler: RequestHandler = (req, res) => {
+export const notFoundHandler = (req: Request, res: Response) => {
   const ctx = (req as any).ctx as RequestCtx | undefined;
   logger.warn(`[404] ${req.method} ${req.path} — route not found`, ctx, {
     method: req.method,

@@ -18,13 +18,14 @@ import Stripe from 'stripe';
 import { audit } from '../../audit';
 import CouponTargetService from '../../services/CouponTargetService';
 import { prisma } from '../../prisma';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 const router = Router();
 
 // Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
 
 function getStripe(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = unifiedConfig.stripeSecretKey;
   if (!key) return null;
   return new Stripe(key, { apiVersion: '2023-10-16' as any });
 }

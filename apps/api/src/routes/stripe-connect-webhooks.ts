@@ -10,17 +10,18 @@
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { prisma } from '../prisma';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Webhook secret for signature verification (from Doppler)
 const getWebhookSecret = (): string | null => {
-  return process.env.STRIPE_WEBHOOK_SECRET || null;
+  return unifiedConfig.stripeWebhookSecret || null;
 };
 
 // Get Stripe client (from Doppler)
 const getStripeClient = (): Stripe | null => {
-  const secretKey = process.env.STRIPE_PLATFORM_SECRET_KEY;
+  const secretKey = unifiedConfig.stripePlatformSecretKey;
   if (!secretKey) {
     return null;
   }

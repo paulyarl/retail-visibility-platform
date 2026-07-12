@@ -5,8 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 import { prisma, basePrisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { StorageBuckets } from '../storage-config';
+import { unifiedConfig } from '../config/unifiedConfig';
 
-const DEV = process.env.NODE_ENV !== 'production';
+const DEV = unifiedConfig.isDevelopment;
 const router = Router();
 
 // Re-declare tenantProfileSchema for PATCH (same as inline-tenant-profile.ts)
@@ -249,8 +250,8 @@ router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req
     }
 
     // Initialize Supabase client (will be initialized below in photos section)
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const SUPABASE_URL = unifiedConfig.supabaseUrl;
+    const SUPABASE_SERVICE_ROLE_KEY = unifiedConfig.supabaseServiceRoleKey;
     const supabaseLogo = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
       ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       : null;
@@ -391,8 +392,8 @@ router.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (re
       return res.status(400).json({ error: "tenant_not_found" });
     }
 
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const SUPABASE_URL = unifiedConfig.supabaseUrl;
+    const SUPABASE_SERVICE_ROLE_KEY = unifiedConfig.supabaseServiceRoleKey;
     const supabaseBanner = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
       ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       : null;

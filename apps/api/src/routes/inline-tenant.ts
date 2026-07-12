@@ -13,6 +13,9 @@ import { validateTierSKUCompatibility } from '../middleware/sku-limits';
 import { checkTenantCreationLimit } from '../middleware/permissions';
 import { memoryCache, cacheKeys, CACHE_TTL } from '../utils/cache';
 import { getDirectPool } from '../utils/db-pool';
+import { tenantController } from '../controllers/tenant/TenantController';
+import { asyncErrorWrapper } from '../middleware/errorHandler';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -217,187 +220,7 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
 });
 
 // GET /api/tenants/:id
-router.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    let tenant: any = await prisma.tenants.findUnique({
-      where: { id: req.params.id as string },
-      select: {
-        id: true,
-        name: true,
-        created_at: true,
-        region: true,
-        language: true,
-        currency: true,
-        subscription_status: true,
-        subscription_tier: true,
-        trial_ends_at: true,
-        subscription_ends_at: true,
-        grace_ends_at: true,
-        stripe_customer_id: true,
-        stripe_subscription_id: true,
-        organization_id: true,
-        service_level: true,
-        managed_services_active: true,
-        dedicated_manager: true,
-        monthly_sku_quota: true,
-        skus_added_this_month: true,
-        google_business_access_token: true,
-        google_business_refresh_token: true,
-        google_business_token_expiry: true,
-        created_by: true,
-        location_status: true,
-        status_changed_at: true,
-        status_changed_by: true,
-        reopening_date: true,
-        closure_reason: true,
-        slug: true,
-        google_sync_enabled: true,
-        google_last_sync: true,
-        google_product_count: true,
-        directory_visible: true,
-        metadata: true,
-        data_policy_accepted: true,
-        is_demo: true,
-        demo_expires_at: true,
-        ...(true as any && {
-          manual_subscription_control: true,
-          manual_subscription_expires_at: true,
-          manual_subscription_reason: true,
-        }),
-        tenant_business_profiles_list: {
-          select: {
-            logo_url: true,
-            city: true,
-            state: true,
-            country_code: true,
-            banner_url: true,
-          },
-        },
-        _count: {
-          select: {
-            inventory_items: true,
-            user_tenants: true,
-          },
-        },
-        organizations_list: {
-          select: {
-            id: true,
-            name: true,
-            subscription_tier: true,
-          },
-        },
-      }
-    });
-    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
-
-    const directoryResult = await prisma.directory_settings_list.findUnique({
-      where: { tenant_id: tenant.id },
-      select: {
-        is_published: true,
-        slug: true
-      }
-    });
-
-    const hasDirectory = directoryResult?.is_published === true;
-    const directorySlug = directoryResult?.slug;
-    const currentSlug = directorySlug || tenant.slug;
-    const hasPublishedDirectory = directoryResult?.is_published === true;
-
-    const now = new Date();
-
-    if (
-      tenant.subscription_status === "trial" &&
-      !tenant.trial_ends_at
-    ) {
-      const trial_ends_at = new Date();
-      trial_ends_at.setDate(trial_ends_at.getDate() + TRIAL_CONFIG.durationDays);
-
-      tenant = await prisma.tenants.update({
-        where: { id: tenant.id },
-        data: {
-          trial_ends_at: trial_ends_at,
-          subscription_status: "trial",
-        },
-      });
-    }
-
-    if (
-      tenant.subscription_status === "trial" &&
-      tenant.trial_ends_at &&
-      tenant.trial_ends_at < now
-    ) {
-      const hasStripeSubscription = !!tenant.stripe_subscription_id;
-
-      tenant = await prisma.tenants.update({
-        where: { id: tenant.id },
-        data: {
-          subscription_status: "expired",
-          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : "discovery",
-        },
-      });
-    }
-
-    const { getLocationStatusInfo } = await import('../utils/location-status');
-    const statusInfo = getLocationStatusInfo(tenant.location_status);
-
-    const effectiveExpiration = (tenant as any).manual_subscription_control
-      ? {
-        expiresAt: (tenant as any).manual_subscription_expires_at,
-        type: 'manual' as const,
-        source: 'manual_override' as const
-      }
-      : (tenant as any).subscription_status === 'trial' && (tenant as any).trial_ends_at
-        ? {
-          expiresAt: (tenant as any).trial_ends_at,
-          type: 'trial' as const,
-          source: 'automatic_trial' as const
-        }
-        : (tenant as any).subscription_ends_at
-          ? {
-            expiresAt: (tenant as any).subscription_ends_at,
-            type: 'subscription' as const,
-            source: 'automatic_subscription' as const
-          }
-          : null;
-
-    const effectiveTier = (tenant as any).organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
-    const isChainMember = !!(tenant as any).organizations_list;
-
-    res.json({
-      ...tenant,
-      slug: currentSlug,
-      hasPublishedDirectory,
-      statusInfo,
-      manualSubscriptionControl: (tenant as any).manual_subscription_control,
-      manualSubscriptionExpiresAt: (tenant as any).manual_subscription_expires_at,
-      manualSubscriptionReason: (tenant as any).manual_subscription_reason,
-      effectiveExpiresAt: effectiveExpiration?.expiresAt,
-      effectiveExpiresType: effectiveExpiration?.type,
-      effectiveExpiresSource: effectiveExpiration?.source,
-      isDemo: (tenant as any).is_demo || false,
-      demoExpiresAt: (tenant as any).demo_expires_at ? (tenant as any).demo_expires_at.toISOString() : null,
-      organization: (tenant as any).organizations_list ? {
-        id: (tenant as any).organizations_list.id,
-        name: (tenant as any).organizations_list.name,
-        tier: (tenant as any).organizations_list.subscription_tier,
-      } : null,
-      subscriptionTier: effectiveTier,
-      isChainMember,
-      logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
-      stats: {
-        productCount: (tenant as any)._count?.inventory_items || 0,
-        userCount: (tenant as any)._count?.user_tenants || 0,
-      },
-      city: (tenant as any).tenant_business_profiles_list?.city || null,
-      state: (tenant as any).tenant_business_profiles_list?.state || null,
-      countryCode: (tenant as any).tenant_business_profiles_list?.country_code || null,
-      bannerUrl: (tenant as any).tenant_business_profiles_list?.banner_url || null,
-    });
-  } catch (e: any) {
-    console.error('[GET /tenants/:id] Error:', e);
-    res.status(500).json({ error: "failed_to_get_tenant", details: e?.message });
-  }
-});
+router.get("/api/tenants/:id", authenticateToken, checkTenantAccess, asyncErrorWrapper((req, res) => tenantController.getTenant(req, res)));
 
 // POST /api/tenants
 const createTenantSchema = z.object({
@@ -563,20 +386,7 @@ const patchTenantSchema = z.object({
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
   organization_id: z.string().optional(),
 });
-router.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssignment, validateTierCompatibility, validateTierSKUCompatibility, async (req, res) => {
-  const parsed = patchTenantSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
-  try {
-    const tenant = await prisma.tenants.update({
-      where: { id: req.params.id as string },
-      data: parsed.data
-    });
-    res.json(tenant);
-  } catch (e: any) {
-    console.error('[PATCH /tenants/:id] Error:', e);
-    res.status(500).json({ error: "failed_to_update_tenant" });
-  }
-});
+router.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssignment, validateTierCompatibility, validateTierSKUCompatibility, asyncErrorWrapper((req, res) => tenantController.updateTenant(req, res)));
 
 // POST /api/tenants/:id/geocode
 router.post("/api/tenants/:id/geocode", async (req, res) => {
@@ -607,7 +417,7 @@ router.post("/api/tenants/:id/geocode", async (req, res) => {
       'USA'
     ].filter(Boolean).join(', ');
 
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const apiKey = unifiedConfig.googleMapsApiKey;
     if (!apiKey) {
       return res.status(500).json({ error: "geocoding_not_configured", message: "Google Maps API key not configured" });
     }

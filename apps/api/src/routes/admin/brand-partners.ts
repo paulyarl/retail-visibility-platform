@@ -6,27 +6,25 @@
  */
 
 import { Router } from 'express';
-import { prisma } from '../../prisma';
 import wholesaleMatchingService from '../../services/WholesaleMatchingService';
 
 const router = Router();
 
-// GET /claims — list all brand partner claims
+// GET /claims — list all brand partner claims with filtering and pagination
 router.get('/claims', async (req, res) => {
   try {
-    const { gtin, brand_name } = req.query;
+    const { gtin, brand_name, claim_type, approved } = req.query;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
 
-    const where: any = {};
-    if (gtin) where.gtin = String(gtin);
-    if (brand_name) where.brand_name = { contains: String(brand_name), mode: 'insensitive' };
+    const filters: any = {};
+    if (gtin) filters.gtin = String(gtin);
+    if (brand_name) filters.brandName = String(brand_name);
+    if (claim_type) filters.claimType = String(claim_type);
+    if (approved !== undefined) filters.approved = approved === 'true';
 
-    const claims = await prisma.brand_partner_claims.findMany({
-      where,
-      orderBy: { created_at: 'desc' },
-      take: 100,
-    });
-
-    res.json({ success: true, claims });
+    const result = await wholesaleMatchingService.listAllBrandPartnerClaims(filters, limit, offset);
+    res.json({ success: true, claims: result.items, total: result.total });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -79,6 +77,25 @@ router.put('/claims/:id/approve', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to approve claim',
+    });
+  }
+});
+
+// DELETE /claims/:id — reject (delete) a brand partner claim
+router.delete('/claims/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const success = await wholesaleMatchingService.rejectBrandPartnerClaim(id);
+
+    if (!success) {
+      return res.status(404).json({ success: false, error: 'Claim not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to reject claim',
     });
   }
 });

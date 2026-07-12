@@ -770,6 +770,18 @@ export interface SocialCommerceOptionsState {
 
 export type PromotionTierType = 'basic' | 'premium' | 'featured';
 
+export type WholesaleMatchingTier = 'none' | 'search' | 'full';
+
+export interface WholesaleMatchingState {
+  enabled: boolean;
+  tier: WholesaleMatchingTier;
+  canCheckSupplierMatch: boolean;
+  canSearchFaire: boolean;
+  canBuildAffiliateLink: boolean;
+  isFlexible: boolean;
+  features: Record<string, boolean>;
+}
+
 export interface DirectoryPromotionState {
   enabled: boolean;
   isFlexible: boolean;
@@ -942,6 +954,7 @@ export interface AllCapabilitiesState {
   chatbotOptions: ChatbotOptionsState;
   socialCommerceOptions: SocialCommerceOptionsState;
   directoryPromotion: DirectoryPromotionState;
+  wholesaleMatching: WholesaleMatchingState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -971,6 +984,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   chatbot_: 'chatbot_options',
   social_commerce_: 'social_commerce_options',
   directory_promotion_: 'directory_promotion',
+  wholesale_: 'wholesale_matching',
 };
 
 /**

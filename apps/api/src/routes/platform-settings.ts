@@ -4,12 +4,13 @@ import { z } from 'zod';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Supabase client for file uploads
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = unifiedConfig.supabaseUrl;
+const SUPABASE_SERVICE_ROLE_KEY = unifiedConfig.supabaseServiceRoleKey;
 const supabase =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)

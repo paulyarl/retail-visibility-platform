@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { SquareOAuthService } from '../../services/square/SquareOAuthService';
 import { requireAuth } from '../../middleware/auth';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 const router = Router();
 const squareOAuth = new SquareOAuthService();
@@ -47,7 +48,7 @@ router.get('/callback', async (req, res) => {
   try {
     const { code, state, error, error_description } = req.query;
 
-    const webBaseUrl = process.env.WEB_URL || 'https://www.visibleshelf.store';
+    const webBaseUrl = unifiedConfig.webUrl;
 
     // Handle OAuth errors from Square
     if (error) {
@@ -81,7 +82,7 @@ router.get('/callback', async (req, res) => {
     res.redirect(`${webBaseUrl}/t/${tenantId}/settings/payment-gateways?connected=square&success=true`);
   } catch (error: any) {
     console.error('[Square OAuth] Callback error:', error);
-    const webBaseUrl = process.env.WEB_URL || 'https://www.visibleshelf.store';
+    const webBaseUrl = unifiedConfig.webUrl;
     
     // Try to extract tenantId from state for error redirect
     let errorRedirectUrl = `${webBaseUrl}/settings/payment-gateways`;

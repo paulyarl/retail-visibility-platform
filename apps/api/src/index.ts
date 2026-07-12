@@ -80,6 +80,11 @@ if (sentryEnabled) {
   Sentry.setupExpressErrorHandler(app);
 }
 
+// Global error handler (terminal middleware — logs to all transports, returns consistent JSON)
+import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler';
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
+
 /* ------------------------------ boot ------------------------------ */
 const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 
@@ -310,6 +315,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.info('Demo tenant expiry job started (every 1 hour)');
       } catch (err) {
         logger.error('Failed to start demo tenant expiry job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
+      // Start affiliate click expiry job (daily) — marks pending clicks as expired after 30 days
+      try {
+        const { startAffiliateClickExpiryJob } = await import('./jobs/affiliate-click-expiry');
+        startAffiliateClickExpiryJob();
+        logger.info('Affiliate click expiry job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start affiliate click expiry job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
     });
 

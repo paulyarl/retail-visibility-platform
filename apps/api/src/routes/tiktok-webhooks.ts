@@ -12,10 +12,11 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
-const TIKTOK_APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
+const TIKTOK_APP_SECRET = unifiedConfig.tiktokAppSecret;
 
 /**
  * Verify TikTok webhook signature

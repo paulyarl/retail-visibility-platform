@@ -16,6 +16,7 @@
 import { Router, Request, Response } from 'express';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 const customerAuthService = CustomerAuthService.getInstance();
@@ -374,7 +375,7 @@ router.post('/logout', async (req: Request, res: Response) => {
     // Clear session cookie (for backward compatibility)
     res.clearCookie('customer_session_id', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: unifiedConfig.isProduction,
       sameSite: 'lax',
     });
 

@@ -18,6 +18,7 @@ import { requireTierFeature, requireWritableSubscription } from '../middleware/t
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateProductCatId, generateQsCatId, generateQuickStart } from '../lib/id-generator';
 import ProductTypeService from '../services/ProductTypeService';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -468,7 +469,7 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
 
     // Configurable product limit (default: 500, allows testing multiple scenarios)
     // Platform admin/support bypass this limit to help multiple stores
-    const productLimit = parseInt(process.env.QUICK_START_PRODUCT_LIMIT || '500', 10);
+    const productLimit = unifiedConfig.quickStartProductLimit;
     const eligible = userCanPerformSupport || (rateLimit.allowed && productCount < productLimit);
 
     res.json({

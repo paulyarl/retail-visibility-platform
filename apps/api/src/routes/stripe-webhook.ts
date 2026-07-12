@@ -14,12 +14,13 @@ import Stripe from 'stripe';
 import { getSubscriptionStatusService } from '../services/subscription/SubscriptionStatusService';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { prisma } from '../prisma';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Check if Stripe is properly configured
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const stripeSecretKey = unifiedConfig.stripeSecretKey;
+const webhookSecret = unifiedConfig.stripeWebhookSecret;
 
 if (!stripeSecretKey) {
   console.warn('[Stripe Webhook] STRIPE_SECRET_KEY not configured. Stripe webhook routes will be disabled.');

@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { auth0MFAService } from '../services/auth0-mfa.service';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../logger';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/status', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 MFA status check failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(500).json({
       success: false,
@@ -59,7 +60,7 @@ router.post('/totp/enroll', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 TOTP enrollment failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(500).json({
       success: false,
@@ -100,7 +101,7 @@ router.post('/totp/verify', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 TOTP verification failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(400).json({
       success: false,
@@ -134,7 +135,7 @@ router.post('/sms/enroll', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 SMS enrollment failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(500).json({
       success: false,
@@ -175,7 +176,7 @@ router.post('/sms/verify', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 SMS verification failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(400).json({
       success: false,
@@ -202,7 +203,7 @@ router.delete('/factor/:factorId', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 MFA factor deletion failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(500).json({
       success: false,
@@ -229,7 +230,7 @@ router.post('/backup-codes/generate', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Auth0 backup codes generation failed', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(500).json({
       success: false,
@@ -253,7 +254,7 @@ router.get('/factors/available', async (req, res) => {
 
   } catch (error: any) {
     logger.error('Failed to get available factors', { 
-      region: process.env.AWS_REGION || 'unknown'
+      region: unifiedConfig.awsRegion
     });
     res.status(500).json({
       success: false,

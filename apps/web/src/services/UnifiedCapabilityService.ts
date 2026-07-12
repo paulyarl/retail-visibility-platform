@@ -76,6 +76,7 @@ import {
   ConstraintViolationState,
   ConstraintStatusState,
   ConstraintStatusMapState,
+  WholesaleMatchingState,
 } from './CapabilityResolutionService';
 
 // ====================
@@ -130,6 +131,7 @@ interface BackendEffectiveCapabilities {
     barcode_scan: BackendEffectiveBarcodeScan;
     social_commerce_options: BackendEffectiveSocialCommerceOptions;
     directory_promotion: BackendEffectiveDirectoryPromotion;
+    wholesale_matching: BackendEffectiveWholesaleMatching;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -892,6 +894,27 @@ function mapDirectoryPromotion(b: BackendEffectiveDirectoryPromotion): Directory
   };
 }
 
+interface BackendEffectiveWholesaleMatching {
+  enabled: boolean;
+  tier: 'none' | 'search' | 'full';
+  can_check_supplier_match: boolean;
+  can_search_faire: boolean;
+  can_build_affiliate_link: boolean;
+  is_flexible: boolean;
+}
+
+function mapWholesaleMatching(b: BackendEffectiveWholesaleMatching): WholesaleMatchingState {
+  return {
+    enabled: b.enabled,
+    tier: b.tier,
+    canCheckSupplierMatch: b.can_check_supplier_match,
+    canSearchFaire: b.can_search_faire,
+    canBuildAffiliateLink: b.can_build_affiliate_link,
+    isFlexible: b.is_flexible,
+    features: {},
+  };
+}
+
 function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
   return {
     tierKey: b.tier.key,
@@ -927,6 +950,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     chatbotOptions: mapChatbot(b.effective.chatbot),
     socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
     directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
+    wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1132,6 +1156,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     return all.directoryPromotion;
   }
 
+  async getWholesaleMatchingState(tenantId: string): Promise<WholesaleMatchingState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.wholesaleMatching;
+  }
+
   async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
@@ -1163,6 +1192,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   chatbot_: 'chatbotOptions',
   social_commerce_: 'socialCommerceOptions',
   directory_promotion_: 'directoryPromotion',
+  wholesale_: 'wholesaleMatching',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

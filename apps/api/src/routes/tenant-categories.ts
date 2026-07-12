@@ -12,14 +12,15 @@ import { generateFeatureFlagId, generateProductCatId, generateQsCatId, generateQ
 import { getDirectPool } from '../utils/db-pool';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
 
 // Create service role Supabase client for storage operations (bypasses RLS)
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const serviceRoleKey = unifiedConfig.supabaseServiceRoleKey;
 const supabaseService = createClient(
-  process.env.SUPABASE_URL!,
-  serviceRoleKey!
+  unifiedConfig.supabaseUrl,
+  serviceRoleKey
 );
 
 const router = Router();

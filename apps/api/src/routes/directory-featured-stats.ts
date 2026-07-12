@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ router.get('/', async (req, res) => {
     console.error('[GET /api/directory/featured-stats] Error:', error);
     return res.status(500).json({
       error: 'Failed to fetch featured stats',
-      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+      details: unifiedConfig.isDevelopment ? (error as Error).message : undefined
     });
   }
 });

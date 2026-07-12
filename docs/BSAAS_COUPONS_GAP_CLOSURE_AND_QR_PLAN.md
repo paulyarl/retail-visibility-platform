@@ -449,7 +449,7 @@ Private grants require a token-based approach since there's no promo code string
 
 ### 4.2 Backend — Grant Token Endpoints
 
-**File**: `apps/api/src/routes/admin/feature-purchases.ts` (new routes)
+**Files**: `apps/api/src/routes/admin/feature-purchases.ts` (create-grant-token), `apps/api/src/routes/bsaas-purchases.ts` (redeem-grant)
 
 ```
 POST /api/admin/feature-purchases/create-grant-token
@@ -493,7 +493,7 @@ Request:
 }
 ```
 
-- Public endpoint (authenticated user, no admin required)
+- Authenticated endpoint (authenticateToken, no admin required) — mounted in `bsaas-purchases.ts` at `/api/subscription/redeem-grant`
 - Verifies token signature and expiry
 - If `tenant_id` in token doesn't match authenticated tenant → 403
 - If `max_claims` exceeded → 410 Gone
@@ -506,7 +506,7 @@ Request:
 
 ### 4.3 Backend — Grant Token Claim Tracking
 
-**File**: `database/migrations/095_bsaas_grant_tokens.sql` (new)
+**File**: `database/migrations/101_bsaas_grant_tokens.sql` (new)
 
 ```sql
 CREATE TABLE bsaas_grant_tokens (
@@ -532,7 +532,8 @@ CREATE TABLE bsaas_grant_token_claims (
 ```
 
 - Prisma models for both tables
-- ID generators: `grant-{nanoid}`, `grantclaim-{nanoid}`
+- ID generators: `gtok-{nanoid}` (global, admin-created), `gclm-{tenantKey}-{nanoid}` (tenant-scoped, claimed by tenant)
+- Note: `grant-` prefix is already used by `generateAccessGrantId` — use `gtok` to avoid collision
 
 ### 4.4 Frontend — Admin Grant QR UI
 
@@ -840,7 +841,7 @@ Phase 6 (Analytics + Docs)          ─── depends on all prior phases
 | `apps/web/src/admin/components/PromoCodeQRDialog.tsx` | 3 | Reusable styled QR dialog for promo codes (uses `qr-code-styling`) |
 | `apps/web/src/admin/components/PrivateFeatureGrantDialog.tsx` | 4 | Admin UI for creating grant token QR codes |
 | `apps/web/src/lib/qr-style-config.ts` | 3, 5 | Shared QR style theme presets + target icon resolution helper |
-| `database/migrations/095_bsaas_grant_tokens.sql` | 4 | Grant token + claim tracking tables |
+| `database/migrations/101_bsaas_grant_tokens.sql` | 4 | Grant token + claim tracking tables |
 | `scripts/migrate_bsaas_coupon_metadata.ps1` | 2 | One-time metadata enrichment script |
 
 ### Modified Files
@@ -850,13 +851,14 @@ Phase 6 (Analytics + Docs)          ─── depends on all prior phases
 | `apps/api/src/routes/bsaas-purchases.ts` | 1, 2 | Extract `validatePromoCode` helper with target validation, apply to bundle purchase, enrich metadata with coupon duration fields |
 | `apps/api/src/jobs/bsaas-renewal.ts` | 2 | Add `calculateRenewalCharge` helper, apply discount logic in all renewal paths |
 | `apps/api/src/routes/admin/bsaas-promotions.ts` | 3 | Add `GET /promotion/:id/qr` endpoint with target icon resolution |
-| `apps/api/src/routes/admin/feature-purchases.ts` | 4 | Add `create-grant-token` and `redeem-grant` endpoints |
+| `apps/api/src/routes/admin/feature-purchases.ts` | 4 | Add `POST /create-grant-token` endpoint (admin, mounted at `/api/admin/feature-purchases`) |
+| `apps/api/src/routes/bsaas-purchases.ts` | 4 | Add `POST /redeem-grant` endpoint (authenticated user, mounted at `/api/subscription`) |
 | `apps/web/src/admin/components/BsaasPromotionManagement.tsx` | 3 | Add QR button + dialog trigger per promo code row |
 | `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | 3, 4 | Read `promo` and `grant` from URL, auto-fill/ show redemption dialog |
 | `apps/web/src/services/AdminBsaasPromotionsService.ts` | 3 | Add `getQRData()` method |
 | `apps/web/src/services/BsaasPurchaseService.ts` | 4 | Add `redeemGrant()` method |
 | `apps/api/prisma/schema.prisma` | 4 | Add `bsaas_grant_tokens` + `bsaas_grant_token_claims` models |
-| `apps/api/src/lib/id-generator.ts` | 4 | Add `generateGrantTokenId`, `generateGrantClaimId` |
+| `apps/api/src/lib/id-generator.ts` | 4 | Add `generateGrantTokenId` (prefix `gtok`, global), `generateGrantClaimId` (prefix `gclm`, tenant-scoped) |
 | `apps/web/src/components/public/TenantQRCode.tsx` | 5 | Conditional render: styled path (`qr-code-styling`) vs plain path (`qrcode`); remove manual `overlayLogoOnQR` for styled path |
 | `apps/web/src/components/items/QRCodeGenerator.tsx` | 5 | Same conditional pattern as TenantQRCode (second surface) |
 | `apps/web/src/services/CapabilityResolutionService.ts` | 5 | Add `showQRStyled`, `allowedQRDotStyles`, `allowedQRCornerStyles`, `qrCustomColors`, `qrGradients` to `StorefrontOptionFlags` + feature-key-driven resolution logic (group gate + individual keys pattern) |

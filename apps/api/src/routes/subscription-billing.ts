@@ -14,6 +14,7 @@ import { getSubscriptionBillingService } from '../services/subscription/Subscrip
 import { SubscriptionValidationService } from '../services/subscription/SubscriptionValidationService';
 import { prisma } from '../prisma';
 import { generatePaymentId } from '../lib/id-generator';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/paypal/config', async (req: Request, res: Response) => {
       success: true,
       data: {
         configured: payPalService.isConfigured(),
-        mode: process.env.PAYPAL_MODE || 'sandbox',
+        mode: unifiedConfig.paypalMode,
       },
     });
   } catch (error: any) {
@@ -1121,7 +1122,7 @@ router.get('/paypal/config', async (req: Request, res: Response) => {
       success: true,
       data: {
         configured: payPalService.isConfigured(),
-        mode: process.env.PAYPAL_MODE || 'sandbox',
+        mode: unifiedConfig.paypalMode,
       },
     });
   } catch (error: any) {
@@ -1451,7 +1452,7 @@ router.post('/cancel', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (re
     // Cancel Stripe subscription
     if (stripeSubscriptionId) {
       const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      const stripe = new Stripe(unifiedConfig.stripeSecretKey, {
         apiVersion: '2026-06-24.dahlia',
       });
 
@@ -1691,7 +1692,7 @@ router.post('/change-tier', requirePermission('CAN_MANAGE_TENANT_BILLING'), asyn
     // Change Stripe subscription
     if (stripeSubscriptionId) {
       const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      const stripe = new Stripe(unifiedConfig.stripeSecretKey, {
         apiVersion: '2026-06-24.dahlia',
       });
 

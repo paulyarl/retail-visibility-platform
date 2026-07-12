@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { authenticateToken } from '../../middleware/auth';
 import { prisma } from '../../prisma';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 const router = Router();
 
@@ -21,8 +22,8 @@ router.post('/create-order', async (req, res) => {
 
     // Get PayPal credentials from database (you'll need to add these to your payment gateway config)
     // For now, using environment variables as fallback
-    const paypalClientId = process.env.PAYPAL_CLIENT_ID;
-    const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET;
+    const paypalClientId = unifiedConfig.paypalClientId;
+    const paypalClientSecret = unifiedConfig.paypalClientSecret;
 
     if (!paypalClientId || !paypalClientSecret) {
       return res.status(500).json({
@@ -169,8 +170,8 @@ router.post('/capture-order', async (req, res) => {
     }
 
     // Get PayPal configuration
-    const paypalClientId = process.env.PAYPAL_CLIENT_ID;
-    const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET;
+    const paypalClientId = unifiedConfig.paypalClientId;
+    const paypalClientSecret = unifiedConfig.paypalClientSecret;
 
     if (!paypalClientId || !paypalClientSecret) {
       return res.status(500).json({

@@ -261,6 +261,8 @@ function buildTenantNav(
         { label: 'Featured Store', href: `/t/${currentTenantId}/settings/featured-store`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Directory Promotion', href: `/t/${currentTenantId}/settings/promotion`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Custom Badges', href: `/t/${currentTenantId}/settings/products/badges`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Wholesale & Suppliers', href: `/t/${currentTenantId}/settings/wholesale`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Brand Partner Claims', href: `/t/${currentTenantId}/settings/admin/brand-partners`, requiredGroup: 'IS_TENANT_ADMIN' },
       ],
     },
     {

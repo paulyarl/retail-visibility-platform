@@ -24,8 +24,9 @@ import { getBillingNotificationService } from '../services/subscription/BillingN
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 import CrmAlertService from '../services/CrmAlertService';
-import CouponTargetService from '../services/CouponTargetService';
+import CouponTargetService, { CouponTargets, CouponTargetContext } from '../services/CouponTargetService';
 import { audit } from '../audit';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -60,6 +61,93 @@ async function getCatalogEntry(featureKey: string): Promise<{
     trial_eligible: entry.trial_eligible,
     demo_eligible: entry.demo_eligible,
   };
+}
+
+// ====================
+// Promo Code Validation Helper
+// ====================
+
+interface PromoValidationResult {
+  promotionCodeId: string;
+  couponId: string;
+  discountCents: number;
+  chargedAmount: number;
+  couponDuration: 'once' | 'repeating' | 'forever';
+  couponDurationInMonths: number | null;
+  couponPercentOff: number | null;
+  couponAmountOff: number | null;
+  targets: CouponTargets | null;
+}
+
+type PromoValidation = PromoValidationResult | { error: string; message: string };
+
+/**
+ * Validate a Stripe promotion code, calculate discount, and check coupon targeting rules.
+ * Shared by individual feature purchase and bundle purchase handlers.
+ * Returns coupon duration/percent_off/amount_off for Phase 2 renewal logic.
+ * Returns targets for Phase 3 QR icon embedding.
+ */
+async function validatePromoCode(
+  promotionCode: string,
+  priceCents: number,
+  context: CouponTargetContext
+): Promise<PromoValidation> {
+  try {
+    const stripeKey = unifiedConfig.stripeSecretKey;
+    if (!stripeKey) {
+      return { error: 'stripe_not_configured', message: 'Promo codes require Stripe' };
+    }
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' as any });
+
+    const promoCodes = await stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 });
+    if (promoCodes.data.length === 0) {
+      return { error: 'invalid_promo_code', message: 'Invalid or expired promotion code' };
+    }
+
+    const promo = promoCodes.data[0];
+    if (promo.max_redemptions && promo.times_redeemed >= promo.max_redemptions) {
+      return { error: 'promo_expired', message: 'This promotion code has reached its usage limit' };
+    }
+    if (promo.expires_at && promo.expires_at * 1000 < Date.now()) {
+      return { error: 'promo_expired', message: 'This promotion code has expired' };
+    }
+
+    const promotionCodeId = promo.id;
+    const coupon = await stripe.coupons.retrieve((promo as any).coupon);
+    const couponId = coupon.id;
+
+    let discountCents = 0;
+    if (coupon.percent_off) {
+      discountCents = Math.round(priceCents * coupon.percent_off / 100);
+    } else if (coupon.amount_off) {
+      discountCents = Math.min(coupon.amount_off, priceCents);
+    }
+    const chargedAmount = Math.max(0, priceCents - discountCents);
+
+    // Validate coupon targets against the purchase context
+    const targetResult = await CouponTargetService.getInstance().validateCouponTargets(couponId, context);
+    if (!targetResult.valid) {
+      return { error: targetResult.reason || 'coupon_target_mismatch', message: 'This promo code is not valid for this purchase context' };
+    }
+
+    // Fetch targets for the coupon (for Phase 3 QR icon embedding)
+    const targets = await CouponTargetService.getInstance().getTargetsForCoupon(couponId);
+
+    return {
+      promotionCodeId,
+      couponId,
+      discountCents,
+      chargedAmount,
+      couponDuration: coupon.duration as 'once' | 'repeating' | 'forever',
+      couponDurationInMonths: (coupon as any).duration_in_months ?? null,
+      couponPercentOff: coupon.percent_off ?? null,
+      couponAmountOff: coupon.amount_off ?? null,
+      targets,
+    };
+  } catch (err: any) {
+    return { error: 'invalid_promo_code', message: 'Failed to validate promotion code' };
+  }
 }
 
 /**
@@ -964,51 +1052,15 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
     let couponId: string | null = null;
 
     if (promotionCode) {
-      try {
-        const stripeKey = process.env.STRIPE_SECRET_KEY;
-        if (!stripeKey) {
-          return res.status(503).json({ success: false, error: 'stripe_not_configured', message: 'Promo codes require Stripe' });
-        }
-        const Stripe = (await import('stripe')).default;
-        const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' as any });
-
-        const promoCodes = await stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 });
-        if (promoCodes.data.length === 0) {
-          return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Invalid or expired promotion code' });
-        }
-
-        const promo = promoCodes.data[0];
-        if (promo.max_redemptions && promo.times_redeemed >= promo.max_redemptions) {
-          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has reached its usage limit' });
-        }
-        if (promo.expires_at && promo.expires_at * 1000 < Date.now()) {
-          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has expired' });
-        }
-
-        promotionCodeId = promo.id;
-        const coupon = await stripe.coupons.retrieve((promo as any).coupon);
-        couponId = coupon.id;
-
-        if (coupon.percent_off) {
-          discountCents = Math.round(priceCents * coupon.percent_off / 100);
-        } else if (coupon.amount_off) {
-          discountCents = Math.min(coupon.amount_off, priceCents);
-        }
-        chargedAmount = Math.max(0, priceCents - discountCents);
-      } catch (err: any) {
-        return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Failed to validate promotion code' });
+      const promoResult = await validatePromoCode(promotionCode, priceCents, { featureKey, tenantId });
+      if ('error' in promoResult) {
+        const statusCode = promoResult.error === 'stripe_not_configured' ? 503 : 400;
+        return res.status(statusCode).json({ success: false, error: promoResult.error, message: promoResult.message });
       }
-
-      // 4a-2. Validate coupon targets against this purchase context
-      if (couponId) {
-        const targetResult = await CouponTargetService.getInstance().validateCouponTargets(couponId, {
-          featureKey,
-          tenantId,
-        });
-        if (!targetResult.valid) {
-          return res.status(400).json({ success: false, error: targetResult.reason || 'coupon_target_mismatch', message: 'This promo code is not valid for this purchase context' });
-        }
-      }
+      promotionCodeId = promoResult.promotionCodeId;
+      couponId = promoResult.couponId;
+      discountCents = promoResult.discountCents;
+      chargedAmount = promoResult.chargedAmount;
     }
 
     const billingService = getSubscriptionBillingService();
@@ -1317,60 +1369,27 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'payment_required', message: 'Payment method is required for non-trial purchases' });
     }
 
-    // 5a. Validate promotion code and calculate discount (fixes bundle promo code gap)
+    // 5a. Validate promotion code and calculate discount
     let chargedAmount = priceCents;
     let promotionCodeId: string | null = null;
     let discountCents = 0;
     let couponId: string | null = null;
 
     if (promotionCode) {
-      try {
-        const stripeKey = process.env.STRIPE_SECRET_KEY;
-        if (!stripeKey) {
-          return res.status(503).json({ success: false, error: 'stripe_not_configured', message: 'Promo codes require Stripe' });
-        }
-        const Stripe = (await import('stripe')).default;
-        const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' as any });
-
-        const promoCodes = await stripe.promotionCodes.list({ code: promotionCode, active: true, limit: 1 });
-        if (promoCodes.data.length === 0) {
-          return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Invalid or expired promotion code' });
-        }
-
-        const promo = promoCodes.data[0];
-        if (promo.max_redemptions && promo.times_redeemed >= promo.max_redemptions) {
-          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has reached its usage limit' });
-        }
-        if (promo.expires_at && promo.expires_at * 1000 < Date.now()) {
-          return res.status(400).json({ success: false, error: 'promo_expired', message: 'This promotion code has expired' });
-        }
-
-        promotionCodeId = promo.id;
-        const coupon = await stripe.coupons.retrieve((promo as any).coupon);
-        couponId = coupon.id;
-
-        if (coupon.percent_off) {
-          discountCents = Math.round(priceCents * coupon.percent_off / 100);
-        } else if (coupon.amount_off) {
-          discountCents = Math.min(coupon.amount_off, priceCents);
-        }
-        chargedAmount = Math.max(0, priceCents - discountCents);
-      } catch (err: any) {
-        return res.status(400).json({ success: false, error: 'invalid_promo_code', message: 'Failed to validate promotion code' });
+      const promoResult = await validatePromoCode(promotionCode, priceCents, {
+        featureKey: featureKeys[0],
+        featureKeys,
+        tenantId,
+        bundleKey,
+      });
+      if ('error' in promoResult) {
+        const statusCode = promoResult.error === 'stripe_not_configured' ? 503 : 400;
+        return res.status(statusCode).json({ success: false, error: promoResult.error, message: promoResult.message });
       }
-
-      // 5a-2. Validate coupon targets against this bundle purchase context
-      if (couponId) {
-        const targetResult = await CouponTargetService.getInstance().validateCouponTargets(couponId, {
-          featureKey: featureKeys[0],
-          featureKeys,
-          tenantId,
-          bundleKey,
-        });
-        if (!targetResult.valid) {
-          return res.status(400).json({ success: false, error: targetResult.reason || 'coupon_target_mismatch', message: 'This promo code is not valid for this purchase context' });
-        }
-      }
+      promotionCodeId = promoResult.promotionCodeId;
+      couponId = promoResult.couponId;
+      discountCents = promoResult.discountCents;
+      chargedAmount = promoResult.chargedAmount;
     }
 
     const billingService = getSubscriptionBillingService();
@@ -1478,7 +1497,7 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
     notificationService.sendNotification({
       tenantId,
       type: 'bsaas_purchase_success',
-      amount: priceCents,
+      amount: chargedAmount,
       billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
       metadata: { bundleKey, bundleName: bundle.marketing_name, featureKeys },
     }).catch(err => console.error('[BSaaS] Failed to send bundle notification:', err));
@@ -1501,6 +1520,76 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[BSaaS] Error purchasing bundle:', error);
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase bundle' });
+  }
+});
+
+// ====================
+// Validate Promo Code (preview discount without purchasing)
+// ====================
+
+const validatePromoSchema = z.object({
+  promotionCode: z.string().min(1),
+  featureKey: z.string().optional(),
+  bundleKey: z.string().optional(),
+  priceCents: z.number().int().min(0),
+  tenantId: z.string().optional(),
+});
+
+// POST /api/subscription/validate-promo
+router.post('/validate-promo', async (req: Request, res: Response) => {
+  try {
+    const validation = validatePromoSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
+    }
+
+    const tenantId = validation.data.tenantId || (req as any).user?.tenantId || req.headers['x-tenant-id'] as string;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'Tenant ID is required' });
+    }
+
+    const { promotionCode, featureKey, bundleKey, priceCents } = validation.data;
+
+    const context: CouponTargetContext = {
+      featureKey: featureKey || '',
+      tenantId,
+      ...(bundleKey ? { bundleKey } : {}),
+    };
+
+    // If bundle, fetch feature keys for target validation
+    if (bundleKey) {
+      const bundle = await prisma.bsaas_bundles.findUnique({
+        where: { bundle_key: bundleKey },
+        include: { bsaas_bundle_items: { select: { feature_key: true } } },
+      });
+      if (bundle) {
+        context.featureKeys = bundle.bsaas_bundle_items.map(i => i.feature_key);
+        context.featureKey = context.featureKeys[0] || '';
+      }
+    }
+
+    const promoResult = await validatePromoCode(promotionCode, priceCents, context);
+    if ('error' in promoResult) {
+      const statusCode = promoResult.error === 'stripe_not_configured' ? 503 : 400;
+      return res.status(statusCode).json({ success: false, error: promoResult.error, message: promoResult.message });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        promotion_code: promotionCode,
+        discount_cents: promoResult.discountCents,
+        charged_amount: promoResult.chargedAmount,
+        original_price_cents: priceCents,
+        coupon_id: promoResult.couponId,
+        coupon_duration: promoResult.couponDuration,
+        coupon_percent_off: promoResult.couponPercentOff,
+        coupon_amount_off: promoResult.couponAmountOff,
+      },
+    });
+  } catch (error: any) {
+    console.error('[BSaaS] Error validating promo code:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to validate promo code' });
   }
 });
 

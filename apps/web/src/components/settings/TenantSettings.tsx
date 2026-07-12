@@ -69,6 +69,19 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           capabilityKey: 'featuredOptions',
         },
         {
+          title: 'Wholesale & Suppliers',
+          description: 'Find wholesale suppliers, track affiliate earnings, and manage bulk orders',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/wholesale`,
+          color: 'bg-indigo-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+        {
           title: 'Directory Promotion',
           description: 'Boost your store visibility on the directory map and search results',
           icon: (
@@ -605,6 +618,19 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
           capabilityKey: 'featuredOptions',
+        },
+        {
+          title: 'Wholesale & Suppliers',
+          description: 'Find wholesale suppliers, track affiliate earnings, and manage bulk orders',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/wholesale`,
+          color: 'bg-indigo-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
         },
         {
           title: 'Directory Promotion',

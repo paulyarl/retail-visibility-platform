@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
 import { randomUUID } from 'crypto';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 const router = Router();
 
@@ -9,9 +10,9 @@ const router = Router();
 // The Square SDK has complex typing issues in this environment
 // Process Square payment
 const processSquarePayment = async (sourceId: string, amount: number, orderId: string, customerInfo: any) => {
-  const accessToken = process.env.SQUARE_ACCESS_TOKEN;
-  const locationId = process.env.SQUARE_LOCATION_ID;
-  const environment = process.env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+  const accessToken = unifiedConfig.squareAccessToken;
+  const locationId = unifiedConfig.squareLocationId;
+  const environment = unifiedConfig.squareEnvironment === 'production' ? 'production' : 'sandbox';
   const baseUrl = environment === 'production' 
     ? 'https://connect.squareup.com' 
     : 'https://connect.squareupsandbox.com';
@@ -179,7 +180,7 @@ router.post('/webhook', async (req, res) => {
     const body = JSON.stringify(req.body);
 
     // Verify webhook signature
-    const webhookSignatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+    const webhookSignatureKey = unifiedConfig.squareWebhookSignatureKey;
     if (webhookSignatureKey) {
       const crypto = require('crypto');
       const hmac = crypto.createHmac('sha256', webhookSignatureKey);

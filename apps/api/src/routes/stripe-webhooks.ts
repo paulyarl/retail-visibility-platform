@@ -20,15 +20,16 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import Stripe from 'stripe';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
 // Initialize Stripe (ensure STRIPE_SECRET_KEY is set in environment)
-const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' })
+const stripe = unifiedConfig.stripeSecretKey 
+  ? new Stripe(unifiedConfig.stripeSecretKey, { apiVersion: '2026-06-24.dahlia' })
   : null;
 
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+const STRIPE_WEBHOOK_SECRET = unifiedConfig.stripeWebhookSecret;
 
 /**
  * Map Stripe subscription status to internal subscription status

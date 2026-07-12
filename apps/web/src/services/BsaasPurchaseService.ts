@@ -261,6 +261,41 @@ class BsaasPurchaseService extends TenantApiSingleton {
     const innerData = (response.data as any)?.data || response.data;
     return { success: true, data: innerData };
   }
+
+  /**
+   * Validate a promo code and preview the discount (no purchase)
+   */
+  async validatePromoCode(
+    promotionCode: string,
+    priceCents: number,
+    opts?: { featureKey?: string; bundleKey?: string }
+  ): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
+    const response = await this.makeDefaultRequest<any>(
+      '/api/subscription/validate-promo',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          promotionCode,
+          priceCents,
+          ...(opts?.featureKey ? { featureKey: opts.featureKey } : {}),
+          ...(opts?.bundleKey ? { bundleKey: opts.bundleKey } : {}),
+        }),
+      },
+      'bsaas-validate-promo'
+    );
+
+    if (!response.success) {
+      const errorData = response.error as any;
+      return {
+        success: false,
+        error: typeof errorData === 'string' ? errorData : errorData?.error || 'validation_failed',
+        message: typeof errorData === 'string' ? errorData : errorData?.message || 'Failed to validate promo code',
+      };
+    }
+
+    const innerData = (response.data as any)?.data || response.data;
+    return { success: true, data: innerData };
+  }
 }
 
 export const bsaasPurchaseService = BsaasPurchaseService.Instance;

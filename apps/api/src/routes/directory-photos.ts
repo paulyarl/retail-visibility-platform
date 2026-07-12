@@ -2,11 +2,12 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../prisma";
+import { unifiedConfig } from "../config/unifiedConfig";
 // Create service role Supabase client for storage operations (bypasses RLS)
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const serviceRoleKey = unifiedConfig.supabaseServiceRoleKey;
 const supabaseService = createClient(
-  process.env.SUPABASE_URL!,
-  serviceRoleKey!
+  unifiedConfig.supabaseUrl,
+  serviceRoleKey
 );
 import { StorageBuckets } from "../storage-config";
 import { generateQuickStart } from "../lib/id-generator";
@@ -16,8 +17,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 // Initialize Supabase client
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
+  unifiedConfig.supabaseUrl,
+  unifiedConfig.supabaseAnonKey
 );
 
 const r = Router();

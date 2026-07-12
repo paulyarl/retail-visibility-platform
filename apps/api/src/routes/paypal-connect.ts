@@ -12,6 +12,7 @@ import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { paypalConnectService } from '../services/payments/PayPalConnectService';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -89,7 +90,7 @@ router.post('/merchants/:tenantId/onboarding', requireAdmin, async (req: Request
     const { tenantId } = req.params;
     const { return_url, refresh_url } = req.body;
 
-    const platformUrl = process.env.PLATFORM_URL || 'http://localhost:3000';
+    const platformUrl = unifiedConfig.platformUrl;
     const returnUrl = return_url || `${platformUrl}/settings/admin/platform-revenue/merchants/${tenantId}/paypal/complete`;
     const refreshUrl = refresh_url || `${platformUrl}/settings/admin/platform-revenue/merchants/${tenantId}/paypal/refresh`;
 

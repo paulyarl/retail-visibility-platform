@@ -13,6 +13,7 @@
 import { Request, Response, Router } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 // Utility function to convert BigInt values to strings for JSON serialization
 const serializeBigInt = (obj: any): any => {
@@ -419,8 +420,8 @@ router.post('/merchants/:tenantId/onboarding', requireAuth, requireAdmin, async 
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${process.env.PLATFORM_URL}/settings/admin/platform-revenue/merchants/${tenantId}/refresh`,
-      return_url: `${process.env.PLATFORM_URL}/settings/admin/platform-revenue/merchants/${tenantId}/complete`,
+      refresh_url: `${unifiedConfig.platformUrl}/settings/admin/platform-revenue/merchants/${tenantId}/refresh`,
+      return_url: `${unifiedConfig.platformUrl}/settings/admin/platform-revenue/merchants/${tenantId}/complete`,
       type: 'account_onboarding',
     });
 

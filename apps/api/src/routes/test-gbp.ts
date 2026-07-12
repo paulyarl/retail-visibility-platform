@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { google } from 'googleapis';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = Router();
 
@@ -9,9 +10,9 @@ const router = Router();
  */
 router.get('/test-gbp', async (req, res) => {
   try {
-    const clientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
+    const clientId = unifiedConfig.googleBusinessClientId;
+    const clientSecret = unifiedConfig.googleBusinessClientSecret;
+    const redirectUri = unifiedConfig.googleBusinessRedirectUri;
 
     // Check if credentials are configured
     if (!clientId || !clientSecret || !redirectUri) {

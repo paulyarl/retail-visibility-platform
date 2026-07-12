@@ -14,6 +14,9 @@ import { user_role, user_tenant_role } from '@prisma/client';
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth';
 import { generateQuickStart, generateUserId, generateUserTenantId } from '../lib/id-generator';
 import * as crypto from 'crypto';
+import { adminUserController } from '../controllers/admin/AdminUserController';
+import { asyncErrorWrapper } from '../middleware/errorHandler';
+import { unifiedConfig } from '../config/unifiedConfig';
 //import { UserRole } from '../utils/location-status';
 
 const router = Router();
@@ -24,259 +27,7 @@ const router = Router();
  * - Platform admins see all users
  * - Tenant owners see only users in their tenants
  */
-router.get('/users', requirePlatformUser, async (req: Request, res: Response) => {
-  try {
-    const requestingUser = (req as any).user;
-    /* console.log('[ADMIN USERS] Request received from user:', {
-      user_id: requestingUser?.userId,
-      email: requestingUser?.email,
-      role: requestingUser?.role,
-      userAgent: req.headers['user-agent'],
-      origin: req.headers.origin,
-      referer: req.headers.referer
-    }); */
-    let users;
-
-    if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
-      // Platform admins see all users
-      console.log('[ADMIN USERS] Platform admin detected, fetching all users...');
-      users = await prisma.users.findMany({
-        select: {
-          id: true,
-          email: true,
-          first_name: true,
-          last_name: true,
-          role: true,
-          created_at: true,
-          last_login: true,
-          is_active: true,
-          email_verified: true,
-          user_tenants: {
-            select: {
-              tenant_id: true,
-              role: true,
-              tenants: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
-    } else if (requestingUser.role === 'OWNER') {
-      // Tenant owners see only users in their tenants (SECURE APPROACH)
-      // This prevents exposure of all user emails to tenant owners
-      const ownerTenants = await prisma.user_tenants.findMany({
-        where: {
-          user_id: requestingUser.userId,
-          role: 'OWNER',
-        },
-        select: {
-          tenant_id: true,
-        },
-      });
-
-      const tenantIds = ownerTenants.map(ut => ut.tenant_id);
-
-      users = await prisma.users.findMany({
-        where: {
-          user_tenants: {
-            some: {
-              tenant_id: {
-                in: tenantIds,
-              },
-            },
-          },
-        },
-        select: {
-          id: true,
-          email: true,
-          first_name: true,
-          last_name: true,
-          role: true,
-          created_at: true,
-          last_login: true,
-          is_active: true,
-          email_verified: true,
-          user_tenants: {
-            where: {
-              tenant_id: {
-                in: tenantIds,
-              },
-            },
-            select: {
-              tenant_id: true,
-              role: true,
-              tenants: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
-    } else {
-      // Other roles have no access
-      return res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view users',
-      });
-    }
-
-    console.log('[ADMIN USERS] Raw users from database:', users?.length || 0, 'users found');
-    
-    // Get pending invitations for the same scope
-    let invitations: any[] = [];
-    if (requestingUser.role === 'PLATFORM_ADMIN' || requestingUser.role === 'ADMIN') {
-      // Platform admins see all invitations
-      invitations = await prisma.invitations.findMany({
-        where: {
-          accepted_at: null,
-          expires_at: {
-            gt: new Date(),
-          },
-        },
-        include: {
-          tenants: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
-    } else if (requestingUser.role === 'OWNER') {
-      // Tenant owners see invitations for their tenants
-      const ownerTenants = await prisma.user_tenants.findMany({
-        where: {
-          user_id: requestingUser.userId,
-          role: 'OWNER',
-        },
-        select: {
-          tenant_id: true,
-        },
-      });
-
-      const tenantIds = ownerTenants.map(ut => ut.tenant_id);
-
-      invitations = await prisma.invitations.findMany({
-        where: {
-          tenant_id: {
-            in: tenantIds,
-          },
-          accepted_at: null,
-          expires_at: {
-            gt: new Date(),
-          },
-        },
-        include: {
-          tenants: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
-    }
-
-    // Format users with proper status
-    const formattedUsers = users.map(user => ({
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      name: user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name || user.last_name || null,
-      role: user.role,
-      created_at: user.created_at,
-      last_login: user.last_login,
-      last_login_at: user.last_login, // Frontend expects last_login_at
-      lastActive: user.last_login, // Frontend expects lastActive
-      is_active: user.is_active,
-      email_verified: user.email_verified,
-      status: user.is_active ? 'active' : 'inactive', // Calculate status from is_active
-      tenantCount: user.user_tenants?.length || 0,
-      tenant: user.user_tenants?.length || 0, // Alias for compatibility
-      tenantRoles: user.user_tenants?.map((ut: any) => ({
-        tenantId: ut.tenant_id,
-        tenantName: ut.tenants?.name || 'Unknown Tenant',
-        role: ut.role,
-      })) || [],
-    }));
-
-    // Format pending invitations as users with 'pending' status
-    const pendingUsers = invitations.map(inv => ({
-      id: `pending-${inv.id}`, // Prefix to distinguish from real users
-      email: inv.email,
-      first_name: null,
-      last_name: null,
-      name: null,
-      role: inv.role,
-      created_at: inv.created_at,
-      last_login: null,
-      last_login_at: null,
-      lastActive: null,
-      is_active: false, // Pending users are not active yet
-      email_verified: false, // Not verified until they accept
-      status: 'pending', // Explicit pending status
-      tenantCount: 1,
-      tenant: 1,
-      tenantRoles: [{
-        tenantId: inv.tenant_id,
-        tenantName: inv.tenants?.name || 'Unknown Tenant',
-        role: inv.role,
-      }],
-      isPending: true, // Flag to identify pending invitations
-      invitationId: inv.id,
-      expiresAt: inv.expires_at,
-    }));
-
-    // Combine real users and pending invitations
-    const allUsers = [...formattedUsers, ...pendingUsers];
-
-    /* console.log('[ADMIN USERS] Formatted users for response:', formattedUsers?.length || 0, 'users');
-    console.log('[ADMIN USERS] Sample user data:', formattedUsers[0] ? {
-      id: formattedUsers[0].id,
-      email: formattedUsers[0].email,
-      role: formattedUsers[0].role,
-      tenantCount: formattedUsers[0].tenant
-    } : 'No users found'); */
-
-    res.json({ 
-      success: true, 
-      users: allUsers,
-      user_tenants: allUsers, // Keep for backward compatibility
-      userTenants: allUsers, // CamelCase version
-      data: allUsers, // Generic data field
-      items: allUsers, // Items field
-      results: allUsers, // Results field
-      total: allUsers.length 
-    });
-  } catch (error: any) {
-    console.error('[Admin Users] Error listing user_tenants:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to list users',
-      message: error.message,
-    });
-  }
-});
+router.get('/users', requirePlatformUser, asyncErrorWrapper((req, res) => adminUserController.listUsers(req, res)));
 
 /**
  * POST /api/admin/users
@@ -1136,7 +887,7 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
     try {
       const { emailService } = require('../services/email-service');
       
-      const acceptUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${token}`;
+      const acceptUrl = `${unifiedConfig.frontendUrl}/accept-invitation?token=${token}`;
       
       const emailResult = await emailService.sendInvitationEmail({
         inviteeEmail: email,
@@ -1189,7 +940,7 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
             : inviterUser?.email || requestingUser.userId,
         },
         // Include acceptance URL for development/testing
-        acceptUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${token}`,
+        acceptUrl: `${unifiedConfig.frontendUrl}/accept-invitation?token=${token}`,
       },
     });
   } catch (error: any) {
@@ -1661,7 +1412,7 @@ router.post('/users/:userId/send-verification-email', requirePlatformAdmin, asyn
 
     // TODO: Send actual email with verification link
     // For now, just return success with the token for testing
-    const verificationLink = `${process.env.WEB_BASE_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    const verificationLink = `${unifiedConfig.webBaseUrl}/verify-email?token=${verificationToken}`;
     
     console.log('[Verification Email] Would send email with link:', verificationLink);
 
@@ -1680,7 +1431,7 @@ router.post('/users/:userId/send-verification-email', requirePlatformAdmin, asyn
     res.json({
       success: true,
       message: 'Verification email sent successfully',
-      verificationLink: process.env.NODE_ENV === 'development' ? verificationLink : undefined, // Only show in development
+      verificationLink: unifiedConfig.isDevelopment ? verificationLink : undefined, // Only show in development
     });
   } catch (error: any) {
     console.error('[POST /users/:userId/send-verification-email] Error:', error);

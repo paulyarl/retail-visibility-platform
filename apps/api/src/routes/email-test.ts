@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { emailService } from '../services/email-service';
+import { unifiedConfig } from '../config/unifiedConfig';
 // For now, use a simple auth check - you can replace with proper platform user check later
 const requirePlatformUser = (req: any, res: any, next: any) => {
   // Simple check - in production you'd verify JWT and platform role
@@ -18,10 +19,10 @@ router.get('/config', requirePlatformUser, async (req: Request, res: Response) =
     
     res.json({
       success: true,
-      provider: process.env.EMAIL_PROVIDER || 'console',
+      provider: unifiedConfig.emailProvider,
       configured: isValid,
-      fromEmail: process.env.EMAIL_FROM || 'noreply@rvp-platform.com',
-      fromName: process.env.EMAIL_FROM_NAME || 'Visible Shelf Platform',
+      fromEmail: unifiedConfig.emailFrom,
+      fromName: unifiedConfig.emailFromName,
     });
   } catch (error: any) {
     console.error('[Email Test] Config check failed:', error);
@@ -106,7 +107,7 @@ router.post('/test-invitation', requirePlatformUser, async (req: Request, res: R
       inviterName: 'Platform Admin',
       tenantName: 'Demo Store',
       role: 'MEMBER',
-      acceptUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=test-token-123`,
+      acceptUrl: `${unifiedConfig.frontendUrl}/accept-invitation?token=test-token-123`,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
       usersName: 'Test User', // Required by InvitationEmailData interface
     };

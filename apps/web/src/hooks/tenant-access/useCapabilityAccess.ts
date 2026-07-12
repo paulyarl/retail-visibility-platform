@@ -36,6 +36,7 @@ import {
   ChatbotOptionsState,
   SocialCommerceOptionsState,
   DirectoryPromotionState,
+  WholesaleMatchingState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -578,6 +579,38 @@ export function useDirectoryPromotionCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch directory promotion capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useWholesaleMatchingCapability
+// ====================
+
+export function useWholesaleMatchingCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<WholesaleMatchingState> {
+  const [data, setData] = useState<WholesaleMatchingState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getWholesaleMatchingState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch wholesale matching capability');
     } finally {
       setLoading(false);
     }

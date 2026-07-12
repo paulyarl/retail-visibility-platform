@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { requirePlatformAdmin } from '../../middleware/auth';
 import { SentryApiService } from '../../services/SentryApiService';
+import { unifiedConfig } from '../../config/unifiedConfig';
 
 const router = Router();
 
@@ -21,8 +22,8 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     console.log('[ADMIN SENTRY] Request received from platform admin');
 
     // Check if Sentry API is configured
-    const sentryToken = process.env.SENTRY_API_TOKEN;
-    const sentryOrg = process.env.SENTRY_ORG_SLUG;
+    const sentryToken = unifiedConfig.sentryApiToken;
+    const sentryOrg = unifiedConfig.sentryOrgSlug;
 
     if (!sentryToken || !sentryOrg) {
       // Return mock data if Sentry API is not configured

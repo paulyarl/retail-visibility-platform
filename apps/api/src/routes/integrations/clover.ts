@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
 import { requireTierFeature } from '../../middleware/tier-access';
+import { unifiedConfig } from '../../config/unifiedConfig';
 import { 
   getDemoItems,
   getDemoItem,
@@ -1629,7 +1630,7 @@ function getMockCloverInventory() {
  */
 async function fetchCloverInventory(integration: any): Promise<{ categories: any[], items: any[] }> {
   // Check environment variable for real API usage
-  const useRealApi = process.env.CLOVER_USE_REAL_API === 'true';
+  const useRealApi = unifiedConfig.cloverUseRealApi;
   
   // Check if we have real API credentials
   const hasRealCredentials = integration.access_token && 
