@@ -255,7 +255,7 @@ This checklist is the **planning mirror** of `end-of-phase-sprint-checklist.md`.
 | IDs | Plan generators and prefixes | Verify no raw UUIDs in new code |
 | Navigation | Plan SQL INSERTs and icon registration | Verify links appear in UI |
 | Backend | Plan routes, jobs, logger usage | Verify mounting, wiring, signatures |
-| Route architecture | Review `api-route-architecture-audit.md` if touching mount order or catch-alls | Run route-order verification and catch-all ordering checks |
+| Route architecture | Review `api-route-architecture-audit.md` if touching mount order or catch-alls | Run `lint:catchall`, `test:routes`, and `gen:routes` from `apps/api` |
 | Auth scope | Plan URL namespace (`/api/public/` vs `/api/tenants/`) and per-route auth | Verify URL prefix matches auth scope, no router-level auth in orchestrator sub-routers |
 | Database | Plan migration, RLS, triggers, indexes | Verify idempotency and Prisma sync |
 | Frontend | Plan components, cache keys, SSR safety | Verify states, no orphaned imports |

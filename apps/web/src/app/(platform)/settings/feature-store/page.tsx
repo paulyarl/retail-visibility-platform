@@ -38,6 +38,10 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [promoError, setPromoError] = useState<string | null>(null);
   const [isDemoTenant, setIsDemoTenant] = useState(false);
   const [urlPromoCode, setUrlPromoCode] = useState<string | null>(null);
+  const [grantToken, setGrantToken] = useState<string | null>(null);
+  const [grantRedeeming, setGrantRedeeming] = useState(false);
+  const [grantError, setGrantError] = useState<string | null>(null);
+  const [grantSuccess, setGrantSuccess] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!tenantId) {
@@ -78,6 +82,10 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
     if (promoFromUrl) {
       setUrlPromoCode(promoFromUrl);
       setPromoCode(promoFromUrl);
+    }
+    const grantFromUrl = searchParams?.get('grant');
+    if (grantFromUrl) {
+      setGrantToken(grantFromUrl);
     }
   }, [searchParams]);
 
@@ -314,6 +322,59 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           <Alert icon={<IconTag size={16} />} color="blue" withCloseButton onClose={() => setUrlPromoCode(null)}>
             Promo code <strong>{urlPromoCode}</strong> applied — click a feature or bundle to purchase with discount.
           </Alert>
+        )}
+
+        {grantToken && (
+          <Card withBorder p="lg" className="bg-purple-50 border-purple-200">
+            <Stack gap="sm">
+              <div className="flex items-center gap-2">
+                <IconLock size={20} className="text-purple-600" />
+                <Text fw={600} className="text-purple-900">You&apos;ve been granted access to a feature</Text>
+              </div>
+              <Text size="sm" c="dimmed">
+                Click Redeem to activate this feature on your tenant. This is a complimentary grant — no payment required.
+              </Text>
+              {grantError && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" onClose={() => setGrantError(null)} withCloseButton>
+                  {grantError}
+                </Alert>
+              )}
+              {grantSuccess && (
+                <Alert icon={<IconCheck size={16} />} color="green" onClose={() => setGrantSuccess(null)} withCloseButton>
+                  {grantSuccess}
+                </Alert>
+              )}
+              <Group>
+                <Button
+                  color="grape"
+                  onClick={async () => {
+                    try {
+                      setGrantRedeeming(true);
+                      setGrantError(null);
+                      const result = await bsaasPurchaseService.redeemGrant(grantToken);
+                      if (result.success) {
+                        setGrantSuccess(`Successfully activated "${result.data?.feature_name || 'feature'}"!`);
+                        setGrantToken(null);
+                        await loadData();
+                      } else {
+                        setGrantError(result.message || result.error || 'Failed to redeem grant');
+                      }
+                    } catch (err: any) {
+                      setGrantError(err.message || 'Failed to redeem grant');
+                    } finally {
+                      setGrantRedeeming(false);
+                    }
+                  }}
+                  loading={grantRedeeming}
+                >
+                  Redeem Grant
+                </Button>
+                <Button variant="subtle" color="gray" onClick={() => setGrantToken(null)}>
+                  Dismiss
+                </Button>
+              </Group>
+            </Stack>
+          </Card>
         )}
 
         {catalog.length === 0 && bundleCatalog.length === 0 && !loading && (

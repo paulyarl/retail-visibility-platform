@@ -512,6 +512,8 @@ export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products
 export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
+export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
+export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
@@ -531,6 +533,11 @@ export interface EffectiveStorefrontOptions {
   qr_enabled: boolean;
   allowed_qr_resolutions: StorefrontOptQRResolutionType[];
   allowed_qr_content_types: StorefrontOptQRContentType[];
+  qr_styled_enabled: boolean;
+  allowed_qr_dot_styles: StorefrontOptQRDotStyleType[];
+  allowed_qr_corner_styles: StorefrontOptQRCornerStyleType[];
+  qr_custom_colors: boolean;
+  qr_gradients: boolean;
   gallery_enabled: boolean;
   allowed_gallery_types: StorefrontOptGalleryType[];
   advanced_enabled: boolean;

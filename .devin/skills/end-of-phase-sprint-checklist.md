@@ -109,7 +109,18 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Routes mounted in `index.ts`.** Any new route file must be imported and mounted in `apps/api/src/index.ts`. Verify the mount path matches the route prefix.
 
-- [ ] **Route order and catch-all ordering.** If the session added or reordered routes, verify no static sub-route is mounted after a catch-all (`/:id`, `/:slug`, `/:tenantId`) in the same `Router()`. Run the route-order verification script and review `api-route-architecture-audit.md` if the count of `app.use` in `index.ts` has grown significantly.
+- [ ] **Route order and catch-all ordering.** If the session added or reordered routes, verify no static sub-route is mounted after a catch-all (`/:id`, `/:slug`, `/:tenantId`) in the same `Router()`. Run the catch-all lint and route coverage tests:
+  ```bash
+  cd apps/api
+  npx tsx src/scripts/lint-catchall-order.ts
+  npx vitest run src/tests/route-coverage.test.ts
+  ```
+  If the count of `app.use` in `index.ts` has grown significantly, also regenerate the route map and OpenAPI spec:
+  ```bash
+  npx tsx src/scripts/generate-route-map.ts
+  npx tsx src/scripts/generate-openapi.ts
+  ```
+  Review `api-route-architecture-audit.md` for patterns and pitfalls.
 
 - [ ] **Background jobs wired into startup.** Any new scheduled job (e.g., `*-sync.ts`, `*-renewal.ts`) must be imported and started in `apps/api/src/index.ts` server startup.
 

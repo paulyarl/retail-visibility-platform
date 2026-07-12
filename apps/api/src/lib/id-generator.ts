@@ -1398,3 +1398,22 @@ export function generateBrandPartnerClaimId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `bpc-${nanoid()}`;
 }
+
+/**
+ * Generate BSaaS grant token ID (global, admin-created)
+ * Format: gtok-{nanoid} (13 chars)
+ * Uses gtok prefix to avoid collision with existing grant- prefix (generateAccessGrantId)
+ */
+export function generateGrantTokenId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `gtok-${nanoid()}`;
+}
+
+/**
+ * Generate BSaaS grant token claim ID (tenant-scoped)
+ * Format: gclm-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateGrantClaimId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `gclm-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

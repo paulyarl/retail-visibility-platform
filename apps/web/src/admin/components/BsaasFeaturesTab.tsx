@@ -26,8 +26,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/Dialog';
-import { AlertCircle, Plus, Pencil, Trash2, ShoppingCart, Gift } from 'lucide-react';
+import { AlertCircle, Plus, Pencil, Trash2, ShoppingCart, Gift, QrCode } from 'lucide-react';
 import ComplimentaryAccessForm from './ComplimentaryAccessForm';
+import PrivateFeatureGrantDialog from './PrivateFeatureGrantDialog';
 import { adminCapabilityService, type CapabilityType } from '@/services/AdminCapabilityService';
 
 function getFeatureTypeBadge(featureKey: string): { label: string; className: string } {
@@ -74,6 +75,7 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
   const [editingEntry, setEditingEntry] = useState<BsaasCatalogEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BsaasCatalogEntry | null>(null);
   const [showGrantDialog, setShowGrantDialog] = useState(false);
+  const [showGrantQRDialog, setShowGrantQRDialog] = useState(false);
 
   const [capabilityTypes, setCapabilityTypes] = useState<CapabilityType[]>([]);
   const [selectedCapType, setSelectedCapType] = useState<string>('');
@@ -217,6 +219,10 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" onClick={() => setShowGrantQRDialog(true)} className="gap-2">
+          <QrCode className="w-4 h-4" />
+          Create Grant QR
+        </Button>
         <Button variant="outline" onClick={() => setShowGrantDialog(true)} className="gap-2">
           <Gift className="w-4 h-4" />
           Grant Access
@@ -576,6 +582,12 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
       <ComplimentaryAccessForm
         open={showGrantDialog}
         onOpenChange={setShowGrantDialog}
+      />
+
+      {/* Private Feature Grant QR Dialog */}
+      <PrivateFeatureGrantDialog
+        open={showGrantQRDialog}
+        onClose={() => setShowGrantQRDialog(false)}
       />
     </div>
   );

@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
 
     const endpoint = action === 'grant-complimentary'
       ? '/api/admin/feature-purchases/grant-complimentary'
+      : action === 'create-grant-token'
+      ? '/api/admin/feature-purchases/create-grant-token'
       : '/api/admin/feature-purchases';
 
     const response = await authenticatedFetch(endpoint, accessToken, {

@@ -27,6 +27,8 @@ import CrmAlertService from '../services/CrmAlertService';
 import CouponTargetService, { CouponTargets, CouponTargetContext } from '../services/CouponTargetService';
 import { audit } from '../audit';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { verifyGrantToken, isGrantTokenExpired } from '../services/GrantTokenService';
+import { generateGrantClaimId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -1784,5 +1786,179 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
 });
 
 export { validatePromoCode, type PromoValidationResult, type PromoValidation };
+
+// ====================
+// Phase 4: Grant Token Redemption
+// ====================
+
+const redeemGrantSchema = z.object({
+  grant_token: z.string().min(1),
+});
+
+// POST /api/subscription/redeem-grant
+router.post('/redeem-grant', async (req: Request, res: Response) => {
+  try {
+    const validation = redeemGrantSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Invalid request', details: validation.error.issues });
+    }
+
+    const { grant_token } = validation.data;
+    const tenantId = getTenantId(req);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, error: 'Tenant ID is required' });
+    }
+
+    // Verify token signature
+    const decoded = verifyGrantToken(grant_token);
+    if (!decoded) {
+      return res.status(400).json({ success: false, error: 'invalid_token', message: 'Invalid or malformed grant token' });
+    }
+
+    // Check QR expiry
+    if (isGrantTokenExpired(decoded)) {
+      return res.status(410).json({ success: false, error: 'token_expired', message: 'This grant QR code has expired' });
+    }
+
+    // Check tenant binding
+    if (decoded.tenant_id && decoded.tenant_id !== tenantId) {
+      return res.status(403).json({ success: false, error: 'wrong_tenant', message: 'This grant is not for your tenant' });
+    }
+
+    // Fetch the grant token record from DB
+    const grantRecord = await prisma.bsaas_grant_tokens.findUnique({
+      where: { id: decoded.grant_token_id },
+    });
+    if (!grantRecord) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Grant token record not found' });
+    }
+
+    // Check max_claims
+    if (grantRecord.claims_count >= grantRecord.max_claims) {
+      return res.status(410).json({ success: false, error: 'max_claims_reached', message: 'This grant has reached its maximum number of redemptions' });
+    }
+
+    // Check for existing claim by this tenant (prevent double-claim)
+    const existingClaim = await prisma.bsaas_grant_token_claims.findUnique({
+      where: {
+        grant_token_id_tenant_id: {
+          grant_token_id: decoded.grant_token_id,
+          tenant_id: tenantId,
+        },
+      },
+    });
+    if (existingClaim) {
+      return res.status(409).json({ success: false, error: 'already_claimed', message: 'Your tenant has already redeemed this grant' });
+    }
+
+    // Verify the feature still exists
+    const feature = await prisma.features_list.findUnique({ where: { key: decoded.feature_key } });
+    if (!feature) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Feature no longer exists' });
+    }
+
+    // Calculate expiry
+    const expiresAt = decoded.duration_days
+      ? new Date(Date.now() + decoded.duration_days * 24 * 60 * 60 * 1000)
+      : null;
+
+    // Create or update the feature purchase with source='admin_grant'
+    const purchase = await prisma.tenant_feature_purchases.upsert({
+      where: {
+        tenant_id_feature_key: { tenant_id: tenantId, feature_key: decoded.feature_key },
+      },
+      update: {
+        source: 'admin_grant',
+        status: 'active',
+        expires_at: expiresAt,
+        metadata: {
+          grant_token_id: decoded.grant_token_id,
+          granted_by: grantRecord.granted_by,
+          grant_redeemed_at: new Date().toISOString(),
+          complimentary: true,
+        },
+        updated_at: new Date(),
+      },
+      create: {
+        tenant_id: tenantId,
+        feature_key: decoded.feature_key,
+        source: 'admin_grant',
+        status: 'active',
+        expires_at: expiresAt,
+        metadata: {
+          grant_token_id: decoded.grant_token_id,
+          granted_by: grantRecord.granted_by,
+          grant_redeemed_at: new Date().toISOString(),
+          complimentary: true,
+        },
+      },
+    });
+
+    // Create claim record (atomic — unique constraint prevents double-claim race)
+    const claimId = generateGrantClaimId(tenantId);
+    await prisma.bsaas_grant_token_claims.create({
+      data: {
+        id: claimId,
+        grant_token_id: decoded.grant_token_id,
+        tenant_id: tenantId,
+      },
+    }).catch(() => {
+      // Unique constraint violation — another request claimed first
+    });
+
+    // Increment claims_count atomically
+    await prisma.bsaas_grant_tokens.update({
+      where: { id: decoded.grant_token_id },
+      data: {
+        claims_count: { increment: 1 },
+        updated_at: new Date(),
+      },
+    });
+
+    // Invalidate capability cache
+    invalidateEffectiveCapabilities(tenantId);
+
+    // Send notification
+    const notificationService = getBillingNotificationService();
+    notificationService.sendNotification({
+      tenantId,
+      type: 'bsaas_purchase_success',
+      metadata: { featureKey: decoded.feature_key, featureName: feature.name, grantRedeemed: true },
+    }).catch(err => console.error('[BSaaS] Failed to send grant redemption notification:', err));
+
+    // Audit
+    await audit({
+      tenantId,
+      actor: (req as any).user?.id || null,
+      action: 'feature_purchase.grant_redeemed',
+      payload: {
+        id: purchase.id,
+        entity_type: 'other',
+        feature_key: decoded.feature_key,
+        grant_token_id: decoded.grant_token_id,
+      },
+    });
+
+    logger.info('[BSaaS] Grant token redeemed', undefined, {
+      tenantId,
+      featureKey: decoded.feature_key,
+      grantTokenId: decoded.grant_token_id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        purchase_id: purchase.id,
+        feature_key: decoded.feature_key,
+        feature_name: feature.marketing_name || feature.name,
+        status: 'active',
+        expires_at: expiresAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('[BSaaS] Error redeeming grant token:', error);
+    res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to redeem grant token' });
+  }
+});
 
 export default router;

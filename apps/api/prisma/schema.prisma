@@ -5500,6 +5500,36 @@ model brand_partner_claims {
   @@index([claim_type], map: "idx_brand_partner_claims_claim_type")
 }
 
+model bsaas_grant_tokens {
+  id                       String                     @id @db.VarChar(255)
+  feature_key              String                     @db.VarChar(100)
+  tenant_id                String?                    @db.VarChar(255)
+  duration_days            Int?
+  granted_by               String                     @db.VarChar(255)
+  max_claims               Int                        @default(1)
+  claims_count             Int                        @default(0)
+  qr_expires_at            DateTime                   @db.Timestamptz(6)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  bsaas_grant_token_claims bsaas_grant_token_claims[]
+
+  @@index([feature_key], map: "idx_bsaas_grant_tokens_feature_key")
+  @@index([tenant_id], map: "idx_bsaas_grant_tokens_tenant_id")
+  @@index([granted_by], map: "idx_bsaas_grant_tokens_granted_by")
+}
+
+model bsaas_grant_token_claims {
+  id                 String             @id @db.VarChar(255)
+  grant_token_id     String             @db.VarChar(255)
+  tenant_id          String             @db.VarChar(255)
+  claimed_at         DateTime           @default(now()) @db.Timestamptz(6)
+  bsaas_grant_tokens bsaas_grant_tokens @relation(fields: [grant_token_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([grant_token_id, tenant_id])
+  @@index([grant_token_id], map: "idx_bsaas_grant_token_claims_grant_token_id")
+  @@index([tenant_id], map: "idx_bsaas_grant_token_claims_tenant_id")
+}
+
 enum action {
   create
   update

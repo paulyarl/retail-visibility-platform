@@ -550,3 +550,94 @@ The Feature Store page (`/settings/feature-store`) reads the `promo` query param
 | `apps/web/src/admin/components/BsaasPromotionManagement.tsx` | QR Code button in promotion codes table |
 | `apps/web/src/services/AdminBsaasPromotionsService.ts` | `getQRData()` method + `PromoQRData` interface |
 | `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | URL `?promo=` auto-fill + banner |
+
+---
+
+## Part 4: QR Codes for Private Grants
+
+### Overview
+
+Admins can generate styled QR codes for private feature grants. The QR code deep-links to the Feature Store with a signed JWT grant token. Tenants scan the QR, land on the Feature Store, and redeem the grant — no payment required.
+
+### Grant Token Structure
+
+JWT payload signed with `unifiedConfig.encryptionKey`:
+- `grant_token_id` — unique ID (`gtok-{nanoid}`)
+- `feature_key` — the feature to grant
+- `tenant_id` — optional, null for open grants (any tenant)
+- `duration_days` — optional, null for permanent
+- `max_claims` — max number of tenants that can redeem (default 1)
+- `qr_expires_at` — ISO timestamp when the QR code expires
+
+### Backend Endpoints
+
+**Admin: `POST /api/admin/feature-purchases/create-grant-token`**
+- Zod validates input (feature_key, optional tenant_id, duration_days, max_claims, qr_expiry_hours)
+- Checks feature exists in `features_list` and `bsaas_catalog`
+- Checks tenant exists if `tenant_id` provided
+- Creates `bsaas_grant_tokens` record
+- Signs JWT grant token
+- Returns `{ grant_token, grant_token_id, qr_url, expires_at, feature_key, feature_name, target_icon }`
+
+**Tenant: `POST /api/subscription/redeem-grant`**
+- Zod validates `grant_token` in body
+- Extracts tenant ID via `getTenantId`
+- Verifies JWT signature and expiry
+- Checks tenant binding (if `tenant_id` in token, must match)
+- Checks `max_claims` not exceeded
+- Checks no existing claim for this tenant + token
+- Creates `tenant_feature_purchases` record with `source: 'admin_grant'`
+- Creates `bsaas_grant_token_claims` record
+- Atomically increments `claims_count`
+- Invalidates capability cache
+- Sends notification + audit event
+
+### Database
+
+**`bsaas_grant_tokens`** — tracks grant tokens and claim counts
+**`bsaas_grant_token_claims`** — tracks individual tenant claims (unique per token + tenant)
+
+Both tables have RLS policies, indexes, and `updated_at` triggers.
+
+### Frontend Components
+
+**`PrivateFeatureGrantDialog`** — admin dialog for creating grant QR codes:
+- Feature selector (from BSaaS catalog)
+- Optional tenant selector
+- Duration, max claims, QR expiry inputs
+- On generate: creates grant token, displays styled QR with theme selector
+- Copy URL/token buttons, PNG/SVG download
+
+**Feature Store `?grant=` param** — tenant-facing redemption:
+- Reads `grant` URL param on page load
+- Shows purple card: "You've been granted access to a feature"
+- Redeem button calls `bsaasPurchaseService.redeemGrant()`
+- On success: shows success message, reloads catalog
+
+### Unit Tests
+
+**`apps/api/src/services/GrantTokenService.test.ts`** — tests covering:
+- `signGrantToken`: returns valid JWT, embeds payload data, preserves tenant_id (null and set)
+- `verifyGrantToken`: returns null for invalid/tampered/empty tokens, verifies valid tokens
+- `isGrantTokenExpired`: false for future, true for past, edge case at expiry
+- `max_claims` enforcement data embedded in token
+- `tenant_id` binding (set and null)
+- `duration_days` (set and null for permanent)
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `database/migrations/101_bsaas_grant_tokens.sql` | DB migration for grant tokens + claims tables |
+| `apps/api/prisma/schema.prisma` | Prisma models for `bsaas_grant_tokens` + `bsaas_grant_token_claims` |
+| `apps/api/src/lib/id-generator.ts` | `generateGrantTokenId` + `generateGrantClaimId` |
+| `apps/api/src/services/GrantTokenService.ts` | JWT signing, verification, expiry checking |
+| `apps/api/src/services/GrantTokenService.test.ts` | Unit tests for grant token service |
+| `apps/api/src/routes/admin/feature-purchases.ts` | Admin `create-grant-token` endpoint |
+| `apps/api/src/routes/bsaas-purchases.ts` | Tenant `redeem-grant` endpoint |
+| `apps/web/src/admin/components/PrivateFeatureGrantDialog.tsx` | Admin grant QR dialog |
+| `apps/web/src/admin/components/BsaasFeaturesTab.tsx` | "Create Grant QR" button |
+| `apps/web/src/services/AdminFeaturePurchasesService.ts` | `createGrantToken()` method |
+| `apps/web/src/services/BsaasPurchaseService.ts` | `redeemGrant()` method |
+| `apps/web/src/app/api/admin/feature-purchases/route.ts` | Proxy route for `create-grant-token` action |
+| `apps/web/src/app/(platform)/settings/feature-store/page.tsx` | `?grant=` URL param redemption UI |

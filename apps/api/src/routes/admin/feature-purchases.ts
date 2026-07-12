@@ -19,6 +19,9 @@ import { prisma } from '../../prisma';
 import { invalidateEffectiveCapabilities } from '../../services/EffectiveCapabilityResolver';
 import { getBillingNotificationService } from '../../services/subscription/BillingNotificationService';
 import { audit } from '../../audit';
+import { signGrantToken } from '../../services/GrantTokenService';
+import { unifiedConfig } from '../../config/unifiedConfig';
+import { generateGrantTokenId } from '../../lib/id-generator';
 
 const router = Router();
 
@@ -280,6 +283,112 @@ router.delete('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[FeaturePurchases] Error deleting:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete feature purchase' });
+  }
+});
+
+// ====================
+// Phase 4: Grant Token QR Codes for Private Features
+// ====================
+
+const createGrantTokenSchema = z.object({
+  feature_key: z.string().min(1),
+  tenant_id: z.string().max(255).optional(),
+  duration_days: z.number().int().min(1).max(3650).optional(),
+  max_claims: z.number().int().min(1).max(100).default(1),
+  qr_expiry_hours: z.number().int().min(1).max(720).default(168),
+});
+
+// POST /api/admin/feature-purchases/create-grant-token
+router.post('/create-grant-token', async (req: Request, res: Response) => {
+  try {
+    const validation = createGrantTokenSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', message: 'Invalid grant token request', details: validation.error.issues });
+    }
+
+    const { feature_key, tenant_id, duration_days, max_claims, qr_expiry_hours } = validation.data;
+
+    // Verify feature exists in features_list (must be active or private)
+    const feature = await prisma.features_list.findUnique({ where: { key: feature_key } });
+    if (!feature || !feature.is_active) {
+      return res.status(404).json({ error: 'not_found', message: `Feature key '${feature_key}' does not exist or is inactive` });
+    }
+
+    // Check bsaas_catalog — feature must be in catalog (is_private allowed)
+    const catalogEntry = await prisma.bsaas_catalog.findUnique({ where: { feature_key } });
+    if (!catalogEntry) {
+      return res.status(400).json({ error: 'not_in_catalog', message: 'Feature is not in the BSaaS catalog' });
+    }
+
+    // If tenant_id provided, verify tenant exists
+    if (tenant_id) {
+      const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+      if (!tenant) {
+        return res.status(404).json({ error: 'not_found', message: 'Tenant not found' });
+      }
+    }
+
+    const grantTokenId = generateGrantTokenId();
+    const qrExpiresAt = new Date(Date.now() + qr_expiry_hours * 60 * 60 * 1000);
+
+    // Create grant token record
+    await prisma.bsaas_grant_tokens.create({
+      data: {
+        id: grantTokenId,
+        feature_key,
+        tenant_id: tenant_id || null,
+        duration_days: duration_days || null,
+        granted_by: (req as any).user?.userId || 'admin',
+        max_claims,
+        claims_count: 0,
+        qr_expires_at: qrExpiresAt,
+      },
+    });
+
+    // Sign the JWT token
+    const grantToken = signGrantToken({
+      grant_token_id: grantTokenId,
+      feature_key,
+      tenant_id: tenant_id || null,
+      duration_days: duration_days || null,
+      max_claims,
+      qr_expires_at: qrExpiresAt,
+    });
+
+    // Construct QR URL
+    const appDomain = unifiedConfig.webUrl;
+    const qrUrl = `${appDomain}/settings/feature-store?grant=${encodeURIComponent(grantToken)}`;
+
+    // Resolve feature icon for QR embedding
+    const targetIcon = {
+      type: 'feature' as const,
+      feature_key,
+      icon_name: feature.icon_name || null,
+      marketing_name: feature.marketing_name || feature.name,
+    };
+
+    await audit({
+      tenantId: 'platform',
+      actor: (req as any).user?.userId || 'admin',
+      action: 'feature_purchase.grant_token_created',
+      payload: { entity_type: 'grant_token', id: grantTokenId, feature_key, tenant_id, duration_days, max_claims, qr_expires_at: qrExpiresAt.toISOString() },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        grant_token: grantToken,
+        grant_token_id: grantTokenId,
+        qr_url: qrUrl,
+        expires_at: qrExpiresAt.toISOString(),
+        feature_key,
+        feature_name: feature.marketing_name || feature.name,
+        target_icon: targetIcon,
+      },
+    });
+  } catch (error: any) {
+    console.error('[FeaturePurchases] Error creating grant token:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create grant token' });
   }
 });
 

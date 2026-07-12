@@ -296,6 +296,33 @@ class BsaasPurchaseService extends TenantApiSingleton {
     const innerData = (response.data as any)?.data || response.data;
     return { success: true, data: innerData };
   }
+
+  /**
+   * Redeem a grant token (from QR code URL)
+   */
+  async redeemGrant(grantToken: string): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
+    const response = await this.makeDefaultRequest<any>(
+      '/api/subscription/redeem-grant',
+      {
+        method: 'POST',
+        body: JSON.stringify({ grant_token: grantToken }),
+      },
+      'bsaas-redeem-grant',
+      0,
+    );
+
+    if (!response.success) {
+      const errorData = response.error as any;
+      return {
+        success: false,
+        error: typeof errorData === 'string' ? errorData : errorData?.error || 'redeem_failed',
+        message: typeof errorData === 'string' ? errorData : errorData?.message || 'Failed to redeem grant',
+      };
+    }
+
+    const innerData = (response.data as any)?.data || response.data;
+    return { success: true, data: innerData };
+  }
 }
 
 export const bsaasPurchaseService = BsaasPurchaseService.Instance;
