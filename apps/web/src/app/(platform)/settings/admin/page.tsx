@@ -807,6 +807,32 @@ export default function AdminDashboardPage() {
           color: 'bg-teal-700',
           stats: 'Integration health',
         },
+        {
+          title: 'Wholesale Matching',
+          description: 'Faire integration status, wholesale suppliers, and affiliate analytics',
+          href: '/settings/admin/wholesale',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          ),
+          color: 'bg-indigo-600',
+          stats: 'Faire & affiliate',
+          badge: 'NEW',
+        },
+        {
+          title: 'Brand Partner Claims',
+          description: 'Review, approve, and reject brand partner claims across all tenants',
+          href: '/settings/admin/brand-partners',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          ),
+          color: 'bg-indigo-700',
+          stats: 'Claim approvals',
+          badge: 'NEW',
+        },
       ],
     },
     {

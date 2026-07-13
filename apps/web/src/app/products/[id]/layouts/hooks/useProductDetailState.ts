@@ -46,6 +46,8 @@ export interface LandingPageFeatures {
   customDomain: boolean;
   abTesting: boolean;
   advancedAnalytics: boolean;
+  galleryDisplayMode: 'carousel' | 'magazine';
+  canUseMagazineGallery: boolean;
 }
 
 /** Minimal product shape required by the hook (subset of full Product). */
@@ -112,6 +114,8 @@ const DEFAULT_FEATURES: LandingPageFeatures = {
   customDomain: false,
   abTesting: false,
   advancedAnalytics: false,
+  galleryDisplayMode: 'carousel' as const,
+  canUseMagazineGallery: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -342,6 +346,8 @@ export function useProductDetailState({
         customDomain: Boolean(featureMap.get('custom_domain')),
         abTesting: Boolean(featureMap.get('ab_testing')),
         advancedAnalytics: Boolean(featureMap.get('advanced_analytics')),
+        galleryDisplayMode: 'carousel' as const,
+        canUseMagazineGallery: false,
       };
     },
     [],
@@ -372,7 +378,12 @@ export function useProductDetailState({
   }, [tenant.id, mapTierToFeatures]);
 
   // ---- Safe features (with fallback) ----
-  const safeFeatures: LandingPageFeatures = features || DEFAULT_FEATURES;
+  // Gallery display mode comes from optFlags (capability resolver), not tier features
+  const safeFeatures: LandingPageFeatures = {
+    ...(features || DEFAULT_FEATURES),
+    galleryDisplayMode: initialOptFlags?.galleryDisplayMode ?? (features || DEFAULT_FEATURES).galleryDisplayMode,
+    canUseMagazineGallery: initialOptFlags?.canUseMagazineGallery ?? (features || DEFAULT_FEATURES).canUseMagazineGallery,
+  };
   const hasStorefront = features !== null && !loading;
 
   // ---- Branding resolution ----

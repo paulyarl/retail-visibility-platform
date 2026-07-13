@@ -11,6 +11,7 @@ import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import DirectoryMagazineGallery from '@/components/directory/DirectoryMagazineGallery';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
@@ -114,7 +115,13 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
               )}
 
               {/* Gallery */}
-              {!showStatusPanel && <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />}
+              {!showStatusPanel && (
+                optFlags?.canUseMagazineGallery && optFlags?.galleryDisplayMode === 'magazine' ? (
+                  <DirectoryMagazineGallery listing={listing} {...businessProfile} isPublished={true} />
+                ) : (
+                  <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
+                )
+              )}
 
               {/* Active Featured Products (from ActiveFeaturedResolver) */}
               {!showStatusPanel && activeFeatured?.hasActive && activeFeatured.products.length > 0 && (

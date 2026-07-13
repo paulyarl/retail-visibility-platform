@@ -27,6 +27,7 @@ import {
   Sparkles,
   Link2,
   QrCode,
+  Image,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -384,6 +385,17 @@ export default function CapabilityShowcase({
         detail: soTier && !soMerchantGated ? "Customizable" : soTier ? "Partially disabled" : "Default",
         settingsLink: `/t/${tenantId}/settings/tenant`,
         constraintWarning: getConstraintWarning('storefront_options'),
+      },
+      {
+        key: "magazineGallery",
+        label: "Magazine Gallery",
+        icon: <Image className="w-4 h-4" />,
+        enabled: so?.canUseMagazineGallery ?? false,
+        status: getStatus(so?.canUseMagazineGallery ?? false, so?.galleryDisplayMode === 'magazine' && !so?.canUseMagazineGallery),
+        detail: so?.canUseMagazineGallery
+          ? (so?.galleryDisplayMode === 'magazine' ? "Magazine mode active" : "Available — enable in settings")
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/storefront-options`,
       },
       {
         key: "storefrontQr",

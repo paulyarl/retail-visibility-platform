@@ -47,6 +47,7 @@ import ProductCategorySidebar from '@/components/storefront/ProductCategorySideb
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
+import DirectoryMagazineGallery from '@/components/directory/DirectoryMagazineGallery';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
@@ -353,7 +354,11 @@ function ShopProfileHeader({ shop, shopData, businessHours, optFlags }: {
 
             {/* Photo Gallery */}
             {directoryListing && (
-              <DirectoryPhotoGalleryDisplay listing={directoryListing} isPublished={true} />
+              optFlags?.canUseMagazineGallery && optFlags?.galleryDisplayMode === 'magazine' ? (
+                <DirectoryMagazineGallery listing={directoryListing} isPublished={true} />
+              ) : (
+                <DirectoryPhotoGalleryDisplay listing={directoryListing} isPublished={true} />
+              )
             )}
 
             {/* Business Hours */}

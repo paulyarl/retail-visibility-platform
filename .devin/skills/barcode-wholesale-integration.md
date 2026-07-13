@@ -789,6 +789,49 @@ The test uses `vi.hoisted()` for mock functions available in `vi.mock` factories
 
 ---
 
+## 13.5 Supplier Seeding Migration (Critical)
+
+Built-in suppliers MUST be seeded via SQL migration, not just runtime `ensureSupplierExists()` calls in sync jobs. The sync jobs have startup delays (10-30 min) and some suppliers are never seeded (UPC Database = on-demand only, Go-UPC = no text search, skipped).
+
+**Pattern:**
+```sql
+INSERT INTO supplier (id, name, connection_type, api_url, api_key_env, active, is_builtin, metadata, created_at, updated_at)
+VALUES
+  ('supplier-off-open-food-facts', 'Open Food Facts', 'API', 'https://world.openfoodfacts.org/api/v2', NULL, true, true, '{"type":"open-source"}', NOW(), NOW()),
+  ('supplier-off-barcodelookup', 'BarcodeLookup.com', 'API', 'https://api.barcodelookup.com/v3', 'BARCODELOOKUP_API_KEY', false, true, '{"type":"commercial"}', NOW(), NOW())
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name, api_url = EXCLUDED.api_url, active = EXCLUDED.active, metadata = EXCLUDED.metadata, updated_at = NOW();
+```
+
+**Rules:**
+- Open-source suppliers (Open Food Facts, Open Beauty Facts): `active = true`, no API key env var
+- Commercial suppliers with free developer accounts (Kroger, UPC Database, Go-UPC): `active = true`, set `api_key_env` to the env var name
+- Commercial suppliers requiring paid subscriptions (BarcodeLookup.com): `active = false` so admin can toggle on when subscription is obtained
+- Always use `ON CONFLICT (id) DO UPDATE` for idempotency — sync jobs will upsert the same rows at runtime
+
+**Reference migration:** `database/migrations/105_seed_builtin_suppliers.sql`
+
+**Admin UI switch behavior:** The SupplierManagement component locks the active toggle for built-in suppliers that are `active = true` (seeded/wired). Inactive built-in suppliers (unfinished setup) are toggleable so admins can enable them when API keys are obtained. Tooltips explain the status.
+
+---
+
+## 13.6 Admin Page Architecture for Wholesale Features
+
+Admin pages for wholesale features live at the **platform level**, not tenant-scoped:
+
+| Page | Route | Service |
+|---|---|---|
+| Supplier Management | `/settings/admin/suppliers` | `SupplierService` (AdminApiSingleton) |
+| Supplier Health | `/settings/admin/suppliers/health` | `SupplierService` (AdminApiSingleton) |
+| Wholesale Matching | `/settings/admin/wholesale` | `AdminWholesaleService` (AdminApiSingleton) |
+| Brand Partner Claims | `/settings/admin/brand-partners` | `AdminBrandPartnerService` (AdminApiSingleton) |
+
+**Key distinction:** The tenant-facing wholesale dashboard at `/t/[tenantId]/settings/wholesale` uses `WholesaleMatchingService` (extends `TenantApiSingleton`, requires tenantId). The admin wholesale page at `/settings/admin/wholesale` uses `AdminWholesaleService` (extends `AdminApiSingleton`, no tenantId) calling `/api/admin/wholesale/*` endpoints.
+
+**Faire integration status** is shown on the admin wholesale page as a status card (configured/not configured based on `FAIRE_API_KEY` env var). Faire is NOT in the `supplier` table — it's accessed on-demand through `WholesaleMatchingService`.
+
+---
+
 ## 14. Skills to Read Before Implementation
 
 | Skill | When to Read |
@@ -825,3 +868,7 @@ The test uses `vi.hoisted()` for mock functions available in `vi.mock` factories
 12. **Don't mount tenant sub-resource routers after `tenantsRoutes`** — `tenantsRoutes` has `/:id` catch-all patterns that will intercept sub-resource paths like `/:tenantId/wholesale`. Always mount sub-resource routers BEFORE `tenantsRoutes` in `tenant.routes.ts`.
 13. **Don't mount admin routes after generic root mounts** — Generic root-mounted routers (`tenantFlagsRoutes`, `platformFlagsRoutes`, etc.) in `admin.routes.ts` can intercept paths meant for specific sub-path routers. Always mount specific sub-paths first.
 14. **Don't forget `preMiddleware: true` for webhooks** — Faire webhook needs raw body for signature verification, same as Stripe webhooks. Without `preMiddleware: true`, JSON parsing middleware consumes the body before signature verification can run.
+15. **Don't rely on runtime `ensureSupplierExists()` as the only seeding mechanism** — Sync jobs call `ensureSupplierExists()` with a startup delay (10-30 min), and some suppliers (UPC Database, Go-UPC) are never seeded at all. Always create a SQL migration with `INSERT INTO supplier ... ON CONFLICT (id) DO UPDATE` to seed all built-in suppliers. Set commercial suppliers requiring paid API keys as `active = false` so admins can toggle them on when keys are obtained. See `105_seed_builtin_suppliers.sql` for the pattern.
+16. **Don't place admin pages at tenant-scoped routes** — Admin pages must live at `(platform)/settings/admin/<feature>/page.tsx`, NOT `t/[tenantId]/settings/admin/<feature>/page.tsx`. The admin dashboard at `(platform)/settings/admin/page.tsx` links to `/settings/admin/<feature>` (no tenant prefix). A tenant-scoped admin page will 404 when accessed from the admin dashboard. If a tenant-scoped admin page already exists, create a platform-level page that imports a client component using `AdminApiSingleton`-based services (no tenantId required).
+17. **Don't use `TenantApiSingleton` services for admin pages** — Admin pages call `/api/admin/*` endpoints which don't include a tenantId. `TenantApiSingleton` requires a tenantId for auth headers and cache isolation. Create a separate `Admin<Feature>Service` extending `AdminApiSingleton` with `makeDefaultRequest` calls to `/api/admin/<feature>/*`. See `AdminWholesaleService.ts` as an example.
+18. **Don't conflate Faire with `supplier` table entries** — Faire is a wholesale marketplace accessed on-demand through `WholesaleMatchingService.searchFaireSuppliers()`, not a barcode lookup connector in the `supplier` table. The `supplier` table holds barcode enrichment connectors (Open Food Facts, Kroger, BarcodeLookup, etc.) that populate `supplier_catalog_item`. Faire requires `FAIRE_API_KEY` env var and partner program enrollment, and has its own webhook at `/api/webhooks/faire`.

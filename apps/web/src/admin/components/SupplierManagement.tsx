@@ -211,7 +211,16 @@ export default function SupplierManagement() {
                       <Switch
                         checked={supplier.active}
                         onCheckedChange={() => handleToggleActive(supplier)}
-                        disabled={supplier.is_builtin}
+                        disabled={supplier.is_builtin && supplier.active}
+                        title={
+                          supplier.is_builtin && supplier.active
+                            ? supplier.api_key_env
+                              ? 'Active — built-in supplier wired with API key. Disable via env var removal.'
+                              : 'Active — built-in open-source supplier. No API key required.'
+                            : supplier.is_builtin && !supplier.active
+                              ? 'Inactive — built-in supplier not yet configured. Toggle to enable.'
+                              : 'Toggle supplier active/inactive.'
+                        }
                       />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">

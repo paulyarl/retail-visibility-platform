@@ -37,6 +37,7 @@ import ProductActions from '@/components/products/ProductActions';
 import ProductVariantSelector from '@/components/products/ProductVariantSelector';
 import ProductGallery from '@/components/products/ProductGallery';
 import BasicProductGallery from '@/components/products/BasicProductGallery';
+import MagazineGallery from '@/components/products/MagazineGallery';
 import { LocationAvailabilitySection } from '@/components/products/LocationAvailabilitySection';
 import Link from 'next/link';
 import { TenantPaymentProvider, useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
@@ -69,6 +70,8 @@ interface LandingPageFeatures {
   customDomain: boolean;
   abTesting: boolean;
   advancedAnalytics: boolean;
+  galleryDisplayMode: 'carousel' | 'magazine';
+  canUseMagazineGallery: boolean;
 }
 
 // Featured Type Badge Component with icons only (subtle display)
@@ -1242,6 +1245,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
       customDomain: Boolean(featureMap.get('custom_domain')),
       abTesting: Boolean(featureMap.get('ab_testing')),
       advancedAnalytics: Boolean(featureMap.get('advanced_analytics')),
+      galleryDisplayMode: 'carousel' as const,
+      canUseMagazineGallery: false,
     };
   }, []);
 
@@ -1301,7 +1306,17 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
     customDomain: false,
     abTesting: false,
     advancedAnalytics: false,
+    galleryDisplayMode: 'carousel' as const,
+    canUseMagazineGallery: false,
   };
+
+  // Override gallery display mode from optFlags (capability resolver)
+  if (initialOptFlags?.galleryDisplayMode) {
+    (safeFeatures as any).galleryDisplayMode = initialOptFlags.galleryDisplayMode;
+  }
+  if (initialOptFlags?.canUseMagazineGallery !== undefined) {
+    (safeFeatures as any).canUseMagazineGallery = initialOptFlags.canUseMagazineGallery;
+  }
 
   // Check if storefront is available (has features and not trial)
   const hasStorefront = features && !loading;
@@ -1357,7 +1372,17 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
         {/* Product Images */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
           {safeFeatures.imageGallery && product.imageGallery && product.imageGallery.length > 0 ? (
-            safeFeatures.maxGalleryImages === 10 ? (
+            safeFeatures.canUseMagazineGallery && safeFeatures.galleryDisplayMode === 'magazine' ? (
+              <MagazineGallery
+                gallery={product.imageGallery.slice(0, safeFeatures.maxGalleryImages).map((img: { url: string; alt?: string; caption?: string }, idx: number) => ({
+                  url: img.url,
+                  alt: img.alt || product.name,
+                  caption: img.caption || null,
+                  position: idx,
+                }))}
+                productTitle={product.name}
+              />
+            ) : safeFeatures.maxGalleryImages === 10 ? (
               <ProductGallery 
                 gallery={product.imageGallery.slice(0, safeFeatures.maxGalleryImages)} 
                 productTitle={product.name} 

@@ -3,6 +3,7 @@
 import React from 'react';
 import ProductGallery from '@/components/products/ProductGallery';
 import BasicProductGallery from '@/components/products/BasicProductGallery';
+import MagazineGallery from '@/components/products/MagazineGallery';
 import { SafeImage } from '@/components/SafeImage';
 import { ShoppableEmbeds } from '../type-sections/ShoppableEmbeds';
 
@@ -49,7 +50,17 @@ export function ProductGalleryPanel({
         {safeFeatures.imageGallery &&
         product.imageGallery &&
         product.imageGallery.length > 0 ? (
-          safeFeatures.maxGalleryImages >= 10 ? (
+          safeFeatures.canUseMagazineGallery && safeFeatures.galleryDisplayMode === 'magazine' ? (
+            <MagazineGallery
+              gallery={product.imageGallery.slice(0, safeFeatures.maxGalleryImages).map((img: { url: string; alt?: string; caption?: string }, idx: number) => ({
+                url: img.url,
+                alt: img.alt || product.name,
+                caption: img.caption || null,
+                position: idx,
+              }))}
+              productTitle={product.name}
+            />
+          ) : safeFeatures.maxGalleryImages >= 10 ? (
             <ProductGallery
               gallery={product.imageGallery.slice(0, safeFeatures.maxGalleryImages)}
               productTitle={product.name}

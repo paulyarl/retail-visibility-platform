@@ -145,6 +145,7 @@ cd apps/web && npx tsc --noEmit
 - [ ] **Indexes on foreign keys and query columns.** Add indexes for `tenant_id`, any column used in `WHERE` clauses, and composite indexes for common query patterns.
 - [ ] **Prisma schema synced via introspection (not edits).** After migration is applied to the DB, run `npx prisma db pull && npx prisma generate` to update `schema.prisma` and TypeScript types. **Never edit `schema.prisma` directly** — see `manual-sql-migration-policy.md`. Verify no edits were made to `schema.prisma` during this session: `git diff apps/api/prisma/schema.prisma` should show no manual changes (only introspected changes from `prisma db pull`).
 - [ ] **Seed data included if needed.** If the migration introduces reference data (e.g., system badges, feature keys), include `INSERT` statements in the migration or a separate seed file.
+- [ ] **Runtime-seeded data has a SQL migration.** If the session relies on runtime seeding (e.g., `ensureSupplierExists()` in sync jobs, `upsert` on first request), verify a SQL migration also exists to seed the data immediately. Runtime-only seeding causes data to be missing on first deploy or after server restart (startup delays of 10-30 min). Check for `upsert` or `ensure*Exists` patterns in new jobs/services and create a matching `INSERT ... ON CONFLICT DO UPDATE` migration. Set paid-subscription entries as `active = false` so admins can toggle them on.
 
 ---
 

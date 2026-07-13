@@ -210,6 +210,20 @@ const CONSTRAINT_METADATA: ConstraintMetadata = {
       ],
     },
     {
+      key: 'storefront_qr',
+      label: 'Storefront QR',
+      fields: [
+        { field: 'enabled', label: 'Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'qr_enabled', label: 'QR Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'qr_classic_enabled', label: 'Classic QR Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'qr_styled_enabled', label: 'Styled QR Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_qr_codes', label: 'Can Use QR Codes', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'qr_custom_colors', label: 'Custom Colors', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'qr_gradients', label: 'Gradients', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'is_flexible', label: 'Is Flexible', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+      ],
+    },
+    {
       key: 'directory_entry',
       label: 'Directory Entry',
       fields: [

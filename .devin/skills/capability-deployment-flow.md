@@ -346,6 +346,12 @@ router.put('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
 3. Add capability to `CAPABILITY_META` array in `PlanSummaryWidget.tsx` (slim dashboard widget — label, icon, prefix, settingsPath)
 4. Add row to `rows` array in `CapabilityShowcase.tsx`
 5. Create or update the settings page at `apps/web/src/app/t/[tenantId]/settings/xxx/`
+6. **Update all rendering surfaces that consume the capability.** After the dashboard/settings are wired, identify every component that conditionally renders based on the capability flags. For each surface:
+   - Check whether it receives `optFlags` / `safeFeatures` / `initialOptFlags` (the `StorefrontOptionFlags` or `LandingPageFeatures` object)
+   - Add a conditional branch: `if (flags?.canUse<Feature> && flags?.<feature>Mode === '<value>')` → render the new component, else → render the existing/default component
+   - Common rendering surfaces: `ProductGalleryPanel.tsx` (Showcase + QuickCommerce layouts), `TierBasedLandingPage.tsx` (inline gallery), directory layout files (`DirectoryEntryClassicLayout.tsx`, `DirectoryEntryEditorialLayout.tsx`, `DirectoryEntryImmersiveLayout.tsx`, `DirectoryEntryPremiumLayout.tsx`), `ShopProfileClient.tsx`
+   - If the new component has different props than the existing one (e.g., `gallery: Photo[]` vs `images: Image[]`), map the data at the call site — don't change the component's interface
+   - The `LandingPageFeatures` interface in `useProductDetailState.ts` and the local copy in `TierBasedLandingPage.tsx` must both be extended with the new fields, and `safeFeatures` must override from `initialOptFlags`
 
 > **Note**: The dashboard now renders `PlanSummaryWidget` (slim widget with color-coded capability type names) instead of the full `PlanSummaryPanel`. The full panel is rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page. Both components must be updated when adding a new capability — `CAPABILITY_DISPLAY` in `PlanSummaryPanel.tsx` for the full page, and `CAPABILITY_META` in `PlanSummaryWidget.tsx` for the dashboard.
 

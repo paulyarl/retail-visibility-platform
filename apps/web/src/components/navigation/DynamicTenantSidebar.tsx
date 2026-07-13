@@ -290,6 +290,7 @@ function buildTenantNav(
         { label: 'Business Category', href: `/t/${currentTenantId}/settings/gbp-category`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Location Status', href: `/t/${currentTenantId}/settings/location-status`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Review Management', href: `/t/${currentTenantId}/reviews` },
+        { label: 'QR Codes', href: `/t/${currentTenantId}/settings/storefront-qr`, requiredGroup: 'IS_TENANT_ADMIN' },
         ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
     },
