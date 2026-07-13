@@ -248,12 +248,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
-  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
+  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId, { isPublic: true });
   const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
   let storefrontType: string | undefined;
   try {
-    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId);
+    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
     // Non-critical — default to undefined
@@ -353,7 +353,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const { counts: rawBucketCounts, groupedProducts: rawGroupedProducts } = await getFeaturedProductsByType(product.tenantId);
 
   // Fetch featured options state and apply merchant gate filtering at page root
-  const featuredState = await unifiedCapabilityService.getFeaturedOptionsState(product.tenantId);
+  const featuredState = await unifiedCapabilityService.getFeaturedOptionsState(product.tenantId, { isPublic: true });
   const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredState);
   const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredState);
   const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredState);
@@ -362,16 +362,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
-  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
-  const productOptFlags = await unifiedCapabilityService.getProductOptionFlags(product.tenantId);
-  const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId);
-  const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId);
+  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId, { isPublic: true });
+  const productOptFlags = await unifiedCapabilityService.getProductOptionFlags(product.tenantId, { isPublic: true });
+  const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId, { isPublic: true });
+  const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId, { isPublic: true });
   const platformSettings = await platformSettingsService.getPlatformSettings();
 
   // Fetch storefront type for social behavior overlay
   let storefrontType: string | undefined;
   try {
-    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId);
+    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
     console.error('Failed to fetch storefront type:', e);
@@ -380,7 +380,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // Fetch social commerce flags for share buttons + social proof gating
   let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
   try {
-    const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId);
+    const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId, { isPublic: true });
     socialCommerceFlags = {
       enabled: socialCommerceState.enabled,
       canUseShareButtons: socialCommerceState.canUseShareButtons,

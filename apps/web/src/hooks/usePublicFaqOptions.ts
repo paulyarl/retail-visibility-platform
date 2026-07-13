@@ -32,7 +32,7 @@ export function usePublicFaqOptions(tenantId: string | null): PublicFaqOptionsSt
     setLoading(true);
     setError(null);
     try {
-      const result = await unifiedCapabilityService.getFaqOptionsFlags(tenantId);
+      const result = await unifiedCapabilityService.getFaqOptionsFlags(tenantId, { isPublic: true });
       setFlags(result);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch FAQ options');

@@ -65,7 +65,7 @@ export default function CustomerSupportPage() {
           // Fetch CRM flags for each tenant to filter by customer ticket eligibility
           const flagsEntries = await Promise.all(
             uniqueTenants.map(async (t) => {
-              const flags = await unifiedCapabilityService.getCrmOptionsFlags(t.id);
+              const flags = await unifiedCapabilityService.getCrmOptionsFlags(t.id, { isPublic: true });
               return [t.id, flags] as [string, PublicCrmOptionsFlags | null];
             })
           );

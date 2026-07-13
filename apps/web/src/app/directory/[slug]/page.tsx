@@ -489,11 +489,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
-          unifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
-          unifiedCapabilityService.getFeaturedOptionsState(data.listing.tenantId),
-          unifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId),
-          unifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId),
-          unifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId)
+          unifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId, { isPublic: true }),
+          unifiedCapabilityService.getFeaturedOptionsState(data.listing.tenantId, { isPublic: true }),
+          unifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId, { isPublic: true }),
+          unifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId, { isPublic: true }),
+          unifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId, { isPublic: true })
         ]);
 
         setBusinessProfile(profile?.data);

@@ -8,7 +8,9 @@
  * No client-side resolution logic — just mapping.
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { RequestType } from '@/providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import {
   AllCapabilitiesState,
   CommerceState,
@@ -1021,7 +1023,9 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
 // SERVICE
 // ====================
 
-class UnifiedCapabilityService extends PublicApiSingleton {
+type SsrAuth = { auth0Email?: string; auth0Id?: string };
+
+class UnifiedCapabilityService extends TenantApiSingleton {
   private static instance: UnifiedCapabilityService;
   private capCache = new Map<string, { data: AllCapabilitiesState; expiry: number }>();
   private inFlight = new Map<string, Promise<BackendEffectiveCapabilities | null>>();
@@ -1051,34 +1055,57 @@ class UnifiedCapabilityService extends PublicApiSingleton {
 
   /** Invalidate cached capabilities for a single tenant (call after merchant gate changes) */
   async invalidateTenantCapabilities(tenantId: string): Promise<void> {
-    this.capCache.delete(tenantId);
-    await this.invalidateCache(`unified-caps-${tenantId}`);
+    this.capCache.delete(`${tenantId}-auth`);
+    this.capCache.delete(`${tenantId}-public`);
+    await this.invalidateCache(`unified-caps-${tenantId}-auth`);
+    await this.invalidateCache(`unified-caps-${tenantId}-public`);
   }
 
-  private async fetchEffective(tenantId: string): Promise<BackendEffectiveCapabilities | null> {
-    const cachekey = `unified-caps-${tenantId}`;
+  private async fetchEffective(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<BackendEffectiveCapabilities | null> {
+    const isPublic = options?.isPublic ?? false;
+    const ssrAuth = options?.ssrAuth;
+    const cachekey = `unified-caps-${tenantId}${isPublic ? '-public' : '-auth'}`;
 
-    // Deduplicate concurrent in-flight requests for the same tenant
+    // Deduplicate concurrent in-flight requests for the same tenant+scope
     if (this.inFlight.has(cachekey)) {
       return this.inFlight.get(cachekey)!;
     }
 
     const promise = (async (): Promise<BackendEffectiveCapabilities | null> => {
       try {
-        const endpoint = `/api/public/tenants/${tenantId}/effective-capabilities`;
-        // console.log(`[UnifiedCapabilityService] Fetching capabilities for tenant ${tenantId} with cache key ${cachekey}`);
-        const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
-          endpoint,
-          {},
-          cachekey,
-          this.CACHE_TTL
-        );
-        if (!result.success) {
-          console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
-          return null;
+        if (isPublic) {
+          const endpoint = `/api/public/tenants/${tenantId}/effective-capabilities`;
+          const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
+            endpoint,
+            {},
+            cachekey,
+            this.CACHE_TTL
+          );
+          if (!result.success) {
+            console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
+            return null;
+          }
+          return result.data?.data || null;
+        } else {
+          const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
+          const result = await this.makeDefaultRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
+            endpoint,
+            {},
+            cachekey,
+            this.CACHE_TTL,
+            {
+              context: AppContext.TENANT,
+              isolation: CacheIsolation.TENANT,
+              requestType: RequestType.AUTHENTICATED,
+              ssrAuth
+            }
+          );
+          if (!result.success) {
+            console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
+            return null;
+          }
+          return result.data?.data || null;
         }
-        // console.log(`[UnifiedCapabilityService] Fetching capabilities - ${JSON.stringify(result.data?.data)}`);
-        return result.data?.data || null;
       } catch (error) {
         console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
         return null;
@@ -1091,145 +1118,146 @@ class UnifiedCapabilityService extends PublicApiSingleton {
     return promise;
   }
 
-  async getAllCapabilities(tenantId: string): Promise<AllCapabilitiesState> {
-    const cached = this.capCache.get(tenantId);
+  async getAllCapabilities(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<AllCapabilitiesState> {
+    const cacheKey = `${tenantId}${options?.isPublic ? '-public' : '-auth'}`;
+    const cached = this.capCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
       return cached.data;
     }
 
-    const raw = await this.fetchEffective(tenantId);
+    const raw = await this.fetchEffective(tenantId, options);
     if (!raw) {
       throw new Error(`[UnifiedCapabilityService] Unable to resolve capabilities for tenant: ${tenantId}`);
     }
 
     const mapped = mapAll(raw);
-    this.capCache.set(tenantId, { data: mapped, expiry: Date.now() + this.CACHE_TTL });
+    this.capCache.set(cacheKey, { data: mapped, expiry: Date.now() + this.CACHE_TTL });
     return mapped;
   }
 
-  async getCommerceState(tenantId: string): Promise<CommerceState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getCommerceState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<CommerceState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.commerce;
   }
 
-  async getPaymentGatewayState(tenantId: string): Promise<PaymentGatewayState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getPaymentGatewayState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PaymentGatewayState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.paymentGateway;
   }
 
-  async getStorefrontState(tenantId: string): Promise<StorefrontState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getStorefrontState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.storefront;
   }
 
-  async getBarcodeScanState(tenantId: string): Promise<BarcodeScanState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getBarcodeScanState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<BarcodeScanState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.barcodeScan;
   }
 
-  async getFulfillmentState(tenantId: string): Promise<FulfillmentState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getFulfillmentState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FulfillmentState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.fulfillment;
   }
 
-  async getProductOptionsState(tenantId: string): Promise<ProductOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getProductOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ProductOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.productOptions;
   }
 
-  async getProductTypeState(tenantId: string): Promise<ProductTypeState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getProductTypeState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ProductTypeState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.productType;
   }
 
   /** Alias for backward compatibility with old PublicProductOptionsService */
-  async getProductOptionFlags(tenantId: string): Promise<ProductOptionsState> {
-    return this.getProductOptionsState(tenantId);
+  async getProductOptionFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ProductOptionsState> {
+    return this.getProductOptionsState(tenantId, options);
   }
 
-  async getFeaturedOptionsState(tenantId: string): Promise<FeaturedOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getFeaturedOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FeaturedOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.featuredOptions;
   }
 
-  async getIntegrationOptionsState(tenantId: string): Promise<IntegrationOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getIntegrationOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<IntegrationOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.integrationOptions;
   }
 
-  async getQuickstartOptionsState(tenantId: string): Promise<QuickstartOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getQuickstartOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<QuickstartOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.quickstartOptions;
   }
 
-  async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getStorefrontOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.storefrontOptions;
   }
 
-  async getStorefrontQrState(tenantId: string): Promise<StorefrontQrState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getStorefrontQrState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontQrState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.storefrontQr;
   }
 
-  async getDirectoryEntryOptionsState(tenantId: string): Promise<DirectoryEntryOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getDirectoryEntryOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryEntryOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.directoryEntryOptions;
   }
 
   /** Compatibility alias for old PublicStorefrontOptionsService */
-  async getStorefrontOptionFlags(tenantId: string): Promise<StorefrontOptionFlags> {
-    const state = await this.getStorefrontOptionsState(tenantId);
+  async getStorefrontOptionFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontOptionFlags> {
+    const state = await this.getStorefrontOptionsState(tenantId, options);
     return toStorefrontOptionFlags(state);
   }
 
-  async getFaqOptionsState(tenantId: string): Promise<FaqOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getFaqOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FaqOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.faqOptions;
   }
 
   /** Compatibility alias for old PublicFaqService */
-  async getFaqOptionsFlags(tenantId: string): Promise<PublicFaqOptionsFlags> {
-    const state = await this.getFaqOptionsState(tenantId);
+  async getFaqOptionsFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PublicFaqOptionsFlags> {
+    const state = await this.getFaqOptionsState(tenantId, options);
     return toPublicFaqOptionsFlags(state);
   }
 
-  async getCrmOptionsState(tenantId: string): Promise<CrmOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getCrmOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<CrmOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.crmOptions;
   }
 
   /** Compatibility alias for old PublicCrmService */
-  async getCrmOptionsFlags(tenantId: string): Promise<PublicCrmOptionsFlags> {
-    const state = await this.getCrmOptionsState(tenantId);
+  async getCrmOptionsFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PublicCrmOptionsFlags> {
+    const state = await this.getCrmOptionsState(tenantId, options);
     return toPublicCrmOptionsFlags(state);
   }
 
-  async getChatbotOptionsState(tenantId: string): Promise<ChatbotOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getChatbotOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ChatbotOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.chatbotOptions;
   }
 
-  async getSocialCommerceOptionsState(tenantId: string): Promise<SocialCommerceOptionsState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getSocialCommerceOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<SocialCommerceOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.socialCommerceOptions;
   }
 
-  async getDirectoryPromotionState(tenantId: string): Promise<DirectoryPromotionState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getDirectoryPromotionState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryPromotionState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.directoryPromotion;
   }
 
-  async getWholesaleMatchingState(tenantId: string): Promise<WholesaleMatchingState> {
-    const all = await this.getAllCapabilities(tenantId);
+  async getWholesaleMatchingState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<WholesaleMatchingState> {
+    const all = await this.getAllCapabilities(tenantId, options);
     return all.wholesaleMatching;
   }
 
-  async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
+  async checkFeatureByCapability(tenantId: string, featureKey: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
 
-    const all = await this.getAllCapabilities(tenantId);
+    const all = await this.getAllCapabilities(tenantId, options);
     const capGroup = (all as any)[capType] as { features: Record<string, boolean> } | undefined;
     if (!capGroup) return false;
 

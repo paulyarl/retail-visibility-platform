@@ -417,7 +417,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront option flags (capability-aware) — prioritized server-side fetch
     let storefrontOptionFlags: StorefrontOptionFlags | null = null;
     try {
-      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug);
+      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch storefront option flags:', e);
     }
@@ -425,7 +425,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch commerce state from unified capability service
     let commerceSettings: CommerceState | null = null;
     try {
-      commerceSettings = await unifiedCapabilityService.getCommerceState(idResolvedBySlug);
+      commerceSettings = await unifiedCapabilityService.getCommerceState(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch commerce state:', e);
     }
@@ -433,7 +433,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch payment gateway state from unified capability service
     let paymentGatewaySettings: PaymentGatewayState | null = null;
     try {
-      paymentGatewaySettings = await unifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug);
+      paymentGatewaySettings = await unifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch payment gateway state:', e);
     }
@@ -441,7 +441,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront type state from unified capability service
     let storefrontTypeSettings: StorefrontState | null = null;
     try {
-      storefrontTypeSettings = await unifiedCapabilityService.getStorefrontState(idResolvedBySlug);
+      storefrontTypeSettings = await unifiedCapabilityService.getStorefrontState(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch storefront type state:', e);
     }
@@ -449,7 +449,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch FAQ option flags server-side (no client waterfall)
     let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
     try {
-      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug);
+      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch FAQ option flags:', e);
     }
@@ -457,7 +457,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch CRM option flags server-side (no client waterfall)
     let crmOptionsFlags: PublicCrmOptionsFlags | null = null;
     try {
-      crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug);
+      crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch CRM option flags:', e);
     }
@@ -465,7 +465,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch product option flags server-side (no client waterfall)
     let productOptionFlags: ProductOptionFlags | null = null;
     try {
-      productOptionFlags = await unifiedCapabilityService.getProductOptionFlags(idResolvedBySlug);
+      productOptionFlags = await unifiedCapabilityService.getProductOptionFlags(idResolvedBySlug, { isPublic: true });
     } catch (e) {
       console.error('Failed to fetch product option flags:', e);
     }
@@ -473,7 +473,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch social commerce options server-side (no client waterfall)
     let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
     try {
-      const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug);
+      const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug, { isPublic: true });
       socialCommerceFlags = {
         enabled: socialCommerceState.enabled,
         canUseShareButtons: socialCommerceState.canUseShareButtons,

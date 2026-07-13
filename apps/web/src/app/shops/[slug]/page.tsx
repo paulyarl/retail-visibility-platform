@@ -113,7 +113,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   let storefrontOptionFlags: StorefrontOptionFlags | null = null;
   try {
     if (tenantId) {
-      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(tenantId);
+      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(tenantId, { isPublic: true });
     }
   } catch (error) {
     console.error('Error fetching storefront option flags:', error);
@@ -123,7 +123,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
   try {
     if (tenantId) {
-      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(tenantId);
+      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(tenantId, { isPublic: true });
     }
   } catch (error) {
     console.error('Error fetching FAQ options flags:', error);
