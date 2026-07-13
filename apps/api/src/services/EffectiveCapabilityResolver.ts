@@ -1121,7 +1121,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_chatbot_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_barcode_scan_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_social_commerce_options_settings.findUnique({ where: { tenant_id: tenantId } })),
-    null,
+    safeQuery(() => prisma.tenant_wholesale_matching_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
   return {

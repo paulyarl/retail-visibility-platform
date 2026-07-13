@@ -8,6 +8,7 @@
  * - CouponTargetService (validateCouponTargets, setCCouponTargets, getTargetsForCoupon)
  * - Affiliate Click Expiry Job
  * - WholesaleMatchingResolver (tier gating logic)
+ * - StorefrontGalleryResolver (Phase 2 — storefront namespace split)
  *
  * Run: npx vitest run src/tests/sprint-e2e-batch.test.ts
  */
@@ -1081,5 +1082,111 @@ describe('Affiliate Analytics Aggregation', () => {
     expect(result.total_clicks).toBe(1);
     expect(result.converted).toBe(1);
     expect(result.total_commission).toBe(500);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 10: StorefrontGalleryResolver (Phase 2 — storefront namespace split)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { resolveStorefrontGallery } from '../services/resolvers/StorefrontGalleryResolver';
+
+describe('StorefrontGalleryResolver', () => {
+  it('returns disabled when no features are present', () => {
+    const result = resolveStorefrontGallery({}, null);
+    expect(result.enabled).toBe(false);
+    expect(result.gallery_enabled).toBe(false);
+    expect(result.can_use_gallery).toBe(false);
+  });
+
+  it('returns disabled when storefront_gallery_disabled is set', () => {
+    const result = resolveStorefrontGallery({ storefront_gallery_enabled: true, storefront_gallery_disabled: true }, null);
+    expect(result.enabled).toBe(false);
+  });
+
+  it('enables gallery with new storefront_gallery_* keys', () => {
+    const features = {
+      storefront_gallery_enabled: true,
+      storefront_gallery_on: true,
+    };
+    const result = resolveStorefrontGallery(features, null);
+    expect(result.enabled).toBe(true);
+    expect(result.gallery_enabled).toBe(true);
+    expect(result.allowed_gallery_types).toEqual(['image_gallery_5', 'image_gallery_10', 'image_gallery_15']);
+  });
+
+  it('falls back to old storefront_opt_gallery_* keys', () => {
+    const fallbackFeatures = {
+      storefront_opt_enabled: true,
+      storefront_opt_gallery_on: true,
+    };
+    const result = resolveStorefrontGallery({}, null, fallbackFeatures);
+    expect(result.enabled).toBe(true);
+    expect(result.gallery_enabled).toBe(true);
+    expect(result.allowed_gallery_types).toEqual(['image_gallery_5', 'image_gallery_10', 'image_gallery_15']);
+  });
+
+  it('respects flexible key to enable all gallery types and modes', () => {
+    const features = { storefront_gallery_enabled: true, storefront_gallery_flexible: true };
+    const result = resolveStorefrontGallery(features, null);
+    expect(result.is_flexible).toBe(true);
+    expect(result.gallery_carousel_enabled).toBe(true);
+    expect(result.gallery_magazine_enabled).toBe(true);
+  });
+
+  it('enables magazine mode via storefront_gallery_magazine key', () => {
+    const features = {
+      storefront_gallery_enabled: true,
+      storefront_gallery_on: true,
+      storefront_gallery_magazine: true,
+    };
+    const result = resolveStorefrontGallery(features, null);
+    expect(result.gallery_magazine_enabled).toBe(true);
+  });
+
+  it('falls back to old storefront_opt_gallery_magazine key', () => {
+    const fallbackFeatures = {
+      storefront_opt_enabled: true,
+      storefront_opt_gallery_on: true,
+      storefront_opt_gallery_magazine: true,
+    };
+    const result = resolveStorefrontGallery({}, null, fallbackFeatures);
+    expect(result.gallery_magazine_enabled).toBe(true);
+  });
+
+  it('downgrades magazine display mode to carousel when not tier-gated', () => {
+    const features = { storefront_gallery_enabled: true, storefront_gallery_on: true };
+    const merchantPrefs = { gallery_display_mode: 'magazine' };
+    const result = resolveStorefrontGallery(features, merchantPrefs);
+    expect(result.gallery_display_mode).toBe('carousel');
+    expect(result.can_use_magazine_gallery).toBe(false);
+  });
+
+  it('respects merchant preferences for image limits', () => {
+    const features = { storefront_gallery_enabled: true, storefront_gallery_on: true };
+    const merchantPrefs = {
+      image_gallery_5: true,
+      image_gallery_10: false,
+      image_gallery_15: false,
+      default_gallery_limit: 5,
+    };
+    const result = resolveStorefrontGallery(features, merchantPrefs);
+    expect(result.merchant_preferences.image_gallery_5).toBe(true);
+    expect(result.merchant_preferences.image_gallery_10).toBe(false);
+    expect(result.default_gallery_limit).toBe(5);
+  });
+
+  it('can_use_gallery is false when merchant disables all gallery types', () => {
+    const features = { storefront_gallery_enabled: true, storefront_gallery_on: true };
+    const merchantPrefs = { image_gallery_5: false, image_gallery_10: false, image_gallery_15: false };
+    const result = resolveStorefrontGallery(features, merchantPrefs);
+    expect(result.can_use_gallery).toBe(false);
+  });
+
+  it('defaults gallery_display_mode to carousel and limit to 5', () => {
+    const features = { storefront_gallery_enabled: true, storefront_gallery_on: true };
+    const result = resolveStorefrontGallery(features, null);
+    expect(result.gallery_display_mode).toBe('carousel');
+    expect(result.default_gallery_limit).toBe(5);
   });
 });

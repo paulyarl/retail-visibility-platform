@@ -12,6 +12,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
+import { prisma } from '../prisma';
 import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 
 const router = Router();
@@ -29,11 +30,15 @@ router.get('/:tenantId/wholesale-matching-options', authenticateToken, async (re
     const caps = await resolveEffectiveCapabilities(tenantId);
     const tierState = caps?.effective?.wholesale_matching ?? { enabled: false, tier: 'none', can_check_supplier_match: false, can_search_faire: false, can_build_affiliate_link: false, can_view_brand_partners: false, is_flexible: false };
 
-    // No merchant settings table yet — return defaults
+    // Fetch merchant settings (or defaults if no row yet)
+    const settings = await prisma.tenant_wholesale_matching_settings.findUnique({
+      where: { tenant_id: tenantId },
+    }).catch(() => null);
+
     res.json({
       success: true,
       settings: {
-        wholesale_matching_enabled: true,
+        wholesale_matching_enabled: settings?.wholesale_matching_enabled ?? true,
       },
       tierState,
     });
@@ -53,13 +58,29 @@ router.put('/:tenantId/wholesale-matching-options', authenticateToken, requireTe
       return res.status(400).json({ success: false, error: parsed.error.flatten() });
     }
 
-    // No merchant settings table yet — settings are tier-gated only
-    // When a table is added, upsert here
-    await invalidateEffectiveCapabilities(req.params.tenantId);
+    // Upsert merchant settings
+    const { tenantId } = req.params;
+    const settings = await prisma.tenant_wholesale_matching_settings.upsert({
+      where: { tenant_id: tenantId },
+      update: {
+        wholesale_matching_enabled: parsed.data.wholesale_matching_enabled ?? true,
+      },
+      create: {
+        tenant_id: tenantId,
+        wholesale_matching_enabled: parsed.data.wholesale_matching_enabled ?? true,
+      },
+    }).catch((err) => {
+      console.error('[PUT wholesale-matching-options] Failed to upsert settings:', err);
+      return null;
+    });
+
+    await invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,
-      settings: parsed.data,
+      settings: {
+        wholesale_matching_enabled: settings?.wholesale_matching_enabled ?? parsed.data.wholesale_matching_enabled ?? true,
+      },
     });
   } catch (error) {
     res.status(500).json({
