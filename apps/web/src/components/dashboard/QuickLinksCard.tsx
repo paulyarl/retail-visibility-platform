@@ -1,18 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Store, Package, MapPin, CreditCard, Truck, ShoppingCart,
   HelpCircle, Bot, Headset, Globe, Star, Users, Settings,
-  Share2,
+  Share2, Building2,
   ArrowRight, Loader2,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useQuickLinks } from "@/hooks/dashboard/useQuickLinks";
 
 const ICONS: Record<string, LucideIcon> = {
   Store, Package, MapPin, CreditCard, Truck, ShoppingCart,
-  HelpCircle, Bot, Headset, Globe, Star, Users, Settings, Share2,
+  HelpCircle, Bot, Headset, Globe, Star, Users, Settings, Share2, Building2,
 };
 
 const ICON_COLORS: Record<string, { bg: string; text: string }> = {
@@ -29,6 +31,10 @@ interface QuickLinksCardProps {
 
 export default function QuickLinksCard({ tenantId }: QuickLinksCardProps) {
   const { links, loading } = useQuickLinks(tenantId);
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_COUNT = 5;
+  const visibleLinks = showAll ? links : links.slice(0, INITIAL_COUNT);
+  const hasMore = links.length > INITIAL_COUNT;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -41,8 +47,8 @@ export default function QuickLinksCard({ tenantId }: QuickLinksCardProps) {
             <div className="h-14 bg-gray-50 rounded-xl animate-pulse" />
             <div className="h-14 bg-gray-50 rounded-xl animate-pulse" />
           </>
-        ) : links.length > 0 ? (
-          links.map((link) => {
+        ) : visibleLinks.length > 0 ? (
+          visibleLinks.map((link) => {
             const Icon = ICONS[link.icon] ?? Store;
             const colors = ICON_COLORS[link.category] ?? ICON_COLORS.store;
             return (
@@ -85,6 +91,18 @@ export default function QuickLinksCard({ tenantId }: QuickLinksCardProps) {
           </div>
         )}
       </div>
+      {hasMore && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+        >
+          {showAll ? (
+            <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
+          ) : (
+            <>Show {links.length - INITIAL_COUNT} more <ChevronDown className="w-3.5 h-3.5" /></>
+          )}
+        </button>
+      )}
     </div>
   );
 }

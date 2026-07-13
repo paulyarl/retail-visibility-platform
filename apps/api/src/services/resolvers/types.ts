@@ -48,6 +48,7 @@ export interface MerchantSettingsBundle {
   quickstartOptions: QuickstartOptionsMerchantSettings | null;
   storefrontOptions: StorefrontOptionsMerchantSettings | null;
   storefrontQr: StorefrontQrMerchantSettings | null;
+  storefrontGallery: StorefrontGalleryMerchantSettings | null;
   directoryEntry: StorefrontOptionsMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
@@ -168,6 +169,15 @@ export interface QuickstartOptionsMerchantSettings {
   default_text_model?: string | null;
   default_image_model?: string | null;
   default_image_quality?: string | null;
+}
+
+export interface StorefrontGalleryMerchantSettings {
+  gallery_enabled?: boolean | null;
+  gallery_display_mode?: string | null;
+  image_gallery_5?: boolean | null;
+  image_gallery_10?: boolean | null;
+  image_gallery_15?: boolean | null;
+  default_gallery_limit?: number | null;
 }
 
 export interface StorefrontQrMerchantSettings {
@@ -547,6 +557,7 @@ export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' |
 export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
 export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
+export type StorefrontOptGalleryDisplayMode = 'carousel' | 'magazine';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
@@ -563,6 +574,20 @@ export interface EffectiveStorefrontQr {
   qr_custom_colors: boolean;
   qr_gradients: boolean;
   can_use_qr_codes: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+export interface EffectiveStorefrontGallery {
+  enabled: boolean;
+  is_flexible: boolean;
+  gallery_enabled: boolean;
+  allowed_gallery_types: StorefrontOptGalleryType[];
+  default_gallery_limit: number;
+  gallery_display_mode: StorefrontOptGalleryDisplayMode;
+  gallery_carousel_enabled: boolean;
+  gallery_magazine_enabled: boolean;
+  can_use_magazine_gallery: boolean;
+  can_use_gallery: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -872,6 +897,7 @@ export interface EffectiveCapabilities {
     quickstart: EffectiveQuickstart;
     storefront_options: EffectiveStorefrontOptions;
     storefront_qr: EffectiveStorefrontQr;
+    storefront_gallery: EffectiveStorefrontGallery;
     directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;

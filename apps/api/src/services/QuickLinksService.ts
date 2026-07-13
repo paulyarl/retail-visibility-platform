@@ -49,6 +49,8 @@ interface LinkContext {
     locationStatus: string;
     subscriptionStatus: string;
     isReadOnly: boolean;
+    organizationId: string | null;
+    organizationName: string | null;
   };
 }
 
@@ -107,6 +109,10 @@ function hasSocialCommerce(ctx: LinkContext): boolean {
 
 function hasDirectoryEntry(ctx: LinkContext): boolean {
   return ctx.capabilities?.effective.directory_entry.enabled ?? false;
+}
+
+function hasOrganization(ctx: LinkContext): boolean {
+  return !!ctx.businessState.organizationId;
 }
 
 function isReadOnly(ctx: LinkContext): boolean {
@@ -196,6 +202,21 @@ const LINKS: LinkDefinition[] = [
     badge: () => 'Action needed',
     condition: (ctx) => needsFulfillmentMethodSelection(ctx),
     score: () => 110,
+  },
+
+  // ── ORGANIZATION: Multi-location management ──
+
+  {
+    id: 'organization-dashboard',
+    label: () => 'Organization Dashboard',
+    description: (ctx) => ctx.businessState.organizationName
+      ? `Manage ${ctx.businessState.organizationName}`
+      : 'Manage your organization',
+    href: (ctx) => `/settings/organization?organizationId=${ctx.businessState.organizationId}`,
+    icon: 'Building2',
+    category: 'settings',
+    condition: (ctx) => hasOrganization(ctx),
+    score: () => 95,
   },
 
   // ── STORE: Core storefront links ──
@@ -506,6 +527,8 @@ interface BusinessState {
   locationStatus: string;
   subscriptionStatus: string;
   isReadOnly: boolean;
+  organizationId: string | null;
+  organizationName: string | null;
 }
 
 async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
@@ -522,6 +545,7 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
         slug: true,
         subscription_status: true,
         location_status: true,
+        organization_id: true,
       },
     }).catch(() => null),
 
@@ -547,6 +571,16 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
 
   const [totalItems, activeItems] = itemCounts as [number, number];
 
+  const organizationId = tenant?.organization_id ?? null;
+  let organizationName: string | null = null;
+  if (organizationId) {
+    const org = await prisma.organizations_list.findUnique({
+      where: { id: organizationId },
+      select: { name: true },
+    }).catch(() => null);
+    organizationName = org?.name ?? null;
+  }
+
   return {
     slug: tenant?.slug ?? null,
     hasProducts: totalItems > 0,
@@ -558,6 +592,8 @@ async function fetchBusinessState(tenantId: string): Promise<BusinessState> {
     locationStatus: tenant?.location_status || 'active',
     subscriptionStatus: tenant?.subscription_status || 'active',
     isReadOnly: false,
+    organizationId,
+    organizationName,
   };
 }
 
