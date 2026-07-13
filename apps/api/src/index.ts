@@ -75,6 +75,12 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 import { mountFromRegistry } from './routes/routeRegistry';
 mountFromRegistry(app);
 
+// Safety net: redirect root-level /platform-settings to /api/platform-settings
+// in case a client constructs the URL without the /api prefix
+app.get('/platform-settings', (_req, res) => {
+  res.redirect(301, '/api/platform-settings');
+});
+
 // Sentry error handler must be after all routes but before other error handlers
 if (sentryEnabled) {
   Sentry.setupExpressErrorHandler(app);

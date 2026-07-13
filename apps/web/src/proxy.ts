@@ -4,7 +4,7 @@ import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
 
 // Environment variables
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'https://api.visibleshelf.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
 const FF_TENANT_URLS = process.env.NEXT_PUBLIC_FF_TENANT_URLS === 'true';
 
 // Platform domains that support subdomains
@@ -232,7 +232,7 @@ export async function proxy(req: NextRequest) {
     
     // Try to get the slug for this tenant
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
       console.log(`[Proxy] Fetching slug for tenant: ${tenantId}`);
       const slugRes = await fetch(`${apiBaseUrl}/api/directory/resolve-slug/${tenantId}`);
       console.log(`[Proxy] Slug res:`, slugRes);
