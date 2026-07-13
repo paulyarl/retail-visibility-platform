@@ -22,6 +22,7 @@ import {
   IntegrationOptionsState,
   QuickstartOptionsState,
   StorefrontOptionsState,
+  StorefrontQrState,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
   DirectoryEntryOptionsState,
@@ -126,6 +127,7 @@ interface BackendEffectiveCapabilities {
     integrations: BackendEffectiveIntegrations;
     quickstart: BackendEffectiveQuickstart;
     storefront_options: BackendEffectiveStorefrontOptions;
+    storefront_qr: BackendEffectiveStorefrontQr;
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
@@ -144,6 +146,7 @@ interface BackendEffectiveCapabilities {
   };
   uncategorized_features: string[];
   purchased_feature_keys?: string[];
+  override_feature_keys?: string[];
 }
 
 interface BackendEffectiveCommerce {
@@ -328,6 +331,8 @@ interface BackendEffectiveStorefrontOptions {
   qr_gradients: boolean;
   gallery_enabled: boolean;
   allowed_gallery_types: StorefrontOptGalleryType[];
+  gallery_magazine_enabled: boolean;
+  can_use_magazine_gallery: boolean;
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
   layout_enabled: boolean;
@@ -352,6 +357,22 @@ interface BackendEffectiveStorefrontOptions {
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontQr {
+  enabled: boolean;
+  is_flexible: boolean;
+  qr_enabled: boolean;
+  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
+  allowed_qr_content_types: StorefrontOptQRContentType[];
+  qr_classic_enabled: boolean;
+  qr_styled_enabled: boolean;
+  allowed_qr_dot_styles: string[];
+  allowed_qr_corner_styles: string[];
+  qr_custom_colors: boolean;
+  qr_gradients: boolean;
+  can_use_qr_codes: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -713,6 +734,9 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     qrGradients: b.qr_gradients ?? false,
     galleryEnabled: b.gallery_enabled,
     allowedGalleryTypes: b.allowed_gallery_types,
+    galleryMagazineEnabled: b.gallery_magazine_enabled ?? false,
+    canUseMagazineGallery: b.can_use_magazine_gallery ?? false,
+    galleryDisplayMode: ((b.merchant_preferences as any)?.gallery_display_mode as 'carousel' | 'magazine') ?? 'carousel',
     advancedEnabled: b.advanced_enabled,
     allowedAdvancedTypes: b.allowed_advanced_types,
     layoutEnabled: b.layout_enabled,
@@ -737,6 +761,25 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseLayoutClassic: b.can_use_layout_classic,
     canUseLayoutEditorial: b.can_use_layout_editorial,
     canUseLayoutImmersive: b.can_use_layout_immersive,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontQr(b: BackendEffectiveStorefrontQr): StorefrontQrState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    qrEnabled: b.qr_enabled,
+    allowedQRResolutions: b.allowed_qr_resolutions,
+    allowedQRContentTypes: b.allowed_qr_content_types,
+    qrClassicEnabled: b.qr_classic_enabled,
+    qrStyledEnabled: b.qr_styled_enabled,
+    allowedQRDotStyles: (b.allowed_qr_dot_styles ?? []) as StorefrontOptQRDotStyleType[],
+    allowedQRCornerStyles: (b.allowed_qr_corner_styles ?? []) as StorefrontOptQRCornerStyleType[],
+    qrCustomColors: b.qr_custom_colors,
+    qrGradients: b.qr_gradients,
+    canUseQRCodes: b.can_use_qr_codes,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };
@@ -958,6 +1001,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     integrationOptions: mapIntegrations(b.effective.integrations),
     quickstartOptions: mapQuickstart(b.effective.quickstart),
     storefrontOptions: mapStorefrontOptions(b.effective.storefront_options),
+    storefrontQr: mapStorefrontQr(b.effective.storefront_qr),
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
@@ -969,6 +1013,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
     purchasedFeatureKeys: b.purchased_feature_keys || [],
+    overrideFeatureKeys: b.override_feature_keys || [],
   };
 }
 
@@ -1120,6 +1165,11 @@ class UnifiedCapabilityService extends PublicApiSingleton {
   async getStorefrontOptionsState(tenantId: string): Promise<StorefrontOptionsState> {
     const all = await this.getAllCapabilities(tenantId);
     return all.storefrontOptions;
+  }
+
+  async getStorefrontQrState(tenantId: string): Promise<StorefrontQrState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.storefrontQr;
   }
 
   async getDirectoryEntryOptionsState(tenantId: string): Promise<DirectoryEntryOptionsState> {

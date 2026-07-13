@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
 import { generateGbpHoursSyncLogId, generateQuickStart, generateSpecialHoursId } from '../lib/id-generator'
@@ -14,10 +14,23 @@ const CACHE_TTL = {
 
 const router = Router()
 
+// Public router for unauthenticated access (mounted at /api/public/tenants/:tenantId)
+const publicBusinessHoursRouter = Router({ mergeParams: true })
+
 // Mirror status (attempt counter). Persistence is reflected in BusinessHours rows.
 const mirrorAttempts = new Map<string, number>()
 
-// GET /api/tenant/:tenantId/business-hours
+// GET /api/public/tenants/:tenantId/business-hours
+publicBusinessHoursRouter.get('/business-hours',
+  async (req: Request<{ tenantId: string }>, res: Response) => {
+  const { tenantId } = req.params
+  const row = await prisma.business_hours_list.findUnique({ where: { tenant_id: tenantId } })
+  const timezone = row?.timezone || 'America/New_York'
+  const periods: any[] = (row?.periods as any) || []
+  res.json({ success: true, data: { timezone, periods } })
+})
+
+// GET /api/tenant/:tenantId/business-hours (kept for authenticated callers)
 router.get('/tenant/:tenantId/business-hours',
   async (req, res) => {
   const { tenantId } = req.params
@@ -94,7 +107,16 @@ router.put('/tenant/:tenantId/business-hours',
   res.json({ success: true })
 })
 
-// GET /api/tenant/:tenantId/business-hours/special
+// GET /api/public/tenants/:tenantId/business-hours/special
+publicBusinessHoursRouter.get('/business-hours/special',
+  async (req: Request<{ tenantId: string }>, res: Response) => {
+  const { tenantId } = req.params
+  const rows = await prisma.business_hours_special_list.findMany({ where: { tenant_id: tenantId }, orderBy: { date: 'asc' } })
+  const overrides = rows.map((r: any) => ({ date: r.date.toISOString().slice(0,10), isClosed: r.isClosed, open: r.open, close: r.close, note: r.note }))
+  res.json({ success: true, data: { overrides } })
+})
+
+// GET /api/tenant/:tenantId/business-hours/special (kept for authenticated callers)
 router.get('/tenant/:tenantId/business-hours/special',
   async (req, res) => {
   const { tenantId } = req.params
@@ -474,5 +496,6 @@ router.get('/business-hours/status/:tenantId',
     })
   }
 })
+export { publicBusinessHoursRouter }
 export default router
 

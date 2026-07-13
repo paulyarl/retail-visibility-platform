@@ -26,6 +26,7 @@ import {
   resolveIntegrationOptions,
   resolveQuickstartOptions,
   resolveStorefrontOptions,
+  resolveStorefrontQr,
   resolveDirectoryEntryOptions,
   resolveFaqOptions,
   resolveCrmOptions,
@@ -177,6 +178,11 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.storefront_options?.features || {},
       merchantBundle.storefrontOptions
     ),
+    resolveStorefrontQr(
+      rawCaps.capabilities.storefront_qr?.features || {},
+      merchantBundle.storefrontQr,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
     resolveDirectoryEntryOptions(
       rawCaps.capabilities.directory_entry?.features || {},
       merchantBundle.directoryEntry
@@ -233,14 +239,15 @@ export async function resolveEffectiveCapabilities(
       integrations: effective[8],
       quickstart: effective[9],
       storefront_options: effective[10],
-      directory_entry: effective[11],
-      faq: effective[12],
-      crm: effective[13],
-      chatbot: effective[14],
-      org_options: effective[15],
-      social_commerce_options: effective[16],
-      directory_promotion: effective[17],
-      wholesale_matching: effective[18],
+      storefront_qr: effective[11],
+      directory_entry: effective[12],
+      faq: effective[13],
+      crm: effective[14],
+      chatbot: effective[15],
+      org_options: effective[16],
+      social_commerce_options: effective[17],
+      directory_promotion: effective[18],
+      wholesale_matching: effective[19],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -619,6 +626,11 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.storefront_options?.features || {},
       merchantBundle.storefrontOptions
     ),
+    resolveStorefrontQr(
+      rawCaps.capabilities.storefront_qr?.features || {},
+      merchantBundle.storefrontQr,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
     resolveDirectoryEntryOptions(
       rawCaps.capabilities.directory_entry?.features || {},
       merchantBundle.directoryEntry
@@ -675,14 +687,15 @@ export async function resolveEffectiveCapabilitiesFromMV(
       integrations: effective[8],
       quickstart: effective[9],
       storefront_options: effective[10],
-      directory_entry: effective[11],
-      faq: effective[12],
-      crm: effective[13],
-      chatbot: effective[14],
-      org_options: effective[15],
-      social_commerce_options: effective[16],
-      directory_promotion: effective[17],
-      wholesale_matching: effective[18],
+      storefront_qr: effective[11],
+      directory_entry: effective[12],
+      faq: effective[13],
+      crm: effective[14],
+      chatbot: effective[15],
+      org_options: effective[16],
+      social_commerce_options: effective[17],
+      directory_promotion: effective[18],
+      wholesale_matching: effective[19],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -1067,6 +1080,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     integrationOptions,
     quickstartOptions,
     storefrontOptions,
+    storefrontQr,
     directoryEntry,
     faqOptions,
     crmOptions,
@@ -1085,6 +1099,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_integration_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_quickstart_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'storefront' } } })),
+    safeQuery(() => prisma.tenant_storefront_qr_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } } })),
     safeQuery(() => prisma.tenant_faq_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1105,6 +1120,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     integrationOptions: integrationOptions as any,
     quickstartOptions: quickstartOptions as any,
     storefrontOptions: storefrontOptions as any,
+    storefrontQr: storefrontQr as any,
     directoryEntry: directoryEntry as any,
     faqOptions: faqOptions as any,
     crmOptions: crmOptions as any,
@@ -1156,6 +1172,13 @@ function buildMerchantSoftGates(bundle: MerchantSettingsBundle): Record<string, 
       pickup_enabled: bundle.fulfillment.pickup_enabled ?? true,
       delivery_enabled: bundle.fulfillment.delivery_enabled ?? true,
       shipping_enabled: bundle.fulfillment.shipping_enabled ?? true,
+    };
+  }
+  if (bundle.storefrontQr) {
+    gates.storefront_qr = {
+      qr_enabled: bundle.storefrontQr.qr_enabled ?? true,
+      qr_classic_enabled: bundle.storefrontQr.qr_classic_enabled ?? true,
+      qr_styled_enabled: bundle.storefrontQr.qr_styled_enabled ?? false,
     };
   }
   if (bundle.wholesaleMatching) {

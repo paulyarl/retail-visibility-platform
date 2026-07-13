@@ -143,7 +143,7 @@ cd apps/web && npx tsc --noEmit
 - [ ] **RLS policies included.** Every new tenant-scoped table must have Row Level Security policies. Use `DO$$ ... EXCEPTION WHEN OTHERS THEN END $$;` for idempotency.
 - [ ] **`updated_at` trigger included.** Every new table with an `updated_at` column must have a trigger function that auto-updates it on row modification.
 - [ ] **Indexes on foreign keys and query columns.** Add indexes for `tenant_id`, any column used in `WHERE` clauses, and composite indexes for common query patterns.
-- [ ] **Prisma schema updated.** After migration, run `npx prisma db pull` or manually update `apps/api/prisma/schema.prisma` to include new models. Verify relations and indexes match the migration.
+- [ ] **Prisma schema synced via introspection (not edits).** After migration is applied to the DB, run `npx prisma db pull && npx prisma generate` to update `schema.prisma` and TypeScript types. **Never edit `schema.prisma` directly** — see `manual-sql-migration-policy.md`. Verify no edits were made to `schema.prisma` during this session: `git diff apps/api/prisma/schema.prisma` should show no manual changes (only introspected changes from `prisma db pull`).
 - [ ] **Seed data included if needed.** If the migration introduces reference data (e.g., system badges, feature keys), include `INSERT` statements in the migration or a separate seed file.
 
 ---
@@ -225,3 +225,4 @@ cd apps/web && npx tsc --noEmit
 | Dashboard performance | `dashboard-performance-audit.md` |
 | Render loops | `debug-infinite-render-loops.md` |
 | Cache invalidation | `cross-context-cache-invalidation.md` |
+| Database schema changes | `manual-sql-migration-policy.md` |

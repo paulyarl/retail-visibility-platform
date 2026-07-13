@@ -46,7 +46,8 @@ import StoreAccessCard from "./StoreAccessCard";
 import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
 import type { TipContext } from "@/lib/growth-tips/tipEngine";
 import CrmTenantWidget from '@/components/crm/CrmTenantWidget';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
+import { useMerchantGates } from '@/hooks/tenant-access/useCapabilityAccess';
 import { botService } from '@/services/BotService';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
@@ -73,6 +74,7 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
 
   const { profile, loading: profileLoading } = useUserProfile();
   const allCaps = useAllCapabilities(tenantId);
+  const { gates: merchantGates } = useMerchantGates(tenantId);
   const { canEdit } = useTenantBehaviorAccess(tenantId);
 
   // Subscription-status-aware capability flags
@@ -453,9 +455,14 @@ export default function TenantDashboardV2({ tenantId }: TenantDashboardV2Props) 
               </div>
             </motion.div>
 
-            {/* Plan Summary */}
+            {/* Plan Summary — slim widget */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}>
-              <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
+              <PlanSummaryWidget
+                capabilities={allCaps.data}
+                loading={allCaps.loading}
+                tenantId={tenantId}
+                merchantGates={merchantGates}
+              />
             </motion.div>
 
             {/* Task Checklist */}

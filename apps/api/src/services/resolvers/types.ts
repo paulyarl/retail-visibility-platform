@@ -47,6 +47,7 @@ export interface MerchantSettingsBundle {
   integrationOptions: IntegrationOptionsMerchantSettings | null;
   quickstartOptions: QuickstartOptionsMerchantSettings | null;
   storefrontOptions: StorefrontOptionsMerchantSettings | null;
+  storefrontQr: StorefrontQrMerchantSettings | null;
   directoryEntry: StorefrontOptionsMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
@@ -167,6 +168,28 @@ export interface QuickstartOptionsMerchantSettings {
   default_text_model?: string | null;
   default_image_model?: string | null;
   default_image_quality?: string | null;
+}
+
+export interface StorefrontQrMerchantSettings {
+  qr_enabled?: boolean | null;
+  qr_classic_enabled?: boolean | null;
+  qr_styled_enabled?: boolean | null;
+  qr_dot_type?: string | null;
+  qr_corner_type?: string | null;
+  qr_dot_color?: string | null;
+  qr_corner_color?: string | null;
+  qr_bg_color?: string | null;
+  qr_gradient_enabled?: boolean | null;
+  qr_gradient_start?: string | null;
+  qr_gradient_end?: string | null;
+  qr_codes_512?: boolean | null;
+  qr_codes_1024?: boolean | null;
+  qr_codes_2048?: boolean | null;
+  default_qr_resolution?: string | null;
+  qr_product?: boolean | null;
+  qr_store?: boolean | null;
+  qr_logo?: boolean | null;
+  qr_directory?: boolean | null;
 }
 
 export interface StorefrontOptionsMerchantSettings {
@@ -527,6 +550,22 @@ export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
+export interface EffectiveStorefrontQr {
+  enabled: boolean;
+  is_flexible: boolean;
+  qr_enabled: boolean;
+  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
+  allowed_qr_content_types: StorefrontOptQRContentType[];
+  qr_classic_enabled: boolean;
+  qr_styled_enabled: boolean;
+  allowed_qr_dot_styles: StorefrontOptQRDotStyleType[];
+  allowed_qr_corner_styles: StorefrontOptQRCornerStyleType[];
+  qr_custom_colors: boolean;
+  qr_gradients: boolean;
+  can_use_qr_codes: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
 export interface EffectiveStorefrontOptions {
   enabled: boolean;
   is_flexible: boolean;
@@ -832,6 +871,7 @@ export interface EffectiveCapabilities {
     integrations: EffectiveIntegrations;
     quickstart: EffectiveQuickstart;
     storefront_options: EffectiveStorefrontOptions;
+    storefront_qr: EffectiveStorefrontQr;
     directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;

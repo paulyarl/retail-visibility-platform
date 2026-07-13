@@ -230,7 +230,7 @@ import subscriptionRoutes from '../routes/subscriptions';
 import categoryRoutes from '../routes/categories';
 import userRoutes from '../routes/users';
 import platformStatsRoutes from '../routes/platform-stats';
-import businessHoursRoutes from '../routes/business-hours';
+import businessHoursRoutes, { publicBusinessHoursRouter } from '../routes/business-hours';
 import taxonomyRoutes from '../routes/taxonomy';
 import analyticsRoutes from '../routes/analytics';
 import shopCategoriesRoutes from '../routes/shop-categories';
@@ -1573,6 +1573,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'settings',
     authLevel: 'public',
     comment: 'Business hours management at /api',
+  },
+  {
+    path: '/api/public/tenants/:tenantId',
+    router: publicBusinessHoursRouter,
+    domain: 'settings',
+    authLevel: 'public',
+    comment: 'Public business hours endpoints (avoids blanket auth on /api/tenant)',
   },
   {
     path: '/api/taxonomy',

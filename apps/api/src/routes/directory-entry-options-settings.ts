@@ -37,6 +37,7 @@ const directoryEntryOptionsSchema = z.object({
   external_link_enabled: z.boolean().optional(),
   default_qr_resolution: z.string().optional(),
   default_gallery_limit: z.number().int().min(5).max(15).optional(),
+  gallery_display_mode: z.enum(['carousel', 'magazine']).optional(),
 });
 
 // Default settings for directory entry
@@ -66,6 +67,7 @@ export const DEFAULT_DIRECTORY_ENTRY_SETTINGS = {
   external_link_enabled: false,
   default_qr_resolution: '1024',
   default_gallery_limit: 5,
+  gallery_display_mode: 'carousel',
 };
 
 // Get directory entry options settings for a tenant
@@ -135,6 +137,7 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
         external_link_enabled: settings.external_link_enabled ?? false,
         default_qr_resolution: settings.default_qr_resolution,
         default_gallery_limit: settings.default_gallery_limit,
+        gallery_display_mode: settings.gallery_display_mode || 'carousel',
       },
     });
   } catch (error) {
@@ -243,6 +246,7 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
         external_link_enabled: settings.external_link_enabled ?? false,
         default_qr_resolution: settings.default_qr_resolution,
         default_gallery_limit: settings.default_gallery_limit,
+        gallery_display_mode: settings.gallery_display_mode || 'carousel',
       },
     });
   } catch (error) {

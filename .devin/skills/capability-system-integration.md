@@ -256,6 +256,15 @@ if (data.selected_type) {
 - Uses `capabilities` prop from `AllCapabilitiesState` (mapped from unified endpoint)
 - Each card shows enabled/disabled status using `capability.enabled` (not `Object.keys(capability.features).length`)
 - New sub-capabilities under an existing group appear automatically if the unified endpoint returns them
+- Rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page (not directly on the dashboard)
+
+**PlanSummaryWidget**: `apps/web/src/components/dashboard/PlanSummaryWidget.tsx`
+
+- Slim dashboard widget showing clickable capability type names with color-coded status dots
+- Color determined by source of effectiveness: green (tier), red (disabled), orange (merchant-gated), blue (purchased), purple (admin grant)
+- Uses `purchasedFeatureKeys` and `overrideFeatureKeys` from `AllCapabilitiesState` to determine color
+- Add an entry to `CAPABILITY_META` array with key, label, icon, prefix, and settingsPath
+- A capability missing from `CAPABILITY_META` will not appear on the dashboard
 
 **TenantDashboardV2**: `apps/web/src/components/dashboard/TenantDashboardV2.tsx`
 

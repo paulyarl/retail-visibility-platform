@@ -484,6 +484,10 @@ export interface StorefrontOptionsState {
   // Gallery Display group (radio)
   galleryEnabled: boolean;
   allowedGalleryTypes: StorefrontOptGalleryType[];
+  // Gallery Magazine feature
+  galleryMagazineEnabled: boolean;
+  canUseMagazineGallery: boolean;
+  galleryDisplayMode: 'carousel' | 'magazine';
   // Advanced group
   advancedEnabled: boolean;
   allowedAdvancedTypes: StorefrontOptAdvancedType[];
@@ -545,6 +549,7 @@ export interface StorefrontOptionsState {
     image_gallery_5: boolean;
     image_gallery_10: boolean;
     image_gallery_15: boolean;
+    gallery_display_mode: 'carousel' | 'magazine';
     enhanced_seo: boolean;
     storefront_actions: boolean;
     storefront_layout: 'classic' | 'editorial' | 'immersive';
@@ -591,6 +596,8 @@ export interface StorefrontOptionFlags {
   qrGradientStart?: string;
   qrGradientEnd?: string;
   galleryLimit: number;
+  galleryDisplayMode: 'carousel' | 'magazine';
+  canUseMagazineGallery: boolean;
   showEnhancedSEO: boolean;
   showStorefrontActions: boolean;
   storefrontLayout?: 'classic' | 'editorial' | 'immersive';
@@ -634,6 +641,8 @@ export function toStorefrontOptionFlags(state: StorefrontOptionsState): Storefro
     qrGradientStart: p?.qr_gradient_start,
     qrGradientEnd: p?.qr_gradient_end,
     galleryLimit: p?.default_gallery_limit ?? 5,
+    galleryDisplayMode: (p?.gallery_display_mode as 'carousel' | 'magazine') ?? 'carousel',
+    canUseMagazineGallery: state.canUseMagazineGallery,
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,
     storefrontLayout: p?.storefront_layout ?? 'classic',
@@ -975,6 +984,23 @@ export interface ConstraintStatusState {
 
 export type ConstraintStatusMapState = Record<string, ConstraintStatusState>;
 
+export interface StorefrontQrState {
+  enabled: boolean;
+  isFlexible: boolean;
+  qrEnabled: boolean;
+  allowedQRResolutions: StorefrontOptQRResolutionType[];
+  allowedQRContentTypes: StorefrontOptQRContentType[];
+  qrClassicEnabled: boolean;
+  qrStyledEnabled: boolean;
+  allowedQRDotStyles: StorefrontOptQRDotStyleType[];
+  allowedQRCornerStyles: StorefrontOptQRCornerStyleType[];
+  qrCustomColors: boolean;
+  qrGradients: boolean;
+  canUseQRCodes: boolean;
+  merchantPreferences: Record<string, any>;
+  features: Record<string, boolean>;
+}
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
@@ -991,6 +1017,7 @@ export interface AllCapabilitiesState {
   integrationOptions: IntegrationOptionsState;
   quickstartOptions: QuickstartOptionsState;
   storefrontOptions: StorefrontOptionsState;
+  storefrontQr: StorefrontQrState;
   directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
@@ -1002,6 +1029,7 @@ export interface AllCapabilitiesState {
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
   purchasedFeatureKeys: string[];
+  overrideFeatureKeys: string[];
 }
 
 // ====================
@@ -1011,6 +1039,7 @@ export interface AllCapabilitiesState {
 const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   commerce_: 'commerce_types',
   payment_gateway_: 'payment_gateway_options',
+  storefront_qr_: 'storefront_qr',
   storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
@@ -2040,6 +2069,7 @@ export function resolveStorefrontOptionsState(
     image_gallery_5?: boolean;
     image_gallery_10?: boolean;
     image_gallery_15?: boolean;
+    gallery_display_mode?: 'carousel' | 'magazine';
     enhanced_seo?: boolean;
     storefront_actions?: boolean;
     storefront_layout?: 'classic' | 'editorial' | 'immersive';
@@ -2079,6 +2109,7 @@ export function resolveStorefrontOptionsState(
     image_gallery_5: merchantPrefs?.image_gallery_5 !== false,
     image_gallery_10: merchantPrefs?.image_gallery_10 ?? false,
     image_gallery_15: merchantPrefs?.image_gallery_15 ?? false,
+    gallery_display_mode: merchantPrefs?.gallery_display_mode || 'carousel',
     enhanced_seo: merchantPrefs?.enhanced_seo ?? false,
     storefront_actions: merchantPrefs?.storefront_actions ?? false,
     storefront_layout: merchantPrefs?.storefront_layout || 'classic',
@@ -2234,6 +2265,10 @@ export function resolveStorefrontOptionsState(
 
   const mainOn = enabled && !disabled;
 
+  // --- Gallery Magazine: gated by storefront_opt_gallery_magazine feature key ---
+  const galleryMagazineEnabled = mainOn && (flexible || !!features.storefront_opt_gallery_magazine);
+  const canUseMagazineGallery = galleryMagazineEnabled && prefs.gallery_display_mode === 'magazine';
+
   // Effective flags = main gate AND tier allows AND merchant enabled
   const effectiveHoursTypes = prefs.storefront_opt_enabled
     ? allowedHoursTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
@@ -2289,6 +2324,9 @@ export function resolveStorefrontOptionsState(
     qrGradients: mainOn && qrGradients,
     galleryEnabled: mainOn && allowedGalleryTypes.length > 0,
     allowedGalleryTypes,
+    galleryMagazineEnabled,
+    canUseMagazineGallery,
+    galleryDisplayMode: prefs.gallery_display_mode,
     advancedEnabled: mainOn && allowedAdvancedTypes.length > 0,
     allowedAdvancedTypes,
     layoutEnabled: mainOn && allowedLayouts.length > 0,

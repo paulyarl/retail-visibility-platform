@@ -26,6 +26,7 @@ import {
   Layers,
   Sparkles,
   Link2,
+  QrCode,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -170,6 +171,11 @@ export default function CapabilityShowcase({
       (so?.allowedGalleryTypes.length ?? 0) > ((so?.allowedGalleryTypes.filter(t => (so?.merchantPreferences?.[t as keyof typeof so.merchantPreferences] ?? false)).length)) ||
       (so?.allowedAdvancedTypes.length ?? 0) > ((so?.canUseEnhancedSEO ? 1 : 0) + (so?.canUseStorefrontActions ? 1 : 0))
     );
+
+    // --- Storefront QR ---
+    const sqr = cap.storefrontQr;
+    const sqrTier = sqr?.enabled ?? false;
+    const sqrMerchantGated = sqrTier && !sqr?.canUseQRCodes;
 
     // --- FAQ Options ---
     // FAQ only has a master toggle merchant pref (faq_enabled), no per-feature merchant prefs.
@@ -378,6 +384,18 @@ export default function CapabilityShowcase({
         detail: soTier && !soMerchantGated ? "Customizable" : soTier ? "Partially disabled" : "Default",
         settingsLink: `/t/${tenantId}/settings/tenant`,
         constraintWarning: getConstraintWarning('storefront_options'),
+      },
+      {
+        key: "storefrontQr",
+        label: "QR Codes",
+        icon: <QrCode className="w-4 h-4" />,
+        enabled: sqrTier && (sqr?.canUseQRCodes ?? false),
+        status: getStatus(sqrTier, sqrMerchantGated),
+        detail: sqrTier
+          ? (sqr?.qrStyledEnabled ? "Styled QR enabled" : sqr?.qrClassicEnabled ? "Classic QR" : "Available")
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/storefront-qr`,
+        constraintWarning: getConstraintWarning('storefront_qr'),
       },
       {
         key: "quickstartOptions",

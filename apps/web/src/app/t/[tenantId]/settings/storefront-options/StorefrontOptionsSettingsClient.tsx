@@ -41,6 +41,7 @@ interface StorefrontOptionsSettings {
   image_gallery_5: boolean;
   image_gallery_10: boolean;
   image_gallery_15: boolean;
+  gallery_display_mode: 'carousel' | 'magazine';
   enhanced_seo: boolean;
   storefront_actions: boolean;
   storefront_layout: 'classic' | 'editorial' | 'immersive';
@@ -82,6 +83,7 @@ const DEFAULT_SETTINGS: StorefrontOptionsSettings = {
   image_gallery_5: true,
   image_gallery_10: false,
   image_gallery_15: false,
+  gallery_display_mode: 'carousel',
   enhanced_seo: false,
   storefront_actions: false,
   storefront_layout: 'classic',
@@ -173,6 +175,7 @@ const GROUP_ICONS: Record<StorefrontOptGroup, React.ReactNode> = {
   info: <Info className="w-5 h-5 text-cyan-600" />,
   qr: <QrCode className="w-5 h-5 text-indigo-600" />,
   gallery: <Image className="w-5 h-5 text-orange-600" />,
+  gallery_mode: <Image className="w-5 h-5 text-rose-600" />,
   advanced: <Zap className="w-5 h-5 text-lime-600" />,
   layout: <LayoutGrid className="w-5 h-5 text-violet-600" />,
 };
@@ -217,6 +220,10 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
       image_gallery_15: selected === 'image_gallery_15',
       default_gallery_limit: selected === 'image_gallery_5' ? 5 : selected === 'image_gallery_10' ? 10 : 15,
     }));
+  };
+
+  const handleGalleryModeRadio = (mode: 'carousel' | 'magazine') => {
+    setSettings(prev => ({ ...prev, gallery_display_mode: mode }));
   };
 
   const handleSave = async () => {
@@ -847,6 +854,84 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
                 </button>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gallery Display Mode — Radio (Carousel vs Magazine) */}
+      {tierAllowsGallery && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {GROUP_ICONS.gallery}
+              Gallery Display Mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Choose how images are displayed on product pages and directory entry pages
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => handleGalleryModeRadio('carousel')}
+                className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                  settings.gallery_display_mode === 'carousel'
+                    ? 'bg-orange-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                }`}
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className={`w-4 h-4 rounded-full border-2 ${settings.gallery_display_mode === 'carousel' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
+                    {settings.gallery_display_mode === 'carousel' && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </div>
+                <div>
+                  <p className="font-medium">Carousel</p>
+                  <p className={`text-sm ${settings.gallery_display_mode === 'carousel' ? 'text-orange-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                    One image at a time with navigation. Classic controlled viewing.
+                  </p>
+                </div>
+              </button>
+              <button
+                onClick={() => cap?.galleryMagazineEnabled && handleGalleryModeRadio('magazine')}
+                disabled={!cap?.galleryMagazineEnabled}
+                className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                  settings.gallery_display_mode === 'magazine'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : cap?.galleryMagazineEnabled
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                      : 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className={`w-4 h-4 rounded-full border-2 ${settings.gallery_display_mode === 'magazine' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
+                    {settings.gallery_display_mode === 'magazine' && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">Magazine</p>
+                    {!cap?.galleryMagazineEnabled && (
+                      <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                        <AlertCircle className="w-3 h-3" />
+                        Upgrade
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-sm ${settings.gallery_display_mode === 'magazine' ? 'text-rose-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                    All images displayed at once in a magazine mosaic. Maximum visual impact.
+                  </p>
+                  {!cap?.galleryMagazineEnabled && (
+                    <Link href={`/t/${tenantId}/settings/store`} className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mt-1 hover:underline">
+                      Upgrade your plan <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  )}
+                </div>
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+              Applies to both product galleries and directory entry galleries
+            </p>
           </CardContent>
         </Card>
       )}

@@ -24,6 +24,7 @@ export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: 
   { key: 'payment_gateway_options', label: 'Payment Gateways', flexibleKeys: ['payment_gateway_flexible'], group: 'Commerce & Conversion' },
   { key: 'storefront_types', label: 'Storefront Types', flexibleKeys: ['storefront_flexible'], group: 'Platform Presence' },
   { key: 'storefront_options', label: 'Storefront Options', flexibleKeys: ['storefront_opt_flexible'], group: 'Platform Presence' },
+  { key: 'storefront_qr', label: 'QR Codes', flexibleKeys: ['storefront_qr_flexible'], group: 'Platform Presence' },
   { key: 'fulfillment_options', label: 'Fulfillment', flexibleKeys: ['fulfillment_flexible'], group: 'Commerce & Conversion' },
   { key: 'barcode_scan_options', label: 'Barcode Scan', flexibleKeys: ['barcode_flexible'], group: 'Clover & Inventory' },
   { key: 'product_types', label: 'Product Types', flexibleKeys: ['product_types_flexible'], group: 'Clover & Inventory' },
@@ -53,6 +54,7 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
   const pg = caps.paymentGateway;
   const sf = caps.storefront;
   const so = caps.storefrontOptions;
+  const sqr = caps.storefrontQr;
   const fl = caps.fulfillment;
   const bc = caps.barcodeScan;
   const pt = caps.productType;
@@ -73,6 +75,7 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
     { key: 'payment_gateway_options', label: 'Payment Gateways', enabled: pg.enabled, flexible: pg.isFlexible, detail: (pg.effectiveGateways ?? []).length > 0 ? pg.effectiveGateways.join(', ') : 'None connected' },
     { key: 'storefront_types', label: 'Storefront Types', enabled: sf.type !== 'none' && (sf.allowedTypes ?? []).length > 0, flexible: sf.isFlexible, detail: sf.effectiveType !== 'none' ? `Type: ${sf.effectiveType}` : 'Not configured' },
     { key: 'storefront_options', label: 'Storefront Options', enabled: so.enabled, flexible: so.isFlexible, detail: so.enabled ? (so.isFlexible ? 'All options unlocked' : 'Customizable') : 'Default' },
+    { key: 'storefront_qr', label: 'QR Codes', enabled: sqr.enabled, flexible: sqr.isFlexible, detail: sqr.enabled ? (sqr.qrStyledEnabled ? 'Styled QR enabled' : sqr.qrClassicEnabled ? 'Classic QR' : 'Available') : 'Not available' },
     { key: 'fulfillment_options', label: 'Fulfillment', enabled: fl.enabled, flexible: fl.isFlexible, detail: fl.effectiveShowsPickup || fl.effectiveShowsDelivery || fl.effectiveShowsShipping ? [fl.effectiveShowsPickup && 'Pickup', fl.effectiveShowsDelivery && 'Delivery', fl.effectiveShowsShipping && 'Shipping'].filter(Boolean).join(', ') : 'Not configured' },
     { key: 'barcode_scan_options', label: 'Barcode Scan', enabled: bc.enabled, flexible: bc.isFlexible, detail: (bc.effectiveModes ?? []).length > 0 ? `Modes: ${bc.effectiveModes.join(', ')}` : 'Not available' },
     { key: 'product_types', label: 'Product Types', enabled: pt.enabled, flexible: pt.isFlexible, detail: (pt.effectiveTypes ?? []).length > 0 ? pt.effectiveTypes.join(', ') : 'Standard' },

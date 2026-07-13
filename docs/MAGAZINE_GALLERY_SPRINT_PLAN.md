@@ -8,6 +8,8 @@ The feature applies to **both surfaces** — product images on storefront produc
 
 The feature integrates into the existing `storefront_options` capability as a new gallery display mode, appears as a radio selection on the merchant options gate page, and can be monetized as a premier BSaaS app-store feature.
 
+> **Namespace Split Alignment**: The `STOREFRONT_OPTIONS_NAMESPACE_SPLIT_PLAN.md` (§4.3) defines `storefront_gallery_*` as a dedicated capability type for all gallery features. The magazine gallery feature (`storefront_opt_gallery_magazine`) will migrate to `storefront_gallery_magazine` in Phase 2 of the namespace split. All references to `storefront_options` in this sprint plan should be considered **temporary** — the feature key, capability type assignment, merchant settings table, and BSaaS catalog entry will all be renamed to the `storefront_gallery` domain during that phase. The resolver logic already handles gallery as a separate block within `StorefrontOptionsResolver.ts`, making the migration a straightforward key rename + capability type reassignment.
+
 ---
 
 ## 2. Current State Analysis
@@ -82,6 +84,8 @@ This is a **separate settings surface** from `StorefrontOptionsSettingsClient.ts
 ### 2.3 Shared Gallery Capability System
 
 Gallery is part of the **`storefront_options`** capability type.
+
+> **Future home**: Per `STOREFRONT_OPTIONS_NAMESPACE_SPLIT_PLAN.md` §4.3, gallery features will migrate to the **`storefront_gallery`** capability type with `storefront_gallery_*` feature key prefixes. The current `storefront_opt_gallery_*` and `storefront_opt_image_gallery_*` keys are temporary — they will be renamed during Phase 2 of the namespace split.
 
 **Current feature keys** (radio selection — only one active at a time):
 - `image_gallery_5` — limit of 5 images

@@ -24,7 +24,7 @@ Phase 4: Resolve         → XxxResolver.ts + types.ts + EffectiveCapabilityReso
 Phase 4.5: Constraints   → capability_constraints_list DB table + CapabilityConstraintRegistry.ts fallback (if cross-capability deps)
 Phase 5: Route           → xxx-options-settings.ts (GET + PUT + tier filtering + cache invalidation + constraint validation)
 Phase 6: Map             → UnifiedCapabilityService.ts + CapabilityResolutionService.ts
-Phase 7: Display         → PlanSummaryPanel.tsx + CapabilityShowcase.tsx + settings page
+Phase 7: Display         → PlanSummaryWidget.tsx (dashboard) + PlanSummaryPanel.tsx (dedicated page) + CapabilityShowcase.tsx + settings page
 Phase 8: Verify          → verify-capability-deployment.md checklist + pnpm checkapi/checkweb
 ```
 
@@ -343,8 +343,11 @@ router.put('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
 **What**:
 1. Add capability to `CAPABILITY_DISPLAY` map in `PlanSummaryPanel.tsx`
 2. Add summary block in `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx`
-3. Add row to `rows` array in `CapabilityShowcase.tsx`
-4. Create or update the settings page at `apps/web/src/app/t/[tenantId]/settings/xxx/`
+3. Add capability to `CAPABILITY_META` array in `PlanSummaryWidget.tsx` (slim dashboard widget — label, icon, prefix, settingsPath)
+4. Add row to `rows` array in `CapabilityShowcase.tsx`
+5. Create or update the settings page at `apps/web/src/app/t/[tenantId]/settings/xxx/`
+
+> **Note**: The dashboard now renders `PlanSummaryWidget` (slim widget with color-coded capability type names) instead of the full `PlanSummaryPanel`. The full panel is rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page. Both components must be updated when adding a new capability — `CAPABILITY_DISPLAY` in `PlanSummaryPanel.tsx` for the full page, and `CAPABILITY_META` in `PlanSummaryWidget.tsx` for the dashboard.
 
 ### PlanSummaryPanel Rules
 
@@ -493,6 +496,7 @@ When deploying a capability change, verify ALL of these:
 - [ ] Fallback resolver in `CapabilityResolutionService.ts` includes `merchantPreferences: null`
 - [ ] `useXxxCapability` hook uses `UnifiedCapabilityService` (not `CapabilityResolutionService`)
 - [ ] `PlanSummaryPanel` has entry in `CAPABILITY_DISPLAY` + summary block in `resolveCapabilitySummaries()`
+- [ ] `PlanSummaryWidget` has entry in `CAPABILITY_META` (slim dashboard widget — label, icon, prefix, settingsPath)
 - [ ] `CapabilityShowcase` has row in `rows` array with correct `merchantGated` computation
 - [ ] Settings page gates toggles by tier state
 - [ ] Expired/inactive tenant returns 200 with disabled capabilities (not 404) — see R13 in `capability-data-flow-rules.md`

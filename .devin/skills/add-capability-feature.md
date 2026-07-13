@@ -235,6 +235,11 @@ After seeding feature keys into `features_list`, the feature is **not automatica
    - Add a summary block in `resolveCapabilitySummaries()` that reads from the mapped state (e.g. `caps.chatbotOptions`) and pushes feature labels + statuses.
    - If the capability is entirely new, also add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` and `mapAll` in `UnifiedCapabilityService.ts` (covered in step 8).
 
+10b. **Update the PlanSummaryWidget** in `apps/web/src/components/dashboard/PlanSummaryWidget.tsx`:
+   - Add an entry to the `CAPABILITY_META` array with the capability key, label, icon, feature key prefix, and `settingsPath`.
+   - The widget uses the prefix to determine color-coded status (green=tier, red=disabled, orange=merchant-gated, blue=purchased, purple=admin-grant) by checking `purchasedFeatureKeys` and `overrideFeatureKeys` for keys matching the prefix.
+   - A capability missing from `CAPABILITY_META` will not appear on the dashboard slim widget.
+
 11. **Update the CapabilityShowcase** in `apps/web/src/components/dashboard/CapabilityShowcase.tsx`:
     - Add a row to the `rows` array in the `useMemo` block for the new capability.
     - Extract the state from `cap.<domain>Options` and compute `tier` / `merchantGated` status.

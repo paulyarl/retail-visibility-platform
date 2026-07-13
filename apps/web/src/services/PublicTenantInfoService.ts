@@ -205,7 +205,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
   /**
    * Get tenant business hours with caching
-   * Uses the /api/tenant/:tenantId/business-hours endpoint
+   * Uses the /api/public/tenants/:tenantId/business-hours endpoint
    */
   async getBusinessHours(tenantId: string): Promise<BusinessHours | null> {
     if (!tenantId) {
@@ -214,8 +214,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
     }
 
     try {
-      // Use public request for public display of business hours
-      // Note: /api/tenant/ (singular) is public, /api/tenants/ (plural) requires auth
+      // Use public endpoint to avoid blanket auth on /api/tenant
       const result = await this.makeDefaultRequest<{
         success: boolean;
         data: {
@@ -227,7 +226,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
           timezone: string;
         };
       }>(
-        `/api/tenant/${tenantId}/business-hours`,
+        `/api/public/tenants/${tenantId}/business-hours`,
         {},
         `public-business-hours-${tenantId}`,
         this.cacheTTL

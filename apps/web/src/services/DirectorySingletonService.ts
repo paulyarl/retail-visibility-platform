@@ -807,7 +807,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
     const response = await super.makeDefaultRequest<any>(
-      `/api/tenant/${tenantId}/business-hours`,
+      `/api/public/tenants/${tenantId}/business-hours`,
       {},
       `business-hours-v2-${tenantId}`, // v2 for timezone enhancement
       this.CACHE_TTL_MEDIUM,

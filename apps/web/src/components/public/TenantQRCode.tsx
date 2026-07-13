@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { storefrontService } from '@/services/StorefrontService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
-import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { StorefrontOptionFlags, StorefrontQrState } from '@/services/CapabilityResolutionService';
+import { StyledTenantQR } from '@/components/public/StyledTenantQR';
 
 export interface TenantQRCodeProps {
   /** The URL to encode in the QR code */
@@ -49,6 +50,8 @@ export function TenantQRCode({
   const [isFetchingTierAndLogo, setIsFetchingTierAndLogo] = useState(true);
   // Capability-aware flags (resolved from API or passed as prop)
   const [resolvedFlags, setResolvedFlags] = useState<StorefrontOptionFlags | null>(capabilityFlags || null);
+  // Storefront QR state (from separate storefront_qr namespace)
+  const [qrState, setQrState] = useState<StorefrontQrState | null>(null);
 
   // Fetch tenant tier, logo, and capability flags
   useEffect(() => {
@@ -56,13 +59,21 @@ export function TenantQRCode({
       try {
         setIsFetchingTierAndLogo(true);
 
-        // Fetch tier data and capability flags in parallel
-        const [tierData, flagsResult] = await Promise.all([
+        // Fetch tier data, capability flags, and QR state in parallel
+        const [tierData, flagsResult, qrStateResult] = await Promise.all([
           storefrontService.getPublicTier(tenantId),
           capabilityFlags
             ? Promise.resolve(capabilityFlags)
             : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
+          capabilityFlags
+            ? Promise.resolve(null)
+            : unifiedCapabilityService.getStorefrontQrState(tenantId).catch(() => null),
         ]);
+
+        // Set QR state if fetched
+        if (qrStateResult) {
+          setQrState(qrStateResult);
+        }
 
         // Set capability flags if not provided as prop
         if (!capabilityFlags && flagsResult) {
@@ -369,53 +380,8 @@ export function TenantQRCode({
       // Get capability-aware QR settings
       const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
-      // Styled QR path: use qr-code-styling when showQRStyled capability is enabled
+      // Styled QR is handled by StyledTenantQR component — skip classic generation when styled is active
       if (resolvedFlags?.showQRStyled) {
-        const { default: QRCodeStyling } = await import('qr-code-styling');
-
-        const dotType = (resolvedFlags.qrDotType || resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
-        const cornerType = (resolvedFlags.qrCornerType || resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-        const dotColor = resolvedFlags.qrDotColor || '#1a56db';
-        const cornerColor = resolvedFlags.qrCornerColor || '#1a56db';
-        const bgColor = resolvedFlags.qrBgColor || '#ffffff';
-        const useGradient = resolvedFlags.qrGradients && resolvedFlags.qrGradientEnabled;
-        const gradientStart = resolvedFlags.qrGradientStart || '#1a56db';
-        const gradientEnd = resolvedFlags.qrGradientEnd || '#7c3aed';
-
-        const qr = new QRCodeStyling({
-          width: qrSettings.exportSize,
-          height: qrSettings.exportSize,
-          type: 'svg',
-          data: url,
-          image: tenantLogo || undefined,
-          imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
-          dotsOptions: {
-            color: dotColor,
-            type: dotType,
-            gradient: useGradient ? {
-              type: 'linear', rotation: 45,
-              colorStops: [{ offset: 0, color: gradientStart }, { offset: 1, color: gradientEnd }],
-            } : undefined,
-          },
-          cornersSquareOptions: {
-            color: cornerColor,
-            type: cornerType,
-          },
-          cornersDotOptions: { color: '#ffffff', type: 'dot' },
-          backgroundOptions: { color: bgColor },
-          qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
-        });
-
-        const blob = await qr.getRawData('png');
-        if (blob instanceof Blob) {
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          setQrImageUrl(dataUrl);
-        }
         return;
       }
 
@@ -639,6 +605,23 @@ export function TenantQRCode({
     if (!pageSpecificFlag) {
       return null;
     }
+  }
+
+  // Styled QR: delegate to StyledTenantQR when effective resolver requires it
+  if (resolvedFlags?.showQRStyled && !isFetchingTierAndLogo) {
+    return (
+      <StyledTenantQR
+        url={url}
+        tenantId={tenantId}
+        tenantLogo={tenantLogo}
+        capabilityFlags={resolvedFlags}
+        label={label}
+        downloadName={downloadName}
+        showDownload={showDownload}
+        className={className}
+        pageType={pageType}
+      />
+    );
   }
 
   return (

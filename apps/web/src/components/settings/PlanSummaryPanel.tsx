@@ -254,6 +254,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   integration_options: { label: 'Integrations', icon: '🔗', settingsPath: '/settings/integration-options' },
   quickstart_options: { label: 'Quickstart', icon: '🚀', settingsPath: '/settings/quickstart-options' },
   storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
+  storefront_qr: { label: 'QR Codes', icon: '📱', settingsPath: '/settings/storefront-qr' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
@@ -613,6 +614,36 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_options',
       settingsPath: CAPABILITY_DISPLAY.storefront_options.settingsPath ?? null,
+    });
+  }
+
+  // Storefront QR — list QR features
+  const sqr = caps.storefrontQr;
+  if (sqr.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSqr = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    sqr.allowedQRResolutions.forEach(t => addSqr(STOREFRONT_OPT_QR_RESOLUTION_LABELS[t], true, sqr.canUseQRCodes));
+    sqr.allowedQRContentTypes.forEach(t => addSqr(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, sqr.canUseQRCodes));
+    if (sqr.qrStyledEnabled) {
+      addSqr('Styled QR', true, true);
+      sqr.allowedQRDotStyles.forEach(t => addSqr(t, true, true));
+      sqr.allowedQRCornerStyles.forEach(t => addSqr(t, true, true));
+      addSqr('Custom Colors', sqr.qrCustomColors, sqr.qrCustomColors);
+      addSqr('Gradients', sqr.qrGradients, sqr.qrGradients);
+    }
+    summaries.push({
+      key: 'storefront_qr',
+      label: CAPABILITY_DISPLAY.storefront_qr.label,
+      icon: CAPABILITY_DISPLAY.storefront_qr.icon,
+      enabled: sqr.enabled,
+      merchantGated: merchantGates?.['storefront_qr'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_qr',
+      settingsPath: CAPABILITY_DISPLAY.storefront_qr.settingsPath ?? null,
     });
   }
 

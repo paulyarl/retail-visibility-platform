@@ -66,6 +66,7 @@ cd apps/web && npx tsc --noEmit
 | Cache invalidation | `cross-context-cache-invalidation.md` |
 | Feature flags | `feature-flag-catalog.md` |
 | Badge system | `meaningful-badge-architecture.md` + `badge-architecture-insights.md` |
+| Database schema changes | `manual-sql-migration-policy.md` |
 
 - [ ] **Flag skills that will need updates after this phase.** This is a mandatory planning task, not optional. As you read each skill, note:
   - Which specific section(s) will need updates (e.g., "Phase 5 route section — add URL namespace rule")
@@ -157,7 +158,7 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Plan idempotency.** All DDL wrapped in `DO$$ BEGIN ... EXCEPTION WHEN OTHERS THEN END $$;`. All INSERTs use `INSERT ... SELECT ... WHERE NOT EXISTS`.
 
-- [ ] **Plan Prisma schema updates.** After migration, will you run `npx prisma db pull` or manually edit `schema.prisma`? Note the models, relations, and indexes to add.
+- [ ] **Plan Prisma introspection (not edits).** After migration is applied to the DB, run `npx prisma db pull && npx prisma generate` to update `schema.prisma` and TypeScript types. **Never edit `schema.prisma` directly** — see `manual-sql-migration-policy.md`. All schema changes must come from SQL migration files applied to the DB first, then introspected via `prisma db pull`.
 
 - [ ] **Identify any materialized views that need rebuilding.** If the migration changes tables that feed into MVs (e.g., `mv_storefront_discovery`), plan the `REFRESH MATERIALIZED VIEW` step.
 
@@ -191,7 +192,7 @@ cd apps/web && npx tsc --noEmit
   4. Resolver (`XxxResolver.ts`) + types + `EffectiveCapabilityResolver.ts`
   5. Route (`xxx-options-settings.ts` with GET + PUT + tier filtering + cache invalidation)
   6. Map (`UnifiedCapabilityService.ts` + `CapabilityResolutionService.ts`)
-  7. Display (`PlanSummaryPanel.tsx` + `CapabilityShowcase.tsx` + settings page)
+  7. Display (`PlanSummaryWidget.tsx` (dashboard) + `PlanSummaryPanel.tsx` (plan-summary page) + `CapabilityShowcase.tsx` + settings page)
   8. Verify (TS checks + `verify-capability-deployment.md`)
 
 - [ ] **Check for cross-capability constraints.** Will the new feature depend on or conflict with another capability? If yes, plan a constraint entry in `capability_constraints_list` and `CapabilityConstraintRegistry.ts`.
@@ -261,7 +262,7 @@ This checklist is the **planning mirror** of `end-of-phase-sprint-checklist.md`.
 | Backend | Plan routes, jobs, logger usage | Verify mounting, wiring, signatures |
 | Route architecture | Review `api-route-architecture-audit.md` if touching mount order or catch-alls | Run `lint:catchall`, `test:routes`, and `gen:routes` from `apps/api` |
 | Auth scope | Plan URL namespace (`/api/public/` vs `/api/tenants/`) and per-route auth | Verify URL prefix matches auth scope, no router-level auth in orchestrator sub-routers |
-| Database | Plan migration, RLS, triggers, indexes | Verify idempotency and Prisma sync |
+| Database | Plan migration, RLS, triggers, indexes; never edit `schema.prisma` | Verify idempotency; `schema.prisma` synced via `prisma db pull` only |
 | Frontend | Plan components, cache keys, SSR safety | Verify states, no orphaned imports |
 | Capabilities | Plan 8-phase deployment | Verify feature keys and constraints |
 | Verification | Note TS check commands | Run `tsc --noEmit` on both apps |

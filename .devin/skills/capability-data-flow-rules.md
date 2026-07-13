@@ -4,7 +4,7 @@ description: Rules for consistent capability data flow from backend resolver thr
 
 # Capability Data Flow Consistency Rules
 
-This skill defines the canonical pattern for how a tier-gated capability flows from backend resolver to dashboard UI. All existing and new capabilities MUST follow these rules to ensure consistent merchant-gating display across `PlanSummaryPanel` and `CapabilityShowcase`.
+This skill defines the canonical pattern for how a tier-gated capability flows from backend resolver to dashboard UI. All existing and new capabilities MUST follow these rules to ensure consistent merchant-gating display across `PlanSummaryWidget` (dashboard), `PlanSummaryPanel` (dedicated plan-summary page), and `CapabilityShowcase`.
 
 ## Architecture: 6 Layers
 
@@ -14,7 +14,7 @@ This skill defines the canonical pattern for how a tier-gated capability flows f
 3. API Route Layer             → xxx-options-settings.ts — GET returns { settings, tierState }, PUT saves merchant prefs
 4. Frontend Service Layer      → UnifiedCapabilityService.ts — maps snake_case backend to camelCase frontend state
 5. React Hook Layer            → useCapabilityAccess.ts — fetches state, provides { data, loading, error, refetch }
-6. Dashboard Display Layer     → PlanSummaryPanel.tsx + CapabilityShowcase.tsx — renders capability summaries
+6. Dashboard Display Layer     → PlanSummaryWidget.tsx (dashboard) + PlanSummaryPanel.tsx (plan-summary page) + CapabilityShowcase.tsx — renders capability summaries
 ```
 
 ## The Canonical Pattern (Tier-Gated + Merchant-Gated)
@@ -107,7 +107,20 @@ export function useXxxCapability(tenantId: string | null): CapabilityHookState<X
 
 ### Layer 6: Dashboard Display
 
-#### PlanSummaryPanel.tsx
+#### PlanSummaryWidget.tsx (Dashboard)
+
+The slim dashboard widget shows clickable capability type names with color-coded status dots. Color is determined by the source of effectiveness:
+- **Green** = tier enabled (tier features grant the capability)
+- **Red** = tier disabled (not enabled by any source)
+- **Orange** = merchant block (tier allows but merchant gate disabled)
+- **Blue** = purchased (BSaaS `purchasedFeatureKeys` includes a key with the capability's prefix)
+- **Purple** = admin grant (`overrideFeatureKeys` includes a key with the capability's prefix)
+
+**Required**: Add an entry to `CAPABILITY_META` in `PlanSummaryWidget.tsx` with the capability key, label, icon, feature key prefix, and settings path. A capability missing from this array will not appear on the dashboard.
+
+#### PlanSummaryPanel.tsx (Plan-Summary Page)
+
+The full panel is rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page. It shows detailed capability cards with per-feature status badges.
 
 **Tier check**: Use `caps.xxx.enabled` to decide whether to show the capability.
 
@@ -669,7 +682,9 @@ When adding new merchant preference fields to a capability domain (e.g., adding 
 - Unified mapper: `apps/web/src/services/UnifiedCapabilityService.ts`
 - React hooks: `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts`
 - Tenant API base: `apps/web/src/providers/base/TenantApiSingleton.ts`
-- Plan summary: `apps/web/src/components/settings/PlanSummaryPanel.tsx`
+- Plan summary (dashboard widget): `apps/web/src/components/dashboard/PlanSummaryWidget.tsx`
+- Plan summary (full page): `apps/web/src/components/settings/PlanSummaryPanel.tsx`
+- Plan summary page route: `apps/web/src/app/t/[tenantId]/settings/plan-summary/`
 - Capability showcase: `apps/web/src/components/dashboard/CapabilityShowcase.tsx`
 
 ### Settings Pages

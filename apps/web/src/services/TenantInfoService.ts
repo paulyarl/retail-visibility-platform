@@ -1975,6 +1975,7 @@ class TenantInfoService extends TenantApiSingleton {
     image_gallery_5: boolean;
     image_gallery_10: boolean;
     image_gallery_15: boolean;
+    gallery_display_mode: 'carousel' | 'magazine';
     enhanced_seo: boolean;
     storefront_actions: boolean;
     storefront_layout: 'classic' | 'editorial' | 'immersive';
@@ -2021,6 +2022,71 @@ class TenantInfoService extends TenantApiSingleton {
       return result.data?.settings as any ?? null;
     } catch (error) {
       console.error('[TenantInfoService] Failed to update storefront options settings:', error);
+      return null;
+    }
+  }
+
+  async getStorefrontQrSettings(tenantId: string): Promise<{
+    qr_enabled: boolean;
+    qr_classic_enabled: boolean;
+    qr_styled_enabled: boolean;
+    qr_codes_512: boolean;
+    qr_codes_1024: boolean;
+    qr_codes_2048: boolean;
+    qr_product: boolean;
+    qr_store: boolean;
+    qr_logo: boolean;
+    qr_directory: boolean;
+    qr_dot_type: string;
+    qr_corner_type: string;
+    qr_dot_color: string;
+    qr_corner_color: string;
+    qr_bg_color: string;
+    qr_gradient_enabled: boolean;
+    qr_gradient_start: string;
+    qr_gradient_end: string;
+    default_qr_resolution: string;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-qr`,
+        {},
+        `tenant-storefront-qr-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront QR settings:', error);
+      return null;
+    }
+  }
+
+  async updateStorefrontQrSettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-qr`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-storefront-qr-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-storefront-qr-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update storefront QR settings:', error);
       return null;
     }
   }

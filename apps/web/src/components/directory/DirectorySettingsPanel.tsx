@@ -217,6 +217,10 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     }));
   };
 
+  const setGalleryMode = (mode: 'carousel' | 'magazine') => {
+    setRawSettings((prev: any) => ({ ...prev, gallery_display_mode: mode }));
+  };
+
   const setQr = (v: boolean) => {
     setRawSettings((prev: any) => ({
       ...prev,
@@ -244,6 +248,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         image_gallery_5: rawSettings.image_gallery_5,
         image_gallery_10: rawSettings.image_gallery_10,
         image_gallery_15: rawSettings.image_gallery_15,
+        gallery_display_mode: rawSettings.gallery_display_mode || 'carousel',
         qr_codes_512: rawSettings.qr_codes_512,
         qr_codes_1024: rawSettings.qr_codes_1024,
         qr_codes_2048: rawSettings.qr_codes_2048,
@@ -508,6 +513,58 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                 }}
               />
             )}
+
+            {/* Gallery Display Mode */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                Gallery Display Mode
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Choose how photos are displayed on the directory page. This setting also applies to product page galleries.
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setGalleryMode('carousel')}
+                  className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                    (rawSettings.gallery_display_mode || 'carousel') === 'carousel'
+                      ? 'bg-orange-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className={`w-4 h-4 rounded-full border-2 ${(rawSettings.gallery_display_mode || 'carousel') === 'carousel' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
+                      {(rawSettings.gallery_display_mode || 'carousel') === 'carousel' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium">Carousel</p>
+                    <p className={`text-sm ${(rawSettings.gallery_display_mode || 'carousel') === 'carousel' ? 'text-orange-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      One image at a time with navigation. Classic controlled viewing.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setGalleryMode('magazine')}
+                  className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                    rawSettings.gallery_display_mode === 'magazine'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className={`w-4 h-4 rounded-full border-2 ${rawSettings.gallery_display_mode === 'magazine' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
+                      {rawSettings.gallery_display_mode === 'magazine' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium">Magazine</p>
+                    <p className={`text-sm ${rawSettings.gallery_display_mode === 'magazine' ? 'text-rose-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      All images displayed at once in a magazine mosaic. Maximum visual impact.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Profile Sync */}

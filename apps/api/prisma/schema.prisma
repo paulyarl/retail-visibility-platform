@@ -4622,14 +4622,6 @@ model tenant_storefront_options_settings {
   qr_store                Boolean?  @default(true)
   qr_logo                 Boolean?  @default(false)
   qr_directory            Boolean?  @default(false)
-  qr_dot_type             String?   @default("rounded") @db.VarChar(30)
-  qr_corner_type          String?   @default("extra-rounded") @db.VarChar(30)
-  qr_dot_color            String?   @default("#1a56db") @db.VarChar(20)
-  qr_corner_color         String?   @default("#1a56db") @db.VarChar(20)
-  qr_bg_color             String?   @default("#ffffff") @db.VarChar(20)
-  qr_gradient_enabled     Boolean?  @default(false)
-  qr_gradient_start       String?   @default("#1a56db") @db.VarChar(20)
-  qr_gradient_end         String?   @default("#7c3aed") @db.VarChar(20)
   image_gallery_5         Boolean?  @default(true)
   image_gallery_10        Boolean?  @default(false)
   image_gallery_15        Boolean?  @default(false)
@@ -4647,11 +4639,49 @@ model tenant_storefront_options_settings {
   page_type               String?   @default("storefront") @db.VarChar(20)
   external_link_enabled   Boolean?  @default(false)
   gallery_display_mode    String?   @default("carousel") @db.VarChar(20)
+  qr_dot_type             String?   @default("rounded") @db.VarChar(30)
+  qr_corner_type          String?   @default("extra-rounded") @db.VarChar(30)
+  qr_dot_color            String?   @default("#1a56db") @db.VarChar(20)
+  qr_corner_color         String?   @default("#1a56db") @db.VarChar(20)
+  qr_bg_color             String?   @default("#ffffff") @db.VarChar(20)
+  qr_gradient_enabled     Boolean?  @default(false)
+  qr_gradient_start       String?   @default("#1a56db") @db.VarChar(20)
+  qr_gradient_end         String?   @default("#7c3aed") @db.VarChar(20)
   tenants                 tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_options_tenant")
 
   @@unique([tenant_id, page_type], map: "uq_storefront_options_tenant_page")
   @@index([tenant_id], map: "idx_storefront_options_tenant")
   @@index([tenant_id, page_type], map: "idx_storefront_options_tenant_page")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_storefront_qr_settings {
+  id                    String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id             String    @unique
+  qr_enabled            Boolean?  @default(true)
+  qr_classic_enabled    Boolean?  @default(true)
+  qr_styled_enabled     Boolean?  @default(false)
+  qr_dot_type           String?   @default("rounded") @db.VarChar(30)
+  qr_corner_type        String?   @default("extra-rounded") @db.VarChar(30)
+  qr_dot_color          String?   @default("#1a56db") @db.VarChar(20)
+  qr_corner_color       String?   @default("#1a56db") @db.VarChar(20)
+  qr_bg_color           String?   @default("#ffffff") @db.VarChar(20)
+  qr_gradient_enabled   Boolean?  @default(false)
+  qr_gradient_start     String?   @default("#1a56db") @db.VarChar(20)
+  qr_gradient_end       String?   @default("#7c3aed") @db.VarChar(20)
+  qr_codes_512          Boolean?  @default(false)
+  qr_codes_1024         Boolean?  @default(true)
+  qr_codes_2048         Boolean?  @default(false)
+  default_qr_resolution String?   @default("1024") @db.VarChar(10)
+  qr_product            Boolean?  @default(true)
+  qr_store              Boolean?  @default(true)
+  qr_logo               Boolean?  @default(false)
+  qr_directory          Boolean?  @default(false)
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_qr_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_qr_tenant")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -4899,6 +4929,7 @@ model tenants {
   tenant_social_pixels                                                                   tenant_social_pixels?
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
   tenant_storefront_policies                                                             tenant_storefront_policies?
+  tenant_storefront_qr_settings                                                          tenant_storefront_qr_settings?
   tenant_storefront_type_settings                                                        tenant_storefront_type_settings?
   merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?               @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users                                                                                  users?                                   @relation(fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)

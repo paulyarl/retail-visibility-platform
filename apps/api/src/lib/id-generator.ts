@@ -1116,6 +1116,16 @@ export function generateStorefrontOptionsSettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate storefront QR settings ID
+ * Format: sqs-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontQrSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sqs-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate storefront type settings ID
  * Format: sts-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

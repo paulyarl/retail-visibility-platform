@@ -34,7 +34,7 @@ export type StorefrontOptLayoutType = LayoutTypeInternal;
 // GROUP DEFINITIONS
 // ====================
 
-export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'advanced' | 'layout';
+export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'gallery_mode' | 'advanced' | 'layout';
 
 export const HOURS_TYPES: StorefrontOptHoursType[] = ['hours_animated', 'hours_status'];
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
@@ -43,6 +43,7 @@ export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', '
 export const QR_RESOLUTION_TYPES: StorefrontOptQRResolutionType[] = ['qr_codes_512', 'qr_codes_1024', 'qr_codes_2048'];
 export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr_store', 'qr_logo', 'qr_directory'];
 export const GALLERY_TYPES: StorefrontOptGalleryType[] = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'];
+export const GALLERY_MODE_TYPES = ['carousel', 'magazine'] as const;
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
 export const LAYOUT_TYPES: StorefrontOptLayoutType[] = ['classic', 'editorial', 'immersive'];
 
@@ -130,6 +131,9 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   image_gallery_5: { key: 'image_gallery_5', label: '5 Images', description: 'Gallery limit of 5 images', group: 'gallery', icon: '🖼️', color: 'orange', selectionMode: 'radio' },
   image_gallery_10: { key: 'image_gallery_10', label: '10 Images', description: 'Gallery limit of 10 images', group: 'gallery', icon: '🖼️', color: 'rose', selectionMode: 'radio' },
   image_gallery_15: { key: 'image_gallery_15', label: '15 Images', description: 'Gallery limit of 15 images', group: 'gallery', icon: '🖼️', color: 'red', selectionMode: 'radio' },
+  // Gallery Display Mode (radio)
+  carousel: { key: 'carousel', label: 'Carousel', description: 'One image at a time with navigation. Classic controlled viewing.', group: 'gallery_mode', icon: '🔄', color: 'orange', selectionMode: 'radio' },
+  magazine: { key: 'magazine', label: 'Magazine', description: 'All images displayed at once in a magazine mosaic. Maximum visual impact.', group: 'gallery_mode', icon: '📰', color: 'rose', selectionMode: 'radio' },
   // Advanced
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced', icon: '🔍', color: 'lime', selectionMode: 'toggle' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced', icon: '⚡', color: 'yellow', selectionMode: 'toggle' },
