@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -28,6 +28,7 @@ import {
   Link2,
   QrCode,
   Image,
+  ChevronDown,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -66,6 +67,7 @@ export default function CapabilityShowcase({
   canUpgrade,
 }: CapabilityShowcaseProps) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
   const rows: CapabilityRow[] = useMemo(() => {
     if (!capabilities) return [];
 
@@ -537,12 +539,20 @@ export default function CapabilityShowcase({
       className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm"
     >
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-semibold text-gray-900">Your Capabilities</h3>
-          <p className="text-xs text-gray-500">
-            {enabledCount} of {totalCount} active
-          </p>
-        </div>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1.5 text-left group/header"
+        >
+          <ChevronDown
+            className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
+          />
+          <div>
+            <h3 className="font-semibold text-gray-900 group-hover/header:text-gray-700 transition-colors">Your Capabilities</h3>
+            <p className="text-xs text-gray-500">
+              {enabledCount} of {totalCount} active
+            </p>
+          </div>
+        </button>
         {canUpgrade && (
           <Link
             href={`/t/${tenantId}/settings/subscription`}
@@ -554,67 +564,69 @@ export default function CapabilityShowcase({
         )}
       </div>
 
-      <div className="space-y-2">
-        {rows.map((row, index) => (
-          <motion.div
-            key={row.key}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 + index * 0.03 }}
-          >
-            <div
-              className={`group flex items-center gap-3 p-2.5 rounded-xl ${readOnly ? '' : 'transition-colors cursor-pointer '}${row.status === 'enabled'
-                ? "hover:bg-gray-50"
-                : row.status === 'merchant-gated'
-                  ? "opacity-80 hover:opacity-100 hover:bg-amber-50/50"
-                  : "opacity-60 hover:opacity-80 hover:bg-gray-50"
-                }`}
-              onClick={readOnly ? undefined : () => router.push(row.settingsLink)}
-              role={readOnly ? undefined : 'link'}
+      {expanded && (
+        <div className="space-y-2">
+          {rows.map((row, index) => (
+            <motion.div
+              key={row.key}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + index * 0.03 }}
             >
               <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  row.status === 'enabled'
-                    ? "bg-indigo-50 text-indigo-600"
-                    : row.status === 'merchant-gated'
-                      ? "bg-amber-50 text-amber-600"
-                      : "bg-gray-100 text-gray-400"
+                className={`group flex items-center gap-3 p-2.5 rounded-xl ${readOnly ? '' : 'transition-colors cursor-pointer '}${row.status === 'enabled'
+                  ? "hover:bg-gray-50"
+                  : row.status === 'merchant-gated'
+                    ? "opacity-80 hover:opacity-100 hover:bg-amber-50/50"
+                    : "opacity-60 hover:opacity-80 hover:bg-gray-50"
                   }`}
+                onClick={readOnly ? undefined : () => router.push(row.settingsLink)}
+                role={readOnly ? undefined : 'link'}
               >
-                {row.icon}
-              </div>
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    row.status === 'enabled'
+                      ? "bg-indigo-50 text-indigo-600"
+                      : row.status === 'merchant-gated'
+                        ? "bg-amber-50 text-amber-600"
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                >
+                  {row.icon}
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">
-                    {row.label}
-                  </span>
-                  {row.status === 'enabled' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : row.status === 'merchant-gated' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5 text-gray-300" />
-                  )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      {row.label}
+                    </span>
+                    {row.status === 'enabled' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : row.status === 'merchant-gated' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5 text-gray-300" />
+                    )}
+                    {row.constraintWarning && (
+                      row.constraintWarning.severity === 'block'
+                        ? <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+                        : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 truncate">{row.detail}</p>
                   {row.constraintWarning && (
-                    row.constraintWarning.severity === 'block'
-                      ? <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-                      : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                    <p className={`text-xs truncate ${row.constraintWarning.severity === 'block' ? 'text-red-600' : 'text-amber-600'}`}>
+                      {row.constraintWarning.message}
+                    </p>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 truncate">{row.detail}</p>
-                {row.constraintWarning && (
-                  <p className={`text-xs truncate ${row.constraintWarning.severity === 'block' ? 'text-red-600' : 'text-amber-600'}`}>
-                    {row.constraintWarning.message}
-                  </p>
-                )}
-              </div>
 
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
-            </div>
-          </motion.div>
-        ))}
-      </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
