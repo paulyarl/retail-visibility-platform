@@ -449,6 +449,7 @@ export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' |
 export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
 export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
+export type StorefrontOptGalleryDisplayMode = 'carousel' | 'magazine';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
@@ -1001,6 +1002,21 @@ export interface StorefrontQrState {
   features: Record<string, boolean>;
 }
 
+export interface StorefrontGalleryState {
+  enabled: boolean;
+  isFlexible: boolean;
+  galleryEnabled: boolean;
+  allowedGalleryTypes: StorefrontOptGalleryType[];
+  defaultGalleryLimit: number;
+  galleryDisplayMode: StorefrontOptGalleryDisplayMode;
+  galleryCarouselEnabled: boolean;
+  galleryMagazineEnabled: boolean;
+  canUseMagazineGallery: boolean;
+  canUseGallery: boolean;
+  merchantPreferences: Record<string, any>;
+  features: Record<string, boolean>;
+}
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
@@ -1018,6 +1034,7 @@ export interface AllCapabilitiesState {
   quickstartOptions: QuickstartOptionsState;
   storefrontOptions: StorefrontOptionsState;
   storefrontQr: StorefrontQrState;
+  storefrontGallery: StorefrontGalleryState;
   directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
@@ -1040,6 +1057,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   commerce_: 'commerce_types',
   payment_gateway_: 'payment_gateway_options',
   storefront_qr_: 'storefront_qr',
+  storefront_gallery_: 'storefront_gallery',
   storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',

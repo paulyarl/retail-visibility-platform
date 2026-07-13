@@ -32,6 +32,7 @@ import {
   QuickstartOptionsState,
   StorefrontOptionsState,
   StorefrontQrState,
+  StorefrontGalleryState,
   FaqOptionsState,
   CrmOptionsState,
   ChatbotOptionsState,
@@ -452,6 +453,38 @@ export function useStorefrontQrCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront QR capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useStorefrontGalleryCapability
+// ====================
+
+export function useStorefrontGalleryCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<StorefrontGalleryState> {
+  const [data, setData] = useState<StorefrontGalleryState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getStorefrontGalleryState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch storefront gallery capability');
     } finally {
       setLoading(false);
     }

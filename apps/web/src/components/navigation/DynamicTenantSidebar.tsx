@@ -291,6 +291,7 @@ function buildTenantNav(
         { label: 'Location Status', href: `/t/${currentTenantId}/settings/location-status`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Review Management', href: `/t/${currentTenantId}/reviews` },
         { label: 'QR Codes', href: `/t/${currentTenantId}/settings/storefront-qr`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Image Gallery', href: `/t/${currentTenantId}/settings/storefront-gallery`, requiredGroup: 'IS_TENANT_ADMIN' },
         ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
     },

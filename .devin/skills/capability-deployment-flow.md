@@ -331,7 +331,7 @@ router.put('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
 - Use `TenantApiSingleton` for merchant-scoped services — MUST call `/api/tenants/...` endpoints
 - Use `PublicApiSingleton` for public storefront reads — MUST call `/api/public/...` endpoints
 - **URL prefix MUST match base class auth scope**: a `PublicApiSingleton` service MUST NOT call `/api/tenants/...` endpoints. A `TenantApiSingleton` service MUST NOT call `/api/public/...` endpoints.
-- For dual-scope data (e.g., `effective-capabilities`): the `PublicApiSingleton` service calls `/api/public/tenants/...` (summary), and a separate `TenantApiSingleton` service calls `/api/tenants/...` (full detail with auth).
+- For dual-scope data (e.g., `effective-capabilities`): Either create two separate services (public `PublicApiSingleton` + private `TenantApiSingleton`), OR use the **single-service dual-scope pattern**: extend `TenantApiSingleton` and accept an optional `{ isPublic?: boolean; ssrAuth?: SsrAuth }` options parameter. When `isPublic: true`, use `makePublicRequest` → `/api/public/tenants/...`. Default (no options) uses `makeDefaultRequest` with `RequestType.AUTHENTICATED` → `/api/tenants/...`. Use separate cache keys (`-public` / `-auth`) to prevent cross-scope contamination. `UnifiedCapabilityService` uses this pattern.
 - Never use direct `fetch` calls — always extend the singleton base
 
 ---

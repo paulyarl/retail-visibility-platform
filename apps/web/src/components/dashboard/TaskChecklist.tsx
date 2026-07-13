@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useNextSteps } from "@/hooks/dashboard/useNextSteps";
 
 interface TaskChecklistProps {
@@ -10,10 +11,14 @@ interface TaskChecklistProps {
 
 export default function TaskChecklist({ tenantId }: TaskChecklistProps) {
   const { tasks, loading } = useNextSteps(tenantId);
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_COUNT = 10;
 
   const completed = tasks.filter((t) => t.done).length;
   const total = tasks.length;
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const visibleTasks = showAll ? tasks : tasks.slice(0, INITIAL_COUNT);
+  const hasMore = tasks.length > INITIAL_COUNT;
 
   if (loading && tasks.length === 0) {
     return (
@@ -61,7 +66,7 @@ export default function TaskChecklist({ tenantId }: TaskChecklistProps) {
       </div>
 
       <div className="space-y-3">
-        {tasks.map((task) => (
+        {visibleTasks.map((task) => (
           <Link
             key={task.id}
             href={task.link}
@@ -91,6 +96,19 @@ export default function TaskChecklist({ tenantId }: TaskChecklistProps) {
           </Link>
         ))}
       </div>
+
+      {hasMore && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+        >
+          {showAll ? (
+            <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
+          ) : (
+            <>Show {tasks.length - INITIAL_COUNT} more <ChevronDown className="w-3.5 h-3.5" /></>
+          )}
+        </button>
+      )}
 
       <Link
         href={`/t/${tenantId}/settings`}

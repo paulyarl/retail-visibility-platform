@@ -2091,6 +2091,58 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getStorefrontGallerySettings(tenantId: string): Promise<{
+    gallery_enabled: boolean;
+    gallery_display_mode: string;
+    image_gallery_5: boolean;
+    image_gallery_10: boolean;
+    image_gallery_15: boolean;
+    default_gallery_limit: number;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-gallery`,
+        {},
+        `tenant-storefront-gallery-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront gallery settings:', error);
+      return null;
+    }
+  }
+
+  async updateStorefrontGallerySettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-gallery`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-storefront-gallery-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-storefront-gallery-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update storefront gallery settings:', error);
+      return null;
+    }
+  }
+
   async updateQuickstartOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
     try {
       if (!tenantId) return null;
