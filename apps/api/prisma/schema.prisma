@@ -4702,6 +4702,18 @@ model tenant_storefront_gallery_settings {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_wholesale_matching_settings {
+  id                         String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id                  String    @unique
+  wholesale_matching_enabled Boolean?  @default(true)
+  created_at                 DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                 DateTime? @default(now()) @db.Timestamp(6)
+  tenants                    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_wholesale_matching_tenant")
+
+  @@index([tenant_id], map: "idx_wholesale_matching_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_storefront_policies {
   id               String    @id @db.VarChar(255)
   tenant_id        String    @unique(map: "uq_storefront_policies_tenant") @db.VarChar(255)
@@ -4949,6 +4961,7 @@ model tenants {
   tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_qr_settings                                                          tenant_storefront_qr_settings?
   tenant_storefront_type_settings                                                        tenant_storefront_type_settings?
+  tenant_wholesale_matching_settings                                                     tenant_wholesale_matching_settings?
   merchant_billing_gateways_tenants_billing_payment_method_idTomerchant_billing_gateways merchant_billing_gateways?               @relation("tenants_billing_payment_method_idTomerchant_billing_gateways", fields: [billing_payment_method_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users                                                                                  users?                                   @relation(fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organizations_list                                                                     organizations_list?                      @relation(fields: [organization_id], references: [id])
