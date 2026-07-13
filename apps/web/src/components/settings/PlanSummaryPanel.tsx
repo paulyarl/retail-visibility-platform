@@ -255,6 +255,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   quickstart_options: { label: 'Quickstart', icon: '🚀', settingsPath: '/settings/quickstart-options' },
   storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
   storefront_qr: { label: 'QR Codes', icon: '📱', settingsPath: '/settings/storefront-qr' },
+  storefront_gallery: { label: 'Image Gallery', icon: '🖼️', settingsPath: '/settings/storefront-gallery' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
@@ -265,7 +266,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
 
 // --- Resolved feature extraction per capability ---
 
-type FeatureStatus = 'enabled' | 'merchant-gated' | 'tier-gated';
+type FeatureStatus = 'enabled' | 'merchant-gated' | 'tier-gated' | 'disabled';
 
 interface FeatureItem {
   label: string;
@@ -644,6 +645,36 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_qr',
       settingsPath: CAPABILITY_DISPLAY.storefront_qr.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Gallery — list gallery types and display mode
+  const sgal = caps.storefrontGallery;
+  if (sgal.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSgal = (label: string, allowed: boolean, effective: boolean) => {
+      specifics.push(label);
+      statuses.push({ label, status: effective ? 'enabled' : allowed ? 'tier-gated' : 'disabled' });
+    };
+    sgal.allowedGalleryTypes.forEach(t => {
+      const label = t === 'image_gallery_5' ? '5 Images' : t === 'image_gallery_10' ? '10 Images' : '15 Images';
+      addSgal(label, true, sgal.canUseGallery);
+    });
+    addSgal('Carousel Mode', sgal.galleryCarouselEnabled, sgal.galleryCarouselEnabled);
+    if (sgal.galleryMagazineEnabled || sgal.isFlexible) {
+      addSgal('Magazine Mode', sgal.galleryMagazineEnabled, sgal.canUseMagazineGallery);
+    }
+    summaries.push({
+      key: 'storefront_gallery',
+      label: CAPABILITY_DISPLAY.storefront_gallery.label,
+      icon: CAPABILITY_DISPLAY.storefront_gallery.icon,
+      enabled: sgal.enabled,
+      merchantGated: merchantGates?.['storefront_gallery'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_gallery',
+      settingsPath: CAPABILITY_DISPLAY.storefront_gallery.settingsPath ?? null,
     });
   }
 

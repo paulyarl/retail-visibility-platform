@@ -224,6 +224,21 @@ const CONSTRAINT_METADATA: ConstraintMetadata = {
       ],
     },
     {
+      key: 'storefront_gallery',
+      label: 'Storefront Gallery',
+      fields: [
+        { field: 'enabled', label: 'Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'gallery_enabled', label: 'Gallery Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'gallery_carousel_enabled', label: 'Carousel Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'gallery_magazine_enabled', label: 'Magazine Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_magazine_gallery', label: 'Can Use Magazine Gallery', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_gallery', label: 'Can Use Gallery', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'gallery_display_mode', label: 'Display Mode', value_type: 'string', operators: STRING_OPS, values: ['carousel', 'magazine'] },
+        { field: 'default_gallery_limit', label: 'Default Gallery Limit', value_type: 'string', operators: STRING_OPS, values: ['5', '10', '15'] },
+        { field: 'is_flexible', label: 'Is Flexible', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+      ],
+    },
+    {
       key: 'directory_entry',
       label: 'Directory Entry',
       fields: [

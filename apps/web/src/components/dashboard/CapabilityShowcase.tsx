@@ -182,6 +182,11 @@ export default function CapabilityShowcase({
     const sqrTier = sqr?.enabled ?? false;
     const sqrMerchantGated = sqrTier && !sqr?.canUseQRCodes;
 
+    // --- Storefront Gallery ---
+    const sgal = cap.storefrontGallery;
+    const sgalTier = sgal?.enabled ?? false;
+    const sgalMerchantGated = sgalTier && !sgal?.canUseGallery;
+
     // --- FAQ Options ---
     // FAQ only has a master toggle merchant pref (faq_enabled), no per-feature merchant prefs.
     // So there is no per-feature merchant gating — badge is either Enabled or Off.
@@ -412,6 +417,18 @@ export default function CapabilityShowcase({
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/storefront-qr`,
         constraintWarning: getConstraintWarning('storefront_qr'),
+      },
+      {
+        key: "storefrontGallery",
+        label: "Image Gallery",
+        icon: <Image className="w-4 h-4" />,
+        enabled: sgalTier && (sgal?.canUseGallery ?? false),
+        status: getStatus(sgalTier, sgalMerchantGated),
+        detail: sgalTier
+          ? (sgal?.canUseMagazineGallery ? "Magazine mode" : sgal?.galleryCarouselEnabled ? "Carousel mode" : "Available")
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/storefront-gallery`,
+        constraintWarning: getConstraintWarning('storefront_gallery'),
       },
       {
         key: "quickstartOptions",

@@ -94,6 +94,8 @@ router.get('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
 
 Maps snake_case backend fields to camelCase frontend state. Must map ALL fields including `allowed_*_types` → `allowed*Types`, `can_use_*` → `canUse*`, `*_available` → `*Available`, `merchant_preferences` → `merchantPreferences`.
 
+**Scope selection**: `UnifiedCapabilityService` uses the **single-service dual-scope pattern** — it extends `TenantApiSingleton` (authenticated by default) and accepts an optional `{ isPublic?: boolean; ssrAuth?: SsrAuth }` options parameter on every method. Public pages (storefront, product, directory) pass `{ isPublic: true }` to hit `/api/public/tenants/...`. Private pages (dashboard, settings) omit the option to hit `/api/tenants/...` with auth. SSR callers can pass `ssrAuth` for explicit Auth0 headers. See `deploy-service-extending-base-singleton.md` Rule 8 for the full pattern.
+
 ### Layer 5: React Hook
 
 **File**: `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts`

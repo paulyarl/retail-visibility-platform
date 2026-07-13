@@ -25,6 +25,7 @@ import {
   QuickstartOptionsState,
   StorefrontOptionsState,
   StorefrontQrState,
+  StorefrontGalleryState,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
   DirectoryEntryOptionsState,
@@ -61,6 +62,7 @@ import {
   StorefrontOptQRDotStyleType,
   StorefrontOptQRCornerStyleType,
   StorefrontOptGalleryType,
+  StorefrontOptGalleryDisplayMode,
   StorefrontOptAdvancedType,
   StorefrontOptLayoutType,
   FaqManagementType,
@@ -130,6 +132,7 @@ interface BackendEffectiveCapabilities {
     quickstart: BackendEffectiveQuickstart;
     storefront_options: BackendEffectiveStorefrontOptions;
     storefront_qr: BackendEffectiveStorefrontQr;
+    storefront_gallery: BackendEffectiveStorefrontGallery;
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
@@ -375,6 +378,20 @@ interface BackendEffectiveStorefrontQr {
   qr_custom_colors: boolean;
   qr_gradients: boolean;
   can_use_qr_codes: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontGallery {
+  enabled: boolean;
+  is_flexible: boolean;
+  gallery_enabled: boolean;
+  allowed_gallery_types: StorefrontOptGalleryType[];
+  default_gallery_limit: number;
+  gallery_display_mode: StorefrontOptGalleryDisplayMode;
+  gallery_carousel_enabled: boolean;
+  gallery_magazine_enabled: boolean;
+  can_use_magazine_gallery: boolean;
+  can_use_gallery: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -787,6 +804,23 @@ function mapStorefrontQr(b: BackendEffectiveStorefrontQr): StorefrontQrState {
   };
 }
 
+function mapStorefrontGallery(b: BackendEffectiveStorefrontGallery): StorefrontGalleryState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    galleryEnabled: b.gallery_enabled,
+    allowedGalleryTypes: b.allowed_gallery_types ?? [],
+    defaultGalleryLimit: b.default_gallery_limit ?? 5,
+    galleryDisplayMode: (b.gallery_display_mode ?? 'carousel') as StorefrontOptGalleryDisplayMode,
+    galleryCarouselEnabled: b.gallery_carousel_enabled,
+    galleryMagazineEnabled: b.gallery_magazine_enabled,
+    canUseMagazineGallery: b.can_use_magazine_gallery,
+    canUseGallery: b.can_use_gallery,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
 function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOptionsState {
   return {
     enabled: b.enabled,
@@ -1004,6 +1038,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     quickstartOptions: mapQuickstart(b.effective.quickstart),
     storefrontOptions: mapStorefrontOptions(b.effective.storefront_options),
     storefrontQr: mapStorefrontQr(b.effective.storefront_qr),
+    storefrontGallery: mapStorefrontGallery(b.effective.storefront_gallery),
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
@@ -1198,6 +1233,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
   async getStorefrontQrState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontQrState> {
     const all = await this.getAllCapabilities(tenantId, options);
     return all.storefrontQr;
+  }
+
+  async getStorefrontGalleryState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontGalleryState> {
+    const all = await this.getAllCapabilities(tenantId, options);
+    return all.storefrontGallery;
   }
 
   async getDirectoryEntryOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryEntryOptionsState> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, AlertTriangle, ArrowRight, MinusCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ArrowRight, MinusCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import {
   systemStatusService,
@@ -12,6 +12,13 @@ import {
 interface SystemStatusCardProps {
   tenantId: string;
 }
+
+const STATUS_PRIORITY: Record<string, number> = {
+  error: 0,
+  warning: 1,
+  ok: 2,
+  inactive: 3,
+};
 
 function StatusRow({ item }: { item: SystemStatusItem }) {
   const icon = (() => {
@@ -55,6 +62,8 @@ function StatusRow({ item }: { item: SystemStatusItem }) {
 export default function SystemStatusCard({ tenantId }: SystemStatusCardProps) {
   const [data, setData] = useState<SystemStatusData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_COUNT = 5;
 
   useEffect(() => {
     if (!tenantId) return;
@@ -73,7 +82,11 @@ export default function SystemStatusCard({ tenantId }: SystemStatusCardProps) {
   }, [tenantId]);
 
   const overall = data?.overall ?? "operational";
-  const visibleItems = data?.items.filter((i) => i.status !== "inactive") ?? [];
+  const sortedItems = (data?.items.filter((i) => i.status !== "inactive") ?? []).sort(
+    (a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99)
+  );
+  const visibleItems = showAll ? sortedItems : sortedItems.slice(0, INITIAL_COUNT);
+  const hasMore = sortedItems.length > INITIAL_COUNT;
 
   const headerColor =
     overall === "operational" ? "bg-emerald-500" :
@@ -123,6 +136,18 @@ export default function SystemStatusCard({ tenantId }: SystemStatusCardProps) {
           <p className="text-sm text-gray-400">No status data available.</p>
         )}
       </div>
+      {hasMore && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+        >
+          {showAll ? (
+            <>Show less <ChevronUp className="w-3.5 h-3.5" /></>
+          ) : (
+            <>Show {sortedItems.length - INITIAL_COUNT} more <ChevronDown className="w-3.5 h-3.5" /></>
+          )}
+        </button>
+      )}
       <Link
         href={`/t/${tenantId}/settings`}
         className="mt-4 inline-flex items-center text-sm text-blue-600 font-medium hover:underline"
