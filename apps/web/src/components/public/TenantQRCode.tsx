@@ -466,14 +466,14 @@ export function TenantQRCode({
     if (styledEnabled) {
       const { default: QRCodeStyling } = await import('qr-code-styling');
 
-      const dotType = (resolvedFlags.qrDotType || resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
-      const cornerType = (resolvedFlags.qrCornerType || resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-      const dotColor = resolvedFlags.qrDotColor || '#1a56db';
-      const cornerColor = resolvedFlags.qrCornerColor || '#1a56db';
-      const bgColor = resolvedFlags.qrBgColor || '#ffffff';
-      const useGradient = resolvedFlags.qrGradients && resolvedFlags.qrGradientEnabled;
-      const gradientStart = resolvedFlags.qrGradientStart || '#1a56db';
-      const gradientEnd = resolvedFlags.qrGradientEnd || '#7c3aed';
+      const dotType = (resolvedFlags?.qrDotType || resolvedFlags?.allowedQRDotStyles?.[0] || 'rounded') as any;
+      const cornerType = (resolvedFlags?.qrCornerType || resolvedFlags?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+      const dotColor = resolvedFlags?.qrDotColor || '#1a56db';
+      const cornerColor = resolvedFlags?.qrCornerColor || '#1a56db';
+      const bgColor = resolvedFlags?.qrBgColor || '#ffffff';
+      const useGradient = resolvedFlags?.qrGradients && resolvedFlags?.qrGradientEnabled;
+      const gradientStart = resolvedFlags?.qrGradientStart || '#1a56db';
+      const gradientEnd = resolvedFlags?.qrGradientEnd || '#7c3aed';
 
       const qr = new QRCodeStyling({
         width: targetSize,
@@ -618,7 +618,7 @@ export function TenantQRCode({
         url={url}
         tenantId={tenantId}
         tenantLogo={tenantLogo}
-        capabilityFlags={resolvedFlags}
+        capabilityFlags={resolvedFlags ?? undefined}
         label={label}
         downloadName={downloadName}
         showDownload={showDownload}
