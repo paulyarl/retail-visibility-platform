@@ -195,6 +195,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
       assignedTo: req.query.assignedTo as string,
       status: req.query.status as string,
       priority: req.query.priority as string,
+      category: req.query.category as string,
     });
     res.json({ success: true, data: tickets });
   } catch (error) {

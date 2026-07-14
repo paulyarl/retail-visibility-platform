@@ -52,7 +52,11 @@ export class CrmTaskService extends BaseService {
     assigned_to?: string;
     created_by: string;
   }) {
-    return prisma.crm_tasks.create({ data: { id: generateCrmTaskId(data.tenant_id), ...data } });
+    const createData: any = { ...data };
+    if (createData.due_date && typeof createData.due_date === 'string') {
+      createData.due_date = new Date(createData.due_date);
+    }
+    return prisma.crm_tasks.create({ data: { id: generateCrmTaskId(data.tenant_id), ...createData } });
   }
 
   async update(taskId: string, data: {
@@ -68,6 +72,11 @@ export class CrmTaskService extends BaseService {
     if (!task) throw new Error('Task not found');
 
     const updateData: any = { ...data };
+
+    // Normalize due_date to a Date object (frontend may send date-only strings)
+    if (updateData.due_date && typeof updateData.due_date === 'string') {
+      updateData.due_date = new Date(updateData.due_date);
+    }
 
     // Track completion time
     if (data.status === 'completed' && task.status !== 'completed') {

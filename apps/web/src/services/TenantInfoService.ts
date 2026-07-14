@@ -2143,6 +2143,56 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getStorefrontHoursSettings(tenantId: string): Promise<{
+    hours_enabled: boolean;
+    hours_display: boolean;
+    hours_animated: boolean;
+    hours_status: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-hours`,
+        {},
+        `tenant-storefront-hours-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront hours settings:', error);
+      return null;
+    }
+  }
+
+  async updateStorefrontHoursSettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-hours`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-storefront-hours-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-storefront-hours-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update storefront hours settings:', error);
+      return null;
+    }
+  }
+
   async updateQuickstartOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
     try {
       if (!tenantId) return null;

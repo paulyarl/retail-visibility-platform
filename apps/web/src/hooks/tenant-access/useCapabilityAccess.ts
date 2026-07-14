@@ -33,12 +33,14 @@ import {
   StorefrontOptionsState,
   StorefrontQrState,
   StorefrontGalleryState,
+  StorefrontHoursState,
   FaqOptionsState,
   CrmOptionsState,
   ChatbotOptionsState,
   SocialCommerceOptionsState,
   DirectoryPromotionState,
   WholesaleMatchingState,
+  PlatformServicesState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -496,6 +498,38 @@ export function useStorefrontGalleryCapability(
 }
 
 // ====================
+// useStorefrontHoursCapability
+// ====================
+
+export function useStorefrontHoursCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<StorefrontHoursState> {
+  const [data, setData] = useState<StorefrontHoursState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getStorefrontHoursState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch storefront hours capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
 // useFaqOptionsCapability
 // ====================
 
@@ -677,6 +711,38 @@ export function useWholesaleMatchingCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch wholesale matching capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// usePlatformServicesCapability
+// ====================
+
+export function usePlatformServicesCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<PlatformServicesState> {
+  const [data, setData] = useState<PlatformServicesState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getPlatformServicesState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch platform services capability');
     } finally {
       setLoading(false);
     }

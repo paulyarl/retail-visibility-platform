@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea, Select } from '@/components/ui';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
+import { adminOperationsService, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTenantDetail, TicketPriority, TaskPriority, TaskStatus } from '@/types/crm';
 
@@ -473,6 +474,7 @@ function TasksTab({ tenantId }: { tenantId: string }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' as TaskPriority, due_date: '', assigned_to: '' });
+  const [staffUsers, setStaffUsers] = useState<AdminUser[]>([]);
 
   async function load() {
     setLoading(true);
@@ -488,7 +490,34 @@ function TasksTab({ tenantId }: { tenantId: string }) {
 
   useEffect(() => {
     load();
+    (async () => {
+      try {
+        const [adminUsersRes, platformAdminRes, platformSupportRes] = await Promise.all([
+          adminOperationsService.getUsers(1, 200, { role: 'ADMIN' }),
+          adminOperationsService.getUsers(1, 200, { role: 'PLATFORM_ADMIN' }),
+          adminOperationsService.getUsers(1, 200, { role: 'PLATFORM_SUPPORT' }),
+        ]);
+        const allStaff = [
+          ...(adminUsersRes.users || []),
+          ...(platformAdminRes.users || []),
+          ...(platformSupportRes.users || []),
+        ];
+        const seen = new Set<string>();
+        setStaffUsers(allStaff.filter(u => {
+          if (seen.has(u.id)) return false;
+          seen.add(u.id);
+          return true;
+        }));
+      } catch (err) {
+        console.error('[Tasks Tab] Staff users load error:', err);
+      }
+    })();
   }, [tenantId]);
+
+  const assigneeOptions = useMemo(() =>
+    staffUsers.map(u => ({ value: u.id, label: `${u.name || u.email} (${u.email})` })),
+    [staffUsers]
+  );
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -654,11 +683,18 @@ function TasksTab({ tenantId }: { tenantId: string }) {
               <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
               <input
                 type="text"
+                list="assignee-options-tenant"
                 value={newTask.assigned_to}
                 onChange={(e) => setNewTask(prev => ({ ...prev, assigned_to: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="User ID or email"
+                placeholder="Select staff user or type email for external assignee..."
               />
+              <datalist id="assignee-options-tenant">
+                {assigneeOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </datalist>
+              <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>

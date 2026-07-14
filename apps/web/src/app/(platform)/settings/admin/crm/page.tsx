@@ -31,6 +31,7 @@ export default function CrmDashboardPage() {
   const [myTickets, setMyTickets] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [promoStats, setPromoStats] = useState<any | null>(null);
+  const [serviceTickets, setServiceTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'all' | 'my-work'>('all');
   const { user } = useAuth();
@@ -43,11 +44,12 @@ export default function CrmDashboardPage() {
           ticketFilters.assignedTo = user.id;
         }
 
-        const [statsRes, ticketsRes, activityRes, promoRes] = await Promise.allSettled([
+        const [statsRes, ticketsRes, activityRes, promoRes, serviceRes] = await Promise.allSettled([
           crmAdminService.getDashboardStats(),
           crmAdminService.listGlobalTickets(ticketFilters),
           crmAdminService.listGlobalActivities({ limit: 8 }),
           crmAdminService.getPromotionStats(),
+          crmAdminService.listGlobalTickets({ category: 'platform_service' }),
         ]);
 
         if (statsRes.status === 'fulfilled') setStats(statsRes.value);
@@ -61,6 +63,7 @@ export default function CrmDashboardPage() {
         }
 
         if (promoRes.status === 'fulfilled') setPromoStats(promoRes.value);
+        if (serviceRes.status === 'fulfilled') setServiceTickets(serviceRes.value);
       } catch (err) {
         console.error('[CRM Dashboard] Load error:', err);
       } finally {
@@ -187,11 +190,52 @@ export default function CrmDashboardPage() {
           </CardContent>
         </Card>
       </div>
+      {/* Platform Services Widget */}
+      <PlatformServicesWidget tickets={serviceTickets} />
+
       {/* Directory Promotions Widget */}
       {promoStats && (
         <DirectoryPromotionsWidget stats={promoStats} />
       )}
     </CrmPageShell>
+  );
+}
+
+function PlatformServicesWidget({ tickets }: { tickets: any[] }) {
+  const active = tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved');
+  const inProgress = tickets.filter(t => t.status === 'in_progress');
+  const delivered = tickets.filter(t => t.status === 'resolved');
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Platform Services</CardTitle>
+          <Link href="/settings/admin/crm/services" className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400">
+            View all →
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          <MiniStat label="Active" value={active.length} />
+          <MiniStat label="In Progress" value={inProgress.length} />
+          <MiniStat label="Delivered" value={delivered.length} />
+          <MiniStat label="Total" value={tickets.length} />
+        </div>
+        {active.length > 0 ? (
+          <div className="space-y-1">
+            {active.slice(0, 5).map((t: any) => (
+              <Link key={t.id} href={`/settings/admin/crm/tickets/${t.id}`} className="flex items-center justify-between text-xs py-1.5 border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                <span className="truncate font-medium">{t.title}</span>
+                <span className="text-neutral-500 ml-2 shrink-0 capitalize">{t.status.replace('_', ' ')}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-neutral-500">No active platform service tickets</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

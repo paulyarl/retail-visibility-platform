@@ -162,6 +162,15 @@ Creates CRM alerts when order status changes (fire-and-forget).
 - `POST /api/admin/crm/alerts` — create alert for a single tenant
 - `POST /api/admin/crm/alerts/broadcast` — broadcast same alert to multiple tenants
 
+### Personal CRM Alert Routes
+**File**: `apps/api/src/routes/crm/personal/crm-personal.ts`
+- `GET /api/personal/crm/alerts` — list alerts across all user's tenant memberships (filter by type, unreadOnly)
+- `PUT /api/personal/crm/alerts/:alertId/read` — mark single alert read
+- `PUT /api/personal/crm/alerts/read-all` — mark all user's alerts read
+- `PUT /api/personal/crm/alerts/:alertId/dismiss` — dismiss alert
+
+**Cross-tenant scoping**: Personal CRM routes use `req.user.tenantIds` from auth context to query across all tenants the user belongs to. No `checkTenantAccess` middleware — routes are user-scoped, not tenant-scoped. Results are enriched with tenant names.
+
 ### Customer CRM Alert Routes
 **File**: `apps/api/src/routes/crm/customer/crm-customer.ts`
 - `GET /api/customer/crm/alerts` — list alerts scoped to customer's orders/tenants
@@ -227,6 +236,15 @@ Creates CRM alerts when order status changes (fire-and-forget).
 
 ### CRM Widget (Tenant Dashboard)
 Alerts appear in the CRM widget on `TenantDashboardV2` via `CrmTenantCrmService.getStats()` which returns `recent_alerts` and `unread_alert_count`.
+
+### Personal CRM Hub (User Dashboard)
+**File**: `apps/web/src/app/(platform)/settings/crm/page.tsx`
+- Aggregates tickets, tasks, alerts, and activities across all user's tenant memberships
+- Tabbed UI: Overview (stats + recent activity + tenant links), Tickets (with conversation modal), Tasks, Alerts
+- Alert actions: mark read, mark all read, dismiss
+- Platform ticket creation modal (tenant_id = `'platform'`)
+- Navigated to from profile page (`/settings/profile`) and PlatformSettings (`/settings`)
+- Uses `PersonalCrmService` (extends `AuthenticatedApiSingleton`, USER context, Auth0 cookie auth)
 
 ## How to Add a New Alert Type
 
@@ -392,12 +410,15 @@ Customer CRM alert routes verify ownership via `getCustomerAlertScope()`:
 | Tenant CRM Alert Routes | `apps/api/src/routes/crm/tenant/crm-tenant.ts` |
 | Admin CRM Alert Routes | `apps/api/src/routes/crm/admin/crm-admin.ts` |
 | Customer CRM Alert Routes | `apps/api/src/routes/crm/customer/crm-customer.ts` |
+| Personal CRM Routes | `apps/api/src/routes/crm/personal/crm-personal.ts` |
 | Tenant Notification Routes | `apps/api/src/routes/tenant-notifications.ts` |
 | Admin Notification Log Routes | `apps/api/src/routes/admin/notification-logs.ts` |
 | Customer Notification Prefs | `apps/api/src/routes/customer-notifications.ts` |
 | CrmTenantCrmService (FE) | `apps/web/src/services/crm/CrmTenantCrmService.ts` |
 | CrmAdminService (FE) | `apps/web/src/services/crm/CrmAdminService.ts` |
 | CrmCustomerService (FE) | `apps/web/src/services/crm/CrmCustomerService.ts` |
+| PersonalCrmService (FE) | `apps/web/src/services/crm/PersonalCrmService.ts` |
+| Personal CRM Hub Page | `apps/web/src/app/(platform)/settings/crm/page.tsx` |
 | CRM Types | `apps/web/src/types/crm.ts` |
 | Tenant Alerts Page | `apps/web/src/app/t/[tenantId]/support/alerts/page.tsx` |
 | CrmTenantService (stats) | `apps/api/src/services/CrmTenantService.ts` |

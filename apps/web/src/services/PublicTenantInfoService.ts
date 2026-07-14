@@ -176,7 +176,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
   /**
    * Get tenant tier information with caching
-   * Uses the /api/tenants/:tenantId/tier/public endpoint
+   * Uses the /api/public/tenants/:tenantId/tier endpoint
    */
   async getTenantTier(tenantId: string): Promise<TenantTier | null> {
     if (!tenantId) {

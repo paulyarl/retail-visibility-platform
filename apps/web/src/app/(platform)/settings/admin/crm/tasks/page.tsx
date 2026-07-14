@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
+import { adminOperationsService, type AdminTenant, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTask, TaskStatus, TaskPriority } from '@/types/crm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -36,6 +37,51 @@ export default function CrmGlobalTasksPage() {
   // Delete confirmation
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Tenant + user options for dropdowns
+  const [tenants, setTenants] = useState<AdminTenant[]>([]);
+  const [staffUsers, setStaffUsers] = useState<AdminUser[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setOptionsLoading(true);
+        const [tenantsRes, adminUsersRes, platformAdminRes, platformSupportRes] = await Promise.all([
+          adminOperationsService.getTenants(1, 200),
+          adminOperationsService.getUsers(1, 200, { role: 'ADMIN' }),
+          adminOperationsService.getUsers(1, 200, { role: 'PLATFORM_ADMIN' }),
+          adminOperationsService.getUsers(1, 200, { role: 'PLATFORM_SUPPORT' }),
+        ]);
+        setTenants(tenantsRes.tenants || []);
+        const allStaff = [
+          ...(adminUsersRes.users || []),
+          ...(platformAdminRes.users || []),
+          ...(platformSupportRes.users || []),
+        ];
+        const seen = new Set<string>();
+        setStaffUsers(allStaff.filter(u => {
+          if (seen.has(u.id)) return false;
+          seen.add(u.id);
+          return true;
+        }));
+      } catch (err) {
+        console.error('[CRM Global Tasks] Options load error:', err);
+      } finally {
+        setOptionsLoading(false);
+      }
+    })();
+  }, []);
+
+  const tenantOptions = useMemo(() =>
+    tenants.map(t => ({ value: t.id, label: `${t.name} (${t.id})` })),
+    [tenants]
+  );
+
+  const assigneeOptions = useMemo(() =>
+    staffUsers.map(u => ({ value: u.id, label: `${u.name || u.email} (${u.email})` })),
+    [staffUsers]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -253,15 +299,29 @@ export default function CrmGlobalTasksPage() {
         <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Create Task" size="md">
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Tenant ID</label>
-              <input
-                type="text"
-                required
-                value={newTask.tenant_id}
-                onChange={(e) => setNewTask(prev => ({ ...prev, tenant_id: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="tenant-id"
-              />
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Tenant</label>
+              {optionsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-neutral-400">
+                  <Spinner size="sm" /> Loading tenants...
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    required
+                    list="tenant-options"
+                    value={newTask.tenant_id}
+                    onChange={(e) => setNewTask(prev => ({ ...prev, tenant_id: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    placeholder="Search and select a tenant..."
+                  />
+                  <datalist id="tenant-options">
+                    {tenantOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </datalist>
+                </>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Title</label>
@@ -306,14 +366,21 @@ export default function CrmGlobalTasksPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To (User ID)</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
               <input
                 type="text"
+                list="assignee-options"
                 value={newTask.assigned_to}
                 onChange={(e) => setNewTask(prev => ({ ...prev, assigned_to: e.target.value }))}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="User ID or email"
+                placeholder="Select staff user or type email for external assignee..."
               />
+              <datalist id="assignee-options">
+                {assigneeOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </datalist>
+              <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
@@ -387,11 +454,18 @@ export default function CrmGlobalTasksPage() {
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
                 <input
                   type="text"
+                  list="assignee-options-edit"
                   value={editTask.assigned_to || ''}
                   onChange={(e) => setEditTask(prev => prev ? { ...prev, assigned_to: e.target.value || null } : null)}
                   className="w-full px-3 py-2 border rounded-lg text-sm"
-                  placeholder="User ID or email"
+                  placeholder="Select staff user or type email for external assignee..."
                 />
+                <datalist id="assignee-options-edit">
+                  {assigneeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </datalist>
+                <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
               </div>
             </div>
             <ModalFooter>

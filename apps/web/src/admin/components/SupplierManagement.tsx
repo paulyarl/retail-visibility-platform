@@ -211,15 +211,18 @@ export default function SupplierManagement() {
                       <Switch
                         checked={supplier.active}
                         onCheckedChange={() => handleToggleActive(supplier)}
-                        disabled={supplier.is_builtin && supplier.active}
                         title={
-                          supplier.is_builtin && supplier.active
-                            ? supplier.api_key_env
-                              ? 'Active — built-in supplier wired with API key. Disable via env var removal.'
-                              : 'Active — built-in open-source supplier. No API key required.'
-                            : supplier.is_builtin && !supplier.active
-                              ? 'Inactive — built-in supplier not yet configured. Toggle to enable.'
-                              : 'Toggle supplier active/inactive.'
+                          supplier.active
+                            ? supplier.is_builtin
+                              ? supplier.api_key_env
+                                ? 'Active — visible in product wizard & items modal. Wired with API key. Toggle off to hide from tenant supplier list.'
+                                : 'Active — visible in product wizard & items modal. Open-source supplier. Toggle off to hide from tenant supplier list.'
+                              : 'Active — visible in product wizard & items modal. Toggle off to hide from tenant supplier list.'
+                            : supplier.is_builtin
+                              ? supplier.api_key_env
+                                ? 'Inactive — hidden from product wizard & items modal. API key env var configured but supplier is disabled. Toggle on to show in tenant supplier list.'
+                                : 'Inactive — hidden from product wizard & items modal. Toggle on to show in tenant supplier list.'
+                              : 'Inactive — hidden from product wizard & items modal. Toggle on to show in tenant supplier list.'
                         }
                       />
                     </td>

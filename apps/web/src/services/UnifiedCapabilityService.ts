@@ -26,6 +26,7 @@ import {
   StorefrontOptionsState,
   StorefrontQrState,
   StorefrontGalleryState,
+  StorefrontHoursState,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
   DirectoryEntryOptionsState,
@@ -84,6 +85,8 @@ import {
   ConstraintStatusState,
   ConstraintStatusMapState,
   WholesaleMatchingState,
+  PlatformServicesState,
+  PlatformServiceType,
 } from './CapabilityResolutionService';
 
 // ====================
@@ -133,6 +136,7 @@ interface BackendEffectiveCapabilities {
     storefront_options: BackendEffectiveStorefrontOptions;
     storefront_qr: BackendEffectiveStorefrontQr;
     storefront_gallery: BackendEffectiveStorefrontGallery;
+    storefront_hours: BackendEffectiveStorefrontHours;
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
@@ -141,6 +145,7 @@ interface BackendEffectiveCapabilities {
     social_commerce_options: BackendEffectiveSocialCommerceOptions;
     directory_promotion: BackendEffectiveDirectoryPromotion;
     wholesale_matching: BackendEffectiveWholesaleMatching;
+    platform_services: BackendEffectivePlatformServices;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -392,6 +397,18 @@ interface BackendEffectiveStorefrontGallery {
   gallery_magazine_enabled: boolean;
   can_use_magazine_gallery: boolean;
   can_use_gallery: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontHours {
+  enabled: boolean;
+  is_flexible: boolean;
+  hours_enabled: boolean;
+  allowed_hours_types: StorefrontOptHoursType[];
+  hours_display_enabled: boolean;
+  can_show_hours_display: boolean;
+  can_use_animated_hours: boolean;
+  can_show_hours_status: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -821,6 +838,21 @@ function mapStorefrontGallery(b: BackendEffectiveStorefrontGallery): StorefrontG
   };
 }
 
+function mapStorefrontHours(b: BackendEffectiveStorefrontHours): StorefrontHoursState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    hoursEnabled: b.hours_enabled,
+    allowedHoursTypes: b.allowed_hours_types ?? [],
+    hoursDisplayEnabled: b.hours_display_enabled,
+    canShowHoursDisplay: b.can_show_hours_display,
+    canUseAnimatedHours: b.can_use_animated_hours,
+    canShowHoursStatus: b.can_show_hours_status,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
 function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOptionsState {
   return {
     enabled: b.enabled,
@@ -995,6 +1027,32 @@ interface BackendEffectiveWholesaleMatching {
   is_flexible: boolean;
 }
 
+interface BackendEffectivePlatformServices {
+  enabled: boolean;
+  allowed_services: string[];
+  can_use_logo_design: boolean;
+  can_use_banner_design: boolean;
+  can_use_store_setup: boolean;
+  can_use_profile_setup: boolean;
+  can_use_seo_optimization: boolean;
+  can_use_social_media_kit: boolean;
+  is_flexible: boolean;
+}
+
+function mapPlatformServices(b: BackendEffectivePlatformServices): PlatformServicesState {
+  return {
+    enabled: b.enabled,
+    allowedServices: (b.allowed_services || []) as PlatformServiceType[],
+    canUseLogoDesign: b.can_use_logo_design,
+    canUseBannerDesign: b.can_use_banner_design,
+    canUseStoreSetup: b.can_use_store_setup,
+    canUseProfileSetup: b.can_use_profile_setup,
+    canUseSeoOptimization: b.can_use_seo_optimization,
+    canUseSocialMediaKit: b.can_use_social_media_kit,
+    isFlexible: b.is_flexible,
+  };
+}
+
 function mapWholesaleMatching(b: BackendEffectiveWholesaleMatching): WholesaleMatchingState {
   return {
     enabled: b.enabled,
@@ -1039,6 +1097,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     storefrontOptions: mapStorefrontOptions(b.effective.storefront_options),
     storefrontQr: mapStorefrontQr(b.effective.storefront_qr),
     storefrontGallery: mapStorefrontGallery(b.effective.storefront_gallery),
+    storefrontHours: mapStorefrontHours(b.effective.storefront_hours),
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
@@ -1046,6 +1105,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
     directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
     wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
+    platformServices: mapPlatformServices(b.effective.platform_services),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1240,6 +1300,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.storefrontGallery;
   }
 
+  async getStorefrontHoursState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontHoursState> {
+    const all = await this.getAllCapabilities(tenantId, options);
+    return all.storefrontHours;
+  }
+
   async getDirectoryEntryOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryEntryOptionsState> {
     const all = await this.getAllCapabilities(tenantId, options);
     return all.directoryEntryOptions;
@@ -1288,6 +1353,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.directoryPromotion;
   }
 
+  async getPlatformServicesState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PlatformServicesState> {
+    const all = await this.getAllCapabilities(tenantId, options);
+    return all.platformServices;
+  }
+
   async getWholesaleMatchingState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<WholesaleMatchingState> {
     const all = await this.getAllCapabilities(tenantId, options);
     return all.wholesaleMatching;
@@ -1325,6 +1395,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   social_commerce_: 'socialCommerceOptions',
   directory_promotion_: 'directoryPromotion',
   wholesale_: 'wholesaleMatching',
+  platform_service_: 'platformServices',
+  platform_services_: 'platformServices',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

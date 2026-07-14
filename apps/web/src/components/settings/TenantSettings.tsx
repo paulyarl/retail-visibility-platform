@@ -489,6 +489,20 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           capabilityKey: 'storefrontGallery',
         },
         {
+          title: 'Business Hours',
+          description: 'Configure business hours display, animated indicators, and open/closed status for your storefront',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/storefront-hours`,
+          color: 'bg-teal-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'storefrontHours',
+        },
+        {
           title: 'Product Conditions',
           description: 'Manage product condition types (new, used, refurbished, etc.)',
           icon: (

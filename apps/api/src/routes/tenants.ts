@@ -644,13 +644,6 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
     let isChain = false;
 
     try {
-      // Reuse existing tier resolution logic from useTenantTier
-      const tierEndpoint = user
-        ? `/api/tenants/${id}/tier`
-        : `/api/tenants/${id}/tier/public`;
-
-      // This would need to be refactored to avoid the actual HTTP call
-      // For now, inline the tier logic here to avoid the separate call
       const tenantTierData = await prisma.tenants.findUnique({
         where: { id },
         select: {

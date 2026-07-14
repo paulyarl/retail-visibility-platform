@@ -841,6 +841,24 @@ export interface DirectoryPromotionState {
   allowedTiers: PromotionTierType[];
 }
 
+// --- Platform Services ---
+
+export type PlatformServiceType =
+  | 'logo_design' | 'banner_design' | 'store_setup'
+  | 'profile_setup' | 'seo_optimization' | 'social_media_kit';
+
+export interface PlatformServicesState {
+  enabled: boolean;
+  allowedServices: PlatformServiceType[];
+  canUseLogoDesign: boolean;
+  canUseBannerDesign: boolean;
+  canUseStoreSetup: boolean;
+  canUseProfileSetup: boolean;
+  canUseSeoOptimization: boolean;
+  canUseSocialMediaKit: boolean;
+  isFlexible: boolean;
+}
+
 // --- Chatbot Options ---
 
 export type ChatbotResponseEngineType =
@@ -1017,6 +1035,19 @@ export interface StorefrontGalleryState {
   features: Record<string, boolean>;
 }
 
+export interface StorefrontHoursState {
+  enabled: boolean;
+  isFlexible: boolean;
+  hoursEnabled: boolean;
+  allowedHoursTypes: StorefrontOptHoursType[];
+  hoursDisplayEnabled: boolean;
+  canShowHoursDisplay: boolean;
+  canUseAnimatedHours: boolean;
+  canShowHoursStatus: boolean;
+  merchantPreferences: Record<string, any>;
+  features: Record<string, boolean>;
+}
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
@@ -1035,6 +1066,7 @@ export interface AllCapabilitiesState {
   storefrontOptions: StorefrontOptionsState;
   storefrontQr: StorefrontQrState;
   storefrontGallery: StorefrontGalleryState;
+  storefrontHours: StorefrontHoursState;
   directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
@@ -1042,6 +1074,7 @@ export interface AllCapabilitiesState {
   socialCommerceOptions: SocialCommerceOptionsState;
   directoryPromotion: DirectoryPromotionState;
   wholesaleMatching: WholesaleMatchingState;
+  platformServices: PlatformServicesState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -1058,6 +1091,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   payment_gateway_: 'payment_gateway_options',
   storefront_qr_: 'storefront_qr',
   storefront_gallery_: 'storefront_gallery',
+  storefront_hours_: 'storefront_hours',
   storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
@@ -1075,6 +1109,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   social_commerce_: 'social_commerce_options',
   directory_promotion_: 'directory_promotion',
   wholesale_: 'wholesale_matching',
+  platform_service_: 'platform_services',
+  platform_services_: 'platform_services',
 };
 
 /**

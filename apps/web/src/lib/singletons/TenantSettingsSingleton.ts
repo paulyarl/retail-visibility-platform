@@ -15,7 +15,6 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
-import { tenantPublicService } from '@/services/TenantPublicService';
 
 // ====================
 // TYPES
@@ -166,16 +165,18 @@ class TenantSettingsSingleton extends TenantApiSingleton {
    * Fetch tenant tier information with caching
    */
   async fetchTenantTier(): Promise<TenantTier> {
-    try {
-      // Use public service for public tier endpoint
-      const data = await tenantPublicService.getPublicTenantTier(this.tenantId);
+    const result = await this.makeDefaultRequest<TenantTier>(
+      `/api/tenants/${this.tenantId}/tier`,
+      { method: 'GET' },
+      `tenant-tier-${this.tenantId}`
+    );
 
-//      console.log('[TenantSettingsSingleton] Fetched tenant tier:', this.tenantId);
-      return data;
-    } catch (error) {
-      console.error('[TenantSettingsSingleton] Failed to fetch tenant tier:', error);
-      throw error;
+    if (!result.success) {
+      console.error('[TenantSettingsSingleton] Error fetching tenant tier:', result.error);
+      throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant tier');
     }
+
+    return result.data || (() => { throw new Error('No tier data received'); })();
   }
 
   /**

@@ -28,6 +28,7 @@ import {
   resolveStorefrontOptions,
   resolveStorefrontQr,
   resolveStorefrontGallery,
+  resolveStorefrontHours,
   resolveDirectoryEntryOptions,
   resolveFaqOptions,
   resolveCrmOptions,
@@ -36,6 +37,7 @@ import {
   resolveSocialCommerceOptions,
   resolveDirectoryPromotion,
   resolveWholesaleMatching,
+  resolvePlatformServices,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -221,6 +223,14 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.wholesale_matching_options?.features || {},
       merchantBundle.wholesaleMatching
     ),
+    resolvePlatformServices(
+      rawCaps.capabilities.platform_services?.features || {}
+    ),
+    resolveStorefrontHours(
+      rawCaps.capabilities.storefront_hours?.features || {},
+      merchantBundle.storefrontHours,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -255,6 +265,8 @@ export async function resolveEffectiveCapabilities(
       social_commerce_options: effective[18],
       directory_promotion: effective[19],
       wholesale_matching: effective[20],
+      platform_services: effective[21],
+      storefront_hours: effective[22],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -326,6 +338,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.payment_gateway.enabled = false;
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
+    result.effective.platform_services.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -353,6 +366,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.chatbot.enabled = false;
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
+    result.effective.platform_services.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance
@@ -675,6 +689,14 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.wholesale_matching_options?.features || {},
       merchantBundle.wholesaleMatching
     ),
+    resolvePlatformServices(
+      rawCaps.capabilities.platform_services?.features || {}
+    ),
+    resolveStorefrontHours(
+      rawCaps.capabilities.storefront_hours?.features || {},
+      merchantBundle.storefrontHours,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -709,6 +731,8 @@ export async function resolveEffectiveCapabilitiesFromMV(
       social_commerce_options: effective[18],
       directory_promotion: effective[19],
       wholesale_matching: effective[20],
+      platform_services: effective[21],
+      storefront_hours: effective[22],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -774,6 +798,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.payment_gateway.enabled = false;
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
+    result.effective.platform_services.enabled = false;
   }
 
   if (isLimited) {
@@ -783,6 +808,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.chatbot.enabled = false;
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
+    result.effective.platform_services.enabled = false;
   }
 
   // Org-level subscription status check
@@ -1095,6 +1121,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     storefrontOptions,
     storefrontQr,
     storefrontGallery,
+    storefrontHours,
     directoryEntry,
     faqOptions,
     crmOptions,
@@ -1115,6 +1142,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'storefront' } } })),
     safeQuery(() => prisma.tenant_storefront_qr_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_gallery_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_storefront_hours_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } } })),
     safeQuery(() => prisma.tenant_faq_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1137,6 +1165,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     storefrontOptions: storefrontOptions as any,
     storefrontQr: storefrontQr as any,
     storefrontGallery: storefrontGallery as any,
+    storefrontHours: storefrontHours as any,
     directoryEntry: directoryEntry as any,
     faqOptions: faqOptions as any,
     crmOptions: crmOptions as any,
@@ -1201,6 +1230,14 @@ function buildMerchantSoftGates(bundle: MerchantSettingsBundle): Record<string, 
     gates.storefront_gallery = {
       gallery_enabled: bundle.storefrontGallery.gallery_enabled ?? true,
       gallery_display_mode: (bundle.storefrontGallery.gallery_display_mode ?? 'carousel') === 'magazine',
+    };
+  }
+  if (bundle.storefrontHours) {
+    gates.storefront_hours = {
+      hours_enabled: bundle.storefrontHours.hours_enabled ?? true,
+      hours_display: bundle.storefrontHours.hours_display ?? true,
+      hours_animated: bundle.storefrontHours.hours_animated ?? true,
+      hours_status: bundle.storefrontHours.hours_status ?? true,
     };
   }
   if (bundle.wholesaleMatching) {

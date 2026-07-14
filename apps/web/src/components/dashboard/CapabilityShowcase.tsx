@@ -27,7 +27,9 @@ import {
   Sparkles,
   Link2,
   QrCode,
+  Wrench,
   Image,
+  Clock,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -187,6 +189,15 @@ export default function CapabilityShowcase({
     const sgalTier = sgal?.enabled ?? false;
     const sgalMerchantGated = sgalTier && !sgal?.canUseGallery;
 
+    // --- Storefront Hours ---
+    const sh = cap.storefrontHours;
+    const shTier = sh?.enabled ?? false;
+    const shMerchantGated = shTier && !sh?.canShowHoursDisplay;
+    const shDetailParts: string[] = [];
+    if (sh?.canShowHoursDisplay) shDetailParts.push('Display');
+    if (sh?.canUseAnimatedHours) shDetailParts.push('Animated');
+    if (sh?.canShowHoursStatus) shDetailParts.push('Status');
+
     // --- FAQ Options ---
     // FAQ only has a master toggle merchant pref (faq_enabled), no per-feature merchant prefs.
     // So there is no per-feature merchant gating — badge is either Enabled or Off.
@@ -262,6 +273,17 @@ export default function CapabilityShowcase({
     if (dp?.allowedTiers.includes('basic')) dpDetailParts.push('Basic');
     if (dp?.allowedTiers.includes('premium')) dpDetailParts.push('Premium');
     if (dp?.allowedTiers.includes('featured')) dpDetailParts.push('Featured');
+
+    // --- Platform Services ---
+    const ps = cap.platformServices;
+    const psEnabled = ps?.enabled ?? false;
+    const psDetailParts: string[] = [];
+    if (ps?.canUseLogoDesign) psDetailParts.push('Logo Design');
+    if (ps?.canUseBannerDesign) psDetailParts.push('Banner Design');
+    if (ps?.canUseStoreSetup) psDetailParts.push('Store Setup');
+    if (ps?.canUseProfileSetup) psDetailParts.push('Profile Setup');
+    if (ps?.canUseSeoOptimization) psDetailParts.push('SEO');
+    if (ps?.canUseSocialMediaKit) psDetailParts.push('Social Media Kit');
 
     // --- Wholesale Matching ---
     const wm = cap.wholesaleMatching;
@@ -431,6 +453,18 @@ export default function CapabilityShowcase({
         constraintWarning: getConstraintWarning('storefront_gallery'),
       },
       {
+        key: "storefrontHours",
+        label: "Business Hours",
+        icon: <Clock className="w-4 h-4" />,
+        enabled: shTier && (sh?.canShowHoursDisplay ?? false),
+        status: getStatus(shTier, shMerchantGated),
+        detail: shTier
+          ? (shDetailParts.length > 0 ? shDetailParts.join(', ') : 'Available')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/storefront-hours`,
+        constraintWarning: getConstraintWarning('storefront_hours'),
+      },
+      {
         key: "quickstartOptions",
         label: "Quick Start",
         icon: <Rocket className="w-4 h-4" />,
@@ -531,6 +565,17 @@ export default function CapabilityShowcase({
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/wholesale`,
         constraintWarning: getConstraintWarning('wholesale_matching'),
+      },
+      {
+        key: "platformServices",
+        label: "Platform Services",
+        icon: <Wrench className="w-4 h-4" />,
+        enabled: psEnabled,
+        status: psEnabled ? "enabled" : "tier-gated",
+        detail: psEnabled
+          ? (psDetailParts.length > 0 ? psDetailParts.join(', ') : 'Available')
+          : "No services purchased",
+        settingsLink: `/t/${tenantId}/settings/feature-store`,
       },
     ];
   }, [capabilities, tenantId]);

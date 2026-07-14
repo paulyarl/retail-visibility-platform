@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-07-12T09:17:46.916Z",
-  "totalMounts": 205,
-  "totalRoutes": 2161,
+  "generatedAt": "2026-07-14T03:33:26.470Z",
+  "totalMounts": 207,
+  "totalRoutes": 2169,
   "mounts": [
     {
       "mountPath": "/api/client-errors",
@@ -3132,6 +3132,14 @@
           "method": "DELETE",
           "path": "/:id",
           "fullPath": "/api/admin/:id",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/create-grant-token",
+          "fullPath": "/api/admin/create-grant-token",
           "middleware": [
             "AsyncFunction"
           ]
@@ -7645,6 +7653,46 @@
           "method": "PUT",
           "path": "/:tenantId/storefront-options",
           "fullPath": "/api/tenants/:tenantId/storefront-options",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction",
+            "requireWritableSubscription",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/storefront-qr",
+          "fullPath": "/api/tenants/:tenantId/storefront-qr",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/:tenantId/storefront-qr",
+          "fullPath": "/api/tenants/:tenantId/storefront-qr",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction",
+            "requireWritableSubscription",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/:tenantId/storefront-gallery",
+          "fullPath": "/api/tenants/:tenantId/storefront-gallery",
+          "middleware": [
+            "authenticateToken",
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "PUT",
+          "path": "/:tenantId/storefront-gallery",
+          "fullPath": "/api/tenants/:tenantId/storefront-gallery",
           "middleware": [
             "authenticateToken",
             "AsyncFunction",
@@ -14199,6 +14247,14 @@
           "middleware": [
             "AsyncFunction"
           ]
+        },
+        {
+          "method": "POST",
+          "path": "/redeem-grant",
+          "fullPath": "/api/subscription/redeem-grant",
+          "middleware": [
+            "AsyncFunction"
+          ]
         }
       ]
     },
@@ -17353,19 +17409,27 @@
       ]
     },
     {
-      "mountPath": "/api",
-      "domain": "tenant",
-      "authLevel": "tenant",
-      "comment": "Tenant tier routes (public tier endpoints mounted BEFORE authenticated tenant routes)",
+      "mountPath": "/api/public/tenants/:tenantId",
+      "domain": "public",
+      "authLevel": "public",
+      "comment": "Public tier endpoint at /api/public/tenants/:tenantId/tier (no auth)",
       "routes": [
         {
           "method": "GET",
-          "path": "/tenants/:id/tier/public",
-          "fullPath": "/api/tenants/:id/tier/public",
+          "path": "/tier",
+          "fullPath": "/api/public/tenants/:tenantId/tier",
           "middleware": [
             "AsyncFunction"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "mountPath": "/api",
+      "domain": "tenant",
+      "authLevel": "tenant",
+      "comment": "Tenant tier routes (authenticated tenant routes only)",
+      "routes": [
         {
           "method": "GET",
           "path": "/tenants/:id/tier",
@@ -17528,6 +17592,30 @@
           "method": "GET",
           "path": "/business-hours/status/:tenantId",
           "fullPath": "/api/business-hours/status/:tenantId",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        }
+      ]
+    },
+    {
+      "mountPath": "/api/public/tenants/:tenantId",
+      "domain": "settings",
+      "authLevel": "public",
+      "comment": "Public business hours endpoints (avoids blanket auth on /api/tenant)",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/business-hours",
+          "fullPath": "/api/public/tenants/:tenantId/business-hours",
+          "middleware": [
+            "AsyncFunction"
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/business-hours/special",
+          "fullPath": "/api/public/tenants/:tenantId/business-hours/special",
           "middleware": [
             "AsyncFunction"
           ]

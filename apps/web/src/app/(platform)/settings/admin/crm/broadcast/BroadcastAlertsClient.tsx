@@ -17,13 +17,26 @@ const ALERT_TYPE_PRESETS = [
   { type: 'info' as AlertType, label: 'Maintenance', icon: '🔧', color: 'blue', description: 'Scheduled maintenance or downtime' },
 ];
 
-const TIER_FILTERS = ['all', 'trial', 'starter', 'growth', 'scale', 'enterprise'] as const;
+const TIER_LABELS: Record<string, string> = {
+  chain_starter: 'Chain Starter',
+  commitment: 'Commitment',
+  organization: 'Organization',
+  enterprise: 'Enterprise',
+  discovery: 'Discovery',
+  chain_professional: 'Chain Professional',
+  ecommerce: 'E-commerce',
+  omnichannel: 'Omnichannel',
+  professional: 'Professional',
+  storefront: 'Storefront',
+};
 
 export default function BroadcastAlertsClient() {
   const [tenants, setTenants] = useState<CrmTenantSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [locationFilter, setLocationFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendToAll, setSendToAll] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -56,16 +69,36 @@ export default function BroadcastAlertsClient() {
     load();
   }, []);
 
+  const availableTiers = useMemo(() => {
+    const tiers = new Set<string>();
+    tenants.forEach(t => { if (t.subscription_tier) tiers.add(t.subscription_tier); });
+    return Array.from(tiers).sort();
+  }, [tenants]);
+
+  const availableStatuses = useMemo(() => {
+    const statuses = new Set<string>();
+    tenants.forEach(t => { if (t.subscription_status) statuses.add(t.subscription_status); });
+    return Array.from(statuses).sort();
+  }, [tenants]);
+
+  const availableLocations = useMemo(() => {
+    const locations = new Set<string>();
+    tenants.forEach(t => { if (t.location_status) locations.add(t.location_status); });
+    return Array.from(locations).sort();
+  }, [tenants]);
+
   const filteredTenants = useMemo(() => {
     return tenants.filter(t => {
       if (tierFilter !== 'all' && t.subscription_tier !== tierFilter) return false;
+      if (statusFilter !== 'all' && t.subscription_status !== statusFilter) return false;
+      if (locationFilter !== 'all' && t.location_status !== locationFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q) || (t.email && t.email.toLowerCase().includes(q));
       }
       return true;
     });
-  }, [tenants, searchQuery, tierFilter]);
+  }, [tenants, searchQuery, tierFilter, statusFilter, locationFilter]);
 
   const toggleTenant = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -139,7 +172,7 @@ export default function BroadcastAlertsClient() {
     );
   }
 
-  const targetCount = sendToAll ? tenants.filter(t => t.subscription_status !== 'cancelled').length : selectedIds.size;
+  const targetCount = sendToAll ? tenants.filter(t => t.subscription_status !== 'cancelled' && t.subscription_status !== 'canceled').length : selectedIds.size;
 
   return (
     <CrmPageShell
@@ -383,20 +416,85 @@ export default function BroadcastAlertsClient() {
                     className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-neutral-900 dark:border-neutral-700"
                   />
                 </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {TIER_FILTERS.map(tier => (
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wide self-center mr-1">Tier</span>
                     <button
-                      key={tier}
-                      onClick={() => setTierFilter(tier)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
-                        tierFilter === tier
+                      onClick={() => setTierFilter('all')}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        tierFilter === 'all'
                           ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
                           : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                       }`}
                     >
-                      {tier}
+                      All
                     </button>
-                  ))}
+                    {availableTiers.map(tier => (
+                      <button
+                        key={tier}
+                        onClick={() => setTierFilter(tier)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          tierFilter === tier
+                            ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        {TIER_LABELS[tier] || tier}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wide self-center mr-1">Sub</span>
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        statusFilter === 'all'
+                          ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {availableStatuses.map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                          statusFilter === status
+                            ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wide self-center mr-1">Loc</span>
+                    <button
+                      onClick={() => setLocationFilter('all')}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        locationFilter === 'all'
+                          ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {availableLocations.map(loc => (
+                      <button
+                        key={loc}
+                        onClick={() => setLocationFilter(loc)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                          locationFilter === loc
+                            ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        {loc}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Select all filtered */}
@@ -440,8 +538,8 @@ export default function BroadcastAlertsClient() {
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {tenant.subscription_tier && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 capitalize">
-                                {tenant.subscription_tier}
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                                {TIER_LABELS[tenant.subscription_tier] || tenant.subscription_tier}
                               </span>
                             )}
                             {tenant.subscription_status && (
@@ -451,6 +549,15 @@ export default function BroadcastAlertsClient() {
                                 : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800'
                               }`}>
                                 {tenant.subscription_status}
+                              </span>
+                            )}
+                            {tenant.location_status && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full capitalize ${
+                                tenant.location_status === 'active' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                : tenant.location_status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800'
+                              }`}>
+                                {tenant.location_status}
                               </span>
                             )}
                           </div>

@@ -161,7 +161,7 @@ class CrmAdminService extends AdminApiSingleton {
     return this.unwrap<CrmTicket[]>(result);
   }
 
-  async listGlobalTickets(filters?: { assignedTo?: string; status?: string; priority?: string }): Promise<CrmTicket[]> {
+  async listGlobalTickets(filters?: { assignedTo?: string; status?: string; priority?: string; category?: string }): Promise<CrmTicket[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString() : '';

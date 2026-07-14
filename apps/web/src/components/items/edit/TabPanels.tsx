@@ -1,7 +1,7 @@
 'use client';
 
 import { Input, Button } from '@/components/ui';
-import { useCapabilityGate } from '@/hooks/useCapabilityGate';
+import { useProductTypeCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import ProductTypeSelector from '../ProductTypeSelector';
 import DigitalProductConfig from '../DigitalProductConfig';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
@@ -28,8 +28,8 @@ interface GeneralTabProps extends TabProps {
 
 // ── General Tab ──────────────────────────────────────────────────────────
 
-export function GeneralTab({ values, setters, saving, onGtinEnrich }: GeneralTabProps) {
-  const productTypesCapability = useCapabilityGate('product_types');
+export function GeneralTab({ values, setters, saving, onGtinEnrich, tenantId }: GeneralTabProps) {
+  const productTypeCap = useProductTypeCapability(tenantId);
 
   return (
     <div className="space-y-4">
@@ -80,12 +80,8 @@ export function GeneralTab({ values, setters, saving, onGtinEnrich }: GeneralTab
         value={values.productType}
         onChange={setters.setProductType}
         disabled={saving}
-        capabilityGate={{
-          capabilities: productTypesCapability.capabilities
-            ? Object.values(productTypesCapability.capabilities).map(cap => cap.features || []).flat()
-            : [],
-          restrictions: productTypesCapability.restrictions,
-        }}
+        allowedTypes={productTypeCap.data?.allowedTypes}
+        effectiveTypes={productTypeCap.data?.effectiveTypes}
       />
 
       {/* SKU */}
