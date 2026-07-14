@@ -4702,6 +4702,21 @@ model tenant_storefront_gallery_settings {
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_storefront_hours_settings {
+  id             String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id      String    @unique
+  hours_enabled  Boolean?  @default(true)
+  hours_display  Boolean?  @default(true)
+  hours_animated Boolean?  @default(true)
+  hours_status   Boolean?  @default(true)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+  tenants        tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_hours_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_hours_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_wholesale_matching_settings {
   id                         String    @id @default(dbgenerated("(gen_random_uuid())::text"))
   tenant_id                  String    @unique
@@ -4957,6 +4972,7 @@ model tenants {
   tenant_social_commerce_options_settings                                                tenant_social_commerce_options_settings?
   tenant_social_pixels                                                                   tenant_social_pixels?
   tenant_storefront_gallery_settings                                                     tenant_storefront_gallery_settings?
+  tenant_storefront_hours_settings                                                       tenant_storefront_hours_settings?
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
   tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_qr_settings                                                          tenant_storefront_qr_settings?

@@ -256,12 +256,14 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   storefront_options: { label: 'Storefront Options', icon: '🎨', settingsPath: '/settings/storefront-options' },
   storefront_qr: { label: 'QR Codes', icon: '📱', settingsPath: '/settings/storefront-qr' },
   storefront_gallery: { label: 'Image Gallery', icon: '🖼️', settingsPath: '/settings/storefront-gallery' },
+  storefront_hours: { label: 'Business Hours', icon: '🕐', settingsPath: '/settings/storefront-hours' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
   chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot/options' },
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
+  platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -678,6 +680,30 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     });
   }
 
+  // Storefront Hours — list hours features
+  const sh = caps.storefrontHours;
+  if (sh?.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSh = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    addSh('Hours Display', sh.canShowHoursDisplay, sh.canShowHoursDisplay);
+    addSh('Animated Hours', sh.canUseAnimatedHours, sh.canUseAnimatedHours);
+    addSh('Hours Status', sh.canShowHoursStatus, sh.canShowHoursStatus);
+    summaries.push({
+      key: 'storefront_hours',
+      label: CAPABILITY_DISPLAY.storefront_hours.label,
+      icon: CAPABILITY_DISPLAY.storefront_hours.icon,
+      enabled: sh.enabled,
+      merchantGated: merchantGates?.['storefront_hours'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_hours',
+      settingsPath: CAPABILITY_DISPLAY.storefront_hours.settingsPath ?? null,
+    });
+  }
+
   // Quickstart Options — list product, category, and AI types
   const qo = caps.quickstartOptions;
   if (qo.enabled) {
@@ -905,6 +931,30 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'wholesale_matching_options',
       settingsPath: CAPABILITY_DISPLAY.wholesale_matching_options.settingsPath ?? null,
+    });
+  }
+
+  // Platform Services
+  const ps = caps.platformServices;
+  if (ps && ps.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (ps.canUseLogoDesign) { specifics.push('Logo Design'); statuses.push({ label: 'Logo Design', status: 'enabled' }); }
+    if (ps.canUseBannerDesign) { specifics.push('Banner Design'); statuses.push({ label: 'Banner Design', status: 'enabled' }); }
+    if (ps.canUseStoreSetup) { specifics.push('Store Setup'); statuses.push({ label: 'Store Setup', status: 'enabled' }); }
+    if (ps.canUseProfileSetup) { specifics.push('Profile Setup'); statuses.push({ label: 'Profile Setup', status: 'enabled' }); }
+    if (ps.canUseSeoOptimization) { specifics.push('SEO Optimization'); statuses.push({ label: 'SEO Optimization', status: 'enabled' }); }
+    if (ps.canUseSocialMediaKit) { specifics.push('Social Media Kit'); statuses.push({ label: 'Social Media Kit', status: 'enabled' }); }
+    summaries.push({
+      key: 'platform_services',
+      label: CAPABILITY_DISPLAY.platform_services.label,
+      icon: CAPABILITY_DISPLAY.platform_services.icon,
+      enabled: ps.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'platform_services',
+      settingsPath: CAPABILITY_DISPLAY.platform_services.settingsPath ?? null,
     });
   }
 

@@ -1182,6 +1182,24 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       }
     })();
 
+    // 5d. If this is a platform service purchase, auto-create fulfillment workflow — fire-and-forget
+    if (featureKey.startsWith('platform_service_')) {
+      (async () => {
+        try {
+          const { PlatformServiceFulfillmentService } = await import('../services/PlatformServiceFulfillmentService');
+          await PlatformServiceFulfillmentService.getInstance().createFulfillmentWorkflow({
+            tenantId,
+            featureKey,
+            serviceName: catalogEntry.marketing_name || featureKey,
+            purchaseId: purchase.id,
+            priceCents,
+          });
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to create platform service fulfillment workflow', undefined, { error: (err as Error).message });
+        }
+      })();
+    }
+
     // 6. Audit log
     await audit({
       tenantId,

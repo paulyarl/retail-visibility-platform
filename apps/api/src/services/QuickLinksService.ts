@@ -408,6 +408,17 @@ const LINKS: LinkDefinition[] = [
   },
 
   {
+    id: 'my-profile',
+    label: () => 'My Profile',
+    description: () => 'View your personal profile',
+    href: () => `/settings/profile`,
+    icon: 'User',
+    category: 'settings',
+    condition: () => true,
+    score: () => 10,
+  },
+
+  {
     id: 'all-settings',
     label: () => 'Settings',
     description: () => 'All settings & configuration',

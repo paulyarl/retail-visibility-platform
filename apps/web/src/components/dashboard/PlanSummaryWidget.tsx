@@ -36,12 +36,15 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'quickstart_options', label: 'Quickstart', icon: '🚀', prefix: 'quickstart_', settingsPath: '/settings/quickstart-options' },
   { key: 'storefront_options', label: 'Storefront Options', icon: '🎨', prefix: 'storefront_opt_', settingsPath: '/settings/storefront-options' },
   { key: 'storefront_qr', label: 'QR Codes', icon: '📱', prefix: 'storefront_qr_', settingsPath: '/settings/storefront-qr' },
+  { key: 'storefront_gallery', label: 'Image Gallery', icon: '🖼️', prefix: 'storefront_gallery_', settingsPath: '/settings/storefront-gallery' },
+  { key: 'storefront_hours', label: 'Business Hours', icon: '🕐', prefix: 'storefront_hours_', settingsPath: '/settings/storefront-hours' },
   { key: 'faq_options', label: 'FAQ Options', icon: '❓', prefix: 'faq_', settingsPath: '/faq/options' },
   { key: 'crm_options', label: 'CRM', icon: '🤝', prefix: 'crm_', settingsPath: '/settings/crm-options' },
   { key: 'directory_entry', label: 'Directory Entry', icon: '📍', prefix: 'directory_entry_', settingsPath: '/settings/directory' },
   { key: 'chatbot_options', label: 'Chatbot', icon: '🤖', prefix: 'chatbot_', settingsPath: '/bot/options' },
   { key: 'social_commerce_options', label: 'Social Commerce', icon: '🛍️', prefix: 'social_commerce_', settingsPath: '/settings/social-commerce' },
   { key: 'wholesale_matching_options', label: 'Wholesale Matching', icon: '🔗', prefix: 'wholesale_', settingsPath: '/settings/wholesale' },
+  { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {
@@ -86,12 +89,15 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'quickstart_options': return caps.quickstartOptions.enabled;
     case 'storefront_options': return caps.storefrontOptions.enabled;
     case 'storefront_qr': return caps.storefrontQr.enabled;
+    case 'storefront_gallery': return caps.storefrontGallery.enabled;
+    case 'storefront_hours': return caps.storefrontHours.enabled;
     case 'faq_options': return caps.faqOptions.enabled;
     case 'crm_options': return caps.crmOptions.enabled;
     case 'directory_entry': return caps.directoryEntryOptions.enabled;
     case 'chatbot_options': return caps.chatbotOptions.enabled;
     case 'social_commerce_options': return caps.socialCommerceOptions.enabled;
     case 'wholesale_matching_options': return !!caps.wholesaleMatching?.enabled;
+    case 'platform_services': return !!caps.platformServices?.enabled;
     default: return false;
   }
 }

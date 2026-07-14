@@ -27,6 +27,7 @@ export default function CrmGlobalTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function CrmGlobalTicketsPage() {
         const result = await crmAdminService.listGlobalTickets({
           status: statusFilter || undefined,
           priority: priorityFilter || undefined,
+          category: categoryFilter || undefined,
         });
         setTickets(result);
       } catch (err) {
@@ -45,7 +47,7 @@ export default function CrmGlobalTicketsPage() {
       }
     }
     load();
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, categoryFilter]);
 
   return (
     <CrmPageShell
@@ -78,6 +80,17 @@ export default function CrmGlobalTicketsPage() {
             {Object.keys(PRIORITY_COLORS).map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+          >
+            <option value="">All Categories</option>
+            <option value="platform_service">Platform Service</option>
+            <option value="general">General</option>
+            <option value="billing">Billing</option>
+            <option value="technical">Technical</option>
           </select>
         </div>
       }

@@ -122,6 +122,8 @@ WHERE stl.tier_key IN ('commitment', 'professional');
 - **Master toggle** (e.g., `crm_enabled`, `faq_enabled`): Single boolean column. When `enabled` is true, ALL tier-allowed features are effectively on. No per-feature merchant gating. See R11 in `capability-data-flow-rules.md`.
 - **Per-feature toggle** (e.g., `chatbot_static_enabled`, `chatbot_widget_enabled`): Individual boolean columns. Tier-allowed features that merchant hasn't enabled show as `merchant-gated` (amber). See R5 in `capability-data-flow-rules.md`.
 
+**Variant — No Merchant Gate (Phase 3 Skip)**: Some capabilities have no merchant preferences table and no merchant gate. The resolver takes only `features` (no `merchantPrefs` param). Example: `platform_services` — one-time professional services purchasable via BSaaS store, no settings table, no merchant toggle. In this case, skip Phase 3 and Phase 5 entirely. The resolver signature is `resolveXxx(features: Record<string, boolean>)` instead of `resolveXxx(features, merchantPrefs)`.
+
 ---
 
 ## Phase 4: Build the Backend Resolver

@@ -302,6 +302,19 @@ export default function AdminDashboardPage() {
           stats: 'Tenant CRM',
           badge: 'NEW',
         },
+        {
+          title: 'Platform Services',
+          description: 'Fulfillment overview for platform-offered services (logo design, store setup, SEO, etc.)',
+          href: '/settings/admin/crm/services',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.737-.483L21 7.5M14.5 3.5l1.5 1.5M5 21l2.5-2.5M14.5 3.5L5 13l-2.5 8.5L11 19l9.5-9.5-6-6z" />
+            </svg>
+          ),
+          color: 'bg-amber-600',
+          stats: 'Service fulfillment',
+          badge: 'NEW',
+        },
       ],
     },
     {

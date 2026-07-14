@@ -60,6 +60,51 @@ const StoreQuerySchema = z.object({
 // ====================
 
 /**
+ * GET /api/public/products/featured
+ * Get featured products with location awareness - Universal Identifier Pattern
+ */
+router.get('/products/featured', async (req, res) => {
+  try {
+    const query = FeaturedProductsQuerySchema.parse(req.query);
+
+    // console.log(`[Public API] Featured products request with query:`, query);
+
+    // Use FeaturedService with intelligent caching
+    const { FeaturedService } = await import('../services/FeaturedService');
+    const featuredService = FeaturedService.getInstance();
+
+    const result = await featuredService.getFeaturedProducts({
+      limit: query.limit,
+      tenantId: query.tenantId,
+      lat: query.lat,
+      lng: query.lng,
+      radius: query.radius,
+      category: query.category,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice
+    });
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'FeaturedService');
+
+    res.json({
+      success: true,
+      ...result,
+      metadata: {
+        cacheTTL: 5 * 60 * 1000, // 5 minutes
+        cacheStats: featuredService.getCacheStats()
+      }
+    });
+  } catch (error) {
+    console.error('[PUBLIC API] Featured products error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch featured products'
+    });
+  }
+});
+
+/**
  * GET /api/public/products/:id
  * Get single product by ID or product_slug with full details - Universal Identifier Pattern
  * Supports both UUID and product_slug lookup for cross-tenant awareness
@@ -113,51 +158,6 @@ router.get('/products/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product'
-    });
-  }
-});
-
-/**
- * GET /api/public/products/featured
- * Get featured products with location awareness - Universal Identifier Pattern
- */
-router.get('/products/featured', async (req, res) => {
-  try {
-    const query = FeaturedProductsQuerySchema.parse(req.query);
-
-    // console.log(`[Public API] Featured products request with query:`, query);
-
-    // Use FeaturedService with intelligent caching
-    const { FeaturedService } = await import('../services/FeaturedService');
-    const featuredService = FeaturedService.getInstance();
-
-    const result = await featuredService.getFeaturedProducts({
-      limit: query.limit,
-      tenantId: query.tenantId,
-      lat: query.lat,
-      lng: query.lng,
-      radius: query.radius,
-      category: query.category,
-      minPrice: query.minPrice,
-      maxPrice: query.maxPrice
-    });
-
-    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
-    res.setHeader('X-Service-Source', 'FeaturedService');
-
-    res.json({
-      success: true,
-      ...result,
-      metadata: {
-        cacheTTL: 5 * 60 * 1000, // 5 minutes
-        cacheStats: featuredService.getCacheStats()
-      }
-    });
-  } catch (error) {
-    console.error('[PUBLIC API] Featured products error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch featured products'
     });
   }
 });
@@ -655,86 +655,6 @@ router.post('/test/batch-resolve', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Batch test failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/:identifier
- * Get shop by any identifier (tenant-id, slug, auto-id) - public access
- */
-router.get('/shops/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    console.log('[Public API] Shop lookup request for identifier:', identifier);
-
-    // Use UniversalIdentifierCache for proper caching and identifier resolution
-    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
-    const cache = UniversalIdentifierCache.getInstance();
-
-    let resolvedTenant: any = null;
-
-    // Add timeout for identifier resolution to prevent hanging
-    const identifierPromise = cache.resolveIdentifier(identifier);
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
-    });
-
-    try {
-      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
-      console.log('[Public API] Successfully resolved identifier:', identifier, '->', resolvedTenant?.id);
-    } catch (error) {
-      console.error('[Public API] Error resolving identifier:', identifier, error);
-      return res.status(404).json({
-        success: false,
-        error: `Identifier not found: ${identifier}`,
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-
-    if (!resolvedTenant) {
-      return res.status(404).json({
-        success: false,
-        error: 'Shop not found',
-        message: `No shop found for identifier: ${identifier}`
-      });
-    }
-
-    // Simple approach: just return the resolved tenant info
-    // No need for expensive ShopService queries for basic identifier validation
-    const shop = {
-      id: resolvedTenant.id,
-      name: resolvedTenant.name,
-      slug: resolvedTenant.slug,
-      business_name: resolvedTenant.name,
-      imageUrl: undefined, // Not needed for basic validation
-      location: undefined,
-      productCount: undefined,
-      rating: undefined,
-      rating_count: undefined,
-      is_published: true,
-      primary_category: undefined,
-      created_at: new Date()
-    };
-
-    console.log(`[Public API] Successfully resolved identifier ${identifier} -> ${resolvedTenant.id}`);
-
-    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
-
-    res.json({
-      success: true,
-      shop,
-      metadata: {
-        identifier,
-        cacheTTL: 15 * 60 * 1000 // 15 minutes
-      }
-    });
-  } catch (error) {
-    console.error('[Public API] Error fetching shop by identifier:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch shop',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -1416,59 +1336,6 @@ router.get('/shops/nearby', async (req, res) => {
 });
 
 /**
- * GET /api/public/shops/:slug
- * Get single shop by slug
- * Note: This route must come after specific routes like /shops/trending
- */
-router.get('/shops/:slug', async (req, res) => {
-  // console.log('[PUBLIC API] Shops slug route HIT with slug:', req.params.slug);
-  try {
-    const { slug } = req.params;
-    
-    // Skip if this is a special route that should be handled elsewhere
-    if (slug === 'trending' || slug === 'featured' || slug === 'id') {
-   //   console.log('[PUBLIC API] Skipping special slug:', slug);
-      return res.status(404).json({
-        success: false,
-        error: 'Not found'
-      });
-    }
-    
-    // Use unified ShopService with caching
-    const { default: ShopService } = await import('../services/ShopService');
-    const shopService = ShopService.getInstance();
-    
-    // Check if this is a tenant ID (starts with 'tid-')
-    let shop;
-    if (slug.startsWith('tid-')) {
-//      console.log('[PUBLIC API] Detected tenant ID, fetching by tenant ID:', slug);
-      shop = await shopService.getShopByTenantId(slug);
-    } else {
- //     console.log('[PUBLIC API] Fetching by slug:', slug);
-      shop = await shopService.getShopBySlug(slug);
-    }
-
-    if (!shop) {
-      return res.status(404).json({
-        success: false,
-        error: 'Shop not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      shop
-    });
-  } catch (error) {
-    console.error('[PUBLIC API] Shop by slug error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch shop'
-    });
-  }
-});
-
-/**
  * GET /api/public/shops/id/:tenantId
  * Get single shop by tenant ID
  */
@@ -1681,9 +1548,229 @@ router.get('/shops/trending', async (req, res) => {
   }
 });
 
+// ====================
+// DYNAMIC SHOP LOOKUP ROUTES (must be after all static /shops/ routes)
+// ====================
+
+/**
+ * GET /api/public/shops/:identifier
+ * Get shop by any identifier (tenant-id, slug, auto-id) - public access
+ */
+router.get('/shops/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log('[Public API] Shop lookup request for identifier:', identifier);
+
+    // Use UniversalIdentifierCache for proper caching and identifier resolution
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+
+    let resolvedTenant: any = null;
+
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log('[Public API] Successfully resolved identifier:', identifier, '->', resolvedTenant?.id);
+    } catch (error) {
+      console.error('[Public API] Error resolving identifier:', identifier, error);
+      return res.status(404).json({
+        success: false,
+        error: `Identifier not found: ${identifier}`,
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found',
+        message: `No shop found for identifier: ${identifier}`
+      });
+    }
+
+    // Simple approach: just return the resolved tenant info
+    // No need for expensive ShopService queries for basic identifier validation
+    const shop = {
+      id: resolvedTenant.id,
+      name: resolvedTenant.name,
+      slug: resolvedTenant.slug,
+      business_name: resolvedTenant.name,
+      imageUrl: undefined, // Not needed for basic validation
+      location: undefined,
+      productCount: undefined,
+      rating: undefined,
+      rating_count: undefined,
+      is_published: true,
+      primary_category: undefined,
+      created_at: new Date()
+    };
+
+    console.log(`[Public API] Successfully resolved identifier ${identifier} -> ${resolvedTenant.id}`);
+
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+
+    res.json({
+      success: true,
+      shop,
+      metadata: {
+        identifier,
+        cacheTTL: 15 * 60 * 1000 // 15 minutes
+      }
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching shop by identifier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch shop',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/:slug
+ * Get single shop by slug
+ * Note: This route must come after specific routes like /shops/trending
+ */
+router.get('/shops/:slug', async (req, res) => {
+  // console.log('[PUBLIC API] Shops slug route HIT with slug:', req.params.slug);
+  try {
+    const { slug } = req.params;
+    
+    // Skip if this is a special route that should be handled elsewhere
+    if (slug === 'trending' || slug === 'featured' || slug === 'id') {
+   //   console.log('[PUBLIC API] Skipping special slug:', slug);
+      return res.status(404).json({
+        success: false,
+        error: 'Not found'
+      });
+    }
+    
+    // Use unified ShopService with caching
+    const { default: ShopService } = await import('../services/ShopService');
+    const shopService = ShopService.getInstance();
+    
+    // Check if this is a tenant ID (starts with 'tid-')
+    let shop;
+    if (slug.startsWith('tid-')) {
+//      console.log('[PUBLIC API] Detected tenant ID, fetching by tenant ID:', slug);
+      shop = await shopService.getShopByTenantId(slug);
+    } else {
+ //     console.log('[PUBLIC API] Fetching by slug:', slug);
+      shop = await shopService.getShopBySlug(slug);
+    }
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      shop
+    });
+  } catch (error) {
+    console.error('[PUBLIC API] Shop by slug error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch shop'
+    });
+  }
+});
+
 // ==========================
 // SCOPE-FIRST ENDPOINTS (Alternative API Pattern)
 // ==========================
+
+/**
+ * GET /api/public/shops/{scope}/trending
+ * Scope-first trending shops endpoint
+ * 
+ * Examples:
+ * GET /api/public/shops/global/trending
+ * GET /api/public/shops/category/trending?category[shopCategoryName]=Electronics Store
+ */
+router.get('/shops/:scope/trending', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { scope } = req.params;
+    const {
+      limit = 12,
+      ...otherQueryParams
+    } = req.query;
+
+    // Validate scope
+    if (!['shop', 'global', 'category', 'location'].includes(scope as string)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid scope: ${scope}. Must be one of: shop, global, category, location`
+      });
+    }
+
+    // Parse location parameters for location scope
+    const location = otherQueryParams['location[city]'] ? {
+      latitude: undefined,
+      longitude: undefined,
+      city: otherQueryParams['location[city]'] as string,
+      state: otherQueryParams['location[state]'] as string,
+      zip: otherQueryParams['location[zip]'] as string,
+      country: otherQueryParams['location[country]'] as string,
+      radius: otherQueryParams['location[radius]'] ? parseInt(otherQueryParams['location[radius]'] as string) : undefined
+    } : undefined;
+
+    // Parse category parameters for category scope
+    const category = otherQueryParams['category[shopCategoryName]'] ? {
+      // Product category parameters
+      productName: otherQueryParams['category[productName]'] as string,
+      productId: otherQueryParams['category[productId]'] as string,
+      googleProductId: otherQueryParams['category[googleProductId]'] as string,
+      
+      // Shop category parameters (GBP-based)
+      shopCategoryName: otherQueryParams['category[shopCategoryName]'] as string,
+      shopCategoryId: otherQueryParams['category[shopCategoryId]'] as string,
+      shopGoogleCategoryId: otherQueryParams['category[shopGoogleCategoryId]'] as string,
+      
+      // Category type - specifies which category to use for filtering
+      categoryType: otherQueryParams['category[categoryType]'] as 'product' | 'shop' | 'both'
+    } : undefined;
+
+    const { ScopeRouter } = await import('../services/ScopeRouter');
+    const scopeRouter = ScopeRouter.getInstance();
+
+    const shops = await scopeRouter.getTrendingShops({
+      scope: scope as 'shop' | 'global' | 'location',
+      limit: parseInt(limit as string),
+      location,
+      category
+    });
+
+    res.json({
+      success: true,
+      data: shops,
+      scope,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime,
+        shopCount: Array.isArray(shops) ? shops.length : 0
+      }
+    });
+  } catch (error) {
+    console.error(`[SHOPS API] Scope-first trending shops error for scope ${req.params.scope}:`, error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      scope: req.params.scope
+    });
+  }
+});
 
 /**
  * GET /api/public/shops/{scope}/{bucketType}
@@ -1791,89 +1878,6 @@ router.get('/shops/:scope/:bucketType', async (req, res) => {
       error: error instanceof Error ? error.message : 'Unknown error',
       scope: req.params.scope,
       bucketType: req.params.bucketType
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/{scope}/trending
- * Scope-first trending shops endpoint
- * 
- * Examples:
- * GET /api/public/shops/global/trending
- * GET /api/public/shops/category/trending?category[shopCategoryName]=Electronics Store
- */
-router.get('/shops/:scope/trending', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { scope } = req.params;
-    const {
-      limit = 12,
-      ...otherQueryParams
-    } = req.query;
-
-    // Validate scope
-    if (!['shop', 'global', 'category', 'location'].includes(scope as string)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid scope: ${scope}. Must be one of: shop, global, category, location`
-      });
-    }
-
-    // Parse location parameters for location scope
-    const location = otherQueryParams['location[city]'] ? {
-      latitude: undefined,
-      longitude: undefined,
-      city: otherQueryParams['location[city]'] as string,
-      state: otherQueryParams['location[state]'] as string,
-      zip: otherQueryParams['location[zip]'] as string,
-      country: otherQueryParams['location[country]'] as string,
-      radius: otherQueryParams['location[radius]'] ? parseInt(otherQueryParams['location[radius]'] as string) : undefined
-    } : undefined;
-
-    // Parse category parameters for category scope
-    const category = otherQueryParams['category[shopCategoryName]'] ? {
-      // Product category parameters
-      productName: otherQueryParams['category[productName]'] as string,
-      productId: otherQueryParams['category[productId]'] as string,
-      googleProductId: otherQueryParams['category[googleProductId]'] as string,
-      
-      // Shop category parameters (GBP-based)
-      shopCategoryName: otherQueryParams['category[shopCategoryName]'] as string,
-      shopCategoryId: otherQueryParams['category[shopCategoryId]'] as string,
-      shopGoogleCategoryId: otherQueryParams['category[shopGoogleCategoryId]'] as string,
-      
-      // Category type - specifies which category to use for filtering
-      categoryType: otherQueryParams['category[categoryType]'] as 'product' | 'shop' | 'both'
-    } : undefined;
-
-    const { ScopeRouter } = await import('../services/ScopeRouter');
-    const scopeRouter = ScopeRouter.getInstance();
-
-    const shops = await scopeRouter.getTrendingShops({
-      scope: scope as 'shop' | 'global' | 'location',
-      limit: parseInt(limit as string),
-      location,
-      category
-    });
-
-    res.json({
-      success: true,
-      data: shops,
-      scope,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime,
-        shopCount: Array.isArray(shops) ? shops.length : 0
-      }
-    });
-  } catch (error) {
-    console.error(`[SHOPS API] Scope-first trending shops error for scope ${req.params.scope}:`, error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      scope: req.params.scope
     });
   }
 });

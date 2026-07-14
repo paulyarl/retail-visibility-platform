@@ -181,6 +181,16 @@ export default router;
 
 **Fix:** Assign one canonical mount path. If the router is intended to be used at both prefixes, create a thin factory that returns a router with the correct base path.
 
+### Pitfall 6: "A static sub-route returns 404 with a param-related error."
+
+**Cause:** A `router.get('/tenants/:tenantId/featured-placements/:purchaseId', ...)` is registered before `router.get('/tenants/:tenantId/featured-placements/analytics', ...)` in the same `Router()`. Express matches routes in registration order, so `analytics` is captured as `:purchaseId`. The handler calls `getPurchase("analytics")`, which returns null, producing a 404 `purchase_not_found`.
+
+This is **intra-file dynamic param shadowing** — different from catch-all mount shadowing (Pitfall 1) because it happens within a single `Router()`, not between mounted sub-routers.
+
+**Fix:** Always register static sibling routes before `/:param` routes in the same router. The lint script (`lint:catchall`) detects this pattern — run it before merging.
+
+**Rule:** Within a single `Router()`, any route ending in `/:param` must be registered **after** all sibling routes that share the same prefix but have a static final segment. For example, `/tenants/:tenantId/featured-placements/analytics` and `/tenants/:tenantId/featured-placements/store-analytics` must both come before `/tenants/:tenantId/featured-placements/:purchaseId`.
+
 ### Pitfall 5: "Body is undefined in a webhook route."
 
 **Cause:** Body parser middleware (`express.json`) is configured before the route and is consuming the raw body, or the route needs `express.raw` but is mounted after `express.json`.

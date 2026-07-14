@@ -31,11 +31,12 @@ export class CrmTicketService extends BaseService {
   /**
    * Global ticket queue (all tenants)
    */
-  async listGlobal(filters: { assignedTo?: string; status?: string; priority?: string } = {}) {
+  async listGlobal(filters: { assignedTo?: string; status?: string; priority?: string; category?: string } = {}) {
     const where: any = {};
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
+    if (filters.category) where.category = filters.category;
     return prisma.crm_support_tickets.findMany({ where, orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }] });
   }
 

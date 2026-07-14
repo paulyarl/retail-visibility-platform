@@ -4,25 +4,19 @@
  */
 
 import React from 'react';
-import { Store, Download, Gift } from 'lucide-react';
+import { Store, Download, Gift, Wrench } from 'lucide-react';
 
-export type ProductType = 'physical' | 'digital' | 'hybrid';
+export type ProductType = 'physical' | 'digital' | 'hybrid' | 'service';
 
 interface ProductTypeSelectorProps {
   value: ProductType;
   onChange: (type: ProductType) => void;
   disabled?: boolean;
-  capabilityGate?: {
-    capabilities: string[];
-    restrictions?: {
-      maxItems?: number;
-      allowedTypes?: string[];
-      blockedOperations?: string[];
-    };
-  };
+  allowedTypes?: ProductType[];
+  effectiveTypes?: ProductType[];
 }
 
-export default function ProductTypeSelector({ value, onChange, disabled, capabilityGate }: ProductTypeSelectorProps) {
+export default function ProductTypeSelector({ value, onChange, disabled, allowedTypes, effectiveTypes }: ProductTypeSelectorProps) {
   const options = [
     {
       value: 'physical' as ProductType,
@@ -42,30 +36,42 @@ export default function ProductTypeSelector({ value, onChange, disabled, capabil
       label: 'Hybrid Product',
       description: 'Physical item + digital content',
     },
+    {
+      value: 'service' as ProductType,
+      icon: Wrench,
+      label: 'Service Product',
+      description: 'Bookable services or appointments',
+    },
   ];
 
-  // Filter options based on capability gate
+  const allAllowed = allowedTypes ?? ['physical'];
+  const allEffective = effectiveTypes ?? ['physical'];
+
   const filteredOptions = options.map(option => {
-    const isAvailable = capabilityGate?.capabilities?.includes(option.value);
-    const isBlocked = capabilityGate?.restrictions?.blockedOperations?.includes(option.value);
-    
+    const isTierAllowed = allAllowed.includes(option.value);
+    const isMerchantEnabled = allEffective.includes(option.value);
+    const isPhysical = option.value === 'physical';
+
     return {
       ...option,
-      isAvailable: isAvailable || option.value === 'physical', // Physical is always available
-      isBlocked,
-      isDisabled: disabled || (!isAvailable && !isBlocked)
+      isTierAllowed: isTierAllowed || isPhysical,
+      isMerchantEnabled: isMerchantEnabled || (isPhysical && !allowedTypes),
+      isDisabled: disabled || !isTierAllowed || (isTierAllowed && !isMerchantEnabled),
     };
   });
 
-  // Auto-switch to physical if current type is not available
+  // Auto-switch to first effective type if current type is not available
   React.useEffect(() => {
-    if (capabilityGate && value !== 'physical') {
+    if (allowedTypes && value) {
       const currentOption = filteredOptions.find(opt => opt.value === value);
-      if (currentOption?.isDisabled) {
-        onChange('physical');
+      if (currentOption?.isDisabled && !disabled) {
+        const firstAvailable = filteredOptions.find(opt => !opt.isDisabled);
+        if (firstAvailable) {
+          onChange(firstAvailable.value);
+        }
       }
     }
-  }, [value, capabilityGate, onChange]);
+  }, [value, allowedTypes, effectiveTypes, onChange, disabled]);
 
   return (
     <div className="space-y-3">
@@ -76,17 +82,21 @@ export default function ProductTypeSelector({ value, onChange, disabled, capabil
         {filteredOptions.map((option) => {
           const Icon = option.icon;
           const isSelected = value === option.value;
-          
-          if (!option.isAvailable && !option.isBlocked) {
-            // Show gated option
+
+          if (option.isDisabled) {
+            const isTierAllowed = option.isTierAllowed;
+            const badgeText = isTierAllowed ? 'Not Enabled' : 'Upgrade Required';
+            const badgeClass = isTierAllowed
+              ? 'bg-gray-100 text-gray-600'
+              : 'bg-amber-100 text-amber-800';
             return (
               <div
                 key={option.value}
-                className="relative flex flex-col items-start p-4 border-2 border-gray-200 rounded-lg opacity-50"
+                className="relative flex flex-col items-start p-4 border-2 border-gray-200 rounded-lg opacity-60"
               >
                 <div className="absolute top-2 right-2">
-                  <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded">
-                    Upgrade Required
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${badgeClass}`}>
+                    {badgeText}
                   </span>
                 </div>
                 <Icon className="w-6 h-6 text-gray-400 mb-2" />
@@ -155,6 +165,7 @@ export default function ProductTypeSelector({ value, onChange, disabled, capabil
         {value === 'physical' && 'Requires inventory tracking and shipping configuration'}
         {value === 'digital' && 'No inventory needed - instant delivery after purchase'}
         {value === 'hybrid' && 'Combines physical shipping with digital content delivery'}
+        {value === 'service' && 'Bookable services - no shipping or inventory needed'}
       </p>
     </div>
   );

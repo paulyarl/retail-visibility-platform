@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Save, AlertCircle, CheckCircle2, Image, Lock, LayoutGrid, GalleryHorizontalEnd } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, Image, Lock, LayoutGrid, GalleryHorizontalEnd, Zap, ArrowRight, Globe, MapPin, Images } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontGalleryCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
@@ -118,17 +118,6 @@ export default function StorefrontGallerySettingsClient({ tenantId }: Storefront
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Image Gallery Settings</h1>
           <p className="text-sm text-neutral-500 mt-1">Configure image gallery display and layout for your storefront</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {saved && (
-            <span className="inline-flex items-center gap-1 text-sm text-green-600">
-              <CheckCircle2 className="h-4 w-4" /> Saved
-            </span>
-          )}
-          <Button onClick={handleSave} disabled={saving || !isTierEnabled}>
-            <Save className="h-4 w-4 mr-1" />
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
         </div>
       </div>
 
@@ -267,6 +256,89 @@ export default function StorefrontGallerySettingsClient({ tenantId }: Storefront
                   );
                 })}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Save Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          {saved && (
+            <span className="inline-flex items-center gap-1 text-sm text-green-600">
+              <CheckCircle2 className="h-4 w-4" /> Saved
+            </span>
+          )}
+          {error && (
+            <span className="inline-flex items-center gap-1 text-sm text-red-600">
+              <AlertCircle className="h-4 w-4" /> {error}
+            </span>
+          )}
+        </div>
+        <Button onClick={handleSave} disabled={saving || !isTierEnabled}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? 'Saving...' : 'Save Settings'}
+        </Button>
+      </div>
+
+      {/* Next Steps */}
+      {isTierEnabled && settings.gallery_enabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-600" />
+              What's Next
+            </CardTitle>
+            <p className="text-sm text-neutral-600 mt-1">
+              Continue setup for the gallery features you just enabled
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link
+                href={`/t/${tenantId}/settings/storefront-options`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-gray-300 text-neutral-900 transition-colors"
+              >
+                <Images className="h-5 w-5 shrink-0 text-neutral-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Storefront Options</p>
+                  <p className="text-xs opacity-80 truncate">Configure additional storefront display features</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+              <Link
+                href={`/t/${tenantId}/settings/storefront-qr`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-gray-300 text-neutral-900 transition-colors"
+              >
+                <Image className="h-5 w-5 shrink-0 text-neutral-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">QR Code Settings</p>
+                  <p className="text-xs opacity-80 truncate">Customize QR codes for your store and products</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+              <Link
+                href={`/tenant/${tenantId}`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-gray-300 text-neutral-900 transition-colors"
+              >
+                <Globe className="h-5 w-5 shrink-0 text-neutral-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Public Storefront</p>
+                  <p className="text-xs opacity-80 truncate">View your store as customers see it</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+              <Link
+                href={`/directory/${tenantId}`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-gray-300 text-neutral-900 transition-colors"
+              >
+                <MapPin className="h-5 w-5 shrink-0 text-neutral-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Directory Entry</p>
+                  <p className="text-xs opacity-80 truncate">View your store's public directory listing</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
             </div>
           </CardContent>
         </Card>

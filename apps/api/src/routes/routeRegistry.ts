@@ -243,6 +243,7 @@ import crossTenantProductsRoutes from '../routes/cross-tenant-products';
 import digitalDownloadsRoutes from '../routes/digital-downloads';
 import crmTenantRoutes from '../routes/crm/tenant/crm-tenant';
 import crmCustomerRoutes from '../routes/crm/customer/crm-customer';
+import crmPersonalRoutes from '../routes/crm/personal/crm-personal';
 import tenantSupplierRoutes from '../routes/tenant/suppliers';
 import brandingRoutes from '../routes/branding';
 import tenantTierRoutes, { publicTenantRouter as tenantTierPublicRouter } from '../routes/tenant-tier';
@@ -1659,6 +1660,14 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public',
     comment: 'CRM customer routes (customer-scoped, requires customer JWT auth)',
+  },
+  {
+    path: '/api/personal/crm',
+    router: crmPersonalRoutes,
+    middleware: [authenticateToken],
+    domain: 'tenant',
+    authLevel: 'tenant',
+    comment: 'Personal CRM routes (user-scoped, cross-tenant aggregator + platform tickets)',
   },
   {
     path: '/api/tenants/:tenantId',

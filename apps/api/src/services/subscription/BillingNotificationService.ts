@@ -44,7 +44,8 @@ export type BillingNotificationType =
   | 'directory_promotion_renewal_failed'
   | 'directory_promotion_grace_period_warning'
   | 'directory_promotion_expired'
-  | 'policy_template_updated';
+  | 'policy_template_updated'
+  | 'platform_service_delivered';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -369,6 +370,14 @@ class BillingNotificationService {
           subject: `Policy Template Update Available - ${data.metadata?.templateTitle || 'Template'} - ${businessName}`,
           html: this.buildPolicyTemplateUpdatedHtml(ownerName, businessName, data),
           text: this.buildPolicyTemplateUpdatedText(ownerName, businessName, data),
+        };
+
+      case 'platform_service_delivered':
+        return {
+          to: toEmail,
+          subject: `Service Delivered - ${data.metadata?.serviceName || 'Platform Service'} - ${businessName}`,
+          html: this.buildPlatformServiceDeliveredHtml(ownerName, businessName, data),
+          text: this.buildPlatformServiceDeliveredText(ownerName, businessName, data),
         };
 
       default:
@@ -1147,6 +1156,12 @@ Your new plan is now active.`;
           body: `A policy template you used for ${tenantName} has been updated. Template: "${data.metadata?.templateTitle || 'Policy'}" — version ${data.metadata?.appliedVersion || '?'} → ${data.metadata?.currentVersion || '?'}. Review and update your policies to stay compliant.`,
           icon: '📋',
         };
+      case 'platform_service_delivered':
+        return {
+          title: `Service delivered: ${data.metadata?.serviceName || 'Platform Service'}`,
+          body: `Your "${data.metadata?.serviceName || 'platform service'}" for ${tenantName} has been delivered. You can view the details and any deliverables in your CRM portal.`,
+          icon: '✅',
+        };
       default:
         return {
           title: 'Subscription update',
@@ -1758,6 +1773,37 @@ We recommend reviewing and updating your ${policyType.replace(/_/g, ' ')} to sta
 Review at: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/policies
 
 Templates are starting points, not legal advice. Consult your attorney before publishing updated policies.
+    `.trim();
+  }
+
+  private buildPlatformServiceDeliveredHtml(name: string, business: string, data: BillingNotificationData): string {
+    const serviceName = data.metadata?.serviceName || 'Platform Service';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #059669; color: white; padding: 20px; text-align: center;">
+          <h2 style="margin: 0;">Service Delivered</h2>
+        </div>
+        <div style="padding: 20px;">
+          <p>Hi ${name},</p>
+          <p>Your <strong>${serviceName}</strong> for <strong>${business}</strong> has been delivered.</p>
+          <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0;"><strong>Service:</strong> ${serviceName}</p>
+          </div>
+          <p>You can view the details and any deliverables in your CRM portal.</p>
+          <a href="${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/crm" style="display: inline-block; background: #059669; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 8px;">View in CRM</a>
+        </div>
+      </div>
+    `;
+  }
+
+  private buildPlatformServiceDeliveredText(name: string, business: string, data: BillingNotificationData): string {
+    const serviceName = data.metadata?.serviceName || 'Platform Service';
+    return `
+Hi ${name},
+
+Your ${serviceName} for ${business} has been delivered.
+
+You can view the details and any deliverables in your CRM portal at: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/crm
     `.trim();
   }
 }

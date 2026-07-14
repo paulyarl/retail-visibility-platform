@@ -49,6 +49,7 @@ export interface MerchantSettingsBundle {
   storefrontOptions: StorefrontOptionsMerchantSettings | null;
   storefrontQr: StorefrontQrMerchantSettings | null;
   storefrontGallery: StorefrontGalleryMerchantSettings | null;
+  storefrontHours: StorefrontHoursMerchantSettings | null;
   directoryEntry: StorefrontOptionsMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
@@ -178,6 +179,13 @@ export interface StorefrontGalleryMerchantSettings {
   image_gallery_10?: boolean | null;
   image_gallery_15?: boolean | null;
   default_gallery_limit?: number | null;
+}
+
+export interface StorefrontHoursMerchantSettings {
+  hours_enabled?: boolean | null;
+  hours_display?: boolean | null;
+  hours_animated?: boolean | null;
+  hours_status?: boolean | null;
 }
 
 export interface StorefrontQrMerchantSettings {
@@ -591,6 +599,18 @@ export interface EffectiveStorefrontGallery {
   merchant_preferences: Record<string, any>;
 }
 
+export interface EffectiveStorefrontHours {
+  enabled: boolean;
+  is_flexible: boolean;
+  hours_enabled: boolean;
+  allowed_hours_types: StorefrontOptHoursType[];
+  hours_display_enabled: boolean;
+  can_show_hours_display: boolean;
+  can_use_animated_hours: boolean;
+  can_show_hours_status: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
 export interface EffectiveStorefrontOptions {
   enabled: boolean;
   is_flexible: boolean;
@@ -859,6 +879,30 @@ export interface WholesaleMatchingMerchantSettings {
   wholesale_matching_enabled?: boolean | null;
 }
 
+// ====================
+// PLATFORM SERVICES
+// ====================
+
+export type PlatformServiceType =
+  | 'logo_design'
+  | 'banner_design'
+  | 'store_setup'
+  | 'profile_setup'
+  | 'seo_optimization'
+  | 'social_media_kit';
+
+export interface EffectivePlatformServices {
+  enabled: boolean;
+  allowed_services: PlatformServiceType[];
+  can_use_logo_design: boolean;
+  can_use_banner_design: boolean;
+  can_use_store_setup: boolean;
+  can_use_profile_setup: boolean;
+  can_use_seo_optimization: boolean;
+  can_use_social_media_kit: boolean;
+  is_flexible: boolean;
+}
+
 export interface EffectiveDirectoryPromotion {
   enabled: boolean;
   allowed_tiers: PromotionTier[];
@@ -898,6 +942,7 @@ export interface EffectiveCapabilities {
     storefront_options: EffectiveStorefrontOptions;
     storefront_qr: EffectiveStorefrontQr;
     storefront_gallery: EffectiveStorefrontGallery;
+    storefront_hours: EffectiveStorefrontHours;
     directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;
@@ -907,6 +952,7 @@ export interface EffectiveCapabilities {
     social_commerce_options: EffectiveSocialCommerceOptions;
     directory_promotion: EffectiveDirectoryPromotion;
     wholesale_matching: EffectiveWholesaleMatching;
+    platform_services: EffectivePlatformServices;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

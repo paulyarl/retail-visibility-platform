@@ -190,12 +190,12 @@ class TenantPublicService extends PublicApiSingleton {
 
   /**
    * Get tenant tier information (public)
-   * Uses the /api/tenants/:tenantId/tier/public endpoint
+   * Uses the /api/public/tenants/:tenantId/tier endpoint (no auth required)
    */
   async getPublicTenantTier(tenantId: string): Promise<any | null> {
     try {
       const response = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/tier/public`,
+        `/api/public/tenants/${tenantId}/tier`,
         {},
         `public-tenant-tier-${tenantId}`,
         this.PROFILE_TTL

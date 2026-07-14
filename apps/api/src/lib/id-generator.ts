@@ -1136,6 +1136,16 @@ export function generateStorefrontGallerySettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate a tenant_storefront_hours_settings ID.
+ * Format: shs-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontHoursSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `shs-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate storefront type settings ID
  * Format: sts-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

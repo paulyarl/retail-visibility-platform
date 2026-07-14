@@ -194,24 +194,6 @@ router.post('/tenants/:tenantId/featured-placements/:purchaseId/renew', authenti
 });
 
 // ====================
-// TENANT: GET SINGLE PURCHASE
-// ====================
-
-router.get('/tenants/:tenantId/featured-placements/:purchaseId', authenticateToken, async (req, res) => {
-  try {
-    const { purchaseId } = req.params;
-    const purchase = await service.getPurchase(purchaseId);
-    if (!purchase) {
-      return res.status(404).json({ error: 'purchase_not_found' });
-    }
-    res.json({ purchase });
-  } catch (error) {
-    console.error('[featured-placement] Failed to get purchase:', error);
-    res.status(500).json({ error: 'failed_to_get_purchase' });
-  }
-});
-
-// ====================
 // TENANT: PLACEMENT ANALYTICS (per-placement ROI + lift)
 // ====================
 
@@ -239,6 +221,24 @@ router.get('/tenants/:tenantId/featured-placements/store-analytics', authenticat
   } catch (error) {
     console.error('[featured-placement] Failed to get store analytics:', error);
     res.status(500).json({ error: 'failed_to_get_store_analytics' });
+  }
+});
+
+// ====================
+// TENANT: GET SINGLE PURCHASE
+// ====================
+
+router.get('/tenants/:tenantId/featured-placements/:purchaseId', authenticateToken, async (req, res) => {
+  try {
+    const { purchaseId } = req.params;
+    const purchase = await service.getPurchase(purchaseId);
+    if (!purchase) {
+      return res.status(404).json({ error: 'purchase_not_found' });
+    }
+    res.json({ purchase });
+  } catch (error) {
+    console.error('[featured-placement] Failed to get purchase:', error);
+    res.status(500).json({ error: 'failed_to_get_purchase' });
   }
 });
 
