@@ -198,7 +198,7 @@ The Gallery domain has two display modes: **Carousel Gallery** (default, one ima
 4. **Tier assignments are copied** from old keys to new keys
 5. **Old `storefront_opt_*` keys are unlinked** from `storefront_options` capability type (removed from `capability_features_list`) but remain in `features_list` for backward compatibility
 6. **Resolver logic is extracted** from `StorefrontOptionsResolver.ts` into 5 new resolver files — the logic already exists, it's a move + key rename
-7. **All surfaces are aligned** to consume the new domain structure (see §8)
+7. **All surfaces are aligned per-domain** — each phase updates surfaces to read from the new domain state and removes old domain references in the same phase (see §5.3), preventing stale reads from `storefront_options`
 
 ### 5.2 Phase Order
 
@@ -208,10 +208,36 @@ Ordered by **highest congestion first** (QR = 31 features) for maximum Admin UI 
 2. **Phase 2**: Gallery (`storefront_gallery`) — 12 features
 3. **Phase 3**: Hours (`storefront_hours`) — 8 features
 4. **Phase 4**: Layouts (`storefront_layouts`) — 7 features
-5. **Phase 5**: Maps (`storefront_maps`) — 6 features
-6. **Phase 6**: Core cleanup + surface alignment finalization
+5. **Phase 5**: Maps (`storefront_maps`) — 6 features + final core cleanup
 
 Each phase is independently deployable. The system remains functional after each phase because resolvers fall back to old keys.
+
+### 5.3 Per-Domain Cleanup (Critical)
+
+**Problem with deferred cleanup**: If cleanup is deferred to a final phase, public surfaces (product pages, directory entries, storefront rendering) continue reading migrated features from the old `storefront_options` state. When the new domain resolver and the old `StorefrontOptionsResolver` both produce values for the same feature, surfaces may read stale or conflicting state — leading to capability resolution bugs where a feature appears enabled in the new domain but disabled (or absent) in the old domain.
+
+**Solution**: Each phase includes a **domain cleanup step** at the end of the phase. This step ensures that once a domain is split out, the old `storefront_options` domain no longer serves the migrated features. All surfaces are updated to read from the new domain state **in the same phase** that the domain is created.
+
+Per-domain cleanup tasks (executed at the end of each phase):
+
+1. **Remove migrated fields from `EffectiveStorefrontOptions`** — delete the domain-specific fields from the interface so the old resolver no longer carries them
+2. **Remove migrated logic from `StorefrontOptionsResolver.ts`** — delete the extracted block so the old resolver no longer resolves those features
+3. **Remove migrated fields from `StorefrontOptionsMerchantSettings`** — the old merchant settings type no longer carries domain-specific prefs
+4. **Update `toStorefrontOptionFlags`** — delegate to the new sub-domain state for migrated features instead of computing them from old fields
+5. **Update `StorefrontOptionsService.ts`** — remove domain-specific resolution; `getDisabledState` no longer returns disabled states for migrated domains
+6. **Update `storefrontOptions.ts` utils** — move domain-specific groups/metadata to a new domain util file (e.g., `storefrontQr.ts`)
+7. **Update `StorefrontOptionsSettingsClient.tsx`** — remove the migrated section from the settings page, add a link to the new domain settings page
+8. **Update public surfaces** — product page components, directory entry components, storefront rendering components, and landing page components must read from the new domain state instead of `storefront_options`
+9. **Update `CapabilityShowcase.tsx`** — add the new domain row, remove the migrated features from the `storefront_options` row
+10. **Update `PlanSummaryPanel.tsx`** — add the new domain card, remove migrated features from the `storefront_options` card
+11. **Update `capability-display.ts`** — add the new domain to `CAPABILITY_META`, `summarizeResolvedCapabilities()`, `buildEffectiveFeatures()`; remove migrated features from the `storefront_options` entry
+12. **Update `useCapabilityAccess.ts`** — add merchant gate status for the new domain; remove migrated features from the `storefront_options` entry
+13. **Update BSaaS surfaces** — catalog, bundle, grant, and feature store UIs must group the new domain's features under the new capability type
+14. **Verify no surface reads migrated features from `storefront_options`** — grep for old `storefront_opt_<domain>_*` keys in surface code and confirm all reads go through the new domain state
+
+**After each phase, the old `storefront_options` domain is cleanly scoped to only the features that have not yet been migrated.** This prevents stale reads and capability resolution conflicts on public surfaces.
+
+The final phase (Phase 5: Maps) includes the same per-domain cleanup for Maps, plus a **final core cleanup** to remove any remaining cross-domain references and run a full regression test pass.
 
 ## 6. Database Migration Plan (per phase)
 
@@ -446,13 +472,13 @@ export interface EffectiveCapabilities {
 }
 ```
 
-### 7.5 Update `EffectiveStorefrontOptions` (Core — slimmed down)
+### 7.5 Update `EffectiveStorefrontOptions` (Core — slimmed down incrementally)
 
-Remove QR, Gallery, Hours, Layout, and Maps fields. Retain only core fields (category, recommend, recently viewed, info, advanced).
+Migrated fields are removed **per-domain** at the end of each phase (see §5.3). After all 5 phases, only core fields remain (category, recommend, recently viewed, info, advanced). This incremental approach prevents the old resolver from carrying stale state for features that have already been migrated to their new domains.
 
 ### 7.6 Update `MerchantSettingsBundle`
 
-Add new sub-domain merchant settings:
+Add new sub-domain merchant settings. Each domain's merchant settings are added in their respective phase, and the corresponding fields are removed from `StorefrontOptionsMerchantSettings` in the same phase's cleanup step:
 
 ```typescript
 export interface MerchantSettingsBundle {
@@ -509,15 +535,15 @@ const effective = await Promise.all([
 
 - Continues to resolve `storefront_options` (core) via `resolveStorefrontOptions`
 - New sub-domain resolvers are called from `EffectiveCapabilityResolver.ts` directly
-- `getDisabledState` fallback must return disabled states for all 6 domains
+- `getDisabledState` fallback is updated **per-domain** — each phase removes the migrated domain's disabled state from the fallback, so the old service no longer produces stale state for migrated domains
 
 ### 7.9 Update `fetchMerchantSettings` in `EffectiveCapabilityResolver.ts`
 
-Add fetches for the 5 new merchant settings tables alongside the existing `storefrontOptions` fetch.
+Add fetches for each new merchant settings table alongside the existing `storefrontOptions` fetch. Each domain's merchant settings fetch is added in its respective phase.
 
-## 8. Surface Alignment
+## 8. Surface Alignment (Per-Domain)
 
-Every surface that currently reads `storefront_options` or `storefront_opt_*` must be aligned to consume the new domain structure. This is the most extensive part of the migration.
+Every surface that currently reads `storefront_options` or `storefront_opt_*` must be aligned to consume the new domain structure. **Surface alignment happens per-domain within each phase** (see §5.3), not deferred to a final phase. This prevents stale reads from the old `storefront_options` domain on public surfaces.
 
 ### 8.1 Storefront Page
 
@@ -734,75 +760,129 @@ Since the migration is additive and non-breaking:
 - [ ] Backend: Add `EffectiveStorefrontQr` + `StorefrontQrMerchantSettings` types
 - [ ] Backend: Update `EffectiveCapabilityResolver.ts` dispatch
 - [ ] Backend: Update `MerchantSettingsBundle` + `fetchMerchantSettings`
-- [ ] Backend: Update `StorefrontOptionsService.ts`
 - [ ] Frontend: Add `StorefrontQrState` to `CapabilityResolutionService.ts`
 - [ ] Frontend: Update `getCapabilityTypeForFeature()` mapping
 - [ ] Frontend: Create `/settings/storefront-qr` page
-- [ ] Frontend: Update `PlanSummaryPanel.tsx` — add QR card
-- [ ] Frontend: Update `capability-display.ts` — add `storefront_qr` to `CAPABILITY_META`
-- [ ] Frontend: Update `useCapabilityAccess.ts` — add QR merchant gate
-- [ ] Frontend: Update QR rendering components (`TenantQRCode.tsx`, etc.)
+- [ ] Frontend: Update QR rendering components (`TenantQRCode.tsx`, `StyledTenantQR.tsx`, etc.) to read from `storefront_qr` state
 - [ ] Frontend: Update BSaaS catalog/bundle/grant UIs for QR domain
 - [ ] Tests: `StorefrontQrResolver.test.ts`
+- [ ] **Domain Cleanup (QR)** — per §5.3:
+  - [ ] Remove QR fields from `EffectiveStorefrontOptions` interface
+  - [ ] Remove QR logic block from `StorefrontOptionsResolver.ts` (lines 78-134)
+  - [ ] Remove QR fields from `StorefrontOptionsMerchantSettings`
+  - [ ] Update `toStorefrontOptionFlags` to delegate QR flags from `storefront_qr` state
+  - [ ] Update `StorefrontOptionsService.ts` — remove QR resolution, update `getDisabledState`
+  - [ ] Move QR groups from `storefrontOptions.ts` to new `storefrontQr.ts` util file
+  - [ ] Update `StorefrontOptionsSettingsClient.tsx` — remove QR section, add link to `/settings/storefront-qr`
+  - [ ] Update public surfaces: product page QR, storefront QR, directory entry QR → read from `storefront_qr` state
+  - [ ] Update `CapabilityShowcase.tsx` — add QR row, remove QR features from `storefront_options` row
+  - [ ] Update `PlanSummaryPanel.tsx` — add QR card, remove QR features from `storefront_options` card
+  - [ ] Update `capability-display.ts` — add `storefront_qr` to `CAPABILITY_META`, remove QR from `storefront_options` entry
+  - [ ] Update `useCapabilityAccess.ts` — add QR merchant gate, remove QR from `storefront_options` gate
+  - [ ] Grep verify: no surface reads `storefront_opt_qr_*` keys — all reads go through `storefront_qr` state
 
 ### Phase 2: Gallery (`storefront_gallery`) — 12 features
 - [ ] Migration: `105_storefront_gallery_capability_split.sql`
 - [ ] Backend: Extract gallery logic → `StorefrontGalleryResolver.ts`
 - [ ] Frontend: `StorefrontGalleryState` + `/settings/storefront-gallery` page
-- [ ] Frontend: Update `PlanSummaryPanel.tsx` — add Gallery card
-- [ ] Frontend: Update `capability-display.ts` — add `storefront_gallery`
-- [ ] Frontend: Update gallery/carousel components
+- [ ] Frontend: Update gallery/carousel/magazine components to read from `storefront_gallery` state
 - [ ] Frontend: Update BSaaS surfaces
 - [ ] Tests: `StorefrontGalleryResolver.test.ts`
+- [ ] **Domain Cleanup (Gallery)** — per §5.3:
+  - [ ] Remove gallery fields from `EffectiveStorefrontOptions` interface
+  - [ ] Remove gallery logic block from `StorefrontOptionsResolver.ts` (lines 136-149)
+  - [ ] Remove gallery fields from `StorefrontOptionsMerchantSettings`
+  - [ ] Update `toStorefrontOptionFlags` to delegate gallery flags from `storefront_gallery` state
+  - [ ] Update `StorefrontOptionsService.ts` — remove gallery resolution, update `getDisabledState`
+  - [ ] Move gallery groups from `storefrontOptions.ts` to new `storefrontGallery.ts` util file
+  - [ ] Update `StorefrontOptionsSettingsClient.tsx` — remove gallery section, add link to `/settings/storefront-gallery`
+  - [ ] Update public surfaces: product page gallery, storefront gallery, directory entry gallery → read from `storefront_gallery` state
+  - [ ] Update `CapabilityShowcase.tsx` — add Gallery row, remove gallery features from `storefront_options` row
+  - [ ] Update `PlanSummaryPanel.tsx` — add Gallery card, remove gallery features from `storefront_options` card
+  - [ ] Update `capability-display.ts` — add `storefront_gallery`, remove gallery from `storefront_options` entry
+  - [ ] Update `useCapabilityAccess.ts` — add Gallery merchant gate, remove gallery from `storefront_options` gate
+  - [ ] Grep verify: no surface reads `storefront_opt_gallery_*` / `storefront_opt_image_gallery_*` keys — all reads go through `storefront_gallery` state
 
 ### Phase 3: Hours (`storefront_hours`) — 8 features
 - [ ] Migration: `106_storefront_hours_capability_split.sql`
 - [ ] Backend: Extract hours logic → `StorefrontHoursResolver.ts`
 - [ ] Frontend: `StorefrontHoursState` + `/settings/storefront-hours` page
-- [ ] Frontend: Update `PlanSummaryPanel.tsx` — add Hours card
-- [ ] Frontend: Update `capability-display.ts` — add `storefront_hours`
-- [ ] Frontend: Update hours display components
+- [ ] Frontend: Update hours display components to read from `storefront_hours` state
 - [ ] Frontend: Update BSaaS surfaces
 - [ ] Tests: `StorefrontHoursResolver.test.ts`
+- [ ] **Domain Cleanup (Hours)** — per §5.3:
+  - [ ] Remove hours fields from `EffectiveStorefrontOptions` interface
+  - [ ] Remove hours logic block from `StorefrontOptionsResolver.ts` (lines 33-42)
+  - [ ] Remove hours fields from `StorefrontOptionsMerchantSettings`
+  - [ ] Update `toStorefrontOptionFlags` to delegate hours flags from `storefront_hours` state
+  - [ ] Update `StorefrontOptionsService.ts` — remove hours resolution, update `getDisabledState`
+  - [ ] Move hours groups from `storefrontOptions.ts` to new `storefrontHours.ts` util file
+  - [ ] Update `StorefrontOptionsSettingsClient.tsx` — remove hours section, add link to `/settings/storefront-hours`
+  - [ ] Update public surfaces: product page hours, storefront hours, directory entry hours → read from `storefront_hours` state
+  - [ ] Update `CapabilityShowcase.tsx` — add Hours row, remove hours features from `storefront_options` row
+  - [ ] Update `PlanSummaryPanel.tsx` — add Hours card, remove hours features from `storefront_options` card
+  - [ ] Update `capability-display.ts` — add `storefront_hours`, remove hours from `storefront_options` entry
+  - [ ] Update `useCapabilityAccess.ts` — add Hours merchant gate, remove hours from `storefront_options` gate
+  - [ ] Grep verify: no surface reads `storefront_opt_hours_*` keys — all reads go through `storefront_hours` state
 
 ### Phase 4: Layouts (`storefront_layouts`) — 7 features
 - [ ] Migration: `107_storefront_layouts_capability_split.sql`
 - [ ] Backend: Extract layout logic → `StorefrontLayoutResolver.ts`
 - [ ] Frontend: `StorefrontLayoutState` + `/settings/storefront-layouts` page
-- [ ] Frontend: Update `PlanSummaryPanel.tsx` — add Layouts card
-- [ ] Frontend: Update `capability-display.ts` — add `storefront_layouts`
-- [ ] Frontend: Update layout selector components
+- [ ] Frontend: Update layout selector components to read from `storefront_layouts` state
 - [ ] Frontend: Update BSaaS surfaces
 - [ ] Tests: `StorefrontLayoutResolver.test.ts`
+- [ ] **Domain Cleanup (Layouts)** — per §5.3:
+  - [ ] Remove layout fields from `EffectiveStorefrontOptions` interface
+  - [ ] Remove layout logic block from `StorefrontOptionsResolver.ts` (lines 162-172)
+  - [ ] Remove layout fields from `StorefrontOptionsMerchantSettings`
+  - [ ] Update `toStorefrontOptionFlags` to delegate layout flags from `storefront_layouts` state
+  - [ ] Update `StorefrontOptionsService.ts` — remove layout resolution, update `getDisabledState`
+  - [ ] Move layout groups from `storefrontOptions.ts` to new `storefrontLayouts.ts` util file
+  - [ ] Update `StorefrontOptionsSettingsClient.tsx` — remove layout section, add link to `/settings/storefront-layouts`
+  - [ ] Update public surfaces: product page layout, storefront layout, directory entry layout → read from `storefront_layouts` state
+  - [ ] Update `CapabilityShowcase.tsx` — add Layouts row, remove layout features from `storefront_options` row
+  - [ ] Update `PlanSummaryPanel.tsx` — add Layouts card, remove layout features from `storefront_options` card
+  - [ ] Update `capability-display.ts` — add `storefront_layouts`, remove layout from `storefront_options` entry
+  - [ ] Update `useCapabilityAccess.ts` — add Layouts merchant gate, remove layout from `storefront_options` gate
+  - [ ] Grep verify: no surface reads `storefront_opt_layout_*` keys — all reads go through `storefront_layouts` state
 
-### Phase 5: Maps (`storefront_maps`) — 6 features
+### Phase 5: Maps (`storefront_maps`) — 6 features + final core cleanup
 - [ ] Migration: `108_storefront_maps_capability_split.sql`
 - [ ] Backend: Extract maps logic → `StorefrontMapsResolver.ts`
 - [ ] Frontend: `StorefrontMapsState` + `/settings/storefront-maps` page
-- [ ] Frontend: Update `PlanSummaryPanel.tsx` — add Maps card
-- [ ] Frontend: Update `capability-display.ts` — add `storefront_maps`
-- [ ] Frontend: Update map/location components
+- [ ] Frontend: Update map/location components to read from `storefront_maps` state
 - [ ] Frontend: Update BSaaS surfaces
 - [ ] Tests: `StorefrontMapsResolver.test.ts`
-
-### Phase 6: Core Cleanup + Final Alignment
-- [ ] Remove migrated fields from `EffectiveStorefrontOptions` interface
-- [ ] Remove migrated logic from `StorefrontOptionsResolver.ts` (keep only core: category, recommend, recently viewed, info, advanced)
-- [ ] Remove migrated fields from `StorefrontOptionsMerchantSettings`
-- [ ] Update `StorefrontOptInfoType` to exclude maps types
-- [ ] Update `toStorefrontOptionFlags` to delegate to sub-domain states
-- [ ] Update `StorefrontOptionsService.ts` to only handle core
-- [ ] Update `storefrontOptions.ts` utils — move domain groups to separate files
-- [ ] Update `StorefrontOptionsSettingsClient.tsx` — remove migrated sections, add links to domain pages
-- [ ] Update directory entry types/components
-- [ ] Update product page components
-- [ ] Full regression test pass
+- [ ] **Domain Cleanup (Maps)** — per §5.3:
+  - [ ] Remove maps fields from `EffectiveStorefrontOptions` interface
+  - [ ] Remove maps logic block from `StorefrontOptionsResolver.ts` (lines 66-76 maps portion)
+  - [ ] Remove maps fields from `StorefrontOptionsMerchantSettings`
+  - [ ] Update `toStorefrontOptionFlags` to delegate maps flags from `storefront_maps` state
+  - [ ] Update `StorefrontOptionsService.ts` — remove maps resolution, update `getDisabledState`
+  - [ ] Move maps groups from `storefrontOptions.ts` to new `storefrontMaps.ts` util file
+  - [ ] Update `StorefrontOptionsSettingsClient.tsx` — remove maps section, add link to `/settings/storefront-maps`
+  - [ ] Update public surfaces: product page maps, storefront maps, directory entry maps → read from `storefront_maps` state
+  - [ ] Update `CapabilityShowcase.tsx` — add Maps row, remove maps features from `storefront_options` row
+  - [ ] Update `PlanSummaryPanel.tsx` — add Maps card, remove maps features from `storefront_options` card
+  - [ ] Update `capability-display.ts` — add `storefront_maps`, remove maps from `storefront_options` entry
+  - [ ] Update `useCapabilityAccess.ts` — add Maps merchant gate, remove maps from `storefront_options` gate
+  - [ ] Grep verify: no surface reads `storefront_opt_interactive_maps` / `storefront_opt_map_display` / `storefront_opt_location_display` keys — all reads go through `storefront_maps` state
+- [ ] **Final Core Cleanup** — after all 5 domains are split and cleaned:
+  - [ ] Update `StorefrontOptInfoType` to exclude maps types (maps now in `storefront_maps`)
+  - [ ] Verify `StorefrontOptionsResolver.ts` contains only core logic (category, recommend, recently viewed, info, advanced)
+  - [ ] Verify `EffectiveStorefrontOptions` contains only core fields
+  - [ ] Verify `StorefrontOptionsMerchantSettings` contains only core prefs
+  - [ ] Verify `storefrontOptions.ts` utils contains only core groups
+  - [ ] Verify `StorefrontOptionsSettingsClient.tsx` shows only core sections + links to 5 domain pages
+  - [ ] Verify `StorefrontOptionsService.ts` handles only core
+  - [ ] Full regression test pass across all 6 domains
 
 ## 13. Key Files Affected
 
 ### Backend — Resolvers
 - `apps/api/src/services/resolvers/types.ts` — new interfaces, updated `EffectiveStorefrontOptions`, `MerchantSettingsBundle`, `EffectiveCapabilities`
-- `apps/api/src/services/resolvers/StorefrontOptionsResolver.ts` — slimmed to core only
+- `apps/api/src/services/resolvers/StorefrontOptionsResolver.ts` — slimmed to core only (incrementally per-domain, see §5.3)
 - `apps/api/src/services/resolvers/StorefrontQrResolver.ts` — **new** (extracted from StorefrontOptionsResolver lines 78-134)
 - `apps/api/src/services/resolvers/StorefrontGalleryResolver.ts` — **new** (extracted from lines 136-149)
 - `apps/api/src/services/resolvers/StorefrontHoursResolver.ts` — **new** (extracted from lines 33-42)
@@ -812,7 +892,7 @@ Since the migration is additive and non-breaking:
 
 ### Backend — Services
 - `apps/api/src/services/EffectiveCapabilityResolver.ts` — add 5 new dispatch calls + merchant settings fetches
-- `apps/api/src/services/StorefrontOptionsService.ts` — slimmed to core only
+- `apps/api/src/services/StorefrontOptionsService.ts` — slimmed to core only (incrementally per-domain)
 - `apps/api/prisma/schema.prisma` — 5 new merchant settings models
 
 ### Frontend — Capability Services
@@ -842,7 +922,7 @@ Since the migration is additive and non-breaking:
 - `apps/web/src/components/directory/redesign/types.ts` — updated `DirectoryLayoutMeta`
 - `apps/web/src/app/directory/[slug]/page.tsx` — reads from 6 domain states
 - `apps/web/src/lib/storefront-sections.ts` — updated for 6 domains
-- `apps/web/src/utils/storefrontOptions.ts` — core groups only; domain groups move to new util files
+- `apps/web/src/utils/storefrontOptions.ts` — core groups only; domain groups moved to new util files per-domain
 
 ### Frontend — Admin/BSaaS Surfaces
 - `apps/web/src/admin/components/CapabilityManagement.tsx` — auto-picks up new capability types

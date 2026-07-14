@@ -63,14 +63,14 @@ describe('Phase 5 services _on/_off fallback', () => {
     it('prefers _on over legacy _enabled group gates', () => {
       const result = StorefrontOptionsService.getInstance().resolveFromFeatures({
         storefront_opt_enabled: true,
-        storefront_opt_hours_on: true,
-        storefront_opt_hours_enabled: false,
-        storefront_opt_hours_off: false,
-        storefront_opt_hours_disabled: false,
+        storefront_opt_category_on: true,
+        storefront_opt_category_enabled: false,
+        storefront_opt_category_off: false,
+        storefront_opt_category_disabled: false,
       });
-      expect(result.hoursEnabled).toBe(true);
-      expect(result.allowedHoursTypes).toContain('hours_animated');
-      expect(result.allowedHoursTypes).toContain('hours_status');
+      expect(result.categoryEnabled).toBe(true);
+      expect(result.allowedCategoryTypes).toContain('category_store');
+      expect(result.allowedCategoryTypes).toContain('category_product');
     });
 
     it('falls back to _enabled group gates when _on is absent', () => {
@@ -85,10 +85,10 @@ describe('Phase 5 services _on/_off fallback', () => {
     it('respects _off group keys', () => {
       const result = StorefrontOptionsService.getInstance().resolveFromFeatures({
         storefront_opt_enabled: true,
-        storefront_opt_hours_on: true,
-        storefront_opt_hours_off: true,
+        storefront_opt_category_on: true,
+        storefront_opt_category_off: true,
       });
-      expect(result.hoursEnabled).toBe(false);
+      expect(result.categoryEnabled).toBe(false);
     });
   });
 

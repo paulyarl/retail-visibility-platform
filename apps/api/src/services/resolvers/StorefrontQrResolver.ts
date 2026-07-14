@@ -145,7 +145,7 @@ export function resolveStorefrontQr(
       || !!features.storefront_qr_enabled
       || !!fallbackFeatures.storefront_opt_qr_on || !!fallbackFeatures.storefront_opt_qr
       || !!fallbackFeatures.storefront_opt_qr_enabled),
-    qr_styled_enabled: mainOn && showQRStyled && prefs.qr_styled_enabled,
+    qr_styled_enabled: mainOn && showQRStyled,
     allowed_qr_dot_styles: allowedQRDotStyles,
     allowed_qr_corner_styles: allowedQRCornerStyles,
     qr_custom_colors: mainOn && qrCustomColors,

@@ -7,14 +7,13 @@
 
 import type {
   EffectiveDirectoryEntryOptions,
-  StorefrontOptionsMerchantSettings,
 } from './types';
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
 
 export function resolveDirectoryEntryOptions(
   features: Record<string, boolean>,
-  merchantPrefs: StorefrontOptionsMerchantSettings | null
+  merchantPrefs: Record<string, any> | null
 ): EffectiveDirectoryEntryOptions {
   // Single-key pattern: present + true = enabled; missing/false = disabled
   const disabled = !!features.directory_entry_disabled;

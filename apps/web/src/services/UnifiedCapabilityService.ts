@@ -322,8 +322,6 @@ interface BackendEffectiveQuickstart {
 interface BackendEffectiveStorefrontOptions {
   enabled: boolean;
   is_flexible: boolean;
-  hours_enabled: boolean;
-  allowed_hours_types: StorefrontOptHoursType[];
   category_enabled: boolean;
   allowed_category_types: StorefrontOptCategoryType[];
   recommend_enabled: boolean;
@@ -331,26 +329,11 @@ interface BackendEffectiveStorefrontOptions {
   recently_viewed_enabled: boolean;
   info_enabled: boolean;
   allowed_info_types: StorefrontOptInfoType[];
-  qr_enabled: boolean;
-  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
-  allowed_qr_content_types: StorefrontOptQRContentType[];
-  qr_styled_enabled: boolean;
-  allowed_qr_dot_styles: string[];
-  allowed_qr_corner_styles: string[];
-  qr_custom_colors: boolean;
-  qr_gradients: boolean;
-  gallery_enabled: boolean;
-  allowed_gallery_types: StorefrontOptGalleryType[];
-  gallery_magazine_enabled: boolean;
-  can_use_magazine_gallery: boolean;
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
   layout_enabled: boolean;
   allowed_layouts: StorefrontOptLayoutType[];
   effective_layout: StorefrontOptLayoutType;
-  can_show_hours_display: boolean;
-  can_use_animated_hours: boolean;
-  can_show_hours_status: boolean;
   can_show_map_display: boolean;
   can_show_location_display: boolean;
   can_use_category_store: boolean;
@@ -361,7 +344,6 @@ interface BackendEffectiveStorefrontOptions {
   can_use_social_media: boolean;
   can_use_contact: boolean;
   can_use_interactive_maps: boolean;
-  can_use_qr_codes: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
   can_use_layout_classic: boolean;
@@ -751,8 +733,6 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
   return {
     enabled: b.enabled,
     isFlexible: b.is_flexible,
-    hoursEnabled: b.hours_enabled,
-    allowedHoursTypes: b.allowed_hours_types,
     categoryEnabled: b.category_enabled,
     allowedCategoryTypes: b.allowed_category_types,
     recommendEnabled: b.recommend_enabled,
@@ -760,27 +740,11 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     recentlyViewedEnabled: b.recently_viewed_enabled,
     infoEnabled: b.info_enabled,
     allowedInfoTypes: b.allowed_info_types,
-    qrEnabled: b.qr_enabled,
-    allowedQRResolutions: b.allowed_qr_resolutions,
-    allowedQRContentTypes: b.allowed_qr_content_types,
-    qrStyledEnabled: b.qr_styled_enabled ?? false,
-    allowedQRDotStyles: (b.allowed_qr_dot_styles ?? []) as StorefrontOptQRDotStyleType[],
-    allowedQRCornerStyles: (b.allowed_qr_corner_styles ?? []) as StorefrontOptQRCornerStyleType[],
-    qrCustomColors: b.qr_custom_colors ?? false,
-    qrGradients: b.qr_gradients ?? false,
-    galleryEnabled: b.gallery_enabled,
-    allowedGalleryTypes: b.allowed_gallery_types,
-    galleryMagazineEnabled: b.gallery_magazine_enabled ?? false,
-    canUseMagazineGallery: b.can_use_magazine_gallery ?? false,
-    galleryDisplayMode: ((b.merchant_preferences as any)?.gallery_display_mode as 'carousel' | 'magazine') ?? 'carousel',
     advancedEnabled: b.advanced_enabled,
     allowedAdvancedTypes: b.allowed_advanced_types,
     layoutEnabled: b.layout_enabled,
     allowedLayouts: b.allowed_layouts,
     effectiveLayout: b.effective_layout,
-    canShowHoursDisplay: b.can_show_hours_display,
-    canUseAnimatedHours: b.can_use_animated_hours,
-    canShowHoursStatus: b.can_show_hours_status,
     canShowMapDisplay: b.can_show_map_display,
     canShowLocationDisplay: b.can_show_location_display,
     canUseCategoryStore: b.can_use_category_store,
@@ -791,7 +755,6 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseSocialMedia: b.can_use_social_media,
     canUseContact: b.can_use_contact,
     canUseInteractiveMaps: b.can_use_interactive_maps,
-    canUseQRCodes: b.can_use_qr_codes,
     canUseEnhancedSEO: b.can_use_enhanced_seo,
     canUseStorefrontActions: b.can_use_storefront_actions,
     canUseLayoutClassic: b.can_use_layout_classic,
@@ -1310,10 +1273,38 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.directoryEntryOptions;
   }
 
-  /** Compatibility alias for old PublicStorefrontOptionsService */
+  /** Compatibility alias for old PublicStorefrontOptionsService.
+   *  Overlays QR/Gallery/Hours from dedicated domain states onto the legacy flags. */
   async getStorefrontOptionFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontOptionFlags> {
     const all = await this.getAllCapabilities(tenantId, options);
     const flags = toStorefrontOptionFlags(all.storefrontOptions);
+
+    // Overlay QR from dedicated storefront_qr domain
+    if (all.storefrontQr) {
+      flags.showQRCodes = all.storefrontQr.canUseQRCodes;
+      flags.showQRStyled = all.storefrontQr.qrStyledEnabled;
+      flags.qrResolutions = all.storefrontQr.allowedQRResolutions as unknown as string[];
+      flags.allowedQRDotStyles = all.storefrontQr.allowedQRDotStyles as unknown as string[];
+      flags.allowedQRCornerStyles = all.storefrontQr.allowedQRCornerStyles as unknown as string[];
+      flags.qrCustomColors = all.storefrontQr.qrCustomColors;
+      flags.qrGradients = all.storefrontQr.qrGradients;
+      const qrPrefs = all.storefrontQr.merchantPreferences as any;
+      flags.showQRProduct = qrPrefs?.qr_product ?? false;
+      flags.showQRStore = qrPrefs?.qr_store ?? false;
+      flags.showQRLogo = qrPrefs?.qr_logo ?? false;
+      flags.showQRDirectory = qrPrefs?.qr_directory ?? false;
+      flags.qrResolution = qrPrefs?.default_qr_resolution ?? '512';
+      flags.qrDotType = qrPrefs?.qr_dot_type;
+      flags.qrCornerType = qrPrefs?.qr_corner_type;
+      flags.qrDotColor = qrPrefs?.qr_dot_color;
+      flags.qrCornerColor = qrPrefs?.qr_corner_color;
+      flags.qrBgColor = qrPrefs?.qr_bg_color;
+      flags.qrGradientEnabled = qrPrefs?.qr_gradient_enabled;
+      flags.qrGradientStart = qrPrefs?.qr_gradient_start;
+      flags.qrGradientEnd = qrPrefs?.qr_gradient_end;
+    }
+
+    // Overlay Gallery from dedicated storefront_gallery domain
     if (all.storefrontGallery) {
       flags.galleryDisplayMode = all.storefrontGallery.galleryDisplayMode;
       flags.canUseMagazineGallery = all.storefrontGallery.canUseMagazineGallery;
@@ -1321,6 +1312,14 @@ class UnifiedCapabilityService extends TenantApiSingleton {
         flags.galleryLimit = all.storefrontGallery.defaultGalleryLimit;
       }
     }
+
+    // Overlay Hours from dedicated storefront_hours domain
+    if (all.storefrontHours) {
+      flags.showHoursDisplay = all.storefrontHours.canShowHoursDisplay;
+      flags.showAnimatedHours = all.storefrontHours.canUseAnimatedHours;
+      flags.showHoursStatus = all.storefrontHours.canShowHoursStatus;
+    }
+
     return flags;
   }
 

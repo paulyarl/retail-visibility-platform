@@ -212,9 +212,6 @@ export interface StorefrontQrMerchantSettings {
 
 export interface StorefrontOptionsMerchantSettings {
   storefront_opt_enabled?: boolean | null;
-  hours_display?: boolean | null;
-  hours_animated?: boolean | null;
-  hours_status?: boolean | null;
   map_display?: boolean | null;
   location_display?: boolean | null;
   category_store?: boolean | null;
@@ -225,32 +222,11 @@ export interface StorefrontOptionsMerchantSettings {
   storefront_social_media?: boolean | null;
   storefront_contact?: boolean | null;
   interactive_maps?: boolean | null;
-  qr_codes_512?: boolean | null;
-  qr_codes_1024?: boolean | null;
-  qr_codes_2048?: boolean | null;
-  qr_product?: boolean | null;
-  qr_store?: boolean | null;
-  qr_logo?: boolean | null;
-  qr_directory?: boolean | null;
-  qr_dot_type?: string | null;
-  qr_corner_type?: string | null;
-  qr_dot_color?: string | null;
-  qr_corner_color?: string | null;
-  qr_bg_color?: string | null;
-  qr_gradient_enabled?: boolean | null;
-  qr_gradient_start?: string | null;
-  qr_gradient_end?: string | null;
-  image_gallery_5?: boolean | null;
-  image_gallery_10?: boolean | null;
-  image_gallery_15?: boolean | null;
   enhanced_seo?: boolean | null;
   storefront_actions?: boolean | null;
   storefront_layout?: string | null;
   directory_entry_layout?: string | null;
-  default_qr_resolution?: string | null;
-  default_gallery_limit?: number | null;
   external_link_enabled?: boolean | null;
-  gallery_display_mode?: string | null;
 }
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
@@ -614,8 +590,6 @@ export interface EffectiveStorefrontHours {
 export interface EffectiveStorefrontOptions {
   enabled: boolean;
   is_flexible: boolean;
-  hours_enabled: boolean;
-  allowed_hours_types: StorefrontOptHoursType[];
   category_enabled: boolean;
   allowed_category_types: StorefrontOptCategoryType[];
   recommend_enabled: boolean;
@@ -623,24 +597,11 @@ export interface EffectiveStorefrontOptions {
   recently_viewed_enabled: boolean;
   info_enabled: boolean;
   allowed_info_types: StorefrontOptInfoType[];
-  qr_enabled: boolean;
-  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
-  allowed_qr_content_types: StorefrontOptQRContentType[];
-  qr_styled_enabled: boolean;
-  allowed_qr_dot_styles: StorefrontOptQRDotStyleType[];
-  allowed_qr_corner_styles: StorefrontOptQRCornerStyleType[];
-  qr_custom_colors: boolean;
-  qr_gradients: boolean;
-  gallery_enabled: boolean;
-  allowed_gallery_types: StorefrontOptGalleryType[];
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
   layout_enabled: boolean;
   allowed_layouts: StorefrontOptLayoutType[];
   effective_layout: StorefrontOptLayoutType;
-  can_show_hours_display: boolean;
-  can_use_animated_hours: boolean;
-  can_show_hours_status: boolean;
   can_show_map_display: boolean;
   can_show_location_display: boolean;
   can_use_category_store: boolean;
@@ -651,14 +612,11 @@ export interface EffectiveStorefrontOptions {
   can_use_social_media: boolean;
   can_use_contact: boolean;
   can_use_interactive_maps: boolean;
-  can_use_qr_codes: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
-  gallery_magazine_enabled: boolean;
-  can_use_magazine_gallery: boolean;
   merchant_preferences: Record<string, any>;
 }
 

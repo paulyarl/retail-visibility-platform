@@ -596,14 +596,10 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     const addSo = (label: string, tierAllowed: boolean, effective: boolean) => {
       if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
     };
-    so.allowedHoursTypes.forEach(t => addSo(STOREFRONT_OPT_HOURS_LABELS[t], true, t === 'hours_animated' ? so.canUseAnimatedHours : t === 'hours_status' ? so.canShowHoursStatus : false));
     so.allowedCategoryTypes.forEach(t => addSo(STOREFRONT_OPT_CATEGORY_LABELS[t], true, t === 'category_store' ? so.canUseCategoryStore : t === 'category_product' ? so.canUseCategoryProduct : false));
     so.allowedRecommendTypes.forEach(t => addSo(STOREFRONT_OPT_RECOMMEND_LABELS[t], true, t === 'recommend_store' ? so.canUseRecommendStore : t === 'recommend_products' ? so.canUseRecommendProducts : false));
     addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
     so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
-    so.allowedQRResolutions.forEach(t => addSo(STOREFRONT_OPT_QR_RESOLUTION_LABELS[t], true, so.canUseQRCodes));
-    so.allowedQRContentTypes.forEach(t => addSo(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, so.canUseQRCodes));
-    so.allowedGalleryTypes.forEach(t => addSo(STOREFRONT_OPT_GALLERY_LABELS[t], true, true));
     so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
     // Layouts
     so.allowedLayouts.forEach(t => addSo(STOREFRONT_OPT_LAYOUT_LABELS[t], true, t === 'classic' ? so.canUseLayoutClassic : t === 'editorial' ? so.canUseLayoutEditorial : so.canUseLayoutImmersive));

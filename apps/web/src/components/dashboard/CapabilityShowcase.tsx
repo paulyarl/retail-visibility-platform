@@ -169,13 +169,10 @@ export default function CapabilityShowcase({
     const so = cap.storefrontOptions;
     const soTier = so?.enabled ?? false;
     const soMerchantGated = soTier && (
-      (so?.allowedHoursTypes.length ?? 0) > (so?.canUseAnimatedHours || so?.canShowHoursStatus ? (so?.canUseAnimatedHours && so?.canShowHoursStatus ? 2 : 1) : 0) ||
       (so?.allowedCategoryTypes.length ?? 0) > ((so?.canUseCategoryStore ? 1 : 0) + (so?.canUseCategoryProduct ? 1 : 0)) ||
       (so?.allowedRecommendTypes.length ?? 0) > ((so?.canUseRecommendStore ? 1 : 0) + (so?.canUseRecommendProducts ? 1 : 0)) ||
       (so?.recentlyViewedEnabled && !so?.canUseRecentlyViewed) ||
       (so?.allowedInfoTypes.length ?? 0) > ((so?.canUseSocialMedia ? 1 : 0) + (so?.canUseContact ? 1 : 0) + (so?.canUseInteractiveMaps ? 1 : 0)) ||
-      (so?.allowedQRResolutions.length ?? 0) > (so?.canUseQRCodes ? so?.allowedQRResolutions.length : 0) ||
-      (so?.allowedGalleryTypes.length ?? 0) > ((so?.allowedGalleryTypes.filter(t => (so?.merchantPreferences?.[t as keyof typeof so.merchantPreferences] ?? false)).length)) ||
       (so?.allowedAdvancedTypes.length ?? 0) > ((so?.canUseEnhancedSEO ? 1 : 0) + (so?.canUseStorefrontActions ? 1 : 0))
     );
 
@@ -421,12 +418,12 @@ export default function CapabilityShowcase({
         key: "magazineGallery",
         label: "Magazine Gallery",
         icon: <Image className="w-4 h-4" />,
-        enabled: so?.canUseMagazineGallery ?? false,
-        status: getStatus(so?.canUseMagazineGallery ?? false, so?.galleryDisplayMode === 'magazine' && !so?.canUseMagazineGallery),
-        detail: so?.canUseMagazineGallery
-          ? (so?.galleryDisplayMode === 'magazine' ? "Magazine mode active" : "Available — enable in settings")
+        enabled: sgal?.canUseMagazineGallery ?? false,
+        status: getStatus(sgal?.canUseMagazineGallery ?? false, sgal?.galleryDisplayMode === 'magazine' && !sgal?.canUseMagazineGallery),
+        detail: sgal?.canUseMagazineGallery
+          ? (sgal?.galleryDisplayMode === 'magazine' ? "Magazine mode active" : "Available — enable in settings")
           : "Not available",
-        settingsLink: `/t/${tenantId}/settings/storefront-options`,
+        settingsLink: `/t/${tenantId}/settings/storefront-gallery`,
       },
       {
         key: "storefrontQr",

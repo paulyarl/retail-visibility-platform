@@ -222,14 +222,14 @@ export function filterAllowedTypes(state: StorefrontOptionsState, group?: Storef
   ];
 
   return allTypes.filter(type => {
-    if (HOURS_TYPES.includes(type as StorefrontOptHoursType)) return state.allowedHoursTypes.includes(type as StorefrontOptHoursType);
+    if (HOURS_TYPES.includes(type as StorefrontOptHoursType)) return false;
     if (CATEGORY_TYPES.includes(type as StorefrontOptCategoryType)) return state.allowedCategoryTypes.includes(type as StorefrontOptCategoryType);
     if (RECOMMEND_TYPES.includes(type as StorefrontOptRecommendType)) return state.allowedRecommendTypes.includes(type as StorefrontOptRecommendType);
     if (type === 'recently_viewed') return state.recentlyViewedEnabled;
     if (INFO_TYPES.includes(type as StorefrontOptInfoType)) return state.allowedInfoTypes.includes(type as StorefrontOptInfoType);
-    if (QR_RESOLUTION_TYPES.includes(type as StorefrontOptQRResolutionType)) return state.allowedQRResolutions.includes(type as StorefrontOptQRResolutionType);
-    if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return state.allowedQRContentTypes.includes(type as StorefrontOptQRContentType);
-    if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return state.allowedGalleryTypes.includes(type as StorefrontOptGalleryType);
+    if (QR_RESOLUTION_TYPES.includes(type as StorefrontOptQRResolutionType)) return false;
+    if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return false;
+    if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return false;
     if (ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType)) return state.allowedAdvancedTypes.includes(type as StorefrontOptAdvancedType);
     if (LAYOUT_TYPES.includes(type as StorefrontOptLayoutType)) return state.allowedLayouts.includes(type as StorefrontOptLayoutType);
     return false;
@@ -244,8 +244,6 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (!state.enabled) return [];
 
   const effective: string[] = [];
-  if (state.canUseAnimatedHours) effective.push('hours_animated');
-  if (state.canShowHoursStatus) effective.push('hours_status');
   if (state.canUseCategoryStore) effective.push('category_store');
   if (state.canUseCategoryProduct) effective.push('category_product');
   if (state.canUseRecommendStore) effective.push('recommend_store');
@@ -254,12 +252,6 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (state.canUseSocialMedia) effective.push('storefront_social_media');
   if (state.canUseContact) effective.push('storefront_contact');
   if (state.canUseInteractiveMaps) effective.push('interactive_maps');
-  if (state.canUseQRCodes) {
-    // Add QR types that are both tier-allowed and merchant-enabled
-    if (state.allowedQRResolutions.length > 0) effective.push(...state.allowedQRResolutions);
-    if (state.allowedQRContentTypes.length > 0) effective.push(...state.allowedQRContentTypes);
-  }
-  if (state.allowedGalleryTypes.length > 0) effective.push(...state.allowedGalleryTypes);
   if (state.canUseEnhancedSEO) effective.push('enhanced_seo');
   if (state.canUseStorefrontActions) effective.push('storefront_actions');
   if (state.canUseLayoutClassic) effective.push('classic');
@@ -273,22 +265,14 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
  * Get the active gallery limit from state (resolves radio selection).
  */
 export function getActiveGalleryLimit(state: StorefrontOptionsState): number {
-  if (!state.enabled || !state.galleryEnabled) return 0;
-  if (state.allowedGalleryTypes.includes('image_gallery_15')) return 15;
-  if (state.allowedGalleryTypes.includes('image_gallery_10')) return 10;
-  if (state.allowedGalleryTypes.includes('image_gallery_5')) return 5;
-  return state.merchantPreferences.default_gallery_limit || 5;
+  return 0;
 }
 
 /**
  * Get the active QR resolution from state.
  */
 export function getActiveQRResolution(state: StorefrontOptionsState): string {
-  if (!state.enabled || !state.qrEnabled) return '';
-  if (state.allowedQRResolutions.includes('qr_codes_2048')) return '2048';
-  if (state.allowedQRResolutions.includes('qr_codes_1024')) return '1024';
-  if (state.allowedQRResolutions.includes('qr_codes_512')) return '512';
-  return state.merchantPreferences.default_qr_resolution || '1024';
+  return '';
 }
 
 // ====================
@@ -343,8 +327,8 @@ export interface StorefrontOptionFlags {
  */
 export function getStorefrontOptionFlags(state: StorefrontOptionsState): StorefrontOptionFlags {
   return {
-    showAnimatedHours: state.canUseAnimatedHours,
-    showHoursStatus: state.canShowHoursStatus,
+    showAnimatedHours: false,
+    showHoursStatus: false,
     showCategoryStore: state.canUseCategoryStore,
     showCategoryProduct: state.canUseCategoryProduct,
     showRecommendStore: state.canUseRecommendStore,
@@ -353,13 +337,13 @@ export function getStorefrontOptionFlags(state: StorefrontOptionsState): Storefr
     showSocialMedia: state.canUseSocialMedia,
     showContact: state.canUseContact,
     showInteractiveMaps: state.canUseInteractiveMaps,
-    showQRCodes: state.canUseQRCodes,
-    showQRProduct: state.enabled && state.allowedQRContentTypes.includes('qr_product') && state.merchantPreferences.qr_product !== false,
-    showQRStore: state.enabled && state.allowedQRContentTypes.includes('qr_store') && state.merchantPreferences.qr_store !== false,
-    showQRLogo: state.enabled && state.allowedQRContentTypes.includes('qr_logo') && state.merchantPreferences.qr_logo !== false,
-    showQRDirectory: state.enabled && state.allowedQRContentTypes.includes('qr_directory') && state.merchantPreferences.qr_directory !== false,
-    qrResolution: getActiveQRResolution(state),
-    galleryLimit: getActiveGalleryLimit(state),
+    showQRCodes: false,
+    showQRProduct: false,
+    showQRStore: false,
+    showQRLogo: false,
+    showQRDirectory: false,
+    qrResolution: '',
+    galleryLimit: 0,
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,
     storefrontLayout: state.canUseLayoutClassic

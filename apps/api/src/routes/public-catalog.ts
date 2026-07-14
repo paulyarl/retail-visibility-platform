@@ -3535,7 +3535,7 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
     const effectiveRecommendTypes = optEnabled
       ? allowedRecommendTypes.filter(t => (prefs as any)[t] !== false)
       : [];
-    const effectiveHoursDisplay = optEnabled && hoursDisplayTierAllowed && prefs.hours_display !== false;
+    const effectiveHoursDisplay = optEnabled && hoursDisplayTierAllowed && (prefs as any).hours_display !== false;
     const effectiveMapDisplay = optEnabled && mapDisplayTierAllowed && prefs.map_display !== false;
     const effectiveLocationDisplay = optEnabled && locationDisplayTierAllowed && prefs.location_display !== false;
     const effectiveRecentlyViewed = optEnabled && recentlyViewedTierAllowed && prefs.recently_viewed !== false;
