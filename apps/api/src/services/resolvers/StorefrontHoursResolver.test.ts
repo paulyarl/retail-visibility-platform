@@ -18,6 +18,8 @@ describe('resolveStorefrontHours', () => {
     const features = {
       storefront_hours_enabled: true,
       storefront_hours_on: true,
+      storefront_hours_animated: true,
+      storefront_hours_status: true,
     };
     const result = resolveStorefrontHours(features, null);
     expect(result.enabled).toBe(true);
@@ -29,10 +31,13 @@ describe('resolveStorefrontHours', () => {
     const fallbackFeatures = {
       storefront_opt_enabled: true,
       storefront_opt_hours_on: true,
+      storefront_opt_hours_animated: true,
+      storefront_opt_hours_status: true,
     };
     const result = resolveStorefrontHours({}, null, fallbackFeatures);
     expect(result.enabled).toBe(true);
     expect(result.hours_enabled).toBe(true);
+    expect(result.allowed_hours_types).toEqual(['hours_animated', 'hours_status']);
   });
 
   it('respects flexible key', () => {

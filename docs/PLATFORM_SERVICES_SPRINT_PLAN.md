@@ -552,7 +552,9 @@ Add a "Platform Services" card in the CRM section linking to `/settings/admin/cr
 
 No change needed — the CRM section already exists in the admin sidebar. The "Services" nav item is added to `CrmNavPanel` instead (see 2.5).
 
-### 2.8 Sprint 2 Verification
+### 2.8 Sprint 2 Verification — ✅ COMPLETE
+
+All items verified on 2026-07-14:
 
 - `pnpm checkapi` — zero TS errors
 - `pnpm checkweb` — zero TS errors
@@ -591,7 +593,9 @@ Test cases:
 5. Returns multiple services when multiple features are enabled
 6. Returns empty `allowed_services` when only `_enabled` is set (no individual services)
 
-### 3.3 Sprint 3 Verification
+### 3.3 Sprint 3 Verification — ✅ COMPLETE
+
+All items verified on 2026-07-14:
 
 - `pnpm checkapi` — zero TS errors
 - `pnpm checkweb` — zero TS errors
