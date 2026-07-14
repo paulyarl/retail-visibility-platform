@@ -1312,8 +1312,16 @@ class UnifiedCapabilityService extends TenantApiSingleton {
 
   /** Compatibility alias for old PublicStorefrontOptionsService */
   async getStorefrontOptionFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontOptionFlags> {
-    const state = await this.getStorefrontOptionsState(tenantId, options);
-    return toStorefrontOptionFlags(state);
+    const all = await this.getAllCapabilities(tenantId, options);
+    const flags = toStorefrontOptionFlags(all.storefrontOptions);
+    if (all.storefrontGallery) {
+      flags.galleryDisplayMode = all.storefrontGallery.galleryDisplayMode;
+      flags.canUseMagazineGallery = all.storefrontGallery.canUseMagazineGallery;
+      if (all.storefrontGallery.defaultGalleryLimit) {
+        flags.galleryLimit = all.storefrontGallery.defaultGalleryLimit;
+      }
+    }
+    return flags;
   }
 
   async getFaqOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FaqOptionsState> {

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Grid } from '@mantine/core';
-import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag, IconLock } from '@tabler/icons-react';
-import { TrendingUp, Eye, Zap, BarChart3 } from 'lucide-react';
+import { IconCheck, IconAlertCircle, IconCreditCard, IconBolt, IconCircleX, IconInfoCircle, IconTag, IconLock, IconPalette } from '@tabler/icons-react';
+import { TrendingUp, Eye, Zap, BarChart3, Wrench, Package } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { bsaasPurchaseService, type BsaasCatalogItem, type BsaasBundleCatalogItem } from '@/services/BsaasPurchaseService';
@@ -42,6 +42,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
   const [grantRedeeming, setGrantRedeeming] = useState(false);
   const [grantError, setGrantError] = useState<string | null>(null);
   const [grantSuccess, setGrantSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'features' | 'bundles' | 'services'>('features');
 
   const loadData = useCallback(async () => {
     if (!tenantId) {
@@ -377,6 +378,52 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           </Card>
         )}
 
+        {/* Tab Bar */}
+        <div className="flex gap-1 border-b border-neutral-200 dark:border-neutral-700">
+          <button
+            onClick={() => setActiveTab('features')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'features'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Features
+            {catalog.filter(item => !item.key.startsWith('platform_service_')).length > 0 && (
+              <Badge size="xs" variant="light" color="blue">{catalog.filter(item => !item.key.startsWith('platform_service_')).length}</Badge>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('bundles')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'bundles'
+                ? 'border-violet-500 text-violet-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Bundles
+            {bundleCatalog.filter(b => !b.allActive).length > 0 && (
+              <Badge size="xs" variant="light" color="violet">{bundleCatalog.filter(b => !b.allActive).length}</Badge>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('services')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'services'
+                ? 'border-amber-500 text-amber-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            Services
+            {catalog.filter(item => item.key.startsWith('platform_service_')).length > 0 && (
+              <Badge size="xs" variant="light" color="orange">{catalog.filter(item => item.key.startsWith('platform_service_')).length}</Badge>
+            )}
+          </button>
+        </div>
+
         {catalog.length === 0 && bundleCatalog.length === 0 && !loading && (
           <Card withBorder p="xl" className="text-center">
             <IconInfoCircle size={48} className="mx-auto text-neutral-400 mb-4" />
@@ -385,11 +432,11 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           </Card>
         )}
 
-        {/* Bundles Section */}
-        {bundleCatalog.filter(b => !b.allActive).length > 0 && (
+        {/* Bundles Tab */}
+        {activeTab === 'bundles' && bundleCatalog.filter(b => !b.allActive).length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-blue-600" />
+              <Package className="w-5 h-5 text-violet-600" />
               <h2 className="text-xl font-bold text-gray-900">Bundles</h2>
               <Badge color="violet" variant="light" size="sm">Save more</Badge>
             </div>
@@ -517,12 +564,12 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           </div>
         )}
 
-        {/* Individual Features Section */}
-        {catalog.length > 0 && (
+        {/* Individual Features Tab */}
+        {activeTab === 'features' && catalog.filter(item => !item.key.startsWith('platform_service_')).length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-900">Individual Features</h2>
             <Grid>
-          {catalog.map((item) => {
+          {catalog.filter(item => !item.key.startsWith('platform_service_')).map((item) => {
             const isActive = item.purchase?.status === 'active';
             const isSuspended = item.purchase?.status === 'suspended';
             const inTier = item.tierAvailability === 'in_tier_active';
@@ -616,7 +663,106 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           </div>
         )}
 
+        {/* Services Tab */}
+        {activeTab === 'services' && (
+          <div className="space-y-4">
+            {catalog.filter(item => item.key.startsWith('platform_service_')).length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-amber-600" />
+                  <h2 className="text-xl font-bold text-gray-900">Platform Services</h2>
+                  <Badge color="orange" variant="light" size="sm">One-time</Badge>
+                </div>
+                <Text size="sm" c="dimmed">
+                  Professional services to help you get set up and grow your business. Logo design, store setup, SEO optimization, and more.
+                </Text>
+                <Grid>
+                  {catalog.filter(item => item.key.startsWith('platform_service_')).map((item) => {
+                    const isActive = item.purchase?.status === 'active';
+                    const isSuspended = item.purchase?.status === 'suspended';
+                    const inTier = item.tierAvailability === 'in_tier_active';
+                    const gateOff = item.tierAvailability === 'in_tier_gate_off';
+                    const notEligible = item.tierEligible === false && !isActive && !inTier && !gateOff;
+                    const demoBlocked = isDemoTenant && !item.demoEligible;
+
+                    return (
+                      <Grid.Col key={item.key} span={{ base: 12, md: 6, lg: 4 }}>
+                        <Card withBorder shadow="sm" p="lg" className={`flex flex-col h-full ${notEligible ? 'opacity-70' : ''}`}>
+                          <Group justify="space-between" mb="xs">
+                            <Text fw={600} size="lg">{item.name}</Text>
+                            {isActive && <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>Active</Badge>}
+                            {isSuspended && <Badge color="orange" variant="light">Suspended</Badge>}
+                            {notEligible && <Badge color="gray" variant="light" leftSection={<IconLock size={12} />}>Upgrade Required</Badge>}
+                            {demoBlocked && <Badge color="red" variant="light" size="sm">Demo Restricted</Badge>}
+                          </Group>
+
+                          <Text size="sm" c="dimmed" className="flex-grow" mb="md">
+                            {item.description}
+                          </Text>
+
+                          {notEligible && (
+                            <Text size="xs" c="dimmed" className="mb-md" style={{ fontStyle: 'italic' }}>
+                              {item.ineligibleReason}
+                            </Text>
+                          )}
+
+                          <Group justify="space-between" mt="auto">
+                            <Text fw={700} size="xl" c={notEligible ? 'dimmed' : 'amber'}>
+                              {formatPrice(item.priceCents, item.billingCycle)}
+                            </Text>
+
+                            {isActive ? (
+                              <Badge color="green" variant="light" leftSection={<IconCheck size={12} />}>Purchased</Badge>
+                            ) : notEligible ? (
+                              <Link href={`/t/${tenantId}/settings/store?tab=plans`}>
+                                <Button variant="light" color="gray" size="sm" leftSection={<IconLock size={16} />}>
+                                  Upgrade Plan
+                                </Button>
+                              </Link>
+                            ) : demoBlocked ? (
+                              <Button variant="light" color="red" size="sm" disabled>
+                                Not Available for Demo
+                              </Button>
+                            ) : !hasPaymentMethod ? (
+                              <Group gap="xs">
+                                <Badge color="orange" variant="light" size="sm" leftSection={<IconCreditCard size={12} />}>No Card on File</Badge>
+                                <Link href={`/t/${tenantId}/settings/store?tab=billing`}>
+                                  <Button variant="light" color="orange" size="sm">
+                                    Add Payment Method
+                                  </Button>
+                                </Link>
+                              </Group>
+                            ) : (
+                              <Button
+                                variant="gradient"
+                                gradient={{ from: 'amber', to: 'orange' }}
+                                style={{ color: 'white' }}
+                                size="sm"
+                                onClick={() => handlePurchaseClick(item)}
+                                leftSection={<IconBolt size={16} />}
+                              >
+                                Purchase
+                              </Button>
+                            )}
+                          </Group>
+                        </Card>
+                      </Grid.Col>
+                    );
+                  })}
+                </Grid>
+              </div>
+            ) : (
+              <Card withBorder p="xl" className="text-center">
+                <Wrench size={48} className="mx-auto text-neutral-400 mb-4" />
+                <Text size="lg" c="dimmed">No platform services are currently available.</Text>
+                <Text size="sm" c="dimmed" mt="xs">Check back later as new services are added.</Text>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* Benefits Section */}
+        {activeTab === 'features' && (
         <div className="bg-gray-50 rounded-lg p-8 mt-6">
           <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             <Zap className="w-6 h-6 text-blue-600" />
@@ -690,6 +836,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
             </Link>
           </div>
         </div>
+        )}
 
         {/* Purchase Confirmation Modal */}
         <Modal

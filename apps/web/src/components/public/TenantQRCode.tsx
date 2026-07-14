@@ -65,9 +65,7 @@ export function TenantQRCode({
           capabilityFlags
             ? Promise.resolve(capabilityFlags)
             : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
-          capabilityFlags
-            ? Promise.resolve(null)
-            : unifiedCapabilityService.getStorefrontQrState(tenantId).catch(() => null),
+          unifiedCapabilityService.getStorefrontQrState(tenantId).catch(() => null),
         ]);
 
         // Set QR state if fetched
@@ -381,7 +379,9 @@ export function TenantQRCode({
       const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
       // Styled QR is handled by StyledTenantQR component — skip classic generation when styled is active
-      if (resolvedFlags?.showQRStyled) {
+      // Use qrState (storefront_qr namespace) which respects merchant prefs, not resolvedFlags (storefront_options, tier-only)
+      const styledEnabled = qrState?.qrStyledEnabled ?? resolvedFlags?.showQRStyled ?? false;
+      if (styledEnabled) {
         return;
       }
 
@@ -460,8 +460,10 @@ export function TenantQRCode({
     // Get capability-aware QR settings
     const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
-    // Styled QR path: use qr-code-styling when showQRStyled capability is enabled
-    if (resolvedFlags?.showQRStyled) {
+    // Styled QR path: use qr-code-styling when styled QR is enabled
+    // Use qrState (storefront_qr namespace) which respects merchant prefs, not resolvedFlags (storefront_options, tier-only)
+    const styledEnabled = qrState?.qrStyledEnabled ?? resolvedFlags?.showQRStyled ?? false;
+    if (styledEnabled) {
       const { default: QRCodeStyling } = await import('qr-code-styling');
 
       const dotType = (resolvedFlags.qrDotType || resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
@@ -607,8 +609,10 @@ export function TenantQRCode({
     }
   }
 
-  // Styled QR: delegate to StyledTenantQR when effective resolver requires it
-  if (resolvedFlags?.showQRStyled && !isFetchingTierAndLogo) {
+  // Styled QR: delegate to StyledTenantQR when styled QR is effectively enabled
+  // Use qrState (storefront_qr namespace) which respects merchant prefs, not resolvedFlags (storefront_options, tier-only)
+  const styledEnabled = qrState?.qrStyledEnabled ?? resolvedFlags?.showQRStyled ?? false;
+  if (styledEnabled && !isFetchingTierAndLogo) {
     return (
       <StyledTenantQR
         url={url}

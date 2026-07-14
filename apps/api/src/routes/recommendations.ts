@@ -474,13 +474,19 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
          dcl.category_slug,
          dcl.google_category_id,
          dcl.is_primary,
-         dcl.rating_avg,
-         dcl.rating_count,
+         COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+         COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
          dcl.product_count,
-         dcl.logo_url,
+         COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
          t.location_status as tenant_location_status
        FROM directory_category_listings dcl
        INNER JOIN tenants t ON dcl.tenant_id = t.id
+       LEFT JOIN LATERAL (
+         SELECT tenant_logo_url, store_average_rating, store_review_count
+         FROM mv_storefront_discovery
+         WHERE tenant_id = dcl.tenant_id
+         LIMIT 1
+       ) msd ON true
        WHERE dcl.tenant_id = $1 
          AND dcl.is_primary = true
        LIMIT 1`,
@@ -536,9 +542,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.category_slug,
           dcl.google_category_id,
           dcl.is_primary,
-          dcl.rating_avg,
-          dcl.rating_count,
-          dcl.logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
           dcl.is_featured,
           dll.business_hours,
           t.location_status as tenant_location_status,
@@ -569,7 +575,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             ) +
             (
               CASE
-                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
+                WHEN ABS(COALESCE(dcl.rating_avg, msd.store_average_rating, 0) - $4) < 0.5 THEN 1
                 ELSE 0
               END
             )
@@ -577,6 +583,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
         LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
         WHERE dcl.tenant_id != $5
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
@@ -648,9 +660,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.city,
           dcl.state,
           dcl.category_name,
-          dcl.logo_url,
-          dcl.rating_avg,
-          dcl.rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
           dll.business_hours,
           t.location_status as tenant_location_status,
           
@@ -680,7 +692,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             ) +
             (
               CASE
-                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
+                WHEN ABS(COALESCE(dcl.rating_avg, msd.store_average_rating, 0) - $4) < 0.5 THEN 1
                 ELSE 0
               END
             )
@@ -688,6 +700,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
         LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
         WHERE dcl.tenant_id != $5
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
@@ -750,9 +768,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.city,
           dcl.state,
           dcl.category_name,
-          dcl.logo_url,
-          dcl.rating_avg,
-          dcl.rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
           dcl.product_count,
           dll.business_hours,
           t.location_status as tenant_location_status,
@@ -760,6 +778,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
         LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
         WHERE dcl.tenant_id != $1
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
@@ -803,9 +827,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             dcl.city,
             dcl.state,
             dcl.category_name,
-            dcl.logo_url,
-            dcl.rating_avg,
-            dcl.rating_count,
+            COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+            COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+            COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
             dcl.product_count,
             dll.business_hours,
             t.location_status as tenant_location_status,
@@ -813,6 +837,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           FROM directory_category_listings dcl
           INNER JOIN tenants t ON dcl.tenant_id = t.id
           LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+          LEFT JOIN LATERAL (
+            SELECT tenant_logo_url, store_average_rating, store_review_count
+            FROM mv_storefront_discovery
+            WHERE tenant_id = dcl.tenant_id
+            LIMIT 1
+          ) msd ON true
           WHERE dcl.tenant_id != $1
             AND dcl.tenant_exists = true
             AND dcl.is_active_location = true
