@@ -12,6 +12,7 @@ import CrmContactService from '../../../services/CrmContactService';
 import CrmTicketService from '../../../services/CrmTicketService';
 import CrmTicketMessageService from '../../../services/CrmTicketMessageService';
 import CrmTaskService from '../../../services/CrmTaskService';
+import CrmTaskMessageService from '../../../services/CrmTaskMessageService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmRequestReadService from '../../../services/CrmRequestReadService';
@@ -40,6 +41,7 @@ const contactService = CrmContactService.getInstance();
 const ticketService = CrmTicketService.getInstance();
 const messageService = CrmTicketMessageService.getInstance();
 const taskService = CrmTaskService.getInstance();
+const taskMessageService = CrmTaskMessageService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const inquiryService = CrmInquiryService.getInstance();
 const requestReadService = CrmRequestReadService.getInstance();
@@ -354,6 +356,38 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[CRM Admin] Error updating task:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to update task' });
+  }
+});
+
+// GET /api/admin/crm/tasks/:taskId/messages
+router.get('/tasks/:taskId/messages', async (req: Request, res: Response) => {
+  try {
+    const messages = await taskMessageService.listByTask(req.params.taskId, true);
+    res.json({ success: true, data: messages });
+  } catch (error) {
+    console.error('[CRM Admin] Error listing task messages:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list task messages' });
+  }
+});
+
+// POST /api/admin/crm/tasks/:taskId/messages
+router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
+  try {
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const actorName = req.user?.email || 'Platform Admin';
+
+    const message = await taskMessageService.create({
+      task_id: req.params.taskId,
+      author_id: actorId,
+      author_type: 'platform',
+      author_name: actorName,
+      content: req.body.content,
+      is_internal: req.body.is_internal ?? true,
+    });
+    res.json({ success: true, data: message });
+  } catch (error) {
+    console.error('[CRM Admin] Error creating task message:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create task message' });
   }
 });
 

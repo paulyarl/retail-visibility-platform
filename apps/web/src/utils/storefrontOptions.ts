@@ -15,7 +15,7 @@ import {
   StorefrontOptQRContentType as QRContentTypeInternal,
   StorefrontOptGalleryType as GalleryTypeInternal,
   StorefrontOptAdvancedType as AdvancedTypeInternal,
-  StorefrontOptLayoutType as LayoutTypeInternal,
+  StorefrontLayoutType as LayoutTypeInternal,
   StorefrontOptionsState,
 } from '@/services/CapabilityResolutionService';
 
@@ -218,7 +218,7 @@ export function filterAllowedTypes(state: StorefrontOptionsState, group?: Storef
   const allTypes = group ? getTypesByGroup(group) : [
     ...HOURS_TYPES, ...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed',
     ...INFO_TYPES, ...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES,
-    ...GALLERY_TYPES, ...ADVANCED_TYPES, ...LAYOUT_TYPES,
+    ...GALLERY_TYPES, ...ADVANCED_TYPES,
   ];
 
   return allTypes.filter(type => {
@@ -231,7 +231,6 @@ export function filterAllowedTypes(state: StorefrontOptionsState, group?: Storef
     if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return false;
     if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return false;
     if (ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType)) return state.allowedAdvancedTypes.includes(type as StorefrontOptAdvancedType);
-    if (LAYOUT_TYPES.includes(type as StorefrontOptLayoutType)) return state.allowedLayouts.includes(type as StorefrontOptLayoutType);
     return false;
   });
 }
@@ -254,9 +253,6 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (state.canUseInteractiveMaps) effective.push('interactive_maps');
   if (state.canUseEnhancedSEO) effective.push('enhanced_seo');
   if (state.canUseStorefrontActions) effective.push('storefront_actions');
-  if (state.canUseLayoutClassic) effective.push('classic');
-  if (state.canUseLayoutEditorial) effective.push('editorial');
-  if (state.canUseLayoutImmersive) effective.push('immersive');
 
   return effective;
 }
@@ -346,9 +342,7 @@ export function getStorefrontOptionFlags(state: StorefrontOptionsState): Storefr
     galleryLimit: 0,
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,
-    storefrontLayout: state.canUseLayoutClassic
-      ? state.merchantPreferences.storefront_layout || 'classic'
-      : state.allowedLayouts[0] || 'classic',
+    storefrontLayout: 'classic',
   };
 }
 

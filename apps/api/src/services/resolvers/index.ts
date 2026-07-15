@@ -17,6 +17,7 @@ export { resolveStorefrontOptions } from './StorefrontOptionsResolver';
 export { resolveStorefrontQr } from './StorefrontQrResolver';
 export { resolveStorefrontGallery } from './StorefrontGalleryResolver';
 export { resolveStorefrontHours } from './StorefrontHoursResolver';
+export { resolveStorefrontLayouts } from './StorefrontLayoutResolver';
 export { resolveDirectoryEntryOptions } from './DirectoryEntryOptionsResolver';
 export { resolveFaqOptions } from './FaqOptionsResolver';
 export { resolveCrmOptions } from './CrmOptionsResolver';

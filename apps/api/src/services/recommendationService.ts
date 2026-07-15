@@ -865,8 +865,9 @@ export async function getSimilarStoresInCategory(
         dcl.address,
         dcl.city,
         dcl.state,
-        dcl.rating_avg,
-        dcl.rating_count,
+        COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+        COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+        COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
         agg.total_category_score,
         agg.best_match_score,
         agg.category_overlap_count,
@@ -875,6 +876,12 @@ export async function getSimilarStoresInCategory(
       FROM aggregated_scores agg
       JOIN directory_listings_list dcl ON dcl.tenant_id = agg.tenant_id
       CROSS JOIN source_store ss
+      LEFT JOIN LATERAL (
+        SELECT tenant_logo_url, store_average_rating, store_review_count
+        FROM mv_storefront_discovery
+        WHERE tenant_id = dcl.tenant_id
+        LIMIT 1
+      ) msd ON true
       WHERE dcl.is_published = true
       ORDER BY 
         combined_score DESC,
@@ -921,7 +928,10 @@ export async function getSimilarStoresInCategory(
         reason,
         address: row.address,
         city: row.city,
-        state: row.state
+        state: row.state,
+        logoUrl: row.logo_url,
+        ratingAvg: row.rating_avg || 0,
+        ratingCount: row.rating_count || 0
       };
     });
 

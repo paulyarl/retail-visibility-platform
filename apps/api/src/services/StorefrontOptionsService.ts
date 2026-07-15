@@ -7,8 +7,9 @@
  *
  * Feature prefix: storefront_opt_ (distinct from storefront_ which belongs to storefront_types)
  *
- * QR, Gallery, and Hours capabilities have been extracted to their own dedicated
- * services (StorefrontQrService, StorefrontGalleryService, StorefrontHoursService).
+ * QR, Gallery, Hours, and Layouts capabilities have been extracted to their own dedicated
+ * services (StorefrontQrService, StorefrontGalleryService, StorefrontHoursService,
+ * StorefrontLayoutService).
  *
  * Gate hierarchy (core only):
  *   storefront_options (main gate - hard)
@@ -32,13 +33,11 @@ export type StorefrontOptCategoryType = 'category_store' | 'category_product';
 export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
 export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
-export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
 export const RECOMMEND_TYPES: StorefrontOptRecommendType[] = ['recommend_store', 'recommend_products'];
 export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact', 'interactive_maps'];
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
-export const LAYOUT_TYPES: StorefrontOptLayoutType[] = ['classic', 'editorial', 'immersive'];
 
 export interface StorefrontOptionsState {
   enabled: boolean;
@@ -57,9 +56,6 @@ export interface StorefrontOptionsState {
   // Advanced group
   advancedEnabled: boolean;
   allowedAdvancedTypes: StorefrontOptAdvancedType[];
-  // Layout group
-  layoutEnabled: boolean;
-  allowedLayouts: StorefrontOptLayoutType[];
   // Convenience flags
   canUseCategoryStore: boolean;
   canUseCategoryProduct: boolean;
@@ -71,9 +67,6 @@ export interface StorefrontOptionsState {
   canUseInteractiveMaps: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
-  canUseLayoutClassic: boolean;
-  canUseLayoutEditorial: boolean;
-  canUseLayoutImmersive: boolean;
   // Raw features
   features: Record<string, boolean>;
 }
@@ -82,7 +75,7 @@ export interface StorefrontOptTypeMeta {
   key: string;
   label: string;
   description: string;
-  group: 'category' | 'recommend' | 'behavior' | 'info' | 'advanced' | 'layout';
+  group: 'category' | 'recommend' | 'behavior' | 'info' | 'advanced';
 }
 
 const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
@@ -96,9 +89,6 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   interactive_maps: { key: 'interactive_maps', label: 'Interactive Maps', description: 'Embedded map on storefront', group: 'info' },
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced' },
-  classic: { key: 'classic', label: 'Classic Layout', description: 'Traditional single-column layout', group: 'layout' },
-  editorial: { key: 'editorial', label: 'Modern Editorial', description: 'Storytelling emphasis, hero banner layout', group: 'layout' },
-  immersive: { key: 'immersive', label: 'Immersive Commerce', description: 'Conversion-optimized compact purchase flow', group: 'layout' },
 };
 
 // ====================
@@ -244,18 +234,6 @@ class StorefrontOptionsService {
       allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
     }
 
-    // --- Layout: new consolidated key with fallback to old group gate + individual keys ---
-    const allowedLayouts: StorefrontOptLayoutType[] = [];
-    if (flexible || features.storefront_opt_layout || features.storefront_opt_layout_on) {
-      allowedLayouts.push('classic', 'editorial', 'immersive');
-    } else if ((features.storefront_opt_layout_on || features.storefront_opt_layout_enabled) && !(features.storefront_opt_layout_off || features.storefront_opt_layout_disabled)) {
-      allowedLayouts.push('classic', 'editorial', 'immersive');
-    } else {
-      if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
-      if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
-      if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
-    }
-
     return {
       enabled: mainOn,
       isFlexible: flexible,
@@ -268,8 +246,6 @@ class StorefrontOptionsService {
       allowedInfoTypes,
       advancedEnabled: mainOn && allowedAdvancedTypes.length > 0,
       allowedAdvancedTypes,
-      layoutEnabled: mainOn && allowedLayouts.length > 0,
-      allowedLayouts,
       // Convenience flags
       canUseCategoryStore: mainOn && allowedCategoryTypes.includes('category_store'),
       canUseCategoryProduct: mainOn && allowedCategoryTypes.includes('category_product'),
@@ -281,9 +257,6 @@ class StorefrontOptionsService {
       canUseInteractiveMaps: mainOn && allowedInfoTypes.includes('interactive_maps'),
       canUseEnhancedSEO: mainOn && allowedAdvancedTypes.includes('enhanced_seo'),
       canUseStorefrontActions: mainOn && allowedAdvancedTypes.includes('storefront_actions'),
-      canUseLayoutClassic: mainOn && allowedLayouts.includes('classic'),
-      canUseLayoutEditorial: mainOn && allowedLayouts.includes('editorial'),
-      canUseLayoutImmersive: mainOn && allowedLayouts.includes('immersive'),
       features,
     };
   }
@@ -300,7 +273,6 @@ class StorefrontOptionsService {
     if (type === 'recently_viewed') return state.recentlyViewedEnabled;
     if (INFO_TYPES.includes(type as StorefrontOptInfoType)) return state.allowedInfoTypes.includes(type as StorefrontOptInfoType);
     if (ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType)) return state.allowedAdvancedTypes.includes(type as StorefrontOptAdvancedType);
-    if (LAYOUT_TYPES.includes(type as StorefrontOptLayoutType)) return state.allowedLayouts.includes(type as StorefrontOptLayoutType);
     return false;
   }
 
@@ -320,8 +292,7 @@ class StorefrontOptionsService {
       : group === 'behavior' ? ['recently_viewed']
       : group === 'info' ? INFO_TYPES
       : group === 'advanced' ? ADVANCED_TYPES
-      : group === 'layout' ? LAYOUT_TYPES
-      : [...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed', ...INFO_TYPES, ...ADVANCED_TYPES, ...LAYOUT_TYPES];
+      : [...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed', ...INFO_TYPES, ...ADVANCED_TYPES];
     return allTypes.map(t => STOREFRONT_OPT_TYPE_META[t]).filter(Boolean);
   }
 
@@ -341,8 +312,6 @@ class StorefrontOptionsService {
       allowedInfoTypes: [],
       advancedEnabled: false,
       allowedAdvancedTypes: [],
-      layoutEnabled: false,
-      allowedLayouts: [],
       canUseCategoryStore: false,
       canUseCategoryProduct: false,
       canUseRecommendStore: false,
@@ -353,9 +322,6 @@ class StorefrontOptionsService {
       canUseInteractiveMaps: false,
       canUseEnhancedSEO: false,
       canUseStorefrontActions: false,
-      canUseLayoutClassic: false,
-      canUseLayoutEditorial: false,
-      canUseLayoutImmersive: false,
       features: {},
     };
   }

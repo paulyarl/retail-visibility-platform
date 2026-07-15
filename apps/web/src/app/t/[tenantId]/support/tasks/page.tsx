@@ -54,7 +54,7 @@ export default function TenantTasksPage() {
     load();
   }, [load]);
 
-  const columns = statusFilter
+  const columns = statusFilter !== 'all'
     ? { [statusFilter]: tasks }
     : tasks.reduce<Record<string, CrmTask[]>>((acc, t) => {
         const col = t.status || 'pending';
@@ -118,7 +118,9 @@ export default function TenantTasksPage() {
               <div key={col} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold capitalize">{col.replace('_', ' ')}</h3>
-                  <span className="text-xs text-neutral-500">{columns[col]?.length || 0}</span>
+                  <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[col] || 'bg-gray-100 text-gray-800'}`}>
+                    {columns[col]?.length || 0}
+                  </span>
                 </div>
                 <div className="space-y-2">
                   {(columns[col] || []).map(t => {

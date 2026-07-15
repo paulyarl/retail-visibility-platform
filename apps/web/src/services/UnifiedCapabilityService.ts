@@ -27,6 +27,8 @@ import {
   StorefrontQrState,
   StorefrontGalleryState,
   StorefrontHoursState,
+  StorefrontLayoutState,
+  StorefrontLayoutType,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
   DirectoryEntryOptionsState,
@@ -65,7 +67,6 @@ import {
   StorefrontOptGalleryType,
   StorefrontOptGalleryDisplayMode,
   StorefrontOptAdvancedType,
-  StorefrontOptLayoutType,
   FaqManagementType,
   FaqPreviewType,
   FaqDisplayType,
@@ -137,6 +138,7 @@ interface BackendEffectiveCapabilities {
     storefront_qr: BackendEffectiveStorefrontQr;
     storefront_gallery: BackendEffectiveStorefrontGallery;
     storefront_hours: BackendEffectiveStorefrontHours;
+    storefront_layouts: BackendEffectiveStorefrontLayouts;
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
@@ -331,9 +333,6 @@ interface BackendEffectiveStorefrontOptions {
   allowed_info_types: StorefrontOptInfoType[];
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
-  layout_enabled: boolean;
-  allowed_layouts: StorefrontOptLayoutType[];
-  effective_layout: StorefrontOptLayoutType;
   can_show_map_display: boolean;
   can_show_location_display: boolean;
   can_use_category_store: boolean;
@@ -346,6 +345,15 @@ interface BackendEffectiveStorefrontOptions {
   can_use_interactive_maps: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontLayouts {
+  enabled: boolean;
+  is_flexible: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: StorefrontLayoutType[];
+  effective_layout: StorefrontLayoutType;
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
@@ -748,9 +756,6 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     allowedInfoTypes: b.allowed_info_types,
     advancedEnabled: b.advanced_enabled,
     allowedAdvancedTypes: b.allowed_advanced_types,
-    layoutEnabled: b.layout_enabled,
-    allowedLayouts: b.allowed_layouts,
-    effectiveLayout: b.effective_layout,
     canShowMapDisplay: b.can_show_map_display,
     canShowLocationDisplay: b.can_show_location_display,
     canUseCategoryStore: b.can_use_category_store,
@@ -763,6 +768,18 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseInteractiveMaps: b.can_use_interactive_maps,
     canUseEnhancedSEO: b.can_use_enhanced_seo,
     canUseStorefrontActions: b.can_use_storefront_actions,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontLayouts(b: BackendEffectiveStorefrontLayouts): StorefrontLayoutState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    layoutEnabled: b.layout_enabled,
+    allowedLayouts: b.allowed_layouts ?? [],
+    effectiveLayout: b.effective_layout ?? 'classic',
     canUseLayoutClassic: b.can_use_layout_classic,
     canUseLayoutEditorial: b.can_use_layout_editorial,
     canUseLayoutImmersive: b.can_use_layout_immersive,
@@ -1071,6 +1088,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     storefrontQr: mapStorefrontQr(b.effective.storefront_qr),
     storefrontGallery: mapStorefrontGallery(b.effective.storefront_gallery),
     storefrontHours: mapStorefrontHours(b.effective.storefront_hours),
+    storefrontLayouts: mapStorefrontLayouts(b.effective.storefront_layouts),
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
@@ -1328,6 +1346,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
       flags.showHoursDisplay = all.storefrontHours.canShowHoursDisplay;
       flags.showAnimatedHours = all.storefrontHours.canUseAnimatedHours;
       flags.showHoursStatus = all.storefrontHours.canShowHoursStatus;
+    }
+
+    // Overlay Layouts from dedicated storefront_layouts domain
+    if (all.storefrontLayouts) {
+      flags.storefrontLayout = all.storefrontLayouts.effectiveLayout;
     }
 
     return flags;

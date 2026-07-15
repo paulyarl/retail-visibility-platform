@@ -444,9 +444,8 @@ export type StorefrontOptCategoryType = 'category_store' | 'category_product';
 export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
 export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
-export type StorefrontOptLayoutType = 'classic' | 'editorial' | 'immersive';
 
-// Dedicated domain types (kept for StorefrontQrState, StorefrontGalleryState, StorefrontHoursState)
+// Dedicated domain types (kept for StorefrontQrState, StorefrontGalleryState, StorefrontHoursState, StorefrontLayoutState)
 export type StorefrontOptHoursType = 'hours_animated' | 'hours_status';
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
@@ -474,10 +473,6 @@ export interface StorefrontOptionsState {
   // Advanced group
   advancedEnabled: boolean;
   allowedAdvancedTypes: StorefrontOptAdvancedType[];
-  // Layout group
-  layoutEnabled: boolean;
-  allowedLayouts: StorefrontOptLayoutType[];
-  effectiveLayout: StorefrontOptLayoutType;
   // Convenience flags
   canShowMapDisplay: boolean;
   canShowLocationDisplay: boolean;
@@ -491,9 +486,6 @@ export interface StorefrontOptionsState {
   canUseInteractiveMaps: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
-  canUseLayoutClassic: boolean;
-  canUseLayoutEditorial: boolean;
-  canUseLayoutImmersive: boolean;
   /** Merchant preference toggles */
   merchantPreferences: {
     storefront_opt_enabled: boolean;
@@ -509,7 +501,6 @@ export interface StorefrontOptionsState {
     interactive_maps: boolean;
     enhanced_seo: boolean;
     storefront_actions: boolean;
-    storefront_layout: 'classic' | 'editorial' | 'immersive';
   };
   /** Raw feature map from backend */
   features: Record<string, boolean>;
@@ -559,8 +550,8 @@ export interface StorefrontOptionFlags {
 }
 
 /** Convert unified StorefrontOptionsState → old StorefrontOptionFlags shape.
- *  QR/Gallery/Hours fields are set to defaults here; they are overlaid from
- *  dedicated domain states (StorefrontQrState, StorefrontGalleryState, StorefrontHoursState)
+ *  QR/Gallery/Hours/Layouts fields are set to defaults here; they are overlaid from
+ *  dedicated domain states (StorefrontQrState, StorefrontGalleryState, StorefrontHoursState, StorefrontLayoutState)
  *  in UnifiedCapabilityService.getStorefrontOptionFlags. */
 export function toStorefrontOptionFlags(state: StorefrontOptionsState): StorefrontOptionFlags {
   const p = state.merchantPreferences;
@@ -595,7 +586,7 @@ export function toStorefrontOptionFlags(state: StorefrontOptionsState): Storefro
     canUseMagazineGallery: false,
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,
-    storefrontLayout: p?.storefront_layout ?? 'classic',
+    storefrontLayout: 'classic',
   };
 }
 
@@ -997,6 +988,21 @@ export interface StorefrontHoursState {
   features: Record<string, boolean>;
 }
 
+export type StorefrontLayoutType = 'classic' | 'editorial' | 'immersive';
+
+export interface StorefrontLayoutState {
+  enabled: boolean;
+  isFlexible: boolean;
+  layoutEnabled: boolean;
+  allowedLayouts: StorefrontLayoutType[];
+  effectiveLayout: StorefrontLayoutType;
+  canUseLayoutClassic: boolean;
+  canUseLayoutEditorial: boolean;
+  canUseLayoutImmersive: boolean;
+  merchantPreferences: { layouts_enabled: boolean; storefront_layout: string };
+  features: Record<string, boolean>;
+}
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
@@ -1016,6 +1022,7 @@ export interface AllCapabilitiesState {
   storefrontQr: StorefrontQrState;
   storefrontGallery: StorefrontGalleryState;
   storefrontHours: StorefrontHoursState;
+  storefrontLayouts: StorefrontLayoutState;
   directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
@@ -1041,6 +1048,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   storefront_qr_: 'storefront_qr',
   storefront_gallery_: 'storefront_gallery',
   storefront_hours_: 'storefront_hours',
+  storefront_layouts_: 'storefront_layouts',
   storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
@@ -2061,7 +2069,6 @@ export function resolveStorefrontOptionsState(
     interactive_maps?: boolean;
     enhanced_seo?: boolean;
     storefront_actions?: boolean;
-    storefront_layout?: 'classic' | 'editorial' | 'immersive';
   } | null
 ): StorefrontOptionsState {
   // Main gate (hard)
@@ -2085,7 +2092,6 @@ export function resolveStorefrontOptionsState(
     interactive_maps: merchantPrefs?.interactive_maps !== false,
     enhanced_seo: merchantPrefs?.enhanced_seo ?? false,
     storefront_actions: merchantPrefs?.storefront_actions ?? false,
-    storefront_layout: merchantPrefs?.storefront_layout || 'classic',
   };
 
   // --- Category: individual features (group gate removed, fallback to old group gate) ---
@@ -2141,21 +2147,9 @@ export function resolveStorefrontOptionsState(
     allowedAdvancedTypes.push('enhanced_seo', 'storefront_actions');
   }
 
-  // --- Layout: new consolidated key with fallback to old group gate + individual keys ---
-  const allowedLayouts: StorefrontOptLayoutType[] = [];
-  if (flexible || features.storefront_opt_layout || features.storefront_opt_layout_on) {
-    allowedLayouts.push('classic', 'editorial', 'immersive');
-  } else if ((features.storefront_opt_layout_on || features.storefront_opt_layout_enabled) && !(features.storefront_opt_layout_off || features.storefront_opt_layout_disabled)) {
-    allowedLayouts.push('classic', 'editorial', 'immersive');
-  } else {
-    if (features.storefront_opt_layout_classic) allowedLayouts.push('classic');
-    if (features.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
-    if (features.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
-  }
-
   const mainOn = enabled && !disabled;
 
-  // Effective flags = main gate AND tier allows AND merchant enabled
+  // Effective flags
   const effectiveCategoryTypes = prefs.storefront_opt_enabled
     ? allowedCategoryTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
     : [];
@@ -2172,9 +2166,6 @@ export function resolveStorefrontOptionsState(
     ? allowedAdvancedTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
     : [];
 
-  // Effective layout = tier allowed (merchant selects one via storefront_layout preference)
-  const effectiveLayouts = prefs.storefront_opt_enabled ? allowedLayouts : [];
-
   return {
     enabled: mainOn,
     isFlexible: flexible,
@@ -2187,11 +2178,6 @@ export function resolveStorefrontOptionsState(
     allowedInfoTypes,
     advancedEnabled: mainOn && allowedAdvancedTypes.length > 0,
     allowedAdvancedTypes,
-    layoutEnabled: mainOn && allowedLayouts.length > 0,
-    allowedLayouts,
-    effectiveLayout: effectiveLayouts.includes(prefs.storefront_layout as StorefrontOptLayoutType)
-      ? (prefs.storefront_layout as StorefrontOptLayoutType)
-      : (effectiveLayouts[0] || 'classic'),
     canShowMapDisplay: mainOn && effectiveMapDisplay,
     canShowLocationDisplay: mainOn && effectiveLocationDisplay,
     canUseCategoryStore: mainOn && effectiveCategoryTypes.includes('category_store'),
@@ -2204,6 +2190,62 @@ export function resolveStorefrontOptionsState(
     canUseInteractiveMaps: mainOn && effectiveInfoTypes.includes('interactive_maps'),
     canUseEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     canUseStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
+    merchantPreferences: prefs,
+    features,
+  };
+}
+
+/**
+ * Resolve storefront layouts state from raw capability features + merchant preferences.
+ * New namespace: storefront_layouts_* with fallback to old storefront_opt_layout_* keys.
+ */
+export function resolveStorefrontLayoutState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    layouts_enabled?: boolean;
+    storefront_layout?: string;
+  } | null,
+  fallbackFeatures?: Record<string, boolean>,
+): StorefrontLayoutState {
+  const fb = fallbackFeatures || {};
+  const disabled = !!features.storefront_layouts_disabled || !!fb.storefront_opt_disabled;
+  const enabled = !disabled && (!!features.storefront_layouts_enabled || !!fb.storefront_opt_enabled);
+  const flexible = !!features.storefront_layouts_flexible || !!fb.storefront_opt_flexible;
+  const mainOn = enabled;
+
+  const layoutGroupEnabled = flexible
+    || !!features.storefront_layouts_on || !!features.storefront_layouts
+    || !!fb.storefront_opt_layout_on
+    || !!fb.storefront_opt_layout_enabled;
+
+  const allowedLayouts: StorefrontLayoutType[] = [];
+  if (layoutGroupEnabled) {
+    if (flexible) {
+      allowedLayouts.push('classic', 'editorial', 'immersive');
+    } else {
+      if (features.storefront_layouts_classic || fb.storefront_opt_layout_classic) allowedLayouts.push('classic');
+      if (features.storefront_layouts_editorial || fb.storefront_opt_layout_editorial) allowedLayouts.push('editorial');
+      if (features.storefront_layouts_immersive || fb.storefront_opt_layout_immersive) allowedLayouts.push('immersive');
+    }
+  }
+
+  const prefs = {
+    layouts_enabled: merchantPrefs?.layouts_enabled !== false,
+    storefront_layout: merchantPrefs?.storefront_layout || 'classic',
+  };
+
+  const effectiveLayouts = mainOn ? allowedLayouts : [];
+  const merchantChoice = prefs.storefront_layout as StorefrontLayoutType;
+  const effectiveLayout: StorefrontLayoutType = effectiveLayouts.includes(merchantChoice)
+    ? merchantChoice
+    : (effectiveLayouts[0] || 'classic');
+
+  return {
+    enabled: mainOn,
+    isFlexible: flexible,
+    layoutEnabled: mainOn && allowedLayouts.length > 0,
+    allowedLayouts,
+    effectiveLayout,
     canUseLayoutClassic: mainOn && allowedLayouts.includes('classic'),
     canUseLayoutEditorial: mainOn && allowedLayouts.includes('editorial'),
     canUseLayoutImmersive: mainOn && allowedLayouts.includes('immersive'),

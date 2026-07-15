@@ -50,7 +50,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
               city: rec.city,
               state: rec.state,
               primaryCategory: rec.primaryCategory,
-              logoUrl: rec.logoUrl,
+              logoUrl: rec.logoUrl || rec.tenantLogoUrl,
               ratingAvg: rec.ratingAvg,
               ratingCount: rec.ratingCount,
               productCount: rec.productCount,

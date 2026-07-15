@@ -31,8 +31,6 @@ const storefrontOptionsSettingsSchema = z.object({
   // Advanced group
   enhanced_seo: z.boolean().optional(),
   storefront_actions: z.boolean().optional(),
-  // Layout selection
-  storefront_layout: z.enum(['classic', 'editorial', 'immersive']).optional(),
 });
 
 // Default settings (core only — QR, Gallery, Hours have dedicated settings routes)
@@ -50,7 +48,6 @@ export const DEFAULT_SETTINGS = {
   interactive_maps: true,
   enhanced_seo: false,
   storefront_actions: false,
-  storefront_layout: 'classic',
 };
 
 // Get storefront options settings for a tenant
@@ -77,7 +74,6 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
           interactive_maps: false,
           enhanced_seo: false,
           storefront_actions: false,
-          storefront_layout: 'classic',
         },
         tierState,
       });
@@ -109,13 +105,6 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
     // Advanced group
     tierFilteredSettings.enhanced_seo = tierState.allowedAdvancedTypes.includes('enhanced_seo') ? !!rawSettings.enhanced_seo : false;
     tierFilteredSettings.storefront_actions = tierState.allowedAdvancedTypes.includes('storefront_actions') ? !!rawSettings.storefront_actions : false;
-    // Layout
-    const allowedLayouts = tierState.allowedLayouts;
-    const effectiveLayout: 'classic' | 'editorial' | 'immersive' =
-      allowedLayouts.includes(rawSettings.storefront_layout as 'classic' | 'editorial' | 'immersive')
-        ? rawSettings.storefront_layout as 'classic' | 'editorial' | 'immersive'
-        : (allowedLayouts[0] || 'classic');
-    tierFilteredSettings.storefront_layout = effectiveLayout;
 
     res.json({
       success: true,
@@ -152,18 +141,6 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
     }
 
     const data = validationResult.data;
-
-    // Enforce tier gate for layout selection
-    if (data.storefront_layout) {
-      const tierState = await StorefrontOptionsService.getInstance().resolveStorefrontOptionsState(tenantId);
-      if (!tierState.enabled || !tierState.allowedLayouts.includes(data.storefront_layout)) {
-        return res.status(403).json({
-          success: false,
-          error: 'tier_restricted',
-          message: `Layout '${data.storefront_layout}' is not available on your current plan`,
-        });
-      }
-    }
 
     // Check if settings exist
     const existing = await prisma.tenant_storefront_options_settings.findUnique({
@@ -208,7 +185,6 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
         interactive_maps: settings.interactive_maps,
         enhanced_seo: settings.enhanced_seo,
         storefront_actions: settings.storefront_actions,
-        storefront_layout: settings.storefront_layout || 'classic',
       },
     });
   } catch (error) {

@@ -238,7 +238,9 @@ export default function CrmGlobalTasksPage() {
                         className="block rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium truncate flex-1">{t.title}</p>
+                          <Link href={`/settings/admin/crm/tasks/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-amber-600 hover:underline">
+                            {t.title}
+                          </Link>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => { setEditTask(t); setShowEdit(true); }}

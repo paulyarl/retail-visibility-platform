@@ -927,6 +927,16 @@ export function generateCrmTicketMessageId(): string {
 }
 
 /**
+ * Generate CRM task message ID
+ * Format: crmtmsg-{nanoid} (15 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmTaskMessageId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmtmsg-${nanoid()}`;
+}
+
+/**
  * Generate CRM task ID
  * Format: crmtask-{tenantKey}-{nanoid} (20 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -1153,6 +1163,16 @@ export function generateDirectoryEntrySettingsId(tenantId: string): string {
 export function generateStorefrontHoursSettingsId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `shs-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a tenant_storefront_layouts_settings ID.
+ * Format: sls-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontLayoutsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sls-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**

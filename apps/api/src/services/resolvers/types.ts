@@ -50,6 +50,7 @@ export interface MerchantSettingsBundle {
   storefrontQr: StorefrontQrMerchantSettings | null;
   storefrontGallery: StorefrontGalleryMerchantSettings | null;
   storefrontHours: StorefrontHoursMerchantSettings | null;
+  storefrontLayouts: StorefrontLayoutMerchantSettings | null;
   directoryEntry: DirectoryEntryMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
@@ -224,6 +225,10 @@ export interface StorefrontOptionsMerchantSettings {
   interactive_maps?: boolean | null;
   enhanced_seo?: boolean | null;
   storefront_actions?: boolean | null;
+}
+
+export interface StorefrontLayoutMerchantSettings {
+  layouts_enabled?: boolean | null;
   storefront_layout?: string | null;
 }
 
@@ -611,9 +616,6 @@ export interface EffectiveStorefrontOptions {
   allowed_info_types: StorefrontOptInfoType[];
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
-  layout_enabled: boolean;
-  allowed_layouts: StorefrontOptLayoutType[];
-  effective_layout: StorefrontOptLayoutType;
   can_show_map_display: boolean;
   can_show_location_display: boolean;
   can_use_category_store: boolean;
@@ -626,10 +628,21 @@ export interface EffectiveStorefrontOptions {
   can_use_interactive_maps: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+export type StorefrontLayoutType = 'classic' | 'editorial' | 'immersive';
+
+export interface EffectiveStorefrontLayouts {
+  enabled: boolean;
+  is_flexible: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: StorefrontLayoutType[];
+  effective_layout: StorefrontLayoutType;
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
-  merchant_preferences: Record<string, any>;
+  merchant_preferences: { layouts_enabled: boolean; storefront_layout: string };
 }
 
 export type FaqManagementType =
@@ -913,6 +926,7 @@ export interface EffectiveCapabilities {
     storefront_qr: EffectiveStorefrontQr;
     storefront_gallery: EffectiveStorefrontGallery;
     storefront_hours: EffectiveStorefrontHours;
+    storefront_layouts: EffectiveStorefrontLayouts;
     directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;

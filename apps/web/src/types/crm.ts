@@ -165,6 +165,23 @@ export interface CreateTicketMessageInput {
   is_internal?: boolean;
 }
 
+// --- Task Messages ---
+export interface CrmTaskMessage {
+  id: string;
+  task_id: string;
+  author_id: string;
+  author_type: AuthorType;
+  author_name: string;
+  content: string;
+  is_internal: boolean;
+  created_at: string;
+}
+
+export interface CreateTaskMessageInput {
+  content: string;
+  is_internal?: boolean;
+}
+
 // --- Task ---
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high';

@@ -11,6 +11,7 @@ import type {
   CrmTicket, CreateTicketInput, UpdateTicketInput,
   CrmTicketMessage, CreateTicketMessageInput,
   CrmTask, CreateTaskInput, UpdateTaskInput,
+  CrmTaskMessage, CreateTaskMessageInput,
   CrmActivity, CreateActivityInput,
   CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
   CrmAlert, CrmOrder, RequestListParams, CrmRequestItem,
@@ -40,6 +41,7 @@ class CrmAdminService extends AdminApiSingleton {
       'crm-tickets',
       'crm-ticket-messages',
       'crm-tasks',
+      'crm-task-messages',
       'crm-activities',
       'crm-inquiries',
       'crm-requests',
@@ -254,6 +256,27 @@ class CrmAdminService extends AdminApiSingleton {
     );
     await this.invalidateServiceCaches();
     if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  // --- Task Messages ---
+  async listTaskMessages(taskId: string): Promise<CrmTaskMessage[]> {
+    const cacheKey = `crm-task-messages-${taskId}`;
+    const result = await this.makeDefaultRequest<CrmTaskMessage[]>(
+      `/api/admin/crm/tasks/${taskId}/messages`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmTaskMessage[]>(result);
+  }
+
+  async createTaskMessage(taskId: string, data: CreateTaskMessageInput): Promise<CrmTaskMessage> {
+    const result = await this.makeDefaultRequest<CrmTaskMessage>(
+      `/api/admin/crm/tasks/${taskId}/messages`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTaskMessage>(result);
   }
 
   // --- Activities (append-only) ---

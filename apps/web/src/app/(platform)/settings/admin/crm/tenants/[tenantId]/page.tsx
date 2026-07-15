@@ -596,7 +596,11 @@ function TasksTab({ tenantId }: { tenantId: string }) {
               const isOverdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'completed';
               return (
                 <tr key={t.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 group">
-                  <td className="px-4 py-3 font-medium">{t.title}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link href={`/settings/admin/crm/tasks/${t.id}`} className="text-amber-600 hover:text-amber-700 dark:text-amber-400 hover:underline">
+                      {t.title}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3">
                     {updatingId === t.id ? (
                       <Spinner size="sm" />

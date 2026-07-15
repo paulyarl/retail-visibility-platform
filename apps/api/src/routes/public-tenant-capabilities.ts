@@ -324,6 +324,17 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_show_hours_status: false,
         merchant_preferences: {},
       },
+      storefront_layouts: {
+        enabled: false,
+        is_flexible: false,
+        layout_enabled: false,
+        allowed_layouts: [],
+        effective_layout: 'classic' as const,
+        can_use_layout_classic: false,
+        can_use_layout_editorial: false,
+        can_use_layout_immersive: false,
+        merchant_preferences: {},
+      },
       directory_entry: {
         enabled: false,
         is_flexible: false,
