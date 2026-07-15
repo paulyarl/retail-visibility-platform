@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
+import { generateDirectorySupportNoteId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -209,8 +210,10 @@ router.post('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, 
     }
 
     const user = (req as any).user;
+    const noteId = generateDirectorySupportNoteId(tenantId);
     const note = await prisma.directory_support_notes_list.create({
       data: {
+        id: noteId,
         tenant_id: tenantId,
         note: parsed.data.note,
         created_by: user.user_id,

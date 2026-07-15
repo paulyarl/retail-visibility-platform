@@ -291,6 +291,15 @@ export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
 }
 
 /**
+ * Generates directory support note IDs
+ * Format: dsn-{tenantKey}-{nanoid}
+ */
+export function generateDirectorySupportNoteId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `dsn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generates organization IDs
  * Format: sess-abc123 (12 chars)
  */
