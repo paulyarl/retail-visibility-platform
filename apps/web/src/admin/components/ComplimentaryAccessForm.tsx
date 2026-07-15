@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { adminFeaturePurchasesService } from '@/services/AdminFeaturePurchasesService';
 import { adminBsaasCatalogService, type BsaasCatalogEntry } from '@/services/AdminBsaasCatalogService';
+import { type BsaasBundleEntry } from '@/services/AdminBsaasBundleService';
 import { adminOperationsService } from '@/services/AdminOperationsService';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -28,9 +29,11 @@ interface ComplimentaryAccessFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  entries?: BsaasCatalogEntry[];
+  bundles?: BsaasBundleEntry[];
 }
 
-export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess }: ComplimentaryAccessFormProps) {
+export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess, entries, bundles }: ComplimentaryAccessFormProps) {
   const [catalog, setCatalog] = useState<BsaasCatalogEntry[]>([]);
   const [tenants, setTenants] = useState<{ id: string; name: string; subscriptionTier: string; subscriptionStatus: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,12 +42,15 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
 
   const [tenantId, setTenantId] = useState('');
   const [featureKey, setFeatureKey] = useState('');
+  const [bundleKey, setBundleKey] = useState('');
   const [durationDays, setDurationDays] = useState('');
   const [reason, setReason] = useState('');
 
   useEffect(() => {
     if (open) {
-      adminBsaasCatalogService.list().then(setCatalog).catch(() => {});
+      if (!entries && !bundles) {
+        adminBsaasCatalogService.list().then(setCatalog).catch(() => {});
+      }
       adminOperationsService.getTenants(1, 500).then((result) => {
         setTenants(result.tenants.map((t) => ({
           id: t.id,
@@ -67,6 +73,7 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
   const resetForm = () => {
     setTenantId('');
     setFeatureKey('');
+    setBundleKey('');
     setDurationDays('');
     setReason('');
     setError(null);
@@ -78,9 +85,16 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
       setError('Tenant ID is required');
       return;
     }
-    if (!featureKey) {
-      setError('Feature is required');
-      return;
+    if (bundles) {
+      if (!bundleKey) {
+        setError('Bundle is required');
+        return;
+      }
+    } else {
+      if (!featureKey) {
+        setError('Feature is required');
+        return;
+      }
     }
     if (!reason.trim()) {
       setError('Reason is required');
@@ -90,13 +104,33 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
     try {
       setLoading(true);
       setError(null);
-      await adminFeaturePurchasesService.grantComplimentary({
-        tenant_id: tenantId.trim(),
-        feature_key: featureKey,
-        duration_days: durationDays ? parseInt(durationDays) : undefined,
-        reason: reason.trim(),
-      });
-      setSuccess(`Complimentary access granted for "${featureKey}" to tenant ${tenantId.trim()}`);
+
+      if (bundles && bundleKey) {
+        const selectedBundle = bundles.find((b) => b.bundle_key === bundleKey);
+        if (!selectedBundle) {
+          setError('Selected bundle not found');
+          return;
+        }
+        const componentKeys = selectedBundle.bsaas_bundle_items.map((i) => i.feature_key);
+        for (const key of componentKeys) {
+          await adminFeaturePurchasesService.grantComplimentary({
+            tenant_id: tenantId.trim(),
+            feature_key: key,
+            duration_days: durationDays ? parseInt(durationDays) : undefined,
+            reason: reason.trim(),
+          });
+        }
+        setSuccess(`Granted access to bundle "${selectedBundle.marketing_name}" (${componentKeys.length} features) to tenant ${tenantId.trim()}`);
+      } else {
+        await adminFeaturePurchasesService.grantComplimentary({
+          tenant_id: tenantId.trim(),
+          feature_key: featureKey,
+          duration_days: durationDays ? parseInt(durationDays) : undefined,
+          reason: reason.trim(),
+        });
+        setSuccess(`Complimentary access granted for "${featureKey}" to tenant ${tenantId.trim()}`);
+      }
+
       resetForm();
       onSuccess?.();
       setTimeout(() => {
@@ -149,19 +183,43 @@ export default function ComplimentaryAccessForm({ open, onOpenChange, onSuccess 
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">Feature *</label>
-            <select
-              className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
-              value={featureKey}
-              onChange={(e) => setFeatureKey(e.target.value)}
-            >
-              <option value="">Select a feature...</option>
-              {catalog.map((entry) => (
-                <option key={entry.id} value={entry.feature_key}>
-                  {entry.marketing_name || entry.feature_key} ({entry.feature_key})
-                </option>
-              ))}
-            </select>
+            <label className="text-sm font-medium mb-1 block">{bundles ? 'Bundle *' : 'Feature *'}</label>
+            {bundles ? (
+              <select
+                className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
+                value={bundleKey}
+                onChange={(e) => setBundleKey(e.target.value)}
+              >
+                <option value="">Select a bundle...</option>
+                {bundles.map((bundle) => (
+                  <option key={bundle.id} value={bundle.bundle_key}>
+                    {bundle.marketing_name} ({bundle.bsaas_bundle_items.length} components)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                className="w-full h-9 rounded-md border border-input bg-white px-3 text-sm"
+                value={featureKey}
+                onChange={(e) => setFeatureKey(e.target.value)}
+              >
+                <option value="">Select a feature...</option>
+                {(entries ?? catalog).map((entry) => (
+                  <option key={entry.id} value={entry.feature_key}>
+                    {entry.marketing_name || entry.feature_key} ({entry.feature_key})
+                  </option>
+                ))}
+              </select>
+            )}
+            {bundles && bundleKey && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {bundles.find((b) => b.bundle_key === bundleKey)?.bsaas_bundle_items.map((item) => (
+                  <span key={item.feature_key} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-700">
+                    {item.feature_key}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

@@ -55,6 +55,7 @@ import { useStorefrontState } from './layouts/hooks/useStorefrontState';
 import { StorefrontLayoutProps } from './layouts/types';
 import StorefrontFooter from './layouts/shared/StorefrontFooter';
 import { Button } from '@mantine/core';
+import { TenantQRCode } from '@/components/public/TenantQRCode';
 
 // ---------------------------------------------------------------------------
 // Layout B – Modern Editorial
@@ -955,16 +956,16 @@ export default function StorefrontEditorialLayout({
       )}
 
       {/* ================================================================= */}
-      {/* STORE INFORMATION (3-col, bg-neutral-50)                           */}
+      {/* STORE INFORMATION (4-col, bg-neutral-50)                           */}
       {/* ================================================================= */}
-      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (showsLocation || showsHours || showsContact) && isRetailStore && (
+      {!isProductsOnly && !storefrontStatus.shouldShowPanel && (showsLocation || showsHours || showsContact || showsQRCodes) && isRetailStore && (
         <section
           id="hours-section"
           className="bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-200 dark:border-neutral-800"
           aria-label="Store information"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Card 1: Visit Us (address + map) */}
               {showsLocation && showsContact && contactInfo.address && (
                 <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-700 overflow-hidden">
@@ -1097,6 +1098,32 @@ export default function StorefrontEditorialLayout({
                     <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
                   </div>
                   )}
+                </div>
+              )}
+
+                           {/* Card 4: QR Code */}
+              {showsQRCodes && (
+                <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6 flex flex-col items-center">
+                  <div className="flex items-center gap-2 mb-4 self-start">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                      Share This Store
+                    </h3>
+                  </div>
+                  <TenantQRCode
+                    url={currentUrl}
+                    tenantId={tenantId}
+                    label="Scan to Share"
+                    downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                    size={160}
+                    showDownload={true}
+                    pageType="storefront"
+                    capabilityFlags={optFlags}
+                  />
                 </div>
               )}
             </div>

@@ -182,15 +182,24 @@ class StorefrontQrService {
     const mainOn = enabled;
 
     // QR group — new keys with fallback to old storefront_opt_qr_* keys
+    // storefront_qr_enabled is the type gate (checked above), NOT a group-on key.
+    // Individual QR keys implicitly enable the group.
+    const hasAnyIndividualQRKey = !!(
+      features.storefront_qr_resolution_512 || features.storefront_qr_resolution_1024 || features.storefront_qr_resolution_2048
+      || features.storefront_qr_product || features.storefront_qr_store || features.storefront_qr_logo || features.storefront_qr_directory
+      || features.storefront_opt_qr_codes_512 || features.storefront_opt_qr_codes_1024 || features.storefront_opt_qr_codes_2048
+      || features.storefront_opt_qr_product || features.storefront_opt_qr_store || features.storefront_opt_qr_logo || features.storefront_opt_qr_directory
+    );
     const qrGroupEnabled = flexible
-      || !!features.storefront_qr_on || !!features.storefront_qr || !!features.storefront_qr_enabled
-      || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr || !!features.storefront_opt_qr_enabled;
+      || !!features.storefront_qr_on || !!features.storefront_qr
+      || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr || !!features.storefront_opt_qr_enabled
+      || hasAnyIndividualQRKey;
 
     // QR resolutions
     const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
     if (qrGroupEnabled) {
       if (flexible
-        || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+        || features.storefront_qr_on || features.storefront_qr
         || features.storefront_qr_resolution
         || features.storefront_opt_qr_on || features.storefront_opt_qr || features.storefront_opt_qr_enabled
         || features.storefront_opt_qr_resolution
@@ -207,7 +216,7 @@ class StorefrontQrService {
     const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
     if (qrGroupEnabled) {
       if (flexible
-        || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+        || features.storefront_qr_on || features.storefront_qr
         || features.storefront_qr_content
         || features.storefront_opt_qr_on || features.storefront_opt_qr || features.storefront_opt_qr_enabled
         || features.storefront_opt_qr_content
@@ -224,7 +233,7 @@ class StorefrontQrService {
     // Classic QR sub-group
     const qrClassicEnabled = mainOn && (flexible
       || !!features.storefront_qr_classic || !!features.storefront_qr_classic_on
-      || !!features.storefront_qr_enabled
+      || !!features.storefront_qr_on || !!features.storefront_qr
       || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr
       || !!features.storefront_opt_qr_enabled);
 

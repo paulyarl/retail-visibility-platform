@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
+import { Card, CardContent, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
-import type { CrmTask, CrmTaskMessage, TaskStatus } from '@/types/crm';
+import type { CrmTask, CrmTaskMessage, CrmActivity, TaskStatus } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -31,27 +31,31 @@ export default function TenantTaskDetailPage() {
 
   const [task, setTask] = useState<CrmTask | null>(null);
   const [messages, setMessages] = useState<CrmTaskMessage[]>([]);
+  const [activities, setActivities] = useState<CrmActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [tenantUsers, setTenantUsers] = useState<User[]>([]);
   const isClosed = task?.status === 'completed' || task?.status === 'cancelled';
 
   useEffect(() => {
     async function load() {
       try {
-        const [taskData, messageData, users] = await Promise.all([
+        const [taskData, messageData, users, activityData] = await Promise.all([
           crmTenantCrmService.listTasks(),
           crmTenantCrmService.listTaskMessages(taskId),
           tenantUserService.getTenantUsers(tenantId),
+          crmTenantCrmService.listActivities({ taskId, limit: 50 }),
         ]);
         const found = (taskData ?? []).find((t: CrmTask) => t.id === taskId) ?? null;
         setTask(found);
         setMessages(messageData ?? []);
         setTenantUsers(users ?? []);
+        setActivities(activityData ?? []);
       } catch (err) {
         console.error('[Tenant Task Detail] Load error:', err);
       } finally {
@@ -60,6 +64,15 @@ export default function TenantTaskDetailPage() {
     }
     load();
   }, [taskId, tenantId]);
+
+  async function refreshActivities() {
+    try {
+      const activityList = await crmTenantCrmService.listActivities({ taskId, limit: 50 });
+      setActivities(activityList ?? []);
+    } catch (err) {
+      console.error('[Tenant Task Detail] Activity refresh error:', err);
+    }
+  }
 
   async function handleReply() {
     if (!reply.trim()) return;
@@ -84,10 +97,26 @@ export default function TenantTaskDetailPage() {
     setUpdating(true);
     setShowStatusDropdown(false);
     try {
-      const updated = await crmTenantCrmService.updateTaskStatus(taskId, newStatus);
+      const updated = await crmTenantCrmService.updateTask(taskId, { status: newStatus });
       setTask(updated);
+      await refreshActivities();
     } catch (err) {
       console.error('[Tenant Task Detail] Status change error:', err);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleAssignChange(userId: string | null) {
+    if (!task) return;
+    setUpdating(true);
+    setShowAssignDropdown(false);
+    try {
+      const updated = await crmTenantCrmService.updateTask(taskId, { assigned_to: userId });
+      setTask(updated);
+      await refreshActivities();
+    } catch (err) {
+      console.error('[Tenant Task Detail] Assign change error:', err);
     } finally {
       setUpdating(false);
     }
@@ -139,7 +168,7 @@ export default function TenantTaskDetailPage() {
         { label: task.id },
       ]}
     >
-      {/* Task header with status dropdown */}
+      {/* Task header with status + assign dropdowns */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">{task.title}</h2>
@@ -163,7 +192,7 @@ export default function TenantTaskDetailPage() {
           {/* Status dropdown */}
           <div className="relative">
             <button
-              onClick={() => { if (isClosed) return; setShowStatusDropdown(!showStatusDropdown); }}
+              onClick={() => { if (isClosed) return; setShowStatusDropdown(!showStatusDropdown); setShowAssignDropdown(false); }}
               disabled={updating || isClosed}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_COLORS[task.status] || 'bg-gray-100 text-gray-800'} hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
@@ -184,6 +213,39 @@ export default function TenantTaskDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Assign dropdown */}
+          {tenantUsers.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => { if (isClosed) return; setShowAssignDropdown(!showAssignDropdown); setShowStatusDropdown(false); }}
+                disabled={updating || isClosed}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity ${isClosed ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                {task.assigned_to ? tenantUsers.find(u => u.id === task.assigned_to)?.name || 'Assigned' : 'Assign'}
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {showAssignDropdown && (
+                <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1 min-w-[180px] max-h-48 overflow-y-auto">
+                  <button
+                    onClick={() => handleAssignChange(null)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${!task.assigned_to ? 'font-semibold' : ''}`}
+                  >
+                    Unassigned
+                  </button>
+                  {tenantUsers.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => handleAssignChange(u.id)}
+                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700 ${u.id === task.assigned_to ? 'font-semibold' : ''}`}
+                    >
+                      {u.name || u.email}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -274,6 +336,33 @@ export default function TenantTaskDetailPage() {
           );
         })}
       </div>
+
+      {/* Activity History */}
+      <Card>
+        <CardContent>
+          <h3 className="text-sm font-semibold mb-3">Activity History</h3>
+          {activities.length === 0 ? (
+            <p className="text-sm text-neutral-500">No activity recorded for this task.</p>
+          ) : (
+            <div className="space-y-3">
+              {activities.map((a) => {
+                const actorUser = tenantUsers.find(u => u.id === a.actor_id);
+                const displayName = actorUser?.name || a.actor_name;
+                return (
+                  <div key={a.id} className="flex gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">{a.content || a.activity_type}</p>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        {displayName} · {a.activity_type.replace(/_/g, ' ')} · {new Date(a.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Reply composer */}
       {!isClosed && (

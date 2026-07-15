@@ -89,6 +89,8 @@ import {
   WholesaleMatchingState,
   PlatformServicesState,
   PlatformServiceType,
+  FunnelState,
+  FunnelStepType,
 } from './CapabilityResolutionService';
 
 // ====================
@@ -150,6 +152,7 @@ interface BackendEffectiveCapabilities {
     directory_promotion: BackendEffectiveDirectoryPromotion;
     wholesale_matching: BackendEffectiveWholesaleMatching;
     platform_services: BackendEffectivePlatformServices;
+    funnel: BackendEffectiveFunnel;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -1062,6 +1065,30 @@ function mapPlatformServices(b: BackendEffectivePlatformServices): PlatformServi
   };
 }
 
+interface BackendEffectiveFunnel {
+  enabled: boolean;
+  builder_enabled: boolean;
+  allowed_steps: string[];
+  can_use_order_bump: boolean;
+  can_use_upsell: boolean;
+  can_use_downsell: boolean;
+  can_use_oto: boolean;
+  is_flexible: boolean;
+}
+
+function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
+  return {
+    enabled: b.enabled,
+    builderEnabled: b.builder_enabled,
+    allowedSteps: (b.allowed_steps || []) as FunnelStepType[],
+    canUseOrderBump: b.can_use_order_bump,
+    canUseUpsell: b.can_use_upsell,
+    canUseDownsell: b.can_use_downsell,
+    canUseOto: b.can_use_oto,
+    isFlexible: b.is_flexible,
+  };
+}
+
 function mapWholesaleMatching(b: BackendEffectiveWholesaleMatching): WholesaleMatchingState {
   return {
     enabled: b.enabled,
@@ -1117,6 +1144,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
     wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
     platformServices: mapPlatformServices(b.effective.platform_services),
+    funnel: mapFunnel(b.effective.funnel),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1433,6 +1461,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
   async getPlatformServicesState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PlatformServicesState> {
     const all = await this.getAllCapabilities(tenantId, options);
     return all.platformServices;
+  }
+
+  async getFunnelState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FunnelState> {
+    const all = await this.getAllCapabilities(tenantId, options);
+    return all.funnel;
   }
 
   async getWholesaleMatchingState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<WholesaleMatchingState> {

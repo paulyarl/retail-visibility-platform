@@ -265,6 +265,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
+  funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -996,6 +997,28 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'platform_services',
       settingsPath: CAPABILITY_DISPLAY.platform_services.settingsPath ?? null,
+    });
+  }
+
+  // Funnel Options
+  const fn = caps.funnel;
+  if (fn && fn.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (fn.canUseOrderBump) { specifics.push('Order Bump'); statuses.push({ label: 'Order Bump', status: 'enabled' }); }
+    if (fn.canUseUpsell) { specifics.push('Upsell'); statuses.push({ label: 'Upsell', status: 'enabled' }); }
+    if (fn.canUseDownsell) { specifics.push('Downsell'); statuses.push({ label: 'Downsell', status: 'enabled' }); }
+    if (fn.canUseOto) { specifics.push('One-Time Offer'); statuses.push({ label: 'One-Time Offer', status: 'enabled' }); }
+    summaries.push({
+      key: 'funnel_options',
+      label: CAPABILITY_DISPLAY.funnel_options.label,
+      icon: CAPABILITY_DISPLAY.funnel_options.icon,
+      enabled: fn.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'funnel_options',
+      settingsPath: CAPABILITY_DISPLAY.funnel_options.settingsPath ?? null,
     });
   }
 

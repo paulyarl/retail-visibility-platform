@@ -292,7 +292,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/tenant/crm/tasks/:taskId (status update only)
+// PUT /api/tenant/crm/tasks/:taskId (status and assignment updates)
 router.put('/tasks/:taskId', async (req: Request, res: Response) => {
   try {
     const tenantId = getTenantId(req);
@@ -305,12 +305,22 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
-    const { status } = req.body as { status?: string };
-    if (!status || !['pending', 'in_progress', 'completed', 'cancelled'].includes(status)) {
-      return res.status(400).json({ error: 'invalid_input', message: 'Valid status required' });
+    const { status, assigned_to } = req.body as { status?: string; assigned_to?: string };
+    const updateData: { status?: string; assigned_to?: string | null } = {};
+    if (status !== undefined) {
+      if (!['pending', 'in_progress', 'completed', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: 'invalid_input', message: 'Valid status required' });
+      }
+      updateData.status = status;
+    }
+    if (assigned_to !== undefined) {
+      updateData.assigned_to = assigned_to || null;
+    }
+    if (updateData.status === undefined && updateData.assigned_to === undefined) {
+      return res.status(400).json({ error: 'invalid_input', message: 'status or assigned_to required' });
     }
 
-    const task = await taskService.update(req.params.taskId, { status }, actorId, actorName, 'tenant');
+    const task = await taskService.update(req.params.taskId, updateData, actorId, actorName, 'tenant');
     await audit({ tenantId, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true, data: task });
   } catch (error) {
@@ -378,6 +388,8 @@ router.get('/activities', async (req: Request, res: Response) => {
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     const activities = await activityService.listByTenant(tenantId, {
       type: req.query.type as string,
+      ticketId: req.query.ticketId as string,
+      taskId: req.query.taskId as string,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
       isInternal: false, // Tenant users don't see internal notes by default
     });

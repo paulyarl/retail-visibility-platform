@@ -28,18 +28,26 @@ export function resolveStorefrontQr(
   const mainOn = enabled;
 
   // QR group — new keys with fallback to old storefront_opt_qr_* keys
+  // storefront_qr_enabled is the master enable (checked above), NOT a group-on key.
+  // Individual QR keys implicitly enable the group.
+  const hasAnyIndividualQRKey = !!(
+    features.storefront_qr_resolution_512 || features.storefront_qr_resolution_1024 || features.storefront_qr_resolution_2048
+    || features.storefront_qr_product || features.storefront_qr_store || features.storefront_qr_logo || features.storefront_qr_directory
+    || fallbackFeatures.storefront_opt_qr_codes_512 || fallbackFeatures.storefront_opt_qr_codes_1024 || fallbackFeatures.storefront_opt_qr_codes_2048
+    || fallbackFeatures.storefront_opt_qr_product || fallbackFeatures.storefront_opt_qr_store || fallbackFeatures.storefront_opt_qr_logo || fallbackFeatures.storefront_opt_qr_directory
+  );
   const qrGroupEnabled = flexible
     || !!features.storefront_qr_on || !!features.storefront_qr
-    || !!features.storefront_qr_enabled
     || !!fallbackFeatures.storefront_opt_qr_on
     || !!fallbackFeatures.storefront_opt_qr
-    || !!fallbackFeatures.storefront_opt_qr_enabled;
+    || !!fallbackFeatures.storefront_opt_qr_enabled
+    || hasAnyIndividualQRKey;
 
   // QR resolutions
   const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
   if (qrGroupEnabled) {
     if (flexible
-      || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+      || features.storefront_qr_on || features.storefront_qr
       || features.storefront_qr_resolution
       || fallbackFeatures.storefront_opt_qr_on || fallbackFeatures.storefront_opt_qr || fallbackFeatures.storefront_opt_qr_enabled
       || fallbackFeatures.storefront_opt_qr_resolution
@@ -56,7 +64,7 @@ export function resolveStorefrontQr(
   const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
   if (qrGroupEnabled) {
     if (flexible
-      || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+      || features.storefront_qr_on || features.storefront_qr
       || features.storefront_qr_content
       || fallbackFeatures.storefront_opt_qr_on || fallbackFeatures.storefront_opt_qr || fallbackFeatures.storefront_opt_qr_enabled
       || fallbackFeatures.storefront_opt_qr_content
@@ -140,16 +148,16 @@ export function resolveStorefrontQr(
     qr_enabled: mainOn && (qrGroupEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
     allowed_qr_resolutions: allowedQRResolutions,
     allowed_qr_content_types: allowedQRContentTypes,
-    qr_classic_enabled: mainOn && (flexible
+    qr_classic_enabled: mainOn && prefs.qr_classic_enabled && (flexible
       || !!features.storefront_qr_classic || !!features.storefront_qr_classic_on
-      || !!features.storefront_qr_enabled
+      || !!features.storefront_qr_on || !!features.storefront_qr
       || !!fallbackFeatures.storefront_opt_qr_on || !!fallbackFeatures.storefront_opt_qr
       || !!fallbackFeatures.storefront_opt_qr_enabled),
-    qr_styled_enabled: mainOn && showQRStyled,
+    qr_styled_enabled: mainOn && showQRStyled && prefs.qr_styled_enabled,
     allowed_qr_dot_styles: allowedQRDotStyles,
     allowed_qr_corner_styles: allowedQRCornerStyles,
-    qr_custom_colors: mainOn && qrCustomColors,
-    qr_gradients: mainOn && qrGradients,
+    qr_custom_colors: mainOn && qrCustomColors && prefs.qr_styled_enabled,
+    qr_gradients: mainOn && qrGradients && prefs.qr_styled_enabled,
     can_use_qr_codes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
     merchant_preferences: prefs,
   };

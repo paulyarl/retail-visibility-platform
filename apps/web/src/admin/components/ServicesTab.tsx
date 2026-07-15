@@ -145,12 +145,14 @@ export default function ServicesTab({ onError, onSuccess }: Props) {
       <ComplimentaryAccessForm
         open={showGrantDialog}
         onOpenChange={setShowGrantDialog}
+        entries={entries}
       />
 
       {/* Private Feature Grant QR Dialog */}
       <PrivateFeatureGrantDialog
         open={showGrantQRDialog}
         onClose={() => setShowGrantQRDialog(false)}
+        entries={entries}
       />
     </div>
   );

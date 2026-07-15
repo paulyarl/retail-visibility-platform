@@ -20,10 +20,11 @@ export class CrmActivityService extends BaseService {
   /**
    * List activities for a tenant
    */
-  async listByTenant(tenantId: string, filters: { type?: string; ticketId?: string; isInternal?: boolean; limit?: number } = {}) {
+  async listByTenant(tenantId: string, filters: { type?: string; ticketId?: string; taskId?: string; isInternal?: boolean; limit?: number } = {}) {
     const where: any = { tenant_id: tenantId };
     if (filters.type) where.activity_type = filters.type;
     if (filters.ticketId) where.ticket_id = filters.ticketId;
+    if (filters.taskId) where.task_id = filters.taskId;
     if (filters.isInternal === false) where.is_internal = false;
     return prisma.crm_activities.findMany({
       where,

@@ -14,10 +14,13 @@ This skill defines the canonical pattern for decoupling a capability domain from
 - A resolver reads merchant preferences from another domain's fields
 - A route queries another domain's table with a discriminator filter
 - You need to **retrofit a clean decouple** after a previous split left residual coupling
+- **Feature-key-level split variant**: A capability has its own feature keys (`storefront_maps_*`) but its merchant prefs are still columns on the parent's settings table (e.g., `interactive_maps`, `map_display`, `location_display` in `tenant_storefront_options_settings`). No `page_type` discriminator — the fields are just mixed into the parent table. The decouple pattern is the same: create a dedicated table, move the fields, clean up the parent. The Storefront Maps decouple (Phase 5) is a reference for this variant.
 
-## Reference Implementation
+## Reference Implementations
 
-The **Directory Entry Decouple Sprint** (`docs/DIRECTORY_ENTRY_DECOUPLE_SPRINT_PLAN.md`) is the reference implementation for this skill. It decouples Directory Entry from Storefront Options at the merchant gate layer.
+1. **Directory Entry Decouple Sprint** (`docs/DIRECTORY_ENTRY_DECOUPLE_SPRINT_PLAN.md`) — Decouples Directory Entry from Storefront Options at the merchant gate layer (page_type discriminator variant).
+
+2. **Storefront Maps Decouple (Phase 5)** — Decouples Maps from Storefront Options at the feature-key level (no page_type discriminator). Maps fields (`interactive_maps`, `map_display`, `location_display`) were directly in `StorefrontOptionsMerchantSettings` and `tenant_storefront_options_settings`. New table: `tenant_storefront_maps_settings`, new resolver: `StorefrontMapsResolver.ts`, new route: `storefront-maps-settings.ts`. Frontend: new `StorefrontMapsSettingsClient.tsx` page, `useStorefrontMapsCapability` hook, `StorefrontMapsState` in `CapabilityResolutionService.ts` + `UnifiedCapabilityService.ts`.
 
 ## The 10 Clean Decouple Principles
 

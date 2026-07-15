@@ -1290,6 +1290,11 @@ function buildMerchantSoftGates(bundle: MerchantSettingsBundle): Record<string, 
       layouts_enabled: bundle.storefrontLayouts.layouts_enabled ?? true,
     };
   }
+  if (bundle.storefrontMaps) {
+    gates.storefront_maps = {
+      maps_enabled: bundle.storefrontMaps.maps_enabled ?? true,
+    };
+  }
   if (bundle.wholesaleMatching) {
     gates.wholesale_matching = {
       wholesale_matching_enabled: bundle.wholesaleMatching.wholesale_matching_enabled ?? true,

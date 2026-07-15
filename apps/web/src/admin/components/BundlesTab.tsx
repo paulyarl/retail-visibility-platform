@@ -314,12 +314,14 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
       <ComplimentaryAccessForm
         open={showGrantDialog}
         onOpenChange={setShowGrantDialog}
+        bundles={bundles}
       />
 
       {/* Private Feature Grant QR Dialog */}
       <PrivateFeatureGrantDialog
         open={showGrantQRDialog}
         onClose={() => setShowGrantQRDialog(false)}
+        bundles={bundles}
       />
 
       {/* Delete Confirmation */}

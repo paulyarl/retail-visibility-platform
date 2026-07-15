@@ -229,6 +229,17 @@ class CrmTenantCrmService extends TenantApiSingleton {
       { method: 'PUT', body: JSON.stringify({ status }) },
       undefined
     );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTask>(result);
+  }
+
+  async updateTask(taskId: string, data: { status?: TaskStatus; assigned_to?: string | null }): Promise<CrmTask> {
+    const result = await this.makeDefaultRequest<CrmTask>(
+      `/api/tenant/crm/tasks/${taskId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      undefined
+    );
+    await this.invalidateServiceCaches();
     return this.unwrap<CrmTask>(result);
   }
 
@@ -254,7 +265,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
   }
 
   // --- Activities ---
-  async listActivities(filters?: { limit?: number }): Promise<CrmActivity[]> {
+  async listActivities(filters?: { limit?: number; ticketId?: string; taskId?: string }): Promise<CrmActivity[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)] as [string, string])
     ).toString() : '';

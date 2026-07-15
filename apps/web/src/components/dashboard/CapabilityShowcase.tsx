@@ -30,8 +30,10 @@ import {
   Wrench,
   Image,
   Clock,
+  Map,
   ChevronDown,
   ChevronUp,
+  Filter,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -195,6 +197,15 @@ export default function CapabilityShowcase({
     if (sh?.canUseAnimatedHours) shDetailParts.push('Animated');
     if (sh?.canShowHoursStatus) shDetailParts.push('Status');
 
+    // --- Storefront Maps ---
+    const sm = cap.storefrontMaps;
+    const smTier = sm?.enabled ?? false;
+    const smMerchantGated = smTier && !sm?.canUseInteractiveMaps;
+    const smDetailParts: string[] = [];
+    if (sm?.canUseInteractiveMaps) smDetailParts.push('Interactive');
+    if (sm?.canShowMapDisplay) smDetailParts.push('Map Display');
+    if (sm?.canShowLocationDisplay) smDetailParts.push('Location');
+
     // --- FAQ Options ---
     // FAQ only has a master toggle merchant pref (faq_enabled), no per-feature merchant prefs.
     // So there is no per-feature merchant gating — badge is either Enabled or Off.
@@ -291,6 +302,16 @@ export default function CapabilityShowcase({
     if (wm?.canSearchFaire) wmDetailParts.push('Faire Search');
     if (wm?.canBuildAffiliateLink) wmDetailParts.push('Affiliate Links');
     if (wm?.canViewBrandPartners) wmDetailParts.push('Brand Partners');
+
+    // --- Funnel Options ---
+    const fn = cap.funnel;
+    const fnTier = fn?.enabled ?? false;
+    const fnBuilderEnabled = fn?.builderEnabled ?? false;
+    const fnDetailParts: string[] = [];
+    if (fn?.canUseOrderBump) fnDetailParts.push('Order Bump');
+    if (fn?.canUseUpsell) fnDetailParts.push('Upsell');
+    if (fn?.canUseDownsell) fnDetailParts.push('Downsell');
+    if (fn?.canUseOto) fnDetailParts.push('OTO');
 
     return [
       {
@@ -462,6 +483,18 @@ export default function CapabilityShowcase({
         constraintWarning: getConstraintWarning('storefront_hours'),
       },
       {
+        key: "storefrontMaps",
+        label: "Storefront Maps",
+        icon: <Map className="w-4 h-4" />,
+        enabled: smTier && (sm?.canUseInteractiveMaps ?? false),
+        status: getStatus(smTier, smMerchantGated),
+        detail: smTier
+          ? (smDetailParts.length > 0 ? smDetailParts.join(', ') : 'Available')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/storefront-maps`,
+        constraintWarning: getConstraintWarning('storefront_maps'),
+      },
+      {
         key: "quickstartOptions",
         label: "Quick Start",
         icon: <Rocket className="w-4 h-4" />,
@@ -573,6 +606,18 @@ export default function CapabilityShowcase({
           ? (psDetailParts.length > 0 ? psDetailParts.join(', ') : 'Available')
           : "No services purchased",
         settingsLink: `/t/${tenantId}/settings/feature-store`,
+      },
+      {
+        key: "funnel",
+        label: "Sales Funnels",
+        icon: <Filter className="w-4 h-4" />,
+        enabled: fnTier && fnBuilderEnabled,
+        status: fnTier && fnBuilderEnabled ? "enabled" : "tier-gated",
+        detail: fnTier && fnBuilderEnabled
+          ? (fnDetailParts.length > 0 ? fnDetailParts.join(', ') : 'Builder ready')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/funnels`,
+        constraintWarning: getConstraintWarning('funnel'),
       },
     ];
   }, [capabilities, tenantId]);

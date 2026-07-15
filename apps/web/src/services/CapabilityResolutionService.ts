@@ -793,6 +793,21 @@ export interface PlatformServicesState {
   isFlexible: boolean;
 }
 
+// --- Funnel Options ---
+
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+
+export interface FunnelState {
+  enabled: boolean;
+  builderEnabled: boolean;
+  allowedSteps: FunnelStepType[];
+  canUseOrderBump: boolean;
+  canUseUpsell: boolean;
+  canUseDownsell: boolean;
+  canUseOto: boolean;
+  isFlexible: boolean;
+}
+
 // --- Chatbot Options ---
 
 export type ChatbotResponseEngineType =
@@ -1042,6 +1057,7 @@ export interface AllCapabilitiesState {
   directoryPromotion: DirectoryPromotionState;
   wholesaleMatching: WholesaleMatchingState;
   platformServices: PlatformServicesState;
+  funnel: FunnelState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -1080,6 +1096,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   wholesale_: 'wholesale_matching',
   platform_service_: 'platform_services',
   platform_services_: 'platform_services',
+  funnel_options_: 'funnel_options',
+  funnel_: 'funnel_options',
 };
 
 /**
@@ -2632,6 +2650,43 @@ export function resolveCrmOptionsState(
     crmAvailable: enabled && !disabled && allTypes.length > 0,
     merchantPreferences: null,
     features: cleanFeatures,
+  };
+}
+
+/**
+ * Resolve funnel options state from raw capability features.
+ * Feature prefix: funnel_options_
+ */
+export function resolveFunnelState(
+  features: Record<string, boolean>
+): FunnelState {
+  const disabled = !!features.funnel_options_disabled;
+  const enabled = !disabled && (!!features.funnel_options_enabled || !!features.funnel_options_builder_on);
+  const flexible = !!features.funnel_options_flexible;
+  const builderOn = !disabled && (!!features.funnel_options_builder_on || flexible);
+  const builderOff = !!features.funnel_options_builder_off;
+  const builderEnabled = enabled && builderOn && !builderOff;
+
+  const allowedSteps: FunnelStepType[] = [];
+  const canUseOrderBump = builderEnabled && (flexible || !!features.funnel_options_builder_order_bump);
+  const canUseUpsell = builderEnabled && (flexible || !!features.funnel_options_builder_upsell);
+  const canUseDownsell = builderEnabled && (flexible || !!features.funnel_options_builder_downsell);
+  const canUseOto = builderEnabled && (flexible || !!features.funnel_options_builder_oto);
+
+  if (canUseOrderBump) allowedSteps.push('order_bump');
+  if (canUseUpsell) allowedSteps.push('upsell');
+  if (canUseDownsell) allowedSteps.push('downsell');
+  if (canUseOto) allowedSteps.push('oto');
+
+  return {
+    enabled,
+    builderEnabled,
+    allowedSteps,
+    canUseOrderBump,
+    canUseUpsell,
+    canUseDownsell,
+    canUseOto,
+    isFlexible: flexible,
   };
 }
 
