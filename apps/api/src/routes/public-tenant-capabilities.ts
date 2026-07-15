@@ -335,6 +335,15 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_layout_immersive: false,
         merchant_preferences: {},
       },
+      storefront_maps: {
+        enabled: false,
+        is_flexible: false,
+        maps_enabled: false,
+        can_show_map_display: false,
+        can_show_location_display: false,
+        can_use_interactive_maps: false,
+        merchant_preferences: {},
+      },
       directory_entry: {
         enabled: false,
         is_flexible: false,

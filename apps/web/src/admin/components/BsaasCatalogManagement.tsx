@@ -11,8 +11,10 @@ import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import BsaasFeaturesTab from './BsaasFeaturesTab';
 import BundlesTab from './BundlesTab';
+import ServicesTab from './ServicesTab';
+import GrantsTab from './GrantsTab';
 
-type TabKey = 'features' | 'bundles';
+type TabKey = 'features' | 'bundles' | 'services' | 'grants';
 
 export default function BsaasCatalogManagement() {
   const [activeTab, setActiveTab] = useState<TabKey>('features');
@@ -76,13 +78,37 @@ export default function BsaasCatalogManagement() {
         >
           Bundles
         </button>
+        <button
+          onClick={() => setActiveTab('services')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'services'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-neutral-500 hover:text-neutral-700'
+          }`}
+        >
+          Services
+        </button>
+        <button
+          onClick={() => setActiveTab('grants')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'grants'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-neutral-500 hover:text-neutral-700'
+          }`}
+        >
+          Grants
+        </button>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'features' ? (
         <BsaasFeaturesTab onError={handleError} onSuccess={handleSuccess} />
-      ) : (
+      ) : activeTab === 'bundles' ? (
         <BundlesTab onError={handleError} onSuccess={handleSuccess} />
+      ) : activeTab === 'services' ? (
+        <ServicesTab onError={handleError} onSuccess={handleSuccess} />
+      ) : (
+        <GrantsTab onError={handleError} onSuccess={handleSuccess} />
       )}
     </div>
   );

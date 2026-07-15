@@ -202,6 +202,8 @@ import debugCookiesRoutes from '../routes/debug-cookies';
 import faqRoutes from '../routes/faq';
 import faqPublicRoutes from '../routes/faq-public';
 import tierConfigRoutes from '../routes/tier-config';
+import funnelRoutes from '../routes/funnel';
+import funnelCheckoutRoutes from '../routes/funnel-checkout';
 
 // Inline handler route files (extracted from index.ts)
 import inlineAuthRbacRoutes from '../routes/inline-auth-rbac';
@@ -1210,6 +1212,20 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Badge analytics at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events',
+  },
+  {
+    path: '/api',
+    router: funnelRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Funnel tenant CRUD at /api/tenants/:tenantId/funnels',
+  },
+  {
+    path: '/api',
+    router: funnelCheckoutRoutes,
+    domain: 'misc',
+    authLevel: 'public',
+    comment: 'Funnel checkout routes at /api/public/funnels/:tenantId/*',
   },
 
   // ── Permissions ──────────────────────────────────────────────────────

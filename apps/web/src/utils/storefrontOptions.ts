@@ -37,7 +37,7 @@ export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior'
 export const HOURS_TYPES: StorefrontOptHoursType[] = ['hours_animated', 'hours_status'];
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
 export const RECOMMEND_TYPES: StorefrontOptRecommendType[] = ['recommend_store', 'recommend_products'];
-export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact', 'interactive_maps'];
+export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact'];
 export const QR_RESOLUTION_TYPES: StorefrontOptQRResolutionType[] = ['qr_codes_512', 'qr_codes_1024', 'qr_codes_2048'];
 export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr_store', 'qr_logo', 'qr_directory'];
 export const GALLERY_TYPES: StorefrontOptGalleryType[] = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'];
@@ -110,7 +110,6 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   // Store Information
   storefront_social_media: { key: 'storefront_social_media', label: 'Social Media Links', description: 'Social media links on storefront', group: 'info', icon: '🔗', color: 'cyan', selectionMode: 'toggle' },
   storefront_contact: { key: 'storefront_contact', label: 'Contact Info', description: 'Contact information on storefront', group: 'info', icon: '📞', color: 'sky', selectionMode: 'toggle' },
-  interactive_maps: { key: 'interactive_maps', label: 'Interactive Maps', description: 'Embedded interactive map on storefront', group: 'info', icon: '🗺️', color: 'emerald', selectionMode: 'toggle' },
   // QR Code Display — Resolution (multi select)
   qr_codes_512: { key: 'qr_codes_512', label: 'QR 512px', description: '512px QR code resolution (standard)', group: 'qr', icon: '📱', color: 'slate', selectionMode: 'multi' },
   qr_codes_1024: { key: 'qr_codes_1024', label: 'QR 1024px', description: '1024px QR code resolution (high)', group: 'qr', icon: '📱', color: 'gray', selectionMode: 'multi' },
@@ -181,7 +180,7 @@ export const STOREFRONT_OPT_GROUPS: StorefrontOptGroupMeta[] = [
   { key: 'category', label: 'Category Display', description: 'Category navigation and badges', icon: '🏷️', color: 'purple' },
   { key: 'recommend', label: 'Recommendation Display', description: 'Recommended content sections', icon: '⭐', color: 'amber' },
   { key: 'behavior', label: 'User Behavior', description: 'User tracking and behavior features', icon: '👁️', color: 'teal' },
-  { key: 'info', label: 'Store Information', description: 'Contact, social, and map display', icon: 'ℹ️', color: 'cyan' },
+  { key: 'info', label: 'Store Information', description: 'Contact and social links', icon: 'ℹ️', color: 'cyan' },
   { key: 'qr', label: 'QR Code Display', description: 'QR code generation and display options', icon: '📱', color: 'indigo' },
   { key: 'gallery', label: 'Gallery Display', description: 'Image gallery limits', icon: '🖼️', color: 'orange' },
   { key: 'advanced', label: 'Advanced', description: 'Advanced storefront features', icon: '⚡', color: 'lime' },
@@ -237,7 +236,6 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (state.canUseRecentlyViewed) effective.push('recently_viewed');
   if (state.canUseSocialMedia) effective.push('storefront_social_media');
   if (state.canUseContact) effective.push('storefront_contact');
-  if (state.canUseInteractiveMaps) effective.push('interactive_maps');
   if (state.canUseEnhancedSEO) effective.push('enhanced_seo');
   if (state.canUseStorefrontActions) effective.push('storefront_actions');
 

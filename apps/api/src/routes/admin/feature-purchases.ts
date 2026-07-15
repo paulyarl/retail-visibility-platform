@@ -286,6 +286,85 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/feature-purchases/grants — list all grant tokens with claims
+router.get('/grants', async (req: Request, res: Response) => {
+  try {
+    const { featureKey, tenantId, status } = req.query;
+
+    const where: any = {};
+    if (featureKey) where.feature_key = featureKey as string;
+    if (tenantId) where.tenant_id = tenantId as string;
+
+    const grants = await prisma.bsaas_grant_tokens.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      include: {
+        bsaas_grant_token_claims: {
+          orderBy: { claimed_at: 'desc' },
+        },
+      },
+    });
+
+    // Enrich with feature + tenant names
+    const featureKeys = [...new Set(grants.map((g) => g.feature_key))];
+    const tenantIds = [...new Set(grants.map((g) => g.tenant_id).filter(Boolean) as string[])];
+
+    const [features, tenants] = await Promise.all([
+      prisma.features_list.findMany({
+        where: { key: { in: featureKeys } },
+        select: { key: true, name: true, marketing_name: true },
+      }),
+      prisma.tenants.findMany({
+        where: { id: { in: tenantIds } },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    const featureMap = new Map(features.map((f) => [f.key, f]));
+    const tenantMap = new Map(tenants.map((t) => [t.id, t]));
+
+    const enriched = grants.map((g) => {
+      const qrExpired = new Date(g.qr_expires_at).getTime() < Date.now();
+      const claimsExhausted = g.claims_count >= g.max_claims;
+      let grantStatus: 'active' | 'expired' | 'fully_claimed' | 'inactive' = 'active';
+      if (qrExpired) grantStatus = 'expired';
+      else if (claimsExhausted) grantStatus = 'fully_claimed';
+
+      if (status && grantStatus !== status) return null;
+
+      const feature = featureMap.get(g.feature_key);
+      const tenant = g.tenant_id ? tenantMap.get(g.tenant_id) : null;
+
+      return {
+        id: g.id,
+        feature_key: g.feature_key,
+        feature_name: feature?.marketing_name || feature?.name || g.feature_key,
+        tenant_id: g.tenant_id,
+        tenant_name: tenant?.name || null,
+        duration_days: g.duration_days,
+        granted_by: g.granted_by,
+        max_claims: g.max_claims,
+        claims_count: g.claims_count,
+        qr_expires_at: g.qr_expires_at.toISOString(),
+        created_at: g.created_at.toISOString(),
+        updated_at: g.updated_at.toISOString(),
+        status: grantStatus,
+        claims: g.bsaas_grant_token_claims.map((c) => ({
+          id: c.id,
+          tenant_id: c.tenant_id,
+          tenant_name: tenantMap.get(c.tenant_id)?.name || null,
+          claimed_at: c.claimed_at.toISOString(),
+        })),
+      };
+    }).filter(Boolean);
+
+    res.json({ success: true, data: enriched });
+  } catch (error) {
+    console.error('[FeaturePurchases] Error listing grants:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list grant tokens' });
+  }
+});
+
 // ====================
 // Phase 4: Grant Token QR Codes for Private Features
 // ====================

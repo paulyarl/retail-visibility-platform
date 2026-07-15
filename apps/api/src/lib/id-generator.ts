@@ -1176,6 +1176,16 @@ export function generateStorefrontLayoutsSettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate storefront maps settings ID
+ * Format: sms-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontMapsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sms-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate storefront type settings ID
  * Format: sts-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -1476,4 +1486,34 @@ export function generateGrantTokenId(): string {
 export function generateGrantClaimId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `gclm-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate sales funnel ID (tenant-scoped)
+ * Format: funnel-{tenantKey}-{nanoid} (20 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFunnelId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `funnel-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate funnel step ID (tenant-scoped)
+ * Format: fstep-{tenantKey}-{nanoid} (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFunnelStepId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fstep-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate funnel event ID (tenant-scoped)
+ * Format: fevt-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFunnelEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fevt-${generateTenantKey(tenantId)}-${nanoid()}`;
 }

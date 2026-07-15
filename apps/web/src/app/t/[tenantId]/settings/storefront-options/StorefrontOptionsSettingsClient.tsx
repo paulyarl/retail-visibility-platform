@@ -22,7 +22,6 @@ interface StorefrontOptionsSettings {
   recently_viewed: boolean;
   storefront_social_media: boolean;
   storefront_contact: boolean;
-  interactive_maps: boolean;
   qr_codes_512: boolean;
   qr_codes_1024: boolean;
   qr_codes_2048: boolean;
@@ -63,7 +62,6 @@ const DEFAULT_SETTINGS: StorefrontOptionsSettings = {
   recently_viewed: true,
   storefront_social_media: true,
   storefront_contact: true,
-  interactive_maps: true,
   qr_codes_512: false,
   qr_codes_1024: true,
   qr_codes_2048: false,
@@ -113,7 +111,7 @@ function getQuickActions(settings: StorefrontOptionsSettings, tenantId: string):
     });
   }
 
-  if (settings.storefront_social_media || settings.storefront_contact || settings.interactive_maps) {
+  if (settings.storefront_social_media || settings.storefront_contact) {
     actions.push({
       id: 'tenant',
       label: 'Tenant Profile',
@@ -456,19 +454,6 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
                 <Switch
                   checked={settings.storefront_contact}
                   onCheckedChange={() => handleToggle('storefront_contact')}
-                  disabled={!settings.storefront_opt_enabled}
-                />
-              </div>
-            )}
-            {cap?.allowedInfoTypes.includes('interactive_maps') && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Interactive Maps</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Embedded interactive map on storefront</p>
-                </div>
-                <Switch
-                  checked={settings.interactive_maps}
-                  onCheckedChange={() => handleToggle('interactive_maps')}
                   disabled={!settings.storefront_opt_enabled}
                 />
               </div>

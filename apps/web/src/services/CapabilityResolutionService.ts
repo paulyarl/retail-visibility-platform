@@ -442,7 +442,7 @@ export interface IntegrationOptionsState {
 
 export type StorefrontOptCategoryType = 'category_store' | 'category_product';
 export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
-export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
+export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 
 // Dedicated domain types (kept for StorefrontQrState, StorefrontGalleryState, StorefrontHoursState, StorefrontLayoutState)
@@ -474,8 +474,6 @@ export interface StorefrontOptionsState {
   advancedEnabled: boolean;
   allowedAdvancedTypes: StorefrontOptAdvancedType[];
   // Convenience flags
-  canShowMapDisplay: boolean;
-  canShowLocationDisplay: boolean;
   canUseCategoryStore: boolean;
   canUseCategoryProduct: boolean;
   canUseRecommendStore: boolean;
@@ -483,14 +481,11 @@ export interface StorefrontOptionsState {
   canUseRecentlyViewed: boolean;
   canUseSocialMedia: boolean;
   canUseContact: boolean;
-  canUseInteractiveMaps: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
   /** Merchant preference toggles */
   merchantPreferences: {
     storefront_opt_enabled: boolean;
-    map_display: boolean;
-    location_display: boolean;
     category_store: boolean;
     category_product: boolean;
     recommend_store: boolean;
@@ -498,7 +493,6 @@ export interface StorefrontOptionsState {
     recently_viewed: boolean;
     storefront_social_media: boolean;
     storefront_contact: boolean;
-    interactive_maps: boolean;
     enhanced_seo: boolean;
     storefront_actions: boolean;
   };
@@ -559,8 +553,8 @@ export function toStorefrontOptionFlags(state: StorefrontOptionsState): Storefro
     showHoursDisplay: false,
     showAnimatedHours: false,
     showHoursStatus: false,
-    showMapDisplay: state.canShowMapDisplay,
-    showLocationDisplay: state.canShowLocationDisplay,
+    showMapDisplay: false,
+    showLocationDisplay: false,
     showCategoryStore: state.canUseCategoryStore,
     showCategoryProduct: state.canUseCategoryProduct,
     showRecommendStore: state.canUseRecommendStore,
@@ -568,7 +562,7 @@ export function toStorefrontOptionFlags(state: StorefrontOptionsState): Storefro
     showRecentlyViewed: state.canUseRecentlyViewed,
     showSocialMedia: state.canUseSocialMedia,
     showContact: state.canUseContact,
-    showInteractiveMaps: state.canUseInteractiveMaps,
+    showInteractiveMaps: false,
     showQRCodes: false,
     showQRProduct: false,
     showQRStore: false,
@@ -1003,6 +997,22 @@ export interface StorefrontLayoutState {
   features: Record<string, boolean>;
 }
 
+export interface StorefrontMapsState {
+  enabled: boolean;
+  isFlexible: boolean;
+  mapsEnabled: boolean;
+  canShowMapDisplay: boolean;
+  canShowLocationDisplay: boolean;
+  canUseInteractiveMaps: boolean;
+  merchantPreferences: {
+    maps_enabled: boolean;
+    interactive_maps: boolean;
+    map_display: boolean;
+    location_display: boolean;
+  };
+  features: Record<string, boolean>;
+}
+
 export interface AllCapabilitiesState {
   tierKey: string;
   tierName: string;
@@ -1023,6 +1033,7 @@ export interface AllCapabilitiesState {
   storefrontGallery: StorefrontGalleryState;
   storefrontHours: StorefrontHoursState;
   storefrontLayouts: StorefrontLayoutState;
+  storefrontMaps: StorefrontMapsState;
   directoryEntryOptions: DirectoryEntryOptionsState;
   faqOptions: FaqOptionsState;
   crmOptions: CrmOptionsState;
@@ -1049,6 +1060,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   storefront_gallery_: 'storefront_gallery',
   storefront_hours_: 'storefront_hours',
   storefront_layouts_: 'storefront_layouts',
+  storefront_maps_: 'storefront_maps',
   storefront_opt_: 'storefront_options',
   storefront_: 'storefront_types',
   barcode_: 'barcode_scan_options',
@@ -2057,8 +2069,6 @@ export function resolveStorefrontOptionsState(
   features: Record<string, boolean>,
   merchantPrefs?: {
     storefront_opt_enabled?: boolean;
-    map_display?: boolean;
-    location_display?: boolean;
     category_store?: boolean;
     category_product?: boolean;
     recommend_store?: boolean;
@@ -2066,7 +2076,6 @@ export function resolveStorefrontOptionsState(
     recently_viewed?: boolean;
     storefront_social_media?: boolean;
     storefront_contact?: boolean;
-    interactive_maps?: boolean;
     enhanced_seo?: boolean;
     storefront_actions?: boolean;
   } | null
@@ -2080,8 +2089,6 @@ export function resolveStorefrontOptionsState(
   // Merchant preferences (soft toggle, defaults to true if not set)
   const prefs = {
     storefront_opt_enabled: merchantPrefs?.storefront_opt_enabled !== false,
-    map_display: merchantPrefs?.map_display !== false,
-    location_display: merchantPrefs?.location_display !== false,
     category_store: merchantPrefs?.category_store !== false,
     category_product: merchantPrefs?.category_product !== false,
     recommend_store: merchantPrefs?.recommend_store !== false,
@@ -2089,7 +2096,6 @@ export function resolveStorefrontOptionsState(
     recently_viewed: merchantPrefs?.recently_viewed !== false,
     storefront_social_media: merchantPrefs?.storefront_social_media !== false,
     storefront_contact: merchantPrefs?.storefront_contact !== false,
-    interactive_maps: merchantPrefs?.interactive_maps !== false,
     enhanced_seo: merchantPrefs?.enhanced_seo ?? false,
     storefront_actions: merchantPrefs?.storefront_actions ?? false,
   };
@@ -2118,8 +2124,7 @@ export function resolveStorefrontOptionsState(
 
   // --- Section Display (standalone, no group gate) ---
   const infoTierAllowed = flexible || !!features.storefront_opt_info || !!features.storefront_opt_info_on || !!features.storefront_opt_info_enabled
-    || !!features.storefront_opt_storefront_social_media || !!features.storefront_opt_storefront_contact
-    || !!features.storefront_opt_interactive_maps || !!features.storefront_opt_map_display || !!features.storefront_opt_location_display;
+    || !!features.storefront_opt_storefront_social_media || !!features.storefront_opt_storefront_contact;
 
   // --- User Behavior (standalone, no group gate) ---
   const recentlyViewedTierAllowed = flexible || !!features.storefront_opt_recently_viewed;
@@ -2127,13 +2132,12 @@ export function resolveStorefrontOptionsState(
   // --- Info: consolidated key (new) with fallback to old group gate + individual keys ---
   const allowedInfoTypes: StorefrontOptInfoType[] = [];
   if (flexible || features.storefront_opt_info || features.storefront_opt_info_on) {
-    allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+    allowedInfoTypes.push('storefront_social_media', 'storefront_contact');
   } else if ((features.storefront_opt_info_on || features.storefront_opt_info_enabled) && !(features.storefront_opt_info_off || features.storefront_opt_info_disabled)) {
-    allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+    allowedInfoTypes.push('storefront_social_media', 'storefront_contact');
   } else {
     if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
     if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
-    if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
   }
 
   // --- Advanced: individual features (group gate removed, fallback to old group gate) ---
@@ -2156,8 +2160,6 @@ export function resolveStorefrontOptionsState(
   const effectiveRecommendTypes = prefs.storefront_opt_enabled
     ? allowedRecommendTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
     : [];
-  const effectiveMapDisplay = prefs.storefront_opt_enabled && infoTierAllowed && prefs.map_display;
-  const effectiveLocationDisplay = prefs.storefront_opt_enabled && infoTierAllowed && prefs.location_display;
   const effectiveRecentlyViewed = prefs.storefront_opt_enabled && recentlyViewedTierAllowed && prefs.recently_viewed;
   const effectiveInfoTypes = prefs.storefront_opt_enabled
     ? allowedInfoTypes.filter(t => prefs[`${t}` as keyof typeof prefs] !== false)
@@ -2178,8 +2180,6 @@ export function resolveStorefrontOptionsState(
     allowedInfoTypes,
     advancedEnabled: mainOn && allowedAdvancedTypes.length > 0,
     allowedAdvancedTypes,
-    canShowMapDisplay: mainOn && effectiveMapDisplay,
-    canShowLocationDisplay: mainOn && effectiveLocationDisplay,
     canUseCategoryStore: mainOn && effectiveCategoryTypes.includes('category_store'),
     canUseCategoryProduct: mainOn && effectiveCategoryTypes.includes('category_product'),
     canUseRecommendStore: mainOn && effectiveRecommendTypes.includes('recommend_store'),
@@ -2187,7 +2187,6 @@ export function resolveStorefrontOptionsState(
     canUseRecentlyViewed: mainOn && effectiveRecentlyViewed,
     canUseSocialMedia: mainOn && effectiveInfoTypes.includes('storefront_social_media'),
     canUseContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
-    canUseInteractiveMaps: mainOn && effectiveInfoTypes.includes('interactive_maps'),
     canUseEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
     canUseStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
     merchantPreferences: prefs,
@@ -2249,6 +2248,66 @@ export function resolveStorefrontLayoutState(
     canUseLayoutClassic: mainOn && allowedLayouts.includes('classic'),
     canUseLayoutEditorial: mainOn && allowedLayouts.includes('editorial'),
     canUseLayoutImmersive: mainOn && allowedLayouts.includes('immersive'),
+    merchantPreferences: prefs,
+    features,
+  };
+}
+
+/**
+ * Resolve storefront maps state from raw capability features + merchant preferences.
+ * New namespace: storefront_maps_* with fallback to old storefront_opt_* keys.
+ */
+export function resolveStorefrontMapsState(
+  features: Record<string, boolean>,
+  merchantPrefs?: {
+    maps_enabled?: boolean;
+    interactive_maps?: boolean;
+    map_display?: boolean;
+    location_display?: boolean;
+  } | null,
+  fallbackFeatures?: Record<string, boolean>,
+): StorefrontMapsState {
+  const fb = fallbackFeatures || {};
+  const disabled = !!features.storefront_maps_disabled || !!fb.storefront_opt_disabled;
+  const enabled = !disabled && (!!features.storefront_maps_enabled || !!fb.storefront_opt_enabled);
+  const flexible = !!features.storefront_maps_flexible || !!fb.storefront_opt_flexible;
+  const mainOn = enabled;
+
+  const mapsGroupEnabled = flexible
+    || !!features.storefront_maps_on || !!features.storefront_maps
+    || !!features.storefront_maps_interactive
+    || !!features.storefront_maps_display
+    || !!features.storefront_maps_location
+    || !!fb.storefront_opt_interactive_maps
+    || !!fb.storefront_opt_map_display
+    || !!fb.storefront_opt_location_display;
+
+  const interactiveMapsTierAllowed = flexible
+    || !!features.storefront_maps_interactive
+    || !!fb.storefront_opt_interactive_maps;
+
+  const mapDisplayTierAllowed = flexible
+    || !!features.storefront_maps_display
+    || !!fb.storefront_opt_map_display;
+
+  const locationDisplayTierAllowed = flexible
+    || !!features.storefront_maps_location
+    || !!fb.storefront_opt_location_display;
+
+  const prefs = {
+    maps_enabled: merchantPrefs?.maps_enabled !== false,
+    interactive_maps: merchantPrefs?.interactive_maps !== false,
+    map_display: merchantPrefs?.map_display !== false,
+    location_display: merchantPrefs?.location_display !== false,
+  };
+
+  return {
+    enabled: mainOn,
+    isFlexible: flexible,
+    mapsEnabled: mainOn && mapsGroupEnabled,
+    canShowMapDisplay: mainOn && mapDisplayTierAllowed && prefs.map_display,
+    canShowLocationDisplay: mainOn && locationDisplayTierAllowed && prefs.location_display,
+    canUseInteractiveMaps: mainOn && interactiveMapsTierAllowed && prefs.interactive_maps,
     merchantPreferences: prefs,
     features,
   };

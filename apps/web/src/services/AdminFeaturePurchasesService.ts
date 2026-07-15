@@ -50,6 +50,30 @@ export interface CreateGrantTokenInput {
   qr_expiry_hours?: number;
 }
 
+export interface GrantClaim {
+  id: string;
+  tenant_id: string;
+  tenant_name: string | null;
+  claimed_at: string;
+}
+
+export interface GrantToken {
+  id: string;
+  feature_key: string;
+  feature_name: string;
+  tenant_id: string | null;
+  tenant_name: string | null;
+  duration_days: number | null;
+  granted_by: string;
+  max_claims: number;
+  claims_count: number;
+  qr_expires_at: string;
+  created_at: string;
+  updated_at: string;
+  status: 'active' | 'expired' | 'fully_claimed' | 'inactive';
+  claims: GrantClaim[];
+}
+
 class AdminFeaturePurchasesService extends AdminApiSingleton {
   private static instance: AdminFeaturePurchasesService;
 
@@ -98,6 +122,32 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
     await this.invalidateCachePattern('admin-feature-purchases');
     const data = (result.data as any)?.data || result.data;
     return data;
+  }
+
+  async listGrants(filters?: { featureKey?: string; tenantId?: string; status?: string }): Promise<GrantToken[]> {
+    const params = new URLSearchParams();
+    params.set('action', 'grants');
+    if (filters?.featureKey) params.set('featureKey', filters.featureKey);
+    if (filters?.tenantId) params.set('tenantId', filters.tenantId);
+    if (filters?.status) params.set('status', filters.status);
+    const qs = params.toString();
+
+    const result = await this.makeDefaultRequest<GrantToken[]>(
+      `/api/admin/feature-purchases?${qs}`,
+      {},
+      'admin-feature-purchases-grants',
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch grant tokens');
+    }
+    const data = result.data;
+    const actualData = Array.isArray(data) ? data : (data as any)?.data;
+    return Array.isArray(actualData) ? actualData : [];
+  }
+
+  async invalidateGrantsCache(): Promise<void> {
+    await this.invalidateCachePattern('admin-feature-purchases-grants');
   }
 
   async createGrantToken(input: CreateGrantTokenInput): Promise<GrantTokenData> {

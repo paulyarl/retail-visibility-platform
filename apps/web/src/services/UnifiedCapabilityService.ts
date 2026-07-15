@@ -29,6 +29,7 @@ import {
   StorefrontHoursState,
   StorefrontLayoutState,
   StorefrontLayoutType,
+  StorefrontMapsState,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
   DirectoryEntryOptionsState,
@@ -139,6 +140,7 @@ interface BackendEffectiveCapabilities {
     storefront_gallery: BackendEffectiveStorefrontGallery;
     storefront_hours: BackendEffectiveStorefrontHours;
     storefront_layouts: BackendEffectiveStorefrontLayouts;
+    storefront_maps: BackendEffectiveStorefrontMaps;
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
@@ -333,8 +335,6 @@ interface BackendEffectiveStorefrontOptions {
   allowed_info_types: StorefrontOptInfoType[];
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
-  can_show_map_display: boolean;
-  can_show_location_display: boolean;
   can_use_category_store: boolean;
   can_use_category_product: boolean;
   can_use_recommend_store: boolean;
@@ -342,7 +342,6 @@ interface BackendEffectiveStorefrontOptions {
   can_use_recently_viewed: boolean;
   can_use_social_media: boolean;
   can_use_contact: boolean;
-  can_use_interactive_maps: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
   merchant_preferences: Record<string, any>;
@@ -357,6 +356,16 @@ interface BackendEffectiveStorefrontLayouts {
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontMaps {
+  enabled: boolean;
+  is_flexible: boolean;
+  maps_enabled: boolean;
+  can_show_map_display: boolean;
+  can_show_location_display: boolean;
+  can_use_interactive_maps: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -756,8 +765,6 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     allowedInfoTypes: b.allowed_info_types,
     advancedEnabled: b.advanced_enabled,
     allowedAdvancedTypes: b.allowed_advanced_types,
-    canShowMapDisplay: b.can_show_map_display,
-    canShowLocationDisplay: b.can_show_location_display,
     canUseCategoryStore: b.can_use_category_store,
     canUseCategoryProduct: b.can_use_category_product,
     canUseRecommendStore: b.can_use_recommend_store,
@@ -765,7 +772,6 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseRecentlyViewed: b.can_use_recently_viewed,
     canUseSocialMedia: b.can_use_social_media,
     canUseContact: b.can_use_contact,
-    canUseInteractiveMaps: b.can_use_interactive_maps,
     canUseEnhancedSEO: b.can_use_enhanced_seo,
     canUseStorefrontActions: b.can_use_storefront_actions,
     merchantPreferences: b.merchant_preferences as any,
@@ -783,6 +789,19 @@ function mapStorefrontLayouts(b: BackendEffectiveStorefrontLayouts): StorefrontL
     canUseLayoutClassic: b.can_use_layout_classic,
     canUseLayoutEditorial: b.can_use_layout_editorial,
     canUseLayoutImmersive: b.can_use_layout_immersive,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontMaps(b: BackendEffectiveStorefrontMaps): StorefrontMapsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    mapsEnabled: b.maps_enabled,
+    canShowMapDisplay: b.can_show_map_display,
+    canShowLocationDisplay: b.can_show_location_display,
+    canUseInteractiveMaps: b.can_use_interactive_maps,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };
@@ -1089,6 +1108,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     storefrontGallery: mapStorefrontGallery(b.effective.storefront_gallery),
     storefrontHours: mapStorefrontHours(b.effective.storefront_hours),
     storefrontLayouts: mapStorefrontLayouts(b.effective.storefront_layouts),
+    storefrontMaps: mapStorefrontMaps(b.effective.storefront_maps),
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
@@ -1301,6 +1321,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.storefrontLayouts;
   }
 
+  async getStorefrontMapsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontMapsState> {
+    const all = await this.getAllCapabilities(tenantId, options);
+    return all.storefrontMaps;
+  }
+
   async getDirectoryEntryOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryEntryOptionsState> {
     const all = await this.getAllCapabilities(tenantId, options);
     return all.directoryEntryOptions;
@@ -1356,6 +1381,13 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     // Overlay Layouts from dedicated storefront_layouts domain
     if (all.storefrontLayouts) {
       flags.storefrontLayout = all.storefrontLayouts.effectiveLayout;
+    }
+
+    // Overlay Maps from dedicated storefront_maps domain
+    if (all.storefrontMaps) {
+      flags.showMapDisplay = all.storefrontMaps.canShowMapDisplay;
+      flags.showLocationDisplay = all.storefrontMaps.canShowLocationDisplay;
+      flags.showInteractiveMaps = all.storefrontMaps.canUseInteractiveMaps;
     }
 
     return flags;

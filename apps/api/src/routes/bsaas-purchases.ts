@@ -656,12 +656,31 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
     const featureKeys = catalogEntries.map(e => e.feature_key);
     const features = await prisma.features_list.findMany({
       where: { key: { in: featureKeys }, is_active: true },
-      select: { key: true, name: true, description: true, category: true },
+      select: { id: true, key: true, name: true, description: true, category: true },
     });
     const featureMap = new Map(features.map(f => [f.key, f]));
 
+    // Fetch capability type for each feature via capability_features_list
+    const capLinks = await prisma.capability_features_list.findMany({
+      where: { feature_id: { in: features.map(f => f.id || '') }, is_active: true },
+      include: { capability_type_list: { select: { key: true } } },
+    });
+    const featureIdToCapKey = new Map<string, string>();
+    for (const link of capLinks) {
+      if (link.capability_type_list?.key) {
+        featureIdToCapKey.set(link.feature_id, link.capability_type_list.key);
+      }
+    }
+    // Also build a feature-key → capability-key map for convenience
+    const featureKeyToCapKey = new Map<string, string>();
+    for (const f of features) {
+      const capKey = featureIdToCapKey.get(f.id || '');
+      if (capKey) featureKeyToCapKey.set(f.key, capKey);
+    }
+
     const catalog = catalogEntries
       .filter(entry => featureMap.has(entry.feature_key))
+      .filter(entry => !entry.feature_key.endsWith('_enabled') && !entry.feature_key.endsWith('_disabled'))
       .map(entry => {
         const f = featureMap.get(entry.feature_key)!;
         return {
@@ -669,6 +688,7 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
           name: entry.marketing_name || f.name,
           description: entry.description || f.description || '',
           category: f.category,
+          capabilityType: featureKeyToCapKey.get(entry.feature_key) || null,
           priceCents: entry.price_cents,
           billingCycle: entry.billing_cycle as 'one_time' | 'weekly' | 'monthly' | 'annual',
           trialDays: entry.trial_days,

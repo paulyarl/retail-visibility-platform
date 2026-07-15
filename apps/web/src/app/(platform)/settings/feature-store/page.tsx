@@ -390,8 +390,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           >
             <Zap className="w-4 h-4" />
             Features
-            {catalog.filter(item => !item.key.startsWith('platform_service_')).length > 0 && (
-              <Badge size="xs" variant="light" color="blue">{catalog.filter(item => !item.key.startsWith('platform_service_')).length}</Badge>
+            {catalog.filter(item => item.capabilityType !== 'platform_services').length > 0 && (
+              <Badge size="xs" variant="light" color="blue">{catalog.filter(item => item.capabilityType !== 'platform_services').length}</Badge>
             )}
           </button>
           <button
@@ -418,8 +418,8 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
           >
             <Wrench className="w-4 h-4" />
             Services
-            {catalog.filter(item => item.key.startsWith('platform_service_')).length > 0 && (
-              <Badge size="xs" variant="light" color="orange">{catalog.filter(item => item.key.startsWith('platform_service_')).length}</Badge>
+            {catalog.filter(item => item.capabilityType === 'platform_services').length > 0 && (
+              <Badge size="xs" variant="light" color="orange">{catalog.filter(item => item.capabilityType === 'platform_services').length}</Badge>
             )}
           </button>
         </div>
@@ -565,11 +565,11 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
         )}
 
         {/* Individual Features Tab */}
-        {activeTab === 'features' && catalog.filter(item => !item.key.startsWith('platform_service_')).length > 0 && (
+        {activeTab === 'features' && catalog.filter(item => item.capabilityType !== 'platform_services').length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-900">Individual Features</h2>
             <Grid>
-          {catalog.filter(item => !item.key.startsWith('platform_service_')).map((item) => {
+          {catalog.filter(item => item.capabilityType !== 'platform_services').map((item) => {
             const isActive = item.purchase?.status === 'active';
             const isSuspended = item.purchase?.status === 'suspended';
             const inTier = item.tierAvailability === 'in_tier_active';
@@ -666,7 +666,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
         {/* Services Tab */}
         {activeTab === 'services' && (
           <div className="space-y-4">
-            {catalog.filter(item => item.key.startsWith('platform_service_')).length > 0 ? (
+            {catalog.filter(item => item.capabilityType === 'platform_services').length > 0 ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Wrench className="w-5 h-5 text-amber-600" />
@@ -677,7 +677,7 @@ export default function FeatureStorePage({ tenantId: propTenantId }: { tenantId?
                   Professional services to help you get set up and grow your business. Logo design, store setup, SEO optimization, and more.
                 </Text>
                 <Grid>
-                  {catalog.filter(item => item.key.startsWith('platform_service_')).map((item) => {
+                  {catalog.filter(item => item.capabilityType === 'platform_services').map((item) => {
                     const isActive = item.purchase?.status === 'active';
                     const isSuspended = item.purchase?.status === 'suspended';
                     const inTier = item.tierAvailability === 'in_tier_active';

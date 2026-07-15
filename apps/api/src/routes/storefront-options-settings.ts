@@ -14,8 +14,6 @@ const router = Router();
 const storefrontOptionsSettingsSchema = z.object({
   storefront_opt_enabled: z.boolean().optional(),
   // Section Display
-  map_display: z.boolean().optional(),
-  location_display: z.boolean().optional(),
   // Category Display group
   category_store: z.boolean().optional(),
   category_product: z.boolean().optional(),
@@ -27,7 +25,6 @@ const storefrontOptionsSettingsSchema = z.object({
   // Store Information group
   storefront_social_media: z.boolean().optional(),
   storefront_contact: z.boolean().optional(),
-  interactive_maps: z.boolean().optional(),
   // Advanced group
   enhanced_seo: z.boolean().optional(),
   storefront_actions: z.boolean().optional(),
@@ -36,8 +33,6 @@ const storefrontOptionsSettingsSchema = z.object({
 // Default settings (core only — QR, Gallery, Hours have dedicated settings routes)
 export const DEFAULT_SETTINGS = {
   storefront_opt_enabled: true,
-  map_display: true,
-  location_display: true,
   category_store: true,
   category_product: true,
   recommend_store: true,
@@ -45,7 +40,6 @@ export const DEFAULT_SETTINGS = {
   recently_viewed: true,
   storefront_social_media: true,
   storefront_contact: true,
-  interactive_maps: true,
   enhanced_seo: false,
   storefront_actions: false,
 };
@@ -71,7 +65,6 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
           recently_viewed: false,
           storefront_social_media: false,
           storefront_contact: false,
-          interactive_maps: false,
           enhanced_seo: false,
           storefront_actions: false,
         },
@@ -101,7 +94,6 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
     // Info group
     tierFilteredSettings.storefront_social_media = tierState.allowedInfoTypes.includes('storefront_social_media') ? !!rawSettings.storefront_social_media : false;
     tierFilteredSettings.storefront_contact = tierState.allowedInfoTypes.includes('storefront_contact') ? !!rawSettings.storefront_contact : false;
-    tierFilteredSettings.interactive_maps = tierState.allowedInfoTypes.includes('interactive_maps') ? !!rawSettings.interactive_maps : false;
     // Advanced group
     tierFilteredSettings.enhanced_seo = tierState.allowedAdvancedTypes.includes('enhanced_seo') ? !!rawSettings.enhanced_seo : false;
     tierFilteredSettings.storefront_actions = tierState.allowedAdvancedTypes.includes('storefront_actions') ? !!rawSettings.storefront_actions : false;
@@ -182,7 +174,6 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
         recently_viewed: settings.recently_viewed,
         storefront_social_media: settings.storefront_social_media,
         storefront_contact: settings.storefront_contact,
-        interactive_maps: settings.interactive_maps,
         enhanced_seo: settings.enhanced_seo,
         storefront_actions: settings.storefront_actions,
       },

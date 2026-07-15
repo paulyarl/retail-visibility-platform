@@ -16,7 +16,7 @@
  *   ├── Category Display (feature gate) → category_store, category_product
  *   ├── Recommendation Display (feature gate) → recommend_store, recommend_products
  *   ├── User Behavior → recently_viewed
- *   ├── Store Information (feature gate) → storefront_social_media, storefront_contact, interactive_maps
+ *   ├── Store Information (feature gate) → storefront_social_media, storefront_contact
  *   ├── Advanced (feature gate) → enhanced_seo, storefront_actions
  *   └── storefront_opt_flexible (master gate - unlocks all)
  */
@@ -31,12 +31,12 @@ import { getEffectiveTier } from '../utils/trial-tier-transparency';
 
 export type StorefrontOptCategoryType = 'category_store' | 'category_product';
 export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
-export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
+export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
 export const RECOMMEND_TYPES: StorefrontOptRecommendType[] = ['recommend_store', 'recommend_products'];
-export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact', 'interactive_maps'];
+export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact'];
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
 
 export interface StorefrontOptionsState {
@@ -64,7 +64,6 @@ export interface StorefrontOptionsState {
   canUseRecentlyViewed: boolean;
   canUseSocialMedia: boolean;
   canUseContact: boolean;
-  canUseInteractiveMaps: boolean;
   canUseEnhancedSEO: boolean;
   canUseStorefrontActions: boolean;
   // Raw features
@@ -86,7 +85,6 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   recently_viewed: { key: 'recently_viewed', label: 'Recently Viewed', description: 'Recently viewed products tracking', group: 'behavior' },
   storefront_social_media: { key: 'storefront_social_media', label: 'Social Media', description: 'Social media links on storefront', group: 'info' },
   storefront_contact: { key: 'storefront_contact', label: 'Contact Info', description: 'Contact information on storefront', group: 'info' },
-  interactive_maps: { key: 'interactive_maps', label: 'Interactive Maps', description: 'Embedded map on storefront', group: 'info' },
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced' },
 };
@@ -214,13 +212,12 @@ class StorefrontOptionsService {
     // --- Info: consolidated key (new) with fallback to old group gate + individual keys ---
     const allowedInfoTypes: StorefrontOptInfoType[] = [];
     if (flexible || features.storefront_opt_info || features.storefront_opt_info_on) {
-      allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+      allowedInfoTypes.push('storefront_social_media', 'storefront_contact');
     } else if ((features.storefront_opt_info_on || features.storefront_opt_info_enabled) && !(features.storefront_opt_info_off || features.storefront_opt_info_disabled)) {
-      allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+      allowedInfoTypes.push('storefront_social_media', 'storefront_contact');
     } else {
       if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
       if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
-      if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
     }
 
     // --- Advanced: individual features (group gate removed, fallback to old group gate) ---
@@ -254,7 +251,6 @@ class StorefrontOptionsService {
       canUseRecentlyViewed: mainOn && recentlyViewedEnabled,
       canUseSocialMedia: mainOn && allowedInfoTypes.includes('storefront_social_media'),
       canUseContact: mainOn && allowedInfoTypes.includes('storefront_contact'),
-      canUseInteractiveMaps: mainOn && allowedInfoTypes.includes('interactive_maps'),
       canUseEnhancedSEO: mainOn && allowedAdvancedTypes.includes('enhanced_seo'),
       canUseStorefrontActions: mainOn && allowedAdvancedTypes.includes('storefront_actions'),
       features,

@@ -243,6 +243,51 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     message: 'Supplier catalog import is not available when service product type is enabled',
     resolution_hint: 'Disable service product type in your product types settings to use supplier catalog import, or disable supplier catalog import to use service products',
   },
+
+  // ── Funnels require digital product type ──
+  // Sales funnels are designed for digital/hybrid products. Enable digital
+  // product type before building funnels.
+  {
+    id: 'funnel_requires_digital_product_type',
+    type: 'requires',
+    severity: 'block',
+    source: {
+      capability: 'funnel',
+      field: 'enabled',
+      operator: 'is_true',
+      value: true,
+    },
+    target: {
+      capability: 'product_types',
+      field: 'effective_types',
+      operator: 'includes',
+      value: 'digital',
+    },
+    message: 'Sales funnels require Digital product type to be enabled',
+    resolution_hint: 'Enable digital product type in your product types settings, or disable sales funnels',
+  },
+
+  // ── Funnels recommend online storefront ──
+  // Online storefronts convert best with post-purchase upsell flows.
+  {
+    id: 'funnel_recommends_online_storefront',
+    type: 'recommends',
+    severity: 'warn',
+    source: {
+      capability: 'funnel',
+      field: 'enabled',
+      operator: 'is_true',
+      value: true,
+    },
+    target: {
+      capability: 'storefront',
+      field: 'effective_type',
+      operator: 'equals',
+      value: 'online',
+    },
+    message: 'Sales funnels work best with an Online storefront',
+    resolution_hint: 'Switch storefront type to Online for optimal funnel conversion',
+  },
 ];
 
 // ====================

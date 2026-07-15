@@ -51,6 +51,7 @@ export interface MerchantSettingsBundle {
   storefrontGallery: StorefrontGalleryMerchantSettings | null;
   storefrontHours: StorefrontHoursMerchantSettings | null;
   storefrontLayouts: StorefrontLayoutMerchantSettings | null;
+  storefrontMaps: StorefrontMapsMerchantSettings | null;
   directoryEntry: DirectoryEntryMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
@@ -616,8 +617,6 @@ export interface EffectiveStorefrontOptions {
   allowed_info_types: StorefrontOptInfoType[];
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
-  can_show_map_display: boolean;
-  can_show_location_display: boolean;
   can_use_category_store: boolean;
   can_use_category_product: boolean;
   can_use_recommend_store: boolean;
@@ -625,7 +624,6 @@ export interface EffectiveStorefrontOptions {
   can_use_recently_viewed: boolean;
   can_use_social_media: boolean;
   can_use_contact: boolean;
-  can_use_interactive_maps: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
   merchant_preferences: Record<string, any>;
@@ -643,6 +641,23 @@ export interface EffectiveStorefrontLayouts {
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
   merchant_preferences: { layouts_enabled: boolean; storefront_layout: string };
+}
+
+export interface StorefrontMapsMerchantSettings {
+  maps_enabled?: boolean | null;
+  interactive_maps?: boolean | null;
+  map_display?: boolean | null;
+  location_display?: boolean | null;
+}
+
+export interface EffectiveStorefrontMaps {
+  enabled: boolean;
+  is_flexible: boolean;
+  maps_enabled: boolean;
+  can_show_map_display: boolean;
+  can_show_location_display: boolean;
+  can_use_interactive_maps: boolean;
+  merchant_preferences: Record<string, any>;
 }
 
 export type FaqManagementType =
@@ -893,6 +908,23 @@ export interface EffectiveDirectoryPromotion {
 }
 
 // ====================
+// SALES FUNNELS
+// ====================
+
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+
+export interface EffectiveFunnel {
+  enabled: boolean;
+  builder_enabled: boolean;
+  allowed_steps: FunnelStepType[];
+  can_use_order_bump: boolean;
+  can_use_upsell: boolean;
+  can_use_downsell: boolean;
+  can_use_oto: boolean;
+  is_flexible: boolean;
+}
+
+// ====================
 // SUBSCRIPTION CONTEXT
 // ====================
 
@@ -927,6 +959,7 @@ export interface EffectiveCapabilities {
     storefront_gallery: EffectiveStorefrontGallery;
     storefront_hours: EffectiveStorefrontHours;
     storefront_layouts: EffectiveStorefrontLayouts;
+    storefront_maps: EffectiveStorefrontMaps;
     directory_entry: EffectiveDirectoryEntryOptions;
     faq: EffectiveFaq;
     crm: EffectiveCrm;
@@ -937,6 +970,7 @@ export interface EffectiveCapabilities {
     directory_promotion: EffectiveDirectoryPromotion;
     wholesale_matching: EffectiveWholesaleMatching;
     platform_services: EffectivePlatformServices;
+    funnel: EffectiveFunnel;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

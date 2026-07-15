@@ -3379,20 +3379,38 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
       select: { id: true },
     });
 
-    const tierFeatures = capabilityType
-      ? await prisma.tier_features_list.findMany({
-          where: {
-            tier_id: effectiveTierId,
-            feature_key: { startsWith: 'storefront_opt_' },
-            is_enabled: true,
-          },
-          select: { feature_key: true },
-        })
-      : [];
+    // Also fetch storefront_maps capability features
+    const mapsCapType = await prisma.capability_type_list.findUnique({
+      where: { key: 'storefront_maps' },
+      select: { id: true },
+    });
+
+    const [tierFeatures, mapsTierFeatures] = await Promise.all([
+      capabilityType
+        ? prisma.tier_features_list.findMany({
+            where: {
+              tier_id: effectiveTierId,
+              feature_key: { startsWith: 'storefront_opt_' },
+              is_enabled: true,
+            },
+            select: { feature_key: true },
+          })
+        : Promise.resolve([]),
+      mapsCapType
+        ? prisma.tier_features_list.findMany({
+            where: {
+              tier_id: effectiveTierId,
+              capability_type_id: mapsCapType.id,
+              is_enabled: true,
+            },
+            select: { feature_key: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
     // Build feature map from tier features
     const features: Record<string, boolean> = {};
-    for (const tf of tierFeatures) {
+    for (const tf of [...tierFeatures, ...mapsTierFeatures]) {
       features[tf.feature_key] = true;
     }
 
@@ -3443,8 +3461,19 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
 
     // Section Display (standalone, no group gate)
     const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
-    const mapDisplayTierAllowed = flexible || !!features.storefront_opt_map_display;
-    const locationDisplayTierAllowed = flexible || !!features.storefront_opt_location_display;
+    // Maps — new storefront_maps_* keys with fallback to old storefront_opt_* keys
+    const mapsDisabled = !!features.storefront_maps_disabled || !!features.storefront_opt_disabled;
+    const mapsEnabled = !mapsDisabled && (!!features.storefront_maps_enabled || !!features.storefront_opt_enabled);
+    const mapsFlexible = !!features.storefront_maps_flexible || !!features.storefront_opt_flexible;
+    const mapDisplayTierAllowed = mapsFlexible
+      || !!features.storefront_maps_display
+      || !!features.storefront_opt_map_display;
+    const locationDisplayTierAllowed = mapsFlexible
+      || !!features.storefront_maps_location
+      || !!features.storefront_opt_location_display;
+    const interactiveMapsTierAllowed = mapsFlexible
+      || !!features.storefront_maps_interactive
+      || !!features.storefront_opt_interactive_maps;
 
     // Recently viewed
     const recentlyViewedTierAllowed = flexible || !!features.storefront_opt_recently_viewed;
@@ -3456,11 +3485,10 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
     const infoUntouched = !infoGroupEnabled && !infoGroupDisabled;
     const allowedInfoTypes: string[] = [];
     if (flexible || infoEnabled) {
-      allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+      allowedInfoTypes.push('storefront_social_media', 'storefront_contact');
     } else if (infoUntouched) {
       if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
       if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
-      if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
     }
 
     // QR group
@@ -3536,8 +3564,15 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
       ? allowedRecommendTypes.filter(t => (prefs as any)[t] !== false)
       : [];
     const effectiveHoursDisplay = optEnabled && hoursDisplayTierAllowed && (prefs as any).hours_display !== false;
-    const effectiveMapDisplay = optEnabled && mapDisplayTierAllowed && prefs.map_display !== false;
-    const effectiveLocationDisplay = optEnabled && locationDisplayTierAllowed && prefs.location_display !== false;
+    // Maps effective flags — from new storefront_maps domain
+    const mapsSettings = await prisma.tenant_storefront_maps_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+    const mapsPrefs = mapsSettings || {};
+    const mapsMainOn = mapsEnabled;
+    const effectiveMapDisplay = mapsMainOn && mapDisplayTierAllowed && mapsPrefs.map_display !== false;
+    const effectiveLocationDisplay = mapsMainOn && locationDisplayTierAllowed && mapsPrefs.location_display !== false;
+    const effectiveInteractiveMaps = mapsMainOn && interactiveMapsTierAllowed && mapsPrefs.interactive_maps !== false;
     const effectiveRecentlyViewed = optEnabled && recentlyViewedTierAllowed && prefs.recently_viewed !== false;
     const effectiveInfoTypes = optEnabled
       ? allowedInfoTypes.filter(t => (prefs as any)[t] !== false)
@@ -3586,7 +3621,7 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
         showRecentlyViewed: mainOn && effectiveRecentlyViewed,
         showSocialMedia: mainOn && effectiveInfoTypes.includes('storefront_social_media'),
         showContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
-        showInteractiveMaps: mainOn && effectiveInfoTypes.includes('interactive_maps'),
+        showInteractiveMaps: mainOn && effectiveInteractiveMaps,
         showQRCodes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
         showQRProduct: mainOn && effectiveQRContentTypes.includes('qr_product'),
         showQRStore: mainOn && effectiveQRContentTypes.includes('qr_store'),

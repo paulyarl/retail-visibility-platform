@@ -15,8 +15,23 @@ export async function GET(request: NextRequest) {
 
     const { accessToken } = authResult;
     const url = new URL(request.url);
-    const queryParams = url.searchParams.toString();
-    const endpoint = `/api/admin/feature-purchases${queryParams ? `?${queryParams}` : ''}`;
+    const action = url.searchParams.get('action');
+
+    let endpoint: string;
+    if (action === 'grants') {
+      const params = new URLSearchParams();
+      const featureKey = url.searchParams.get('featureKey');
+      const tenantId = url.searchParams.get('tenantId');
+      const status = url.searchParams.get('status');
+      if (featureKey) params.set('featureKey', featureKey);
+      if (tenantId) params.set('tenantId', tenantId);
+      if (status) params.set('status', status);
+      const qs = params.toString();
+      endpoint = `/api/admin/feature-purchases/grants${qs ? `?${qs}` : ''}`;
+    } else {
+      const queryParams = url.searchParams.toString();
+      endpoint = `/api/admin/feature-purchases${queryParams ? `?${queryParams}` : ''}`;
+    }
 
     const response = await authenticatedFetch(endpoint, accessToken, { method: 'GET' });
     const data = await response.json();

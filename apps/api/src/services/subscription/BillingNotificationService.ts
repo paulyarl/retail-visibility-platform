@@ -45,7 +45,12 @@ export type BillingNotificationType =
   | 'directory_promotion_grace_period_warning'
   | 'directory_promotion_expired'
   | 'policy_template_updated'
-  | 'platform_service_delivered';
+  | 'platform_service_delivered'
+  | 'funnel_builder_purchased'
+  | 'funnel_builder_renewal_success'
+  | 'funnel_builder_renewal_failed'
+  | 'funnel_builder_expired'
+  | 'funnel_step_conversion';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -378,6 +383,46 @@ class BillingNotificationService {
           subject: `Service Delivered - ${data.metadata?.serviceName || 'Platform Service'} - ${businessName}`,
           html: this.buildPlatformServiceDeliveredHtml(ownerName, businessName, data),
           text: this.buildPlatformServiceDeliveredText(ownerName, businessName, data),
+        };
+
+      case 'funnel_builder_purchased':
+        return {
+          to: toEmail,
+          subject: `Sales Funnel Builder Activated - ${businessName}`,
+          html: this.buildFunnelBuilderPurchasedHtml(ownerName, businessName, data),
+          text: this.buildFunnelBuilderPurchasedText(ownerName, businessName, data),
+        };
+
+      case 'funnel_builder_renewal_success':
+        return {
+          to: toEmail,
+          subject: `Sales Funnel Builder Renewed - ${businessName}`,
+          html: this.buildFunnelBuilderRenewalSuccessHtml(ownerName, businessName, data),
+          text: this.buildFunnelBuilderRenewalSuccessText(ownerName, businessName, data),
+        };
+
+      case 'funnel_builder_renewal_failed':
+        return {
+          to: toEmail,
+          subject: `Sales Funnel Builder Renewal Failed - ${businessName}`,
+          html: this.buildFunnelBuilderRenewalFailedHtml(ownerName, businessName, data),
+          text: this.buildFunnelBuilderRenewalFailedText(ownerName, businessName, data),
+        };
+
+      case 'funnel_builder_expired':
+        return {
+          to: toEmail,
+          subject: `Sales Funnel Builder Expired - ${businessName}`,
+          html: this.buildFunnelBuilderExpiredHtml(ownerName, businessName, data),
+          text: this.buildFunnelBuilderExpiredText(ownerName, businessName, data),
+        };
+
+      case 'funnel_step_conversion':
+        return {
+          to: toEmail,
+          subject: `Funnel Conversion - ${data.metadata?.funnelName || businessName}`,
+          html: this.buildFunnelStepConversionHtml(ownerName, businessName, data),
+          text: this.buildFunnelStepConversionText(ownerName, businessName, data),
         };
 
       default:
@@ -925,6 +970,42 @@ Your new plan is now active.`;
           priority: 'low',
         };
 
+      case 'funnel_builder_purchased':
+        return {
+          title: `Sales Funnel Builder purchased — ${tenantName}`,
+          description: `Tenant "${tenantName}" activated the Sales Funnel Builder add-on. Funnel builder: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/funnels`,
+          priority: 'low',
+        };
+
+      case 'funnel_builder_renewal_success':
+        return {
+          title: `Sales Funnel Builder renewed — ${tenantName}`,
+          description: `Tenant "${tenantName}" renewed the Sales Funnel Builder add-on. Amount: $${((data.amount || 0) / 100).toFixed(2)}.`,
+          priority: 'low',
+        };
+
+      case 'funnel_builder_renewal_failed':
+        return {
+          title: `Sales Funnel Builder renewal failed — ${tenantName}`,
+          description: `Tenant "${tenantName}" Sales Funnel Builder renewal failed. Reason: ${data.reason || 'Payment declined'}. Funnels will be paused after the grace period.\n\nBilling settings: ${billingUrl}`,
+          priority: 'high',
+          dueDate: new Date(Date.now() + (data.gracePeriodDaysRemaining || 7) * 24 * 60 * 60 * 1000),
+        };
+
+      case 'funnel_builder_expired':
+        return {
+          title: `Sales Funnel Builder expired — ${tenantName}`,
+          description: `Tenant "${tenantName}" Sales Funnel Builder add-on has expired. Funnels are now paused.\n\nRenew: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/feature-store`,
+          priority: 'medium',
+        };
+
+      case 'funnel_step_conversion':
+        return {
+          title: `Funnel conversion — ${tenantName}`,
+          description: `A customer accepted a ${data.metadata?.stepType || 'funnel'} offer in "${data.metadata?.funnelName || 'Funnel'}". Additional revenue: $${((data.amount || 0) / 100).toFixed(2)}.`,
+          priority: 'low',
+        };
+
       default:
         return {
           title: `Subscription event: ${data.type} — ${tenantName}`,
@@ -1161,6 +1242,36 @@ Your new plan is now active.`;
           title: `Service delivered: ${data.metadata?.serviceName || 'Platform Service'}`,
           body: `Your "${data.metadata?.serviceName || 'platform service'}" for ${tenantName} has been delivered. You can view the details and any deliverables in your CRM portal.`,
           icon: '✅',
+        };
+      case 'funnel_builder_purchased':
+        return {
+          title: 'Sales Funnel Builder activated',
+          body: `Your Sales Funnel Builder add-on for ${tenantName} is now active. Create funnels to increase average order value.`,
+          icon: '🚀',
+        };
+      case 'funnel_builder_renewal_success':
+        return {
+          title: 'Sales Funnel Builder renewed',
+          body: `Your Sales Funnel Builder add-on for ${tenantName} was renewed successfully.`,
+          icon: '✅',
+        };
+      case 'funnel_builder_renewal_failed':
+        return {
+          title: 'Sales Funnel Builder renewal failed',
+          body: `We could not process payment for Sales Funnel Builder on ${tenantName}. Please update your payment method before the grace period ends.`,
+          icon: '⚠️',
+        };
+      case 'funnel_builder_expired':
+        return {
+          title: 'Sales Funnel Builder expired',
+          body: `Your Sales Funnel Builder add-on for ${tenantName} has expired. Your funnels are paused until you renew.`,
+          icon: '⏰',
+        };
+      case 'funnel_step_conversion':
+        return {
+          title: 'Funnel conversion',
+          body: `A customer accepted a ${data.metadata?.stepType || 'funnel'} offer in "${data.metadata?.funnelName || 'Funnel'}" for ${tenantName}. Additional revenue: $${((data.amount || 0) / 100).toFixed(2)}.`,
+          icon: '💰',
         };
       default:
         return {
@@ -1805,6 +1916,103 @@ Your ${serviceName} for ${business} has been delivered.
 
 You can view the details and any deliverables in your CRM portal at: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/crm
     `.trim();
+  }
+
+  // Email templates - Funnel Builder
+  private buildFunnelBuilderPurchasedHtml(name: string, business: string, data: BillingNotificationData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #4f46e5;">Sales Funnel Builder Activated</h2>
+        <p>Hi ${name},</p>
+        <p>Your <strong>Sales Funnel Builder</strong> add-on for <strong>${business}</strong> is now active.</p>
+        <p>You can start creating order bumps, upsells, downsells, and one-time offers to increase your average order value.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/funnels" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Open Funnel Builder</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildFunnelBuilderPurchasedText(name: string, business: string, data: BillingNotificationData): string {
+    return `Hi ${name},
+
+Your Sales Funnel Builder add-on for ${business} is now active.
+
+Start creating funnels at: ${process.env.WEB_URL || 'https://visibleshelf.com'}/t/${data.tenantId}/settings/funnels`;
+  }
+
+  private buildFunnelBuilderRenewalSuccessHtml(name: string, business: string, data: BillingNotificationData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Sales Funnel Builder Renewed</h2>
+        <p>Hi ${name},</p>
+        <p>Your Sales Funnel Builder add-on for <strong>${business}</strong> has been renewed successfully.</p>
+        <p><strong>Amount:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+      </div>
+    `;
+  }
+
+  private buildFunnelBuilderRenewalSuccessText(name: string, business: string, data: BillingNotificationData): string {
+    return `Hi ${name},
+
+Your Sales Funnel Builder add-on for ${business} has been renewed successfully. Amount: $${((data.amount || 0) / 100).toFixed(2)}`;
+  }
+
+  private buildFunnelBuilderRenewalFailedHtml(name: string, business: string, data: BillingNotificationData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Sales Funnel Builder Renewal Failed</h2>
+        <p>Hi ${name},</p>
+        <p>We were unable to renew your Sales Funnel Builder add-on for <strong>${business}</strong>.</p>
+        <p>Please update your payment method within the grace period to keep your funnels active.</p>
+      </div>
+    `;
+  }
+
+  private buildFunnelBuilderRenewalFailedText(name: string, business: string, data: BillingNotificationData): string {
+    return `Hi ${name},
+
+We were unable to renew your Sales Funnel Builder add-on for ${business}. Please update your payment method to keep your funnels active.`;
+  }
+
+  private buildFunnelBuilderExpiredHtml(name: string, business: string, data: BillingNotificationData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6b7280;">Sales Funnel Builder Expired</h2>
+        <p>Hi ${name},</p>
+        <p>Your Sales Funnel Builder add-on for <strong>${business}</strong> has expired and your funnels are now paused.</p>
+        <p>Renew the add-on to reactivate your funnels.</p>
+      </div>
+    `;
+  }
+
+  private buildFunnelBuilderExpiredText(name: string, business: string, data: BillingNotificationData): string {
+    return `Hi ${name},
+
+Your Sales Funnel Builder add-on for ${business} has expired and your funnels are now paused. Renew to reactivate them.`;
+  }
+
+  private buildFunnelStepConversionHtml(name: string, business: string, data: BillingNotificationData): string {
+    const funnelName = data.metadata?.funnelName || 'Funnel';
+    const stepType = data.metadata?.stepType || 'step';
+    const revenue = ((data.amount || 0) / 100).toFixed(2);
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Funnel Conversion</h2>
+        <p>Hi ${name},</p>
+        <p>A customer accepted a <strong>${stepType}</strong> offer in <strong>${funnelName}</strong> for <strong>${business}</strong>.</p>
+        <p><strong>Additional revenue:</strong> $${revenue}</p>
+      </div>
+    `;
+  }
+
+  private buildFunnelStepConversionText(name: string, business: string, data: BillingNotificationData): string {
+    const funnelName = data.metadata?.funnelName || 'Funnel';
+    const stepType = data.metadata?.stepType || 'step';
+    const revenue = ((data.amount || 0) / 100).toFixed(2);
+    return `Hi ${name},
+
+A customer accepted a ${stepType} offer in ${funnelName} for ${business}. Additional revenue: $${revenue}`;
   }
 }
 

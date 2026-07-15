@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { stripeConnectService } from '../../services/payments/StripeConnectService';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
+import FunnelEngine from '../../services/FunnelEngine';
 
 const router = Router();
 
@@ -189,6 +190,18 @@ router.post('/confirm-payment', async (req, res) => {
       // Don't fail the confirmation if we can't retrieve card details
     }
 
+    // Determine whether a post-payment funnel upsell should be shown
+    let funnelNextStep = null;
+    try {
+      funnelNextStep = await FunnelEngine.getInstance().getNextStepForOrder(
+        payment.orders.tenant_id,
+        payment.orders.id
+      );
+    } catch (funnelError) {
+      console.error('[Stripe] Failed to resolve funnel next step:', funnelError);
+      // Non-fatal: continue without funnel redirect
+    }
+
     res.json({
       success: true,
       orderId: payment.orders.id,
@@ -197,6 +210,7 @@ router.post('/confirm-payment', async (req, res) => {
       cardBrand,
       expiryMonth,
       expiryYear,
+      funnelNextStep,
     });
   } catch (error) {
     console.error('[Stripe] Confirm payment error:', error);

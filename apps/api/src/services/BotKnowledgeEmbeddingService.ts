@@ -703,6 +703,89 @@ class BotKnowledgeEmbeddingService {
     return parts.join('\n');
   }
 
+  // ─── Funnel Embeddings ───
+
+  /**
+   * Refresh sales funnel embeddings for a tenant.
+   * Reads active tenant_sales_funnels and their steps, chunks into text,
+   * and embeds into bot_knowledge_embeddings with source_type='funnel'.
+   */
+  async refreshFunnelEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
+    const pool = getDirectPool();
+
+    await pool.query(
+      "DELETE FROM bot_knowledge_embeddings WHERE tenant_id = $1 AND source_type = 'funnel'",
+      [tenantId]
+    );
+
+    const funnels = await prisma.tenant_sales_funnels.findMany({
+      where: { tenant_id: tenantId, is_active: true },
+      include: {
+        tenant_funnel_steps: {
+          where: { is_active: true },
+          orderBy: { sort_order: 'asc' },
+          include: { inventory_items: { select: { name: true, description: true } } },
+        },
+      },
+    });
+
+    if (funnels.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddingModel = await BotRagService.getInstance().getEmbeddingModel();
+    const chunks: { sourceId: string; text: string }[] = [];
+
+    for (const funnel of funnels) {
+      const parts = [
+        `Sales Funnel: ${funnel.name}`,
+        funnel.entry_item_id ? `Attached to product: ${funnel.entry_item_id}` : 'Storewide trigger',
+        `Trigger: ${funnel.trigger_type}`,
+      ];
+
+      if (funnel.tenant_funnel_steps.length > 0) {
+        const stepDescriptions = funnel.tenant_funnel_steps.map((step, index) => {
+          const offerName = step.inventory_items?.name || step.offer_item_id;
+          const lines = [`${index + 1}. ${step.step_type}: ${step.display_title || offerName}`];
+          if (step.display_description) lines.push(`   Description: ${step.display_description}`);
+          if (step.price_cents) lines.push(`   Offer price: $${(step.price_cents / 100).toFixed(2)}`);
+          if (step.discount_cents) lines.push(`   Discount: $${(step.discount_cents / 100).toFixed(2)}`);
+          return lines.join('\n');
+        });
+        parts.push(`Steps:\n${stepDescriptions.join('\n')}`);
+      }
+
+      chunks.push({ sourceId: funnel.id, text: parts.join('\n') });
+    }
+
+    const embeddings = await this.generateEmbeddings(chunks.map((c) => c.text));
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const embedding = embeddings[i];
+      const embeddingStr = `[${embedding.join(',')}]`;
+
+      await pool.query(
+        `INSERT INTO bot_knowledge_embeddings (tenant_id, source_type, source_id, chunk_text, chunk_index, embedding, model)
+         VALUES ($1, 'funnel', $2, $3, 0, $4::vector, $5)
+         ON CONFLICT (tenant_id, source_type, source_id, chunk_index) DO UPDATE SET
+           chunk_text = EXCLUDED.chunk_text,
+           embedding = EXCLUDED.embedding,
+           model = EXCLUDED.model,
+           updated_at = now()`,
+        [tenantId, chunk.sourceId, chunk.text, embeddingStr, embeddingModel]
+      );
+    }
+
+    logger.info('[BotKnowledgeEmbeddingService] Refreshed funnel embeddings', undefined, {
+      tenantId,
+      funnels: funnels.length,
+      chunks: chunks.length,
+    });
+
+    return { processed: funnels.length, chunks: chunks.length };
+  }
+
   // ─── Unified Refresh ───
 
   /**
@@ -807,7 +890,7 @@ class BotKnowledgeEmbeddingService {
    */
   async refreshKnowledgeEmbeddings(
     tenantId: string,
-    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement' | 'policy_template'
+    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement' | 'policy_template' | 'funnel'
   ): Promise<{ processed: number; chunks: number }> {
     if (sourceType === 'badge_registry') {
       return this.refreshBadgeRegistryEmbeddings(tenantId);
@@ -836,6 +919,9 @@ class BotKnowledgeEmbeddingService {
     if (sourceType === 'policy_template') {
       return this.refreshPolicyTemplateEmbeddings(tenantId);
     }
+    if (sourceType === 'funnel') {
+      return this.refreshFunnelEmbeddings(tenantId);
+    }
 
     const badgeResult = await this.refreshBadgeRegistryEmbeddings(tenantId);
     const policyResult = await this.refreshPolicyEmbeddings(tenantId);
@@ -846,9 +932,10 @@ class BotKnowledgeEmbeddingService {
     const featurePurchaseResult = await this.refreshFeaturePurchaseEmbeddings(tenantId);
     const featuredPlacementResult = await this.refreshFeaturedPlacementEmbeddings(tenantId);
     const policyTemplateResult = await this.refreshPolicyTemplateEmbeddings(tenantId);
+    const funnelResult = await this.refreshFunnelEmbeddings(tenantId);
     return {
-      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed + policyTemplateResult.processed,
-      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks + policyTemplateResult.chunks,
+      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed + policyTemplateResult.processed + funnelResult.processed,
+      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks + policyTemplateResult.chunks + funnelResult.chunks,
     };
   }
 

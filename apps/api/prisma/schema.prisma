@@ -2218,6 +2218,8 @@ model inventory_items {
   product_variants                                                                product_variants[]
   shopping_cart_items                                                             shopping_cart_items[]
   store_reviews                                                                   store_reviews[]
+  tenant_funnel_steps                                                             tenant_funnel_steps[]
+  tenant_sales_funnels                                                            tenant_sales_funnels[]
 
   @@unique([tenant_id, sku])
   @@index([tenant_id, featured_type, is_featured], map: "idx_inventory_items_featured_type")
@@ -4985,12 +4987,14 @@ model tenants {
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_product_types_settings                                                          tenant_product_types_settings?
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?
+  tenant_sales_funnels                                                                   tenant_sales_funnels[]
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
   tenant_social_commerce_options_settings                                                tenant_social_commerce_options_settings?
   tenant_social_pixels                                                                   tenant_social_pixels?
   tenant_storefront_gallery_settings                                                     tenant_storefront_gallery_settings?
   tenant_storefront_hours_settings                                                       tenant_storefront_hours_settings?
   tenant_storefront_layouts_settings                                                     tenant_storefront_layouts_settings?
+  tenant_storefront_maps_settings                                                        tenant_storefront_maps_settings?
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
   tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_qr_settings                                                          tenant_storefront_qr_settings?
@@ -5668,6 +5672,95 @@ model tenant_storefront_layouts_settings {
   tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_layouts_tenant")
 
   @@index([tenant_id], map: "idx_storefront_layouts_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_storefront_maps_settings {
+  id               String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id        String    @unique
+  maps_enabled     Boolean?  @default(true)
+  interactive_maps Boolean?  @default(true)
+  map_display      Boolean?  @default(true)
+  location_display Boolean?  @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  tenants          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_maps_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_maps_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_sales_funnels {
+  id                   String                @id
+  tenant_id            String
+  name                 String
+  entry_item_id        String?
+  trigger_type         String                @default("product")
+  min_cart_value_cents Int?
+  is_active            Boolean               @default(true)
+  is_default           Boolean               @default(false)
+  metadata             Json?                 @default("{}")
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime              @default(now()) @db.Timestamptz(6)
+  funnel_events        funnel_events[]
+  tenant_funnel_steps  tenant_funnel_steps[]
+  inventory_items      inventory_items?      @relation(fields: [entry_item_id], references: [id], onUpdate: NoAction, map: "fk_tenant_sales_funnels_entry_item")
+  tenants              tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_sales_funnels_tenant")
+
+  @@index([tenant_id, is_active], map: "idx_tenant_sales_funnels_tenant_active")
+  @@index([tenant_id], map: "idx_tenant_sales_funnels_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_funnel_steps {
+  id                   String                @id
+  tenant_id            String
+  funnel_id            String
+  step_type            String
+  offer_item_id        String
+  display_title        String?
+  display_description  String?
+  price_cents          Int?
+  discount_cents       Int                   @default(0)
+  sort_order           Int                   @default(0)
+  accept_to_step_id    String?
+  skip_to_step_id      String?
+  is_active            Boolean               @default(true)
+  metadata             Json?                 @default("{}")
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime              @default(now()) @db.Timestamptz(6)
+  funnel_events        funnel_events[]
+  accept_to_step       tenant_funnel_steps?  @relation("FunnelStepBranchingAccept", fields: [accept_to_step_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_accept_to")
+  other_steps_accept   tenant_funnel_steps[] @relation("FunnelStepBranchingAccept")
+  tenant_sales_funnels tenant_sales_funnels  @relation(fields: [funnel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_funnel_steps_funnel")
+  inventory_items      inventory_items       @relation(fields: [offer_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_funnel_steps_offer_item")
+  skip_to_step         tenant_funnel_steps?  @relation("FunnelStepBranchingSkip", fields: [skip_to_step_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_skip_to")
+  other_steps_skip     tenant_funnel_steps[] @relation("FunnelStepBranchingSkip")
+
+  @@index([funnel_id], map: "idx_tenant_funnel_steps_funnel")
+  @@index([funnel_id, is_active, sort_order], map: "idx_tenant_funnel_steps_funnel_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model funnel_events {
+  id                   String               @id
+  tenant_id            String
+  funnel_id            String
+  step_id              String?
+  event_type           String
+  order_id             String?
+  session_id           String?
+  customer_id          String?
+  revenue_cents        Int                  @default(0)
+  metadata             Json?                @default("{}")
+  created_at           DateTime             @default(now()) @db.Timestamptz(6)
+  tenant_sales_funnels tenant_sales_funnels @relation(fields: [funnel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_funnel_events_funnel")
+  step                 tenant_funnel_steps? @relation(fields: [step_id], references: [id], onUpdate: NoAction, map: "fk_funnel_events_step")
+
+  @@index([funnel_id], map: "idx_funnel_events_funnel")
+  @@index([step_id], map: "idx_funnel_events_step")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_funnel_events_tenant_created")
+  @@index([tenant_id, event_type, created_at(sort: Desc)], map: "idx_funnel_events_tenant_event_type")
 }
 
 enum action {
