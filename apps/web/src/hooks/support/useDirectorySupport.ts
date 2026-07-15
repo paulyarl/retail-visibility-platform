@@ -57,8 +57,24 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const status = await directorySupportService.getDirectoryStatus(tenantId);
-      return status;
+      const raw = await directorySupportService.getDirectoryStatus(tenantId);
+      if (!raw) return null;
+      return {
+        ...raw,
+        tenant: {
+          ...raw.tenant,
+          subscriptionTier: raw.tenant?.subscription_tier,
+          subscriptionStatus: raw.tenant?.subscription_status,
+        },
+        settings: {
+          ...raw.settings,
+          isPublished: raw.settings?.is_published ?? false,
+          isFeatured: raw.settings?.is_featured ?? false,
+        },
+        profile: raw.profile
+          ? { ...raw.profile, businessName: raw.profile.business_name }
+          : null,
+      };
     } catch (error) {
       console.error('Failed to get directory status:', error);
       setError('Failed to get directory status');
@@ -89,8 +105,9 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const notes = await directorySupportService.getDirectoryNotes(tenantId);
-      return notes || [];
+      const raw = await directorySupportService.getDirectoryNotes(tenantId);
+      if (!raw) return [];
+      return Array.isArray(raw) ? raw : (raw.notes || []);
     } catch (err) {
       console.error('Error fetching notes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load notes');

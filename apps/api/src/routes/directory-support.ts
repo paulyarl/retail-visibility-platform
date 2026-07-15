@@ -164,7 +164,31 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
       orderBy: { created_at: 'desc' },
     });
 
-    return res.json({ notes });
+    const userIds = [...new Set(notes.map((n: any) => n.created_by).filter(Boolean))];
+    const users = userIds.length > 0
+      ? await prisma.users.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, email: true, first_name: true, last_name: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u: any) => [u.id, u]));
+
+    const mapped = notes.map((n: any) => {
+      const u = userMap.get(n.created_by);
+      return {
+        ...n,
+        createdByUser: u
+          ? {
+              id: u.id,
+              email: u.email,
+              firstName: u.first_name,
+              lastName: u.last_name,
+            }
+          : null,
+      };
+    });
+
+    return res.json({ notes: mapped });
   } catch (error: any) {
     console.error('[GET /support/directory/tenant/:tenantId/notes] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_notes' });
@@ -172,10 +196,10 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
 });
 
 /**
- * POST /api/support/directory/tenant/:tenantId/add-note
+ * POST /api/support/directory/tenant/:tenantId/notes
  * Add a support note
  */
-router.post('/tenant/:tenantId/add-note', authenticateToken, requireSupportAccess, async (req: Request, res: Response) => {
+router.post('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
     const parsed = addNoteSchema.safeParse(req.body);
