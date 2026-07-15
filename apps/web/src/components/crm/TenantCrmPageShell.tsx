@@ -12,6 +12,7 @@ interface TenantCrmPageShellProps {
   breadcrumbs?: { label: string; href?: string }[];
   navCounts?: {
     tickets?: number;
+    tasks?: number;
     inquiries?: number;
     alerts?: number;
   };

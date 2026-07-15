@@ -10,6 +10,20 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { DirectoryListing } from './DirectoryListingSingletonService';
 
+export interface DirectoryEntrySettings {
+  directory_entry_opt_enabled?: boolean;
+  directory_entry_layout?: 'classic' | 'editorial' | 'immersive' | 'premium';
+  hours_display?: boolean;
+  map_display?: boolean;
+  location_display?: boolean;
+  storefront_social_media?: boolean;
+  storefront_contact?: boolean;
+  interactive_maps?: boolean;
+  enhanced_seo?: boolean;
+  external_link_enabled?: boolean;
+  gallery_display_mode?: 'carousel' | 'magazine';
+}
+
 export class TenantDirectoryManagementService extends TenantApiSingleton {
   private static instance: TenantDirectoryManagementService;
 
@@ -301,7 +315,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
   /**
    * Get directory entry options settings (raw merchant toggles + layout)
    */
-  async getDirectoryEntryOptions(tenantId: string): Promise<any> {
+  async getDirectoryEntryOptions(tenantId: string): Promise<DirectoryEntrySettings | null> {
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }
@@ -324,7 +338,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
   /**
    * Update directory entry options settings (layout, section toggles)
    */
-  async updateDirectoryEntryOptions(tenantId: string, options: any): Promise<any> {
+  async updateDirectoryEntryOptions(tenantId: string, options: Partial<DirectoryEntrySettings>): Promise<any> {
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }

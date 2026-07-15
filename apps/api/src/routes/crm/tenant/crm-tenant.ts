@@ -274,7 +274,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
 });
 
 // ====================
-// Tasks (read-only for tenant)
+// Tasks
 // ====================
 
 // GET /api/tenant/crm/tasks
@@ -287,6 +287,33 @@ router.get('/tasks', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[CRM Tenant] Error listing tasks:', error);
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tasks' });
+  }
+});
+
+// PUT /api/tenant/crm/tasks/:taskId (status update only)
+router.put('/tasks/:taskId', async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
+
+    const existing = await taskService.getById(req.params.taskId);
+    if (!existing) return res.status(404).json({ error: 'task_not_found' });
+    if (existing.tenant_id !== tenantId) return res.status(403).json({ error: 'forbidden' });
+
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const actorName = req.user?.email || 'Tenant User';
+
+    const { status } = req.body as { status?: string };
+    if (!status || !['pending', 'in_progress', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'invalid_input', message: 'Valid status required' });
+    }
+
+    const task = await taskService.update(req.params.taskId, { status }, actorId, actorName, 'tenant');
+    await audit({ tenantId, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
+    res.json({ success: true, data: task });
+  } catch (error) {
+    console.error('[CRM Tenant] Error updating task:', error);
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update task' });
   }
 });
 

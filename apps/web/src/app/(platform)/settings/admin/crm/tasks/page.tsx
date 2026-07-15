@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea } from '@/components/ui';
+import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea, Select, SearchableSelect } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminOperationsService, type AdminTenant, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
@@ -77,6 +77,12 @@ export default function CrmGlobalTasksPage() {
     tenants.map(t => ({ value: t.id, label: `${t.name} (${t.id})` })),
     [tenants]
   );
+
+  const tenantNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    tenants.forEach(t => map.set(t.id, t.name));
+    return map;
+  }, [tenants]);
 
   const assigneeOptions = useMemo(() =>
     staffUsers.map(u => ({ value: u.id, label: `${u.name || u.email} (${u.email})` })),
@@ -251,8 +257,8 @@ export default function CrmGlobalTasksPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
-                          <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="text-xs text-neutral-500 hover:underline">
-                            {t.tenant_id}
+                          <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="text-xs text-neutral-500 hover:underline" title={t.tenant_id}>
+                            {tenantNameMap.get(t.tenant_id) || t.tenant_id}
                           </Link>
                           {t.priority && (
                             <Badge variant={t.priority === 'high' ? 'warning' : 'default'}>
@@ -305,22 +311,12 @@ export default function CrmGlobalTasksPage() {
                   <Spinner size="sm" /> Loading tenants...
                 </div>
               ) : (
-                <>
-                  <input
-                    type="text"
-                    required
-                    list="tenant-options"
-                    value={newTask.tenant_id}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, tenant_id: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    placeholder="Search and select a tenant..."
-                  />
-                  <datalist id="tenant-options">
-                    {tenantOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </datalist>
-                </>
+                <SearchableSelect
+                  options={tenantOptions}
+                  value={newTask.tenant_id}
+                  onChange={(val) => setNewTask(prev => ({ ...prev, tenant_id: val }))}
+                  placeholder="Search and select a tenant..."
+                />
               )}
             </div>
             <div>
@@ -367,20 +363,12 @@ export default function CrmGlobalTasksPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
-              <input
-                type="text"
-                list="assignee-options"
+              <Select
                 value={newTask.assigned_to}
                 onChange={(e) => setNewTask(prev => ({ ...prev, assigned_to: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="Select staff user or type email for external assignee..."
+                options={[{ value: '', label: '— Unassigned —' }, ...assigneeOptions]}
+                disabled={optionsLoading}
               />
-              <datalist id="assignee-options">
-                {assigneeOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </datalist>
-              <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
@@ -452,20 +440,12 @@ export default function CrmGlobalTasksPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
-                <input
-                  type="text"
-                  list="assignee-options-edit"
+                <Select
                   value={editTask.assigned_to || ''}
                   onChange={(e) => setEditTask(prev => prev ? { ...prev, assigned_to: e.target.value || null } : null)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                  placeholder="Select staff user or type email for external assignee..."
+                  options={[{ value: '', label: '— Unassigned —' }, ...assigneeOptions]}
+                  disabled={optionsLoading}
                 />
-                <datalist id="assignee-options-edit">
-                  {assigneeOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </datalist>
-                <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
               </div>
             </div>
             <ModalFooter>

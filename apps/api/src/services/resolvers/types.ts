@@ -50,7 +50,7 @@ export interface MerchantSettingsBundle {
   storefrontQr: StorefrontQrMerchantSettings | null;
   storefrontGallery: StorefrontGalleryMerchantSettings | null;
   storefrontHours: StorefrontHoursMerchantSettings | null;
-  directoryEntry: StorefrontOptionsMerchantSettings | null;
+  directoryEntry: DirectoryEntryMerchantSettings | null;
   faqOptions: FaqOptionsMerchantSettings | null;
   crmOptions: CrmOptionsMerchantSettings | null;
   chatbotOptions: ChatbotOptionsMerchantSettings | null;
@@ -225,8 +225,20 @@ export interface StorefrontOptionsMerchantSettings {
   enhanced_seo?: boolean | null;
   storefront_actions?: boolean | null;
   storefront_layout?: string | null;
+}
+
+export interface DirectoryEntryMerchantSettings {
+  directory_entry_opt_enabled?: boolean | null;
   directory_entry_layout?: string | null;
+  hours_display?: boolean | null;
+  map_display?: boolean | null;
+  location_display?: boolean | null;
+  storefront_social_media?: boolean | null;
+  storefront_contact?: boolean | null;
+  interactive_maps?: boolean | null;
+  enhanced_seo?: boolean | null;
   external_link_enabled?: boolean | null;
+  gallery_display_mode?: string | null;
 }
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';

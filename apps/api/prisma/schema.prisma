@@ -4956,6 +4956,7 @@ model tenants {
   tenant_chatbot_options_settings                                                        tenant_chatbot_options_settings?
   tenant_commerce_settings                                                               tenant_commerce_settings?
   tenant_crm_options_settings                                                            tenant_crm_options_settings?
+  tenant_directory_entry_settings                                                        tenant_directory_entry_settings?
   tenant_faq_options_settings                                                            tenant_faq_options_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
   tenant_feature_purchases                                                               tenant_feature_purchases[]
@@ -5615,6 +5616,28 @@ model bsaas_grant_token_claims {
   @@unique([grant_token_id, tenant_id])
   @@index([grant_token_id], map: "idx_bsaas_grant_token_claims_grant_token_id")
   @@index([tenant_id], map: "idx_bsaas_grant_token_claims_tenant_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_directory_entry_settings {
+  id                          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id                   String    @unique
+  directory_entry_opt_enabled Boolean?  @default(true)
+  directory_entry_layout      String?   @default("classic") @db.VarChar(20)
+  hours_display               Boolean?  @default(true)
+  map_display                 Boolean?  @default(true)
+  location_display            Boolean?  @default(true)
+  storefront_social_media     Boolean?  @default(true)
+  storefront_contact          Boolean?  @default(true)
+  interactive_maps            Boolean?  @default(true)
+  enhanced_seo                Boolean?  @default(false)
+  external_link_enabled       Boolean?  @default(false)
+  gallery_display_mode        String?   @default("carousel") @db.VarChar(20)
+  created_at                  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+  tenants                     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_directory_entry_tenant")
+
+  @@index([tenant_id], map: "idx_directory_entry_settings_tenant")
 }
 
 enum action {

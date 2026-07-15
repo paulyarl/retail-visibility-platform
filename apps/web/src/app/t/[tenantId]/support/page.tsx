@@ -140,6 +140,7 @@ export default function TenantSupportPage() {
       ]}
       navCounts={{
         tickets: tickets.length,
+        tasks: tasks.length,
         inquiries: inquiries.length,
         alerts: unreadAlertCount + unreadActivityCount,
       }}

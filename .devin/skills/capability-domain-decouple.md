@@ -282,6 +282,52 @@ grep -rn "<parent_only_field>" apps/web/src/components/<domain>/
 
 6. **No grep verification** — Assuming the decouple is complete without verifying. **Fix**: Run the grep-verification checklist and confirm zero residual coupling.
 
+## Frontend Decouple (Sprint 2)
+
+The frontend decouple follows the backend sprint and ensures the UI layer consumes the new dedicated types and APIs. The key principle: **frontend components for the decoupled domain must not reference parent domain fields**.
+
+### Frontend Type Separation
+
+1. **`UnifiedCapabilityService.ts`** — Type `BackendEffective<Domain>.merchant_preferences` with a dedicated interface instead of `Record<string, any>`. In `map<Domain>()`, explicitly map fields from the backend interface to the frontend state interface, casting enum-like fields (e.g., layout keys) to the frontend union type.
+
+2. **`TenantDirectoryManagementService.ts`** (or equivalent singleton) — Add a `<Domain>Settings` interface with only domain-relevant fields. Type the `get<Domain>Options` and `update<Domain>Options` methods with this interface instead of `any`.
+
+3. **`CapabilityResolutionService.ts`** — The `<Domain>OptionsState.merchantPreferences` interface should use `<domain>_opt_enabled` (not `<parent>_opt_enabled`). No frontend fallback resolver function is needed if the domain doesn't have one — just ensure the state interface is clean.
+
+### Frontend Component Cleanup
+
+4. **Settings panel** (`<Domain>SettingsPanel.tsx`) — Remove all parent-domain-only toggle sections and their helper functions:
+   - Remove `is<ParentSection>On` / `set<ParentSection>` helpers that read/write parent domain fields
+   - Remove parent domain fields from the save payload in `handleSaveSections`
+   - Remove parent domain toggle UI sections (checkboxes, labels, descriptions)
+   - Add any new domain-specific toggles that have dedicated table columns but no UI yet (e.g., `location_display`, `interactive_maps`)
+
+### Frontend Grep-Verification
+
+```bash
+# Frontend: Decoupled components must not reference parent domain fields
+grep -rn "<parent>_opt_enabled" apps/web/src/components/<domain>/
+# Expected: zero results
+
+# Frontend: Decoupled components must not reference parent-only section fields
+grep -rn "<parent_only_field>" apps/web/src/components/<domain>/
+# Expected: zero results
+
+# Frontend: TS check
+pnpm checkweb
+# Expected: zero TS errors
+```
+
+### Common Frontend Pitfalls
+
+1. **`as any` casts in mapper functions** — Using `merchantPreferences: b.merchant_preferences as any` instead of explicit field mapping. **Fix**: Map each field explicitly with proper type casts for enum-like fields.
+
+2. **Untyped service methods** — Using `Promise<any>` for get/update methods. **Fix**: Define a `<Domain>Settings` interface and type all service methods.
+
+3. **Retaining parent domain toggles in UI** — Keeping Gallery/QR/etc. toggles in the decoupled domain's settings panel because "they were already there". **Fix**: Remove them — those sections belong to their own dedicated resolvers and settings panels.
+
+4. **Missing new domain toggles** — The new dedicated table may have columns that had no UI toggle before (because they were lost in the shared table). **Fix**: Add toggles for any new domain-specific fields like `location_display`, `interactive_maps`.
+
 ## Related Skills
 
 - `capability-deployment-flow.md` — End-to-end orchestration for adding new capabilities

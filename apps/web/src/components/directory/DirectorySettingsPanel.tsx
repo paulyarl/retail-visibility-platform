@@ -205,33 +205,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     setRawSettings((prev: any) => ({ ...prev, [key]: value }));
   };
 
-  const isGalleryOn = !!(rawSettings.image_gallery_5 || rawSettings.image_gallery_10 || rawSettings.image_gallery_15);
-  const isQrOn = !!(rawSettings.qr_product || rawSettings.qr_store || rawSettings.qr_logo || rawSettings.qr_directory);
-
-  const setGallery = (v: boolean) => {
-    setRawSettings((prev: any) => ({
-      ...prev,
-      image_gallery_5: v,
-      image_gallery_10: false,
-      image_gallery_15: false,
-    }));
-  };
-
   const setGalleryMode = (mode: 'carousel' | 'magazine') => {
     setRawSettings((prev: any) => ({ ...prev, gallery_display_mode: mode }));
-  };
-
-  const setQr = (v: boolean) => {
-    setRawSettings((prev: any) => ({
-      ...prev,
-      qr_codes_512: false,
-      qr_codes_1024: v,
-      qr_codes_2048: false,
-      qr_product: v,
-      qr_store: v,
-      qr_logo: false,
-      qr_directory: false,
-    }));
   };
 
   const handleSaveSections = async () => {
@@ -242,20 +217,12 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       await tenantDirectoryManagementService.updateDirectoryEntryOptions(tenantId, {
         hours_display: rawSettings.hours_display,
         map_display: rawSettings.map_display,
+        location_display: rawSettings.location_display,
         storefront_contact: rawSettings.storefront_contact,
         storefront_social_media: rawSettings.storefront_social_media,
+        interactive_maps: rawSettings.interactive_maps,
         enhanced_seo: rawSettings.enhanced_seo,
-        image_gallery_5: rawSettings.image_gallery_5,
-        image_gallery_10: rawSettings.image_gallery_10,
-        image_gallery_15: rawSettings.image_gallery_15,
         gallery_display_mode: rawSettings.gallery_display_mode || 'carousel',
-        qr_codes_512: rawSettings.qr_codes_512,
-        qr_codes_1024: rawSettings.qr_codes_1024,
-        qr_codes_2048: rawSettings.qr_codes_2048,
-        qr_product: rawSettings.qr_product,
-        qr_store: rawSettings.qr_store,
-        qr_logo: rawSettings.qr_logo,
-        qr_directory: rawSettings.qr_directory,
         external_link_enabled: rawSettings.external_link_enabled,
       });
 
@@ -763,35 +730,35 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                 </label>
               </div>
-              {/* Gallery */}
+              {/* Location */}
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Photo Gallery</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Showcase photos on directory page</p>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Location</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Show business address</p>
                 </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowGallery ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input
                     type="checkbox"
-                    checked={isGalleryOn}
-                    disabled={!capState?.canShowGallery}
-                    onChange={(e) => setGallery(e.target.checked)}
+                    checked={!!rawSettings.location_display}
+                    disabled={!capState?.canShowMap}
+                    onChange={(e) => toggleRaw('location_display', e.target.checked)}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                 </label>
               </div>
-              {/* QR */}
+              {/* Interactive Maps */}
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">QR Codes</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Link to store and products</p>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Interactive Map</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Embedded map widget</p>
                 </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowQr ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input
                     type="checkbox"
-                    checked={isQrOn}
-                    disabled={!capState?.canShowQr}
-                    onChange={(e) => setQr(e.target.checked)}
+                    checked={!!rawSettings.interactive_maps}
+                    disabled={!capState?.canShowMap}
+                    onChange={(e) => toggleRaw('interactive_maps', e.target.checked)}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>

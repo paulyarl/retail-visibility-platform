@@ -1143,7 +1143,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_storefront_qr_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_gallery_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_hours_settings.findUnique({ where: { tenant_id: tenantId } })),
-    safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } } })),
+    safeQuery(() => prisma.tenant_directory_entry_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_faq_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_chatbot_options_settings.findUnique({ where: { tenant_id: tenantId } })),

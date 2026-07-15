@@ -51,7 +51,6 @@ export const DEFAULT_SETTINGS = {
   enhanced_seo: false,
   storefront_actions: false,
   storefront_layout: 'classic',
-  directory_entry_layout: 'classic',
 };
 
 // Get storefront options settings for a tenant

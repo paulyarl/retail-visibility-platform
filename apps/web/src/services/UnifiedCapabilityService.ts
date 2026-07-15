@@ -412,6 +412,12 @@ interface BackendEffectiveFaq {
   merchant_preferences: { faq_enabled?: boolean | null } | null;
 }
 
+interface BackendEffectiveDirectoryEntryMerchantPrefs {
+  directory_entry_opt_enabled: boolean;
+  directory_entry_layout: string;
+  external_link_enabled?: boolean;
+}
+
 interface BackendEffectiveDirectoryEntry {
   enabled: boolean;
   is_flexible: boolean;
@@ -438,7 +444,7 @@ interface BackendEffectiveDirectoryEntry {
   can_show_seo: boolean;
   can_show_external_link: boolean;
   external_link_enabled: boolean;
-  merchant_preferences: Record<string, any>;
+  merchant_preferences: BackendEffectiveDirectoryEntryMerchantPrefs;
 }
 
 interface BackendEffectiveCrm {
@@ -843,7 +849,11 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     canShowSeo: b.can_show_seo,
     canShowExternalLink: b.can_show_external_link,
     externalLinkEnabled: b.external_link_enabled,
-    merchantPreferences: b.merchant_preferences as any,
+    merchantPreferences: {
+      directory_entry_opt_enabled: b.merchant_preferences.directory_entry_opt_enabled,
+      directory_entry_layout: (b.merchant_preferences.directory_entry_layout as DirectoryEntryLayoutKey) || 'classic',
+      external_link_enabled: b.merchant_preferences.external_link_enabled,
+    },
     features: {},
   };
 }

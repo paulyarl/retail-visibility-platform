@@ -1330,3 +1330,180 @@ describe('StorefrontHoursResolver', () => {
     expect(result.allowed_hours_types).toEqual([]);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// SECTION 11: DirectoryEntryOptionsResolver (Directory Entry Decouple Sprint)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
+import type { DirectoryEntryMerchantSettings } from '../services/resolvers/types';
+
+describe('DirectoryEntryOptionsResolver', () => {
+  it('returns disabled when no features are present', () => {
+    const result = resolveDirectoryEntryOptions({}, null);
+    expect(result.enabled).toBe(false);
+    expect(result.layout_enabled).toBe(false);
+    expect(result.allowed_layouts).toEqual([]);
+  });
+
+  it('returns disabled when directory_entry_disabled is set', () => {
+    const result = resolveDirectoryEntryOptions({ directory_entry_enabled: true, directory_entry_disabled: true }, null);
+    expect(result.enabled).toBe(false);
+  });
+
+  it('enables with directory_entry_enabled key', () => {
+    const result = resolveDirectoryEntryOptions({ directory_entry_enabled: true }, null);
+    expect(result.enabled).toBe(true);
+  });
+
+  it('implicitly enables when any directory_entry_* feature is present', () => {
+    const result = resolveDirectoryEntryOptions({ directory_entry_layout_classic: true }, null);
+    expect(result.enabled).toBe(true);
+  });
+
+  it('respects flexible key to enable all layouts', () => {
+    const features = { directory_entry_enabled: true, directory_entry_flexible: true };
+    const result = resolveDirectoryEntryOptions(features, null);
+    expect(result.is_flexible).toBe(true);
+    expect(result.allowed_layouts).toEqual(['classic', 'editorial', 'immersive', 'premium']);
+  });
+
+  it('respects individual layout feature keys', () => {
+    const features = {
+      directory_entry_enabled: true,
+      directory_entry_layout_classic: true,
+      directory_entry_layout_editorial: true,
+    };
+    const result = resolveDirectoryEntryOptions(features, null);
+    expect(result.allowed_layouts).toEqual(['classic', 'editorial']);
+    expect(result.can_use_layout_classic).toBe(true);
+    expect(result.can_use_layout_editorial).toBe(true);
+    expect(result.can_use_layout_immersive).toBe(false);
+    expect(result.can_use_layout_premium).toBe(false);
+  });
+
+  it('uses merchant prefs directory_entry_layout as effective layout when allowed', () => {
+    const features = { directory_entry_enabled: true, directory_entry_flexible: true };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: true,
+      directory_entry_layout: 'immersive',
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.effective_layout).toBe('immersive');
+  });
+
+  it('falls back to first allowed layout when merchant choice is not in allowed list', () => {
+    const features = {
+      directory_entry_enabled: true,
+      directory_entry_layout_classic: true,
+    };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: true,
+      directory_entry_layout: 'premium',
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.effective_layout).toBe('classic');
+  });
+
+  it('reads directory_entry_opt_enabled from merchant prefs (not storefront_opt_enabled)', () => {
+    const features = { directory_entry_enabled: true, directory_entry_flexible: true };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: false,
+      directory_entry_layout: 'classic',
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.merchant_preferences.directory_entry_opt_enabled).toBe(false);
+  });
+
+  it('defaults merchant prefs to true when null', () => {
+    const features = { directory_entry_enabled: true, directory_entry_flexible: true };
+    const result = resolveDirectoryEntryOptions(features, null);
+    expect(result.merchant_preferences.directory_entry_opt_enabled).toBe(true);
+    expect(result.merchant_preferences.directory_entry_layout).toBe('classic');
+  });
+
+  it('enables section flags via flexible', () => {
+    const features = { directory_entry_enabled: true, directory_entry_flexible: true };
+    const result = resolveDirectoryEntryOptions(features, null);
+    expect(result.hours_enabled).toBe(true);
+    expect(result.map_enabled).toBe(true);
+    expect(result.contact_enabled).toBe(true);
+    expect(result.gallery_enabled).toBe(true);
+    expect(result.qr_enabled).toBe(true);
+    expect(result.social_enabled).toBe(true);
+    expect(result.seo_enabled).toBe(true);
+  });
+
+  it('respects merchant prefs to disable sections', () => {
+    const features = { directory_entry_enabled: true, directory_entry_flexible: true };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: true,
+      directory_entry_layout: 'classic',
+      hours_display: false,
+      map_display: false,
+      storefront_contact: false,
+      storefront_social_media: false,
+      enhanced_seo: false,
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.hours_enabled).toBe(false);
+    expect(result.map_enabled).toBe(false);
+    expect(result.contact_enabled).toBe(false);
+    expect(result.social_enabled).toBe(false);
+    expect(result.seo_enabled).toBe(false);
+  });
+
+  it('enables external link when tier allows and merchant pref is true', () => {
+    const features = { directory_entry_enabled: true, directory_entry_external_link: true };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: true,
+      directory_entry_layout: 'classic',
+      external_link_enabled: true,
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.can_show_external_link).toBe(true);
+    expect(result.external_link_enabled).toBe(true);
+  });
+
+  it('disables external link when merchant pref is false', () => {
+    const features = { directory_entry_enabled: true, directory_entry_external_link: true };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: true,
+      directory_entry_layout: 'classic',
+      external_link_enabled: false,
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.can_show_external_link).toBe(true);
+    expect(result.external_link_enabled).toBe(false);
+  });
+
+  it('disables external link when tier does not allow', () => {
+    const features = { directory_entry_enabled: true };
+    const prefs: DirectoryEntryMerchantSettings = {
+      directory_entry_opt_enabled: true,
+      directory_entry_layout: 'classic',
+      external_link_enabled: true,
+    };
+    const result = resolveDirectoryEntryOptions(features, prefs);
+    expect(result.can_show_external_link).toBe(false);
+    expect(result.external_link_enabled).toBe(false);
+  });
+
+  it('does not read storefront_opt_enabled or parent domain fields', () => {
+    const features = {
+      directory_entry_enabled: true,
+      directory_entry_flexible: true,
+      // Parent domain fields present but should be ignored
+      storefront_opt_enabled: true,
+      image_gallery_5: true,
+      qr_product: true,
+    };
+    const result = resolveDirectoryEntryOptions(features, null);
+    // Result should be based on directory_entry_* features only
+    expect(result.enabled).toBe(true);
+    // merchant_preferences should not contain parent domain fields
+    expect(result.merchant_preferences).not.toHaveProperty('storefront_opt_enabled');
+    expect(result.merchant_preferences).not.toHaveProperty('image_gallery_5');
+    expect(result.merchant_preferences).not.toHaveProperty('qr_product');
+  });
+});

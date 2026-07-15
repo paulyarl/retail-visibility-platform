@@ -1136,6 +1136,16 @@ export function generateStorefrontGallerySettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate directory entry settings ID
+ * Format: des-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryEntrySettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `des-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate a tenant_storefront_hours_settings ID.
  * Format: shs-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable

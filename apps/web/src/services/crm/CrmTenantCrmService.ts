@@ -11,7 +11,7 @@ import type {
   CrmTicket, CreateTicketInput, UpdateTicketInput,
   CrmTicketMessage, CreateTicketMessageInput,
   CrmTask, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
-  CrmAlert,
+  CrmAlert, TaskStatus,
 } from '@/types/crm';
 
 class CrmTenantCrmService extends TenantApiSingleton {
@@ -208,7 +208,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
     return this.unwrap<CrmTicketMessage>(result);
   }
 
-  // --- Tasks (read-only) ---
+  // --- Tasks ---
   async listTasks(filters?: { status?: string; assignedTo?: string }): Promise<CrmTask[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
@@ -221,6 +221,15 @@ class CrmTenantCrmService extends TenantApiSingleton {
       3 * 60 * 1000
     );
     return this.unwrap<CrmTask[]>(result);
+  }
+
+  async updateTaskStatus(taskId: string, status: TaskStatus): Promise<CrmTask> {
+    const result = await this.makeDefaultRequest<CrmTask>(
+      `/api/tenant/crm/tasks/${taskId}`,
+      { method: 'PUT', body: JSON.stringify({ status }) },
+      undefined
+    );
+    return this.unwrap<CrmTask>(result);
   }
 
   // --- Activities ---
