@@ -82,6 +82,20 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           accessOptions: { roles: ['admin', 'support'] },
         },
         {
+          title: 'Sales Funnels',
+          description: 'Build order bumps, upsells, and downsells to increase checkout revenue',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18l-6 8v6l-6 2v-8L3 4z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/funnels`,
+          color: 'bg-cyan-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'funnel',
+        },
+        {
           title: 'Directory Promotion',
           description: 'Boost your store visibility on the directory map and search results',
           icon: (
@@ -689,6 +703,20 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           accessOptions: { roles: ['admin', 'support'] },
         },
         {
+          title: 'Sales Funnels',
+          description: 'Build order bumps, upsells, and downsells to increase checkout revenue',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18l-6 8v6l-6 2v-8L3 4z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/funnels`,
+          color: 'bg-cyan-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+          capabilityKey: 'funnel',
+        },
+        {
           title: 'Directory Promotion',
           description: 'Boost your store visibility on the directory map and search results',
           icon: (
@@ -872,6 +900,19 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           ),
           href: `/t/${tenantId}/settings/directory`,
           color: 'bg-rose-500',
+          badge: 'NEW',
+          accessOptions: { roles: ['admin', 'support'] },
+        },
+        {
+          title: 'Directory Health',
+          description: 'Run a quality check on your directory listing to see completeness score and recommendations',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.062-.18-2.087-.51-3.033z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/directory/health`,
+          color: 'bg-emerald-600',
           badge: 'NEW',
           accessOptions: { roles: ['admin', 'support'] },
         },

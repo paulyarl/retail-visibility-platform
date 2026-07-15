@@ -134,6 +134,14 @@ function ChartIcon() {
   );
 }
 
+function FilterIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-6 8v6l-6 2v-8L3 4z" />
+    </svg>
+  );
+}
+
 function MapPinIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -169,6 +177,7 @@ const IconComponents = {
   tags: TagsIcon,
   store: StoreIcon,
   chart: ChartIcon,
+  filter: FilterIcon,
 };
 
 // Convert icon string to React component

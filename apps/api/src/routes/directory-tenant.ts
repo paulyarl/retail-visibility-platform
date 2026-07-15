@@ -558,4 +558,64 @@ router.post('/:id/directory/unpublish', authenticateToken, checkTenantAccess, as
   }
 });
 
+/**
+ * GET /api/tenants/:id/directory/quality-check
+ * Self-service quality check for a tenant's own directory listing
+ */
+router.get('/:id/directory/quality-check', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id: tenantId } = req.params;
+
+    const profile = await prisma.tenant_business_profiles_list.findUnique({ where: { tenant_id: tenantId } });
+    const settings = await prisma.directory_settings_list.findUnique({ where: { tenant_id: tenantId } });
+    const itemCount = await prisma.inventory_items.count({
+      where: { tenant_id: tenantId, item_status: 'active' },
+    });
+
+    const checks = {
+      business_name: !!profile?.business_name,
+      address: !!profile?.address_line1,
+      cityState: !!(profile?.city && profile?.state),
+      phone: !!profile?.phone_number,
+      email: !!profile?.email,
+      website: !!profile?.website,
+      logo: !!profile?.logo_url,
+      hours: !!profile?.hours,
+      description: !!(settings?.seo_description && settings.seo_description.length > 100),
+      category: !!settings?.primary_category,
+      hasItems: itemCount > 0,
+      hasMultipleItems: itemCount > 10,
+    };
+
+    const completedChecks = Object.values(checks).filter(Boolean).length;
+    const totalChecks = Object.keys(checks).length;
+    const completenessPercent = Math.round((completedChecks / totalChecks) * 100);
+
+    const recommendations: string[] = [];
+    if (!checks.business_name) recommendations.push('Add business name');
+    if (!checks.address) recommendations.push('Add street address');
+    if (!checks.cityState) recommendations.push('Add city and state');
+    if (!checks.phone) recommendations.push('Add phone number for better local SEO');
+    if (!checks.email) recommendations.push('Add email address');
+    if (!checks.website) recommendations.push('Add website URL');
+    if (!checks.logo) recommendations.push('Upload business logo');
+    if (!checks.hours) recommendations.push('Add business hours');
+    if (!checks.description) recommendations.push('Add detailed description (150+ words)');
+    if (!checks.category) recommendations.push('Select primary category');
+    if (!checks.hasItems) recommendations.push('Add products to showcase');
+    if (!checks.hasMultipleItems) recommendations.push('Add more products (10+ recommended)');
+
+    return res.json({
+      completenessPercent,
+      checks,
+      recommendations,
+      itemCount,
+      canPublish: checks.business_name && checks.cityState && checks.category,
+    });
+  } catch (error: any) {
+    console.error('[GET /tenants/:id/directory/quality-check] Error:', error);
+    return res.status(500).json({ error: 'failed_to_check_quality' });
+  }
+});
+
 export default router;

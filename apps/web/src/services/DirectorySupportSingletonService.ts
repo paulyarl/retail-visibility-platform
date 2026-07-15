@@ -96,7 +96,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryStatus>(
-      `/support/directory/tenant/${tenantId}/status`,
+      `/api/support/directory/tenant/${tenantId}/status`,
       {},
       `directory-status-${tenantId}`,
       this.cacheTTL
@@ -120,7 +120,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryQualityCheck>(
-      `/support/directory/tenant/${tenantId}/quality-check`,
+      `/api/support/directory/tenant/${tenantId}/quality-check`,
       {},
       `directory-quality-check-${tenantId}`,
       this.cacheTTL
@@ -144,7 +144,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryNote[]>(
-      `/support/directory/tenant/${tenantId}/notes`,
+      `/api/support/directory/tenant/${tenantId}/notes`,
       {},
       `directory-notes-${tenantId}`,
       this.cacheTTL
@@ -168,7 +168,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryNote>(
-      `/support/directory/tenant/${tenantId}/notes`,
+      `/api/support/directory/tenant/${tenantId}/notes`,
       {
         method: 'POST',
         headers: {
@@ -202,7 +202,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
       }
 
       const response = await this.makeDefaultRequest<any>(
-        `/support/directory/search?q=${encodeURIComponent(query)}`,
+        `/api/support/directory/search?q=${encodeURIComponent(query)}`,
         {},
         `search-directory-${query}`,
         this.cacheTTL

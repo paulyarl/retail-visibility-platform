@@ -549,6 +549,14 @@ function MapIcon() {
   );
 }
 
+function FilterIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-6 8v6l-6 2v-8L3 4z" />
+    </svg>
+  );
+}
+
 const IconComponents = {
   home: HomeIcon,
   user: UserIcon,
@@ -602,6 +610,7 @@ const IconComponents = {
   cube: CubeIcon,
   'map-pin': MapPinIcon,
   map: MapIcon,
+  filter: FilterIcon,
 };
 
 // Convert icon string to React component
@@ -657,6 +666,7 @@ const ICON_OPTIONS = [
   { value: 'cube', label: 'Cube' },
   { value: 'map-pin', label: 'Map Pin' },
   { value: 'map', label: 'Map' },
+  { value: 'filter', label: 'Filter/Funnel' },
 ];
 
 const PERMISSION_OPTIONS = [

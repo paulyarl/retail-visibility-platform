@@ -315,6 +315,18 @@ export default function AdminDashboardPage() {
           stats: 'Service fulfillment',
           badge: 'NEW',
         },
+        {
+          title: 'Directory Support Tools',
+          description: 'Look up tenants, check directory listing quality, and manage support notes',
+          href: '/support/directory',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          ),
+          color: 'bg-cyan-600',
+          stats: 'Tenant lookup & quality',
+        },
       ],
     },
     {
