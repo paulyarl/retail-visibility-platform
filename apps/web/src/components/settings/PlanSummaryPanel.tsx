@@ -160,7 +160,6 @@ const STOREFRONT_OPT_RECOMMEND_LABELS: Record<StorefrontOptRecommendType, string
 const STOREFRONT_OPT_INFO_LABELS: Record<StorefrontOptInfoType, string> = {
   storefront_social_media: 'Social Media',
   storefront_contact: 'Contact Info',
-  interactive_maps: 'Maps',
 };
 
 const STOREFRONT_OPT_QR_RESOLUTION_LABELS: Record<StorefrontOptQRResolutionType, string> = {
@@ -258,6 +257,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   storefront_gallery: { label: 'Image Gallery', icon: '🖼️', settingsPath: '/settings/storefront-gallery' },
   storefront_hours: { label: 'Business Hours', icon: '🕐', settingsPath: '/settings/storefront-hours' },
   storefront_layouts: { label: 'Storefront Layout', icon: '📐', settingsPath: '/settings/storefront-layouts' },
+  storefront_maps: { label: 'Storefront Maps', icon: '🗺️', settingsPath: '/settings/storefront-maps' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
@@ -600,7 +600,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     so.allowedCategoryTypes.forEach(t => addSo(STOREFRONT_OPT_CATEGORY_LABELS[t], true, t === 'category_store' ? so.canUseCategoryStore : t === 'category_product' ? so.canUseCategoryProduct : false));
     so.allowedRecommendTypes.forEach(t => addSo(STOREFRONT_OPT_RECOMMEND_LABELS[t], true, t === 'recommend_store' ? so.canUseRecommendStore : t === 'recommend_products' ? so.canUseRecommendProducts : false));
     addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
-    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
+    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : false));
     so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
     summaries.push({
       key: 'storefront_options',
@@ -718,6 +718,30 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_layouts',
       settingsPath: CAPABILITY_DISPLAY.storefront_layouts.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Maps — list map features
+  const sm = caps.storefrontMaps;
+  if (sm && sm.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSm = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    addSm('Interactive Maps', sm.canUseInteractiveMaps, sm.canUseInteractiveMaps);
+    addSm('Map Display', sm.canShowMapDisplay, sm.canShowMapDisplay);
+    addSm('Location Display', sm.canShowLocationDisplay, sm.canShowLocationDisplay);
+    summaries.push({
+      key: 'storefront_maps',
+      label: CAPABILITY_DISPLAY.storefront_maps.label,
+      icon: CAPABILITY_DISPLAY.storefront_maps.icon,
+      enabled: sm.enabled,
+      merchantGated: merchantGates?.['storefront_maps'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_maps',
+      settingsPath: CAPABILITY_DISPLAY.storefront_maps.settingsPath ?? null,
     });
   }
 

@@ -2,28 +2,37 @@
  * Funnel Resolver
  *
  * Resolves effective sales funnel capability from merged tier + purchased features.
- * Merchants can build funnels only when funnel_builder (or funnel_builder_flexible)
- * is enabled; individual step types can be unlocked by tier or purchased separately.
+ * Follows the canonical feature-key convention for options capabilities:
+ *   <capability_key>_enabled / _disabled
+ *   <capability_key>_flexible
+ *   <capability_key>_<group>_on / _off
+ *   <capability_key>_<group>_<feature>
+ *
+ * For funnel_options the group is "builder" and the step types are the features.
  */
 
 import type { EffectiveFunnel, FunnelStepType } from './types';
 
 const STEP_KEY_MAP: { key: string; type: FunnelStepType }[] = [
-  { key: 'funnel_order_bump', type: 'order_bump' },
-  { key: 'funnel_upsell', type: 'upsell' },
-  { key: 'funnel_downsell', type: 'downsell' },
-  { key: 'funnel_oto', type: 'oto' },
+  { key: 'funnel_options_builder_order_bump', type: 'order_bump' },
+  { key: 'funnel_options_builder_upsell', type: 'upsell' },
+  { key: 'funnel_options_builder_downsell', type: 'downsell' },
+  { key: 'funnel_options_builder_oto', type: 'oto' },
 ];
 
 export function resolveFunnelOptions(features: Record<string, boolean>): EffectiveFunnel {
   const disabled = !!features.funnel_options_disabled;
   const masterEnabled = !!features.funnel_options_enabled;
-  const flexible = !!features.funnel_builder_flexible;
-  const builderEnabled = masterEnabled && !disabled && (flexible || !!features.funnel_builder);
+  const flexible = !!features.funnel_options_flexible;
+  const groupOn = flexible || !!features.funnel_options_builder_on;
+  const groupOff = !!features.funnel_options_builder_off;
+  const builderEnabled = masterEnabled && !disabled && groupOn && !groupOff;
 
   const allowed_steps: FunnelStepType[] = [];
   for (const { key, type } of STEP_KEY_MAP) {
-    if (flexible || !!features[key]) {
+    if (groupOn && !groupOff) {
+      allowed_steps.push(type);
+    } else if (!groupOff && !!features[key]) {
       allowed_steps.push(type);
     }
   }

@@ -315,7 +315,6 @@ class StorefrontOptionsService {
       canUseRecentlyViewed: false,
       canUseSocialMedia: false,
       canUseContact: false,
-      canUseInteractiveMaps: false,
       canUseEnhancedSEO: false,
       canUseStorefrontActions: false,
       features: {},

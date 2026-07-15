@@ -317,7 +317,7 @@ export function getStorefrontOptionFlags(state: StorefrontOptionsState): Storefr
     showRecentlyViewed: state.canUseRecentlyViewed,
     showSocialMedia: state.canUseSocialMedia,
     showContact: state.canUseContact,
-    showInteractiveMaps: state.canUseInteractiveMaps,
+    showInteractiveMaps: false,
     showQRCodes: false,
     showQRProduct: false,
     showQRStore: false,

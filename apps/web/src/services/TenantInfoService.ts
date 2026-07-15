@@ -2241,6 +2241,56 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getStorefrontMapsSettings(tenantId: string): Promise<{
+    maps_enabled: boolean;
+    interactive_maps: boolean;
+    map_display: boolean;
+    location_display: boolean;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-maps`,
+        {},
+        `tenant-storefront-maps-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront maps settings:', error);
+      return null;
+    }
+  }
+
+  async updateStorefrontMapsSettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-maps`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-storefront-maps-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-storefront-maps-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update storefront maps settings:', error);
+      return null;
+    }
+  }
+
   async updateQuickstartOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
     try {
       if (!tenantId) return null;

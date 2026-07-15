@@ -214,8 +214,6 @@ export interface StorefrontQrMerchantSettings {
 
 export interface StorefrontOptionsMerchantSettings {
   storefront_opt_enabled?: boolean | null;
-  map_display?: boolean | null;
-  location_display?: boolean | null;
   category_store?: boolean | null;
   category_product?: boolean | null;
   recommend_store?: boolean | null;
@@ -223,7 +221,6 @@ export interface StorefrontOptionsMerchantSettings {
   recently_viewed?: boolean | null;
   storefront_social_media?: boolean | null;
   storefront_contact?: boolean | null;
-  interactive_maps?: boolean | null;
   enhanced_seo?: boolean | null;
   storefront_actions?: boolean | null;
 }
@@ -553,7 +550,7 @@ export interface EffectiveDirectoryEntryOptions {
 export type StorefrontOptHoursType = 'hours_animated' | 'hours_status';
 export type StorefrontOptCategoryType = 'category_store' | 'category_product';
 export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products';
-export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact' | 'interactive_maps';
+export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact';
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
 export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';

@@ -294,6 +294,7 @@ function buildTenantNav(
         { label: 'Image Gallery', href: `/t/${currentTenantId}/settings/storefront-gallery`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Business Hours', href: `/t/${currentTenantId}/settings/storefront-hours`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Storefront Layout', href: `/t/${currentTenantId}/settings/storefront-layouts`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'Storefront Maps', href: `/t/${currentTenantId}/settings/storefront-maps`, requiredGroup: 'IS_TENANT_ADMIN' },
         ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
     },

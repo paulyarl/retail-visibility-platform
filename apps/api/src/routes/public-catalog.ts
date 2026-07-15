@@ -3570,9 +3570,9 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
     });
     const mapsPrefs = mapsSettings || {};
     const mapsMainOn = mapsEnabled;
-    const effectiveMapDisplay = mapsMainOn && mapDisplayTierAllowed && mapsPrefs.map_display !== false;
-    const effectiveLocationDisplay = mapsMainOn && locationDisplayTierAllowed && mapsPrefs.location_display !== false;
-    const effectiveInteractiveMaps = mapsMainOn && interactiveMapsTierAllowed && mapsPrefs.interactive_maps !== false;
+    const effectiveMapDisplay = mapsMainOn && mapDisplayTierAllowed && (mapsPrefs as any).map_display !== false;
+    const effectiveLocationDisplay = mapsMainOn && locationDisplayTierAllowed && (mapsPrefs as any).location_display !== false;
+    const effectiveInteractiveMaps = mapsMainOn && interactiveMapsTierAllowed && (mapsPrefs as any).interactive_maps !== false;
     const effectiveRecentlyViewed = optEnabled && recentlyViewedTierAllowed && prefs.recently_viewed !== false;
     const effectiveInfoTypes = optEnabled
       ? allowedInfoTypes.filter(t => (prefs as any)[t] !== false)
