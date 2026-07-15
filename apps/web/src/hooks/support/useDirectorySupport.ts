@@ -57,7 +57,7 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const raw = await directorySupportService.getDirectoryStatus(tenantId);
+      const raw = await directorySupportService.getDirectoryStatus(tenantId) as any;
       if (!raw) return null;
       return {
         ...raw,
@@ -105,7 +105,7 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const raw = await directorySupportService.getDirectoryNotes(tenantId);
+      const raw = await directorySupportService.getDirectoryNotes(tenantId) as any;
       if (!raw) return [];
       return Array.isArray(raw) ? raw : (raw.notes || []);
     } catch (err) {
