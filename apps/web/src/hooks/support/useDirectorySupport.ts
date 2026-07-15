@@ -121,8 +121,26 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const data = await directorySupportService.searchDirectory(query);
-      return data?.tenants || [];
+      const response = await directorySupportService.searchDirectory(query);
+      const tenants = response?.data?.tenants || response?.tenants || [];
+      return tenants.map((t: any) => ({
+        ...t,
+        subscriptionTier: t.subscription_tier,
+        subscriptionStatus: t.subscription_status,
+        businessProfile: t.tenant_business_profiles_list
+          ? {
+              ...t.tenant_business_profiles_list,
+              businessName: t.tenant_business_profiles_list.business_name,
+            }
+          : undefined,
+        directorySettings: t.directory_settings_list
+          ? {
+              ...t.directory_settings_list,
+              isPublished: t.directory_settings_list.is_published,
+              isFeatured: t.directory_settings_list.is_featured,
+            }
+          : undefined,
+      }));
     } catch (err) {
       console.error('Error searching tenants:', err);
       setError(err instanceof Error ? err.message : 'Failed to search');
