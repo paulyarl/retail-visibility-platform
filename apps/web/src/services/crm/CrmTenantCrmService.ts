@@ -10,7 +10,7 @@ import type {
   CrmTenantCrmStats, CrmUserReadState, CrmContact, CrmContactDetail, CreateContactInput, UpdateContactInput,
   CrmTicket, CreateTicketInput, UpdateTicketInput,
   CrmTicketMessage, CreateTicketMessageInput,
-  CrmTask, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
+  CrmTask, CrmTaskMessage, CreateTaskMessageInput, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
   CrmAlert, TaskStatus,
 } from '@/types/crm';
 
@@ -230,6 +230,27 @@ class CrmTenantCrmService extends TenantApiSingleton {
       undefined
     );
     return this.unwrap<CrmTask>(result);
+  }
+
+  // --- Task Messages ---
+  async listTaskMessages(taskId: string): Promise<CrmTaskMessage[]> {
+    const cacheKey = `crm-tenant-task-messages-${taskId}`;
+    const result = await this.makeDefaultRequest<CrmTaskMessage[]>(
+      `/api/tenant/crm/tasks/${taskId}/messages`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmTaskMessage[]>(result);
+  }
+
+  async createTaskMessage(taskId: string, data: CreateTaskMessageInput): Promise<CrmTaskMessage> {
+    const result = await this.makeDefaultRequest<CrmTaskMessage>(
+      `/api/tenant/crm/tasks/${taskId}/messages`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTaskMessage>(result);
   }
 
   // --- Activities ---

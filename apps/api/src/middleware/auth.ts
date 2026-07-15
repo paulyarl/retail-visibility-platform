@@ -40,6 +40,8 @@ export interface JWTPayload {
   email: string;
   role: user_role;
   tenantIds: string[];
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 // Customer payload interface
@@ -139,6 +141,8 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
           email: true,
           role: true,
           auth0_id: true,
+          first_name: true,
+          last_name: true,
           user_tenants: {
             select: { tenant_id: true }
           }
@@ -155,6 +159,8 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
           email: true,
           role: true,
           auth0_id: true,
+          first_name: true,
+          last_name: true,
           user_tenants: {
             select: { tenant_id: true }
           }
@@ -173,7 +179,9 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       user_id: user.id,
       email: user.email,
       role: user.role as user_role,
-      tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
+      tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || [],
+      first_name: user.first_name,
+      last_name: user.last_name,
     };
     
     req.user = makeBothConventionsAvailable(payload);
@@ -346,6 +354,8 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
             email: true,
             role: true,
             auth0_id: true,
+            first_name: true,
+            last_name: true,
             user_tenants: {
               select: { tenant_id: true }
             }
@@ -362,6 +372,8 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
             email: true,
             role: true,
             auth0_id: true,
+            first_name: true,
+            last_name: true,
             user_tenants: {
               select: { tenant_id: true }
             }
@@ -376,7 +388,9 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
           user_id: user.id,
           email: user.email,
           role: user.role as user_role,
-          tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
+          tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || [],
+          first_name: user.first_name,
+          last_name: user.last_name,
         };
         
         req.user = makeBothConventionsAvailable(payload);

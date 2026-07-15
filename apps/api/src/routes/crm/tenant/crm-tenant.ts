@@ -188,7 +188,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
     if (!(await checkCrmCreateAllowed(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     // Resolve customer_id from contact_id if not explicitly provided
     let customer_id = req.body.customer_id;
@@ -227,7 +227,7 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     const ticket = await ticketService.update(req.params.ticketId, req.body, actorId, actorName, 'tenant');
     await audit({ tenantId, actor: actorId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
@@ -258,7 +258,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     const message = await messageService.create({
       ticket_id: req.params.ticketId,
@@ -303,7 +303,7 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
     if (existing.tenant_id !== tenantId) return res.status(403).json({ error: 'forbidden' });
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     const { status } = req.body as { status?: string };
     if (!status || !['pending', 'in_progress', 'completed', 'cancelled'].includes(status)) {
@@ -350,7 +350,7 @@ router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
     }
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     const message = await taskMessageService.create({
       task_id: req.params.taskId,
@@ -433,7 +433,7 @@ router.put('/inquiries/:inquiryId', async (req: Request, res: Response) => {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(400).json({ error: 'tenant_id_required' });
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     const inquiry = await inquiryService.update(req.params.inquiryId, req.body);
 
@@ -542,7 +542,7 @@ router.post('/inquiries/:inquiryId/create-ticket', async (req: Request, res: Res
     if (!(await checkCrmCreateAllowed(tenantId, res))) return;
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Tenant User';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Tenant User';
 
     const inquiry = await inquiryService.getById(req.params.inquiryId);
     if (!inquiry || inquiry.tenant_id !== tenantId) {

@@ -32,8 +32,8 @@ function getUserId(req: Request): string | null {
   return req.user?.userId || req.user?.user_id || req.user?.id || null;
 }
 
-function getUserEmail(req: Request): string {
-  return req.user?.email || 'Platform User';
+function getUserDisplayName(req: Request): string {
+  return [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform User';
 }
 
 function getTenantIds(req: Request): string[] {
@@ -165,7 +165,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(401).json({ error: 'authentication_required' });
-    const actorName = getUserEmail(req);
+    const actorName = getUserDisplayName(req);
 
     const ticket = await ticketService.create({
       tenant_id: PLATFORM_TENANT_ID,
@@ -229,7 +229,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(401).json({ error: 'authentication_required' });
-    const actorName = getUserEmail(req);
+    const actorName = getUserDisplayName(req);
 
     const ticket = await ticketService.getById(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });

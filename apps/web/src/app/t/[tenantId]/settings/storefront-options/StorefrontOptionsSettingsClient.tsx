@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/Switch';
 import { Save, AlertCircle, CheckCircle2, Clock, LayoutGrid, Star, Eye, Info, QrCode, Image, Zap, ArrowRight, Building, Paintbrush, MapPin, CalendarDays, Tag, FolderOpen, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
-import { STOREFRONT_OPT_GROUPS, getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
+import { getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 
@@ -175,7 +175,6 @@ const GROUP_ICONS: Record<StorefrontOptGroup, React.ReactNode> = {
   gallery: <Image className="w-5 h-5 text-orange-600" />,
   gallery_mode: <Image className="w-5 h-5 text-rose-600" />,
   advanced: <Zap className="w-5 h-5 text-lime-600" />,
-  layout: <LayoutGrid className="w-5 h-5 text-violet-600" />,
 };
 
 export default function StorefrontOptionsSettingsClient({ tenantId }: StorefrontOptionsSettingsClientProps) {

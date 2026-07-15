@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/comp
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
+import Link from 'next/link';
 import type { CrmTask, TaskStatus, TaskPriority } from '@/types/crm';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -133,7 +134,9 @@ export default function TenantTasksPage() {
                         key={t.id}
                         className="block rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
                       >
-                        <p className="text-sm font-medium truncate">{t.title}</p>
+                        <Link href={`/t/${tenantId}/support/tasks/${t.id}`} className="text-sm font-medium truncate block hover:text-amber-600 hover:underline">
+                          {t.title}
+                        </Link>
                         {t.description && (
                           <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{t.description}</p>
                         )}

@@ -225,7 +225,7 @@ router.post('/tenants/:tenantId/tickets', async (req: Request, res: Response) =>
   try {
     const tenantId = req.params.tenantId;
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const ticket = await ticketService.create({ tenant_id: tenantId, ...req.body });
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
@@ -253,7 +253,7 @@ router.post('/tenants/:tenantId/tickets', async (req: Request, res: Response) =>
 router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
   try {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const ticket = await ticketService.update(req.params.ticketId, req.body, actorId, actorName, 'platform');
     await audit({ tenantId: ticket.tenant_id, actor: actorId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
@@ -280,7 +280,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
 router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) => {
   try {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const message = await messageService.create({
       ticket_id: req.params.ticketId,
@@ -320,7 +320,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
 router.post('/tasks', async (req: Request, res: Response) => {
   try {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const task = await taskService.create({ ...req.body, created_by: actorId });
     await audit({ tenantId: req.body.tenant_id, actor: actorId, action: 'create', payload: { entity_type: 'crm_task', id: task.id } });
@@ -348,7 +348,7 @@ router.post('/tasks', async (req: Request, res: Response) => {
 router.put('/tasks/:taskId', async (req: Request, res: Response) => {
   try {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const task = await taskService.update(req.params.taskId, req.body, actorId, actorName, 'platform');
     await audit({ tenantId: task.tenant_id, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
@@ -374,7 +374,7 @@ router.get('/tasks/:taskId/messages', async (req: Request, res: Response) => {
 router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
   try {
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const message = await taskMessageService.create({
       task_id: req.params.taskId,
@@ -445,7 +445,7 @@ router.post('/tenants/:tenantId/activities', async (req: Request, res: Response)
   try {
     const tenantId = req.params.tenantId;
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const activity = await activityService.create({
       tenant_id: tenantId,
@@ -550,7 +550,7 @@ router.patch('/requests/:requestId', async (req: Request, res: Response) => {
   try {
     const { type, ...data } = req.body;
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
-    const actorName = req.user?.email || 'Platform Admin';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     let result: any;
     if (type === 'ticket') {

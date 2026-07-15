@@ -15,7 +15,6 @@ import {
   StorefrontOptQRContentType as QRContentTypeInternal,
   StorefrontOptGalleryType as GalleryTypeInternal,
   StorefrontOptAdvancedType as AdvancedTypeInternal,
-  StorefrontLayoutType as LayoutTypeInternal,
   StorefrontOptionsState,
 } from '@/services/CapabilityResolutionService';
 
@@ -28,13 +27,12 @@ export type StorefrontOptQRResolutionType = QRResolutionTypeInternal;
 export type StorefrontOptQRContentType = QRContentTypeInternal;
 export type StorefrontOptGalleryType = GalleryTypeInternal;
 export type StorefrontOptAdvancedType = AdvancedTypeInternal;
-export type StorefrontOptLayoutType = LayoutTypeInternal;
 
 // ====================
 // GROUP DEFINITIONS
 // ====================
 
-export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'gallery_mode' | 'advanced' | 'layout';
+export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'gallery_mode' | 'advanced';
 
 export const HOURS_TYPES: StorefrontOptHoursType[] = ['hours_animated', 'hours_status'];
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
@@ -45,7 +43,6 @@ export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr
 export const GALLERY_TYPES: StorefrontOptGalleryType[] = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'];
 export const GALLERY_MODE_TYPES = ['carousel', 'magazine'] as const;
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
-export const LAYOUT_TYPES: StorefrontOptLayoutType[] = ['classic', 'editorial', 'immersive'];
 
 // ====================
 // TYPE GUARDS
@@ -81,10 +78,6 @@ export function isGalleryType(type: string): type is StorefrontOptGalleryType {
 
 export function isAdvancedType(type: string): type is StorefrontOptAdvancedType {
   return ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType);
-}
-
-export function isLayoutType(type: string): type is StorefrontOptLayoutType {
-  return LAYOUT_TYPES.includes(type as StorefrontOptLayoutType);
 }
 
 // ====================
@@ -137,10 +130,6 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   // Advanced
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced', icon: '🔍', color: 'lime', selectionMode: 'toggle' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced', icon: '⚡', color: 'yellow', selectionMode: 'toggle' },
-  // Layout
-  classic: { key: 'classic', label: 'Classic Layout', description: 'Traditional single-column layout', group: 'layout', icon: '📄', color: 'slate', selectionMode: 'radio' },
-  editorial: { key: 'editorial', label: 'Modern Editorial', description: 'Storytelling emphasis, hero banner layout', group: 'layout', icon: '📰', color: 'violet', selectionMode: 'radio' },
-  immersive: { key: 'immersive', label: 'Immersive Commerce', description: 'Conversion-optimized compact purchase flow', group: 'layout', icon: '🛒', color: 'emerald', selectionMode: 'radio' },
 };
 
 /**
@@ -163,7 +152,6 @@ export function getTypesByGroup(group: StorefrontOptGroup): string[] {
     case 'qr': return [...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES];
     case 'gallery': return [...GALLERY_TYPES];
     case 'advanced': return [...ADVANCED_TYPES];
-    case 'layout': return [...LAYOUT_TYPES];
     default: return [];
   }
 }
@@ -197,7 +185,6 @@ export const STOREFRONT_OPT_GROUPS: StorefrontOptGroupMeta[] = [
   { key: 'qr', label: 'QR Code Display', description: 'QR code generation and display options', icon: '📱', color: 'indigo' },
   { key: 'gallery', label: 'Gallery Display', description: 'Image gallery limits', icon: '🖼️', color: 'orange' },
   { key: 'advanced', label: 'Advanced', description: 'Advanced storefront features', icon: '⚡', color: 'lime' },
-  { key: 'layout', label: 'Storefront Layout', description: 'Storefront page layout options', icon: '📐', color: 'violet' },
 ];
 
 export function getGroupMeta(group: StorefrontOptGroup): StorefrontOptGroupMeta | undefined {
