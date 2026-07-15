@@ -2193,6 +2193,54 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getStorefrontLayoutsSettings(tenantId: string): Promise<{
+    layouts_enabled: boolean;
+    storefront_layout: string;
+  } | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-layouts`,
+        {},
+        `tenant-storefront-layouts-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get storefront layouts settings:', error);
+      return null;
+    }
+  }
+
+  async updateStorefrontLayoutsSettings(tenantId: string, settings: any): Promise<any | null> {
+    try {
+      if (!tenantId) return null;
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        settings: Record<string, any>;
+      }>(
+        `/api/tenants/${tenantId}/storefront-layouts`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+        `tenant-storefront-layouts-settings-update-${tenantId}`
+      );
+      if (!result.success) return null;
+      await this.invalidateCachePattern(`tenant-storefront-layouts-settings-${tenantId}*`);
+      await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
+      return result.data?.settings as any ?? null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to update storefront layouts settings:', error);
+      return null;
+    }
+  }
+
   async updateQuickstartOptionsSettings(tenantId: string, settings: any): Promise<any | null> {
     try {
       if (!tenantId) return null;

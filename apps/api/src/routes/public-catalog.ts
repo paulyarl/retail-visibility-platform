@@ -3597,8 +3597,8 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
         galleryLimit,
         showEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
         showStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
-        storefrontLayout: allowedLayouts.includes(prefs.storefront_layout || 'classic')
-          ? (prefs.storefront_layout || 'classic')
+        storefrontLayout: allowedLayouts.includes('classic')
+          ? 'classic'
           : (allowedLayouts[0] || 'classic'),
       },
       tierKey: effectiveTierKey,

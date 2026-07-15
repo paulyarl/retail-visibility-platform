@@ -34,6 +34,7 @@ import {
   StorefrontQrState,
   StorefrontGalleryState,
   StorefrontHoursState,
+  StorefrontLayoutState,
   FaqOptionsState,
   CrmOptionsState,
   ChatbotOptionsState,
@@ -519,6 +520,38 @@ export function useStorefrontHoursCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront hours capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, options?.forTenant]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useStorefrontLayoutsCapability
+// ====================
+
+export function useStorefrontLayoutsCapability(
+  tenantId: string | null,
+  options?: { forTenant?: boolean }
+): CapabilityHookState<StorefrontLayoutState> {
+  const [data, setData] = useState<StorefrontLayoutState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const service = getService(!!options?.forTenant);
+      const state = await service.getStorefrontLayoutsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch storefront layouts capability');
     } finally {
       setLoading(false);
     }

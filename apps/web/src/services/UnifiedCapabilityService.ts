@@ -1296,6 +1296,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.storefrontHours;
   }
 
+  async getStorefrontLayoutsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontLayoutState> {
+    const all = await this.getAllCapabilities(tenantId, options);
+    return all.storefrontLayouts;
+  }
+
   async getDirectoryEntryOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryEntryOptionsState> {
     const all = await this.getAllCapabilities(tenantId, options);
     return all.directoryEntryOptions;

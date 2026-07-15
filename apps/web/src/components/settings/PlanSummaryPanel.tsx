@@ -25,7 +25,7 @@ import {
   StorefrontOptQRContentType,
   StorefrontOptGalleryType,
   StorefrontOptAdvancedType,
-  StorefrontOptLayoutType,
+  StorefrontLayoutType,
   FaqManagementType,
   FaqPreviewType,
   FaqDisplayType,
@@ -187,7 +187,7 @@ const STOREFRONT_OPT_ADVANCED_LABELS: Record<StorefrontOptAdvancedType, string> 
   storefront_actions: 'CTA Buttons',
 };
 
-const STOREFRONT_OPT_LAYOUT_LABELS: Record<StorefrontOptLayoutType, string> = {
+const STOREFRONT_OPT_LAYOUT_LABELS: Record<StorefrontLayoutType, string> = {
   classic: 'Classic Layout',
   editorial: 'Editorial Layout',
   immersive: 'Immersive Layout',
@@ -257,6 +257,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   storefront_qr: { label: 'QR Codes', icon: '📱', settingsPath: '/settings/storefront-qr' },
   storefront_gallery: { label: 'Image Gallery', icon: '🖼️', settingsPath: '/settings/storefront-gallery' },
   storefront_hours: { label: 'Business Hours', icon: '🕐', settingsPath: '/settings/storefront-hours' },
+  storefront_layouts: { label: 'Storefront Layout', icon: '📐', settingsPath: '/settings/storefront-layouts' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
@@ -601,8 +602,6 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
     so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
     so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
-    // Layouts
-    so.allowedLayouts.forEach(t => addSo(STOREFRONT_OPT_LAYOUT_LABELS[t], true, t === 'classic' ? so.canUseLayoutClassic : t === 'editorial' ? so.canUseLayoutEditorial : so.canUseLayoutImmersive));
     summaries.push({
       key: 'storefront_options',
       label: CAPABILITY_DISPLAY.storefront_options.label,
@@ -697,6 +696,28 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_hours',
       settingsPath: CAPABILITY_DISPLAY.storefront_hours.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Layouts — list layout types
+  const sl = caps.storefrontLayouts;
+  if (sl && sl.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSl = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    sl.allowedLayouts.forEach(t => addSl(STOREFRONT_OPT_LAYOUT_LABELS[t], true, t === 'classic' ? sl.canUseLayoutClassic : t === 'editorial' ? sl.canUseLayoutEditorial : sl.canUseLayoutImmersive));
+    summaries.push({
+      key: 'storefront_layouts',
+      label: CAPABILITY_DISPLAY.storefront_layouts.label,
+      icon: CAPABILITY_DISPLAY.storefront_layouts.icon,
+      enabled: sl.enabled,
+      merchantGated: merchantGates?.['storefront_layouts'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_layouts',
+      settingsPath: CAPABILITY_DISPLAY.storefront_layouts.settingsPath ?? null,
     });
   }
 

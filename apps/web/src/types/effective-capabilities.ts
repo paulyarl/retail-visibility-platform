@@ -39,7 +39,7 @@ export type {
   StorefrontOptQRContentType,
   StorefrontOptGalleryType,
   StorefrontOptAdvancedType,
-  StorefrontOptLayoutType,
+  StorefrontLayoutType,
   FaqManagementType,
   FaqPreviewType,
   FaqDisplayType,
