@@ -65,6 +65,7 @@ import {
   StorefrontOptQRContentType,
   StorefrontOptQRDotStyleType,
   StorefrontOptQRCornerStyleType,
+  StorefrontOptQRCornerDotStyleType,
   StorefrontOptGalleryType,
   StorefrontOptGalleryDisplayMode,
   StorefrontOptAdvancedType,
@@ -822,6 +823,7 @@ function mapStorefrontQr(b: BackendEffectiveStorefrontQr): StorefrontQrState {
     qrStyledEnabled: b.qr_styled_enabled,
     allowedQRDotStyles: (b.allowed_qr_dot_styles ?? []) as StorefrontOptQRDotStyleType[],
     allowedQRCornerStyles: (b.allowed_qr_corner_styles ?? []) as StorefrontOptQRCornerStyleType[],
+    allowedQRCornerDotStyles: (b.allowed_qr_corner_dot_styles ?? []) as StorefrontOptQRCornerDotStyleType[],
     qrCustomColors: b.qr_custom_colors,
     qrGradients: b.qr_gradients,
     canUseQRCodes: b.can_use_qr_codes,
@@ -1373,6 +1375,7 @@ class UnifiedCapabilityService extends TenantApiSingleton {
       flags.qrResolutions = all.storefrontQr.allowedQRResolutions as unknown as string[];
       flags.allowedQRDotStyles = all.storefrontQr.allowedQRDotStyles as unknown as string[];
       flags.allowedQRCornerStyles = all.storefrontQr.allowedQRCornerStyles as unknown as string[];
+      flags.allowedQRCornerDotStyles = all.storefrontQr.allowedQRCornerDotStyles as unknown as string[];
       flags.qrCustomColors = all.storefrontQr.qrCustomColors;
       flags.qrGradients = all.storefrontQr.qrGradients;
       const qrPrefs = all.storefrontQr.merchantPreferences as any;
@@ -1383,6 +1386,8 @@ class UnifiedCapabilityService extends TenantApiSingleton {
       flags.qrResolution = qrPrefs?.default_qr_resolution ?? '512';
       flags.qrDotType = qrPrefs?.qr_dot_type;
       flags.qrCornerType = qrPrefs?.qr_corner_type;
+      flags.qrCornerDotType = qrPrefs?.qr_corner_dot_type;
+      flags.qrCornerDotColor = qrPrefs?.qr_corner_dot_color;
       flags.qrDotColor = qrPrefs?.qr_dot_color;
       flags.qrCornerColor = qrPrefs?.qr_corner_color;
       flags.qrBgColor = qrPrefs?.qr_bg_color;

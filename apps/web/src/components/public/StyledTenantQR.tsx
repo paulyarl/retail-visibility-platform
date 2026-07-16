@@ -47,8 +47,10 @@ export function StyledTenantQR({
 
     const dotType = (prefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded') as any;
     const cornerType = (prefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+    const cornerDotType = (prefs?.qr_corner_dot_type || 'dot') as any;
     const dotColor = prefs?.qr_dot_color || '#1a56db';
     const cornerColor = prefs?.qr_corner_color || '#1a56db';
+    const cornerDotColor = prefs?.qr_corner_dot_color || '#ffffff';
     const bgColor = prefs?.qr_bg_color || '#ffffff';
     const useGradient = qrState?.qrGradients && prefs?.qr_gradient_enabled;
     const gradientStart = prefs?.qr_gradient_start || '#1a56db';
@@ -73,7 +75,7 @@ export function StyledTenantQR({
         color: cornerColor,
         type: cornerType,
       },
-      cornersDotOptions: { color: '#ffffff', type: 'dot' },
+      cornersDotOptions: { color: cornerDotColor, type: cornerDotType },
       backgroundOptions: { color: bgColor },
       qrOptions: { errorCorrectionLevel: errorCorrection },
     });

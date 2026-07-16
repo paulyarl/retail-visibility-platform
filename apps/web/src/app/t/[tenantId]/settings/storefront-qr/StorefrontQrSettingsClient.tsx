@@ -24,6 +24,8 @@ interface StorefrontQrSettings {
   qr_directory: boolean;
   qr_dot_type: string;
   qr_corner_type: string;
+  qr_corner_dot_type: string;
+  qr_corner_dot_color: string;
   qr_dot_color: string;
   qr_corner_color: string;
   qr_bg_color: string;
@@ -51,6 +53,8 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_directory: false,
   qr_dot_type: 'rounded',
   qr_corner_type: 'extra-rounded',
+  qr_corner_dot_type: 'dot',
+  qr_corner_dot_color: '#ffffff',
   qr_dot_color: '#1a56db',
   qr_corner_color: '#1a56db',
   qr_bg_color: '#ffffff',
@@ -62,17 +66,24 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
 };
 
 const DOT_STYLES = [
+  { value: 'square', label: 'Square' },
   { value: 'rounded', label: 'Rounded' },
+  { value: 'extra-rounded', label: 'Extra Rounded' },
   { value: 'dots', label: 'Dots' },
   { value: 'classy', label: 'Classy' },
   { value: 'classy-rounded', label: 'Classy Rounded' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
 ];
 
 const CORNER_STYLES = [
-  { value: 'dot', label: 'Dot' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
-  { value: 'rounded', label: 'Rounded' },
+  { value: 'square', label: 'Square' },
+  { value: 'rounded', label: 'Rounded Square' },
+  { value: 'extra-rounded', label: 'Round Square' },
+  { value: 'dot', label: 'Round' },
+];
+
+const CORNER_DOT_STYLES = [
+  { value: 'square', label: 'Square' },
+  { value: 'dot', label: 'Round' },
 ];
 
 const RESOLUTIONS = [
@@ -153,6 +164,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
   const tierQrGradients = tierState?.qrGradients ?? false;
   const tierDotStyles = tierState?.allowedQRDotStyles ?? [];
   const tierCornerStyles = tierState?.allowedQRCornerStyles ?? [];
+  const tierCornerDotStyles = tierState?.allowedQRCornerDotStyles ?? [];
 
   const previewUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/tenant/${tenantId}`
@@ -439,7 +451,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
             {/* Dot Style */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">Dot Style</p>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {DOT_STYLES.map(style => {
                   const tierAllowed = isTierFlexible || tierDotStyles.includes(style.value as any);
                   const isSelected = settings.qr_dot_type === style.value;
@@ -468,7 +480,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
             {/* Corner Style */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">Corner Style</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {CORNER_STYLES.map(style => {
                   const tierAllowed = isTierFlexible || tierCornerStyles.includes(style.value as any);
                   const isSelected = settings.qr_corner_type === style.value;
@@ -478,6 +490,36 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                       onClick={() => {
                         if (!tierAllowed) return;
                         updateSetting('qr_corner_type', style.value);
+                      }}
+                      className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
+                        tierAllowed
+                          ? isSelected
+                            ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                            : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
+                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      {style.label}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Corner Dot Style (inner dots inside the 3 corner squares) */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700">Corner Dot Style</p>
+              <p className="text-xs text-neutral-500">Inner shape inside the 3 corner squares</p>
+              <div className="grid grid-cols-2 gap-2">
+                {CORNER_DOT_STYLES.map(style => {
+                  const tierAllowed = isTierFlexible || tierCornerDotStyles.includes(style.value as any);
+                  const isSelected = settings.qr_corner_dot_type === style.value;
+                  return (
+                    <div
+                      key={style.value}
+                      onClick={() => {
+                        if (!tierAllowed) return;
+                        updateSetting('qr_corner_dot_type', style.value);
                       }}
                       className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
                         tierAllowed
@@ -509,13 +551,14 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                       if (!v) {
                         updateSetting('qr_dot_color', '#1a56db');
                         updateSetting('qr_corner_color', '#1a56db');
+                        updateSetting('qr_corner_dot_color', '#ffffff');
                         updateSetting('qr_bg_color', '#ffffff');
                       }
                     }}
                   />
                 </div>
                 {settings.qr_custom_colors_enabled && (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     <div>
                       <label className="text-xs text-neutral-500">Dot Color</label>
                       <input
@@ -531,6 +574,15 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                         type="color"
                         value={settings.qr_corner_color}
                         onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
+                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-neutral-500">Corner Dot</label>
+                      <input
+                        type="color"
+                        value={settings.qr_corner_dot_color}
+                        onChange={(e) => updateSetting('qr_corner_dot_color', e.target.value)}
                         className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
                       />
                     </div>

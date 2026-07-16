@@ -473,8 +473,10 @@ export function TenantQRCode({
       const qrPrefs = qrState?.merchantPreferences as any;
       const dotType = (qrPrefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded') as any;
       const cornerType = (qrPrefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+      const cornerDotType = (qrPrefs?.qr_corner_dot_type || 'dot') as any;
       const dotColor = qrPrefs?.qr_dot_color || '#1a56db';
       const cornerColor = qrPrefs?.qr_corner_color || '#1a56db';
+      const cornerDotColor = qrPrefs?.qr_corner_dot_color || '#ffffff';
       const bgColor = qrPrefs?.qr_bg_color || '#ffffff';
       const useGradient = qrState?.qrGradients && qrPrefs?.qr_gradient_enabled;
       const gradientStart = qrPrefs?.qr_gradient_start || '#1a56db';
@@ -499,7 +501,7 @@ export function TenantQRCode({
           color: cornerColor,
           type: cornerType,
         },
-        cornersDotOptions: { color: '#ffffff', type: 'dot' },
+        cornersDotOptions: { color: cornerDotColor, type: cornerDotType },
         backgroundOptions: { color: bgColor },
         qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
       });

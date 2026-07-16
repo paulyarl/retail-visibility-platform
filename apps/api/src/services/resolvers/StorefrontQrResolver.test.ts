@@ -42,8 +42,9 @@ describe('resolveStorefrontQr', () => {
     const result = resolveStorefrontQr(features, null);
     expect(result.is_flexible).toBe(true);
     expect(result.qr_styled_enabled).toBe(true);
-    expect(result.allowed_qr_dot_styles).toEqual(['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded']);
-    expect(result.allowed_qr_corner_styles).toEqual(['dot', 'extra-rounded', 'rounded']);
+    expect(result.allowed_qr_dot_styles).toEqual(['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded', 'square']);
+    expect(result.allowed_qr_corner_styles).toEqual(['dot', 'extra-rounded', 'rounded', 'square']);
+    expect(result.allowed_qr_corner_dot_styles).toEqual(['dot', 'square']);
     expect(result.qr_custom_colors).toBe(true);
     expect(result.qr_gradients).toBe(true);
   });
@@ -68,6 +69,7 @@ describe('resolveStorefrontQr', () => {
     const result = resolveStorefrontQr(features, null);
     expect(result.qr_styled_enabled).toBe(false);
     expect(result.allowed_qr_dot_styles).toEqual([]);
+    expect(result.allowed_qr_corner_dot_styles).toEqual([]);
   });
 
   it('respects individual QR resolution keys', () => {

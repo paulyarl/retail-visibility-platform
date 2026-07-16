@@ -449,8 +449,9 @@ export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
 export type StorefrontOptHoursType = 'hours_animated' | 'hours_status';
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
-export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
-export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
+export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded' | 'square';
+export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded' | 'square';
+export type StorefrontOptQRCornerDotStyleType = 'dot' | 'square';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
 export type StorefrontOptGalleryDisplayMode = 'carousel' | 'magazine';
 
@@ -525,10 +526,13 @@ export interface StorefrontOptionFlags {
   showQRStyled: boolean;
   allowedQRDotStyles: string[];
   allowedQRCornerStyles: string[];
+  allowedQRCornerDotStyles: string[];
   qrCustomColors: boolean;
   qrGradients: boolean;
   qrDotType?: string;
   qrCornerType?: string;
+  qrCornerDotType?: string;
+  qrCornerDotColor?: string;
   qrDotColor?: string;
   qrCornerColor?: string;
   qrBgColor?: string;
@@ -573,6 +577,7 @@ export function toStorefrontOptionFlags(state: StorefrontOptionsState): Storefro
     showQRStyled: false,
     allowedQRDotStyles: [],
     allowedQRCornerStyles: [],
+    allowedQRCornerDotStyles: [],
     qrCustomColors: false,
     qrGradients: false,
     galleryLimit: 5,
@@ -962,6 +967,7 @@ export interface StorefrontQrState {
   qrStyledEnabled: boolean;
   allowedQRDotStyles: StorefrontOptQRDotStyleType[];
   allowedQRCornerStyles: StorefrontOptQRCornerStyleType[];
+  allowedQRCornerDotStyles: StorefrontOptQRCornerDotStyleType[];
   qrCustomColors: boolean;
   qrGradients: boolean;
   canUseQRCodes: boolean;

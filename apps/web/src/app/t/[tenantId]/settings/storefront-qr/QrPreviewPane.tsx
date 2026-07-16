@@ -11,6 +11,8 @@ export interface QrPreviewSettings {
   qr_logo: boolean;
   qr_dot_type: string;
   qr_corner_type: string;
+  qr_corner_dot_type: string;
+  qr_corner_dot_color: string;
   qr_dot_color: string;
   qr_corner_color: string;
   qr_bg_color: string;
@@ -37,6 +39,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
 
   const effectiveDotColor = settings.qr_custom_colors_enabled ? settings.qr_dot_color : '#1a56db';
   const effectiveCornerColor = settings.qr_custom_colors_enabled ? settings.qr_corner_color : '#1a56db';
+  const effectiveCornerDotColor = settings.qr_custom_colors_enabled ? settings.qr_corner_dot_color : '#ffffff';
   const effectiveBgColor = settings.qr_custom_colors_enabled ? settings.qr_bg_color : '#ffffff';
 
   const previewSize = 256;
@@ -104,7 +107,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
               color: effectiveCornerColor,
               type: settings.qr_corner_type as any,
             },
-            cornersDotOptions: { color: '#ffffff', type: 'dot' },
+            cornersDotOptions: { color: effectiveCornerDotColor, type: settings.qr_corner_dot_type as any },
             backgroundOptions: { color: effectiveBgColor },
             qrOptions: { errorCorrectionLevel: logoUrl ? 'H' : 'M' },
           });
@@ -164,6 +167,8 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
     isStyled,
     settings.qr_dot_type,
     settings.qr_corner_type,
+    settings.qr_corner_dot_type,
+    effectiveCornerDotColor,
     effectiveDotColor,
     effectiveCornerColor,
     effectiveBgColor,

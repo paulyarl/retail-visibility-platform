@@ -296,6 +296,7 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         qr_styled_enabled: false,
         allowed_qr_dot_styles: [],
         allowed_qr_corner_styles: [],
+        allowed_qr_corner_dot_styles: [],
         qr_custom_colors: false,
         qr_gradients: false,
         can_use_qr_codes: false,

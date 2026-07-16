@@ -196,6 +196,8 @@ export interface StorefrontQrMerchantSettings {
   qr_styled_enabled?: boolean | null;
   qr_dot_type?: string | null;
   qr_corner_type?: string | null;
+  qr_corner_dot_type?: string | null;
+  qr_corner_dot_color?: string | null;
   qr_dot_color?: string | null;
   qr_corner_color?: string | null;
   qr_bg_color?: string | null;
@@ -554,8 +556,9 @@ export type StorefrontOptRecommendType = 'recommend_store' | 'recommend_products
 export type StorefrontOptInfoType = 'storefront_social_media' | 'storefront_contact';
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
-export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
-export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
+export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded' | 'square';
+export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded' | 'square';
+export type StorefrontOptQRCornerDotStyleType = 'dot' | 'square';
 export type StorefrontOptGalleryType = 'image_gallery_5' | 'image_gallery_10' | 'image_gallery_15';
 export type StorefrontOptGalleryDisplayMode = 'carousel' | 'magazine';
 export type StorefrontOptAdvancedType = 'enhanced_seo' | 'storefront_actions';
@@ -571,6 +574,7 @@ export interface EffectiveStorefrontQr {
   qr_styled_enabled: boolean;
   allowed_qr_dot_styles: StorefrontOptQRDotStyleType[];
   allowed_qr_corner_styles: StorefrontOptQRCornerStyleType[];
+  allowed_qr_corner_dot_styles: StorefrontOptQRCornerDotStyleType[];
   qr_custom_colors: boolean;
   qr_gradients: boolean;
   can_use_qr_codes: boolean;
