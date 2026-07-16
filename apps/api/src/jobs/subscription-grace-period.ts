@@ -14,6 +14,7 @@ import { getBillingNotificationService } from '../services/subscription/BillingN
 import { getTrialManagementService, GRACE_DURATION_DAYS } from '../services/subscription/TrialManagementService';
 import { expireManualSubscriptionControl } from './expireManualSubscriptionControl';
 import { processOrgStandingInheritance } from './org-standing-inheritance';
+import { logger } from '../logger';
 
 export interface GracePeriodResult {
   processed: number;
@@ -41,7 +42,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
     await expireManualSubscriptionControl();
     console.log('[GracePeriodJob] Manual subscription control check completed');
   } catch (error) {
-    console.error('[GracePeriodJob] Error checking manual subscription control:', error);
+    logger.error('[GracePeriodJob] Error checking manual subscription control:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     result.errors.push('Failed to check manual subscription control');
   }
 
@@ -70,7 +71,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
           }).catch(err => console.error('[GracePeriodJob] Failed to create CRM task for grace period entry:', err));
         }
       } catch (error: any) {
-        console.error(`[GracePeriodJob] Error processing trial end for ${tenantId}:`, error);
+        logger.error(`[GracePeriodJob] Error processing trial end for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         result.errors.push(`Trial ${tenantId}: ${error.message}`);
       }
     }
@@ -93,7 +94,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
           console.log(`[GracePeriodJob] Payment retry failed for tenant ${tenantId}: ${retryResult.error}`);
         }
       } catch (error: any) {
-        console.error(`[GracePeriodJob] Error retrying payment for ${tenantId}:`, error);
+        logger.error(`[GracePeriodJob] Error retrying payment for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         result.errors.push(`Retry ${tenantId}: ${error.message}`);
       }
     }
@@ -124,7 +125,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
         console.log(`[GracePeriodJob] Demoted tenant ${tenantId} to expired_trial - grace period expired`);
         result.demoted++;
       } catch (error: any) {
-        console.error(`[GracePeriodJob] Error demoting tenant ${tenantId}:`, error);
+        logger.error(`[GracePeriodJob] Error demoting tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         result.errors.push(`Tenant ${tenantId}: ${error.message}`);
       }
     }
@@ -151,7 +152,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
         }).catch(err => console.error(`[GracePeriodJob] Failed to create CRM task for tenant ${tenant.id}:`, err));
       }
     } catch (error: any) {
-      console.error('[GracePeriodJob] Error sending grace period warnings:', error);
+      logger.error('[GracePeriodJob] Error sending grace period warnings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Grace period warnings: ${error.message}`);
     }
 
@@ -160,7 +161,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
       const standingResult = await processOrgStandingInheritance();
       console.log(`[GracePeriodJob] Org standing: Orgs bad: ${standingResult.orgsDetectedBad}, Grace set: ${standingResult.gracePeriodSet}, Flipped: ${standingResult.tenantsAutoFlipped}, Cleared: ${standingResult.graceCleared}, Alerts: ${standingResult.alertsSent}`);
     } catch (error: any) {
-      console.error('[GracePeriodJob] Error processing org standing inheritance:', error);
+      logger.error('[GracePeriodJob] Error processing org standing inheritance:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Org standing: ${error.message}`);
     }
 
@@ -168,7 +169,7 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
     
     return result;
   } catch (error: any) {
-    console.error('[GracePeriodJob] Fatal error:', error);
+    logger.error('[GracePeriodJob] Fatal error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     result.errors.push(`Fatal error: ${error.message}`);
     return result;
   }

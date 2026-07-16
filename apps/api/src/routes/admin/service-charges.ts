@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getServiceChargeService } from '../../services/subscription/ServiceChargeService';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -101,7 +102,7 @@ router.post('/', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/service-charges] Error:', error);
+    logger.error('[POST /api/admin/service-charges] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -181,7 +182,7 @@ router.post('/invoice', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/service-charges/invoice] Error:', error);
+    logger.error('[POST /api/admin/service-charges/invoice] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -205,7 +206,7 @@ router.get('/', async (req, res) => {
       charges,
     });
   } catch (error: any) {
-    console.error('[GET /api/admin/service-charges] Error:', error);
+    logger.error('[GET /api/admin/service-charges] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -263,7 +264,7 @@ router.put('/:chargeId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[PUT /api/admin/service-charges] Error:', error);
+    logger.error('[PUT /api/admin/service-charges] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -289,7 +290,7 @@ router.get('/configurations', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/admin/service-charges/configurations] Error:', error);
+    logger.error('[GET /api/admin/service-charges/configurations] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -339,7 +340,7 @@ router.get('/:tenantId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/admin/service-charges/:tenantId] Error:', error);
+    logger.error('[GET /api/admin/service-charges/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -384,7 +385,7 @@ router.get('/:tenantId/stats', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/admin/service-charges/:tenantId/stats] Error:', error);
+    logger.error('[GET /api/admin/service-charges/:tenantId/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',

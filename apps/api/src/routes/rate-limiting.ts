@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import RateLimitingService from '../services/RateLimitingService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/status/:ip', async (req, res) => {
       message: 'Rate limit status retrieved successfully'
     });
   } catch (error) {
-    console.error('Rate limit status check failed:', error);
+    logger.error('Rate limit status check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to check rate limit status',
@@ -64,7 +65,7 @@ router.post('/check', async (req, res) => {
       message: 'Rate limit check completed'
     });
   } catch (error) {
-    console.error('Rate limit check failed:', error);
+    logger.error('Rate limit check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to check rate limit',
@@ -91,7 +92,7 @@ router.get('/rules', async (req, res) => {
       message: 'Rate limiting rules retrieved successfully'
     });
   } catch (error) {
-    console.error('Rate limiting rules retrieval failed:', error);
+    logger.error('Rate limiting rules retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve rate limiting rules',
@@ -119,7 +120,7 @@ router.post('/rules', async (req, res) => {
       message: 'Rate limiting rule created successfully'
     });
   } catch (error) {
-    console.error('Rate limiting rule creation failed:', error);
+    logger.error('Rate limiting rule creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create rate limiting rule',
@@ -148,7 +149,7 @@ router.put('/rules/:id', async (req, res) => {
       message: 'Rate limiting rule updated successfully'
     });
   } catch (error) {
-    console.error('Rate limiting rule update failed:', error);
+    logger.error('Rate limiting rule update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update rate limiting rule',
@@ -172,7 +173,7 @@ router.delete('/rules/:id', async (req, res) => {
       message: 'Rate limiting rule deleted successfully'
     });
   } catch (error) {
-    console.error('Rate limiting rule deletion failed:', error);
+    logger.error('Rate limiting rule deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete rate limiting rule',
@@ -200,7 +201,7 @@ router.get('/metrics', async (req, res) => {
       message: 'Rate limiting metrics retrieved successfully'
     });
   } catch (error) {
-    console.error('Rate limiting metrics retrieval failed:', error);
+    logger.error('Rate limiting metrics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve rate limiting metrics',
@@ -233,7 +234,7 @@ export async function addRateLimitRule(req: any, res: any) {
       message: 'Rate limit rule created successfully'
     });
   } catch (error) {
-    console.error('Rate limit rule creation failed:', error as Error);
+    logger.error('Rate limit rule creation failed:', undefined, { error: { name: 'Error', message: String(error as Error) } });
     res.status(500).json({
       success: false,
       error: 'Failed to create rate limit rule',
@@ -257,7 +258,7 @@ export async function getRateLimitRules(req: any, res: any) {
       message: 'Rate limit rules retrieved successfully'
     });
   } catch (error) {
-    console.error('Rate limit rules retrieval failed:', error);
+    logger.error('Rate limit rules retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve rate limit rules',
@@ -283,7 +284,7 @@ export async function updateRateLimitRule(req: any, res: any) {
       message: 'Rate limit rule updated successfully'
     });
   } catch (error) {
-    console.error('Rate limit rule update failed:', error);
+    logger.error('Rate limit rule update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update rate limit rule',
@@ -307,7 +308,7 @@ export async function removeRateLimitRule(req: any, res: any) {
       message: `Rate limit rule for ${routeType} removed successfully`
     });
   } catch (error) {
-    console.error('Rate limit rule removal failed:', error);
+    logger.error('Rate limit rule removal failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to remove rate limit rule',
@@ -332,7 +333,7 @@ export async function blockIP(req: any, res: any) {
       message: `IP ${ip} blocked for rate limiting`
     });
   } catch (error) {
-    console.error('IP blocking failed:', error);
+    logger.error('IP blocking failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to block IP',
@@ -356,7 +357,7 @@ export async function unblockIP(req: any, res: any) {
       message: `IP ${ip} unblocked successfully`
     });
   } catch (error) {
-    console.error('IP unblocking failed:', error);
+    logger.error('IP unblocking failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to unblock IP',
@@ -380,7 +381,7 @@ export async function getBlockedIPs(req: any, res: any) {
       message: 'Blocked IPs retrieved successfully'
     });
   } catch (error) {
-    console.error('Blocked IPs retrieval failed:', error);
+    logger.error('Blocked IPs retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve blocked IPs',
@@ -404,7 +405,7 @@ export async function getRateLimitMetrics(req: any, res: any) {
       message: 'Rate limiting metrics retrieved successfully'
     });
   } catch (error) {
-    console.error('Rate limiting metrics retrieval failed:', error);
+    logger.error('Rate limiting metrics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve rate limiting metrics',
@@ -442,7 +443,7 @@ export async function checkRateLimit(req: any, res: any) {
       message: `Rate limit check completed: ${isAllowed ? 'Allowed' : 'Blocked'}`
     });
   } catch (error) {
-    console.error('Rate limit check failed:', error);
+    logger.error('Rate limit check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to check rate limit',

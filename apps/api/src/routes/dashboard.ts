@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 console.log('🔥 [Dashboard FIXED] Loading NEW dashboard-fixed.ts file');
 
@@ -25,7 +26,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
     const userId = (req as any).user?.userId;
     
     if (!userId) {
-      console.error('[Dashboard] No userId found in authenticated request');
+      logger.error('[Dashboard] No userId found in authenticated request', undefined);
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -84,7 +85,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
           });
         }
       } catch (userError) {
-        console.error(`[Dashboard] Error fetching user tenants: ${(userError as Error).message}`);
+        logger.error(`[Dashboard] Error fetching user tenants: ${(userError as Error).message}`, undefined);
         userTenants = [];
       }
     }
@@ -216,7 +217,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
     return res.json(result);
 
   } catch (error) {
-    console.error('[Dashboard] Unexpected error:', error);
+    logger.error('[Dashboard] Unexpected error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
 });

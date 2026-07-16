@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface AdminNotificationData {
   type: 'merchant_onboarding_complete' | 'merchant_onboarding_requires_action' | 'platform_revenue_summary' | 'new_merchant_signup' | 'subscription_cancellation_request';
@@ -82,12 +83,12 @@ class AdminEmailService {
       if (allSuccess) {
         console.log(`[AdminEmail] ${notification.type} sent to ${adminEmails.length} admins`);
       } else {
-        console.error(`[AdminEmail] Some sends failed for ${notification.type}`);
+        logger.error(`[AdminEmail] Some sends failed for ${notification.type}`, undefined);
       }
 
       return { success: allSuccess };
     } catch (error: any) {
-      console.error('[AdminEmail] Error sending admin notification:', error);
+      logger.error('[AdminEmail] Error sending admin notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: error.message };
     }
   }
@@ -140,7 +141,7 @@ class AdminEmailService {
       
       return { success: result.success };
     } catch (error) {
-      console.error('[AdminEmail] Error sending revenue summary:', error);
+      logger.error('[AdminEmail] Error sending revenue summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false };
     }
   }

@@ -16,6 +16,7 @@ import {
   invalidateActiveFeaturedCache,
 } from '../services/ActiveFeaturedResolver';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = express.Router();
 
@@ -43,7 +44,7 @@ publicTenantRouter.get('/active-featured', async (req: express.Request<{ tenantI
     const result = await getTenantActiveFeatured(tenantId, surface, limit);
     res.json(result);
   } catch (error) {
-    console.error('[active-featured] Failed to get tenant active featured:', error);
+    logger.error('[active-featured] Failed to get tenant active featured:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch active featured products' });
   }
 });
@@ -67,7 +68,7 @@ router.get('/active-featured', async (req, res) => {
     const result = await getPlatformActiveFeatured(surface, limit);
     res.json(result);
   } catch (error) {
-    console.error('[active-featured] Failed to get platform active featured:', error);
+    logger.error('[active-featured] Failed to get platform active featured:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch active featured products' });
   }
 });
@@ -85,7 +86,7 @@ router.post('/admin/active-featured/invalidate-cache', authenticateToken, async 
     invalidateActiveFeaturedCache(tenantId, surface);
     res.json({ success: true, message: 'Active featured cache invalidated' });
   } catch (error) {
-    console.error('[active-featured] Failed to invalidate cache:', error);
+    logger.error('[active-featured] Failed to invalidate cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to invalidate cache' });
   }
 });

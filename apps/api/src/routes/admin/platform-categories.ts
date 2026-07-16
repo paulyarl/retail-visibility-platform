@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../../utils/db-pool';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Admin Platform Categories] List error:', error);
+    logger.error('[Admin Platform Categories] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch platform categories',
@@ -112,7 +113,7 @@ router.post('/', async (req: Request, res: Response) => {
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('[Admin Platform Categories] Create error:', error);
+    logger.error('[Admin Platform Categories] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to create category',
@@ -225,7 +226,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('[Admin Platform Categories] Update error:', error);
+    logger.error('[Admin Platform Categories] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to update category',
@@ -286,7 +287,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       });
     }
   } catch (error) {
-    console.error('[Admin Platform Categories] Delete error:', error);
+    logger.error('[Admin Platform Categories] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to delete category',
@@ -334,7 +335,7 @@ router.post('/reorder', async (req: Request, res: Response) => {
       client.release();
     }
   } catch (error) {
-    console.error('[Admin Platform Categories] Reorder error:', error);
+    logger.error('[Admin Platform Categories] Reorder error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to reorder categories',

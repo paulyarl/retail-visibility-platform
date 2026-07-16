@@ -255,7 +255,7 @@ export class BarcodeEnrichmentService {
       logger.error('All enrichment providers failed', undefined, {
         tenantId,
         barcode,
-        error: { name: error?.name, message: error?.message, stack: error?.stack },
+        error: { name: (error as any)?.name, message: (error as any)?.message, stack: (error as any)?.stack },
       });
       await this.logLookup(tenantId, barcode, 'fallback', 'error', null, Date.now() - startTime, error.message);
       
@@ -748,7 +748,7 @@ export class BarcodeEnrichmentService {
       return this.krogerToken;
     } catch (error: any) {
       logger.warn('Kroger OAuth2 token fetch failed', undefined, {
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return null;
     }

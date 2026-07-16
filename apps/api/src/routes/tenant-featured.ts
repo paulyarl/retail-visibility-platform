@@ -2,6 +2,7 @@ import express from 'express';
 import { prisma } from '../prisma';
 import { isValidFeaturedType, getValidFeaturedTypes } from '../services/FeaturedProductsService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 interface FeaturedProduct {
   id: string;
@@ -65,7 +66,7 @@ router.get('/tenants/:tenantId/featured', authenticateToken, async (req, res) =>
       }
     });
   } catch (error) {
-    console.error('Error fetching featured products:', error);
+    logger.error('Error fetching featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch featured products'
@@ -123,7 +124,7 @@ router.put('/tenants/:tenantId/featured/:type', authenticateToken, async (req, r
       message: `Updated ${type} featured products`
     });
   } catch (error) {
-    console.error('Error updating featured products:', error);
+    logger.error('Error updating featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update featured products'
@@ -172,7 +173,7 @@ router.get('/tenants/:tenantId/available-featured', authenticateToken, async (re
       data: availableProducts
     });
   } catch (error) {
-    console.error('Error fetching available products:', error);
+    logger.error('Error fetching available products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch available products'

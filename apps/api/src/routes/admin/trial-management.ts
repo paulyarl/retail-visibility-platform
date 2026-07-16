@@ -13,6 +13,7 @@ import { prisma } from '../../prisma';
 import { getTrialManagementService } from '../../services/subscription/TrialManagementService';
 import { getSubscriptionBillingService } from '../../services/subscription/SubscriptionBillingService';
 import { audit } from '../../audit';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -138,7 +139,7 @@ router.post('/start', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/trials/start] Error:', error);
+    logger.error('[POST /api/admin/trials/start] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -231,7 +232,7 @@ router.post('/cancel', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/trials/cancel] Error:', error);
+    logger.error('[POST /api/admin/trials/cancel] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',

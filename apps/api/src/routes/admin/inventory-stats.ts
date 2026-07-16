@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { getDirectPool } from '../../utils/db-pool';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -113,7 +114,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       }))
     });
   } catch (error) {
-    console.error('[AdminInventoryStats] Error getting stats:', error);
+    logger.error('[AdminInventoryStats] Error getting stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get inventory stats' });
   }
 });
@@ -166,7 +167,7 @@ router.get('/by-tenant', async (req: Request, res: Response) => {
       total: Number(totalResult.rows[0]?.count || 0)
     });
   } catch (error) {
-    console.error('[AdminInventoryStats] Error getting tenant breakdown:', error);
+    logger.error('[AdminInventoryStats] Error getting tenant breakdown:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get tenant breakdown' });
   }
 });
@@ -198,7 +199,7 @@ router.get('/by-category', async (req: Request, res: Response) => {
       total_stock: Number(c.total_stock)
     })));
   } catch (error) {
-    console.error('[AdminInventoryStats] Error getting category distribution:', error);
+    logger.error('[AdminInventoryStats] Error getting category distribution:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get category distribution' });
   }
 });
@@ -240,7 +241,7 @@ router.get('/top-products', async (req: Request, res: Response) => {
       total_stock: Number(p.total_stock)
     })));
   } catch (error) {
-    console.error('[AdminInventoryStats] Error getting top products:', error);
+    logger.error('[AdminInventoryStats] Error getting top products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get top products' });
   }
 });
@@ -277,7 +278,7 @@ router.get('/geographic', async (req: Request, res: Response) => {
       total_stock: Number(l.total_stock)
     })));
   } catch (error) {
-    console.error('[AdminInventoryStats] Error getting geographic distribution:', error);
+    logger.error('[AdminInventoryStats] Error getting geographic distribution:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get geographic distribution' });
   }
 });

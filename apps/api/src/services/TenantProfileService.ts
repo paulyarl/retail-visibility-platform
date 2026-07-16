@@ -6,6 +6,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
+import { logger } from '../logger';
 
 // Tenant Profile Types
 export interface TenantProfile {
@@ -229,7 +230,7 @@ class TenantProfileService extends UniversalSingleton {
 
       return null;
     } catch (error) {
-      console.error('Error fetching tenant profile:', error);
+      logger.error('Error fetching tenant profile:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -259,7 +260,7 @@ class TenantProfileService extends UniversalSingleton {
 
       return newProfile;
     } catch (error) {
-      console.error('Error creating tenant profile:', error);
+      logger.error('Error creating tenant profile:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -295,7 +296,7 @@ class TenantProfileService extends UniversalSingleton {
 
       return updatedProfile;
     } catch (error) {
-      console.error('Error updating tenant profile:', error);
+      logger.error('Error updating tenant profile:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -318,7 +319,7 @@ class TenantProfileService extends UniversalSingleton {
       this.profileCache.delete(tenantId);
       await this.clearCache(`tenant-profile-${tenantId}`);
     } catch (error) {
-      console.error('Error processing profile update:', error);
+      logger.error('Error processing profile update:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -351,7 +352,7 @@ class TenantProfileService extends UniversalSingleton {
 
         await this.processProfileUpdate(tenantId, mergedUpdates);
       } catch (error) {
-        console.error(`Error processing updates for tenant ${tenantId}:`, error);
+        logger.error(`Error processing updates for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
   }
@@ -384,7 +385,7 @@ class TenantProfileService extends UniversalSingleton {
       this.profileCache.delete(tenantId);
       await this.clearCache(`tenant-profile-${tenantId}`);
     } catch (error) {
-      console.error('Error updating tenant analytics:', error);
+      logger.error('Error updating tenant analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -427,7 +428,7 @@ class TenantProfileService extends UniversalSingleton {
         lastActivityAt: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Error recording tenant activity:', error);
+      logger.error('Error recording tenant activity:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -450,7 +451,7 @@ class TenantProfileService extends UniversalSingleton {
           profiles.set(tenantId, profile);
         }
       } catch (error) {
-        console.error(`Failed to fetch profile for tenant ${tenantId}:`, error);
+        logger.error(`Failed to fetch profile for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     });
 
@@ -476,7 +477,7 @@ class TenantProfileService extends UniversalSingleton {
       const profiles = await this.searchTenantProfilesInDatabase(query, filters, limit);
       return profiles;
     } catch (error) {
-      console.error('Error searching tenant profiles:', error);
+      logger.error('Error searching tenant profiles:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -490,7 +491,7 @@ class TenantProfileService extends UniversalSingleton {
       const profiles = await this.getFeaturedTenantProfilesInDatabase(limit);
       return profiles;
     } catch (error) {
-      console.error('Error fetching featured tenant profiles:', error);
+      logger.error('Error fetching featured tenant profiles:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -516,7 +517,7 @@ class TenantProfileService extends UniversalSingleton {
       await this.setCache(cacheKey, stats);
       return stats;
     } catch (error) {
-      console.error('Error fetching tenant profile stats:', error);
+      logger.error('Error fetching tenant profile stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Return default stats
       return {

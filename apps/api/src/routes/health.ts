@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { checkDatabaseConnection } from '../prisma';
 import { prisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -46,7 +47,7 @@ router.get('/db', async (_req: Request, res: Response) => {
     });
   } catch (error: any) {
     const latency = Date.now() - start;
-    console.error('[Database Health] Connection check failed:', error);
+    logger.error('[Database Health] Connection check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(503).json({ 
       status: 'error',

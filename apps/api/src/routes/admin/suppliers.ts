@@ -20,6 +20,7 @@
 import express from 'express';
 import SupplierService from '../../services/SupplierService';
 import SupplierCatalogService from '../../services/SupplierCatalogService';
+import { logger } from '../../logger';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get('/', async (req, res) => {
     const suppliers = await SupplierService.listSuppliers(activeOnly);
     res.json({ suppliers });
   } catch (error) {
-    console.error('[admin/suppliers] List error:', error);
+    logger.error('[admin/suppliers] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list suppliers' });
   }
 });
@@ -43,7 +44,7 @@ router.get('/health/dashboard', async (req, res) => {
     const dashboard = await SupplierService.getHealthDashboard();
     res.json(dashboard);
   } catch (error) {
-    console.error('[admin/suppliers] Health dashboard error:', error);
+    logger.error('[admin/suppliers] Health dashboard error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get health dashboard' });
   }
 });
@@ -57,7 +58,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json({ supplier });
   } catch (error) {
-    console.error('[admin/suppliers] Get error:', error);
+    logger.error('[admin/suppliers] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get supplier' });
   }
 });
@@ -78,7 +79,7 @@ router.post('/', async (req, res) => {
     });
     res.status(201).json({ supplier });
   } catch (error) {
-    console.error('[admin/suppliers] Create error:', error);
+    logger.error('[admin/suppliers] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to create supplier' });
   }
 });
@@ -97,7 +98,7 @@ router.put('/:id', async (req, res) => {
     });
     res.json({ supplier });
   } catch (error) {
-    console.error('[admin/suppliers] Update error:', error);
+    logger.error('[admin/suppliers] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update supplier' });
   }
 });
@@ -108,7 +109,7 @@ router.delete('/:id', async (req, res) => {
     await SupplierService.deleteSupplier(req.params.id);
     res.json({ success: true });
   } catch (error) {
-    console.error('[admin/suppliers] Delete error:', error);
+    logger.error('[admin/suppliers] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const message = error instanceof Error ? error.message : 'Failed to delete supplier';
     if (message.includes('not found')) {
       return res.status(404).json({ error: message });
@@ -129,7 +130,7 @@ router.get('/:id/health', async (req, res) => {
     }
     res.json({ health });
   } catch (error) {
-    console.error('[admin/suppliers] Health error:', error);
+    logger.error('[admin/suppliers] Health error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get supplier health' });
   }
 });
@@ -148,7 +149,7 @@ router.get('/:id/catalog', async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error('[admin/suppliers] Catalog browse error:', error);
+    logger.error('[admin/suppliers] Catalog browse error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to browse catalog' });
   }
 });
@@ -163,7 +164,7 @@ router.post('/:id/ingest', async (req, res) => {
     const result = await SupplierCatalogService.batchIngest(req.params.id, rows);
     res.json(result);
   } catch (error) {
-    console.error('[admin/suppliers] Ingest error:', error);
+    logger.error('[admin/suppliers] Ingest error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to ingest catalog rows' });
   }
 });
@@ -175,7 +176,7 @@ router.get('/:id/quarantine', async (req, res) => {
     const items = await SupplierCatalogService.getQuarantinedItems(req.params.id, limit);
     res.json({ items });
   } catch (error) {
-    console.error('[admin/suppliers] Quarantine list error:', error);
+    logger.error('[admin/suppliers] Quarantine list error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list quarantined items' });
   }
 });
@@ -189,7 +190,7 @@ router.post('/:id/quarantine/:qid/replay', async (req, res) => {
     }
     res.json({ success: true });
   } catch (error) {
-    console.error('[admin/suppliers] Quarantine replay error:', error);
+    logger.error('[admin/suppliers] Quarantine replay error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to replay quarantined item' });
   }
 });

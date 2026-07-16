@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
 // Import the enhanced createSecurityAlert function
 import { createSecurityAlert } from '../routes/admin-security';
 import { collectEnhancedSecurityContext, createSecuritySummary } from '../utils/security-context';
+import { logger } from '../logger';
 
 // Extend Express Request interface to include rateLimit property
 declare global {
@@ -34,7 +35,7 @@ async function isRateLimitingEnabled(): Promise<boolean> {
     return platformSettings?.rate_limiting_enabled ?? 
            (process.env.RATE_LIMITING_ENABLED === 'false' ? false : true);
   } catch (error) {
-    console.error('[Rate Limit] Failed to check platform settings:', error);
+    logger.error('[Rate Limit] Failed to check platform settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Fallback to environment variable
     return process.env.RATE_LIMITING_ENABLED === 'false' ? false : true;
   }
@@ -88,7 +89,7 @@ async function getRateLimitConfig(routeType: string) {
     
     return defaults[routeType as keyof typeof defaults] || defaults['standard'];
   } catch (error) {
-    console.error('[Rate Limit] Failed to get rate limit config:', error);
+    logger.error('[Rate Limit] Failed to get rate limit config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Fallback to environment variables
     const envDefaults = {
       'auth': { 
@@ -273,7 +274,7 @@ async function analyzeRequestRate(req: Request): Promise<{
     };
     
   } catch (error) {
-    console.error('[Rate Analysis] Failed to analyze request rate:', error);
+    logger.error('[Rate Analysis] Failed to analyze request rate:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Return fallback data
     return {
       currentRate: 1,
@@ -304,7 +305,7 @@ async function storeRateLimitWarning(req: Request, blocked: boolean = false) {
       }
     });
   } catch (error) {
-    console.error('[Rate Limit] Failed to store warning:', error);
+    logger.error('[Rate Limit] Failed to store warning:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw - this is non-critical
   }
 }

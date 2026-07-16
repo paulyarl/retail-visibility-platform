@@ -7,6 +7,7 @@
 
 import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 const GBP_INSIGHTS_API = 'https://mybusinessaccountmanagement.googleapis.com/v1';
@@ -21,7 +22,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
     });
 
     if (!tokenRecord) {
-      console.error('[GBP] No token found for account:', account_id);
+      logger.error('[GBP] No token found for account:', undefined, { error: { name: (account_id as any)?.name || 'Error', message: (account_id as any)?.message || String(account_id), stack: (account_id as any)?.stack } });
       return null;
     }
 
@@ -34,7 +35,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
-        console.error('[GBP] Failed to refresh token');
+        logger.error('[GBP] Failed to refresh token', undefined);
         return null;
       }
 
@@ -54,7 +55,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
 
     return decryptToken(tokenRecord.access_token_encrypted);
   } catch (error) {
-    console.error('[GBP] Error getting valid token:', error);
+    logger.error('[GBP] Error getting valid token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -78,14 +79,14 @@ export async function listBusinessAccounts(account_id: string): Promise<any[]> {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GBP] Failed to fetch business accounts:', error);
+      logger.error('[GBP] Failed to fetch business accounts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
 
     const data = await response.json() as { accounts?: any[] };
     return data.accounts || [];
   } catch (error) {
-    console.error('[GBP] Error listing business accounts:', error);
+    logger.error('[GBP] Error listing business accounts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -115,14 +116,14 @@ export async function listLocations(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GBP] Failed to fetch locations:', error);
+      logger.error('[GBP] Failed to fetch locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
 
     const data = await response.json() as { locations?: any[] };
     return data.locations || [];
   } catch (error) {
-    console.error('[GBP] Error listing locations:', error);
+    logger.error('[GBP] Error listing locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -152,13 +153,13 @@ export async function getLocation(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GBP] Failed to fetch location:', error);
+      logger.error('[GBP] Failed to fetch location:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('[GBP] Error getting location:', error);
+    logger.error('[GBP] Error getting location:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -214,7 +215,7 @@ export async function syncLocation(
     console.log('[GBP] Synced location:', locationId);
     return true;
   } catch (error) {
-    console.error('[GBP] Error syncing location:', error);
+    logger.error('[GBP] Error syncing location:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return false;
   }
 }
@@ -285,13 +286,13 @@ export async function getLocationInsights(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GBP] Failed to fetch insights:', error);
+      logger.error('[GBP] Failed to fetch insights:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('[GBP] Error getting location insights:', error);
+    logger.error('[GBP] Error getting location insights:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -343,7 +344,7 @@ export async function storeInsights(
 
     return true;
   } catch (error) {
-    console.error('[GBP] Error storing insights:', error);
+    logger.error('[GBP] Error storing insights:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return false;
   }
 }
@@ -396,7 +397,7 @@ export async function getAggregatedInsights(
       daily: insights,
     };
   } catch (error) {
-    console.error('[GBP] Error getting aggregated insights:', error);
+    logger.error('[GBP] Error getting aggregated insights:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }

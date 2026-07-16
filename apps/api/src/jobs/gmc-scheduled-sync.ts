@@ -6,6 +6,7 @@
 import { prisma } from '../prisma';
 import { batchSyncProducts } from '../services/GMCProductSync';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { logger } from '../logger';
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 let syncIntervalId: NodeJS.Timeout | null = null;
@@ -35,7 +36,7 @@ async function getConnectedTenants(): Promise<string[]> {
 
     return Array.from(tenantIds);
   } catch (error) {
-    console.error('[GMC Scheduled Sync] Error getting connected tenants:', error);
+    logger.error('[GMC Scheduled Sync] Error getting connected tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -78,7 +79,7 @@ async function runScheduledSync(): Promise<void> {
 
         console.log(`[GMC Scheduled Sync] Tenant ${tenantId}: ${result.synced} synced, ${result.failed} failed`);
       } catch (error) {
-        console.error(`[GMC Scheduled Sync] Error syncing tenant ${tenantId}:`, error);
+        logger.error(`[GMC Scheduled Sync] Error syncing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         totalFailed++;
       }
 
@@ -89,7 +90,7 @@ async function runScheduledSync(): Promise<void> {
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[GMC Scheduled Sync] Completed in ${duration}s: ${tenantsProcessed} tenants, ${totalSynced} products synced, ${totalFailed} failed`);
   } catch (error) {
-    console.error('[GMC Scheduled Sync] Scheduled sync failed:', error);
+    logger.error('[GMC Scheduled Sync] Scheduled sync failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -147,7 +148,7 @@ export async function triggerManualSync(): Promise<{ tenants: number; synced: nu
       totalSynced += result.synced;
       totalFailed += result.failed;
     } catch (error) {
-      console.error(`[GMC Manual Sync] Error syncing tenant ${tenantId}:`, error);
+      logger.error(`[GMC Manual Sync] Error syncing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       totalFailed++;
     }
     await new Promise(resolve => setTimeout(resolve, 500));

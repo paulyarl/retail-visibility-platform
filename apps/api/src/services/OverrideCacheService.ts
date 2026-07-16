@@ -7,6 +7,7 @@
 
 import Redis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../logger';
 
 export interface CacheConfig {
   redis: {
@@ -230,7 +231,7 @@ export class OverrideCacheService {
       
       return null;
     } catch (error) {
-      console.error('[Cache] Get override error:', error);
+      logger.error('[Cache] Get override error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -265,7 +266,7 @@ export class OverrideCacheService {
       await this.redis!.expire(tenantListKey, this.config.ttl.overrides);
       
     } catch (error) {
-      console.error('[Cache] Set override error:', error);
+      logger.error('[Cache] Set override error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -312,7 +313,7 @@ export class OverrideCacheService {
       
       return overrides.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
     } catch (error) {
-      console.error('[Cache] Get tenant overrides error:', error);
+      logger.error('[Cache] Get tenant overrides error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -356,7 +357,7 @@ export class OverrideCacheService {
         await this.redis!.del(...analyticsKeys);
       }
     } catch (error) {
-      console.error('[Cache] Invalidate tenant error:', error);
+      logger.error('[Cache] Invalidate tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -385,7 +386,7 @@ export class OverrideCacheService {
       const tenantListKey = `tenant_overrides:${tenantId}`;
       await this.redis!.srem(tenantListKey, overrideId);
     } catch (error) {
-      console.error('[Cache] Invalidate override error:', error);
+      logger.error('[Cache] Invalidate override error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -423,7 +424,7 @@ export class OverrideCacheService {
       
       return null;
     } catch (error) {
-      console.error('[Cache] Get analytics error:', error);
+      logger.error('[Cache] Get analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -470,7 +471,7 @@ export class OverrideCacheService {
       
       await this.redis!.setex(key, this.config.ttl.analytics, JSON.stringify(entry));
     } catch (error) {
-      console.error('[Cache] Set analytics error:', error);
+      logger.error('[Cache] Set analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -501,7 +502,7 @@ export class OverrideCacheService {
       
       return [];
     } catch (error) {
-      console.error('[Cache] Get approval requests error:', error);
+      logger.error('[Cache] Get approval requests error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -529,7 +530,7 @@ export class OverrideCacheService {
       const value = JSON.stringify(requests);
       await this.redis!.setex(key, this.config.ttl.approvals, value);
     } catch (error) {
-      console.error('[Cache] Set approval requests error:', error);
+      logger.error('[Cache] Set approval requests error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -563,7 +564,7 @@ export class OverrideCacheService {
 
       console.log(`[Cache] Warmed cache for tenant ${tenantId} with ${overrides.length} overrides`);
     } catch (error) {
-      console.error('[Cache] Warm tenant cache error:', error);
+      logger.error('[Cache] Warm tenant cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -615,7 +616,7 @@ export class OverrideCacheService {
         },
       };
     } catch (error) {
-      console.error('[Cache] Get stats error:', error);
+      logger.error('[Cache] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         totalKeys: 0,
         memoryUsage: 'unknown',
@@ -650,7 +651,7 @@ export class OverrideCacheService {
       await this.redis.flushdb();
       console.log('[Cache] Redis cache cleared');
     } catch (error) {
-      console.error('[Cache] Clear cache error:', error);
+      logger.error('[Cache] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -662,14 +663,14 @@ export class OverrideCacheService {
       try {
         await this.redis.quit();
       } catch (error) {
-        console.error('[Cache] Disconnect error:', error);
+        logger.error('[Cache] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
     
     try {
       await this.prisma.$disconnect();
     } catch (error) {
-      console.error('[Cache] Prisma disconnect error:', error);
+      logger.error('[Cache] Prisma disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 }

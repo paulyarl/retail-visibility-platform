@@ -2,6 +2,7 @@ import express from 'express';
 import { emailService } from '../services/email-service';
 import { emailTrackingService } from '../services/email-tracking.service';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/providers', authenticateToken, requireAdmin, async (req, res) => {
       providers: status,
     });
   } catch (error) {
-    console.error('[Email Management] Failed to get provider status:', error);
+    logger.error('[Email Management] Failed to get provider status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get provider status',
@@ -55,7 +56,7 @@ router.post('/providers/switch', authenticateToken, requireAdmin, async (req, re
       });
     }
   } catch (error) {
-    console.error('[Email Management] Failed to switch provider:', error);
+    logger.error('[Email Management] Failed to switch provider:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to switch provider',
@@ -86,7 +87,7 @@ router.post('/providers/test', authenticateToken, requireAdmin, async (req, res)
       testEmail,
     });
   } catch (error) {
-    console.error('[Email Management] Failed to test providers:', error);
+    logger.error('[Email Management] Failed to test providers:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to test providers',
@@ -115,7 +116,7 @@ router.get('/tracking/:messageId', authenticateToken, async (req, res) => {
       tracking: status,
     });
   } catch (error) {
-    console.error('[Email Management] Failed to get tracking status:', error);
+    logger.error('[Email Management] Failed to get tracking status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get tracking status',
@@ -138,7 +139,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
       timeframe,
     });
   } catch (error) {
-    console.error('[Email Management] Failed to get stats:', error);
+    logger.error('[Email Management] Failed to get stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get delivery statistics',
@@ -191,7 +192,7 @@ router.post('/webhook/sendgrid', async (req, res) => {
 
     res.status(200).json({ received: events.length });
   } catch (error) {
-    console.error('[Email Webhook] SendGrid webhook error:', error);
+    logger.error('[Email Webhook] SendGrid webhook error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
@@ -245,7 +246,7 @@ router.post('/webhook/ses', async (req, res) => {
 
     res.status(200).json({ message: 'Webhook processed' });
   } catch (error) {
-    console.error('[Email Webhook] SES webhook error:', error);
+    logger.error('[Email Webhook] SES webhook error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });

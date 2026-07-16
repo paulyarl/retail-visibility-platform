@@ -7,6 +7,7 @@
  */
 
 import crypto from 'crypto';
+import { logger } from '../../logger';
 
 // Environment variables
 const META_APP_ID = process.env.META_APP_ID || '';
@@ -69,13 +70,13 @@ export function decodeState(state: string): { tenantId: string; nonce: string; t
     // Validate timestamp (max 10 minutes old)
     const age = Date.now() - decoded.timestamp;
     if (age > 10 * 60 * 1000) {
-      console.error('[Meta OAuth] State expired:', age);
+      logger.error('[Meta OAuth] State expired:', undefined, { error: { name: (age as any)?.name || 'Error', message: (age as any)?.message || String(age), stack: (age as any)?.stack } });
       return null;
     }
 
     return decoded;
   } catch (error) {
-    console.error('[Meta OAuth] Invalid state:', error);
+    logger.error('[Meta OAuth] Invalid state:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -106,7 +107,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[Meta OAuth] Token exchange failed:', error);
+      logger.error('[Meta OAuth] Token exchange failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
@@ -116,7 +117,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
       expires_in: number;
     } | null;
   } catch (error) {
-    console.error('[Meta OAuth] Token exchange error:', error);
+    logger.error('[Meta OAuth] Token exchange error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -141,7 +142,7 @@ export async function getLongLivedToken(shortLivedToken: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[Meta OAuth] Long-lived token exchange failed:', error);
+      logger.error('[Meta OAuth] Long-lived token exchange failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
@@ -151,7 +152,7 @@ export async function getLongLivedToken(shortLivedToken: string): Promise<{
       expires_in: number;
     } | null;
   } catch (error) {
-    console.error('[Meta OAuth] Long-lived token error:', error);
+    logger.error('[Meta OAuth] Long-lived token error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -174,7 +175,7 @@ export async function getUserInfo(accessToken: string): Promise<{
     const response = await fetch(`${META_GRAPH_URL}/me?${params.toString()}`);
 
     if (!response.ok) {
-      console.error('[Meta OAuth] User info fetch failed');
+      logger.error('[Meta OAuth] User info fetch failed', undefined);
       return null;
     }
 
@@ -185,7 +186,7 @@ export async function getUserInfo(accessToken: string): Promise<{
       picture?: { data: { url: string } };
     } | null;
   } catch (error) {
-    console.error('[Meta OAuth] User info error:', error);
+    logger.error('[Meta OAuth] User info error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -209,7 +210,7 @@ export async function getBusinessAccounts(accessToken: string): Promise<{
     const response = await fetch(`${META_GRAPH_URL}/me/accounts?${params.toString()}`);
 
     if (!response.ok) {
-      console.error('[Meta OAuth] Business accounts fetch failed');
+      logger.error('[Meta OAuth] Business accounts fetch failed', undefined);
       return null;
     }
 
@@ -217,7 +218,7 @@ export async function getBusinessAccounts(accessToken: string): Promise<{
       data: Array<{ id: string; name: string; instagram_business_account?: { id: string; username: string } }>;
     } | null;
   } catch (error) {
-    console.error('[Meta OAuth] Business accounts error:', error);
+    logger.error('[Meta OAuth] Business accounts error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -240,7 +241,7 @@ export async function getCatalogs(accessToken: string, businessId: string): Prom
     const response = await fetch(`${META_GRAPH_URL}/${businessId}/owned_product_catalogs?${params.toString()}`);
 
     if (!response.ok) {
-      console.error('[Meta OAuth] Catalogs fetch failed');
+      logger.error('[Meta OAuth] Catalogs fetch failed', undefined);
       return null;
     }
 
@@ -248,7 +249,7 @@ export async function getCatalogs(accessToken: string, businessId: string): Prom
       data: Array<{ id: string; name: string }>;
     } | null;
   } catch (error) {
-    console.error('[Meta OAuth] Catalogs error:', error);
+    logger.error('[Meta OAuth] Catalogs error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -306,7 +307,7 @@ export async function revokeToken(token: string): Promise<boolean> {
 
     return response.ok;
   } catch (error) {
-    console.error('[Meta OAuth] Token revocation error:', error);
+    logger.error('[Meta OAuth] Token revocation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return false;
   }
 }

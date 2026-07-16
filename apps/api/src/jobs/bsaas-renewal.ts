@@ -17,6 +17,7 @@ import { prisma } from '../prisma';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 /**
  * Calculate the renewal charge amount based on coupon metadata.
@@ -189,7 +190,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         }
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error processing bundle ${bundleKey}:`, error);
+      logger.error(`[BSaaS Renewal] Error processing bundle ${bundleKey}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Bundle ${bundleKey}: ${error.message}`);
     }
   }
@@ -270,7 +271,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         await enterGracePeriod(purchase, chargeResult.error || 'Payment declined', result, featureName, renewalCharge.chargedAmount, billingCycle);
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error processing purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error processing purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Purchase ${purchase.id}: ${error.message}`);
     }
   }
@@ -371,7 +372,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         }
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error converting bundle trial ${bundleKey}:`, error);
+      logger.error(`[BSaaS Renewal] Error converting bundle trial ${bundleKey}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Bundle trial ${bundleKey}: ${error.message}`);
     }
   }
@@ -444,7 +445,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         await enterGracePeriod(purchase, chargeResult.error || 'Payment declined during trial conversion', result, featureName, renewalCharge.chargedAmount, billingCycle);
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error converting trial ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error converting trial ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Trial ${purchase.id}: ${error.message}`);
     }
   }
@@ -566,7 +567,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         }).catch(err => console.error('[BSaaS Renewal] Failed to send grace warning:', err));
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error retrying past_due purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error retrying past_due purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Retry ${purchase.id}: ${error.message}`);
     }
   }
@@ -596,7 +597,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
       result.expired++;
       console.log(`[BSaaS Renewal] Expired cancelled purchase ${purchase.id} for tenant ${purchase.tenant_id}`);
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error expiring purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error expiring purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Expire ${purchase.id}: ${error.message}`);
     }
   }
@@ -617,7 +618,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
     try {
       await enterGracePeriod(purchase, 'Renewal window missed — purchase expired', result);
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error entering grace period for overdue purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error entering grace period for overdue purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Grace ${purchase.id}: ${error.message}`);
     }
   }

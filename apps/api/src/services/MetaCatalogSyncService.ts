@@ -15,6 +15,7 @@
 import { prisma } from '../prisma';
 import { decryptToken } from '../lib/meta/oauth';
 import { generateMetaProductFeed } from '../lib/meta/feed-generator';
+import { logger } from '../logger';
 
 const META_GRAPH_URL = 'https://graph.facebook.com/v21.0';
 
@@ -67,7 +68,7 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; c
 
     return { token, catalogId: account.catalog_id };
   } catch (error) {
-    console.error(`[MetaCatalogSync] Error getting token for tenant ${tenantId}:`, error);
+    logger.error(`[MetaCatalogSync] Error getting token for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -101,7 +102,7 @@ export async function syncProduct(tenantId: string, item: any): Promise<SyncResu
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[MetaCatalogSync] Product sync failed for ${item.id}:`, errorText);
+      logger.error(`[MetaCatalogSync] Product sync failed for ${item.id}:`, undefined, { error: { name: (errorText as any)?.name || 'Error', message: (errorText as any)?.message || String(errorText), stack: (errorText as any)?.stack } });
       return {
         success: false,
         productId: item.id,
@@ -126,7 +127,7 @@ export async function syncProduct(tenantId: string, item: any): Promise<SyncResu
       retailerId: item.sku || item.id,
     };
   } catch (error) {
-    console.error(`[MetaCatalogSync] Product sync error for ${item.id}:`, error);
+    logger.error(`[MetaCatalogSync] Product sync error for ${item.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       success: false,
       productId: item.id,
@@ -177,7 +178,7 @@ export async function batchSyncProducts(tenantId: string, items: any[]): Promise
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[MetaCatalogSync] Batch sync failed for batch ${i}:`, errorText);
+        logger.error(`[MetaCatalogSync] Batch sync failed for batch ${i}:`, undefined, { error: { name: (errorText as any)?.name || 'Error', message: (errorText as any)?.message || String(errorText), stack: (errorText as any)?.stack } });
         batch.forEach(item => {
           results.push({
             success: false,
@@ -202,7 +203,7 @@ export async function batchSyncProducts(tenantId: string, items: any[]): Promise
         });
       });
     } catch (error) {
-      console.error(`[MetaCatalogSync] Batch sync error for batch ${i}:`, error);
+      logger.error(`[MetaCatalogSync] Batch sync error for batch ${i}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       batch.forEach(item => {
         results.push({
           success: false,

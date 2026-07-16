@@ -6,6 +6,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { user_role } from '@prisma/client';
 import { getUserTenantRole } from '../middleware/permissions';
 import { generateUserId, generateUserTenantId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.get('/tenants', async (req, res) => {
       count: activeTenants.length
     });
   } catch (error: any) {
-    console.error('[GET /user/tenants] Error:', error);
+    logger.error('[GET /user/tenants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       success: false, 
       error: 'internal_error', 
@@ -97,7 +98,7 @@ router.get('/preferences', async (req, res) => {
       data: preferencesObj,
     });
   } catch (error) {
-    console.error('[Preferences Error]', error);
+    logger.error('[Preferences Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'internal_error',
       message: 'Failed to fetch preferences',
@@ -157,7 +158,7 @@ router.patch('/preferences', async (req, res) => {
       data: updatedPreferences,
     });
   } catch (error) {
-    console.error('[Preferences Update Error]', error);
+    logger.error('[Preferences Update Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'internal_error',
       message: 'Failed to update preferences',
@@ -288,7 +289,7 @@ router.get('/profile', async (req, res) => {
 
     res.json(profile);
   } catch (error) {
-    console.error('[GET /user/profile] Error:', error);
+    logger.error('[GET /user/profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_profile' });
   }
 });
@@ -348,7 +349,7 @@ router.patch('/profile', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[PATCH /user/profile] Error:', error);
+    logger.error('[PATCH /user/profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_profile' });
   }
 });
@@ -401,7 +402,7 @@ router.get('/', requireAdmin, async (req, res) => {
 
     res.json(transformedUsers);
   } catch (error) {
-    console.error('[GET /users] Error:', error);
+    logger.error('[GET /users] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_users' });
   }
 });
@@ -442,7 +443,7 @@ router.get('/:id', requireAdmin, async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    console.error('[GET /users/:id] Error:', error);
+    logger.error('[GET /users/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_user' });
   }
 });
@@ -498,7 +499,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
     res.json(updatedUser);
   } catch (error) {
-    console.error('[PUT /users/:id] Error:', error);
+    logger.error('[PUT /users/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_user' });
   }
 });
@@ -532,7 +533,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('[DELETE /users/:id] Error:', error);
+    logger.error('[DELETE /users/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_user' });
   }
 });
@@ -567,7 +568,7 @@ router.get('/:id/tenants/:tenantId', async (req, res) => {
       role,
     });
   } catch (error) {
-    console.error('[GET /users/:id/tenants/:tenantId] Error:', error);
+    logger.error('[GET /users/:id/tenants/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'failed_to_fetch_user_tenant',
     });
@@ -624,7 +625,7 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
 
     res.status(201).json(userTenant);
   } catch (error: any) {
-    console.error('[POST /users/:id/tenants] Error:', error);
+    logger.error('[POST /users/:id/tenants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     // Handle unique constraint violation
     if (error.code === 'P2002') {
@@ -669,7 +670,7 @@ router.delete('/:id/tenants/:tenantId', requireAdmin, async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('[DELETE /users/:id/tenants/:tenantId] Error:', error);
+    logger.error('[DELETE /users/:id/tenants/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_remove_user_from_tenant' });
   }
 });
@@ -695,7 +696,7 @@ router.get('/stats/summary', requireAdmin, async (req, res) => {
       admins,
     });
   } catch (error) {
-    console.error('[GET /users/stats/summary] Error:', error);
+    logger.error('[GET /users/stats/summary] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_stats' });
   }
 });

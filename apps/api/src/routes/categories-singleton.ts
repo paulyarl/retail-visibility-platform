@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { categoryService } from '../services/CategoryService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ router.get('/:id', async (req, res) => {
       message: 'Category retrieved successfully'
     });
   } catch (error) {
-    console.error('Category retrieval failed:', error);
+    logger.error('Category retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve category',
@@ -80,7 +81,7 @@ router.get('/slug/:slug', async (req, res) => {
       message: 'Category retrieved successfully'
     });
   } catch (error) {
-    console.error('Category retrieval by slug failed:', error);
+    logger.error('Category retrieval by slug failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve category',
@@ -114,7 +115,7 @@ router.post('/', async (req, res) => {
       message: 'Category created successfully'
     });
   } catch (error) {
-    console.error('Category creation failed:', error);
+    logger.error('Category creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create category',
@@ -148,7 +149,7 @@ router.put('/:id', async (req, res) => {
       message: 'Category updated successfully'
     });
   } catch (error) {
-    console.error('Category update failed:', error);
+    logger.error('Category update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update category',
@@ -174,7 +175,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Category deleted successfully'
     });
   } catch (error) {
-    console.error('Category deletion failed:', error);
+    logger.error('Category deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete category',
@@ -225,7 +226,7 @@ router.get('/', async (req, res) => {
       message: 'Categories retrieved successfully'
     });
   } catch (error) {
-    console.error('Category listing failed:', error);
+    logger.error('Category listing failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to list categories',
@@ -264,7 +265,7 @@ router.get('/tree', async (req, res) => {
       message: 'Category tree retrieved successfully'
     });
   } catch (error) {
-    console.error('Category tree retrieval failed:', error);
+    logger.error('Category tree retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve category tree',
@@ -296,7 +297,7 @@ router.get('/stats', async (req, res) => {
       message: 'Category stats retrieved successfully'
     });
   } catch (error) {
-    console.error('Category stats retrieval failed:', error);
+    logger.error('Category stats retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve category stats',

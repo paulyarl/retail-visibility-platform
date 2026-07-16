@@ -31,7 +31,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: any) {
     // Only log serious errors, ignore DOM manipulation warnings
     if (!error.message.includes('Node.removeChild') && !error.message.includes('removeChild')) {
-      clientLogger.error(`ErrorBoundary: ${error.message}`, {
+      clientLogger.error(error, {
         componentStack: errorInfo?.componentStack || 'No component stack available',
       });
     } else {

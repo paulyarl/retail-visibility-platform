@@ -32,6 +32,7 @@ import { z } from 'zod';
 import { prisma } from '../../prisma';
 import BotRagService from '../../services/BotRagService';
 import { audit } from '../../audit';
+import { logger } from '../../logger';
 
 const router = Router({ mergeParams: true });
 const ragService = BotRagService.getInstance();
@@ -56,7 +57,7 @@ router.get('/settings', async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error fetching bot settings:', error);
+    logger.error('[BotPlatformAdmin] Error fetching bot settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch bot settings' });
   }
 });
@@ -118,7 +119,7 @@ router.put('/settings', async (req: Request, res: Response) => {
         console.log('[BotPlatformAdmin] Embedding sync job stopped (admin toggle)');
       }
     } catch (jobErr) {
-      console.error('[BotPlatformAdmin] Error toggling embedding sync job:', jobErr);
+      logger.error('[BotPlatformAdmin] Error toggling embedding sync job:', undefined, { error: { name: (jobErr as any)?.name || 'Error', message: (jobErr as any)?.message || String(jobErr), stack: (jobErr as any)?.stack } });
     }
 
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_settings', botAiEnabled, botEmbeddingSyncEnabled, botEmbeddingModel, botChatModel, botSyncIntervalHours, botEmbeddingProvider, botChatProvider } });
@@ -142,7 +143,7 @@ router.put('/settings', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error updating bot settings:', error);
+    logger.error('[BotPlatformAdmin] Error updating bot settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update bot settings' });
   }
 });
@@ -159,7 +160,7 @@ router.post('/sync-now', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_sync', action: 'manual_trigger', ...result } });
     res.json({ success: true, data: result });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error triggering manual sync:', error);
+    logger.error('[BotPlatformAdmin] Error triggering manual sync:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to trigger sync' });
   }
 });
@@ -211,7 +212,7 @@ router.get('/sync-estimate', async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error estimating sync cost:', error);
+    logger.error('[BotPlatformAdmin] Error estimating sync cost:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to estimate sync cost' });
   }
 });
@@ -286,7 +287,7 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error fetching dashboard stats:', error);
+    logger.error('[BotPlatformAdmin] Error fetching dashboard stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch dashboard stats' });
   }
 });
@@ -315,7 +316,7 @@ router.get('/guardrails', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: rules });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error listing guardrails:', error);
+    logger.error('[BotPlatformAdmin] Error listing guardrails:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list guardrail rules' });
   }
 });
@@ -330,7 +331,7 @@ router.post('/guardrails', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'create', payload: { entity_type: 'bot_guardrail_rule', id: rule.id, ...validation.data } });
     res.json({ success: true, data: rule });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error creating guardrail:', error);
+    logger.error('[BotPlatformAdmin] Error creating guardrail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create guardrail rule' });
   }
 });
@@ -348,7 +349,7 @@ router.put('/guardrails/:id', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_guardrail_rule', id: rule.id } });
     res.json({ success: true, data: rule });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error updating guardrail:', error);
+    logger.error('[BotPlatformAdmin] Error updating guardrail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update guardrail rule' });
   }
 });
@@ -359,7 +360,7 @@ router.delete('/guardrails/:id', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'delete', payload: { entity_type: 'bot_guardrail_rule', id: req.params.id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error deleting guardrail:', error);
+    logger.error('[BotPlatformAdmin] Error deleting guardrail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete guardrail rule' });
   }
 });
@@ -385,7 +386,7 @@ router.get('/intents', async (_req: Request, res: Response) => {
     });
     res.json({ success: true, data: intents });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error listing intents:', error);
+    logger.error('[BotPlatformAdmin] Error listing intents:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list intents' });
   }
 });
@@ -400,7 +401,7 @@ router.post('/intents', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'create', payload: { entity_type: 'bot_intent', id: intent.id, ...validation.data } });
     res.json({ success: true, data: intent });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error creating intent:', error);
+    logger.error('[BotPlatformAdmin] Error creating intent:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create intent' });
   }
 });
@@ -418,7 +419,7 @@ router.put('/intents/:id', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_intent', id: intent.id } });
     res.json({ success: true, data: intent });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error updating intent:', error);
+    logger.error('[BotPlatformAdmin] Error updating intent:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update intent' });
   }
 });
@@ -429,7 +430,7 @@ router.delete('/intents/:id', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'delete', payload: { entity_type: 'bot_intent', id: req.params.id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error deleting intent:', error);
+    logger.error('[BotPlatformAdmin] Error deleting intent:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete intent' });
   }
 });
@@ -464,7 +465,7 @@ router.get('/skills', async (_req: Request, res: Response) => {
     });
     res.json({ success: true, data: skills });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error listing skills:', error);
+    logger.error('[BotPlatformAdmin] Error listing skills:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list skills' });
   }
 });
@@ -479,7 +480,7 @@ router.post('/skills', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'create', payload: { entity_type: 'bot_skill', id: skill.id, ...validation.data } });
     res.json({ success: true, data: skill });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error creating skill:', error);
+    logger.error('[BotPlatformAdmin] Error creating skill:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create skill' });
   }
 });
@@ -497,7 +498,7 @@ router.put('/skills/:id', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'update', payload: { entity_type: 'bot_skill', id: skill.id } });
     res.json({ success: true, data: skill });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error updating skill:', error);
+    logger.error('[BotPlatformAdmin] Error updating skill:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update skill' });
   }
 });
@@ -508,7 +509,7 @@ router.delete('/skills/:id', async (req: Request, res: Response) => {
     await audit({ tenantId: 'platform', actor: (req as any).user?.userId || 'admin', action: 'delete', payload: { entity_type: 'bot_skill', id: req.params.id } });
     res.json({ success: true });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error deleting skill:', error);
+    logger.error('[BotPlatformAdmin] Error deleting skill:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete skill' });
   }
 });
@@ -562,7 +563,7 @@ router.get('/knowledge', async (req: Request, res: Response) => {
 
     res.json({ success: true, data, total, page, limit });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error fetching knowledge status:', error);
+    logger.error('[BotPlatformAdmin] Error fetching knowledge status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch knowledge status' });
   }
 });
@@ -593,7 +594,7 @@ router.post('/knowledge/refresh', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: results });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error refreshing embeddings:', error);
+    logger.error('[BotPlatformAdmin] Error refreshing embeddings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to refresh embeddings' });
   }
 });
@@ -649,7 +650,7 @@ router.get('/tenants', async (req: Request, res: Response) => {
 
     res.json({ success: true, data, total, page, limit });
   } catch (error) {
-    console.error('[BotPlatformAdmin] Error listing bot tenants:', error);
+    logger.error('[BotPlatformAdmin] Error listing bot tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list bot tenants' });
   }
 });

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import StorefrontQrService from '../services/StorefrontQrService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateStorefrontQrSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -142,7 +143,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching storefront QR settings:', error);
+    logger.error('Error fetching storefront QR settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -220,7 +221,7 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
       },
     });
   } catch (error) {
-    console.error('Error updating storefront QR settings:', error);
+    logger.error('Error updating storefront QR settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

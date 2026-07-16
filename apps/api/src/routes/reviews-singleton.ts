@@ -7,6 +7,7 @@ import { Router } from 'express';
 import ReviewsService from '../services/ReviewsService';
 import { getDirectPool } from '../utils/db-pool';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get('/stats', async (req, res) => {
       message: 'Review statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[REVIEWS SINGLETON] Get stats error:', error);
+    logger.error('[REVIEWS SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review statistics'
@@ -85,7 +86,7 @@ router.get('/:id', async (req, res) => {
       message: 'Review retrieved successfully'
     });
   } catch (error) {
-    console.error('Review retrieval failed:', error);
+    logger.error('Review retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve review',
@@ -130,7 +131,7 @@ router.get('/product/:productId', async (req, res) => {
       message: 'Product reviews retrieved successfully'
     });
   } catch (error) {
-    console.error('Product reviews retrieval failed:', error);
+    logger.error('Product reviews retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve product reviews',
@@ -179,7 +180,7 @@ router.get('/tenant/:tenantId', async (req, res) => {
       message: 'Tenant reviews retrieved successfully'
     });
   } catch (error) {
-    console.error('Tenant reviews retrieval failed:', error);
+    logger.error('Tenant reviews retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tenant reviews',
@@ -285,7 +286,7 @@ router.get('/', async (req, res) => {
       message: 'Reviews retrieved successfully'
     });
   } catch (error) {
-    console.error('Reviews listing failed:', error);
+    logger.error('Reviews listing failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve reviews',
@@ -324,7 +325,7 @@ router.post('/', async (req, res) => {
       message: 'Review created successfully'
     });
   } catch (error) {
-    console.error('Review creation failed:', error);
+    logger.error('Review creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create review',
@@ -373,7 +374,7 @@ router.put('/:id', async (req, res) => {
       message: 'Review updated successfully'
     });
   } catch (error) {
-    console.error('Review update failed:', error);
+    logger.error('Review update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update review',
@@ -421,7 +422,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Review deleted successfully'
     });
   } catch (error) {
-    console.error('Review deletion failed:', error);
+    logger.error('Review deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete review',
@@ -457,7 +458,7 @@ router.post('/:id/approve', async (req, res) => {
       message: 'Review approved successfully'
     });
   } catch (error) {
-    console.error('Review approval failed:', error);
+    logger.error('Review approval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to approve review',
@@ -494,7 +495,7 @@ router.post('/:id/reject', async (req, res) => {
       message: 'Review rejected successfully'
     });
   } catch (error) {
-    console.error('Review rejection failed:', error);
+    logger.error('Review rejection failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to reject review',
@@ -536,7 +537,7 @@ router.get('/pending', async (req, res) => {
       message: 'Pending reviews retrieved successfully'
     });
   } catch (error) {
-    console.error('Pending reviews retrieval failed:', error);
+    logger.error('Pending reviews retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve pending reviews',

@@ -4,6 +4,7 @@
  */
 
 import { digitalAssetService } from './DigitalAssetService';
+import { logger } from '../../logger';
 
 async function testStorage() {
   console.log('🧪 Testing Supabase Storage for Digital Products...\n');
@@ -15,16 +16,16 @@ async function testStorage() {
     if (hasAccess) {
       console.log('✅ Bucket access: OK\n');
     } else {
-      console.error('❌ Bucket access: FAILED');
-      console.error('Cannot access digital-products bucket. Check:');
-      console.error('1. Bucket exists in Supabase Dashboard');
-      console.error('2. SUPABASE_URL environment variable is correct');
-      console.error('3. SUPABASE_SERVICE_ROLE_KEY environment variable is correct');
-      console.error('4. Storage policies are configured\n');
+      logger.error('❌ Bucket access: FAILED', undefined);
+      logger.error('Cannot access digital-products bucket. Check:', undefined);
+      logger.error('1. Bucket exists in Supabase Dashboard', undefined);
+      logger.error('2. SUPABASE_URL environment variable is correct', undefined);
+      logger.error('3. SUPABASE_SERVICE_ROLE_KEY environment variable is correct', undefined);
+      logger.error('4. Storage policies are configured\n', undefined);
       return;
     }
   } catch (error: any) {
-    console.error('❌ Bucket access check failed:', error.message);
+    logger.error('❌ Bucket access check failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return;
   }
   
@@ -48,7 +49,7 @@ async function testStorage() {
     console.log(`   File path: ${testAsset.file_path}`);
     console.log(`   File size: ${testAsset.file_size_bytes} bytes\n`);
   } catch (error: any) {
-    console.error('❌ File upload failed:', error.message);
+    logger.error('❌ File upload failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return;
   }
   
@@ -59,10 +60,10 @@ async function testStorage() {
     if (exists) {
       console.log('✅ File validation: OK\n');
     } else {
-      console.error('❌ File validation: FAILED - File not found after upload\n');
+      logger.error('❌ File validation: FAILED - File not found after upload\n', undefined);
     }
   } catch (error: any) {
-    console.error('❌ File validation failed:', error.message);
+    logger.error('❌ File validation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 4: Get file metadata
@@ -75,10 +76,10 @@ async function testStorage() {
       console.log(`   MIME type: ${metadata.mimeType}`);
       console.log(`   Last modified: ${metadata.lastModified}\n`);
     } else {
-      console.error('❌ File metadata: FAILED - No metadata returned\n');
+      logger.error('❌ File metadata: FAILED - No metadata returned\n', undefined);
     }
   } catch (error: any) {
-    console.error('❌ File metadata failed:', error.message);
+    logger.error('❌ File metadata failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 5: Generate signed URL
@@ -89,7 +90,7 @@ async function testStorage() {
     console.log(`   URL expires in: 60 seconds`);
     console.log(`   URL length: ${signedUrl.length} characters\n`);
   } catch (error: any) {
-    console.error('❌ Signed URL generation failed:', error.message);
+    logger.error('❌ Signed URL generation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 6: Generate access token
@@ -99,7 +100,7 @@ async function testStorage() {
     console.log('✅ Access token generation: OK');
     console.log(`   Token length: ${accessToken.length} characters\n`);
   } catch (error: any) {
-    console.error('❌ Access token generation failed:', error.message);
+    logger.error('❌ Access token generation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 7: Generate license key
@@ -109,7 +110,7 @@ async function testStorage() {
     console.log('✅ License key generation: OK');
     console.log(`   License key: ${licenseKey}\n`);
   } catch (error: any) {
-    console.error('❌ License key generation failed:', error.message);
+    logger.error('❌ License key generation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 8: Create external link asset
@@ -124,7 +125,7 @@ async function testStorage() {
     console.log(`   Asset ID: ${externalAsset.id}`);
     console.log(`   External URL: ${externalAsset.external_url}\n`);
   } catch (error: any) {
-    console.error('❌ External link asset creation failed:', error.message);
+    logger.error('❌ External link asset creation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 9: Create license key asset
@@ -137,7 +138,7 @@ async function testStorage() {
     console.log('✅ License key asset creation: OK');
     console.log(`   Asset ID: ${licenseAsset.id}\n`);
   } catch (error: any) {
-    console.error('❌ License key asset creation failed:', error.message);
+    logger.error('❌ License key asset creation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
   }
   
   // Test 10: Delete test file (cleanup)
@@ -146,8 +147,8 @@ async function testStorage() {
     await digitalAssetService.deleteAsset(testAsset.file_path!);
     console.log('✅ File deletion: OK\n');
   } catch (error: any) {
-    console.error('❌ File deletion failed:', error.message);
-    console.error('   You may need to manually delete the test file from Supabase Dashboard\n');
+    logger.error('❌ File deletion failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
+    logger.error('   You may need to manually delete the test file from Supabase Dashboard\n', undefined);
   }
   
   // Summary
@@ -162,6 +163,6 @@ async function testStorage() {
 
 // Run tests
 testStorage().catch(error => {
-  console.error('\n❌ Test suite failed:', error);
+  logger.error('\n❌ Test suite failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   process.exit(1);
 });

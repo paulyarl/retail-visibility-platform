@@ -16,6 +16,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { deriveInternalStatus } from '../utils/subscription-status';
+import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
 
@@ -537,7 +538,7 @@ router.get('/resolve/:identifier', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[GET /api/public/tenants/resolve/:identifier] Error:', error);
+    logger.error('[GET /api/public/tenants/resolve/:identifier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'failed_to_resolve_tenant' });
   }
 });
@@ -680,7 +681,7 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
       uncategorized_features: uncategorizedFeatures,
     });
   } catch (error) {
-    console.error('[GET /api/public/tenants/:tenantId/capabilities] Error:', error);
+    logger.error('[GET /api/public/tenants/:tenantId/capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_tenant_capabilities' });
   }
 });
@@ -734,7 +735,7 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
       data: result,
     });
   } catch (error) {
-    console.error('[GET /api/public/tenants/:tenantId/effective-capabilities] Error:', error);
+    logger.error('[GET /api/public/tenants/:tenantId/effective-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { logger } from '../logger';
 
 /**
  * Service for encrypting and decrypting OAuth tokens using AES-256-GCM
@@ -101,7 +102,7 @@ export class TokenEncryptionService {
       const decrypted = this.decrypt(encrypted);
       return testString === decrypted;
     } catch (error) {
-      console.error('[TokenEncryption] Verification failed:', error);
+      logger.error('[TokenEncryption] Verification failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

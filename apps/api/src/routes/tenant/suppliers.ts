@@ -28,6 +28,7 @@ import SupplierCatalogService from '../../services/SupplierCatalogService';
 import SupplierImportService from '../../services/SupplierImportService';
 import { BarcodeEnrichmentService } from '../../services/BarcodeEnrichmentService';
 import { resolveEffectiveCapabilities } from '../../services/EffectiveCapabilityResolver';
+import { logger } from '../../logger';
 
 // mergeParams: true is required because this router is mounted at /api/tenants/:tenantId
 // and its global middleware (checkTenantAccess) needs req.params.tenantId.
@@ -62,7 +63,7 @@ router.use('/suppliers', async (req, res, next) => {
     }
     next();
   } catch (error) {
-    console.error('[tenant/suppliers] Capability check error:', error);
+    logger.error('[tenant/suppliers] Capability check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'Failed to verify capability' });
   }
 });
@@ -73,7 +74,7 @@ router.get('/suppliers', async (req, res) => {
     const suppliers = await SupplierService.listSuppliers(true);
     res.json({ suppliers });
   } catch (error) {
-    console.error('[tenant/suppliers] List error:', error);
+    logger.error('[tenant/suppliers] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list suppliers' });
   }
 });
@@ -92,7 +93,7 @@ router.get('/suppliers/catalog/search', async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error('[tenant/suppliers] Catalog search error:', error);
+    logger.error('[tenant/suppliers] Catalog search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to search catalog' });
   }
 });
@@ -108,7 +109,7 @@ router.get('/suppliers/catalog/lookup', async (req, res) => {
     const items = await SupplierCatalogService.lookupByBarcode(gtin, supplierId);
     res.json({ items });
   } catch (error) {
-    console.error('[tenant/suppliers] Barcode lookup error:', error);
+    logger.error('[tenant/suppliers] Barcode lookup error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to lookup by barcode' });
   }
 });
@@ -126,7 +127,7 @@ router.get('/suppliers/enrich/:barcode', async (req, res) => {
     const enrichment = await enrichmentService.enrichWithCategorySuggestion(barcode, tenantId);
     res.json({ enrichment });
   } catch (error) {
-    console.error('[tenant/suppliers] Barcode enrichment error:', error);
+    logger.error('[tenant/suppliers] Barcode enrichment error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to enrich barcode' });
   }
 });
@@ -141,7 +142,7 @@ router.post('/suppliers/import/check', async (req, res) => {
     const result = await SupplierImportService.checkConflicts(getTenantId(req), selections);
     res.json(result);
   } catch (error) {
-    console.error('[tenant/suppliers] Import check error:', error);
+    logger.error('[tenant/suppliers] Import check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to check import conflicts' });
   }
 });
@@ -182,13 +183,13 @@ router.post('/suppliers/import', requireTenantOwner, async (req, res) => {
           },
         });
       } catch (auditError) {
-        console.error('[tenant/suppliers] Audit log error:', auditError);
+        logger.error('[tenant/suppliers] Audit log error:', undefined, { error: { name: (auditError as any)?.name || 'Error', message: (auditError as any)?.message || String(auditError), stack: (auditError as any)?.stack } });
       }
     }
 
     res.json(result);
   } catch (error) {
-    console.error('[tenant/suppliers] Import error:', error);
+    logger.error('[tenant/suppliers] Import error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to execute import' });
   }
 });
@@ -200,7 +201,7 @@ router.get('/suppliers/mappings', async (req, res) => {
     const mappings = await SupplierImportService.getMappings(getTenantId(req), supplierId);
     res.json({ mappings });
   } catch (error) {
-    console.error('[tenant/suppliers] Mappings list error:', error);
+    logger.error('[tenant/suppliers] Mappings list error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list mappings' });
   }
 });
@@ -231,13 +232,13 @@ router.put('/suppliers/mappings/:mid', requireTenantOwner, async (req, res) => {
           },
         });
       } catch (auditError) {
-        console.error('[tenant/suppliers] Audit log error:', auditError);
+        logger.error('[tenant/suppliers] Audit log error:', undefined, { error: { name: (auditError as any)?.name || 'Error', message: (auditError as any)?.message || String(auditError), stack: (auditError as any)?.stack } });
       }
     }
 
     res.json({ mapping });
   } catch (error) {
-    console.error('[tenant/suppliers] Update mapping error:', error);
+    logger.error('[tenant/suppliers] Update mapping error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update mapping' });
   }
 });
@@ -264,13 +265,13 @@ router.delete('/suppliers/mappings/:mid', requireTenantOwner, async (req, res) =
           },
         });
       } catch (auditError) {
-        console.error('[tenant/suppliers] Audit log error:', auditError);
+        logger.error('[tenant/suppliers] Audit log error:', undefined, { error: { name: (auditError as any)?.name || 'Error', message: (auditError as any)?.message || String(auditError), stack: (auditError as any)?.stack } });
       }
     }
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[tenant/suppliers] Unlink mapping error:', error);
+    logger.error('[tenant/suppliers] Unlink mapping error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const message = error instanceof Error ? error.message : 'Failed to unlink mapping';
     if (message.includes('not found')) {
       return res.status(404).json({ error: message });

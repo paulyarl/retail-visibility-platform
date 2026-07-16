@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 // import { getFeaturedTypeDisplay } from '../utils/featured-types'; // TODO: Create this utility
 
 // Simple implementation for now
@@ -96,7 +97,7 @@ router.get('/item/:itemId', authenticateToken, async (req: Request, res: Respons
     });
 
   } catch (error: any) {
-    console.error('[VARIANT FEATURED TYPES] Fetch error:', error);
+    logger.error('[VARIANT FEATURED TYPES] Fetch error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -206,7 +207,7 @@ router.get('/variants/:parentItemId', authenticateToken, async (req: Request, re
     });
 
   } catch (error: any) {
-    console.error('[VARIANT FEATURED TYPES] Bulk fetch error:', error);
+    logger.error('[VARIANT FEATURED TYPES] Bulk fetch error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'bulk_fetch_failed',

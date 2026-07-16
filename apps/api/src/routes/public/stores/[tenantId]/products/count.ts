@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDirectPool } from '../../../../../utils/db-pool';
+import { logger } from '../../../../../logger';
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +37,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Store Product Count API Error:', error);
+    logger.error('Store Product Count API Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

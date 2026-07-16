@@ -5,6 +5,7 @@ import { getStockService } from '../services/StockService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 import { stripeConnectService } from '../services/payments/StripeConnectService';
 import { getOrderNotificationService } from '../services/OrderNotificationService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -195,7 +196,7 @@ router.get('/buyer', async (req, res) => {
       count: ordersList.length,
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error fetching orders:', error);
+    logger.error('[Buyer Orders] Error fetching orders:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -371,7 +372,7 @@ router.get('/customer/:email', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error fetching customer orders:', error);
+    logger.error('[Buyer Orders] Error fetching customer orders:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -568,7 +569,7 @@ router.get('/:orderId', async (req, res) => {
       order: orderDetail,
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error fetching order:', error);
+    logger.error('[Buyer Orders] Error fetching order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -677,7 +678,7 @@ router.patch('/:orderId/pickup', async (req, res) => {
           // console.log('[Buyer Orders] Recorded deposit revenue:', depositPayment.platform_fee_cents, 'cents');
         }
       } catch (revenueError) {
-        console.error('[Buyer Orders] Failed to record deposit revenue:', revenueError);
+        logger.error('[Buyer Orders] Failed to record deposit revenue:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
         // Don't fail the fulfillment if revenue recording fails
       }
     }
@@ -705,7 +706,7 @@ router.patch('/:orderId/pickup', async (req, res) => {
       const { hybridFulfillmentCoordinator } = await import('../services/HybridFulfillmentCoordinator');
       await hybridFulfillmentCoordinator.checkHybridFulfillmentComplete(orderId);
     } catch (hybridError) {
-      console.error('[Buyer Orders] Hybrid fulfillment check failed:', hybridError);
+      logger.error('[Buyer Orders] Hybrid fulfillment check failed:', undefined, { error: { name: (hybridError as any)?.name || 'Error', message: (hybridError as any)?.message || String(hybridError), stack: (hybridError as any)?.stack } });
     }
 
     res.json({
@@ -718,7 +719,7 @@ router.patch('/:orderId/pickup', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error marking order as picked up:', error);
+    logger.error('[Buyer Orders] Error marking order as picked up:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'update_failed',
@@ -819,7 +820,7 @@ router.patch('/:orderId/cancel', async (req, res) => {
       await stockService.restoreStockForOrder(orderId);
       // console.log(`[Buyer Orders] Stock restored for cancelled order: ${orderId}`);
     } catch (stockError) {
-      console.error(`[Buyer Orders] Failed to restore stock for cancelled order ${orderId}:`, stockError);
+      logger.error(`[Buyer Orders] Failed to restore stock for cancelled order ${orderId}:`, undefined, { error: { name: (stockError as any)?.name || 'Error', message: (stockError as any)?.message || String(stockError), stack: (stockError as any)?.stack } });
       // Don't fail the cancellation if stock restoration fails
     }
 
@@ -841,7 +842,7 @@ router.patch('/:orderId/cancel', async (req, res) => {
         console.log(`[Buyer Orders] Revoked ${revokedCount.count} digital access grants for cancelled order: ${orderId}`);
       }
     } catch (digitalError) {
-      console.error(`[Buyer Orders] Failed to revoke digital access for cancelled order ${orderId}:`, digitalError);
+      logger.error(`[Buyer Orders] Failed to revoke digital access for cancelled order ${orderId}:`, undefined, { error: { name: (digitalError as any)?.name || 'Error', message: (digitalError as any)?.message || String(digitalError), stack: (digitalError as any)?.stack } });
       // Don't fail the cancellation if digital revocation fails
     }
 
@@ -879,10 +880,10 @@ router.patch('/:orderId/cancel', async (req, res) => {
           if (refundResult.success) {
             // console.log('[Buyer Orders] Refund processed successfully:', refundResult.refundId);
           } else {
-            console.error('[Buyer Orders] Refund failed:', refundResult.error);
+            logger.error('[Buyer Orders] Refund failed:', undefined, { error: { name: 'Error', message: refundResult.error } });
           }
         }).catch(error => {
-          console.error('[Buyer Orders] Refund processing error:', error);
+          logger.error('[Buyer Orders] Refund processing error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         });
       } else {
         console.warn('[Buyer Orders] No payment record found for paid order:', orderId);
@@ -900,7 +901,7 @@ router.patch('/:orderId/cancel', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error cancelling order:', error);
+    logger.error('[Buyer Orders] Error cancelling order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'cancel_failed',
@@ -969,7 +970,7 @@ router.get('/downloads/:email', async (req, res) => {
       count: downloads.length,
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error fetching downloads:', error);
+    logger.error('[Buyer Orders] Error fetching downloads:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -991,7 +992,7 @@ router.get('/customer/:email/service-bookings', async (req, res) => {
       data: bookings,
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error fetching service bookings:', error);
+    logger.error('[Buyer Orders] Error fetching service bookings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -1013,7 +1014,7 @@ router.get('/:orderId/service-bookings', async (req, res) => {
       data: bookings,
     });
   } catch (error) {
-    console.error('[Buyer Orders] Error fetching order service bookings:', error);
+    logger.error('[Buyer Orders] Error fetching order service bookings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',

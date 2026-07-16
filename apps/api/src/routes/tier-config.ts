@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 router.use(authenticateToken);
@@ -104,7 +105,7 @@ router.get('/', async (req, res) => {
       limits,
     });
   } catch (error) {
-    console.error('[GET /api/tier-config] Error:', error);
+    logger.error('[GET /api/tier-config] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_load_tier_config' });
   }
 });

@@ -13,6 +13,7 @@ import { prisma } from '../prisma';
 import { getShipmentStatusService } from '../services/ShipmentStatusService';
 import type { ShipmentStatus } from '../services/ShipmentStatusService';
 import { checkTierAccessWithOverrides } from '../middleware/tier-access';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -83,7 +84,7 @@ router.get('/:shipmentId', authenticateToken, async (req: Request, res: Response
       },
     });
   } catch (error) {
-    console.error('[Shipments API] Error fetching shipment:', error);
+    logger.error('[Shipments API] Error fetching shipment:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -173,7 +174,7 @@ router.patch(
         message: 'Shipment status updated',
       });
     } catch (error) {
-      console.error('[Shipments API] Error updating shipment status:', error);
+      logger.error('[Shipments API] Error updating shipment status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: 'internal_error',
@@ -228,7 +229,7 @@ router.get(
         data: timeline,
       });
     } catch (error) {
-      console.error('[Shipments API] Error fetching tracking events:', error);
+      logger.error('[Shipments API] Error fetching tracking events:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: 'internal_error',

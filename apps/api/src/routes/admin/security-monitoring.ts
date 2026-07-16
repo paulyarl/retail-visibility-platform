@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { basePrisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.get('/sessions', async (req, res) => {
       total: Number(count),
     });
   } catch (error) {
-    console.error('[GET /api/admin/security/sessions] Error:', error);
+    logger.error('[GET /api/admin/security/sessions] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
@@ -110,7 +111,7 @@ router.get('/sessions/stats', async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[GET /api/admin/security/sessions/stats] Error:', error);
+    logger.error('[GET /api/admin/security/sessions/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch session stats' });
   }
 });
@@ -231,7 +232,7 @@ router.get('/alerts', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GET /api/admin/security/alerts] Error:', error);
+    logger.error('[GET /api/admin/security/alerts] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch alerts' });
   }
 });
@@ -280,7 +281,7 @@ router.get('/alerts/stats', async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[GET /api/admin/security/alerts/stats] Error:', error);
+    logger.error('[GET /api/admin/security/alerts/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch alert stats' });
   }
 });
@@ -360,7 +361,7 @@ router.get('/alerts/by-type', async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[GET /api/admin/security/alerts/by-type] Error:', error);
+    logger.error('[GET /api/admin/security/alerts/by-type] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch alerts by type' });
   }
 });
@@ -435,7 +436,7 @@ router.get('/failed-logins', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Security Monitoring] Error fetching failed logins:', error);
+    logger.error('[Security Monitoring] Error fetching failed logins:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -506,7 +507,7 @@ router.delete('/sessions/:sessionId', async (req, res) => {
       userEmail: session.user_email
     });
   } catch (error) {
-    console.error('[DELETE /api/admin/security/sessions/:sessionId] Error:', error);
+    logger.error('[DELETE /api/admin/security/sessions/:sessionId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to revoke session',
       message: 'An internal error occurred while revoking the session'

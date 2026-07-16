@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../logger';
 
 /**
  * GeocodingService - Converts addresses to coordinates
@@ -51,7 +52,7 @@ export class GeocodingService {
       // Try just city name
       return this.geocodeByCity(normalized);
     } catch (error) {
-      console.error('[GEOCODING] Error geocoding address:', error);
+      logger.error('[GEOCODING] Error geocoding address:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }

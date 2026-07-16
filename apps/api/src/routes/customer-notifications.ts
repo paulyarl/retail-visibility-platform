@@ -11,6 +11,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { CustomerTokenService } from '../services/CustomerTokenService';
+import { logger } from '../logger';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
@@ -118,7 +119,7 @@ router.get('/preferences', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[CustomerNotifications API] Get preferences error:', error);
+    logger.error('[CustomerNotifications API] Get preferences error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -231,7 +232,7 @@ router.put('/preferences', async (req: Request, res: Response) => {
       message: 'Notification preferences updated successfully',
     });
   } catch (error: any) {
-    console.error('[CustomerNotifications API] Update preferences error:', error);
+    logger.error('[CustomerNotifications API] Update preferences error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',

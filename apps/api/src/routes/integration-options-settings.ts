@@ -5,6 +5,7 @@ import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import IntegrationOptionsService from '../services/IntegrationOptionsService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -79,7 +80,7 @@ router.get('/:tenantId/integration-options', authenticateToken, async (req, res)
       },
     });
   } catch (error) {
-    console.error('Error fetching integration options settings:', error);
+    logger.error('Error fetching integration options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -172,7 +173,7 @@ router.put('/:tenantId/integration-options', authenticateToken, requireTenantAdm
       },
     });
   } catch (error) {
-    console.error('Error updating integration options settings:', error);
+    logger.error('Error updating integration options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -193,7 +194,7 @@ router.get('/:tenantId/integration-options/capability', authenticateToken, async
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving integration options capability:', error);
+    logger.error('Error resolving integration options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

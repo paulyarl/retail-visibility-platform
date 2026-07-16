@@ -5,6 +5,7 @@ import { requireOrgAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { generateOrganizationCommerceSettingsId } from '../lib/id-generator';
 import { getOrganizationCommerceCapabilities } from '../utils/commerce-capabilities';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -95,7 +96,7 @@ router.get('/organizations/:organizationId/commerce-settings', authenticateToken
       source: capabilities.source,
     });
   } catch (error) {
-    console.error('Error fetching organization commerce settings:', error);
+    logger.error('Error fetching organization commerce settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -168,7 +169,7 @@ router.put('/organizations/:organizationId/commerce-settings', authenticateToken
     });
 
   } catch (error) {
-    console.error('[Organization Commerce Settings PUT] Error:', error);
+    logger.error('[Organization Commerce Settings PUT] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_update_settings',
@@ -205,7 +206,7 @@ router.get('/public/organization/:organizationId/commerce-settings', async (req:
     });
 
   } catch (error) {
-    console.error('[Public Organization Commerce Settings GET] Error:', error);
+    logger.error('[Public Organization Commerce Settings GET] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_settings',

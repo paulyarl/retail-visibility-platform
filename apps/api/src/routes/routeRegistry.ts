@@ -283,6 +283,7 @@ import directorySupportRoutes from '../routes/directory-support';
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
 import { auditLogger } from '../middleware/audit-logger';
+import { logger } from '../logger';
 
 // ─── Registry Types ────────────────────────────────────────────────────────
 
@@ -1927,7 +1928,7 @@ export function mountFromRegistry(app: Express): void {
       }
       console.log(`✅ [Registry] ${entry.domain}: ${entry.path} - ${entry.comment || ''}`);
     } catch (error) {
-      console.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, error);
+      logger.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -1941,7 +1942,7 @@ export function mountFromRegistry(app: Express): void {
       }
       console.log(`✅ [Registry] ${entry.domain}: ${entry.path} - ${entry.comment || ''}`);
     } catch (error) {
-      console.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, error);
+      logger.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

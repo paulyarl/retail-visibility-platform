@@ -3,6 +3,7 @@ import { SESEmailProvider } from './email-providers/ses';
 import { ConsoleEmailProvider } from './email-providers/console';
 import { MailtrapEmailProvider } from './email-providers/mailtrap';
 import { emailTrackingService } from './email-tracking.service';
+import { logger } from '../logger';
 
 export interface EmailProvider {
   sendEmail(params: SendEmailParams): Promise<EmailResult>;
@@ -119,12 +120,12 @@ class EmailService {
         }
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`[Email Service] Provider ${providerName} threw error:`, error);
+        logger.error(`[Email Service] Provider ${providerName} threw error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
     // All providers failed
-    console.error(`[Email Service] ❌ All providers failed. Last error: ${lastError}`);
+    logger.error(`[Email Service] ❌ All providers failed. Last error: ${lastError}`, undefined);
     
     return {
       success: false,
@@ -151,14 +152,14 @@ class EmailService {
   async switchProvider(newProvider: string): Promise<boolean> {
     const provider = this.providers.get(newProvider.toLowerCase());
     if (!provider) {
-      console.error(`[Email Service] Provider ${newProvider} not found`);
+      logger.error(`[Email Service] Provider ${newProvider} not found`, undefined);
       return false;
     }
 
     try {
       const isValid = await provider.validateConfig();
       if (!isValid) {
-        console.error(`[Email Service] Provider ${newProvider} configuration invalid`);
+        logger.error(`[Email Service] Provider ${newProvider} configuration invalid`, undefined);
         return false;
       }
 
@@ -166,7 +167,7 @@ class EmailService {
       console.log(`[Email Service] ✅ Switched to provider: ${newProvider}`);
       return true;
     } catch (error) {
-      console.error(`[Email Service] Failed to switch to ${newProvider}:`, error);
+      logger.error(`[Email Service] Failed to switch to ${newProvider}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -466,7 +467,7 @@ This invitation was sent to ${data.inviteeEmail}. If you didn't expect this invi
       if (!provider) return false;
       return await provider.validateConfig();
     } catch (error) {
-      console.error('[Email Service] Configuration validation failed:', error);
+      logger.error('[Email Service] Configuration validation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

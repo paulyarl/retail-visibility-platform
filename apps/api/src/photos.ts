@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { createClient } from "@supabase/supabase-js";
 import { StorageBuckets } from "./storage-config";
 import { generateQuickStart } from "./lib/id-generator";
+import { logger } from './logger';
 
 const prismaClient = prisma;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -70,7 +71,7 @@ export async function migrateTempPhotos(
         .download(tempPath);
 
       if (downloadError || !fileData) {
-        console.error('[migrateTempPhotos] Failed to download temp file:', downloadError);
+        logger.error('[migrateTempPhotos] Failed to download temp file:', undefined, { error: { name: (downloadError as any)?.name || 'Error', message: (downloadError as any)?.message || String(downloadError), stack: (downloadError as any)?.stack } });
         permanentUrls.push(tempUrl); // Keep temp URL as fallback
         continue;
       }
@@ -84,7 +85,7 @@ export async function migrateTempPhotos(
         });
 
       if (uploadError) {
-        console.error('[migrateTempPhotos] Failed to upload to permanent location:', uploadError);
+        logger.error('[migrateTempPhotos] Failed to upload to permanent location:', undefined, { error: { name: (uploadError as any)?.name || 'Error', message: (uploadError as any)?.message || String(uploadError), stack: (uploadError as any)?.stack } });
         permanentUrls.push(tempUrl); // Keep temp URL as fallback
         continue;
       }
@@ -103,7 +104,7 @@ export async function migrateTempPhotos(
 
       console.log('[migrateTempPhotos] Migrated:', tempPath, '->', permanentPath);
     } catch (error) {
-      console.error('[migrateTempPhotos] Error migrating photo:', error);
+      logger.error('[migrateTempPhotos] Error migrating photo:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       permanentUrls.push(tempUrl); // Keep temp URL as fallback
     }
   }
@@ -201,8 +202,8 @@ r.post("/photos/temp", upload.single("file"), async (req, res) => {
       bytes,
     });
   } catch (e: any) {
-    console.error("temp photo upload error", e);
-    return res.status(500).json({ error: e?.message || "upload failed" });
+    logger.error("temp photo upload error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ error: (e as any)?.message || "upload failed" });
   }
 });
 
@@ -234,14 +235,14 @@ r.delete("/photos/temp", async (req, res) => {
       .remove([path]);
 
     if (deleteError) {
-      console.error("temp photo delete error", deleteError);
+      logger.error("temp photo delete error", undefined, { error: { name: (deleteError as any)?.name || 'Error', message: (deleteError as any)?.message || String(deleteError), stack: (deleteError as any)?.stack } });
       return res.status(500).json({ error: deleteError.message });
     }
 
     return res.status(200).json({ success: true, path });
   } catch (e: any) {
-    console.error("temp photo delete error", e);
-    return res.status(500).json({ error: e?.message || "delete failed" });
+    logger.error("temp photo delete error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ error: (e as any)?.message || "delete failed" });
   }
 });
 
@@ -389,8 +390,8 @@ r.post("/:id/photos", upload.single("file"), async (req, res) => {
 
     return res.status(201).json(created);
   } catch (e: any) {
-    console.error("photo upload error", e);
-    return res.status(500).json({ error: e?.message || "upload failed" });
+    logger.error("photo upload error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ error: (e as any)?.message || "upload failed" });
   }
 });
 
@@ -441,8 +442,8 @@ r.post('/:id/photos/migrate-legacy', async (req, res) => {
 
     return res.status(201).json(created);
   } catch (e: any) {
-    console.error("migrate legacy photo error", e);
-    return res.status(500).json({ error: e?.message || "migration failed" });
+    logger.error("migrate legacy photo error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ error: (e as any)?.message || "migration failed" });
   }
 });
 
@@ -500,7 +501,7 @@ r.put('/:id/photos/:photoId', async (req, res) => {
           });
         }
       } catch (swapError: any) {
-        console.error(`[Photo Update] Position swap failed:`, swapError);
+        logger.error(`[Photo Update] Position swap failed:`, undefined, { error: { name: (swapError as any)?.name || 'Error', message: (swapError as any)?.message || String(swapError), stack: (swapError as any)?.stack } });
         return res.status(500).json({ 
           error: "position_update_failed", 
           details: swapError.message 
@@ -535,8 +536,8 @@ r.put('/:id/photos/:photoId', async (req, res) => {
 
     res.json(updated);
   } catch (e: any) {
-    console.error("photo update error", e);
-    res.status(500).json({ error: e?.message || "update failed" });
+    logger.error("photo update error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "update failed" });
   }
 });
 
@@ -587,8 +588,8 @@ r.put('/:id/photos/reorder', async (req, res) => {
 
     res.status(204).send();
   } catch (e: any) {
-    console.error("reorder error", e);
-    res.status(500).json({ error: e?.message || "reorder failed" });
+    logger.error("reorder error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "reorder failed" });
   }
 });
 
@@ -617,7 +618,7 @@ r.delete('/:id/photos/:photoId', async (req, res) => {
           await supabase.storage.from(StorageBuckets.PHOTOS.name).remove([path]);
         }
       } catch (storageError) {
-        console.error("Failed to delete from storage:", storageError);
+        logger.error("Failed to delete from storage:", undefined, { error: { name: (storageError as any)?.name || 'Error', message: (storageError as any)?.message || String(storageError), stack: (storageError as any)?.stack } });
         // Continue with DB deletion even if storage fails
       }
     }
@@ -655,8 +656,8 @@ r.delete('/:id/photos/:photoId', async (req, res) => {
 
     res.status(204).send();
   } catch (e: any) {
-    console.error("photo delete error", e);
-    res.status(500).json({ error: e?.message || "delete failed" });
+    logger.error("photo delete error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "delete failed" });
   }
 });
 

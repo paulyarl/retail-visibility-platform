@@ -12,6 +12,7 @@
 import { prisma } from '../prisma';
 import { emailService } from './email-service';
 import CrmAlertService from './CrmAlertService';
+import { logger } from '../logger';
 
 export type OrderNotificationType = 
   | 'order_placed'
@@ -102,7 +103,7 @@ class OrderNotificationService {
 
       return sent;
     } catch (error) {
-      console.error('[OrderNotification] Error sending notification:', error);
+      logger.error('[OrderNotification] Error sending notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Still try to log even if email failed
       await this.logNotification(data, false);
       return false;
@@ -485,7 +486,7 @@ class OrderNotificationService {
       });
       return true;
     } catch (error) {
-      console.error('[OrderNotification] Failed to log notification:', error);
+      logger.error('[OrderNotification] Failed to log notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

@@ -8,6 +8,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { z } from 'zod';
 import { generateDirectoryFeaturedId, generateProductCatId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -154,7 +155,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
       },
     });
   } catch (error: any) {
-    console.error('[GET /admin/directory/listings] Error:', error);
+    logger.error('[GET /admin/directory/listings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_listings' });
   }
 });
@@ -204,7 +205,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req: Request, res: 
       byTier: tierCounts,
     });
   } catch (error: any) {
-    console.error('[GET /admin/directory/stats] Error:', error);
+    logger.error('[GET /admin/directory/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_stats' });
   }
 });
@@ -236,7 +237,7 @@ router.get('/featured', authenticateToken, requireAdmin, async (req: Request, re
 
     return res.json({ featured });
   } catch (error: any) {
-    console.error('[GET /admin/directory/featured] Error:', error);
+    logger.error('[GET /admin/directory/featured] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_featured' });
   }
 });
@@ -283,7 +284,7 @@ router.post('/feature/:tenantId', authenticateToken, requireAdmin, async (req: R
 
     return res.json({ success: true, featured });
   } catch (error: any) {
-    console.error('[POST /admin/directory/feature/:tenantId] Error:', error);
+    logger.error('[POST /admin/directory/feature/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_feature_listing' });
   }
 });
@@ -319,7 +320,7 @@ router.delete('/unfeature/:tenantId', authenticateToken, requireAdmin, async (re
 
     return res.json({ success: true });
   } catch (error: any) {
-    console.error('[DELETE /admin/directory/unfeature/:tenantId] Error:', error);
+    logger.error('[DELETE /admin/directory/unfeature/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_unfeature_listing' });
   }
 });

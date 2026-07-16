@@ -18,6 +18,7 @@ import { audit } from '../audit';
 import { prisma } from '../prisma';
 import { validateTierAssignment } from '../middleware/tier-validation';
 import { validateSKULimits } from '../middleware/sku-limits';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -60,7 +61,7 @@ router.post('/test-chains', async (req, res) => {
       message: 'Test chain created successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error creating test chain:', error);
+    logger.error('[Admin Tools] Error creating test chain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to create test chain',
       message: error.message,
@@ -95,7 +96,7 @@ router.delete('/test-chains/:organizationId', async (req, res) => {
       message: 'Test chain deleted successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error deleting test chain:', error);
+    logger.error('[Admin Tools] Error deleting test chain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to delete test chain',
       message: error.message,
@@ -141,7 +142,7 @@ router.post('/tenants', validateTierAssignment, validateSKULimits, async (req, r
       message: 'Test tenant created successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error creating test tenant:', error);
+    logger.error('[Admin Tools] Error creating test tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to create test tenant',
       message: error.message,
@@ -203,7 +204,7 @@ router.delete('/tenants/:tenantId', async (req, res) => {
       message: 'Test tenant deleted successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error deleting test tenant:', error);
+    logger.error('[Admin Tools] Error deleting test tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to delete test tenant',
       message: error.message,
@@ -243,7 +244,7 @@ router.post('/bulk-seed', async (req, res) => {
       message: 'Bulk seed completed successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error bulk seeding:', error);
+    logger.error('[Admin Tools] Error bulk seeding:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to bulk seed products',
       message: error.message,
@@ -287,7 +288,7 @@ router.delete('/bulk-clear', async (req, res) => {
       message: 'Bulk clear completed successfully',
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error bulk clearing:', error);
+    logger.error('[Admin Tools] Error bulk clearing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to bulk clear products',
       message: error.message,
@@ -318,7 +319,7 @@ router.get('/scan-sessions/stats', async (req: Request, res: Response) => {
 
     res.json({ active, total });
   } catch (error: any) {
-    console.error('[Admin Tools] Error fetching scan session stats:', error);
+    logger.error('[Admin Tools] Error fetching scan session stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to fetch scan session stats',
       message: error.message,
@@ -371,7 +372,7 @@ router.post('/scan-sessions/cleanup', async (req: Request, res: Response) => {
       message: `Cleaned up ${result.count} active scan sessions`,
     });
   } catch (error: any) {
-    console.error('[Admin Tools] Error cleaning up scan sessions:', error);
+    logger.error('[Admin Tools] Error cleaning up scan sessions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to cleanup scan sessions',
       message: error.message,

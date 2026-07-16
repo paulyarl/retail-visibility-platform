@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { parseSlugToJSON } from '../../lib/slug-generator';
 import { getDirectPool } from '../../utils/db-pool';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -98,7 +99,7 @@ router.get('/products', async (req: Request, res: Response) => {
       total
     });
   } catch (error) {
-    console.error('[AdminCatalog] Error listing products:', error);
+    logger.error('[AdminCatalog] Error listing products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list catalog products' });
   }
 });
@@ -178,7 +179,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       }))
     });
   } catch (error) {
-    console.error('[AdminCatalog] Error getting stats:', error);
+    logger.error('[AdminCatalog] Error getting stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get catalog stats' });
   }
 });
@@ -205,7 +206,7 @@ router.get('/brands', async (req: Request, res: Response) => {
       product_count: Number(b.product_count)
     })));
   } catch (error) {
-    console.error('[AdminCatalog] Error getting brands:', error);
+    logger.error('[AdminCatalog] Error getting brands:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get brands' });
   }
 });
@@ -234,7 +235,7 @@ router.get('/categories', async (req: Request, res: Response) => {
 
     res.json(categories);
   } catch (error) {
-    console.error('[AdminCatalog] Error getting categories:', error);
+    logger.error('[AdminCatalog] Error getting categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get categories' });
   }
 });
@@ -312,7 +313,7 @@ router.get('/products/:slug', async (req: Request, res: Response) => {
       slug_components: slugComponents
     });
   } catch (error) {
-    console.error('[AdminCatalog] Error getting product detail:', error);
+    logger.error('[AdminCatalog] Error getting product detail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get product detail' });
   }
 });
@@ -384,7 +385,7 @@ router.get('/products/upc/:upc', async (req: Request, res: Response) => {
 
     res.json(product);
   } catch (error) {
-    console.error('[AdminCatalog] Error getting product by UPC:', error);
+    logger.error('[AdminCatalog] Error getting product by UPC:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get product by UPC' });
   }
 });
@@ -433,7 +434,7 @@ router.get('/search', async (req: Request, res: Response) => {
       total
     });
   } catch (error) {
-    console.error('[AdminCatalog] Error searching products:', error);
+    logger.error('[AdminCatalog] Error searching products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to search products' });
   }
 });
@@ -462,7 +463,7 @@ router.patch('/products/:slug', async (req: Request, res: Response) => {
 
     res.json(product);
   } catch (error) {
-    console.error('[AdminCatalog] Error updating product:', error);
+    logger.error('[AdminCatalog] Error updating product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update product' });
   }
 });
@@ -482,7 +483,7 @@ router.post('/products/:slug/approve', async (req: Request, res: Response) => {
 
     res.json({ success: true, product });
   } catch (error) {
-    console.error('[AdminCatalog] Error approving product:', error);
+    logger.error('[AdminCatalog] Error approving product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to approve product' });
   }
 });
@@ -510,7 +511,7 @@ router.post('/products/:slug/reject', async (req: Request, res: Response) => {
 
     res.json({ success: true, product });
   } catch (error) {
-    console.error('[AdminCatalog] Error rejecting product:', error);
+    logger.error('[AdminCatalog] Error rejecting product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to reject product' });
   }
 });
@@ -567,13 +568,13 @@ router.post('/products/merge', async (req: Request, res: Response) => {
 
         mergedCount++;
       } catch (err) {
-        console.error(`[AdminCatalog] Failed to merge ${dupSlug}:`, err);
+        logger.error(`[AdminCatalog] Failed to merge ${dupSlug}:`, undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
       }
     }
 
     res.json({ success: true, merged_count: mergedCount });
   } catch (error) {
-    console.error('[AdminCatalog] Error merging products:', error);
+    logger.error('[AdminCatalog] Error merging products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to merge products' });
   }
 });
@@ -605,7 +606,7 @@ router.post('/products/bulk-category', async (req: Request, res: Response) => {
       failed: productSlugs.length - result.count
     });
   } catch (error) {
-    console.error('[AdminCatalog] Error bulk assigning category:', error);
+    logger.error('[AdminCatalog] Error bulk assigning category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to bulk assign category' });
   }
 });

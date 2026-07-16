@@ -7,6 +7,7 @@
 import { prisma } from '../prisma';
 import { PayPalOAuthService } from '../services/paypal/PayPalOAuthService';
 import { SquareOAuthService } from '../services/square/SquareOAuthService';
+import { logger } from '../logger';
 
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const TOKEN_EXPIRY_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours before expiry
@@ -43,7 +44,7 @@ async function getTokensNeedingRefresh(): Promise<Array<{ tenant_id: string; gat
 
     return tokens;
   } catch (error) {
-    console.error('[OAuth Token Refresh] Error getting tokens needing refresh:', error);
+    logger.error('[OAuth Token Refresh] Error getting tokens needing refresh:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -66,7 +67,7 @@ async function refreshToken(tenantId: string, gatewayType: string): Promise<Toke
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[OAuth Token Refresh] Error refreshing ${gatewayType} token for tenant ${tenantId}:`, errorMessage);
+    logger.error(`[OAuth Token Refresh] Error refreshing ${gatewayType} token for tenant ${tenantId}:`, undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     return { tenantId, gatewayType, success: false, error: errorMessage };
   }
 }
@@ -100,7 +101,7 @@ async function runScheduledRefresh(): Promise<void> {
         console.log(`[OAuth Token Refresh] Refreshed ${token.gateway_type} token for tenant ${token.tenant_id}`);
       } else {
         totalFailed++;
-        console.error(`[OAuth Token Refresh] Failed to refresh ${token.gateway_type} token for tenant ${token.tenant_id}: ${result.error}`);
+        logger.error(`[OAuth Token Refresh] Failed to refresh ${token.gateway_type} token for tenant ${token.tenant_id}: ${result.error}`, undefined);
       }
 
       // Small delay between refreshes to avoid rate limiting
@@ -110,7 +111,7 @@ async function runScheduledRefresh(): Promise<void> {
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[OAuth Token Refresh] Completed in ${duration}s: ${totalRefreshed} refreshed, ${totalFailed} failed`);
   } catch (error) {
-    console.error('[OAuth Token Refresh] Scheduled refresh failed:', error);
+    logger.error('[OAuth Token Refresh] Scheduled refresh failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

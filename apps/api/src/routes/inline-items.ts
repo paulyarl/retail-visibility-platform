@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/subscription';
 import { checkTenantAccess } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -125,7 +126,7 @@ router.get("/api/items/complete", authenticateToken, checkTenantAccess, async (r
       },
     });
   } catch (error) {
-    console.error('[GET /api/items/complete] Error:', error);
+    logger.error('[GET /api/items/complete] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_items" });
   }
 });
@@ -141,8 +142,8 @@ router.patch('/api/v1/tenants/:tenant_id/items/:itemId/category', async (req, re
     return res.json({ success: true, data: updated });
   } catch (e: any) {
     const code = typeof e?.statusCode === 'number' ? e.statusCode : 500;
-    const msg = e?.message || 'failed_to_assign_category';
-    console.error('[PATCH /api/v1/tenants/:tenant_id/items/:itemId/category] Error:', msg);
+    const msg = (e as any)?.message || 'failed_to_assign_category';
+    logger.error('[PATCH /api/v1/tenants/:tenant_id/items/:itemId/category] Error:', undefined, { error: { name: (msg as any)?.name || 'Error', message: (msg as any)?.message || String(msg), stack: (msg as any)?.stack } });
     return res.status(code).json({ success: false, error: msg });
   }
 });
@@ -193,7 +194,7 @@ router.put('/api/items/:itemId', authenticateToken, requireWritableSubscription,
 
     return res.json(result);
   } catch (error) {
-    console.error('[PUT /api/items/:itemId] Error:', error);
+    logger.error('[PUT /api/items/:itemId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_update_item' });
   }
 });
@@ -236,7 +237,7 @@ router.get('/api/products/needs-enrichment', authenticateToken, async (req, res)
 
     res.json({ items, total: items.length });
   } catch (error) {
-    console.error('[GET /api/products/needs-enrichment] Error:', error);
+    logger.error('[GET /api/products/needs-enrichment] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_products_needing_enrichment' });
   }
 });

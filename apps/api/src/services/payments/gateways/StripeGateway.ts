@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { logger } from '../../../logger';
 import {
   PaymentGatewayInterface,
   PaymentMethod,
@@ -227,7 +228,7 @@ export class StripeGateway extends PaymentGatewayInterface {
 
   validateWebhook(payload: string | Buffer, signature: string): boolean {
     if (!this.credentials.webhookSecret) {
-      console.error('[Stripe] Webhook secret not configured');
+      logger.error('[Stripe] Webhook secret not configured', undefined);
       return false;
     }
 
@@ -239,7 +240,7 @@ export class StripeGateway extends PaymentGatewayInterface {
       );
       return !!event;
     } catch (error: any) {
-      console.error('[Stripe] Webhook validation failed:', error.message);
+      logger.error('[Stripe] Webhook validation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
       return false;
     }
   }

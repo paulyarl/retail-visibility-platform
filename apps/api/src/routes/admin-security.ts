@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ router.get('/alerts', authenticateToken, requireAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Failed to fetch security alerts:', error);
+    logger.error('Failed to fetch security alerts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch security alerts' });
   }
 });
@@ -92,7 +93,7 @@ router.get('/alerts/stats', authenticateToken, requireAdmin, async (req, res) =>
       })),
     });
   } catch (error) {
-    console.error('Failed to fetch alert stats:', error);
+    logger.error('Failed to fetch alert stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch alert stats' });
   }
 });
@@ -112,7 +113,7 @@ router.patch('/alerts/:id/read', authenticateToken, requireAdmin, async (req, re
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to mark alert as read:', error);
+    logger.error('Failed to mark alert as read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update alert' });
   }
 });
@@ -150,7 +151,7 @@ export async function createSecurityAlert(data: {
       },
     });
   } catch (error) {
-    console.error('Failed to create security alert:', error);
+    logger.error('Failed to create security alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 // Get platform stability insights
@@ -166,7 +167,7 @@ router.get('/stability-insights', authenticateToken, requireAdmin, async (req, r
 
     res.json(insights);
   } catch (error) {
-    console.error('Failed to fetch stability insights:', error);
+    logger.error('Failed to fetch stability insights:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch stability insights' });
   }
 });
@@ -190,7 +191,7 @@ export class SecurityAnalyticsService {
 
       return this.analyzeIncidents(incidents);
     } catch (error) {
-      console.error('Failed to generate stability insights:', error);
+      logger.error('Failed to generate stability insights:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }

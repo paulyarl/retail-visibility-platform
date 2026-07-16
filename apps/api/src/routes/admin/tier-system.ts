@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { generateFeatureId, generateTierChangeId, generateTierId } from '../../lib/id-generator';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -156,7 +157,7 @@ async function logTierChange(params: {
       },
     });
   } catch (error) {
-    console.error('[Tier Change Log] Failed to log change:', error);
+    logger.error('[Tier Change Log] Failed to log change:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -220,7 +221,7 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[GET /api/admin/tier-system/tiers] Error:', error);
+    logger.error('[GET /api/admin/tier-system/tiers] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tiers' });
   }
 });
@@ -250,7 +251,7 @@ router.get('/features', requirePlatformStaff, async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[GET /api/admin/tier-system/features] Error:', error);
+    logger.error('[GET /api/admin/tier-system/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_features' });
   }
 });
@@ -282,7 +283,7 @@ router.get('/tiers/:tierId', requirePlatformStaff, async (req, res) => {
 
     res.json({ tier: transformedTier });
   } catch (error) {
-    console.error('[GET /api/admin/tier-system/tiers/:tierId] Error:', error);
+    logger.error('[GET /api/admin/tier-system/tiers/:tierId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_tier' });
   }
 });
@@ -396,7 +397,7 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
 
     res.status(201).json({ tier: transformedTier });
   } catch (error) {
-    console.error('[POST /api/admin/tier-system/tiers] Error:', error);
+    logger.error('[POST /api/admin/tier-system/tiers] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_tier' });
   }
 });
@@ -544,7 +545,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     res.json({ tier: transformedTier });
   } catch (error) {
-    console.error('[PATCH /api/admin/tier-system/tiers/:tierId] Error:', error);
+    logger.error('[PATCH /api/admin/tier-system/tiers/:tierId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_tier' });
   }
 });
@@ -666,7 +667,7 @@ router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     res.json({ tier: transformedTier });
   } catch (error) {
-    console.error('[PUT /api/admin/tier-system/tiers/:tierId] Error:', error);
+    logger.error('[PUT /api/admin/tier-system/tiers/:tierId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_tier' });
   }
 });
@@ -772,7 +773,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     res.json({ success: true, deactivated: true, tier: transformedTier });
     }
   } catch (error) {
-    console.error('[DELETE /api/admin/tier-system/tiers/:tierId] Error:', error);
+    logger.error('[DELETE /api/admin/tier-system/tiers/:tierId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_tier' });
   }
 });
@@ -799,7 +800,7 @@ router.get('/features', requirePlatformStaff, async (req, res) => {
 
     res.json(sortedFeatures);
   } catch (error) {
-    console.error('[GET /api/admin/tier-system/features] Error:', error);
+    logger.error('[GET /api/admin/tier-system/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_features' });
   }
 });
@@ -888,7 +889,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
 
     res.status(201).json({ feature });
   } catch (error) {
-    console.error('[POST /api/admin/tier-system/tiers/:tierId/features] Error:', error);
+    logger.error('[POST /api/admin/tier-system/tiers/:tierId/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_add_feature' });
   }
 });
@@ -977,7 +978,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
 
     res.json({ feature: updatedFeature });
   } catch (error) {
-    console.error('[PATCH /api/admin/tier-system/tiers/:tierId/features/:featureId] Error:', error);
+    logger.error('[PATCH /api/admin/tier-system/tiers/:tierId/features/:featureId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_feature' });
   }
 });
@@ -1151,7 +1152,7 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
       }
     });
   } catch (error) {
-    console.error('[POST /api/admin/tier-system/tiers/:tierId/inherit-features] Error:', error);
+    logger.error('[POST /api/admin/tier-system/tiers/:tierId/inherit-features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_inherit_features' });
   }
 });
@@ -1221,7 +1222,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[DELETE /api/admin/tier-system/tiers/:tierId/features/:featureId] Error:', error);
+    logger.error('[DELETE /api/admin/tier-system/tiers/:tierId/features/:featureId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_remove_feature' });
   }
 });
@@ -1247,7 +1248,7 @@ router.get('/change-logs', requirePlatformStaff, async (req, res) => {
 
     res.json({ logs });
   } catch (error) {
-    console.error('[GET /api/admin/tier-system/change-logs] Error:', error);
+    logger.error('[GET /api/admin/tier-system/change-logs] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_logs' });
   }
 });

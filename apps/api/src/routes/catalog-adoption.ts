@@ -11,6 +11,7 @@ import { product_source } from '@prisma/client';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { generateItemId, generateTenantItemId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -234,7 +235,7 @@ router.post('/adopt', authenticateToken, async (req: Request, res: Response) => 
       message: 'Product adopted successfully'
     });
   } catch (error) {
-    console.error('[CatalogAdoption] Error adopting product:', error);
+    logger.error('[CatalogAdoption] Error adopting product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to adopt product' });
   }
 });
@@ -280,7 +281,7 @@ router.get('/permissions/:tierId', async (req: Request, res: Response) => {
       max_catalog_products: permissions.max_catalog_products
     });
   } catch (error) {
-    console.error('[CatalogAdoption] Error fetching tier permissions:', error);
+    logger.error('[CatalogAdoption] Error fetching tier permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch permissions' });
   }
 });

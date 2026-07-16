@@ -68,7 +68,7 @@ async function refreshSmartSaleMV() {
     
   } catch (error) {
     logger.error('[SMART SALE MV] Refresh failed: ' + (error instanceof Error ? error.message : 'Unknown error'), undefined, { error });
-    console.error('❌ Smart Sale MV refresh failed:', error);
+    logger.error('❌ Smart Sale MV refresh failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     process.exit(1);
   } finally {
     await pool.end();
@@ -78,7 +78,7 @@ async function refreshSmartSaleMV() {
 // Run the refresh if this script is executed directly
 if (require.main === module) {
   refreshSmartSaleMV().catch(error => {
-    console.error('Fatal error:', error);
+    logger.error('Fatal error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     process.exit(1);
   });
 }

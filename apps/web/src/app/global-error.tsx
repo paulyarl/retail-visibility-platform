@@ -13,7 +13,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
 }) {
   useEffect(() => {
-    clientLogger.error(`GlobalError: ${error.message}`, {
+    clientLogger.error(error, {
       digest: error.digest,
     });
   }, [error]);

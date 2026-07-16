@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth';
 import { checkImageSearchLimit } from '../middleware/image-search-limits';
 import { requireTierFeature } from '../middleware/tier-access';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -67,7 +68,7 @@ router.get('/search', authenticateToken, checkImageSearchLimit, async (req, res)
           }
         }
       } catch (error) {
-        console.error('[Image Search] Unsplash error:', error);
+        logger.error('[Image Search] Unsplash error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -100,7 +101,7 @@ router.get('/search', authenticateToken, checkImageSearchLimit, async (req, res)
           }
         }
       } catch (error) {
-        console.error('[Image Search] Pexels error:', error);
+        logger.error('[Image Search] Pexels error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -111,7 +112,7 @@ router.get('/search', authenticateToken, checkImageSearchLimit, async (req, res)
       images,
     });
   } catch (error: any) {
-    console.error('[Image Search] Error:', error);
+    logger.error('[Image Search] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to search for images',
       message: error.message,

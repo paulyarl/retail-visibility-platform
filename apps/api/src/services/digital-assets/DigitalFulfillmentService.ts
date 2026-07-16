@@ -6,6 +6,7 @@
 import { prisma } from '../../prisma';
 import { digitalAccessService } from './DigitalAccessService';
 import { digitalDownloadEmailService } from '../email/DigitalDownloadEmailService';
+import { logger } from '../../logger';
 
 export interface FulfillmentResult {
   success: boolean;
@@ -109,7 +110,7 @@ export class DigitalFulfillmentService {
           });
 
         } catch (error: any) {
-          console.error('[DigitalFulfillment] Failed to create access grant:', error);
+          logger.error('[DigitalFulfillment] Failed to create access grant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           
           result.errors.push({
             orderItemId: orderItem.id,
@@ -179,7 +180,7 @@ export class DigitalFulfillmentService {
         try {
           await this.sendDownloadEmail(order, result.accessGrants);
         } catch (emailError) {
-          console.error('[DigitalFulfillment] Failed to send email:', emailError);
+          logger.error('[DigitalFulfillment] Failed to send email:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
           // Don't fail fulfillment if email fails
         }
       }
@@ -187,7 +188,7 @@ export class DigitalFulfillmentService {
       return result;
 
     } catch (error: any) {
-      console.error('[DigitalFulfillment] Order fulfillment failed:', error);
+      logger.error('[DigitalFulfillment] Order fulfillment failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

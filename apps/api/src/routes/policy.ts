@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { requireAdmin } from '../middleware/auth';
 import { getComplianceReport } from '../middleware/policy-enforcement';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -211,7 +212,7 @@ router.get('/admin/policy/compliance', requireAdmin, async (req, res) => {
     const report = await getComplianceReport(tenantId as string);
     res.json(report);
   } catch (error: any) {
-    console.error('[Compliance Report] Error:', error);
+    logger.error('[Compliance Report] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_generate_report' });
   }
 });

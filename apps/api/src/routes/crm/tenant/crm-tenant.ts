@@ -20,6 +20,7 @@ import CrmUserReadStateService from '../../../services/CrmUserReadStateService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
 import { deriveInternalStatus } from '../../../utils/subscription-status';
+import { logger } from '../../../logger';
 
 const router = Router({ mergeParams: true });
 
@@ -88,7 +89,7 @@ router.get('/stats', async (req: Request, res: Response) => {
     const stats = await tenantService.getTenantCrmStats(tenantId, userId ?? undefined);
     res.json({ success: true, data: stats });
   } catch (error) {
-    console.error('[CRM Tenant] Error fetching stats:', error);
+    logger.error('[CRM Tenant] Error fetching stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch CRM stats' });
   }
 });
@@ -108,7 +109,7 @@ router.get('/contacts', async (req: Request, res: Response) => {
     const contacts = await contactService.listByTenant(tenantId);
     res.json({ success: true, data: contacts });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing contacts:', error);
+    logger.error('[CRM Tenant] Error listing contacts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list contacts' });
   }
 });
@@ -124,7 +125,7 @@ router.post('/contacts', async (req: Request, res: Response) => {
     await audit({ tenantId, actor: req.user?.userId, action: 'create', payload: { entity_type: 'crm_contact', id: contact.id, ...req.body } });
     res.json({ success: true, data: contact });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating contact:', error);
+    logger.error('[CRM Tenant] Error creating contact:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create contact' });
   }
 });
@@ -140,7 +141,7 @@ router.get('/contacts/:contactId', async (req: Request, res: Response) => {
     }
     res.json({ success: true, data: contact });
   } catch (error) {
-    console.error('[CRM Tenant] Error fetching contact detail:', error);
+    logger.error('[CRM Tenant] Error fetching contact detail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch contact detail' });
   }
 });
@@ -154,7 +155,7 @@ router.put('/contacts/:contactId', async (req: Request, res: Response) => {
     await audit({ tenantId, actor: req.user?.userId, action: 'update', payload: { entity_type: 'crm_contact', id: contact.id } });
     res.json({ success: true, data: contact });
   } catch (error) {
-    console.error('[CRM Tenant] Error updating contact:', error);
+    logger.error('[CRM Tenant] Error updating contact:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update contact' });
   }
 });
@@ -175,7 +176,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: tickets });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing tickets:', error);
+    logger.error('[CRM Tenant] Error listing tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tickets' });
   }
 });
@@ -216,7 +217,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: ticket });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating ticket:', error);
+    logger.error('[CRM Tenant] Error creating ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket' });
   }
 });
@@ -233,7 +234,7 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
     await audit({ tenantId, actor: actorId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
     res.json({ success: true, data: ticket });
   } catch (error) {
-    console.error('[CRM Tenant] Error updating ticket:', error);
+    logger.error('[CRM Tenant] Error updating ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update ticket' });
   }
 });
@@ -247,7 +248,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     const messages = await messageService.listByTicket(req.params.ticketId, true);
     res.json({ success: true, data: messages });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing ticket messages:', error);
+    logger.error('[CRM Tenant] Error listing ticket messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list messages' });
   }
 });
@@ -270,7 +271,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
     });
     res.json({ success: true, data: message });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating ticket message:', error);
+    logger.error('[CRM Tenant] Error creating ticket message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create message' });
   }
 });
@@ -287,7 +288,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
     const tasks = await taskService.listByTenant(tenantId, { status: req.query.status as string, assignedTo: req.query.assignedTo as string });
     res.json({ success: true, data: tasks });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing tasks:', error);
+    logger.error('[CRM Tenant] Error listing tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tasks' });
   }
 });
@@ -324,7 +325,7 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
     await audit({ tenantId, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true, data: task });
   } catch (error) {
-    console.error('[CRM Tenant] Error updating task:', error);
+    logger.error('[CRM Tenant] Error updating task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update task' });
   }
 });
@@ -343,7 +344,7 @@ router.get('/tasks/:taskId/messages', async (req: Request, res: Response) => {
     const messages = await taskMessageService.listByTask(req.params.taskId, true);
     res.json({ success: true, data: messages });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing task messages:', error);
+    logger.error('[CRM Tenant] Error listing task messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list task messages' });
   }
 });
@@ -372,7 +373,7 @@ router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: message });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating task message:', error);
+    logger.error('[CRM Tenant] Error creating task message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create task message' });
   }
 });
@@ -395,7 +396,7 @@ router.get('/activities', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: activities });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing activities:', error);
+    logger.error('[CRM Tenant] Error listing activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list activities' });
   }
 });
@@ -416,7 +417,7 @@ router.get('/inquiries', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: inquiries });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing inquiries:', error);
+    logger.error('[CRM Tenant] Error listing inquiries:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list inquiries' });
   }
 });
@@ -434,7 +435,7 @@ router.post('/inquiries', async (req: Request, res: Response) => {
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_inquiry', id: inquiry.id, ...req.body } });
     res.json({ success: true, data: inquiry });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating inquiry:', error);
+    logger.error('[CRM Tenant] Error creating inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create inquiry' });
   }
 });
@@ -465,7 +466,7 @@ router.put('/inquiries/:inquiryId', async (req: Request, res: Response) => {
     await audit({ tenantId, actor: actorId, action: 'update', payload: { entity_type: 'crm_inquiry', id: inquiry.id, ...req.body } });
     res.json({ success: true, data: inquiry });
   } catch (error) {
-    console.error('[CRM Tenant] Error updating inquiry:', error);
+    logger.error('[CRM Tenant] Error updating inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update inquiry' });
   }
 });
@@ -540,7 +541,7 @@ router.post('/inquiries/:inquiryId/create-faq', async (req: Request, res: Respon
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'faq', source: 'inquiry', inquiry_id: inquiry.id, faq_id: faq?.id } });
     res.json({ success: true, data: faq });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating FAQ from inquiry:', error);
+    logger.error('[CRM Tenant] Error creating FAQ from inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create FAQ from inquiry' });
   }
 });
@@ -587,7 +588,7 @@ router.post('/inquiries/:inquiryId/create-ticket', async (req: Request, res: Res
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_ticket', source: 'inquiry', inquiry_id: inquiry.id, ticket_id: ticket.id } });
     res.json({ success: true, data: ticket });
   } catch (error) {
-    console.error('[CRM Tenant] Error creating ticket from inquiry:', error);
+    logger.error('[CRM Tenant] Error creating ticket from inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket from inquiry' });
   }
 });
@@ -607,7 +608,7 @@ router.get('/alerts', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: alerts });
   } catch (error) {
-    console.error('[CRM Tenant] Error listing alerts:', error);
+    logger.error('[CRM Tenant] Error listing alerts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list alerts' });
   }
 });
@@ -625,7 +626,7 @@ router.put('/alerts/:alertId/read', async (req: Request, res: Response) => {
     await alertService.markRead(req.params.alertId);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Tenant] Error marking alert read:', error);
+    logger.error('[CRM Tenant] Error marking alert read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark alert read' });
   }
 });
@@ -638,7 +639,7 @@ router.put('/alerts/read-all', async (req: Request, res: Response) => {
     await alertService.markAllRead(tenantId);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Tenant] Error marking all alerts read:', error);
+    logger.error('[CRM Tenant] Error marking all alerts read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark all alerts read' });
   }
 });
@@ -656,7 +657,7 @@ router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
     await alertService.dismiss(req.params.alertId);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Tenant] Error dismissing alert:', error);
+    logger.error('[CRM Tenant] Error dismissing alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to dismiss alert' });
   }
 });
@@ -676,7 +677,7 @@ router.get('/read-state', async (req: Request, res: Response) => {
     const states = await userReadStateService.getReadStates(userId, tenantId);
     res.json({ success: true, data: states });
   } catch (error) {
-    console.error('[CRM Tenant] Error fetching read state:', error);
+    logger.error('[CRM Tenant] Error fetching read state:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch read state' });
   }
 });
@@ -702,7 +703,7 @@ router.put('/read-state', async (req: Request, res: Response) => {
     await userReadStateService.setLastReadAt(userId, tenantId, scope, lastReadAt);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Tenant] Error updating read state:', error);
+    logger.error('[CRM Tenant] Error updating read state:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update read state' });
   }
 });
@@ -717,7 +718,7 @@ router.patch('/tickets/reorder', async (req: Request, res: Response) => {
     await ticketService.reorder(items);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Tenant] Error reordering tickets:', error);
+    logger.error('[CRM Tenant] Error reordering tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to reorder tickets' });
   }
 });
@@ -732,7 +733,7 @@ router.patch('/tasks/reorder', async (req: Request, res: Response) => {
     await taskService.reorder(items);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Tenant] Error reordering tasks:', error);
+    logger.error('[CRM Tenant] Error reordering tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to reorder tasks' });
   }
 });

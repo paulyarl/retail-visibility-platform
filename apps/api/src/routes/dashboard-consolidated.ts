@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import TierService from '../services/TierService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -186,10 +187,10 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
       },
     });
   } catch (e: any) {
-    console.error('[GET /api/dashboard/consolidated/:tenantId] Error:', e);
+    logger.error('[GET /api/dashboard/consolidated/:tenantId] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ 
       error: 'failed_to_get_dashboard_data',
-      details: e?.message 
+      details: (e as any)?.message 
     });
   }
 });

@@ -13,6 +13,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken, optionalAuth } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -125,7 +126,7 @@ router.get('/browse', optionalAuth, async (req: Request, res: Response) => {
       brands: uniqueBrands
     });
   } catch (error) {
-    console.error('[GlobalCatalog] Error browsing catalog:', error);
+    logger.error('[GlobalCatalog] Error browsing catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to browse catalog' });
   }
 });
@@ -210,7 +211,7 @@ router.get('/search', optionalAuth, async (req: Request, res: Response) => {
       hasMore: offset + limitNum < total
     });
   } catch (error) {
-    console.error('[GlobalCatalog] Error searching catalog:', error);
+    logger.error('[GlobalCatalog] Error searching catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to search catalog' });
   }
 });
@@ -236,7 +237,7 @@ router.get('/products/:slug', optionalAuth, async (req: Request, res: Response) 
 
     res.json(product);
   } catch (error) {
-    console.error('[GlobalCatalog] Error fetching product by slug:', error);
+    logger.error('[GlobalCatalog] Error fetching product by slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product' });
   }
 });
@@ -262,7 +263,7 @@ router.get('/products/upc/:upc', optionalAuth, async (req: Request, res: Respons
 
     res.json(product);
   } catch (error) {
-    console.error('[GlobalCatalog] Error fetching product by UPC:', error);
+    logger.error('[GlobalCatalog] Error fetching product by UPC:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product' });
   }
 });
@@ -286,7 +287,7 @@ router.get('/popular', optionalAuth, async (req: Request, res: Response) => {
 
     res.json(products);
   } catch (error) {
-    console.error('[GlobalCatalog] Error fetching popular products:', error);
+    logger.error('[GlobalCatalog] Error fetching popular products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch popular products' });
   }
 });
@@ -308,7 +309,7 @@ router.get('/recent', optionalAuth, async (req: Request, res: Response) => {
 
     res.json(products);
   } catch (error) {
-    console.error('[GlobalCatalog] Error fetching recent products:', error);
+    logger.error('[GlobalCatalog] Error fetching recent products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch recent products' });
   }
 });
@@ -347,7 +348,7 @@ router.get('/stats', optionalAuth, async (req: Request, res: Response) => {
       lastUpdated: lastUpdated?.updated_at || new Date().toISOString()
     });
   } catch (error) {
-    console.error('[GlobalCatalog] Error fetching catalog stats:', error);
+    logger.error('[GlobalCatalog] Error fetching catalog stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch catalog stats' });
   }
 });
@@ -388,7 +389,7 @@ router.get('/categories/:categorySlug', optionalAuth, async (req: Request, res: 
       category: categorySlug
     });
   } catch (error) {
-    console.error('[GlobalCatalog] Error fetching products by category:', error);
+    logger.error('[GlobalCatalog] Error fetching products by category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch products' });
   }
 });

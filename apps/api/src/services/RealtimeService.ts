@@ -4,6 +4,7 @@
  */
 
 import { digitalFulfillmentService } from './digital-assets/DigitalFulfillmentService';
+import { logger } from '../logger';
 
 export interface CustomerNotification {
   type: 'digital-access-granted' | 'download-complete' | 'access-expiring' | 'access-revoked';
@@ -77,7 +78,7 @@ class RealtimeService {
           client.send(messageStr);
         }
       } catch (error) {
-        console.error('[RealtimeService] Failed to send message to client:', error);
+        logger.error('[RealtimeService] Failed to send message to client:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 

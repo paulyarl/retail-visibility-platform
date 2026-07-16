@@ -76,7 +76,7 @@ router.get('/tiers', async (req: Request, res: Response) => {
       data: tiers,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error fetching tiers:', error);
+    logger.error('[Subscription] Error fetching tiers:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tier pricing',
@@ -106,7 +106,7 @@ router.get('/tiers/:tier', async (req: Request, res: Response) => {
       data: pricing,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error fetching tier:', error);
+    logger.error('[Subscription] Error fetching tier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tier pricing',
@@ -153,7 +153,7 @@ router.get('/payment-methods', requirePermission('CAN_MANAGE_TENANT_BILLING'), a
       data: maskedMethods,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error fetching payment methods:', error);
+    logger.error('[Subscription] Error fetching payment methods:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch payment methods',
@@ -206,7 +206,7 @@ router.post('/payment-methods', requirePermission('CAN_MANAGE_TENANT_BILLING'), 
       },
     });
   } catch (error: any) {
-    console.error('[Subscription] Error adding payment method:', error);
+    logger.error('[Subscription] Error adding payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to add payment method',
@@ -239,7 +239,7 @@ router.put('/payment-methods/:id/default', requirePermission('CAN_MANAGE_TENANT_
       message: 'Default payment method updated',
     });
   } catch (error: any) {
-    console.error('[Subscription] Error setting default payment method:', error);
+    logger.error('[Subscription] Error setting default payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to set default payment method',
@@ -272,7 +272,7 @@ router.delete('/payment-methods/:id', requirePermission('CAN_MANAGE_TENANT_BILLI
       message: 'Payment method removed',
     });
   } catch (error: any) {
-    console.error('[Subscription] Error removing payment method:', error);
+    logger.error('[Subscription] Error removing payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to remove payment method',
@@ -336,7 +336,7 @@ router.get('/preview', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (re
       data: preview,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error previewing subscription:', error);
+    logger.error('[Subscription] Error previewing subscription:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to preview subscription',
@@ -506,7 +506,7 @@ router.post('/subscribe', requirePermission('CAN_MANAGE_TENANT_BILLING'), async 
       });
     }
   } catch (error: any) {
-    console.error('[Subscription] Error subscribing:', error);
+    logger.error('[Subscription] Error subscribing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to subscribe',
@@ -532,7 +532,7 @@ router.post('/confirm', authenticateToken, async (req: Request, res: Response) =
     });
 
     if (!tenantId) {
-      console.error('[Subscription] Confirm failed: No tenant context');
+      logger.error('[Subscription] Confirm failed: No tenant context', undefined);
       return res.status(400).json({
         success: false,
         error: 'No tenant context',
@@ -588,8 +588,8 @@ router.post('/confirm', authenticateToken, async (req: Request, res: Response) =
       },
     });
   } catch (error: any) {
-    console.error('[Subscription] Error confirming payment:', error);
-    console.error('[Subscription] Error stack:', error.stack);
+    logger.error('[Subscription] Error confirming payment:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Subscription] Error stack:', undefined, { error: { name: 'Error', message: String(error.stack) } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to confirm payment',
@@ -735,7 +735,7 @@ router.post('/paypal/activate', async (req: Request, res: Response) => {
       invoiceId,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error activating PayPal subscription:', error);
+    logger.error('[Subscription] Error activating PayPal subscription:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to activate PayPal subscription',
@@ -809,7 +809,7 @@ router.get('/status', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[Subscription] Error fetching status:', error);
+    logger.error('[Subscription] Error fetching status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch subscription status',
@@ -850,7 +850,7 @@ router.get('/invoices', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (r
       data: invoices,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error fetching invoices:', error);
+    logger.error('[Subscription] Error fetching invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch invoices',
@@ -890,7 +890,7 @@ router.get('/invoices/:id', requirePermission('CAN_MANAGE_TENANT_BILLING'), asyn
       data: invoice,
     });
   } catch (error: any) {
-    console.error('[Subscription] Error fetching invoice:', error);
+    logger.error('[Subscription] Error fetching invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch invoice',
@@ -1098,7 +1098,7 @@ router.get('/invoices/:id/pdf', requirePermission('CAN_MANAGE_TENANT_BILLING'), 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     res.send(pdfBuffer);
   } catch (error: any) {
-    console.error('[Subscription] Error generating invoice PDF:', error);
+    logger.error('[Subscription] Error generating invoice PDF:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to generate invoice PDF',
@@ -1191,7 +1191,7 @@ router.post('/paypal/create-order', requirePermission('CAN_MANAGE_TENANT_BILLING
       data: order,
     });
   } catch (error: any) {
-    console.error('[Subscription] PayPal create order error:', error);
+    logger.error('[Subscription] PayPal create order error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create PayPal order',
@@ -1273,7 +1273,7 @@ router.post('/paypal/capture-order', requirePermission('CAN_MANAGE_TENANT_BILLIN
         console.log('[Subscription] Recorded PayPal revenue transaction:', capture.amount, 'cents platform revenue');
       }
     } catch (revenueError) {
-      console.error('[Subscription] Failed to record PayPal revenue transaction:', revenueError);
+      logger.error('[Subscription] Failed to record PayPal revenue transaction:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
       // Don't fail the capture if revenue recording fails
     }
 
@@ -1287,7 +1287,7 @@ router.post('/paypal/capture-order', requirePermission('CAN_MANAGE_TENANT_BILLIN
       },
     });
   } catch (error: any) {
-    console.error('[Subscription] PayPal capture error:', error);
+    logger.error('[Subscription] PayPal capture error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to capture PayPal order',
@@ -1327,7 +1327,7 @@ router.post('/paypal/create-billing-agreement', requirePermission('CAN_MANAGE_TE
       data: agreement,
     });
   } catch (error: any) {
-    console.error('[Subscription] PayPal billing agreement error:', error);
+    logger.error('[Subscription] PayPal billing agreement error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to create PayPal billing agreement',
@@ -1399,7 +1399,7 @@ router.post('/paypal/save-payment-method', requirePermission('CAN_MANAGE_TENANT_
       data: paymentMethod,
     });
   } catch (error: any) {
-    console.error('[Subscription] PayPal save payment method error:', error);
+    logger.error('[Subscription] PayPal save payment method error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to save PayPal payment method',
@@ -1490,7 +1490,7 @@ router.post('/cancel', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (re
       status: immediately ? 'canceled' : 'canceling',
     });
   } catch (error: any) {
-    console.error('[Subscription] Cancel error:', error);
+    logger.error('[Subscription] Cancel error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to cancel subscription',
@@ -1552,7 +1552,7 @@ router.post('/pause', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (req
       status: 'paused',
     });
   } catch (error: any) {
-    console.error('[Subscription] Pause error:', error);
+    logger.error('[Subscription] Pause error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to pause subscription',
@@ -1623,7 +1623,7 @@ router.post('/resume', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (re
       status: 'active',
     });
   } catch (error: any) {
-    console.error('[Subscription] Resume error:', error);
+    logger.error('[Subscription] Resume error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to resume subscription',
@@ -1763,7 +1763,7 @@ router.post('/change-tier', requirePermission('CAN_MANAGE_TENANT_BILLING'), asyn
       billingCycle,
     });
   } catch (error: any) {
-    console.error('[Subscription] Change tier error:', error);
+    logger.error('[Subscription] Change tier error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to change subscription tier',
@@ -1775,6 +1775,7 @@ router.post('/change-tier', requirePermission('CAN_MANAGE_TENANT_BILLING'), asyn
 // BSaaS Feature Purchase Routes
 // ====================
 import bsaasPurchaseRoutes from './bsaas-purchases';
+import { logger } from '../logger';
 router.use(bsaasPurchaseRoutes);
 
 export default router;

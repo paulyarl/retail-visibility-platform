@@ -16,6 +16,7 @@
 import { prisma } from '../prisma';
 import { evaluateBadgeRulesForTenant } from '../services/BadgeRuleEngine';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
+import { logger } from '../logger';
 
 const SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const STARTUP_DELAY_MS = 3 * 60 * 1000; // 3 minutes (before platform badge sync at 5 min)
@@ -40,7 +41,7 @@ async function getAllTenantIds(): Promise<string[]> {
     });
     return tenants.map(t => t.id);
   } catch (error) {
-    console.error('[BadgeRuleSync] Error fetching tenants:', error);
+    logger.error('[BadgeRuleSync] Error fetching tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -88,7 +89,7 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
             );
             result.assigned++;
           } catch (error: any) {
-            console.error(`[BadgeRuleSync] Error assigning ${assign.badgeKey} to ${assign.inventoryItemId}:`, error);
+            logger.error(`[BadgeRuleSync] Error assigning ${assign.badgeKey} to ${assign.inventoryItemId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             result.errors.push(`Assign ${tenantId}/${assign.badgeKey}: ${error.message}`);
           }
         }
@@ -110,7 +111,7 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
             });
             result.removed++;
           } catch (error: any) {
-            console.error(`[BadgeRuleSync] Error removing ${remove.badgeKey} from ${remove.inventoryItemId}:`, error);
+            logger.error(`[BadgeRuleSync] Error removing ${remove.badgeKey} from ${remove.inventoryItemId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             result.errors.push(`Remove ${tenantId}/${remove.badgeKey}: ${error.message}`);
           }
         }
@@ -123,7 +124,7 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
 
         result.tenantsProcessed++;
       } catch (error: any) {
-        console.error(`[BadgeRuleSync] Error processing tenant ${tenantId}:`, error);
+        logger.error(`[BadgeRuleSync] Error processing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         result.errors.push(`Tenant ${tenantId}: ${error.message}`);
       }
 
@@ -137,7 +138,7 @@ async function runScheduledSync(): Promise<BadgeRuleSyncResult> {
       `${result.assigned} assigned, ${result.removed} removed, ${result.conflicts} conflicts, ${result.errors.length} errors`
     );
   } catch (error) {
-    console.error('[BadgeRuleSync] Fatal error:', error);
+    logger.error('[BadgeRuleSync] Fatal error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     result.errors.push(`Fatal: ${error instanceof Error ? error.message : String(error)}`);
   }
 
@@ -207,7 +208,7 @@ export async function triggerManualBadgeRuleSync(tenantId: string): Promise<{
       );
       assigned++;
     } catch (error) {
-      console.error(`[BadgeRuleSync] Manual assign error:`, error);
+      logger.error(`[BadgeRuleSync] Manual assign error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -227,7 +228,7 @@ export async function triggerManualBadgeRuleSync(tenantId: string): Promise<{
       });
       removed++;
     } catch (error) {
-      console.error(`[BadgeRuleSync] Manual remove error:`, error);
+      logger.error(`[BadgeRuleSync] Manual remove error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

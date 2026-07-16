@@ -11,6 +11,7 @@
 import { Pool, PoolClient } from 'pg';
 import { getDirectPool } from '../utils/db-pool';
 import slugSingletonService from './SlugSingletonService';
+import { logger } from '../logger';
 
 interface GBPCategory {
   id: string;
@@ -257,7 +258,7 @@ export class GBPCategorySyncService {
       // 8. Refresh materialized view (async, don't wait)
       // Note: In production, this should be queued as a background job
       client.query('SELECT refresh_directory_category_listings()').catch(err => {
-        console.error('[GBP Sync] Failed to refresh MV:', err);
+        logger.error('[GBP Sync] Failed to refresh MV:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
       });
 
       await client.query('COMMIT');
@@ -270,7 +271,7 @@ export class GBPCategorySyncService {
 
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('[GBP Sync] Error:', error);
+      logger.error('[GBP Sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
       // Update tenant with error status using dedicated columns
       try {
@@ -283,7 +284,7 @@ export class GBPCategorySyncService {
           [tenantId]
         );
       } catch (updateError) {
-        console.error('[GBP Sync] Failed to update error status:', updateError);
+        logger.error('[GBP Sync] Failed to update error status:', undefined, { error: { name: (updateError as any)?.name || 'Error', message: (updateError as any)?.message || String(updateError), stack: (updateError as any)?.stack } });
       }
 
       return {
@@ -333,7 +334,7 @@ export class GBPCategorySyncService {
       await this.pool.query('SELECT refresh_directory_category_listings()');
       console.log('[GBP Sync] Refreshed directory_category_listings MV');
     } catch (error) {
-      console.error('[GBP Sync] Failed to refresh directory MV:', error);
+      logger.error('[GBP Sync] Failed to refresh directory MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
 
@@ -341,7 +342,7 @@ export class GBPCategorySyncService {
       await this.pool.query('SELECT refresh_gbp_category_usage_stats()');
       console.log('[GBP Sync] Refreshed gbp_category_usage_stats MV');
     } catch (error) {
-      console.error('[GBP Sync] Failed to refresh usage stats MV:', error);
+      logger.error('[GBP Sync] Failed to refresh usage stats MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

@@ -21,6 +21,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import Stripe from 'stripe';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -75,12 +76,12 @@ function extractTierFromPrice(price: Stripe.Price | null): string {
  */
 router.post('/webhooks', async (req: Request, res: Response) => {
   if (!stripe) {
-    console.error('[Stripe Webhooks] Stripe not initialized - missing STRIPE_SECRET_KEY');
+    logger.error('[Stripe Webhooks] Stripe not initialized - missing STRIPE_SECRET_KEY', undefined);
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
   if (!STRIPE_WEBHOOK_SECRET) {
-    console.error('[Stripe Webhooks] Missing STRIPE_WEBHOOK_SECRET');
+    logger.error('[Stripe Webhooks] Missing STRIPE_WEBHOOK_SECRET', undefined);
     return res.status(500).json({ error: 'Webhook secret not configured' });
   }
 
@@ -100,7 +101,7 @@ router.post('/webhooks', async (req: Request, res: Response) => {
       STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error('[Stripe Webhooks] Signature verification failed:', err);
+    logger.error('[Stripe Webhooks] Signature verification failed:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
     return res.status(400).json({ error: 'Invalid signature' });
   }
 
@@ -165,7 +166,7 @@ router.post('/webhooks', async (req: Request, res: Response) => {
 
     res.json({ received: true });
   } catch (error) {
-    console.error(`[Stripe Webhooks] Error processing ${event.type}:`, error);
+    logger.error(`[Stripe Webhooks] Error processing ${event.type}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
@@ -191,14 +192,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const tenantId = session.metadata?.tenantId || session.client_reference_id;
 
   if (!tenantId) {
-    console.error('[Stripe Webhooks] No tenantId in checkout session metadata');
+    logger.error('[Stripe Webhooks] No tenantId in checkout session metadata', undefined);
     return;
   }
 
   const tenant = await prisma.tenants.findUnique({ where: { id: tenantId } });
 
   if (!tenant) {
-    console.error(`[Stripe Webhooks] Tenant ${tenantId} not found`);
+    logger.error(`[Stripe Webhooks] Tenant ${tenantId} not found`, undefined);
     return;
   }
 
@@ -223,7 +224,7 @@ async function handleFeaturedPlacementCheckout(session: Stripe.Checkout.Session)
 
   const purchaseId = session.metadata?.purchaseId;
   if (!purchaseId) {
-    console.error('[Stripe Webhooks] No purchaseId in featured placement session metadata');
+    logger.error('[Stripe Webhooks] No purchaseId in featured placement session metadata', undefined);
     return;
   }
 
@@ -234,7 +235,7 @@ async function handleFeaturedPlacementCheckout(session: Stripe.Checkout.Session)
     await FeaturedPlacementService.getInstance().activatePurchase(purchaseId, paymentIntentId);
     console.log(`[Stripe Webhooks] Featured placement ${purchaseId} activated`);
   } catch (error) {
-    console.error(`[Stripe Webhooks] Failed to activate featured placement ${purchaseId}:`, error);
+    logger.error(`[Stripe Webhooks] Failed to activate featured placement ${purchaseId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -247,7 +248,7 @@ async function handleDirectoryPromotionCheckout(session: Stripe.Checkout.Session
 
   const purchaseId = session.metadata?.purchaseId;
   if (!purchaseId) {
-    console.error('[Stripe Webhooks] No purchaseId in directory promotion session metadata');
+    logger.error('[Stripe Webhooks] No purchaseId in directory promotion session metadata', undefined);
     return;
   }
 
@@ -258,7 +259,7 @@ async function handleDirectoryPromotionCheckout(session: Stripe.Checkout.Session
     await DirectoryPromotionService.getInstance().activatePurchase(purchaseId, paymentIntentId);
     console.log(`[Stripe Webhooks] Directory promotion ${purchaseId} activated`);
   } catch (error) {
-    console.error(`[Stripe Webhooks] Failed to activate directory promotion ${purchaseId}:`, error);
+    logger.error(`[Stripe Webhooks] Failed to activate directory promotion ${purchaseId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -275,7 +276,7 @@ async function handleSubscriptionCreatedOrUpdated(subscription: any) {
   });
 
   if (!tenant) {
-    console.error(`[Stripe Webhooks] No tenant found for customer ${subscription.customer}`);
+    logger.error(`[Stripe Webhooks] No tenant found for customer ${subscription.customer}`, undefined);
     return;
   }
 
@@ -347,7 +348,7 @@ async function handleSubscriptionDeleted(subscription: any) {
   });
 
   if (!tenant) {
-    console.error(`[Stripe Webhooks] No tenant found for subscription ${subscription.id}`);
+    logger.error(`[Stripe Webhooks] No tenant found for subscription ${subscription.id}`, undefined);
     return;
   }
 
@@ -381,7 +382,7 @@ async function handlePaymentFailed(invoice: any) {
   });
 
   if (!tenant) {
-    console.error(`[Stripe Webhooks] No tenant found for subscription ${invoice.subscription}`);
+    logger.error(`[Stripe Webhooks] No tenant found for subscription ${invoice.subscription}`, undefined);
     return;
   }
 
@@ -415,7 +416,7 @@ async function handlePaymentSucceeded(invoice: any) {
   });
 
   if (!tenant) {
-    console.error(`[Stripe Webhooks] No tenant found for subscription ${invoice.subscription}`);
+    logger.error(`[Stripe Webhooks] No tenant found for subscription ${invoice.subscription}`, undefined);
     return;
   }
 

@@ -27,6 +27,7 @@ import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import DirectoryPromotionService from '../services/DirectoryPromotionService';
 import { trackBadgeEvent } from '../services/BadgeAnalyticsService';
+import { logger } from '../logger';
 
 const router = Router();
 const pool = getDirectPool();
@@ -85,7 +86,7 @@ router.get('/tenants/:tenantId/promotion/status', async (req: Request, res: Resp
       activePurchase: activePurchase || null,
     });
   } catch (error) {
-    console.error('Error fetching promotion status:', error);
+    logger.error('Error fetching promotion status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch promotion status' });
   }
 });
@@ -98,7 +99,7 @@ router.get('/tenants/:tenantId/promotion/plans', async (req: Request, res: Respo
     const plans = await DirectoryPromotionService.getInstance().listCatalogPlans(false);
     res.json({ plans });
   } catch (error) {
-    console.error('Error listing promotion plans:', error);
+    logger.error('Error listing promotion plans:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list promotion plans' });
   }
 });
@@ -128,7 +129,7 @@ router.post('/tenants/:tenantId/promotion/purchase', async (req: Request, res: R
     });
   } catch (error) {
     const message = (error as Error).message;
-    console.error('Error creating promotion purchase:', message);
+    logger.error('Error creating promotion purchase:', undefined, { error: { name: (message as any)?.name || 'Error', message: (message as any)?.message || String(message), stack: (message as any)?.stack } });
 
     if (message === 'plan_not_found_or_inactive') {
       return res.status(404).json({ error: 'Plan not found or inactive' });
@@ -174,7 +175,7 @@ router.post('/tenants/:tenantId/promotion/renew', async (req: Request, res: Resp
     });
   } catch (error) {
     const message = (error as Error).message;
-    console.error('Error renewing promotion:', message);
+    logger.error('Error renewing promotion:', undefined, { error: { name: (message as any)?.name || 'Error', message: (message as any)?.message || String(message), stack: (message as any)?.stack } });
 
     if (message === 'purchase_not_found') {
       return res.status(404).json({ error: 'Purchase not found' });
@@ -211,7 +212,7 @@ router.post('/tenants/:tenantId/promotion/cancel', async (req: Request, res: Res
     });
   } catch (error) {
     const message = (error as Error).message;
-    console.error('Error cancelling promotion:', message);
+    logger.error('Error cancelling promotion:', undefined, { error: { name: (message as any)?.name || 'Error', message: (message as any)?.message || String(message), stack: (message as any)?.stack } });
 
     if (message === 'no_active_promotion') {
       return res.status(404).json({ error: 'No active promotion to cancel' });
@@ -232,7 +233,7 @@ router.get('/tenants/:tenantId/promotion/purchases', async (req: Request, res: R
     const purchases = await DirectoryPromotionService.getInstance().listTenantPurchases(tenantId, status ? { status } : {});
     res.json({ purchases });
   } catch (error) {
-    console.error('Error listing promotion purchases:', error);
+    logger.error('Error listing promotion purchases:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list promotion purchases' });
   }
 });
@@ -305,7 +306,7 @@ router.get('/tenants/:tenantId/promotion/analytics', async (req: Request, res: R
       avgClicksPerDay,
     });
   } catch (error) {
-    console.error('Error fetching promotion analytics:', error);
+    logger.error('Error fetching promotion analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch promotion analytics' });
   }
 });
@@ -334,7 +335,7 @@ router.post('/tenants/:tenantId/promotion/track-impression', async (req: Request
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error tracking impression:', error);
+    logger.error('Error tracking impression:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to track impression' });
   }
 });
@@ -363,7 +364,7 @@ router.post('/tenants/:tenantId/promotion/track-click', async (req: Request, res
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error tracking click:', error);
+    logger.error('Error tracking click:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to track click' });
   }
 });
@@ -380,7 +381,7 @@ router.get('/admin/promotion/levels', async (req: Request, res: Response) => {
     const levels = await DirectoryPromotionService.getInstance().getAvailableLevels();
     res.json({ levels });
   } catch (error) {
-    console.error('Error fetching promotion levels:', error);
+    logger.error('Error fetching promotion levels:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch promotion levels' });
   }
 });
@@ -394,7 +395,7 @@ router.get('/admin/promotion/catalog', async (req: Request, res: Response) => {
     const plans = await DirectoryPromotionService.getInstance().listCatalogPlans(includeInactive);
     res.json({ plans });
   } catch (error) {
-    console.error('Error listing promotion catalog:', error);
+    logger.error('Error listing promotion catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list promotion catalog' });
   }
 });
@@ -423,7 +424,7 @@ router.post('/admin/promotion/catalog', async (req: Request, res: Response) => {
     res.json({ plan });
   } catch (error) {
     const message = (error as Error).message;
-    console.error('Error creating promotion catalog plan:', message);
+    logger.error('Error creating promotion catalog plan:', undefined, { error: { name: (message as any)?.name || 'Error', message: (message as any)?.message || String(message), stack: (message as any)?.stack } });
 
     if (message === 'invalid_level') {
       return res.status(400).json({ error: 'Invalid promotion level. Must be a registered directory_promotion_level_* feature key.' });
@@ -456,7 +457,7 @@ router.put('/admin/promotion/catalog/:planKey', async (req: Request, res: Respon
 
     res.json({ plan });
   } catch (error) {
-    console.error('Error updating promotion catalog plan:', error);
+    logger.error('Error updating promotion catalog plan:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update promotion catalog plan' });
   }
 });
@@ -472,7 +473,7 @@ router.delete('/admin/promotion/catalog/:planKey', async (req: Request, res: Res
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deactivating promotion catalog plan:', error);
+    logger.error('Error deactivating promotion catalog plan:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to deactivate promotion catalog plan' });
   }
 });
@@ -490,7 +491,7 @@ router.get('/admin/promotion/purchases', async (req: Request, res: Response) => 
     const purchases = await DirectoryPromotionService.getInstance().listAllPurchases(filters);
     res.json({ purchases });
   } catch (error) {
-    console.error('Error listing all promotion purchases:', error);
+    logger.error('Error listing all promotion purchases:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list promotion purchases' });
   }
 });
@@ -508,7 +509,7 @@ router.get('/admin/promotion/revenue', async (req: Request, res: Response) => {
     const summary = await DirectoryPromotionService.getInstance().getRevenueSummary(filters);
     res.json({ summary });
   } catch (error) {
-    console.error('Error fetching promotion revenue summary:', error);
+    logger.error('Error fetching promotion revenue summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch promotion revenue summary' });
   }
 });
@@ -521,7 +522,7 @@ router.get('/admin/promotion/stats', async (req: Request, res: Response) => {
     const stats = await DirectoryPromotionService.getInstance().getDashboardStats();
     res.json({ stats });
   } catch (error) {
-    console.error('Error fetching promotion dashboard stats:', error);
+    logger.error('Error fetching promotion dashboard stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch promotion dashboard stats' });
   }
 });
@@ -539,7 +540,7 @@ router.get('/admin/promotion/tenant/:tenantId', async (req: Request, res: Respon
     ]);
     res.json({ activePurchase, purchases });
   } catch (error) {
-    console.error('Error fetching tenant promotion data:', error);
+    logger.error('Error fetching tenant promotion data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch tenant promotion data' });
   }
 });
@@ -571,7 +572,7 @@ router.post('/admin/promotion/grant-complimentary', async (req: Request, res: Re
 
     res.json({ success: true, purchaseId: result.purchaseId });
   } catch (error: any) {
-    const message = error?.message || 'Failed to grant complimentary promotion';
+    const message = (error as any)?.message || 'Failed to grant complimentary promotion';
     const status = ['plan_not_found_or_inactive', 'tenant_already_has_active_promotion', 'tenant_has_no_directory_listing', 'tenant_directory_not_published'].includes(message)
       ? 400 : 500;
     const errorMessage = message === 'tenant_directory_not_published'

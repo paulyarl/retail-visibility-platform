@@ -42,7 +42,7 @@ class SimpleManualBillingTester {
       await this.testIDGenerators();
 
     } catch (error: any) {
-      this.log('Test Suite Error', false, error?.message || 'Unknown error');
+      this.log('Test Suite Error', false, (error as any)?.message || 'Unknown error');
     }
 
     this.printSummary();
@@ -93,7 +93,7 @@ class SimpleManualBillingTester {
       }
 
     } catch (error: any) {
-      this.log('Database Schema Validation', false, error?.message || 'Unknown error');
+      this.log('Database Schema Validation', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -129,7 +129,7 @@ class SimpleManualBillingTester {
       });
 
     } catch (error: any) {
-      this.log('Service Instantiation', false, error?.message || 'Unknown error');
+      this.log('Service Instantiation', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -157,7 +157,7 @@ class SimpleManualBillingTester {
       }
 
     } catch (error: any) {
-      this.log('Service Charge Configurations', false, error?.message || 'Unknown error');
+      this.log('Service Charge Configurations', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -185,7 +185,7 @@ class SimpleManualBillingTester {
       this.log('Generate Billing Method ID', true, undefined, { id: billingMethodId, pattern: /^mbg-test-tenant-[a-z0-9]{6}$/.test(billingMethodId) });
 
     } catch (error: any) {
-      this.log('ID Generators', false, error?.message || 'Unknown error');
+      this.log('ID Generators', false, (error as any)?.message || 'Unknown error');
     }
   }
 

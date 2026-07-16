@@ -70,6 +70,17 @@ function SuccessPageContent() {
           console.error('[Checkout Success] Failed to clear cart:', err);
         }
 
+        // Check for post-purchase funnel upsell step
+        if (confirmResult.funnelNextStep && confirmResult.funnelNextStep.stepId) {
+          const fs = confirmResult.funnelNextStep;
+          const params = new URLSearchParams({
+            tenantId: order?.tenant_id || '',
+            funnelId: fs.funnelId,
+          });
+          router.replace(`/checkout/funnel/${confirmResult.orderId}/step/${fs.stepId}?${params.toString()}`);
+          return;
+        }
+
         // Check if user wanted to save payment method before redirect
         const shouldSavePaymentMethod = sessionStorage.getItem('checkout_savePaymentMethod') === 'true';
         const saveTenantId = sessionStorage.getItem('checkout_tenantId');

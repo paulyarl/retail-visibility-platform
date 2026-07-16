@@ -7,6 +7,7 @@
 const { SquareClient } = require('square') as any;
 import { squareIntegrationRepository } from './square-integration.repository';
 import { createSquareClient } from './square-client';
+import { logger } from '../../logger';
 
 export interface SyncOptions {
   direction?: 'to_square' | 'from_square' | 'bidirectional';
@@ -124,7 +125,7 @@ export class SquareSyncService {
             error: error.message,
             code: error.code,
           });
-          console.error(`[SquareSync] Failed to import product ${product.name}:`, error);
+          logger.error(`[SquareSync] Failed to import product ${product.name}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         }
       }
 
@@ -153,7 +154,7 @@ export class SquareSyncService {
         syncLogId: syncLog.toString(),
       };
     } catch (error: any) {
-      console.error('[SquareSync] Sync from Square failed:', error);
+      logger.error('[SquareSync] Sync from Square failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       this.updateProgress({ stage: 'error', total: 0, processed: 0, succeeded: 0, failed: 0 });
       
       throw new Error(`Sync from Square failed: ${error.message}`);
@@ -215,7 +216,7 @@ export class SquareSyncService {
             error: error.message,
             code: error.code,
           });
-          console.error(`[SquareSync] Failed to export product ${product.name}:`, error);
+          logger.error(`[SquareSync] Failed to export product ${product.name}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         }
       }
 
@@ -244,7 +245,7 @@ export class SquareSyncService {
         syncLogId: syncLog.toString(),
       };
     } catch (error: any) {
-      console.error('[SquareSync] Sync to Square failed:', error);
+      logger.error('[SquareSync] Sync to Square failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       this.updateProgress({ stage: 'error', total: 0, processed: 0, succeeded: 0, failed: 0 });
       
       throw new Error(`Sync to Square failed: ${error.message}`);
@@ -289,7 +290,7 @@ export class SquareSyncService {
       // For now, return empty array
       return [];
     } catch (error) {
-      console.error('[SquareSync] Failed to fetch Square products:', error);
+      logger.error('[SquareSync] Failed to fetch Square products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -309,7 +310,7 @@ export class SquareSyncService {
       // For now, return empty array
       return [];
     } catch (error) {
-      console.error('[SquareSync] Failed to fetch Platform products:', error);
+      logger.error('[SquareSync] Failed to fetch Platform products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -329,7 +330,7 @@ export class SquareSyncService {
       // 5. Create product mapping
       
     } catch (error) {
-      console.error(`[SquareSync] Failed to import product ${product.name}:`, error);
+      logger.error(`[SquareSync] Failed to import product ${product.name}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -349,7 +350,7 @@ export class SquareSyncService {
       // 5. Update product mapping
       
     } catch (error) {
-      console.error(`[SquareSync] Failed to export product ${product.name}:`, error);
+      logger.error(`[SquareSync] Failed to export product ${product.name}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

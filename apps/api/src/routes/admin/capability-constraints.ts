@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { z } from 'zod';
 import { invalidateConstraintCache } from '../../services/resolvers';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -426,7 +427,7 @@ router.get('/', async (_req, res) => {
     });
     res.json(constraints);
   } catch (error) {
-    console.error('Error fetching capability constraints:', error);
+    logger.error('Error fetching capability constraints:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch constraints' });
   }
 });
@@ -436,7 +437,7 @@ router.get('/metadata', (_req, res) => {
   try {
     res.json(CONSTRAINT_METADATA);
   } catch (error) {
-    console.error('Error fetching constraint metadata:', error);
+    logger.error('Error fetching constraint metadata:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch constraint metadata' });
   }
 });
@@ -452,7 +453,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(constraint);
   } catch (error) {
-    console.error('Error fetching constraint:', error);
+    logger.error('Error fetching constraint:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch constraint' });
   }
 });
@@ -491,7 +492,7 @@ router.post('/', async (req, res) => {
     if (error?.code === 'P2002') {
       return res.status(409).json({ success: false, error: 'duplicate', message: 'Constraint ID already exists' });
     }
-    console.error('Error creating constraint:', error);
+    logger.error('Error creating constraint:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to create constraint' });
   }
 });
@@ -521,7 +522,7 @@ router.put('/:id', async (req, res) => {
     invalidateConstraintCache();
     res.json(constraint);
   } catch (error) {
-    console.error('Error updating constraint:', error);
+    logger.error('Error updating constraint:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update constraint' });
   }
 });
@@ -538,7 +539,7 @@ router.delete('/:id', async (req, res) => {
     invalidateConstraintCache();
     res.json({ message: 'Constraint deleted' });
   } catch (error) {
-    console.error('Error deleting constraint:', error);
+    logger.error('Error deleting constraint:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to delete constraint' });
   }
 });

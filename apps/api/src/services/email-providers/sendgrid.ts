@@ -1,4 +1,5 @@
 import { EmailProvider, SendEmailParams, EmailResult } from '../email-service';
+import { logger } from '../../logger';
 
 export class SendGridEmailProvider implements EmailProvider {
   private apiKey: string;
@@ -38,7 +39,7 @@ export class SendGridEmailProvider implements EmailProvider {
         provider: 'sendgrid',
       };
     } catch (error: any) {
-      console.error('[SendGrid] Email send failed:', error);
+      logger.error('[SendGrid] Email send failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       return {
         success: false,
@@ -51,12 +52,12 @@ export class SendGridEmailProvider implements EmailProvider {
   async validateConfig(): Promise<boolean> {
     try {
       if (!this.apiKey) {
-        console.error('[SendGrid] API key not configured');
+        logger.error('[SendGrid] API key not configured', undefined);
         return false;
       }
 
       if (!this.fromEmail) {
-        console.error('[SendGrid] From email not configured');
+        logger.error('[SendGrid] From email not configured', undefined);
         return false;
       }
 
@@ -69,14 +70,14 @@ export class SendGridEmailProvider implements EmailProvider {
       });
 
       if (!response.ok) {
-        console.error('[SendGrid] API key validation failed:', response.status);
+        logger.error('[SendGrid] API key validation failed:', undefined, { error: { name: 'Error', message: String(response.status) } });
         return false;
       }
 
       console.log('[SendGrid] Configuration validated successfully');
       return true;
     } catch (error) {
-      console.error('[SendGrid] Configuration validation error:', error);
+      logger.error('[SendGrid] Configuration validation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

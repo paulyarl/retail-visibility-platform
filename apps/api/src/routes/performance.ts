@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -85,7 +86,7 @@ router.get('/dashboard', async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[Performance Dashboard] Error:', error);
+    logger.error('[Performance Dashboard] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_dashboard' });
   }
 });
@@ -148,7 +149,7 @@ router.get('/product/:itemId', async (req, res) => {
       daily: performance,
     });
   } catch (error: any) {
-    console.error('[Product Performance] Error:', error);
+    logger.error('[Product Performance] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_performance' });
   }
 });
@@ -220,7 +221,7 @@ router.post('/update', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'invalid_payload', details: error.flatten() });
     }
-    console.error('[Performance Update] Error:', error);
+    logger.error('[Performance Update] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_performance' });
   }
 });
@@ -274,7 +275,7 @@ router.get('/approval-status', async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[Approval Status] Error:', error);
+    logger.error('[Approval Status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_approval_status' });
   }
 });

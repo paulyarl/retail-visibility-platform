@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 // PayPal API configuration
 const PAYPAL_API_BASE = process.env.PAYPAL_MODE === 'live' 
@@ -137,7 +138,7 @@ class PayPalService {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[PayPal] Failed to get access token:', error);
+      logger.error('[PayPal] Failed to get access token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error('Failed to authenticate with PayPal');
     }
 
@@ -170,7 +171,7 @@ class PayPalService {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[PayPal] API error ${path}:`, error);
+      logger.error(`[PayPal] API error ${path}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error(`PayPal API error: ${response.status}`);
     }
 
@@ -361,7 +362,7 @@ class PayPalService {
         payerId: paypalSource?.account_id,
       };
     } catch (error) {
-      console.error('[PayPal] Failed to authorize order:', error);
+      logger.error('[PayPal] Failed to authorize order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false };
     }
   }
@@ -382,7 +383,7 @@ class PayPalService {
     try {
       return await this.apiRequest(`/v2/vault/payment-tokens/${tokenId}`);
     } catch (error) {
-      console.error('[PayPal] Failed to get payment token:', error);
+      logger.error('[PayPal] Failed to get payment token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -406,7 +407,7 @@ class PayPalService {
       // Setup tokens are at /v2/vault/setup-tokens/, not payment-tokens
       return await this.apiRequest(`/v2/vault/setup-tokens/${tokenId}`);
     } catch (error) {
-      console.error('[PayPal] Failed to get setup token:', error);
+      logger.error('[PayPal] Failed to get setup token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -475,7 +476,7 @@ class PayPalService {
       );
       return response.ok;
     } catch (error) {
-      console.error('[PayPal] Failed to delete payment token:', error);
+      logger.error('[PayPal] Failed to delete payment token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -655,7 +656,7 @@ class PayPalService {
     try {
       return await this.apiRequest<PayPalSubscription>(`/v1/billing/subscriptions/${subscriptionId}`);
     } catch (error) {
-      console.error('[PayPal] Failed to get subscription:', error);
+      logger.error('[PayPal] Failed to get subscription:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -672,7 +673,7 @@ class PayPalService {
       );
       return true;
     } catch (error) {
-      console.error('[PayPal] Failed to cancel subscription:', error);
+      logger.error('[PayPal] Failed to cancel subscription:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -689,7 +690,7 @@ class PayPalService {
       );
       return true;
     } catch (error) {
-      console.error('[PayPal] Failed to suspend subscription:', error);
+      logger.error('[PayPal] Failed to suspend subscription:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -706,7 +707,7 @@ class PayPalService {
       );
       return true;
     } catch (error) {
-      console.error('[PayPal] Failed to activate subscription:', error);
+      logger.error('[PayPal] Failed to activate subscription:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

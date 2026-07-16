@@ -4,6 +4,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions, AuthContext } from '../lib/UniversalSingleton';
+import { logger } from '../logger';
 
 export interface SecurityEvent {
   id: string;
@@ -224,7 +225,7 @@ class SecurityMonitoringService extends UniversalSingleton {
       event.resolved = true;
       this.logInfo('Security event processed', { eventId: event.id, type: event.type });
     } catch (error) {
-      console.error(`[SECURITY-MONITORING] ERROR: Failed to process security event`, error);
+      logger.error(`[SECURITY-MONITORING] ERROR: Failed to process security event`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 }

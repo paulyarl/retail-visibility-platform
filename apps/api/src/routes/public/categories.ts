@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../../utils/db-pool';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.json({ categories });
     
   } catch (error) {
-    console.error('Public categories error:', error);
+    logger.error('Public categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

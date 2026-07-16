@@ -1,4 +1,5 @@
 import { UniversalIdentifierCache } from './UniversalIdentifierCache';
+import { logger } from '../logger';
 
 export interface SingleProductResult {
   id: string;
@@ -989,7 +990,7 @@ export class SingleProductService {
       console.log(`[SingleProductService] Cached product by slug: ${productSlug}`);
       return transformedProduct;
     } catch (error) {
-      console.error('[SingleProductService] Error fetching product by slug:', error);
+      logger.error('[SingleProductService] Error fetching product by slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }

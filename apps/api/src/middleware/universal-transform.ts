@@ -10,6 +10,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../logger';
 
 /**
  * Convert camelCase to snake_case
@@ -186,7 +187,7 @@ export const universalRequestTransform = (
     }
     
   } catch (error) {
-    console.error('[UNIVERSAL-REQUEST] Transform error:', error);
+    logger.error('[UNIVERSAL-REQUEST] Transform error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
   
   next();
@@ -219,7 +220,7 @@ export const universalResponseTransform = (
       
       return originalJson.call(this, universalData);
     } catch (error) {
-      console.error('[UNIVERSAL-RESPONSE] Transform error:', error);
+      logger.error('[UNIVERSAL-RESPONSE] Transform error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return originalJson.call(this, data);
     }
   };

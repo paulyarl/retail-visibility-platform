@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.get('/', async (req, res) => {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[Platform Stats] Error fetching stats:', error);
+    logger.error('[Platform Stats] Error fetching stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     // Return fallback values on error (better than failing)
     res.json({

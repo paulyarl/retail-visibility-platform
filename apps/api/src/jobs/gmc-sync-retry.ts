@@ -9,6 +9,7 @@
 import { prisma } from '../prisma';
 import { syncProduct } from '../services/GMCProductSync';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { logger } from '../logger';
 
 const RETRY_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
 const MAX_RETRIES = 3;
@@ -37,7 +38,7 @@ async function getConnectedTenants(): Promise<string[]> {
 
     return Array.from(tenantIds);
   } catch (error) {
-    console.error('[GMC Sync Retry] Error getting connected tenants:', error);
+    logger.error('[GMC Sync Retry] Error getting connected tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -64,7 +65,7 @@ async function getFailedItems(tenantId: string): Promise<any[]> {
       return retryCount < MAX_RETRIES;
     });
   } catch (error) {
-    console.error(`[GMC Sync Retry] Error getting failed items for tenant ${tenantId}:`, error);
+    logger.error(`[GMC Sync Retry] Error getting failed items for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -138,7 +139,7 @@ async function runRetryCycle(): Promise<void> {
               });
             } else {
               const newRetryCount = retryCount + 1;
-              console.error(`[GMC Sync Retry] Item ${item.id} retry ${newRetryCount} failed: ${result.error}`);
+              logger.error(`[GMC Sync Retry] Item ${item.id} retry ${newRetryCount} failed: ${result.error}`, undefined);
 
               if (newRetryCount >= MAX_RETRIES) {
                 // Mark as permanent error
@@ -163,7 +164,7 @@ async function runRetryCycle(): Promise<void> {
               }
             }
           } catch (syncError) {
-            console.error(`[GMC Sync Retry] Exception retrying item ${item.id}:`, syncError);
+            logger.error(`[GMC Sync Retry] Exception retrying item ${item.id}:`, undefined, { error: { name: (syncError as any)?.name || 'Error', message: (syncError as any)?.message || String(syncError), stack: (syncError as any)?.stack } });
             const newRetryCount = retryCount + 1;
 
             if (newRetryCount >= MAX_RETRIES) {
@@ -182,7 +183,7 @@ async function runRetryCycle(): Promise<void> {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       } catch (error) {
-        console.error(`[GMC Sync Retry] Error processing tenant ${tenantId}:`, error);
+        logger.error(`[GMC Sync Retry] Error processing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
 
       // Small delay between tenants
@@ -192,7 +193,7 @@ async function runRetryCycle(): Promise<void> {
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[GMC Sync Retry] Completed in ${duration}s: ${totalRetried} retried, ${totalSucceeded} succeeded, ${totalPermanentlyFailed} permanent failures`);
   } catch (error) {
-    console.error('[GMC Sync Retry] Retry cycle failed:', error);
+    logger.error('[GMC Sync Retry] Retry cycle failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -282,7 +283,7 @@ export async function triggerManualRetry(): Promise<{ retried: number; succeeded
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     } catch (error) {
-      console.error(`[GMC Sync Retry] Manual retry error for tenant ${tenantId}:`, error);
+      logger.error(`[GMC Sync Retry] Manual retry error for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

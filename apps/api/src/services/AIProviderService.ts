@@ -13,6 +13,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../prisma';
 import aiProviderFactory from './ai-providers';
+import { logger } from '../logger';
 
 export type AIProvider = 'google' | 'openai' | 'anthropic' | 'mistral';
 export type QuickStartTextProvider = 'openai' | 'google' | 'anthropic' | 'mistral';
@@ -128,7 +129,7 @@ export class AIProviderService {
       }
       throw new Error('No AI provider available');
     } catch (error: any) {
-      console.error(`[AI] ${provider} failed:`, error.message);
+      logger.error(`[AI] ${provider} failed:`, undefined, { error: { name: 'Error', message: String(error.message) } });
       
       // Try fallback if enabled
       if (config.fallbackEnabled) {
@@ -142,7 +143,7 @@ export class AIProviderService {
             return await this.generateWithGenericProvider(businessType, categoryName, count, 'anthropic');
           }
         } catch (fallbackError: any) {
-          console.error('[AI] Fallback also failed:', fallbackError.message);
+          logger.error('[AI] Fallback also failed:', undefined, { error: { name: 'Error', message: String(fallbackError.message) } });
         }
       }
       

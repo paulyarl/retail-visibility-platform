@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../../middleware/auth';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.get('/', requireAdmin, async (req: Request, res: Response) => {
       }))
     });
   } catch (error) {
-    console.error('Error fetching ticker messages:', error);
+    logger.error('Error fetching ticker messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch ticker messages',
@@ -137,7 +138,7 @@ router.get('/active', async (req: Request, res: Response) => {
       }))
     });
   } catch (error) {
-    console.error('Error fetching active ticker messages:', error);
+    logger.error('Error fetching active ticker messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch active ticker messages',
@@ -248,7 +249,7 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
       userMessage: 'Ticker message created successfully'
     });
   } catch (error) {
-    console.error('Error creating ticker message:', error);
+    logger.error('Error creating ticker message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to create ticker message',
@@ -392,7 +393,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
       userMessage: 'Ticker message updated successfully'
     });
   } catch (error) {
-    console.error('Error updating ticker message:', error);
+    logger.error('Error updating ticker message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to update ticker message',
@@ -438,7 +439,7 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
       userMessage: 'Ticker message deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting ticker message:', error);
+    logger.error('Error deleting ticker message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to delete ticker message',

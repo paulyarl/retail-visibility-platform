@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 export class HybridFulfillmentCoordinator {
   /**
@@ -99,7 +100,7 @@ export class HybridFulfillmentCoordinator {
           amount: order.total_cents,
         });
       } catch (notifError) {
-        console.error('[HybridCoordinator] Failed to send fulfillment notification:', notifError);
+        logger.error('[HybridCoordinator] Failed to send fulfillment notification:', undefined, { error: { name: (notifError as any)?.name || 'Error', message: (notifError as any)?.message || String(notifError), stack: (notifError as any)?.stack } });
       }
 
       return true;

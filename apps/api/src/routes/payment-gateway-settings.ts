@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generatePaymentGatewaySettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
       },
     });
   } catch (error) {
-    console.error('Error fetching payment gateway settings:', error);
+    logger.error('Error fetching payment gateway settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -178,7 +179,7 @@ router.put('/:tenantId/payment-gateway-settings', authenticateToken, async (req,
       },
     });
   } catch (error) {
-    console.error('Error updating payment gateway settings:', error);
+    logger.error('Error updating payment gateway settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -218,7 +219,7 @@ router.get('/public/tenant/:tenantId/payment-gateway-settings', async (req, res)
       },
     });
   } catch (error) {
-    console.error('Error fetching public payment gateway settings:', error);
+    logger.error('Error fetching public payment gateway settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

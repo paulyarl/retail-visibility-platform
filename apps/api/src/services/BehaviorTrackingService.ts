@@ -6,6 +6,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
+import { logger } from '../logger';
 
 // Behavior Tracking Types
 export interface TrackingEvent {
@@ -205,7 +206,7 @@ class BehaviorTrackingService extends UniversalSingleton {
     try {
       await this.sendBatch(batch);
     } catch (error) {
-      console.error('Error processing behavior tracking batch:', error);
+      logger.error('Error processing behavior tracking batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Re-add failed events to queue for retry
       this.eventQueue.unshift(...batch);
     }
@@ -219,7 +220,7 @@ class BehaviorTrackingService extends UniversalSingleton {
       // Store event in database
       await this.storeEvent(event);
     } catch (error) {
-      console.error('Error sending tracking event:', error);
+      logger.error('Error sending tracking event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -232,7 +233,7 @@ class BehaviorTrackingService extends UniversalSingleton {
       // Store events in database
       await this.storeEvents(events);
     } catch (error) {
-      console.error('Error sending tracking batch:', error);
+      logger.error('Error sending tracking batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -330,7 +331,7 @@ class BehaviorTrackingService extends UniversalSingleton {
       await this.setCache(cacheKey, analytics);
       return analytics;
     } catch (error) {
-      console.error('Error calculating behavior analytics:', error);
+      logger.error('Error calculating behavior analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Return default analytics
       return {
@@ -377,7 +378,7 @@ class BehaviorTrackingService extends UniversalSingleton {
       await this.setCache(cacheKey, patterns);
       return patterns;
     } catch (error) {
-      console.error('Error calculating user behavior patterns:', error);
+      logger.error('Error calculating user behavior patterns:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Return default patterns
       return {

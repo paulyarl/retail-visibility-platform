@@ -30,6 +30,7 @@ import * as jwt from 'jsonwebtoken';
 import { user_tenant_role, user_role } from '@prisma/client';
 import { isPlatformUser, isPlatformAdmin } from '../utils/platform-admin';
 import { authService } from '../auth/auth.service';
+import { logger } from '../logger';
 
 // JWT Payload interface
 // Note: Universal transform middleware makes both userId and userId available
@@ -187,7 +188,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     req.user = makeBothConventionsAvailable(payload);
     return next();
   } catch (error) {
-    console.error('[AUTH] Auth0 authentication failed:', error);
+    logger.error('[AUTH] Auth0 authentication failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(401).json({ error: 'authentication_failed', message: 'Authentication failed' });
   }
 }
@@ -312,7 +313,7 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
       return next();
     }
   } catch (error) {
-    console.error('[checkTenantAccess] Error checking tenant membership:', error);
+    logger.error('[checkTenantAccess] Error checking tenant membership:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 
   return res.status(403).json({ 
@@ -411,7 +412,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
           userRole: user.role,
           req,
         }).catch(err => {
-          console.error('[optionalAuth] Error tracking session:', err);
+          logger.error('[optionalAuth] Error tracking session:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
         });
       }
     }
@@ -519,7 +520,7 @@ export async function requireTenantOwner(req: Request, res: Response, next: Next
 
     next();
   } catch (error) {
-    console.error('[requireTenantOwner] Error checking tenant access:', error);
+    logger.error('[requireTenantOwner] Error checking tenant access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'authorization_check_failed' });
   }
 }
@@ -605,7 +606,7 @@ export async function authenticateCustomer(req: Request, res: Response, next: Ne
     req.customer = customer;
     next();
   } catch (error) {
-    console.error('[AUTH] Customer authentication failed:', error);
+    logger.error('[AUTH] Customer authentication failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(401).json({ error: 'customer_auth_failed', message: 'Customer authentication failed' });
   }
 }

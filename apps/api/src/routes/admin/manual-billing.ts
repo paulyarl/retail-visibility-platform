@@ -14,6 +14,7 @@ import { getManualBillingService } from '../../services/subscription/ManualBilli
 import { getServiceChargeService } from '../../services/subscription/ServiceChargeService';
 import { audit } from '../../audit';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -101,7 +102,7 @@ router.post('/invoices', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/manual-billing/invoices] Error:', error);
+    logger.error('[POST /api/admin/manual-billing/invoices] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -192,7 +193,7 @@ router.post('/payment-methods', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/manual-billing/payment-methods] Error:', error);
+    logger.error('[POST /api/admin/manual-billing/payment-methods] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -282,7 +283,7 @@ router.post('/mark-paid', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/manual-billing/mark-paid] Error:', error);
+    logger.error('[POST /api/admin/manual-billing/mark-paid] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -306,7 +307,7 @@ router.get('/invoices', async (req, res) => {
       invoices,
     });
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/invoices] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/invoices] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -390,7 +391,7 @@ router.get('/all-invoices', async (req, res) => {
       invoices: transformedInvoices,
     });
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/all-invoices] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/all-invoices] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -449,7 +450,7 @@ router.put('/subscription-control/:tenantId', async (req, res) => {
       }
     });
   } catch (error: any) {
-    console.error('[PUT /api/admin/manual-billing/subscription-control] Error:', error);
+    logger.error('[PUT /api/admin/manual-billing/subscription-control] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -509,7 +510,7 @@ router.put('/invoices/:invoiceId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[PUT /api/admin/manual-billing/invoices] Error:', error);
+    logger.error('[PUT /api/admin/manual-billing/invoices] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -563,7 +564,7 @@ router.delete('/invoices/:invoiceId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[DELETE /api/admin/manual-billing/invoices] Error:', error);
+    logger.error('[DELETE /api/admin/manual-billing/invoices] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -608,7 +609,7 @@ router.get('/invoices/:tenantId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/invoices/:tenantId] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/invoices/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -632,7 +633,7 @@ router.get('/payment-methods', async (req, res) => {
       paymentMethods,
     });
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/payment-methods] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/payment-methods] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -703,7 +704,7 @@ router.put('/payment-methods/:paymentMethodId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[PUT /api/admin/manual-billing/payment-methods] Error:', error);
+    logger.error('[PUT /api/admin/manual-billing/payment-methods] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -750,7 +751,7 @@ router.delete('/payment-methods/:paymentMethodId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[DELETE /api/admin/manual-billing/payment-methods] Error:', error);
+    logger.error('[DELETE /api/admin/manual-billing/payment-methods] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -795,7 +796,7 @@ router.get('/payment-methods/:tenantId', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/payment-methods/:tenantId] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/payment-methods/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -894,7 +895,7 @@ router.get('/tenants', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/tenants] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/tenants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -1182,7 +1183,7 @@ router.post('/generate-invoice-pdf', async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (error: any) {
-    console.error('[POST /api/admin/manual-billing/generate-invoice-pdf] Error:', error);
+    logger.error('[POST /api/admin/manual-billing/generate-invoice-pdf] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -1252,7 +1253,7 @@ router.post('/send-invoice', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST /api/admin/manual-billing/send-invoice] Error:', error);
+    logger.error('[POST /api/admin/manual-billing/send-invoice] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -1517,7 +1518,7 @@ router.get('/invoices/:invoiceId/pdf', async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (error: any) {
-    console.error('[GET /api/admin/manual-billing/invoices/:invoiceId/pdf] Error:', error);
+    logger.error('[GET /api/admin/manual-billing/invoices/:invoiceId/pdf] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',

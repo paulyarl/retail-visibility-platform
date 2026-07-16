@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { InventoryTransferService } from '../../services/InventoryTransferService';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 const inventoryTransferService = InventoryTransferService.getInstance();
@@ -72,7 +73,7 @@ router.get('/transfers', async (req: Request, res: Response) => {
       data: transfers
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get transfers error:', error);
+    logger.error('[Admin Inventory] Get transfers error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_transfers',
@@ -117,7 +118,7 @@ router.get('/transfers/incoming', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get incoming transfers error:', error);
+    logger.error('[Admin Inventory] Get incoming transfers error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_incoming_transfers',
@@ -198,7 +199,7 @@ router.post('/transfers', async (req: Request, res: Response) => {
       data: transfer
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Create transfer error:', error);
+    logger.error('[Admin Inventory] Create transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_create_transfer',
@@ -219,7 +220,7 @@ router.get('/transfers/:transferId', async (req: Request, res: Response) => {
       message: 'Transfer details endpoint - to be implemented'
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get transfer details error:', error);
+    logger.error('[Admin Inventory] Get transfer details error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_transfer_details',
@@ -255,7 +256,7 @@ router.post('/transfers/:transferId/approve', async (req: Request, res: Response
       message: 'Transfer approved successfully'
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Approve transfer error:', error);
+    logger.error('[Admin Inventory] Approve transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_approve_transfer',
@@ -293,7 +294,7 @@ router.post('/transfers/:transferId/ship', async (req: Request, res: Response) =
       message: 'Transfer shipped successfully'
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Ship transfer error:', error);
+    logger.error('[Admin Inventory] Ship transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_ship_transfer',
@@ -330,7 +331,7 @@ router.post('/transfers/:transferId/receive', async (req: Request, res: Response
       message: 'Transfer received successfully'
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Receive transfer error:', error);
+    logger.error('[Admin Inventory] Receive transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_receive_transfer',
@@ -352,7 +353,7 @@ router.post('/transfers/:transferId/cancel', async (req: Request, res: Response)
       message: 'Cancel transfer endpoint - to be implemented'
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Cancel transfer error:', error);
+    logger.error('[Admin Inventory] Cancel transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_cancel_transfer',
@@ -401,7 +402,7 @@ router.get('/locations/:locationId/inventory', async (req: Request, res: Respons
       data: result
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get location inventory error:', error);
+    logger.error('[Admin Inventory] Get location inventory error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_location_inventory',
@@ -443,7 +444,7 @@ router.get('/locations/:locationId/inventory/:sku', async (req: Request, res: Re
       data: pool
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get inventory pool error:', error);
+    logger.error('[Admin Inventory] Get inventory pool error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_inventory_pool',
@@ -505,7 +506,7 @@ router.get('/alerts/low-stock', async (req: Request, res: Response) => {
       data: result
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get low stock alerts error:', error);
+    logger.error('[Admin Inventory] Get low stock alerts error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_low_stock_alerts',
@@ -532,7 +533,7 @@ router.get('/analytics/inventory', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Get analytics error:', error);
+    logger.error('[Admin Inventory] Get analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_analytics',
@@ -623,7 +624,7 @@ router.post('/inventory/bulk-update', async (req: Request, res: Response) => {
           });
         }
       } catch (error: any) {
-        console.error(`Failed to update inventory pool for ${locationId}/${sku}:`, error);
+        logger.error(`Failed to update inventory pool for ${locationId}/${sku}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.push({
           locationId,
           sku,
@@ -646,7 +647,7 @@ router.post('/inventory/bulk-update', async (req: Request, res: Response) => {
       results
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Bulk update error:', error);
+    logger.error('[Admin Inventory] Bulk update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_bulk_update',
@@ -694,7 +695,7 @@ router.post('/transfers/initiate', async (req: Request, res: Response) => {
       data: transfer
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Initiate transfer error:', error);
+    logger.error('[Admin Inventory] Initiate transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_initiate_transfer',
@@ -724,7 +725,7 @@ router.post('/transfers/bulk-initiate', async (req: Request, res: Response) => {
       initiated: transfers.length
     });
   } catch (error: any) {
-    console.error('[Admin Inventory] Bulk transfer error:', error);
+    logger.error('[Admin Inventory] Bulk transfer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_bulk_transfer',

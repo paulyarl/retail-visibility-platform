@@ -7,6 +7,7 @@ import { z } from 'zod';
 import ProductOptionsService, { ProductLayoutType } from '../services/ProductOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateProductOptionsSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -150,7 +151,7 @@ router.get('/:tenantId/product-options', authenticateToken, async (req, res) => 
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching product options settings:', error);
+    logger.error('Error fetching product options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -293,7 +294,7 @@ router.put('/:tenantId/product-options', authenticateToken, requireTenantAdmin, 
       },
     });
   } catch (error) {
-    console.error('Error updating product options settings:', error);
+    logger.error('Error updating product options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -314,7 +315,7 @@ router.get('/:tenantId/product-options/capability', authenticateToken, async (re
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving product options capability:', error);
+    logger.error('Error resolving product options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

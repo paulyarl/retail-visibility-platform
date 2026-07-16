@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { logger } from './logger';
 
 const prisma = new PrismaClient();
 
@@ -28,7 +29,7 @@ async function checkPaymentGateways() {
       console.log('---');
     });
   } catch (error) {
-    console.error('Error:', error);
+    logger.error('Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   } finally {
     await prisma.$disconnect();
   }

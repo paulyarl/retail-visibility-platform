@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import { UAParser } from 'ua-parser-js';
 import { generateSessionId } from '../lib/id-generator';
 import { collectEnhancedSecurityContext, createSecuritySummary } from '../utils/security-context';
+import { logger } from '../logger';
 
 interface SessionInfo {
   userId: string;
@@ -274,7 +275,7 @@ export async function trackSession(sessionInfo: SessionInfo & { req?: Request })
       }
     }
   } catch (error) {
-    console.error('[trackSession] Error:', error);
+    logger.error('[trackSession] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw - session tracking shouldn't break auth flow
   }
 }
@@ -318,7 +319,7 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
       userRole: req.user?.role,
       req, // Pass the request object for enhanced security context
     }).catch(err => {
-      console.error('[sessionActivityMiddleware] Error tracking session:', err);
+      logger.error('[sessionActivityMiddleware] Error tracking session:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
     });
   }
 
@@ -351,7 +352,7 @@ export async function trackFailedLogin(
       )
     `;
   } catch (error) {
-    console.error('[trackFailedLogin] Error:', error);
+    logger.error('[trackFailedLogin] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -385,6 +386,6 @@ export async function createSecurityAlert(
       )
     `;
   } catch (error) {
-    console.error('[createSecurityAlert] Error:', error);
+    logger.error('[createSecurityAlert] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }

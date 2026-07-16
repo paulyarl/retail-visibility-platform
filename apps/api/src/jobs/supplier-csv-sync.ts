@@ -11,6 +11,7 @@
 
 import { prisma } from '../prisma';
 import SupplierCatalogService, { type BatchIngestRow } from '../services/SupplierCatalogService';
+import { logger } from '../logger';
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 10 * 60 * 1000; // 10 minutes
@@ -70,7 +71,7 @@ async function fetchCsvWithBackoff(url: string, maxRetries = 3): Promise<string 
       return await response.text();
     } catch (error) {
       const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
-      console.error(`[SupplierCsvSync] Fetch attempt ${attempt + 1} failed, retrying in ${delay}ms:`, error);
+      logger.error(`[SupplierCsvSync] Fetch attempt ${attempt + 1} failed, retrying in ${delay}ms:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       if (attempt < maxRetries - 1) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -104,7 +105,7 @@ async function runScheduledSync(): Promise<void> {
         const csvText = await fetchCsvWithBackoff(supplier.api_url);
 
         if (!csvText) {
-          console.error(`[SupplierCsvSync] Failed to fetch CSV for supplier ${supplier.id}`);
+          logger.error(`[SupplierCsvSync] Failed to fetch CSV for supplier ${supplier.id}`, undefined);
           continue;
         }
 
@@ -121,7 +122,7 @@ async function runScheduledSync(): Promise<void> {
           `${result.updated} updated, ${result.quarantined} quarantined`
         );
       } catch (error) {
-        console.error(`[SupplierCsvSync] Error syncing supplier ${supplier.id}:`, error);
+        logger.error(`[SupplierCsvSync] Error syncing supplier ${supplier.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
 
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -129,7 +130,7 @@ async function runScheduledSync(): Promise<void> {
 
     console.log('[SupplierCsvSync] Completed');
   } catch (error) {
-    console.error('[SupplierCsvSync] Scheduled sync failed:', error);
+    logger.error('[SupplierCsvSync] Scheduled sync failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

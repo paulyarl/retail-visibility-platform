@@ -10,6 +10,7 @@
 
 import Stripe from 'stripe';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 export interface InvoiceGenerationResult {
   invoiceId: string;
@@ -155,7 +156,7 @@ export class PlatformFeeInvoiceService {
           results.push(invoice);
         }
       } catch (error) {
-        console.error(`[PlatformFeeInvoice] Failed to generate invoice for tenant ${tenant_id}:`, error);
+        logger.error(`[PlatformFeeInvoice] Failed to generate invoice for tenant ${tenant_id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -356,7 +357,7 @@ export class PlatformFeeInvoiceService {
 
       return stripeInvoice.id;
     } catch (error) {
-      console.error('[PlatformFeeInvoice] Failed to create Stripe invoice:', error);
+      logger.error('[PlatformFeeInvoice] Failed to create Stripe invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }

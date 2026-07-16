@@ -8,6 +8,7 @@
 import { prisma } from '../prisma';
 import { ResolvedTenant } from './UniversalIdentifierCache';
 import { resolveEffectiveStatusFromTenant } from '../utils/org-standing-inheritance';
+import { logger } from '../logger';
 
 export interface TenantProfile {
   id: string;
@@ -296,7 +297,7 @@ export class TenantService {
         demoExpiresAt: tenant.demo_expires_at ? tenant.demo_expires_at.toISOString() : null,
       };
     } catch (error) {
-      console.error(`[TenantService] Error getting profile for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error getting profile for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -420,7 +421,7 @@ export class TenantService {
         subscription: subscriptionInfo
       };
     } catch (error) {
-      console.error(`[TenantService] Error getting complete data for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error getting complete data for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -491,7 +492,7 @@ export class TenantService {
         }
       };
     } catch (error) {
-      console.error(`[TenantService] Error getting users for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error getting users for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -547,7 +548,7 @@ export class TenantService {
         }
       };
     } catch (error) {
-      console.error(`[TenantService] Error getting orders for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error getting orders for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -630,7 +631,7 @@ export class TenantService {
         businessInfo: {}
       };
     } catch (error) {
-      console.error(`[TenantService] Error updating profile for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error updating profile for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -692,7 +693,7 @@ export class TenantService {
         hasPublishedDirectory: hasDirectory
       };
     } catch (error) {
-      console.error(`[TenantService] Error updating subdomain for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error updating subdomain for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -782,7 +783,7 @@ export class TenantService {
         }
       };
     } catch (error) {
-      console.error(`[TenantService] Error getting tier info for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error getting tier info for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Return defaults on error
       return {
         currentTier: 'starter',
@@ -853,7 +854,7 @@ export class TenantService {
         features,
       };
     } catch (error) {
-      console.error(`[TenantService] Error getting subscription info for ${tenantId}:`, error);
+      logger.error(`[TenantService] Error getting subscription info for ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Return defaults on error
       return {
         status: 'active',

@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -144,7 +145,7 @@ router.get('/random-featured-global', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error in directory-random-featured-global:', error);
+    logger.error('Error in directory-random-featured-global:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch random featured products'

@@ -9,6 +9,7 @@ import { prisma } from '../../prisma';
 import { decryptCredential, encryptCredential } from '../../utils/credential-encryption';
 import { generateBillingMethodId, generateInvoiceId, generateSubscriptionPaymentId } from '../../lib/id-generator';
 import Stripe from 'stripe';
+import { logger } from '../../logger';
 
 export type BillingGatewayType = 'stripe' | 'paypal' | 'manual';
 
@@ -343,7 +344,7 @@ export class SubscriptionBillingService {
             expiryYear = pm.card.exp_year;
           }
         } catch (stripeError: any) {
-          console.error('Stripe payment method error:', stripeError);
+          logger.error('Stripe payment method error:', undefined, { error: { name: (stripeError as any)?.name || 'Error', message: (stripeError as any)?.message || String(stripeError), stack: (stripeError as any)?.stack } });
           
           // Provide helpful error message for configuration issues
           if (stripeError.message?.includes('No such PaymentMethod') || 
@@ -467,7 +468,7 @@ export class SubscriptionBillingService {
         await this.stripe.paymentMethods.detach(method.payment_method_token!);
       } catch (error: any) {
         // Log but don't fail - the local record is what matters
-        console.error('[SubscriptionBilling] Failed to detach Stripe payment method:', error.message);
+        logger.error('[SubscriptionBilling] Failed to detach Stripe payment method:', undefined, { error: { name: 'Error', message: String(error.message) } });
       }
     }
 
@@ -773,7 +774,7 @@ export class SubscriptionBillingService {
               console.log('[Subscription] Recorded revenue transaction:', amount, 'cents platform revenue');
             }
           } catch (revenueError) {
-            console.error('[Subscription] Failed to record revenue transaction:', revenueError);
+            logger.error('[Subscription] Failed to record revenue transaction:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
             // Don't fail the subscription if revenue recording fails
           }
 
@@ -793,7 +794,7 @@ export class SubscriptionBillingService {
               invoiceId,
             });
           } catch (emailError) {
-            console.error('[SubscriptionBilling] Failed to send payment success email:', emailError);
+            logger.error('[SubscriptionBilling] Failed to send payment success email:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
           }
           
           return {
@@ -834,7 +835,7 @@ export class SubscriptionBillingService {
               reason: `Invoice status: ${invoice?.status || 'unknown'}`,
             });
           } catch (emailError) {
-            console.error('[SubscriptionBilling] Failed to send payment failed email:', emailError);
+            logger.error('[SubscriptionBilling] Failed to send payment failed email:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
           }
           
           return {
@@ -846,7 +847,7 @@ export class SubscriptionBillingService {
           };
         }
       } catch (error: any) {
-        console.error('[SubscriptionBilling] Stripe subscription failed:', error);
+        logger.error('[SubscriptionBilling] Stripe subscription failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return {
           success: false,
           tier,
@@ -881,7 +882,7 @@ export class SubscriptionBillingService {
           paypalSubscriptionId: result.subscriptionId,
         };
       } catch (error: any) {
-        console.error('[SubscriptionBilling] PayPal subscription failed:', error);
+        logger.error('[SubscriptionBilling] PayPal subscription failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return {
           success: false,
           tier,
@@ -990,7 +991,7 @@ export class SubscriptionBillingService {
           };
         }
       } catch (error: any) {
-        console.error('[SubscriptionBilling] Stripe subscription with existing customer failed:', error);
+        logger.error('[SubscriptionBilling] Stripe subscription with existing customer failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return {
           success: false,
           tier,
@@ -1045,7 +1046,7 @@ export class SubscriptionBillingService {
    */
   async createStripeCustomerForTenant(tenantId: string, tenantName: string): Promise<string | null> {
     if (!this.stripe) {
-      console.error('[SubscriptionBilling] Stripe not configured');
+      logger.error('[SubscriptionBilling] Stripe not configured', undefined);
       return null;
     }
 
@@ -1066,7 +1067,7 @@ export class SubscriptionBillingService {
       console.log('[SubscriptionBilling] Created Stripe customer:', customer.id, 'for tenant:', tenantId);
       return customer.id;
     } catch (error: any) {
-      console.error('[SubscriptionBilling] Failed to create Stripe customer:', error);
+      logger.error('[SubscriptionBilling] Failed to create Stripe customer:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -1076,7 +1077,7 @@ export class SubscriptionBillingService {
    */
   async attachPaymentMethodFromCharge(stripeCustomerId: string, chargeId: string): Promise<string | null> {
     if (!this.stripe) {
-      console.error('[SubscriptionBilling] Stripe not configured');
+      logger.error('[SubscriptionBilling] Stripe not configured', undefined);
       return null;
     }
 
@@ -1117,7 +1118,7 @@ export class SubscriptionBillingService {
       console.log('[SubscriptionBilling] Attached payment method:', paymentMethodId, 'to customer:', stripeCustomerId);
       return paymentMethodId;
     } catch (error: any) {
-      console.error('[SubscriptionBilling] Failed to attach payment method from charge:', error);
+      logger.error('[SubscriptionBilling] Failed to attach payment method from charge:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -1247,7 +1248,7 @@ export class SubscriptionBillingService {
           };
         }
       } catch (error: any) {
-        console.error('[SubscriptionBilling] Stripe charge failed:', error);
+        logger.error('[SubscriptionBilling] Stripe charge failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return {
           success: false,
           error: error.message,
@@ -1314,7 +1315,7 @@ export class SubscriptionBillingService {
 
     // Send branded invoice email
     this.sendInvoiceEmail(tenantId, id, tier, amountCents, 'paid', now, now, cycleEnd).catch(error => {
-      console.error('[SubscriptionBillingService] Failed to send invoice email:', error);
+      logger.error('[SubscriptionBillingService] Failed to send invoice email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     });
 
     return id;
@@ -1344,7 +1345,7 @@ export class SubscriptionBillingService {
       });
 
       if (!tenant) {
-        console.error(`[SubscriptionBillingService] Tenant not found: ${tenantId}`);
+        logger.error(`[SubscriptionBillingService] Tenant not found: ${tenantId}`, undefined);
         return;
       }
 
@@ -1384,7 +1385,7 @@ export class SubscriptionBillingService {
 
       console.log(`[SubscriptionBillingService] Invoice email sent to ${contactEmail} for invoice ${invoiceId}`);
     } catch (error) {
-      console.error('[SubscriptionBillingService] Error sending invoice email:', error);
+      logger.error('[SubscriptionBillingService] Error sending invoice email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

@@ -1,4 +1,5 @@
 import { getDirectPool } from './db-pool';
+import { logger } from '../logger';
 
 export interface DirectoryCategoryCount {
   categoryId: string;
@@ -59,7 +60,7 @@ export async function getDirectoryCategoryCounts(options?: {
     return result.rows;
     
   } catch (error) {
-    console.error('[Directory Category Counts] Error:', error);
+    logger.error('[Directory Category Counts] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw new Error('Failed to get directory category counts');
   }
 }
@@ -106,7 +107,7 @@ export async function getPlatformDirectoryCategoryCounts(): Promise<DirectoryCat
     return result.rows;
     
   } catch (error) {
-    console.error('[Platform Directory Category Counts] Error:', error);
+    logger.error('[Platform Directory Category Counts] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw new Error('Failed to get platform directory category counts');
   }
 }
@@ -140,7 +141,7 @@ export async function getCategorySummary(categoryId: string): Promise<DirectoryC
     return result.rows[0] || null;
     
   } catch (error) {
-    console.error('[Category Summary] Error:', error);
+    logger.error('[Category Summary] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw new Error('Failed to get category summary');
   }
 }
@@ -187,7 +188,7 @@ export async function getDirectoryStats(): Promise<{
     };
     
   } catch (error) {
-    console.error('[Directory Stats] Error:', error);
+    logger.error('[Directory Stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw new Error('Failed to get directory stats');
   }
 }

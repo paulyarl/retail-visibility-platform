@@ -8,6 +8,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { generateDirectorySupportNoteId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ router.get('/tenant/:tenantId/status', authenticateToken, requireSupportAccess, 
       featuredUntil: activeFeatured?.featured_until,
     });
   } catch (error: any) {
-    console.error('[GET /support/directory/tenant/:tenantId/status] Error:', error);
+    logger.error('[GET /support/directory/tenant/:tenantId/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_status' });
   }
 });
@@ -147,7 +148,7 @@ router.get('/tenant/:tenantId/quality-check', authenticateToken, requireSupportA
       canPublish: checks.business_name && checks.cityState && checks.category,
     });
   } catch (error: any) {
-    console.error('[GET /support/directory/tenant/:tenantId/quality-check] Error:', error);
+    logger.error('[GET /support/directory/tenant/:tenantId/quality-check] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_check_quality' });
   }
 });
@@ -191,7 +192,7 @@ router.get('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, a
 
     return res.json({ notes: mapped });
   } catch (error: any) {
-    console.error('[GET /support/directory/tenant/:tenantId/notes] Error:', error);
+    logger.error('[GET /support/directory/tenant/:tenantId/notes] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_notes' });
   }
 });
@@ -222,7 +223,7 @@ router.post('/tenant/:tenantId/notes', authenticateToken, requireSupportAccess, 
 
     return res.json({ success: true, note });
   } catch (error: any) {
-    console.error('[POST /support/directory/tenant/:tenantId/add-note] Error:', error);
+    logger.error('[POST /support/directory/tenant/:tenantId/add-note] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_add_note' });
   }
 });
@@ -273,7 +274,7 @@ router.get('/search', authenticateToken, requireSupportAccess, async (req: Reque
 
     return res.json({ tenants });
   } catch (error: any) {
-    console.error('[GET /support/directory/search] Error:', error);
+    logger.error('[GET /support/directory/search] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_search' });
   }
 });

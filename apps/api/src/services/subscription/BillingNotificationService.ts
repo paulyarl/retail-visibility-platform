@@ -12,6 +12,7 @@
 import { prisma } from '../../prisma';
 import { CrmTaskService } from '../CrmTaskService';
 import { CrmAlertService } from '../CrmAlertService';
+import { logger } from '../../logger';
 
 export type BillingNotificationType = 
   | 'payment_success'
@@ -81,7 +82,7 @@ class BillingNotificationService {
       // Get all tenant owner emails
       const owners = await this.getTenantOwners(data.tenantId);
       if (owners.length === 0) {
-        console.error(`[BillingNotification] No owner emails found for tenant ${data.tenantId}`);
+        logger.error(`[BillingNotification] No owner emails found for tenant ${data.tenantId}`, undefined);
         // Still log the notification attempt
         await this.logNotification(data, false);
         return false;
@@ -103,7 +104,7 @@ class BillingNotificationService {
 
       return anySent;
     } catch (error) {
-      console.error('[BillingNotification] Error sending notification:', error);
+      logger.error('[BillingNotification] Error sending notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Still log the failed attempt
       await this.logNotification(data, false);
       return false;
@@ -720,7 +721,7 @@ Your new plan is now active.`;
         console.log(`[BillingNotification] Email sent to ${payload.to}: ${payload.subject}`);
         return true;
       } catch (error) {
-        console.error('[BillingNotification] Resend error:', error);
+        logger.error('[BillingNotification] Resend error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return this.logEmailFallback(payload);
       }
     }
@@ -755,7 +756,7 @@ Your new plan is now active.`;
       });
     } catch (error) {
       // Don't fail if logging fails
-      console.error('[BillingNotification] Failed to log notification:', error);
+      logger.error('[BillingNotification] Failed to log notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -873,7 +874,7 @@ Your new plan is now active.`;
 
       console.log(`[BillingNotification] CRM task created for tenant ${data.tenantId}: ${title}`);
     } catch (error) {
-      console.error('[BillingNotification] Failed to create CRM task:', error);
+      logger.error('[BillingNotification] Failed to create CRM task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -1046,7 +1047,7 @@ Your new plan is now active.`;
 
       console.log(`[BillingNotification] CRM alert created for tenant ${data.tenantId}: ${title}`);
     } catch (error) {
-      console.error('[BillingNotification] Failed to create CRM alert:', error);
+      logger.error('[BillingNotification] Failed to create CRM alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

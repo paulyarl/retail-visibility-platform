@@ -8,6 +8,7 @@
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { generateSessionId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 export interface CatalogSearchParams {
   supplierId?: string;
@@ -341,7 +342,7 @@ class SupplierCatalogServiceClass {
         },
       });
     } catch (error) {
-      console.error('[SupplierCatalog] Failed to sync GTIN to barcode_enrichment:', error);
+      logger.error('[SupplierCatalog] Failed to sync GTIN to barcode_enrichment:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

@@ -15,6 +15,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { permissionServiceFactory } from './PermissionServiceFactory';
+import { logger } from '../../logger';
 
 // Extend Express Request type
 declare global {
@@ -154,7 +155,7 @@ export function requireFeature(feature: string, options?: { skipCache?: boolean 
       }
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking feature:', error);
+      logger.error('[PermissionMiddleware] Error checking feature:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -207,7 +208,7 @@ export function requireLimit(limitType: string, required: number = 1) {
 
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking limit:', error);
+      logger.error('[PermissionMiddleware] Error checking limit:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -263,7 +264,7 @@ export function requireAccess(resource: string, action: string) {
       }
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking access:', error);
+      logger.error('[PermissionMiddleware] Error checking access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -290,7 +291,7 @@ export function requireAdmin() {
 
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking admin:', error);
+      logger.error('[PermissionMiddleware] Error checking admin:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -322,7 +323,7 @@ export function requirePlatformAdmin() {
 
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking platform admin:', error);
+      logger.error('[PermissionMiddleware] Error checking platform admin:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -366,7 +367,7 @@ export function requireTenantManagement(tenantIdParam: string = 'tenantId') {
 
       return permissionDenied(res, 'TENANT_MANAGEMENT_DENIED', 'You do not have permission to manage this tenant');
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking tenant management:', error);
+      logger.error('[PermissionMiddleware] Error checking tenant management:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -442,7 +443,7 @@ export function requirePermissions(options: PermissionMiddlewareOptions) {
 
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error checking permissions:', error);
+      logger.error('[PermissionMiddleware] Error checking permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: {
@@ -464,7 +465,7 @@ export function withPermissions() {
       req.permissions = context;
       next();
     } catch (error) {
-      console.error('[PermissionMiddleware] Error extracting permissions:', error);
+      logger.error('[PermissionMiddleware] Error extracting permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       next();
     }
   };

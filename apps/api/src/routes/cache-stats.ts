@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -57,7 +58,7 @@ router.get('/cache/stats', authenticateToken, async (req, res) => {
       }))
     });
   } catch (error: any) {
-    console.error('[Cache Stats] Error:', error);
+    logger.error('[Cache Stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get cache stats' });
   }
 });

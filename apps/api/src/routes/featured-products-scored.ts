@@ -13,6 +13,7 @@ import { MINIMUM_QUALITY_THRESHOLD, getQualityTier } from '../utils/featured-pro
 import { prisma } from '../prisma';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get('/management', async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[GET /featured-products/management] Error:', error);
+    logger.error('[GET /featured-products/management] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_management_featured_products', message: error.message });
   }
 });
@@ -87,7 +88,7 @@ router.get('/debug', async (req, res) => {
       }))
     });
   } catch (error: any) {
-    console.error('[GET /featured-products/debug] Error:', error);
+    logger.error('[GET /featured-products/debug] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_debug_featured_products', message: error.message });
   }
 });
@@ -111,7 +112,7 @@ router.post('/migrate', async (req, res) => {
       ...result
     });
   } catch (error: any) {
-    console.error('[POST /featured-products/migrate] Error:', error);
+    logger.error('[POST /featured-products/migrate] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_migrate_featured_products', message: error.message });
   }
 });
@@ -382,7 +383,7 @@ router.get('/scored', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Featured Products Scored] Error:', error);
+    logger.error('[Featured Products Scored] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'failed_to_fetch_scored_featured_products',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -462,7 +463,7 @@ router.get('/score-stats', async (req: Request, res: Response) => {
       threshold: MINIMUM_QUALITY_THRESHOLD,
     });
   } catch (error) {
-    console.error('[Featured Products Score Stats] Error:', error);
+    logger.error('[Featured Products Score Stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'failed_to_fetch_score_stats',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -498,7 +499,7 @@ router.post('/tenants/:id/approve-featured-access', authenticateToken, requireAd
     });
 
   } catch (error: any) {
-    console.error('[POST featured-products/tenants/:id/approve-featured-access] Error:', error);
+    logger.error('[POST featured-products/tenants/:id/approve-featured-access] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_approve_tenant_featured_access', message: error.message });
   }
 });
@@ -526,7 +527,7 @@ router.post('/tenants/:id/reject-featured-access', authenticateToken, requireAdm
     });
 
   } catch (error: any) {
-    console.error('[POST featured-products/tenants/:id/reject-featured-access] Error:', error);
+    logger.error('[POST featured-products/tenants/:id/reject-featured-access] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_reject_tenant_featured_access', message: error.message });
   }
 });
@@ -542,7 +543,7 @@ router.get('/all-featured-products', authenticateToken, requireAdmin, async (req
     });
 
   } catch (error: any) {
-    console.error('[GET featured-products/all-featured-products] Error:', error);
+    logger.error('[GET featured-products/all-featured-products] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_all_featured_products', message: error.message });
   }
 });
@@ -567,7 +568,7 @@ router.post('/:productId/approve', authenticateToken, requireAdmin, async (req, 
     });
 
   } catch (error: any) {
-    console.error('[POST featured-products/:productId/approve] Error:', error);
+    logger.error('[POST featured-products/:productId/approve] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_approve_featured_product', message: error.message });
   }
 });
@@ -594,7 +595,7 @@ router.post('/:productId/reject', authenticateToken, requireAdmin, async (req, r
     });
 
   } catch (error: any) {
-    console.error('[POST featured-products/:productId/reject] Error:', error);
+    logger.error('[POST featured-products/:productId/reject] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_reject_featured_product', message: error.message });
   }
 });
@@ -610,7 +611,7 @@ router.get('/tenants/all-with-featured-access-status', authenticateToken, requir
     });
 
   } catch (error: any) {
-    console.error('[GET featured-products/tenants/all-with-featured-access-status] Error:', error);
+    logger.error('[GET featured-products/tenants/all-with-featured-access-status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_all_tenants_featured_access_status', message: error.message });
   }
 });
@@ -626,7 +627,7 @@ router.get('/tenants/pending-featured-access', authenticateToken, requireAdmin, 
     });
 
   } catch (error: any) {
-    console.error('[GET featured-products/tenants/pending-featured-access] Error:', error);
+    logger.error('[GET featured-products/tenants/pending-featured-access] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_pending_tenant_featured_access', message: error.message });
   }
 });
@@ -652,7 +653,7 @@ router.get('/tenants/:id/featured-access-status', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET featured-access-status] Error:', error);
+    logger.error('[GET featured-access-status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_featured_access_status', message: error.message });
   }
 });
@@ -690,7 +691,7 @@ router.get('/tenants/:id/featured-products/with-approval', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[GET featured-products/with-approval] Error:', error);
+    logger.error('[GET featured-products/with-approval] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_featured_products_with_approval', message: error.message });
   }
 });
@@ -738,7 +739,7 @@ router.post('/tenants/:id/request-featured-access', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[POST request-featured-access] Error:', error);
+    logger.error('[POST request-featured-access] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_request_featured_access', message: error.message });
   }
 });

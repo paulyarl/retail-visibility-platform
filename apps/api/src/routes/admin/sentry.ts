@@ -9,6 +9,7 @@ import { Router, Request, Response } from 'express';
 import { requirePlatformAdmin } from '../../middleware/auth';
 import { SentryApiService } from '../../services/SentryApiService';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -100,7 +101,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
 
     // Check for API errors
     if (projectsResponse.error) {
-      console.error('[ADMIN SENTRY] Projects API error:', projectsResponse.error);
+      logger.error('[ADMIN SENTRY] Projects API error:', undefined, { error: { name: 'Error', message: String(projectsResponse.error) } });
       return res.status(500).json({
         configured: true,
         error: `Failed to fetch projects: ${projectsResponse.error}`
@@ -108,7 +109,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     }
 
     if (issuesResponse.error) {
-      console.error('[ADMIN SENTRY] Issues API error:', issuesResponse.error);
+      logger.error('[ADMIN SENTRY] Issues API error:', undefined, { error: { name: 'Error', message: String(issuesResponse.error) } });
       return res.status(500).json({
         configured: true,
         error: `Failed to fetch issues: ${issuesResponse.error}`
@@ -116,7 +117,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     }
 
     if (statsResponse.error) {
-      console.error('[ADMIN SENTRY] Stats API error:', statsResponse.error);
+      logger.error('[ADMIN SENTRY] Stats API error:', undefined, { error: { name: 'Error', message: String(statsResponse.error) } });
       return res.status(500).json({
         configured: true,
         error: `Failed to fetch stats: ${statsResponse.error}`
@@ -139,7 +140,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error fetching Sentry data:', error);
+    logger.error('Error fetching Sentry data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       configured: true,
       error: 'Failed to fetch Sentry data',

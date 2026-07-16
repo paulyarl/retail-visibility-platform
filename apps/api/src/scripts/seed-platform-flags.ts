@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const DEFAULT_FLAGS = [
   {
@@ -148,7 +149,7 @@ async function seedPlatformFlags() {
       console.log(`${status} ${override} ${flag.flag}`);
       console.log(`   ${flag.rollout || 'No description'}\n`);
     } catch (error) {
-      console.error(`❌ Failed to seed ${flagData.flag}:`, error);
+      logger.error(`❌ Failed to seed ${flagData.flag}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -157,7 +158,7 @@ async function seedPlatformFlags() {
 
 seedPlatformFlags()
   .catch((error) => {
-    console.error('❌ Seed failed:', error);
+    logger.error('❌ Seed failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     process.exit(1);
   })
   .finally(() => {

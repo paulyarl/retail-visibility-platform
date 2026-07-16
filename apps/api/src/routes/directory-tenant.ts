@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { z } from 'zod';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -126,7 +127,7 @@ router.get('/:id/directory/listing', authenticateToken, checkTenantAccess, async
       } : undefined,
     });
   } catch (error: any) {
-    console.error('[GET /tenants/:id/directory/listing] Error:', error);
+    logger.error('[GET /tenants/:id/directory/listing] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_listing' });
   }
 });
@@ -162,7 +163,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
     const parsed = updateListingSchema.safeParse(cleanBody);
 
     if (!parsed.success) {
-      console.error('[PATCH /tenants/:id/directory/listing] Validation failed:', parsed.error.flatten());
+      logger.error('[PATCH /tenants/:id/directory/listing] Validation failed:', undefined, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
@@ -266,7 +267,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         await pool.query('REFRESH MATERIALIZED VIEW directory_gbp_listings');
         console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_gbp_listings MV (blocking)');
       } else {
-        console.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', mvError);
+        logger.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', undefined, { error: { name: (mvError as any)?.name || 'Error', message: (mvError as any)?.message || String(mvError), stack: (mvError as any)?.stack } });
         // Don't fail the request for MV refresh errors
       }
     }
@@ -282,7 +283,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         await pool.query('REFRESH MATERIALIZED VIEW directory_category_products');
         console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_category_products MV (blocking)');
       } else {
-        console.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', mvError);
+        logger.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', undefined, { error: { name: (mvError as any)?.name || 'Error', message: (mvError as any)?.message || String(mvError), stack: (mvError as any)?.stack } });
         // Don't fail the request for MV refresh errors
       }
     }
@@ -298,7 +299,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         await pool.query('REFRESH MATERIALIZED VIEW directory_gbp_stats');
         console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_gbp_stats MV (blocking)');
       } else {
-        console.error('[PATCH /tenants/:id/directory/listing] GBP stats MV refresh failed:', mvError);
+        logger.error('[PATCH /tenants/:id/directory/listing] GBP stats MV refresh failed:', undefined, { error: { name: (mvError as any)?.name || 'Error', message: (mvError as any)?.message || String(mvError), stack: (mvError as any)?.stack } });
         // Don't fail the request for MV refresh errors
       }
     }
@@ -306,10 +307,10 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
     // Return the updated record
     return res.json(updated);
   } catch (error: any) {
-    console.error('[PATCH /tenants/:id/directory/listing] ===== ERROR =====');
-    console.error('[PATCH /tenants/:id/directory/listing] Error details:', error);
-    console.error('[PATCH /tenants/:id/directory/listing] Error message:', error.message);
-    console.error('[PATCH /tenants/:id/directory/listing] Error stack:', error.stack);
+    logger.error('[PATCH /tenants/:id/directory/listing] ===== ERROR =====', undefined);
+    logger.error('[PATCH /tenants/:id/directory/listing] Error details:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PATCH /tenants/:id/directory/listing] Error message:', undefined, { error: { name: 'Error', message: String(error.message) } });
+    logger.error('[PATCH /tenants/:id/directory/listing] Error stack:', undefined, { error: { name: 'Error', message: String(error.stack) } });
     return res.status(500).json({ error: 'failed_to_update_listing' });
   }
 });
@@ -427,7 +428,7 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
 
     return res.json({ success: true, listing: updated });
   } catch (error: any) {
-    console.error('[POST /tenants/:id/directory/publish] Error:', error);
+    logger.error('[POST /tenants/:id/directory/publish] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_publish' });
   }
 });
@@ -490,7 +491,7 @@ router.post('/:id/directory/sync-profile', authenticateToken, checkTenantAccess,
       }
     });
   } catch (error: any) {
-    console.error('[POST /tenants/:id/directory/sync-profile] Error:', error);
+    logger.error('[POST /tenants/:id/directory/sync-profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_sync_profile', message: error.message });
   }
 });
@@ -524,7 +525,7 @@ router.post('/:id/directory/refresh', authenticateToken, checkTenantAccess, asyn
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
-    console.error('[POST /tenants/:id/directory/refresh] Error:', error);
+    logger.error('[POST /tenants/:id/directory/refresh] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_refresh_views', message: error.message });
   }
 });
@@ -553,7 +554,7 @@ router.post('/:id/directory/unpublish', authenticateToken, checkTenantAccess, as
 
     return res.json({ success: true, listing: updated });
   } catch (error: any) {
-    console.error('[POST /tenants/:id/directory/unpublish] Error:', error);
+    logger.error('[POST /tenants/:id/directory/unpublish] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_unpublish' });
   }
 });
@@ -613,7 +614,7 @@ router.get('/:id/directory/quality-check', authenticateToken, checkTenantAccess,
       canPublish: checks.business_name && checks.cityState && checks.category,
     });
   } catch (error: any) {
-    console.error('[GET /tenants/:id/directory/quality-check] Error:', error);
+    logger.error('[GET /tenants/:id/directory/quality-check] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_check_quality' });
   }
 });

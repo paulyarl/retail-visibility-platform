@@ -8,6 +8,7 @@
 
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -344,7 +345,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Storefront products error:', error);
+    logger.error('Storefront products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_items' });
   }
 });
@@ -426,7 +427,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       uncategorizedCount,
     });
   } catch (error) {
-    console.error('Storefront categories error:', error);
+    logger.error('Storefront categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_categories' });
   }
 });
@@ -504,7 +505,7 @@ router.get('/:tenantId/storefront/mv-debug', async (req: Request, res: Response)
       }
     });
   } catch (error) {
-    console.error('MV Debug error:', error);
+    logger.error('MV Debug error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_debug_mv', details: (error as Error).message });
   }
 });
@@ -626,7 +627,7 @@ router.get('/:tenantId/storefront/categories-stats', async (req: Request, res: R
       }
     });
   } catch (error) {
-    console.error('Storefront categories stats error:', error);
+    logger.error('Storefront categories stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_categories_stats' });
   }
 });
@@ -667,7 +668,7 @@ router.get('/health', async (req: Request, res: Response) => {
       status: 'healthy',
     });
   } catch (error) {
-    console.error('Storefront health check error:', error);
+    logger.error('Storefront health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'health_check_failed' });
   }
 });

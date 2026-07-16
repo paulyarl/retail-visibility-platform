@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { StripeWebhookHandler } from '../services/payments/webhooks/StripeWebhookHandler';
 import { prisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.post(
     const sig = req.headers['stripe-signature'];
 
     if (!sig) {
-      console.error('[Webhook] Missing stripe-signature header');
+      logger.error('[Webhook] Missing stripe-signature header', undefined);
       return res.status(400).json({
         success: false,
         error: 'missing_signature',
@@ -35,7 +36,7 @@ router.post(
       const webhookSecret = unifiedConfig.stripeWebhookSecret;
 
       if (!webhookSecret) {
-        console.error('[Webhook] STRIPE_WEBHOOK_SECRET not configured');
+        logger.error('[Webhook] STRIPE_WEBHOOK_SECRET not configured', undefined);
         return res.status(500).json({
           success: false,
           error: 'webhook_not_configured',
@@ -92,7 +93,7 @@ router.post(
             },
           });
         } catch (error) {
-          console.error('[Webhook] Error processing event:', error);
+          logger.error('[Webhook] Error processing event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           
           // Mark as failed
           await prisma.webhook_events.update({
@@ -115,7 +116,7 @@ router.post(
       });
 
     } catch (error: any) {
-      console.error('[Webhook] Error verifying signature:', error);
+      logger.error('[Webhook] Error verifying signature:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       return res.status(400).json({
         success: false,
@@ -147,7 +148,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
   const webhookId = unifiedConfig.paypalWebhookId;
 
   if (!transmissionId || !transmissionSig || !certUrl) {
-    console.error('[PayPal Webhook] Missing required headers');
+    logger.error('[PayPal Webhook] Missing required headers', undefined);
     return res.status(400).json({
       success: false,
       error: 'missing_headers',
@@ -162,7 +163,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
     // Fetch PayPal's certificate
     const certResponse = await fetch(certUrl);
     if (!certResponse.ok) {
-      console.error('[PayPal Webhook] Failed to fetch certificate');
+      logger.error('[PayPal Webhook] Failed to fetch certificate', undefined);
       return res.status(400).json({
         success: false,
         error: 'cert_fetch_failed',
@@ -184,7 +185,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
     // Extract public key from certificate
     const certMatch = certPem.match(/-----BEGIN CERTIFICATE-----[\s\S]*-----END CERTIFICATE-----/);
     if (!certMatch) {
-      console.error('[PayPal Webhook] Invalid certificate format');
+      logger.error('[PayPal Webhook] Invalid certificate format', undefined);
       return res.status(400).json({
         success: false,
         error: 'invalid_cert',
@@ -199,7 +200,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
     const isValid = verifier.verify(publicKey, transmissionSig, 'base64');
     
     if (!isValid) {
-      console.error('[PayPal Webhook] Signature verification failed');
+      logger.error('[PayPal Webhook] Signature verification failed', undefined);
       return res.status(400).json({
         success: false,
         error: 'invalid_signature',
@@ -248,7 +249,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
           },
         });
       } catch (error) {
-        console.error('[PayPal Webhook] Error processing event:', error);
+        logger.error('[PayPal Webhook] Error processing event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         
         await prisma.webhook_events.update({
           where: { event_id: parsedBody.id },
@@ -269,7 +270,7 @@ router.post('/paypal', express.raw({ type: 'application/json' }), async (req: Re
     });
 
   } catch (error: any) {
-    console.error('[PayPal Webhook] Error processing webhook:', error);
+    logger.error('[PayPal Webhook] Error processing webhook:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(400).json({
       success: false,
       error: 'processing_failed',
@@ -335,7 +336,7 @@ async function handlePayPalPaymentCompleted(resource: any) {
   });
 
   if (!tenant) {
-    console.error(`[PayPal Webhook] No tenant found for PayPal subscription ${subscriptionId}`);
+    logger.error(`[PayPal Webhook] No tenant found for PayPal subscription ${subscriptionId}`, undefined);
     return;
   }
 
@@ -383,7 +384,7 @@ async function handlePayPalPaymentCompleted(resource: any) {
       amount: amountCents,
     });
   } catch (emailError) {
-    console.error('[PayPal Webhook] Failed to send payment success email:', emailError);
+    logger.error('[PayPal Webhook] Failed to send payment success email:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
   }
 
   console.log(`[PayPal Webhook] Payment completed for tenant ${tenant.id}`);
@@ -427,7 +428,7 @@ async function handlePayPalPaymentFailed(resource: any) {
       reason: 'PayPal payment failed',
     });
   } catch (emailError) {
-    console.error('[PayPal Webhook] Failed to send payment failed email:', emailError);
+    logger.error('[PayPal Webhook] Failed to send payment failed email:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
   }
 
   console.log(`[PayPal Webhook] Payment failed for tenant ${tenant.id}`);
@@ -442,7 +443,7 @@ async function handlePayPalSubscriptionActivated(resource: any) {
   const tenantId = customId.tenantId;
 
   if (!tenantId) {
-    console.error('[PayPal Webhook] No tenantId in subscription custom_id');
+    logger.error('[PayPal Webhook] No tenantId in subscription custom_id', undefined);
     return;
   }
 
@@ -498,7 +499,7 @@ async function handlePayPalSubscriptionCancelled(resource: any) {
       reason: 'Subscription cancelled via PayPal',
     });
   } catch (emailError) {
-    console.error('[PayPal Webhook] Failed to send cancellation email:', emailError);
+    logger.error('[PayPal Webhook] Failed to send cancellation email:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
   }
 
   console.log(`[PayPal Webhook] Subscription cancelled for tenant ${tenant.id}`);
@@ -579,7 +580,7 @@ router.get('/events', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Webhook] Error fetching events:', error);
+    logger.error('[Webhook] Error fetching events:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'fetch_failed',

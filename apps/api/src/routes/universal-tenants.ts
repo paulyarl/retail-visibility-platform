@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { TenantService } from '../services/TenantService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -60,7 +61,7 @@ router.get('/tenants/:identifier/profile', authenticateToken, checkTenantAccess,
       }
     });
   } catch (error) {
-    console.error('[Universal Tenants] Error getting profile:', error);
+    logger.error('[Universal Tenants] Error getting profile:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -117,7 +118,7 @@ router.get('/tenants/:identifier/complete', authenticateToken, checkTenantAccess
       }
     });
   } catch (error) {
-    console.error('[Universal Tenants] Error getting complete data:', error);
+    logger.error('[Universal Tenants] Error getting complete data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -178,7 +179,7 @@ router.get('/tenants/:identifier/stats', authenticateToken, checkTenantAccess, a
       }
     });
   } catch (error) {
-    console.error('[Universal Tenants] Error getting stats:', error);
+    logger.error('[Universal Tenants] Error getting stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error',

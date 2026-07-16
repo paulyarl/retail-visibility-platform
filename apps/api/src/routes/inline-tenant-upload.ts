@@ -6,6 +6,7 @@ import { prisma, basePrisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { StorageBuckets } from '../storage-config';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const DEV = unifiedConfig.isDevelopment;
 const router = Router();
@@ -49,7 +50,7 @@ router.get("/api/public/features-showcase-config", async (req, res) => {
     };
     return res.json(defaultConfig);
   } catch (e: any) {
-    console.error("[GET /api/public/features-showcase-config] Error:", e);
+    logger.error("[GET /api/public/features-showcase-config] Error:", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_get_config" });
   }
 });
@@ -177,7 +178,7 @@ router.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
         await slugSingletonService.updateSlug(tenant_id, (delta as any).slug);
         console.log('[PATCH /tenant/profile] Slug updated successfully');
       } catch (slugError) {
-        console.error('[PATCH /tenant/profile] Failed to update slug:', slugError);
+        logger.error('[PATCH /tenant/profile] Failed to update slug:', undefined, { error: { name: (slugError as any)?.name || 'Error', message: (slugError as any)?.message || String(slugError), stack: (slugError as any)?.stack } });
         // Don't fail the entire request if slug update fails
       }
     } else if (delta.business_name) {
@@ -219,7 +220,7 @@ router.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
 
     return res.json(responseProfile);
   } catch (e: any) {
-    console.error("[PATCH /tenant/profile] Error:", e);
+    logger.error("[PATCH /tenant/profile] Error:", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_update_profile" });
   }
 });
@@ -285,7 +286,7 @@ router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req
         });
 
       if (error) {
-        console.error(`[Logo Upload] Supabase upload error:`, error);
+        logger.error(`[Logo Upload] Supabase upload error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return res.status(500).json({ error: error.message, details: error });
       }
 
@@ -296,7 +297,7 @@ router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req
     else if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
       const parsed = logoDataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) {
-        console.error(`[Logo Upload] Invalid dataUrl payload:`, parsed.error.flatten());
+        logger.error(`[Logo Upload] Invalid dataUrl payload:`, undefined, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
         return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
       }
 
@@ -333,7 +334,7 @@ router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req
         });
 
       if (error) {
-        console.error("[Logo Upload] Supabase dataUrl upload error:", error);
+        logger.error("[Logo Upload] Supabase dataUrl upload error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
       }
 
@@ -369,13 +370,13 @@ router.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req
     return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
   } catch (e: any) {
     console.error("[Logo Upload Error] Full error details:", {
-      message: e?.message,
-      stack: e?.stack,
+      message: (e as any)?.message,
+      stack: (e as any)?.stack,
       tenant_id: req.params.id,
     });
     return res.status(500).json({
       error: "failed_to_upload_logo",
-      details: DEV ? e?.message : undefined
+      details: DEV ? (e as any)?.message : undefined
     });
   }
 });
@@ -409,7 +410,7 @@ router.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (re
     if (!req.file && (req.is("application/json") || req.is("*/json")) && typeof (req.body as any)?.dataUrl === "string") {
       const parsed = logoDataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) {
-        console.error(`[Banner Upload] Invalid dataUrl payload:`, parsed.error.flatten());
+        logger.error(`[Banner Upload] Invalid dataUrl payload:`, undefined, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
         return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
       }
 
@@ -445,7 +446,7 @@ router.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (re
         });
 
       if (error) {
-        console.error("[Banner Upload] Supabase upload error:", error);
+        logger.error("[Banner Upload] Supabase upload error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
       }
 
@@ -468,10 +469,10 @@ router.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (re
 
     return res.status(200).json({ url: publicUrl, tenant: updatedTenant });
   } catch (e: any) {
-    console.error("[Banner Upload Error]:", e?.message);
+    logger.error("[Banner Upload Error]:", undefined, { error: { name: 'Error', message: String((e as any)?.message) } });
     return res.status(500).json({
       error: "failed_to_upload_banner",
-      details: DEV ? e?.message : undefined
+      details: DEV ? (e as any)?.message : undefined
     });
   }
 });

@@ -5,6 +5,7 @@ import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -112,7 +113,7 @@ router.get('/platform-settings', async (_req, res) => {
 
     res.json(mappedSettings);
   } catch (error) {
-    console.error('Error fetching platform settings:', error);
+    logger.error('Error fetching platform settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_settings' });
   }
 });
@@ -197,7 +198,7 @@ router.post(
             });
 
           if (error) {
-            console.error('Logo upload error:', error);
+            logger.error('Logo upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             return res.status(500).json({ error: 'logo_upload_failed' });
           }
 
@@ -222,7 +223,7 @@ router.post(
             });
 
           if (error) {
-            console.error('Favicon upload error:', error);
+            logger.error('Favicon upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             return res.status(500).json({ error: 'favicon_upload_failed' });
           }
 
@@ -247,7 +248,7 @@ router.post(
             });
 
           if (error) {
-            console.error('Banner upload error:', error);
+            logger.error('Banner upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             return res.status(500).json({ error: 'banner_upload_failed' });
           }
 
@@ -352,7 +353,7 @@ router.post(
 
       res.json(mappedSettings);
     } catch (error) {
-      console.error('Error updating platform settings:', error);
+      logger.error('Error updating platform settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({ error: 'failed_to_update_settings' });
     }
   }

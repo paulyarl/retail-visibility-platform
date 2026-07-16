@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.get('/workflows', async (req, res) => {
 
     res.json(workflows);
   } catch (error) {
-    console.error('Error fetching workflows:', error);
+    logger.error('Error fetching workflows:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch workflows' });
   }
 });
@@ -97,7 +98,7 @@ router.post('/workflows/:workflowId/execute', async (req, res) => {
     console.log(`Executing workflow: ${workflowId}`);
     res.json({ success: true, execution });
   } catch (error) {
-    console.error('Error executing workflow:', error);
+    logger.error('Error executing workflow:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to execute workflow' });
   }
 });
@@ -153,7 +154,7 @@ router.get('/workflows/:workflowId/executions', async (req, res) => {
 
     res.json(executions);
   } catch (error) {
-    console.error('Error fetching executions:', error);
+    logger.error('Error fetching executions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch executions' });
   }
 });
@@ -221,7 +222,7 @@ router.get('/notifications/templates', async (req, res) => {
 
     res.json(templates);
   } catch (error) {
-    console.error('Error fetching notification templates:', error);
+    logger.error('Error fetching notification templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch notification templates' });
   }
 });
@@ -243,7 +244,7 @@ router.post('/notifications/templates/:templateId/test', async (req, res) => {
       templateId
     });
   } catch (error) {
-    console.error('Error testing template:', error);
+    logger.error('Error testing template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to test template' });
   }
 });
@@ -306,7 +307,7 @@ router.get('/notifications/campaigns', async (req, res) => {
 
     res.json(campaigns);
   } catch (error) {
-    console.error('Error fetching campaigns:', error);
+    logger.error('Error fetching campaigns:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch campaigns' });
   }
 });
@@ -383,7 +384,7 @@ router.get('/predictive/churn', async (req, res) => {
 
     res.json(churnPredictions);
   } catch (error) {
-    console.error('Error fetching churn predictions:', error);
+    logger.error('Error fetching churn predictions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch churn predictions' });
   }
 });
@@ -411,7 +412,7 @@ router.get('/predictive/revenue-forecast', async (req, res) => {
 
     res.json(forecast);
   } catch (error) {
-    console.error('Error fetching revenue forecast:', error);
+    logger.error('Error fetching revenue forecast:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch revenue forecast' });
   }
 });
@@ -476,7 +477,7 @@ router.get('/predictive/upsell-opportunities', async (req, res) => {
 
     res.json(opportunities);
   } catch (error) {
-    console.error('Error fetching upsell opportunities:', error);
+    logger.error('Error fetching upsell opportunities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch upsell opportunities' });
   }
 });
@@ -609,7 +610,7 @@ router.get('/integrations', async (req, res) => {
 
     res.json(integrations);
   } catch (error) {
-    console.error('Error fetching integrations:', error);
+    logger.error('Error fetching integrations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch integrations' });
   }
 });
@@ -635,7 +636,7 @@ router.post('/integrations/:integrationId/test', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error testing integration:', error);
+    logger.error('Error testing integration:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to test integration' });
   }
 });

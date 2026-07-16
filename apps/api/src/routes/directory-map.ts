@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -136,7 +137,7 @@ router.get('/map/locations', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Directory Map] Error fetching locations:', error);
+    logger.error('[Directory Map] Error fetching locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch map locations',

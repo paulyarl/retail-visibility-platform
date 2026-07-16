@@ -11,6 +11,7 @@ import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculat
 
 import { generateOrderId, generateOrderItemHistoryId, generateOrderItemId } from '../lib/id-generator';
 import CrmAlertService from '../services/CrmAlertService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -232,7 +233,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       order: completeOrder,
     });
   } catch (error: any) {
-    console.error('[Orders] Create error:', error);
+    logger.error('[Orders] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_creation_failed',
@@ -330,7 +331,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[Orders] List error:', error);
+    logger.error('[Orders] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_list_failed',
@@ -373,7 +374,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       order,
     });
   } catch (error: any) {
-    console.error('[Orders] Get error:', error);
+    logger.error('[Orders] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_fetch_failed',
@@ -469,7 +470,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
       order: updatedOrder,
     });
   } catch (error: any) {
-    console.error('[Orders] Update error:', error);
+    logger.error('[Orders] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_update_failed',

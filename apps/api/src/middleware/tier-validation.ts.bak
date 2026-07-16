@@ -1,0 +1,283 @@
+/**
+ * Tier Validation Middleware
+ * 
+ * Centralized tier validation to ensure:
+ * 1. Only valid tiers can be assigned (now database-driven)
+ * 2. Organization tier requires an organization
+ * 3. Organization exists and is valid
+ * 
+ * Fix once, apply everywhere!
+ * 
+ * MIGRATION NOTE: Now uses TierService for database-driven tier validation.
+ */
+
+import { Request, Response, NextFunction } from 'express';
+import { prisma } from '../prisma';
+import { checkTierFeatureAccess, getMinimumTierForFeature, isValidTier, getValidTierKeys } from '../services/TierService';
+
+type SubscriptionTier = 'trial' | 'google_only' | 'discovery' | 'starter' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
+
+// LEGACY: Kept for fallback only
+const VALID_TIERS: SubscriptionTier[] = [
+  'trial',
+  'google_only',
+  'discovery',
+  'starter',
+  'storefront',
+  'commitment',
+  'professional',
+  'enterprise',
+  'chain_starter',
+  'chain_professional',
+  'chain_enterprise',
+  'organization',
+];
+
+/**
+ * Validate tier assignment for tenant creation or update
+ */
+export async function validateTierAssignment(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { subscriptionTier, organizationId } = req.body;
+    const tenantId = req.params.id;
+
+    // Skip if no tier being set
+    if (!subscriptionTier) {
+      return next();
+    }
+
+    // Validate tier exists (database-driven with fallback)
+    const isValid = await isValidTier(subscriptionTier).catch(() => 
+      VALID_TIERS.includes(subscriptionTier)
+    );
+    
+    if (!isValid) {
+      const validTiers = await getValidTierKeys().catch(() => VALID_TIERS);
+      return res.status(400).json({
+        error: 'invalid_tier',
+        message: `Invalid subscription tier: ${subscriptionTier}`,
+        validTiers,
+      });
+    }
+
+    // Organization tier requires organization
+    if (subscriptionTier === 'organization') {
+      // Check for organizationId in body or existing tenant link
+      let orgId = organizationId;
+
+      // If updating existing tenant, check if already linked to org
+      if (tenantId && !orgId) {
+        const existingTenant = await prisma.tenants.findUnique({
+          where: { id: tenantId },
+          select: { organization_id: true },
+        });
+        orgId = existingTenant?.organization_id;
+      }
+
+      if (!orgId) {
+        return res.status(400).json({
+          error: 'organization_required',
+          message: 'Organization tier requires tenant to belong to an organization',
+          hint: 'Provide organizationId or link tenant to organization first',
+        });
+      }
+
+      // Validate organization exists
+      const org = await prisma.organizations_list.findUnique({
+        where: { id: orgId },
+      });
+
+      if (!org) {
+        return res.status(404).json({
+          error: 'organization_not_found',
+          message: `Organization ${orgId} does not exist`,
+        });
+      }
+
+      console.log(`[Tier Validation] Organization tier validated for org: ${org.name}`);
+    }
+
+    console.log(`[Tier Validation] Tier ${subscriptionTier} validated successfully`);
+    next();
+  } catch (error) {
+    console.error('[validateTierAssignment] Error:', error);
+    return res.status(500).json({
+      error: 'tier_validation_failed',
+      message: 'Failed to validate tier assignment',
+    });
+  }
+}
+
+/**
+ * Validate tier is compatible with tenant's current state
+ * Used for updates to ensure tier change is safe
+ */
+export async function validateTierCompatibility(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { subscriptionTier } = req.body;
+    const { id: tenantId } = req.params;
+
+    if (!subscriptionTier || !tenantId) {
+      return next();
+    }
+
+    // Get tenant's current state
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'tenant_not_found',
+        message: 'Tenant does not exist',
+      });
+    }
+
+    // If changing TO organization tier, must have organization
+    if (subscriptionTier === 'organization') {
+      const tenantWithOrg = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { organization_id: true },
+      });
+      
+      if (!tenantWithOrg?.organization_id) {
+        return res.status(400).json({
+          error: 'organization_required',
+          message: 'Cannot set organization tier: tenant not linked to any organization',
+          hint: 'Link tenant to organization first',
+        });
+      }
+    }
+
+    // If changing FROM organization tier, warn about losing features
+    if (tenant.subscription_tier === 'organization' && subscriptionTier !== 'organization') {
+      console.warn(`[Tier Validation] WARNING: Changing tenant ${tenantId} from organization tier to ${subscriptionTier}`);
+      // Allow but log warning - admin may be intentionally removing from org
+    }
+
+    next();
+  } catch (error) {
+    console.error('[validateTierCompatibility] Error:', error);
+    return res.status(500).json({
+      error: 'tier_compatibility_check_failed',
+      message: 'Failed to validate tier compatibility',
+    });
+  }
+}
+
+/**
+ * Middleware to check if tenant has required tier for propagation
+ * Returns a middleware function that validates tier access for specific propagation types
+ */
+export function requirePropagationTier(
+  propagationType: 'products' | 'user_roles' | 'hours' | 'profile' | 'categories' | 'gbp' | 'flags' | 'brand_assets'
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tenantId = req.params.tenantId || req.params.id;
+      
+      if (!tenantId) {
+        return res.status(400).json({
+          error: 'tenantId_required',
+          message: 'Tenant ID is required'
+        });
+      }
+
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        include: {
+          organizations_list: {
+            select: {
+              id: true,
+              subscription_tier: true,
+              _count: { select: { tenants: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!tenant) {
+        return res.status(404).json({ 
+          error: 'tenant_not_found',
+          message: 'Tenant not found'
+        });
+      }
+
+      // Get effective tier (org tier overrides tenant tier)
+      const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+      
+      // Check if user has 2+ locations
+      const locationCount = tenant.organizations_list?._count.tenants || 1;
+      if (locationCount < 2) {
+        return res.status(403).json({
+          error: 'insufficient_locations',
+          message: 'Propagation requires 2 or more locations. Upgrade your plan to add more locations.',
+          currentLocations: locationCount,
+          requiredLocations: 2,
+          propagationType
+        });
+      }
+
+      // Define propagation feature mapping
+      const propagationFeatureMapping: Record<string, string> = {
+        products: 'propagation_products',
+        user_roles: 'propagation_user_roles', 
+        hours: 'propagation_hours',
+        profile: 'propagation_profile',
+        categories: 'propagation_categories',
+        gbp: 'propagation_gbp_sync',
+        flags: 'propagation_feature_flags',
+        brand_assets: 'propagation_brand'
+      };
+
+      const featureKey = propagationFeatureMapping[propagationType];
+      if (!featureKey) {
+        return res.status(400).json({
+          error: 'invalid_propagation_type',
+          message: 'Invalid propagation type specified',
+          propagationType
+        });
+      }
+
+      // Check if tier has the required propagation feature
+      console.log(`[requirePropagationTier] Checking feature ${featureKey} for tier ${effectiveTier}`);
+      const hasFeature = await checkTierFeatureAccess(effectiveTier, featureKey);
+      console.log(`[requirePropagationTier] Feature access result: ${hasFeature}`);
+      
+      if (!hasFeature) {
+        // Get the minimum tier that has this feature for upgrade suggestion
+        const minTier = await getMinimumTierForFeature(featureKey);
+        console.log(`[requirePropagationTier] Minimum tier for feature: ${minTier}`);
+        
+        return res.status(403).json({
+          error: 'tier_upgrade_required',
+          message: `${propagationType.replace('_', ' ')} propagation requires ${minTier || 'higher'} tier or higher`,
+          currentTier: effectiveTier,
+          requiredTier: minTier || 'professional',
+          propagationType,
+          upgradeUrl: '/settings/subscription'
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('[requirePropagationTier] Error:', error);
+      return res.status(500).json({
+        error: 'tier_validation_failed',
+        message: 'Failed to validate tier requirements'
+      });
+    }
+  };
+}

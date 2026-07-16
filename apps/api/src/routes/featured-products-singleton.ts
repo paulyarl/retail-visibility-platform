@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import FeaturedProductsSingletonService from '../services/FeaturedProductsSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get('/stats', async (req, res) => {
       message: 'Featured products statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[FEATURED PRODUCTS SINGLETON] Get stats error:', error);
+    logger.error('[FEATURED PRODUCTS SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch featured products statistics'
@@ -84,7 +85,7 @@ router.get('/:id', async (req, res) => {
       message: 'Featured product retrieved successfully'
     });
   } catch (error) {
-    console.error('Featured product retrieval failed:', error);
+    logger.error('Featured product retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve featured product',
@@ -130,7 +131,7 @@ router.get('/tenant/:tenantId', async (req, res) => {
       message: 'Tenant featured products retrieved successfully'
     });
   } catch (error) {
-    console.error('Tenant featured products retrieval failed:', error);
+    logger.error('Tenant featured products retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tenant featured products',
@@ -172,7 +173,7 @@ router.get('/type/:type', async (req, res) => {
       message: 'Featured products by type retrieved successfully'
     });
   } catch (error) {
-    console.error('Featured products by type retrieval failed:', error);
+    logger.error('Featured products by type retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve featured products by type',
@@ -217,7 +218,7 @@ router.get('/', async (req, res) => {
       message: 'Featured products retrieved successfully'
     });
   } catch (error) {
-    console.error('Featured products listing failed:', error);
+    logger.error('Featured products listing failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve featured products',
@@ -253,7 +254,7 @@ router.post('/', async (req, res) => {
       message: 'Featured product created successfully'
     });
   } catch (error) {
-    console.error('Featured product creation failed:', error);
+    logger.error('Featured product creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create featured product',
@@ -299,7 +300,7 @@ router.put('/:id', async (req, res) => {
       message: 'Featured product updated successfully'
     });
   } catch (error) {
-    console.error('Featured product update failed:', error);
+    logger.error('Featured product update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update featured product',
@@ -344,7 +345,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Featured product deleted successfully'
     });
   } catch (error) {
-    console.error('Featured product deletion failed:', error);
+    logger.error('Featured product deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete featured product',

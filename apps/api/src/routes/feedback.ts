@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { generateQuickStart } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -50,7 +51,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    console.error('Error submitting feedback:', error);
+    logger.error('Error submitting feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to submit feedback',
@@ -119,7 +120,7 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching feedback:', error);
+    logger.error('Error fetching feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feedback',
@@ -151,7 +152,7 @@ router.get('/:id', async (req, res) => {
       data: feedback,
     });
   } catch (error) {
-    console.error('Error fetching feedback:', error);
+    logger.error('Error fetching feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feedback',
@@ -242,7 +243,7 @@ router.get('/analytics/summary', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching feedback analytics:', error);
+    logger.error('Error fetching feedback analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feedback analytics',
@@ -345,7 +346,7 @@ router.get('/pilot/kpis', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching pilot KPIs:', error);
+    logger.error('Error fetching pilot KPIs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch pilot KPIs',
@@ -370,7 +371,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Feedback deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting feedback:', error);
+    logger.error('Error deleting feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete feedback',

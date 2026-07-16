@@ -7,6 +7,7 @@ import { z } from 'zod';
 import StorefrontOptionsService from '../services/StorefrontOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateStorefrontOptionsSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -104,7 +105,7 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching storefront options settings:', error);
+    logger.error('Error fetching storefront options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -179,7 +180,7 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
       },
     });
   } catch (error) {
-    console.error('Error updating storefront options settings:', error);
+    logger.error('Error updating storefront options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

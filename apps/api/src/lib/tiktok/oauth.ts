@@ -7,6 +7,7 @@
  */
 
 import crypto from 'crypto';
+import { logger } from '../../logger';
 
 const TIKTOK_APP_KEY = process.env.TIKTOK_APP_KEY || '';
 const TIKTOK_APP_SECRET = process.env.TIKTOK_APP_SECRET || '';
@@ -63,13 +64,13 @@ export function decodeState(state: string): { tenantId: string; nonce: string; t
 
     const age = Date.now() - decoded.timestamp;
     if (age > 10 * 60 * 1000) {
-      console.error('[TikTok OAuth] State expired:', age);
+      logger.error('[TikTok OAuth] State expired:', undefined, { error: { name: (age as any)?.name || 'Error', message: (age as any)?.message || String(age), stack: (age as any)?.stack } });
       return null;
     }
 
     return decoded;
   } catch (error) {
-    console.error('[TikTok OAuth] Invalid state:', error);
+    logger.error('[TikTok OAuth] Invalid state:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -99,7 +100,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[TikTok OAuth] Token exchange failed:', error);
+      logger.error('[TikTok OAuth] Token exchange failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
@@ -115,10 +116,10 @@ export async function exchangeCodeForTokens(code: string): Promise<{
       };
     }
 
-    console.error('[TikTok OAuth] Token exchange error response:', result);
+    logger.error('[TikTok OAuth] Token exchange error response:', undefined, { error: { name: (result as any)?.name || 'Error', message: (result as any)?.message || String(result), stack: (result as any)?.stack } });
     return null;
   } catch (error) {
-    console.error('[TikTok OAuth] Token exchange error:', error);
+    logger.error('[TikTok OAuth] Token exchange error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -146,7 +147,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[TikTok OAuth] Token refresh failed:', error);
+      logger.error('[TikTok OAuth] Token refresh failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
@@ -162,7 +163,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
 
     return null;
   } catch (error) {
-    console.error('[TikTok OAuth] Token refresh error:', error);
+    logger.error('[TikTok OAuth] Token refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -187,7 +188,7 @@ export async function getSellerInfo(accessToken: string): Promise<{
     const response = await fetch(`${TIKTOK_API_URL}/user/info?${params.toString()}`);
 
     if (!response.ok) {
-      console.error('[TikTok OAuth] Seller info fetch failed');
+      logger.error('[TikTok OAuth] Seller info fetch failed', undefined);
       return null;
     }
 
@@ -205,7 +206,7 @@ export async function getSellerInfo(accessToken: string): Promise<{
 
     return null;
   } catch (error) {
-    console.error('[TikTok OAuth] Seller info error:', error);
+    logger.error('[TikTok OAuth] Seller info error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }

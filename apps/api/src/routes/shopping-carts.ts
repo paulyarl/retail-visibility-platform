@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { requireAuth } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       carts: result.rows,
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] List error:', error);
+    logger.error('[Shopping Carts] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'cart_list_failed',
@@ -81,7 +82,7 @@ router.get('/:cartId', requireAuth, async (req: Request, res: Response) => {
       cart,
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Get error:', error);
+    logger.error('[Shopping Carts] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'cart_fetch_failed',
@@ -141,7 +142,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       existed: false,
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Create error:', error);
+    logger.error('[Shopping Carts] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'cart_creation_failed',
@@ -237,7 +238,7 @@ router.post('/:cartId/items', requireAuth, async (req: Request, res: Response) =
       item: result.rows[0],
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Add item error:', error);
+    logger.error('[Shopping Carts] Add item error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'add_item_failed',
@@ -316,7 +317,7 @@ router.put('/:cartId/items/:itemId', requireAuth, async (req: Request, res: Resp
       item: result.rows[0],
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Update item error:', error);
+    logger.error('[Shopping Carts] Update item error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'update_item_failed',
@@ -360,7 +361,7 @@ router.delete('/:cartId/items/:itemId', requireAuth, async (req: Request, res: R
       message: 'Item removed from cart',
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Delete item error:', error);
+    logger.error('[Shopping Carts] Delete item error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'delete_item_failed',
@@ -411,7 +412,7 @@ router.delete('/:cartId', requireAuth, async (req: Request, res: Response) => {
       message: mark_converted === 'true' ? 'Cart marked as converted' : 'Cart deleted',
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Delete cart error:', error);
+    logger.error('[Shopping Carts] Delete cart error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'delete_cart_failed',
@@ -533,7 +534,7 @@ router.post('/migrate', requireAuth, async (req: Request, res: Response) => {
       message: `Successfully migrated ${migratedCarts.length} carts`,
     });
   } catch (error: any) {
-    console.error('[Shopping Carts] Migration error:', error);
+    logger.error('[Shopping Carts] Migration error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'migration_failed',

@@ -4,6 +4,7 @@
  */
 import { Router } from 'express';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 // Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
@@ -60,7 +61,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[GET /api/admin/tiers] Error:', error);
+    logger.error('[GET /api/admin/tiers] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tiers' });
   }
 });
@@ -75,7 +76,7 @@ router.get('/list', requirePlatformStaff, async (req, res) => {
     });
     res.json(tiers.map(t => t.tier_key));
   } catch (error) {
-    console.error('[GET /api/admin/tiers/list] Error:', error);
+    logger.error('[GET /api/admin/tiers/list] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tier_keys' });
   }
 });
@@ -132,7 +133,7 @@ router.put('/', requirePlatformAdmin, async (req, res) => {
       updated_at: updated!.updated_at?.toISOString(),
     });
   } catch (error) {
-    console.error('[PUT /api/admin/tiers] Error:', error);
+    logger.error('[PUT /api/admin/tiers] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_tier' });
   }
 });

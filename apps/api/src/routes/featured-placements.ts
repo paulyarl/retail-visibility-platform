@@ -17,6 +17,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import FeaturedPlacementService from '../services/FeaturedPlacementService';
 import FeaturedPlacementAnalyticsService from '../services/FeaturedPlacementAnalyticsService';
+import { logger } from '../logger';
 
 const router = Router();
 const service = FeaturedPlacementService.getInstance();
@@ -32,7 +33,7 @@ router.get('/admin/featured-placement/catalog', authenticateToken, requireAdmin,
     const plans = await service.listCatalogPlans(includeInactive);
     res.json({ plans });
   } catch (error) {
-    console.error('[featured-placement] Failed to list catalog:', error);
+    logger.error('[featured-placement] Failed to list catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_catalog' });
   }
 });
@@ -46,7 +47,7 @@ router.post('/admin/featured-placement/catalog', authenticateToken, requireAdmin
     const plan = await service.createCatalogPlan({ planKey, label, surface, durationDays, priceCents, currency, sortOrder });
     res.status(201).json({ plan });
   } catch (error) {
-    console.error('[featured-placement] Failed to create catalog plan:', error);
+    logger.error('[featured-placement] Failed to create catalog plan:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_plan' });
   }
 });
@@ -58,7 +59,7 @@ router.put('/admin/featured-placement/catalog/:planKey', authenticateToken, requ
     const plan = await service.updateCatalogPlan(planKey, updates);
     res.json({ plan });
   } catch (error) {
-    console.error('[featured-placement] Failed to update catalog plan:', error);
+    logger.error('[featured-placement] Failed to update catalog plan:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_plan' });
   }
 });
@@ -69,7 +70,7 @@ router.delete('/admin/featured-placement/catalog/:planKey', authenticateToken, r
     await service.deleteCatalogPlan(planKey);
     res.json({ success: true });
   } catch (error) {
-    console.error('[featured-placement] Failed to delete catalog plan:', error);
+    logger.error('[featured-placement] Failed to delete catalog plan:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_plan' });
   }
 });
@@ -87,7 +88,7 @@ router.get('/admin/featured-placement/purchases', authenticateToken, requireAdmi
     const purchases = await service.listAllPurchases(filters);
     res.json({ purchases });
   } catch (error) {
-    console.error('[featured-placement] Failed to list purchases:', error);
+    logger.error('[featured-placement] Failed to list purchases:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_purchases' });
   }
 });
@@ -103,7 +104,7 @@ router.post('/admin/featured-placement/purchases/:purchaseId/revoke', authentica
     await service.revokePurchase(purchaseId, reason || 'Admin revoked');
     res.json({ success: true });
   } catch (error) {
-    console.error('[featured-placement] Failed to revoke purchase:', error);
+    logger.error('[featured-placement] Failed to revoke purchase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const msg = (error as Error).message;
     if (msg === 'purchase_not_found') {
       return res.status(404).json({ error: msg });
@@ -125,7 +126,7 @@ router.get('/admin/featured-placement/revenue', authenticateToken, requireAdmin,
     const summary = await service.getRevenueSummary(filters);
     res.json({ summary });
   } catch (error) {
-    console.error('[featured-placement] Failed to get revenue:', error);
+    logger.error('[featured-placement] Failed to get revenue:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_revenue' });
   }
 });
@@ -142,7 +143,7 @@ router.get('/tenants/:tenantId/featured-placements', authenticateToken, async (r
     const purchases = await service.listTenantPurchases(tenantId, filters);
     res.json({ purchases });
   } catch (error) {
-    console.error('[featured-placement] Failed to list tenant purchases:', error);
+    logger.error('[featured-placement] Failed to list tenant purchases:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_purchases' });
   }
 });
@@ -161,7 +162,7 @@ router.post('/tenants/:tenantId/featured-placements', authenticateToken, require
     const result = await service.createPurchase({ tenantId, inventoryItemId, planKey, successUrl, cancelUrl });
     res.status(201).json(result);
   } catch (error) {
-    console.error('[featured-placement] Failed to create purchase:', error);
+    logger.error('[featured-placement] Failed to create purchase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const msg = (error as Error).message;
     if (msg.includes('not_found') || msg.includes('inactive') || msg.includes('already')) {
       return res.status(400).json({ error: msg });
@@ -184,7 +185,7 @@ router.post('/tenants/:tenantId/featured-placements/:purchaseId/renew', authenti
     const result = await service.renewPurchase({ purchaseId, successUrl, cancelUrl });
     res.status(201).json(result);
   } catch (error) {
-    console.error('[featured-placement] Failed to renew purchase:', error);
+    logger.error('[featured-placement] Failed to renew purchase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const msg = (error as Error).message;
     if (msg.includes('not_found') || msg.includes('inactive')) {
       return res.status(400).json({ error: msg });
@@ -204,7 +205,7 @@ router.get('/tenants/:tenantId/featured-placements/analytics', authenticateToken
     const result = await analyticsService.getTenantPlacementAnalytics(tenantId, { status });
     res.json(result);
   } catch (error) {
-    console.error('[featured-placement] Failed to get analytics:', error);
+    logger.error('[featured-placement] Failed to get analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_analytics' });
   }
 });
@@ -219,7 +220,7 @@ router.get('/tenants/:tenantId/featured-placements/store-analytics', authenticat
     const result = await analyticsService.getStoreAnalytics(tenantId);
     res.json(result);
   } catch (error) {
-    console.error('[featured-placement] Failed to get store analytics:', error);
+    logger.error('[featured-placement] Failed to get store analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_store_analytics' });
   }
 });
@@ -237,7 +238,7 @@ router.get('/tenants/:tenantId/featured-placements/:purchaseId', authenticateTok
     }
     res.json({ purchase });
   } catch (error) {
-    console.error('[featured-placement] Failed to get purchase:', error);
+    logger.error('[featured-placement] Failed to get purchase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_purchase' });
   }
 });
@@ -254,7 +255,7 @@ router.get('/admin/featured-placements/analytics', authenticateToken, requireAdm
     const result = await analyticsService.getPlatformRevenueAnalytics(options);
     res.json(result);
   } catch (error) {
-    console.error('[featured-placement] Failed to get platform analytics:', error);
+    logger.error('[featured-placement] Failed to get platform analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_platform_analytics' });
   }
 });
@@ -271,7 +272,7 @@ router.get('/admin/featured-placements/revenue-analytics', authenticateToken, re
     const result = await analyticsService.getPlatformRevenueAnalytics(options);
     res.json(result);
   } catch (error) {
-    console.error('[featured-placement] Failed to get revenue analytics:', error);
+    logger.error('[featured-placement] Failed to get revenue analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_revenue_analytics' });
   }
 });

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { getDirectPool } from '../../utils/db-pool';
 import TenantProfileService from '../../services/TenantProfileService';
 import { resolveEffectiveStatusFromTenant } from '../../utils/org-standing-inheritance';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -49,7 +50,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.json({ tenants });
 
   } catch (error) {
-    console.error('Public tenants error:', error);
+    logger.error('Public tenants error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -79,7 +80,7 @@ router.get('/tenant/:tenantId/slug', async (req: Request, res: Response) => {
     res.json({ slug: result.rows[0].slug });
 
   } catch (error) {
-    console.error('Tenant slug error:', error);
+    logger.error('Tenant slug error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -109,7 +110,7 @@ router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
     res.json({ tenantId: result.rows[0].id });
 
   } catch (error) {
-    console.error('Slug tenant error:', error);
+    logger.error('Slug tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -298,7 +299,7 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Public Tenant Profile] Error:', error);
+    logger.error('[Public Tenant Profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -377,7 +378,7 @@ router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Respo
     });
 
   } catch (error) {
-    console.error('Public tenant payment gateways error:', error);
+    logger.error('Public tenant payment gateways error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -436,7 +437,7 @@ router.get('/tenant/:tenantId/oauth-status/:gatewayType', async (req: Request, r
     });
 
   } catch (error) {
-    console.error('Public OAuth status error:', error);
+    logger.error('Public OAuth status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error',

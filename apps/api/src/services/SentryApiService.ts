@@ -1,3 +1,5 @@
+import { logger } from '../logger';
+
 /**
  * Sentry API Service
  * Handles API calls to Sentry for monitoring data
@@ -79,7 +81,7 @@ export class SentryApiService {
       const data = await response.json() as T;
       return { data };
     } catch (error) {
-      console.error('[SentryApiService] Request failed:', error);
+      logger.error('[SentryApiService] Request failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { data: null as T, error: error instanceof Error ? error.message : 'Network error' };
     }
   }

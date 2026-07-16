@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -51,7 +52,7 @@ export async function GET(
       data: transformDownloadPage(page),
     });
   } catch (error) {
-    console.error('Error fetching download page:', error);
+    logger.error('Error fetching download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to fetch download page' },
       { status: 500 }
@@ -194,7 +195,7 @@ export async function PATCH(
       data: transformDownloadPage(updatedPage),
     });
   } catch (error) {
-    console.error('Error updating download page:', error);
+    logger.error('Error updating download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to update download page' },
       { status: 500 }
@@ -245,7 +246,7 @@ export async function DELETE(
       data: { message: 'Download page deleted successfully' },
     });
   } catch (error) {
-    console.error('Error deleting download page:', error);
+    logger.error('Error deleting download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to delete download page' },
       { status: 500 }

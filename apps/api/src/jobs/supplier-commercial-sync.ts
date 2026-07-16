@@ -80,7 +80,7 @@ async function runNightlyBackfillForConnector(
   } catch (error: any) {
     logger.error('Commercial supplier nightly backfill failed', undefined, {
       supplierId,
-      error: { name: error?.name, message: error?.message },
+      error: { name: (error as any)?.name, message: (error as any)?.message },
     });
   }
 }
@@ -100,7 +100,7 @@ async function refreshKrogerToken(): Promise<void> {
     logger.info('Kroger OAuth2 token refreshed', undefined);
   } catch (error: any) {
     logger.warn('Kroger OAuth2 token refresh failed', undefined, {
-      error: { name: error?.name, message: error?.message },
+      error: { name: (error as any)?.name, message: (error as any)?.message },
     });
   }
 }

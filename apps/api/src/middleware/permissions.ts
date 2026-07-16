@@ -6,6 +6,7 @@ import { getTenantLimit, getTenantLimitConfig, canCreateTenant, getPlatformSuppo
 // Type extensions are automatically loaded from src/types/express.d.ts
 
 import { user_tenant_role } from '@prisma/client';
+import { logger } from '../logger';
 
 /**
  * Get organization ID from request (params or body)
@@ -150,7 +151,7 @@ export async function requireOrgAdmin(
 
     next();
   } catch (error) {
-    console.error('[requireOrgAdmin] Error:', error);
+    logger.error('[requireOrgAdmin] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'permission_check_failed',
       message: 'Failed to verify organization admin permissions',
@@ -236,7 +237,7 @@ export async function requireOrgMember(
 
     next();
   } catch (error) {
-    console.error('[requireOrgMember] Error:', error);
+    logger.error('[requireOrgMember] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'permission_check_failed',
       message: 'Failed to verify organization member permissions',
@@ -337,7 +338,7 @@ export async function requireOrgAdminForRequest(
 
     next();
   } catch (error) {
-    console.error('[requireOrgAdminForRequest] Error:', error);
+    logger.error('[requireOrgAdminForRequest] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'permission_check_failed',
       message: 'Failed to verify organization admin permissions',
@@ -394,7 +395,7 @@ export async function requireOrgOwner(
 
     next();
   } catch (error) {
-    console.error('[requireOrgOwner] Error:', error);
+    logger.error('[requireOrgOwner] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'permission_check_failed',
       message: 'Failed to verify organization owner permissions',
@@ -490,7 +491,7 @@ export function requireTenantRole(...allowedRoles: user_tenant_role[]) {
 
       next();
     } catch (error) {
-      console.error('[requireTenantRole] Error:', error);
+      logger.error('[requireTenantRole] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'permission_check_failed',
         message: 'Failed to verify permissions',
@@ -668,7 +669,7 @@ export async function checkTenantCreationLimit(
 
     next();
   } catch (error) {
-    console.error('[checkTenantCreationLimit] Error:', error);
+    logger.error('[checkTenantCreationLimit] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'limit_check_failed',
       message: 'Failed to verify tenant creation limit',
@@ -729,7 +730,7 @@ export async function requireTenantOwner(
 
     next();
   } catch (error) {
-    console.error('[requireTenantOwner] Error:', error);
+    logger.error('[requireTenantOwner] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'permission_check_failed',
       message: 'Failed to verify ownership',

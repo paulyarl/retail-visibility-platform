@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../prisma";
 import { z } from "zod";
 import { TRIAL_CONFIG } from "../config/tenant-limits";
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -117,7 +118,7 @@ router.get("/status", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[GET /subscriptions/status] Error:", error);
+    logger.error("[GET /subscriptions/status] Error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_status" });
   }
 });
@@ -173,7 +174,7 @@ router.patch("/update", async (req, res) => {
       tenant,
     });
   } catch (error) {
-    console.error("[PATCH /subscriptions/update] Error:", error);
+    logger.error("[PATCH /subscriptions/update] Error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_update_subscription" });
   }
 });

@@ -6,6 +6,7 @@
 
 import { prisma } from '../prisma';
 import BotRagService from '../services/BotRagService';
+import { logger } from '../logger';
 
 const DEFAULT_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes after server start (avoids firing on nodemon restarts)
@@ -48,7 +49,7 @@ async function getChatbotEnabledTenants(): Promise<string[]> {
     });
     return configs.map((c: any) => c.tenant_id);
   } catch (error) {
-    console.error('[BotProductEmbeddingSync] Error fetching chatbot-enabled tenants:', error);
+    logger.error('[BotProductEmbeddingSync] Error fetching chatbot-enabled tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -97,7 +98,7 @@ async function runScheduledSync(): Promise<void> {
         totalChunks += result.chunks;
         console.log(`[BotProductEmbeddingSync] Tenant ${tenantId}: ${result.processed} products, ${result.chunks} chunks`);
       } catch (error: any) {
-        console.error(`[BotProductEmbeddingSync] Error refreshing tenant ${tenantId}:`, error);
+        logger.error(`[BotProductEmbeddingSync] Error refreshing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         failed++;
         if (error?.code === 'insufficient_quota' || error?.status === 429) {
           console.log('[BotProductEmbeddingSync] OpenAI quota exceeded, skipping remaining tenants');
@@ -115,7 +116,7 @@ async function runScheduledSync(): Promise<void> {
       `${totalProducts} products, ${totalChunks} chunks, ${failed} failed`
     );
   } catch (error) {
-    console.error('[BotProductEmbeddingSync] Scheduled sync failed:', error);
+    logger.error('[BotProductEmbeddingSync] Scheduled sync failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -186,7 +187,7 @@ export async function triggerManualProductEmbeddingSync(): Promise<{
       totalProducts += result.processed;
       totalChunks += result.chunks;
     } catch (error) {
-      console.error(`[BotProductEmbeddingSync] Manual sync error for tenant ${tenantId}:`, error);
+      logger.error(`[BotProductEmbeddingSync] Manual sync error for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       failed++;
     }
     await new Promise(resolve => setTimeout(resolve, 1000));

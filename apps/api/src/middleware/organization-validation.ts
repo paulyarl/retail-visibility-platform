@@ -12,6 +12,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { isValidTier, getAllTiers } from '../services/TierService';
+import { logger } from '../logger';
 
 /**
  * Validate organization tier assignment
@@ -48,7 +49,7 @@ export async function validateOrganizationTier(
     console.log(`[Organization Validation] Tier ${tier} validated successfully`);
     next();
   } catch (error) {
-    console.error('[validateOrganizationTier] Error:', error);
+    logger.error('[validateOrganizationTier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'organization_tier_validation_failed',
       message: 'Failed to validate organization tier',
@@ -113,7 +114,7 @@ export async function validateOrganizationLimits(
     console.log(`[Organization Validation] Limits validated for ${tier}`);
     next();
   } catch (error) {
-    console.error('[validateOrganizationLimits] Error:', error);
+    logger.error('[validateOrganizationLimits] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'organization_limits_validation_failed',
       message: 'Failed to validate organization limits',
@@ -204,7 +205,7 @@ export async function validateOrganizationTierChange(
     console.log(`[Organization Validation] Tier change validated: ${currentLocationCount} locations, ${totalSKUs} SKUs fits in ${tier}`);
     next();
   } catch (error) {
-    console.error('[validateOrganizationTierChange] Error:', error);
+    logger.error('[validateOrganizationTierChange] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'organization_tier_change_validation_failed',
       message: 'Failed to validate organization tier change',

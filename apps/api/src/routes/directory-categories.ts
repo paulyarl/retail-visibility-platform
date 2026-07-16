@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { categoryDirectoryService } from '../services/category-directory.service';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching directory categories:', error);
+    logger.error('Error fetching directory categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch directory categories',
@@ -93,7 +94,7 @@ router.get('/:categoryId', async (req: Request, res: Response, next) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching category details:', error);
+    logger.error('Error fetching category details:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch category details',
@@ -165,7 +166,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('Error fetching stores by category:', error);
+      logger.error('Error fetching stores by category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       if (error instanceof Error && error.message === 'Category not found') {
         return res.status(404).json({
@@ -209,7 +210,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('Error fetching category hierarchy:', error);
+      logger.error('Error fetching category hierarchy:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       res.status(500).json({
         success: false,
         error: 'Failed to fetch category hierarchy',
@@ -282,7 +283,7 @@ router.get('/categories/search', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Error searching categories:', error);
+    logger.error('Error searching categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to search categories',

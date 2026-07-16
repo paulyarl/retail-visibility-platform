@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import InventoryService from '../services/InventoryService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/stats', async (req, res) => {
       message: 'Inventory statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[INVENTORY SINGLETON] Get stats error:', error);
+    logger.error('[INVENTORY SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch inventory statistics'
@@ -80,7 +81,7 @@ router.get('/:id', async (req, res) => {
       message: 'Inventory item retrieved successfully'
     });
   } catch (error) {
-    console.error('Inventory item retrieval failed:', error);
+    logger.error('Inventory item retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve inventory item',
@@ -123,7 +124,7 @@ router.get('/sku/:tenantId/:sku', async (req, res) => {
       message: 'Inventory item retrieved successfully'
     });
   } catch (error) {
-    console.error('Inventory item retrieval by SKU failed:', error);
+    logger.error('Inventory item retrieval by SKU failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve inventory item',
@@ -159,7 +160,7 @@ router.post('/', async (req, res) => {
       message: 'Inventory item created successfully'
     });
   } catch (error) {
-    console.error('Inventory item creation failed:', error);
+    logger.error('Inventory item creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create inventory item',
@@ -205,7 +206,7 @@ router.put('/:id', async (req, res) => {
       message: 'Inventory item updated successfully'
     });
   } catch (error) {
-    console.error('Inventory item update failed:', error);
+    logger.error('Inventory item update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update inventory item',
@@ -250,7 +251,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Inventory item deleted successfully'
     });
   } catch (error) {
-    console.error('Inventory item deletion failed:', error);
+    logger.error('Inventory item deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete inventory item',
@@ -297,7 +298,7 @@ router.get('/', async (req, res) => {
       message: 'Inventory items retrieved successfully'
     });
   } catch (error) {
-    console.error('Inventory listing failed:', error);
+    logger.error('Inventory listing failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to list inventory items',
@@ -343,7 +344,7 @@ router.post('/:id/stock', async (req, res) => {
       message: 'Stock levels updated successfully'
     });
   } catch (error) {
-    console.error('Stock update failed:', error);
+    logger.error('Stock update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update stock levels',
@@ -379,7 +380,7 @@ router.get('/stats', async (req, res) => {
       message: 'Inventory statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('Inventory statistics retrieval failed:', error);
+    logger.error('Inventory statistics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve inventory statistics',
@@ -416,7 +417,7 @@ router.get('/alerts/low-stock', async (req, res) => {
       message: 'Low stock alerts retrieved successfully'
     });
   } catch (error) {
-    console.error('Low stock alerts retrieval failed:', error);
+    logger.error('Low stock alerts retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve low stock alerts',

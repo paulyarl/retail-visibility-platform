@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { getGoogleProductTaxonomy, searchGoogleProductTaxonomy } from '../../services/GoogleProductTaxonomyService';
 import { getDirectPool } from '../../utils/db-pool';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Google Product Taxonomy] Search error:', error);
+    logger.error('[Google Product Taxonomy] Search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to search Google product taxonomy' });
   }
 });
@@ -53,7 +54,7 @@ router.get('/all', async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Google Product Taxonomy] Fetch all error:', error);
+    logger.error('[Google Product Taxonomy] Fetch all error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to fetch Google product taxonomy' });
   }
 });
@@ -87,7 +88,7 @@ router.get('/coverage', async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Google Product Taxonomy] Coverage error:', error);
+    logger.error('[Google Product Taxonomy] Coverage error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get mapping coverage' });
   }
 });
@@ -124,7 +125,7 @@ router.post('/batch-map', async (req: Request, res: Response) => {
       message: `Updated ${updated} category mappings`,
     });
   } catch (error) {
-    console.error('[Google Product Taxonomy] Batch map error:', error);
+    logger.error('[Google Product Taxonomy] Batch map error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to batch update mappings' });
   }
 });

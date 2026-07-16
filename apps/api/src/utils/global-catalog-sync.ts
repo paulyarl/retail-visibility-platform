@@ -7,6 +7,7 @@
 
 import { prisma } from '../prisma';
 import { generateGlobalProductId, generateProductSlug } from '../lib/id-generator';
+import { logger } from '../logger';
 
 /**
  * Extract available attributes from variants for filtering/search
@@ -152,7 +153,7 @@ export async function ensureGlobalCatalogEntry(item: GlobalCatalogItem): Promise
 
     return { globalProduct, slugRegistry };
   } catch (error) {
-    console.error('[Global Catalog Sync] Error creating global entry:', error);
+    logger.error('[Global Catalog Sync] Error creating global entry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -179,7 +180,7 @@ export async function ensureGlobalCatalogEntries(items: Array<{
       await ensureGlobalCatalogEntry(item);
       results.push({ success: true, sku: item.sku });
     } catch (error) {
-      console.error(`[Global Catalog Sync] Failed for SKU ${item.sku}:`, error);
+      logger.error(`[Global Catalog Sync] Failed for SKU ${item.sku}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       results.push({ success: false, error: error instanceof Error ? error.message : 'Unknown error', sku: item.sku });
     }
   }

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/api/directory/store-types', async (req, res) => {
       data: { storeTypes, totalCount: storeTypes.length }
     });
   } catch (error: any) {
-    console.error('[STORE-TYPES] Error:', error);
+    logger.error('[STORE-TYPES] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch store types' });
   }
 });

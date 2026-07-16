@@ -385,6 +385,32 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       return false;
     }
   }
+
+  async getQualityCheck(tenantId: string): Promise<any | null> {
+    if (!tenantId) {
+      console.error('[TenantDirectorySingleton] getQualityCheck: tenantId is required');
+      return null;
+    }
+
+    try {
+      const result = await super.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/directory/quality-check`,
+        {},
+        `directory-quality-check-${tenantId}`
+      );
+
+      if (!result.success) {
+        console.error('[TenantDirectorySingleton] Failed to get quality check:', result.error);
+        return null;
+      }
+
+      const responseData = result.data;
+      return responseData?.data || responseData;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to get quality check:', error);
+      return null;
+    }
+  }
 }
 
 // Export singleton instance

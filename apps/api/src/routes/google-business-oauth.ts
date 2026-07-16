@@ -4,6 +4,7 @@ import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
 import { isGBPSyncAllowed } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
         const newTokens = await refreshAccessToken(refreshToken);
 
         if (!newTokens) {
-          console.error(`[GBP] Token refresh failed for tenant ${tenantId}`);
+          logger.error(`[GBP] Token refresh failed for tenant ${tenantId}`, undefined);
           return null;
         }
 
@@ -85,7 +86,7 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
 
           return credentials.access_token!;
         } catch (refreshError) {
-          console.error(`[GBP] Legacy token refresh failed for tenant ${tenantId}:`, refreshError);
+          logger.error(`[GBP] Legacy token refresh failed for tenant ${tenantId}:`, undefined, { error: { name: (refreshError as any)?.name || 'Error', message: (refreshError as any)?.message || String(refreshError), stack: (refreshError as any)?.stack } });
           return null;
         }
       }
@@ -94,7 +95,7 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
 
     return tenant.google_business_access_token;
   } catch (error) {
-    console.error(`[GBP] Error getting token for tenant ${tenantId}:`, error);
+    logger.error(`[GBP] Error getting token for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -159,7 +160,7 @@ router.get('/google/business/status', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Google Business OAuth] Error checking status:', error);
+    logger.error('[Google Business OAuth] Error checking status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'status_check_failed',
@@ -217,7 +218,7 @@ router.get('/google/business', async (req, res) => {
       data: { url: authUrl }
     });
   } catch (error) {
-    console.error('[Google Business OAuth] Error initiating flow:', error);
+    logger.error('[Google Business OAuth] Error initiating flow:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'oauth_init_failed',
@@ -236,7 +237,7 @@ router.get('/google/business/callback', async (req, res) => {
 
     // Handle OAuth errors
     if (error) {
-      console.error('[Google Business OAuth] OAuth error:', error);
+      logger.error('[Google Business OAuth] OAuth error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.redirect(`${unifiedConfig.webUrl}/settings?error=oauth_denied`);
     }
 
@@ -356,7 +357,7 @@ router.get('/google/business/callback', async (req, res) => {
     // Redirect back to frontend with success
     res.redirect(`${unifiedConfig.webUrl}/t/${tenantId}/settings/integrations/google?success=business_connected`);
   } catch (error) {
-    console.error('[Google Business OAuth] Error in callback:', error);
+    logger.error('[Google Business OAuth] Error in callback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.redirect(`${unifiedConfig.webUrl}/settings/integrations/google?error=oauth_failed`);
   }
 });
@@ -404,7 +405,7 @@ router.post('/google/business/disconnect', async (req, res) => {
       message: 'Google Business Profile disconnected successfully'
     });
   } catch (error) {
-    console.error('[Google Business OAuth] Error disconnecting:', error);
+    logger.error('[Google Business OAuth] Error disconnecting:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'disconnect_failed',
@@ -450,7 +451,7 @@ router.get('/google/business/locations', async (req, res) => {
 
     if (!accountsResponse.ok) {
       const errorText = await accountsResponse.text();
-      console.error('[GBP] Failed to fetch accounts:', errorText);
+      logger.error('[GBP] Failed to fetch accounts:', undefined, { error: { name: (errorText as any)?.name || 'Error', message: (errorText as any)?.message || String(errorText), stack: (errorText as any)?.stack } });
       
       // Parse error for user-friendly messages
       try {
@@ -567,7 +568,7 @@ router.get('/google/business/locations', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GBP] Error listing locations:', error);
+    logger.error('[GBP] Error listing locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_locations_failed',
@@ -685,7 +686,7 @@ router.post('/google/business/link-location', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GBP] Error linking location:', error);
+    logger.error('[GBP] Error linking location:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'link_location_failed',
@@ -738,7 +739,7 @@ router.get('/google/business/linked-location', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GBP] Error getting linked location:', error);
+    logger.error('[GBP] Error getting linked location:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'get_linked_location_failed',
@@ -878,7 +879,7 @@ router.post('/google/business/sync', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GBP Sync] Error:', error);
+    logger.error('[GBP Sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_failed',
@@ -985,7 +986,7 @@ router.post('/google/business/sync/:field', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GBP Sync Field] Error:', error);
+    logger.error('[GBP Sync Field] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_failed',
@@ -1018,7 +1019,7 @@ router.get('/google/business/sync-status', async (req, res) => {
       data: status
     });
   } catch (error) {
-    console.error('[GBP Sync Status] Error:', error);
+    logger.error('[GBP Sync Status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'get_status_failed',
@@ -1340,7 +1341,7 @@ router.get('/google/business/read', async (req, res) => {
       data: result.data
     });
   } catch (error) {
-    console.error('[GBP Read] Error:', error);
+    logger.error('[GBP Read] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'read_failed',
@@ -1398,7 +1399,7 @@ router.get('/google/business/compare', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GBP Compare] Error:', error);
+    logger.error('[GBP Compare] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'compare_failed',
@@ -1442,7 +1443,7 @@ router.get('/google/business/sync-tracking', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GBP Sync Tracking] Error:', error);
+    logger.error('[GBP Sync Tracking] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_tracking_failed',
@@ -1478,7 +1479,7 @@ router.post('/google/business/sync-tracking/initialize', async (req, res) => {
       data: { summary }
     });
   } catch (error) {
-    console.error('[GBP Sync Tracking] Initialize error:', error);
+    logger.error('[GBP Sync Tracking] Initialize error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'initialize_failed',
@@ -1516,7 +1517,7 @@ router.get('/google/business/sync-history', async (req, res) => {
       data: { history }
     });
   } catch (error) {
-    console.error('[GBP Sync History] Error:', error);
+    logger.error('[GBP Sync History] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_history_failed',
@@ -1563,7 +1564,7 @@ router.get('/google/business/sync-pending', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GBP Sync Pending] Error:', error);
+    logger.error('[GBP Sync Pending] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_pending_failed',

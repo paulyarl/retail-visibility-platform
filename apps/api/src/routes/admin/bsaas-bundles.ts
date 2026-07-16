@@ -17,6 +17,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { audit } from '../../audit';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -83,7 +84,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: bundles });
   } catch (error) {
-    console.error('[BSaaS Bundles] Error listing:', error);
+    logger.error('[BSaaS Bundles] Error listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list bundles' });
   }
 });
@@ -146,7 +147,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: bundle });
   } catch (error: any) {
-    console.error('[BSaaS Bundles] Error creating:', error);
+    logger.error('[BSaaS Bundles] Error creating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create bundle' });
   }
 });
@@ -227,7 +228,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: bundle });
   } catch (error: any) {
-    console.error('[BSaaS Bundles] Error updating:', error);
+    logger.error('[BSaaS Bundles] Error updating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update bundle' });
   }
 });
@@ -252,7 +253,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Bundle removed' });
   } catch (error: any) {
-    console.error('[BSaaS Bundles] Error deleting:', error);
+    logger.error('[BSaaS Bundles] Error deleting:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete bundle' });
   }
 });

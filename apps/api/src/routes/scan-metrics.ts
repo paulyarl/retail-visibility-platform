@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { user_role } from '@prisma/client';
 import { canViewAllTenants } from '../utils/platform-admin';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -180,7 +181,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       recentActivity: recentSessions,
     });
   } catch (error: any) {
-    console.error('[scan-metrics] Error:', error);
+    logger.error('[scan-metrics] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -269,7 +270,7 @@ router.get('/api/admin/scan-metrics/timeseries', authenticateToken, async (req: 
       data: timeseries,
     });
   } catch (error: any) {
-    console.error('[scan-metrics/timeseries] Error:', error);
+    logger.error('[scan-metrics/timeseries] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });

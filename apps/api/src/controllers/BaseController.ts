@@ -105,7 +105,7 @@ export abstract class BaseController {
       throw error;
     }
 
-    const ctx = req ? (req as any).ctx as RequestCtx | undefined : undefined;
+    const ctx = req ? undefined as RequestCtx | undefined : undefined;
     const err = error instanceof Error ? error : new Error(String(error));
 
     // Determine status code
@@ -133,7 +133,7 @@ export abstract class BaseController {
     };
 
     if (statusCode >= 500) {
-      logger.error(`[${operation}] ${message}`, ctx, logMeta);
+      logger.error(`[${operation}] ${message}`, undefined, { error: { name: 'Error', message: String(ctx) + ' ' + String(logMeta) } });
     } else if (statusCode >= 400) {
       logger.warn(`[${operation}] ${message}`, ctx, logMeta);
     }

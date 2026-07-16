@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -74,13 +75,13 @@ router.post('/rate-limit-warnings', async (req: Request, res: Response) => {
 
       console.log('✅ Rate limit warning and security alert created:', warning.id);
     } catch (alertError) {
-      console.error('Failed to create security alert for rate limit:', alertError);
+      logger.error('Failed to create security alert for rate limit:', undefined, { error: { name: (alertError as any)?.name || 'Error', message: (alertError as any)?.message || String(alertError), stack: (alertError as any)?.stack } });
       // Don't fail the main request if alert creation fails
     }
 
     res.json({ success: true, id: warning.id });
   } catch (error) {
-    console.error('Failed to store rate limit warning:', error);
+    logger.error('Failed to store rate limit warning:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to store warning' });
   }
 });
@@ -214,14 +215,14 @@ router.get('/rate-limit-warnings', async (req: Request, res: Response) => {
 
         console.log('📊 Rate limit trends with security alerts cross-reference');
       } catch (alertError) {
-        console.error('Failed to fetch security alerts cross-reference:', alertError);
+        logger.error('Failed to fetch security alerts cross-reference:', undefined, { error: { name: (alertError as any)?.name || 'Error', message: (alertError as any)?.message || String(alertError), stack: (alertError as any)?.stack } });
         response.securityAlerts = { error: 'Failed to fetch alerts data' };
       }
     }
 
     res.json(response);
   } catch (error) {
-    console.error('Failed to fetch rate limit trends:', error);
+    logger.error('Failed to fetch rate limit trends:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch trends' });
   }
 });

@@ -9,6 +9,7 @@ import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { directoryController } from '../controllers/directory/DirectoryController';
 import { asyncErrorWrapper } from '../middleware/errorHandler';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -160,7 +161,7 @@ router.get('/categories/:categoryId/stores', async (req: Request, res: Response)
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories/:categoryId/stores] Error:', error);
+    logger.error('[GET /api/directory/categories/:categoryId/stores] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_stores' });
   }
 });
@@ -234,7 +235,7 @@ router.get('/categories/:categoryId/summary', async (req: Request, res: Response
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories/:categoryId/summary] Error:', error);
+    logger.error('[GET /api/directory/categories/:categoryId/summary] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_summary' });
   }
 });
@@ -297,7 +298,7 @@ router.get('/categories/featured', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories/featured] Error:', error);
+    logger.error('[GET /api/directory/categories/featured] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_featured_categories' });
   }
 });
@@ -395,7 +396,7 @@ router.get('/health', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/health] Error:', error);
+    logger.error('[GET /api/directory/health] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_health' });
   }
 });

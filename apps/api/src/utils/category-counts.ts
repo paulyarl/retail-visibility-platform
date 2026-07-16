@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 export interface CategoryCount {
   id: string;
@@ -103,7 +104,7 @@ export async function getCategoryCounts(
     console.log(`[Category Counts] Retrieved ${result.rows.length} categories from materialized view for tenant ${tenantId}${categoryType ? ` (type: ${categoryType})` : ''}`);
     return transformedRows;
   } catch (error) {
-    console.error('[Category Counts] Error reading from materialized view:', error);
+    logger.error('[Category Counts] Error reading from materialized view:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Return empty array since MV is the primary method and fallback has TypeScript issues
     return [];
   }
@@ -133,7 +134,7 @@ export async function getUncategorizedCount(
 
     return await prisma.inventory_items.count({ where });
   } catch (error) {
-    console.error('[Uncategorized Count] Error:', error);
+    logger.error('[Uncategorized Count] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return 0;
   }
 }
@@ -161,7 +162,7 @@ export async function getTotalProductCount(
 
     return await prisma.inventory_items.count({ where });
   } catch (error) {
-    console.error('[Total Product Count] Error:', error);
+    logger.error('[Total Product Count] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return 0;
   }
 }

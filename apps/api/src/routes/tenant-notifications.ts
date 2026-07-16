@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -102,7 +103,7 @@ router.get('/:tenantId/notifications', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching tenant notifications:', error);
+    logger.error('Error fetching tenant notifications:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }
 });
@@ -135,7 +136,7 @@ router.patch('/:tenantId/notifications/:notificationId/read', authenticateToken,
 
     res.json({ success: true, notification: updatedNotification });
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    logger.error('Error marking notification as read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to mark notification as read' });
   }
 });
@@ -164,7 +165,7 @@ router.patch('/:tenantId/notifications/mark-all-read', authenticateToken, async 
       updated_count: result.count 
     });
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    logger.error('Error marking all notifications as read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to mark all notifications as read' });
   }
 });
@@ -194,7 +195,7 @@ router.delete('/:tenantId/notifications/:notificationId', authenticateToken, asy
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    logger.error('Error deleting notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to delete notification' });
   }
 });
@@ -240,7 +241,7 @@ router.get('/:tenantId/notifications/stats', authenticateToken, async (req, res)
       by_severity,
     });
   } catch (error) {
-    console.error('Error fetching notification stats:', error);
+    logger.error('Error fetching notification stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch notification stats' });
   }
 });
@@ -263,7 +264,7 @@ router.get('/:tenantId/notifications/unread-count', authenticateToken, async (re
 
     res.json({ count: unreadCount });
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    logger.error('Error fetching unread count:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch unread count' });
   }
 });

@@ -208,7 +208,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 
     res.json(transformedTenants);
   } catch (error: any) {
-    console.error('[TENANTS] Error fetching tenants list:', error);
+    logger.error('[TENANTS] Error fetching tenants list:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -314,7 +314,7 @@ router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Reques
 
     res.json(transformedTenant);
   } catch (error: any) {
-    console.error('[PATCH /api/tenants/:id] Error updating tenant:', error);
+    logger.error('[PATCH /api/tenants/:id] Error updating tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     console.error('[PATCH /api/tenants/:id] Error details:', {
       message: error.message,
       code: error.code,
@@ -411,7 +411,7 @@ router.put('/:id/subdomain', authenticateToken, checkTenantAccess, async (req: R
       }
     });
   } catch (error: any) {
-    console.error('[TENANTS] Error updating subdomain:', error);
+    logger.error('[TENANTS] Error updating subdomain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -452,7 +452,7 @@ router.delete('/:id/subdomain', authenticateToken, checkTenantAccess, async (req
       }
     });
   } catch (error: any) {
-    console.error('[TENANTS] Error removing subdomain:', error);
+    logger.error('[TENANTS] Error removing subdomain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -541,7 +541,7 @@ router.get('/check-subdomain/:subdomain', authenticateToken, async (req: Request
       ownedByCurrentUser: false
     });
   } catch (error: any) {
-    console.error('[TENANTS] Error checking subdomain availability:', error);
+    logger.error('[TENANTS] Error checking subdomain availability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -579,7 +579,7 @@ router.get('/resolve-subdomain/:subdomain', async (req: Request, res: Response) 
       subdomain
     });
   } catch (error: any) {
-    console.error('[TENANTS] Error resolving subdomain:', error);
+    logger.error('[TENANTS] Error resolving subdomain:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -742,7 +742,7 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
 
     res.json(transformedResponse);
   } catch (error: any) {
-    console.error('[TENANTS] Error fetching complete tenant data:', error);
+    logger.error('[TENANTS] Error fetching complete tenant data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -759,6 +759,7 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
 
 // Mount billing routes for tenants
 import tenantBillingRoutes from './tenant-billing';
+import { logger } from '../logger';
 router.use('/:tenantId/billing', tenantBillingRoutes);
 
 /**
@@ -850,7 +851,7 @@ router.patch('/:id/status', authenticateToken, checkTenantAccess, async (req: Re
     });
 
   } catch (error: any) {
-    console.error('[PATCH /api/tenants/:id/status] Error:', error);
+    logger.error('[PATCH /api/tenants/:id/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_server_error',
@@ -889,7 +890,7 @@ async function invalidateAllTenantCaches(tenantId: string) {
     console.log(`[Cache Invalidation] Invalidated keys for slug: ${tenant?.slug || 'no-slug'}`);
     
   } catch (error) {
-    console.error(`[Cache Invalidation] Error invalidating caches for tenant ${tenantId}:`, error);
+    logger.error(`[Cache Invalidation] Error invalidating caches for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw - cache invalidation failure shouldn't break the status update
   }
 }

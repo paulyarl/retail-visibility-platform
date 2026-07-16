@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@mantine/core';
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 
 interface QualityCheck {
   completenessPercent: number;
@@ -36,15 +37,11 @@ export default function DirectoryHealthClient({ tenantId }: { tenantId: string }
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/tenants/${tenantId}/directory/quality-check`, {
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `HTTP ${res.status}`);
+      const data = await tenantDirectoryService.getQualityCheck(tenantId);
+      if (!data) {
+        throw new Error('Failed to load quality check');
       }
-      const json = await res.json();
-      setData(json);
+      setData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load quality check');
     } finally {

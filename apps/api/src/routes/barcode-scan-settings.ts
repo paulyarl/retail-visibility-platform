@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.get('/:tenantId/barcode-scan', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching barcode scan settings:', error);
+    logger.error('Error fetching barcode scan settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -121,7 +122,7 @@ router.put('/:tenantId/barcode-scan', authenticateToken, requireTenantAdmin, asy
       },
     });
   } catch (error) {
-    console.error('Error updating barcode scan settings:', error);
+    logger.error('Error updating barcode scan settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

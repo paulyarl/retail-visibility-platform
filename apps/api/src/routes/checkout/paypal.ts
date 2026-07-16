@@ -4,6 +4,7 @@ import { authenticateToken } from '../../middleware/auth';
 import { prisma } from '../../prisma';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -128,7 +129,7 @@ router.post('/create-order', async (req, res) => {
 
     if (!orderResponse.ok) {
       const errorData = await orderResponse.text();
-      console.error('PayPal order creation failed:', errorData);
+      logger.error('PayPal order creation failed:', undefined, { error: { name: (errorData as any)?.name || 'Error', message: (errorData as any)?.message || String(errorData), stack: (errorData as any)?.stack } });
       throw new Error('Failed to create PayPal order');
     }
 
@@ -149,7 +150,7 @@ router.post('/create-order', async (req, res) => {
       orderId: paypalOrder.id,
     });
   } catch (error) {
-    console.error('PayPal create order error:', error);
+    logger.error('PayPal create order error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to create PayPal order',
       message: 'An error occurred while setting up your payment. Please try again.',
@@ -210,7 +211,7 @@ router.post('/capture-order', async (req, res) => {
 
     if (!captureResponse.ok) {
       const errorData = await captureResponse.text();
-      console.error('PayPal capture failed:', errorData);
+      logger.error('PayPal capture failed:', undefined, { error: { name: (errorData as any)?.name || 'Error', message: (errorData as any)?.message || String(errorData), stack: (errorData as any)?.stack } });
       throw new Error('Failed to capture PayPal payment');
     }
 
@@ -261,7 +262,7 @@ router.post('/capture-order', async (req, res) => {
           console.log('[PayPal] Recorded revenue transaction:', payment.platform_fee_cents, 'cents');
         }
       } catch (revenueError) {
-        console.error('[PayPal] Failed to record revenue transaction:', revenueError);
+        logger.error('[PayPal] Failed to record revenue transaction:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
         // Don't fail the capture if revenue recording fails
       }
     }
@@ -284,7 +285,7 @@ router.post('/capture-order', async (req, res) => {
       capture: captureData,
     });
   } catch (error) {
-    console.error('PayPal capture order error:', error);
+    logger.error('PayPal capture order error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to capture PayPal payment',
       message: 'An error occurred while processing your payment. Please try again.',

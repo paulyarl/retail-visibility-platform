@@ -78,7 +78,7 @@ router.get('/stats', requireAuth, async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    logger.error('[SMART SALE TAGGING] Stats error:', error);
+    logger.error('[SMART SALE TAGGING] Stats error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'stats_fetch_failed',
@@ -118,7 +118,7 @@ router.post('/refresh', requireAuth, async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    logger.error('[SMART SALE TAGGING] Refresh error:', error);
+    logger.error('[SMART SALE TAGGING] Refresh error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'refresh_failed',
@@ -216,7 +216,7 @@ router.get('/products', requireAuth, async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    logger.error('[SMART SALE TAGGING] Products error:', error);
+    logger.error('[SMART SALE TAGGING] Products error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'products_fetch_failed',
@@ -260,7 +260,7 @@ router.get('/health', async (req: Request, res: Response) => {
     });
     
   } catch (error: any) {
-    logger.error('[SMART SALE TAGGING] Health check error:', error);
+    logger.error('[SMART SALE TAGGING] Health check error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       healthy: false,

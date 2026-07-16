@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../logger';
 
 interface BatchedRequest {
   id: string;
@@ -103,7 +104,7 @@ async function handleBatchedRequests(req: Request, res: Response) {
 
     res.json(responses);
   } catch (error) {
-    console.error('[BATCH] Error processing batched requests:', error);
+    logger.error('[BATCH] Error processing batched requests:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to process batch request'
     });

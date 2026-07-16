@@ -5,6 +5,7 @@
  */
 
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 async function debugProductCounts() {
   const pool = getDirectPool();
@@ -75,7 +76,7 @@ async function debugProductCounts() {
     }
     
   } catch (error) {
-    console.error('Fatal error during debug:', error);
+    logger.error('Fatal error during debug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   } finally {
     await pool.end();
   }
@@ -89,7 +90,7 @@ if (require.main === module) {
       process.exit(0);
     })
     .catch((error) => {
-      console.error('❌ Debug failed:', error);
+      logger.error('❌ Debug failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       process.exit(1);
     });
 }

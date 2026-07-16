@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -146,7 +147,7 @@ router.get('/', async (req, res) => {
     return res.json(response);
 
   } catch (error) {
-    console.error('[GET /api/directory/featured-stats] Error:', error);
+    logger.error('[GET /api/directory/featured-stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'Failed to fetch featured stats',
       details: unifiedConfig.isDevelopment ? (error as Error).message : undefined

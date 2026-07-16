@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -36,7 +37,7 @@ router.get('/api/gbp/categories/popular', async (req, res) => {
 
     return res.json({ items: popularCategories });
   } catch (error) {
-    console.error('[GET /api/gbp/categories/popular] Error:', error);
+    logger.error('[GET /api/gbp/categories/popular] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_popular_categories' });
   }
 });
@@ -90,7 +91,7 @@ router.get('/api/gbp/categories', async (req, res) => {
 
     return res.json({ items: results, source: 'platform_categories' });
   } catch (error) {
-    console.error('[GET /api/gbp/categories] Error:', error);
+    logger.error('[GET /api/gbp/categories] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_search_categories' });
   }
 });

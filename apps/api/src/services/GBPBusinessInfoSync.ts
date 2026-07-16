@@ -15,6 +15,7 @@
 
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { logger } from '../logger';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 
@@ -75,7 +76,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
         const newTokens = await refreshAccessToken(refreshToken);
 
         if (!newTokens) {
-          console.error(`[GBPBusinessInfoSync] Token refresh failed for tenant ${tenantId}`);
+          logger.error(`[GBPBusinessInfoSync] Token refresh failed for tenant ${tenantId}`, undefined);
           return null;
         }
 
@@ -132,7 +133,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
           
           return credentials.access_token!;
         } catch (refreshError) {
-          console.error(`[GBPBusinessInfoSync] Legacy token refresh failed for tenant ${tenantId}:`, refreshError);
+          logger.error(`[GBPBusinessInfoSync] Legacy token refresh failed for tenant ${tenantId}:`, undefined, { error: { name: (refreshError as any)?.name || 'Error', message: (refreshError as any)?.message || String(refreshError), stack: (refreshError as any)?.stack } });
           return null;
         }
       }
@@ -141,7 +142,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
 
     return tenant.google_business_access_token;
   } catch (error) {
-    console.error(`[GBPBusinessInfoSync] Error getting token for tenant ${tenantId}:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error getting token for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -163,7 +164,7 @@ async function getLinkedLocation(tenantId: string): Promise<string | null> {
 
     return account?.gbp_locations_list[0]?.location_id || null;
   } catch (error) {
-    console.error(`[GBPBusinessInfoSync] Error getting linked location for tenant ${tenantId}:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error getting linked location for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -202,14 +203,14 @@ export async function syncBusinessName(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync business name:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync business name:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'name', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced business name for tenant ${tenantId}`);
     return { success: true, field: 'name' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing business name:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing business name:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'name', error: error.message };
   }
 }
@@ -250,14 +251,14 @@ export async function syncPhoneNumber(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync phone:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync phone:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'phone', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced phone for tenant ${tenantId}`);
     return { success: true, field: 'phone' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing phone:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing phone:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'phone', error: error.message };
   }
 }
@@ -296,14 +297,14 @@ export async function syncWebsite(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync website:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync website:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'website', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced website for tenant ${tenantId}`);
     return { success: true, field: 'website' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing website:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing website:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'website', error: error.message };
   }
 }
@@ -354,14 +355,14 @@ export async function syncAddress(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync address:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync address:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'address', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced address for tenant ${tenantId}`);
     return { success: true, field: 'address' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing address:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing address:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'address', error: error.message };
   }
 }
@@ -402,14 +403,14 @@ export async function syncDescription(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync description:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync description:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'description', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced description for tenant ${tenantId}`);
     return { success: true, field: 'description' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing description:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing description:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'description', error: error.message };
   }
 }
@@ -462,14 +463,14 @@ export async function syncCategories(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync categories:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync categories:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'categories', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced categories for tenant ${tenantId}`);
     return { success: true, field: 'categories' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing categories:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing categories:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'categories', error: error.message };
   }
 }
@@ -535,14 +536,14 @@ export async function syncBusinessHours(tenantId: string): Promise<SyncResult> {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync business hours:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync business hours:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'regularHours', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced regular business hours for tenant ${tenantId} (${gbpPeriods.length} periods)`);
     return { success: true, field: 'regularHours' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing business hours:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing business hours:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'regularHours', error: error.message };
   }
 }
@@ -618,14 +619,14 @@ export async function syncSpecialHours(tenantId: string): Promise<SyncResult> {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync special hours:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync special hours:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, field: 'specialHours', error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPBusinessInfoSync] Synced special business hours for tenant ${tenantId} (${gbpSpecialPeriods.length} periods)`);
     return { success: true, field: 'specialHours' };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing special hours:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing special hours:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, field: 'specialHours', error: error.message };
   }
 }
@@ -735,7 +736,7 @@ export async function syncAllBusinessInfo(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to sync all business info:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to sync all business info:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       return {
         success: false,
@@ -789,7 +790,7 @@ export async function syncAllBusinessInfo(
       skippedFields: [...skippedFields.filter(f => f === 'regularHours' || f === 'specialHours')],
     };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error syncing all business info:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error syncing all business info:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       success: false,
       results: [{ success: false, field: 'all', error: error.message }],
@@ -815,7 +816,7 @@ async function recordSyncTimestamp(tenantId: string, fields: string[]): Promise<
 
     console.log(`[GBPBusinessInfoSync] Recorded sync timestamp for tenant ${tenantId}`);
   } catch (error) {
-    console.error(`[GBPBusinessInfoSync] Error recording sync timestamp:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error recording sync timestamp:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -863,7 +864,7 @@ export async function getSyncStatus(tenantId: string): Promise<{
       canSync: hasGBPConnection && !!locationId,
     };
   } catch (error) {
-    console.error(`[GBPBusinessInfoSync] Error getting sync status:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error getting sync status:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       hasGBPConnection: false,
       hasLinkedLocation: false,
@@ -970,7 +971,7 @@ export async function readFromGoogle(tenantId: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPBusinessInfoSync] Failed to read from Google:`, error);
+      logger.error(`[GBPBusinessInfoSync] Failed to read from Google:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, data: null, error: `API error: ${response.status}` };
     }
 
@@ -1059,7 +1060,7 @@ export async function readFromGoogle(tenantId: string): Promise<{
     console.log(`[GBPBusinessInfoSync] Read data from Google for tenant ${tenantId}`);
     return { success: true, data };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error reading from Google:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error reading from Google:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, data: null, error: error.message };
   }
 }
@@ -1182,7 +1183,7 @@ export async function compareWithGoogle(tenantId: string): Promise<ComparisonRes
       googleData,
     };
   } catch (error: any) {
-    console.error(`[GBPBusinessInfoSync] Error comparing with Google:`, error);
+    logger.error(`[GBPBusinessInfoSync] Error comparing with Google:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       success: false,
       fields: [],

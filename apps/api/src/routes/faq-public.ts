@@ -9,6 +9,7 @@ import { Router, Request, Response } from 'express';
 import FaqService from '../services/FaqService';
 import FaqOptionsService from '../services/FaqOptionsService';
 import FaqCrmIntegrationService from '../services/FaqCrmIntegrationService';
+import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
 const faqService = FaqService.getInstance();
@@ -59,7 +60,7 @@ router.get('/faqs', async (req: Request, res: Response) => {
     const faqs = await faqService.getPublicStorefrontFAQs(tenantId);
     res.json({ success: true, data: faqs });
   } catch (error) {
-    console.error('[FAQ Public] Error fetching FAQs:', error);
+    logger.error('[FAQ Public] Error fetching FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch FAQs' });
   }
 });
@@ -79,7 +80,7 @@ router.get('/faq-categories', async (req: Request, res: Response) => {
     const categories = await faqService.listCategories(tenantId);
     res.json({ success: true, data: categories });
   } catch (error) {
-    console.error('[FAQ Public] Error fetching categories:', error);
+    logger.error('[FAQ Public] Error fetching categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch categories' });
   }
 });
@@ -100,7 +101,7 @@ router.post('/faqs/:faqId/feedback', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: feedback });
   } catch (error) {
-    console.error('[FAQ Public] Error submitting feedback:', error);
+    logger.error('[FAQ Public] Error submitting feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to submit feedback' });
   }
 });
@@ -123,7 +124,7 @@ router.post('/faqs/:faqId/suggest-edit', async (req: Request, res: Response) => 
     });
     res.json({ success: true, data: feedback });
   } catch (error) {
-    console.error('[FAQ Public] Error submitting suggested edit:', error);
+    logger.error('[FAQ Public] Error submitting suggested edit:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to submit suggested edit' });
   }
 });
@@ -152,7 +153,7 @@ router.get('/faqs/search', async (req: Request, res: Response) => {
     );
     res.json({ success: true, data: suggestions });
   } catch (error) {
-    console.error('[FAQ Public] Error searching FAQs:', error);
+    logger.error('[FAQ Public] Error searching FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to search FAQs' });
   }
 });
@@ -181,8 +182,8 @@ router.post('/faqs/:faqId/create-ticket', async (req: Request, res: Response) =>
 
     res.status(201).json({ success: true, data: ticket });
   } catch (error: any) {
-    console.error('[FAQ Public] Error creating ticket from feedback:', error);
-    res.status(500).json({ success: false, error: error?.message || 'Failed to create ticket' });
+    logger.error('[FAQ Public] Error creating ticket from feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: (error as any)?.message || 'Failed to create ticket' });
   }
 });
 

@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAdmin } from '../../middleware/auth';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -112,7 +113,7 @@ router.get('/', async (req: Request, res: Response) => {
       data: responseData
     });
   } catch (error) {
-    console.error('Error fetching ticker config:', error);
+    logger.error('Error fetching ticker config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch ticker configuration',
@@ -176,7 +177,7 @@ router.put('/', async (req: Request, res: Response) => {
       userMessage: 'Ticker configuration updated successfully'
     });
   } catch (error) {
-    console.error('Error updating ticker config:', error);
+    logger.error('Error updating ticker config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to update ticker configuration',
@@ -255,7 +256,7 @@ router.put('/settings', requireAdmin, async (req: Request, res: Response) => {
       userMessage: 'Ticker settings updated successfully'
     });
   } catch (error) {
-    console.error('Error updating ticker settings:', error);
+    logger.error('Error updating ticker settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'internal_error',

@@ -14,6 +14,7 @@ import { requireTenantAdmin } from '../middleware/permissions';
 import storefrontPolicyService, { PolicyType } from '../services/StorefrontPolicyService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get('/public/storefront-policies/:tenantId', async (req, res) => {
     const policies = await storefrontPolicyService.getPolicies(tenantId);
     res.json({ success: true, policies });
   } catch (error) {
-    console.error('Error fetching public storefront policies:', error);
+    logger.error('Error fetching public storefront policies:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch policies' });
   }
 });
@@ -58,7 +59,7 @@ router.get('/public/storefront-policies/:tenantId/:type', async (req, res) => {
     }
     res.json({ success: true, type, content });
   } catch (error) {
-    console.error('Error fetching public storefront policy:', error);
+    logger.error('Error fetching public storefront policy:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch policy' });
   }
 });
@@ -70,7 +71,7 @@ router.get('/:tenantId/storefront-policies', authenticateToken, async (req, res)
     const policies = await storefrontPolicyService.getPolicies(tenantId);
     res.json({ success: true, policies });
   } catch (error) {
-    console.error('Error fetching storefront policies:', error);
+    logger.error('Error fetching storefront policies:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch policies' });
   }
 });
@@ -90,7 +91,7 @@ router.put('/:tenantId/storefront-policies', authenticateToken, requireTenantAdm
     // Refresh policy knowledge embeddings
     BotKnowledgeEmbeddingService.getInstance().refreshPolicyEmbeddings(tenantId).catch(() => {});
   } catch (error) {
-    console.error('Error updating storefront policies:', error);
+    logger.error('Error updating storefront policies:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update policies' });
   }
 });

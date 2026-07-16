@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../logger';
 
 /**
  * Security middleware to protect against common web vulnerabilities
@@ -94,7 +95,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
         // Check for dangerous patterns
         for (const pattern of DANGEROUS_PATTERNS) {
           if (pattern.test(value)) {
-            console.error(`[SECURITY] Blocked dangerous pattern in query param "${key}": ${value} from ${clientIP}`);
+            logger.error(`[SECURITY] Blocked dangerous pattern in query param "${key}": ${value} from ${clientIP}`, undefined);
             return res.status(400).json({
               error: 'dangerous_input_detected',
               message: 'Invalid input detected'
@@ -105,7 +106,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
         // Check for ONVIF/IoT patterns
         for (const pattern of IOT_PATTERNS) {
           if (pattern.test(value)) {
-            console.error(`[SECURITY] Blocked IoT/IoT pattern in query param "${key}": ${value} from ${clientIP}`);
+            logger.error(`[SECURITY] Blocked IoT/IoT pattern in query param "${key}": ${value} from ${clientIP}`, undefined);
             return res.status(403).json({
               error: 'Forbidden',
               message: 'Access denied'
@@ -115,7 +116,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
 
         // Check for internal IPs (SSRF protection)
         if (containsInternalIP(value)) {
-          console.error(`[SECURITY] Blocked internal IP access in query param "${key}": ${value} from ${clientIP}`);
+          logger.error(`[SECURITY] Blocked internal IP access in query param "${key}": ${value} from ${clientIP}`, undefined);
           return res.status(403).json({
             error: 'Forbidden',
             message: 'Access denied'
@@ -130,7 +131,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
         // Check for dangerous patterns
         for (const pattern of DANGEROUS_PATTERNS) {
           if (pattern.test(value)) {
-            console.error(`[SECURITY] Blocked dangerous pattern in URL param "${key}": ${value} from ${clientIP}`);
+            logger.error(`[SECURITY] Blocked dangerous pattern in URL param "${key}": ${value} from ${clientIP}`, undefined);
             return res.status(400).json({
               error: 'dangerous_input_detected',
               message: 'Invalid input detected'
@@ -141,7 +142,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
         // Check for ONVIF/IoT patterns
         for (const pattern of IOT_PATTERNS) {
           if (pattern.test(value)) {
-            console.error(`[SECURITY] Blocked IoT pattern in URL param "${key}": ${value} from ${clientIP}`);
+            logger.error(`[SECURITY] Blocked IoT pattern in URL param "${key}": ${value} from ${clientIP}`, undefined);
             return res.status(403).json({
               error: 'Forbidden',
               message: 'Access denied'
@@ -161,7 +162,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
             // Check for dangerous patterns
             for (const pattern of DANGEROUS_PATTERNS) {
               if (pattern.test(value)) {
-                console.error(`[SECURITY] Blocked dangerous pattern in body "${currentPath}": ${value} from ${clientIP}`);
+                logger.error(`[SECURITY] Blocked dangerous pattern in body "${currentPath}": ${value} from ${clientIP}`, undefined);
                 return false;
               }
             }
@@ -169,14 +170,14 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
             // Check for ONVIF/IoT patterns
             for (const pattern of IOT_PATTERNS) {
               if (pattern.test(value)) {
-                console.error(`[SECURITY] Blocked IoT pattern in body "${currentPath}": ${value} from ${clientIP}`);
+                logger.error(`[SECURITY] Blocked IoT pattern in body "${currentPath}": ${value} from ${clientIP}`, undefined);
                 return false;
               }
             }
 
             // Check for internal IPs (SSRF protection)
             if (containsInternalIP(value)) {
-              console.error(`[SECURITY] Blocked internal IP access in body "${currentPath}": ${value} from ${clientIP}`);
+              logger.error(`[SECURITY] Blocked internal IP access in body "${currentPath}": ${value} from ${clientIP}`, undefined);
               return false;
             }
           } else if (typeof value === 'object' && value !== null) {
@@ -201,7 +202,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
       if (typeof value === 'string') {
         for (const pattern of DANGEROUS_PATTERNS) {
           if (pattern.test(value)) {
-            console.error(`[SECURITY] Blocked dangerous pattern in header "${key}": ${value} from ${clientIP}`);
+            logger.error(`[SECURITY] Blocked dangerous pattern in header "${key}": ${value} from ${clientIP}`, undefined);
             return res.status(400).json({
               error: 'dangerous_input_detected',
               message: 'Invalid input detected'
@@ -213,7 +214,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
 
     next();
   } catch (error) {
-    console.error('[SECURITY] Error in input validation:', error);
+    logger.error('[SECURITY] Error in input validation:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Validation error'

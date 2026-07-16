@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { SubscriptionBillingService } from '../../services/subscription/SubscriptionBillingService';
+import { logger } from '../../logger';
 
 const router = Router();
 const subscriptionBillingService = new SubscriptionBillingService();
@@ -127,7 +128,7 @@ router.get('/tenants/:tenantId/financial-metrics', async (req, res) => {
 
     res.json(metrics);
   } catch (error) {
-    console.error('Error fetching financial metrics:', error);
+    logger.error('Error fetching financial metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch financial metrics' });
   }
 });
@@ -174,7 +175,7 @@ router.get('/tenants/:tenantId/transactions', async (req, res) => {
 
     res.json(transactions);
   } catch (error) {
-    console.error('Error fetching transactions:', error);
+    logger.error('Error fetching transactions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
@@ -324,7 +325,7 @@ router.get('/tenants/:tenantId/health-metrics', async (req, res) => {
 
     res.json(healthMetrics);
   } catch (error) {
-    console.error('Error fetching health metrics:', error);
+    logger.error('Error fetching health metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch health metrics' });
   }
 });
@@ -360,7 +361,7 @@ router.post('/tenants/:tenantId/send-notification', async (req, res) => {
       type 
     });
   } catch (error) {
-    console.error('Error sending notification:', error);
+    logger.error('Error sending notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to send notification' });
   }
 });

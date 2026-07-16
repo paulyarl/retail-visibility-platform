@@ -23,6 +23,7 @@ import { evaluateBadgeRulesForTenant } from '../services/BadgeRuleEngine';
 import { authenticateToken } from '../middleware/auth';
 import FeaturedOptionsService from '../services/FeaturedOptionsService';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import { logger } from '../logger';
 
 const router = express.Router();
 
@@ -36,7 +37,7 @@ router.get('/public/badge-registry', async (_req, res) => {
     const badges = await getSystemBadges();
     res.json({ badges });
   } catch (error) {
-    console.error('[badge-registry] Failed to get system badges:', error);
+    logger.error('[badge-registry] Failed to get system badges:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch badge registry' });
   }
 });
@@ -52,7 +53,7 @@ router.get('/tenants/:tenantId/badge-registry', authenticateToken, async (req, r
     const badges = await getTenantBadges(tenantId);
     res.json({ badges });
   } catch (error) {
-    console.error('[badge-registry] Failed to get tenant badges:', error);
+    logger.error('[badge-registry] Failed to get tenant badges:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch tenant badge registry' });
   }
 });
@@ -70,7 +71,7 @@ router.get('/tenants/:tenantId/badge-registry/rules', authenticateToken, async (
     ]);
     res.json({ badgesWithRules, conflictPairs });
   } catch (error) {
-    console.error('[badge-registry] Failed to get badge rules:', error);
+    logger.error('[badge-registry] Failed to get badge rules:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch badge rules' });
   }
 });
@@ -87,7 +88,7 @@ router.get('/tenants/:tenantId/badge-registry/validation', authenticateToken, as
     const evaluation = await evaluateBadgeRulesForTenant(tenantId);
     res.json(evaluation);
   } catch (error) {
-    console.error('[badge-registry] Failed to evaluate badge rules:', error);
+    logger.error('[badge-registry] Failed to evaluate badge rules:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to evaluate badge rules' });
   }
 });
@@ -105,7 +106,7 @@ router.get('/tenants/:tenantId/badge-registry/custom', authenticateToken, async 
     const featuredState = await FeaturedOptionsService.getInstance().resolveFeaturedOptionsState(tenantId);
     res.json({ badges, usedSlots, hasAccess: featuredState.customBadgeSlotsEnabled });
   } catch (error) {
-    console.error('[badge-registry] Failed to get tenant custom badges:', error);
+    logger.error('[badge-registry] Failed to get tenant custom badges:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch custom badges' });
   }
 });
@@ -155,7 +156,7 @@ router.post('/tenants/:tenantId/badge-registry/custom', authenticateToken, async
     if (error?.code === 'P2002') {
       return res.status(409).json({ error: 'A badge with this key already exists for your tenant' });
     }
-    console.error('[badge-registry] Failed to create custom badge:', error);
+    logger.error('[badge-registry] Failed to create custom badge:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to create custom badge' });
   }
 });
@@ -189,7 +190,7 @@ router.put('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateToke
     // Refresh badge registry knowledge embeddings
     BotKnowledgeEmbeddingService.getInstance().refreshBadgeRegistryEmbeddings(tenantId).catch(() => {});
   } catch (error) {
-    console.error('[badge-registry] Failed to update custom badge:', error);
+    logger.error('[badge-registry] Failed to update custom badge:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update custom badge' });
   }
 });
@@ -213,7 +214,7 @@ router.delete('/tenants/:tenantId/badge-registry/custom/:badgeId', authenticateT
     // Refresh badge registry knowledge embeddings
     BotKnowledgeEmbeddingService.getInstance().refreshBadgeRegistryEmbeddings(tenantId).catch(() => {});
   } catch (error) {
-    console.error('[badge-registry] Failed to delete custom badge:', error);
+    logger.error('[badge-registry] Failed to delete custom badge:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to delete custom badge' });
   }
 });
@@ -246,7 +247,7 @@ router.get('/tenants/:tenantId/badge-suggestions', authenticateToken, async (req
       },
     });
   } catch (error) {
-    console.error('[badge-registry] Failed to get badge suggestions:', error);
+    logger.error('[badge-registry] Failed to get badge suggestions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get badge suggestions' });
   }
 });
@@ -261,7 +262,7 @@ router.post('/admin/badge-registry/invalidate-cache', authenticateToken, async (
     invalidateBadgeRegistryCache();
     res.json({ success: true, message: 'Badge registry cache invalidated' });
   } catch (error) {
-    console.error('[badge-registry] Failed to invalidate cache:', error);
+    logger.error('[badge-registry] Failed to invalidate cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to invalidate cache' });
   }
 });

@@ -7,6 +7,7 @@
 import { SquareOAuthService, createSquareOAuthService } from '../services/square/square-oauth.service';
 import { squareIntegrationRepository } from '../services/square/square-integration.repository';
 import { createSquareClient } from '../services/square/square-client';
+import { logger } from '../logger';
 
 export class SquareIntegrationService {
   private oauthService: SquareOAuthService | null = null;
@@ -59,7 +60,7 @@ export class SquareIntegrationService {
 
       return integration;
     } catch (error) {
-      console.error('[SquareIntegration] Connect tenant error:', error);
+      logger.error('[SquareIntegration] Connect tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error('Failed to connect Square integration');
     }
   }
@@ -93,7 +94,7 @@ export class SquareIntegrationService {
 
       console.log(`[SquareIntegration] Integration deleted for tenant ${tenantId}`);
     } catch (error) {
-      console.error('[SquareIntegration] Disconnect tenant error:', error);
+      logger.error('[SquareIntegration] Disconnect tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -127,7 +128,7 @@ export class SquareIntegrationService {
 
       return integration;
     } catch (error) {
-      console.error('[SquareIntegration] Get status error:', error);
+      logger.error('[SquareIntegration] Get status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -149,7 +150,7 @@ export class SquareIntegrationService {
 
       console.log(`[SquareIntegration] Token refreshed for integration ${integrationId}`);
     } catch (error) {
-      console.error('[SquareIntegration] Refresh token error:', error);
+      logger.error('[SquareIntegration] Refresh token error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Mark integration as having an error
       await squareIntegrationRepository.updateIntegration(integrationId, {
@@ -168,7 +169,7 @@ export class SquareIntegrationService {
     try {
       return await squareIntegrationRepository.getSyncLogsByTenantId(tenantId, limit);
     } catch (error) {
-      console.error('[SquareIntegration] Get sync logs error:', error);
+      logger.error('[SquareIntegration] Get sync logs error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -191,7 +192,7 @@ export class SquareIntegrationService {
 
       return await squareClient.testConnection();
     } catch (error) {
-      console.error('[SquareIntegration] Test connection error:', error);
+      logger.error('[SquareIntegration] Test connection error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

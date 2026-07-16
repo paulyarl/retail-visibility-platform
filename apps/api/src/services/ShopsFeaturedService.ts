@@ -410,7 +410,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return trendingShops;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching trending shops', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching trending shops', undefined, { error: { name: 'Error', message: String(error) } });
       
       // Let the error propagate to see if SQL query works
       throw error;
@@ -471,7 +471,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
 
       return categories;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching trending categories', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching trending categories', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -523,7 +523,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching sale products', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching sale products', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -575,7 +575,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching seasonal products', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching seasonal products', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -627,7 +627,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching staff picks', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching staff picks', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -679,7 +679,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching store selections', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching store selections', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -731,7 +731,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching recommended', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching recommended', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -783,7 +783,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching bestseller', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching bestseller', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -835,7 +835,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching clearance', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching clearance', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -887,7 +887,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching featured', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching featured', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -930,7 +930,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching weighted random products', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching weighted random products', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -983,7 +983,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching products by location', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching products by location', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -1031,7 +1031,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching products by location address', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching products by location address', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -1079,7 +1079,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching products by product category', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching products by product category', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -1127,7 +1127,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching products by shop category', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching products by shop category', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }
@@ -1176,7 +1176,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       
       return result.rows;
     } catch (error) {
-      this.logger.error('[SHOPS FEATURED] Error fetching random products', error);
+      this.logger.error('[SHOPS FEATURED] Error fetching random products', undefined, { error: { name: 'Error', message: String(error) } });
       return [];
     }
   }

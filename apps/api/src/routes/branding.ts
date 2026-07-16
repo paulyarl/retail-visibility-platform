@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import tenantSingletonService from '../services/TenantSingletonService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/:tenantId', async (req, res) => {
       data: branding
     });
   } catch (error) {
-    console.error('[Get Branding Error]', error);
+    logger.error('[Get Branding Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -120,7 +121,7 @@ router.put('/:tenantId', async (req, res) => {
       message: 'Branding settings updated successfully'
     });
   } catch (error) {
-    console.error('[Update Branding Error]', error);
+    logger.error('[Update Branding Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -152,7 +153,7 @@ router.post('/:tenantId/logo', async (req, res) => {
       message: 'Logo uploaded successfully (mock implementation)'
     });
   } catch (error) {
-    console.error('[Upload Logo Error]', error);
+    logger.error('[Upload Logo Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -205,7 +206,7 @@ router.get('/:tenantId/preview', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Get Branding Preview Error]', error);
+    logger.error('[Get Branding Preview Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -232,7 +233,7 @@ router.delete('/:tenantId/logo', async (req, res) => {
       message: 'Logo removed successfully (mock implementation)'
     });
   } catch (error) {
-    console.error('[Remove Logo Error]', error);
+    logger.error('[Remove Logo Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

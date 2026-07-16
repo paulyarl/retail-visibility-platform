@@ -10,6 +10,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
+import { logger } from '../logger';
 
 const ROUTES_DIR = join(__dirname, '..', 'routes');
 
@@ -221,21 +222,21 @@ export function runLint(): { catchAll: Violation[]; param: ParamViolation[] } {
     console.log('✅ No catch-all or param shadowing ordering violations found.');
   } else {
     if (catchAllViolations.length > 0) {
-      console.error(`❌ Found ${catchAllViolations.length} catch-all ordering violation(s):\n`);
+      logger.error(`❌ Found ${catchAllViolations.length} catch-all ordering violation(s):\n`, undefined);
       for (const v of catchAllViolations) {
-        console.error(`  File: ${v.file}`);
-        console.error(`  Catch-all at line ${v.line}: ${v.catchAll}`);
-        console.error(`  Static route at line ${v.staticLine}: ${v.staticRoute}`);
-        console.error('');
+        logger.error(`  File: ${v.file}`, undefined);
+        logger.error(`  Catch-all at line ${v.line}: ${v.catchAll}`, undefined);
+        logger.error(`  Static route at line ${v.staticLine}: ${v.staticRoute}`, undefined);
+        logger.error('', undefined);
       }
     }
     if (paramViolations.length > 0) {
-      console.error(`❌ Found ${paramViolations.length} dynamic param shadowing violation(s):\n`);
+      logger.error(`❌ Found ${paramViolations.length} dynamic param shadowing violation(s):\n`, undefined);
       for (const v of paramViolations) {
-        console.error(`  File: ${v.file}`);
-        console.error(`  Param route at line ${v.paramLine}: ${v.paramRoute}`);
-        console.error(`  Static sibling at line ${v.staticLine}: ${v.staticRoute}`);
-        console.error('');
+        logger.error(`  File: ${v.file}`, undefined);
+        logger.error(`  Param route at line ${v.paramLine}: ${v.paramRoute}`, undefined);
+        logger.error(`  Static sibling at line ${v.staticLine}: ${v.staticRoute}`, undefined);
+        logger.error('', undefined);
       }
     }
   }

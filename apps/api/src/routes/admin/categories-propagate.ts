@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../../middleware/auth';
 import { prisma } from '../../prisma';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -151,7 +152,7 @@ router.post('/propagate', authenticateToken, requireAdmin, async (req: Request, 
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {
-    console.error('[Admin Categories Propagate] Error:', error);
+    logger.error('[Admin Categories Propagate] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',

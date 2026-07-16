@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { productQueueService } from '../lib/services/ProductQueueService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -18,7 +19,7 @@ router.get('/:tenantId/stats', async (req, res) => {
     const queueStats = await productQueueService.getQueueStats(tenantId);
     return res.json({ success: true, data: queueStats });
   } catch (error) {
-    console.error('Queue stats GET error:', error);
+    logger.error('Queue stats GET error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json(
       { success: false, error: 'Failed to fetch queue stats' }
     );
@@ -66,7 +67,7 @@ router.get('/:tenantId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Queue GET error:', error);
+    logger.error('Queue GET error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json(
       { success: false, error: 'Failed to fetch queue data' }
     );
@@ -116,7 +117,7 @@ router.post('/:tenantId', async (req, res) => {
     return res.json({ success: true, data: result });
 
   } catch (error) {
-    console.error('Queue POST error:', error);
+    logger.error('Queue POST error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json(
       { success: false, error: 'Failed to add item to queue' }
     );
@@ -139,7 +140,7 @@ router.delete('/:tenantId', async (req, res) => {
     return res.json({ success: true, data: result });
 
   } catch (error) {
-    console.error('Queue DELETE error:', error);
+    logger.error('Queue DELETE error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json(
       { success: false, error: 'Failed to clear queue' }
     );

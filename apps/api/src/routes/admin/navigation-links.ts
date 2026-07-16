@@ -12,6 +12,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma, basePrisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.get('/', async (req: Request, res: Response) => {
       data: links.map(toApiShape),
     });
   } catch (error) {
-    console.error('[Navigation Links] GET error:', error);
+    logger.error('[Navigation Links] GET error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch navigation links',
@@ -210,7 +211,7 @@ router.post('/', async (req: Request, res: Response) => {
       userMessage: 'Navigation links saved successfully',
     });
   } catch (error) {
-    console.error('[Navigation Links] POST error:', error);
+    logger.error('[Navigation Links] POST error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to save navigation links',
@@ -256,7 +257,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true, data: toApiShape(updated), userMessage: 'Link updated' });
   } catch (error) {
-    console.error('[Navigation Links] PUT error:', error);
+    logger.error('[Navigation Links] PUT error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to update link',
@@ -292,7 +293,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true, userMessage: 'Navigation link deleted' });
   } catch (error) {
-    console.error('[Navigation Links] DELETE error:', error);
+    logger.error('[Navigation Links] DELETE error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to delete link',

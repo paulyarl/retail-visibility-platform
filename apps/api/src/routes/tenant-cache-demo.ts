@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -136,7 +137,7 @@ router.get('/:tenantId/info', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Tenant Info] Error:', error);
+    logger.error('[Tenant Info] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to fetch tenant information',
       cached: false,
@@ -227,7 +228,7 @@ router.get('/:tenantId/limits', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Tenant Limits] Error:', error);
+    logger.error('[Tenant Limits] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to fetch tenant limits',
       cached: false,
@@ -259,7 +260,7 @@ router.post('/:tenantId/cache/clear', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Tenant Cache Clear] Error:', error);
+    logger.error('[Tenant Cache Clear] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to clear tenant cache',
       cleared_at: new Date().toISOString()
@@ -279,7 +280,7 @@ router.get('/stats', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Cache Stats] Error:', error);
+    logger.error('[Cache Stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to get cache statistics',
       timestamp: new Date().toISOString()

@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import ShopsFeaturedService from '../../services/ShopsFeaturedService';
+import { logger } from '../../logger';
 
 const router = Router();
 const shopsService = ShopsFeaturedService.getInstance();
@@ -44,7 +45,7 @@ router.get('/trending', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching trending shops:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching trending shops:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trending shops',
@@ -99,7 +100,7 @@ router.get('/featured/trending', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching trending products:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching trending products:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trending products',
@@ -154,7 +155,7 @@ router.get('/featured/new', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching new products:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching new products:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch new products',
@@ -201,7 +202,7 @@ router.get('/featured/random', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching random shops:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching random shops:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch random shops',
@@ -250,7 +251,7 @@ router.get('/featured/sale', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching sale products:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching sale products:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sale products',
@@ -295,7 +296,7 @@ router.get('/featured/seasonal', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching seasonal products:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching seasonal products:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch seasonal products',
@@ -339,7 +340,7 @@ router.get('/featured/staff', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching staff picks:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching staff picks:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch staff picks',
@@ -387,7 +388,7 @@ router.get('/featured/selection', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching store selections:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching store selections:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch store selections',
@@ -425,7 +426,7 @@ router.get('/trending-shops', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching trending shops:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching trending shops:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trending shops',

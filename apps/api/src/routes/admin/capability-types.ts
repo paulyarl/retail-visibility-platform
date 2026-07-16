@@ -13,6 +13,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -124,7 +125,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
 
     res.json(transformed);
   } catch (error) {
-    console.error('[GET /api/admin/capability-types] Error:', error);
+    logger.error('[GET /api/admin/capability-types] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_capability_types' });
   }
 });
@@ -288,7 +289,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
     transformed = await transformCapabilityType(capType);
     res.status(201).json(transformed);
   } catch (error) {
-    console.error('[POST /api/admin/capability-types] Error:', error);
+    logger.error('[POST /api/admin/capability-types] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_capability_type' });
   }
 });
@@ -398,7 +399,7 @@ router.put('/', requirePlatformAdmin, async (req, res) => {
     const transformed = await transformCapabilityType(updated);
     res.json(transformed);
   } catch (error) {
-    console.error('[PUT /api/admin/capability-types] Error:', error);
+    logger.error('[PUT /api/admin/capability-types] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_capability_type' });
   }
 });
@@ -461,7 +462,7 @@ router.delete('/', requirePlatformAdmin, async (req, res) => {
       message: `Capability type '${capability_type_key}' deleted`,
     });
   } catch (error) {
-    console.error('[DELETE /api/admin/capability-types] Error:', error);
+    logger.error('[DELETE /api/admin/capability-types] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_capability_type' });
   }
 });

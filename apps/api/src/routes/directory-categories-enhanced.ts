@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -95,7 +96,7 @@ router.get('/categories-enhanced', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('Enhanced directory categories error:', error);
+    logger.error('Enhanced directory categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_categories' });
   }
 });
@@ -163,7 +164,7 @@ router.get('/categories-enhanced/:slug', async (req: Request, res: Response) => 
 
     return res.json(categoryInfo);
   } catch (error) {
-    console.error('Enhanced category details error:', error);
+    logger.error('Enhanced category details error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_category_details' });
   }
 });

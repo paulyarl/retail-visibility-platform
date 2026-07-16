@@ -7,6 +7,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { generateDownloadLogId, generateLicenseKey } from '../../lib/id-generator';
+import { logger } from '../../logger';
 
 const prisma = new PrismaClient();
 
@@ -205,7 +206,7 @@ export async function validateDownloadAccess(
       } : undefined,
     };
   } catch (error) {
-    console.error('Error validating download access:', error);
+    logger.error('Error validating download access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       granted: false,
       reason: 'VALIDATION_ERROR',
@@ -284,7 +285,7 @@ export async function recordDownload(
 
     return { success: true, logId };
   } catch (error) {
-    console.error('Error recording download:', error);
+    logger.error('Error recording download:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, error: 'RECORD_ERROR' };
   }
 }
@@ -344,7 +345,7 @@ export async function generateOrRetrieveLicenseKey(
 
     return { key: newKey };
   } catch (error) {
-    console.error('Error generating license key:', error);
+    logger.error('Error generating license key:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { error: 'LICENSE_KEY_GENERATION_ERROR' };
   }
 }
@@ -413,7 +414,7 @@ export async function validateLicenseKey(
       },
     };
   } catch (error) {
-    console.error('Error validating license key:', error);
+    logger.error('Error validating license key:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       valid: false,
       reason: 'VALIDATION_ERROR',
@@ -447,7 +448,7 @@ export async function activateLicenseKey(
 
     return { success: true };
   } catch (error) {
-    console.error('Error activating license key:', error);
+    logger.error('Error activating license key:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, error: 'ACTIVATION_ERROR' };
   }
 }
@@ -499,7 +500,7 @@ export async function createAccessGrant(params: {
       accessToken: grant.access_token || '',
     };
   } catch (error) {
-    console.error('Error creating access grant:', error);
+    logger.error('Error creating access grant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }

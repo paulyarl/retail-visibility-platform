@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../prisma';
+import { logger } from '../../../../logger';
 
 export async function GET(
   request: NextRequest,
@@ -86,7 +87,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Store API Error:', error);
+    logger.error('Store API Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

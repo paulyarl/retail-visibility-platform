@@ -1,3 +1,5 @@
+import { logger } from '../../logger';
+
 /**
  * Square Client Service
  * Wrapper around Square SDK for consistent API access
@@ -75,14 +77,14 @@ export class SquareClientService {
     try {
       // Test if client is properly initialized
       if (!this.client || !this.client.locationsApi) {
-        console.error('[SquareClient] Client or locationsApi is undefined');
+        logger.error('[SquareClient] Client or locationsApi is undefined', undefined);
         return false;
       }
       
       const response = await this.client.locationsApi.listLocations();
       return response?.result?.locations !== undefined;
     } catch (error) {
-      console.error('[SquareClient] Connection test failed:', error);
+      logger.error('[SquareClient] Connection test failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -95,7 +97,7 @@ export class SquareClientService {
       const response = await this.client.merchantsApi.listMerchants();
       return response.result.merchant?.[0];
     } catch (error) {
-      console.error('[SquareClient] Failed to get merchant info:', error);
+      logger.error('[SquareClient] Failed to get merchant info:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -108,7 +110,7 @@ export class SquareClientService {
       const response = await this.client.locationsApi.listLocations();
       return response.result.locations || [];
     } catch (error) {
-      console.error('[SquareClient] Failed to list locations:', error);
+      logger.error('[SquareClient] Failed to list locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

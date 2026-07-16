@@ -10,6 +10,7 @@ import { isPlatformAdmin, isPlatformUser } from '../utils/platform-admin';
 import { getTenantLimitConfig, canCreateTenant, getUserLimit, TenantLimitTier } from '../config/tenant-limits';
 import { generateUserTenantId } from '../lib/id-generator';
 import { audit } from '../audit';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -165,7 +166,7 @@ router.get('/:tenantId/users', checkTenantAccess, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GET /tenants/:tenantId/user] Error:', error);
+    logger.error('[GET /tenants/:tenantId/user] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_tenant_user' });
   }
 });
@@ -271,7 +272,7 @@ router.post('/:tenantId/users', requireTenantAdmin, async (req, res) => {
       addedAt: userTenant.created_at.toISOString(),
     });
   } catch (error: any) {
-    console.error('[POST /tenants/:tenantId/users] Error:', error);
+    logger.error('[POST /tenants/:tenantId/users] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_add_user_to_tenant' });
   }
 });
@@ -405,7 +406,7 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
 
     res.json(userTenant);
   } catch (error: any) {
-    console.error('[PUT /tenants/:tenantId/users/:userId] Error:', error);
+    logger.error('[PUT /tenants/:tenantId/users/:userId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -533,7 +534,7 @@ router.patch('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =>
 
     res.json(userTenant);
   } catch (error: any) {
-    console.error('[PATCH /tenants/:tenantId/users/:userId] Error:', error);
+    logger.error('[PATCH /tenants/:tenantId/users/:userId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -596,7 +597,7 @@ router.delete('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) =
 
     res.status(204).send();
   } catch (error: any) {
-    console.error('[DELETE /tenants/:tenantId/users/:userId] Error:', error);
+    logger.error('[DELETE /tenants/:tenantId/users/:userId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -738,7 +739,7 @@ router.post('/:tenantId/users/invite', requireTenantAdmin, async (req, res) => {
       email: normalizedEmail,
     });
   } catch (error: any) {
-    console.error('[POST /tenants/:tenantId/users/invite] Error:', error);
+    logger.error('[POST /tenants/:tenantId/users/invite] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_invite_user', message: error.message });
   }
 });
@@ -765,7 +766,7 @@ router.get('/:tenantId/invitations', requireTenantAdmin, async (req, res) => {
 
     res.json({ success: true, invitations });
   } catch (error: any) {
-    console.error('[GET /tenants/:tenantId/invitations] Error:', error);
+    logger.error('[GET /tenants/:tenantId/invitations] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_invitations' });
   }
 });
@@ -784,7 +785,7 @@ router.delete('/:tenantId/invitations/:id', requireTenantAdmin, async (req, res)
 
     res.json({ success: true, message: 'Invitation cancelled' });
   } catch (error: any) {
-    console.error('[DELETE /tenants/:tenantId/invitations/:id] Error:', error);
+    logger.error('[DELETE /tenants/:tenantId/invitations/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_cancel_invitation' });
   }
 });

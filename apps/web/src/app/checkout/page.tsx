@@ -9,6 +9,7 @@ import { CustomerInfoForm } from '@/components/checkout/CustomerInfoForm';
 import FulfillmentMethodForm, { FulfillmentMethod } from '@/components/checkout/FulfillmentMethodForm';
 import { ShippingAddressFormWithSaved } from '@/components/checkout/ShippingAddressFormWithSaved';
 import { GuestSavePaymentMethodPrompt } from '@/components/checkout/GuestSavePaymentMethodPrompt';
+import { OrderBump } from '@/components/checkout/OrderBump';
 import PayPalPaymentForm from '@/components/checkout/PayPalPaymentForm';
 import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import StripePaymentForm from '@/components/checkout/StripePaymentForm';
@@ -746,6 +747,16 @@ function CheckoutPageContent() {
                     />
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Order Bump Offer (review step) */}
+              {currentStep === 'review' && tenantId && cartItems.length > 0 && (
+                <OrderBump
+                  tenantId={tenantId}
+                  triggerProductId={cartItems[0]?.product_id}
+                  cartValueCents={subtotal}
+                  customerId={customerId || undefined}
+                />
               )}
 
               {/* Step 2: Fulfillment Method */}

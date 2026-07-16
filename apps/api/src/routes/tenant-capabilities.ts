@@ -13,6 +13,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { buildExpiredCapabilitiesResponse } from './public-tenant-capabilities';
+import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
 
@@ -74,7 +75,7 @@ router.get('/capabilities/tiers-by-capability', authenticateToken, async (req: R
 
     res.json(Array.from(tierMap.values()));
   } catch (error) {
-    console.error('[GET /api/tenants/capabilities/tiers-by-capability] Error:', error);
+    logger.error('[GET /api/tenants/capabilities/tiers-by-capability] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tiers_by_capability' });
   }
 });
@@ -128,7 +129,7 @@ router.get('/:tenantId/effective-capabilities', authenticateToken, checkTenantAc
       data: result,
     });
   } catch (error) {
-    console.error('[GET /effective-capabilities] Error:', error);
+    logger.error('[GET /effective-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -165,7 +166,7 @@ router.get('/:tenantId/system-status', authenticateToken, checkTenantAccess, asy
       data: result,
     });
   } catch (error) {
-    console.error('[GET /system-status] Error:', error);
+    logger.error('[GET /system-status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -201,7 +202,7 @@ router.get('/:tenantId/next-steps', authenticateToken, checkTenantAccess, async 
       data: tasks,
     });
   } catch (error) {
-    console.error('[GET /next-steps] Error:', error);
+    logger.error('[GET /next-steps] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -242,7 +243,7 @@ router.get('/:tenantId/growth-tips', authenticateToken, checkTenantAccess, async
       data: tips,
     });
   } catch (error) {
-    console.error('[GET /growth-tips] Error:', error);
+    logger.error('[GET /growth-tips] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -279,7 +280,7 @@ router.get('/:tenantId/quick-links', authenticateToken, checkTenantAccess, async
       data: links,
     });
   } catch (error) {
-    console.error('[GET /quick-links] Error:', error);
+    logger.error('[GET /quick-links] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

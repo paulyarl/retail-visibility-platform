@@ -1,6 +1,7 @@
 import { getDirectPool } from '../utils/db-pool';
 import tenantSingletonService from './TenantSingletonService';
 import slugSingletonService from './SlugSingletonService';
+import { logger } from '../logger';
 
 // TypeScript interfaces for store type data
 interface StoreTypeDetails {
@@ -167,7 +168,7 @@ class StoreTypeDirectoryService {
         };
       });
     } catch (error) {
-      console.error('[StoreTypeService] Error fetching store types:', error);
+      logger.error('[StoreTypeService] Error fetching store types:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -364,7 +365,7 @@ class StoreTypeDirectoryService {
         updatedAt: store.updated_at,
       }));
     } catch (error) {
-      console.error('[StoreTypeService] Error fetching stores by type:', error);
+      logger.error('[StoreTypeService] Error fetching stores by type:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -475,7 +476,7 @@ class StoreTypeDirectoryService {
       };
 
     } catch (error) {
-      console.error('[StoreTypeService] Error fetching store type details:', error);
+      logger.error('[StoreTypeService] Error fetching store type details:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }

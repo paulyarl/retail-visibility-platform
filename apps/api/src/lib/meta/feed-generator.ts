@@ -12,6 +12,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface MetaFeedItem {
   retailer_id: string;        // SKU — must be stable
@@ -112,7 +113,7 @@ export async function generateMetaProductFeed(tenant_id: string, websiteUrl?: st
       return feedItem;
     });
   } catch (error) {
-    console.error('[Meta Feed Generator] Error:', error);
+    logger.error('[Meta Feed Generator] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }

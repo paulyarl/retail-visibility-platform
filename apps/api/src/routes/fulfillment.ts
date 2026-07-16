@@ -14,6 +14,7 @@ import { FulfillmentService } from '../services/FulfillmentService';
 import { authenticateToken } from '../middleware/auth';
 import { canPerformSupportActions } from '../utils/platform-admin';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -102,7 +103,7 @@ router.post('/time-slots/:tenantId', authenticateToken, async (req: Request, res
       timeSlots,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Create time slots error:', error);
+    logger.error('[Fulfillment] Create time slots error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_create_time_slots',
@@ -154,7 +155,7 @@ router.get('/time-slots/:tenantId', authenticateToken, async (req: Request, res:
       timeSlots,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Get time slots error:', error);
+    logger.error('[Fulfillment] Get time slots error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_time_slots',
@@ -240,7 +241,7 @@ router.post('/schedule/:orderId', authenticateToken, async (req: Request, res: R
       schedule,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Schedule fulfillment error:', error);
+    logger.error('[Fulfillment] Schedule fulfillment error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_schedule_fulfillment',
@@ -297,7 +298,7 @@ router.get('/schedules/:tenantId', authenticateToken, async (req: Request, res: 
       total: result.total,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Get schedules error:', error);
+    logger.error('[Fulfillment] Get schedules error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_schedules',
@@ -382,7 +383,7 @@ router.post('/notifications', authenticateToken, async (req: Request, res: Respo
       notification,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Create notification error:', error);
+    logger.error('[Fulfillment] Create notification error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_create_notification',
@@ -429,7 +430,7 @@ router.get('/stats/:tenantId', authenticateToken, async (req: Request, res: Resp
       stats,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Get stats error:', error);
+    logger.error('[Fulfillment] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_stats',
@@ -508,7 +509,7 @@ router.put('/schedule/:orderId/status', authenticateToken, async (req: Request, 
       schedule,
     });
   } catch (error: any) {
-    console.error('[Fulfillment] Update schedule status error:', error);
+    logger.error('[Fulfillment] Update schedule status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_update_status',

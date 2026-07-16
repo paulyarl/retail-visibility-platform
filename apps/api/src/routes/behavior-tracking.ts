@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import BehaviorTrackingService from '../services/BehaviorTrackingService';
 import { extractTrackingIdentity, TrackingIdentity } from '../utils/auth0Identity';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -57,7 +58,7 @@ router.post('/events', async (req, res) => {
       message: 'Behavior event tracked successfully'
     });
   } catch (error) {
-    console.error('Behavior event tracking failed:', error);
+    logger.error('Behavior event tracking failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to track behavior event',
@@ -109,7 +110,7 @@ router.post('/events/batch', async (req, res) => {
       message: `${events.length} events batch tracked successfully`
     });
   } catch (error) {
-    console.error('Batch event tracking failed:', error);
+    logger.error('Batch event tracking failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to batch track events',
@@ -150,7 +151,7 @@ router.post('/sessions', async (req, res) => {
       message: 'Session data saved successfully'
     });
   } catch (error) {
-    console.error('Session save failed:', error);
+    logger.error('Session save failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to save session data',
@@ -178,7 +179,7 @@ router.get('/analytics', async (req, res) => {
       message: 'Behavior analytics retrieved successfully'
     });
   } catch (error) {
-    console.error('Behavior analytics retrieval failed:', error);
+    logger.error('Behavior analytics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve behavior analytics',
@@ -209,7 +210,7 @@ router.get('/patterns/:userId', async (req, res) => {
       message: 'User behavior patterns retrieved successfully'
     });
   } catch (error) {
-    console.error('User behavior patterns retrieval failed:', error);
+    logger.error('User behavior patterns retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve user behavior patterns',
@@ -244,7 +245,7 @@ router.get('/session/:sessionId', async (req, res) => {
       message: 'Session data retrieved successfully'
     });
   } catch (error) {
-    console.error('Session data retrieval failed:', error);
+    logger.error('Session data retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve session data',
@@ -272,7 +273,7 @@ router.post('/session/:sessionId/end', async (req, res) => {
       message: 'Session ended successfully'
     });
   } catch (error) {
-    console.error('Session ending failed:', error);
+    logger.error('Session ending failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to end session',
@@ -300,7 +301,7 @@ router.put('/config', async (req, res) => {
       message: 'Tracking configuration updated successfully'
     });
   } catch (error) {
-    console.error('Tracking config update failed:', error);
+    logger.error('Tracking config update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update tracking configuration',
@@ -326,7 +327,7 @@ router.get('/config', async (req, res) => {
       message: 'Tracking configuration retrieved successfully'
     });
   } catch (error) {
-    console.error('Tracking config retrieval failed:', error);
+    logger.error('Tracking config retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tracking configuration',
@@ -362,7 +363,7 @@ router.get('/metrics', async (req, res) => {
       message: 'Behavior metrics retrieved successfully'
     });
   } catch (error) {
-    console.error('Behavior metrics retrieval failed:', error);
+    logger.error('Behavior metrics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve behavior metrics',

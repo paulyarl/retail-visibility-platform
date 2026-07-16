@@ -9,6 +9,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { authenticateToken } from '../../middleware/auth';
 import { requireTierFeature } from '../../middleware/tier-access';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.get('/:tenantId/square/status', authenticateToken, async (req: Request, r
     });
 
   } catch (error) {
-    console.error('Error fetching Square status:', error);
+    logger.error('Error fetching Square status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -67,7 +68,7 @@ router.get('/:tenantId/square/oauth/authorize', authenticateToken, requireTierFe
       message: 'Square OAuth integration coming soon'
     });
   } catch (error) {
-    console.error('Error generating Square OAuth URL:', error);
+    logger.error('Error generating Square OAuth URL:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -83,7 +84,7 @@ router.get('/:tenantId/square/oauth/callback', async (req: Request, res: Respons
       message: 'Square OAuth integration coming soon'
     });
   } catch (error) {
-    console.error('Error in Square OAuth callback:', error);
+    logger.error('Error in Square OAuth callback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -99,7 +100,7 @@ router.post('/:tenantId/square/disconnect', authenticateToken, requireTierFeatur
       message: 'Square integration coming soon'
     });
   } catch (error) {
-    console.error('Error disconnecting Square:', error);
+    logger.error('Error disconnecting Square:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -115,7 +116,7 @@ router.post('/:tenantId/square/sync', authenticateToken, requireTierFeature('int
       message: 'Square sync coming soon'
     });
   } catch (error) {
-    console.error('Error syncing Square:', error);
+    logger.error('Error syncing Square:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error' });
   }
 });

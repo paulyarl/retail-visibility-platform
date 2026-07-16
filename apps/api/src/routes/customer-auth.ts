@@ -17,6 +17,7 @@ import { Router, Request, Response } from 'express';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 const customerAuthService = CustomerAuthService.getInstance();
@@ -76,7 +77,7 @@ router.post('/register', async (req: Request, res: Response) => {
       tokens, // Return tokens to frontend
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Register error:', error);
+    logger.error('[CustomerAuth API] Register error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -132,7 +133,7 @@ router.post('/login', async (req: Request, res: Response) => {
       tokens, // Return tokens to frontend
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Login error:', error);
+    logger.error('[CustomerAuth API] Login error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -201,7 +202,7 @@ router.post('/oauth/:provider', async (req: Request, res: Response) => {
       tokens, // Return tokens to frontend
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] OAuth error:', error);
+    logger.error('[CustomerAuth API] OAuth error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -242,7 +243,7 @@ router.post('/verify-email', async (req: Request, res: Response) => {
       message: 'Email verified successfully',
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Verify email error:', error);
+    logger.error('[CustomerAuth API] Verify email error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -276,7 +277,7 @@ router.post('/request-reset', async (req: Request, res: Response) => {
       message: 'If an account exists with this email, you will receive a reset link.',
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Request reset error:', error);
+    logger.error('[CustomerAuth API] Request reset error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -333,7 +334,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       message: 'Password reset successfully',
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Reset password error:', error);
+    logger.error('[CustomerAuth API] Reset password error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -384,7 +385,7 @@ router.post('/logout', async (req: Request, res: Response) => {
       message: 'Logged out successfully',
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Logout error:', error);
+    logger.error('[CustomerAuth API] Logout error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.json({
       success: true,
       message: 'Logged out successfully',
@@ -446,7 +447,7 @@ router.put('/profile', async (req: Request, res: Response) => {
       message: 'Profile updated successfully',
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Update profile error:', error);
+    logger.error('[CustomerAuth API] Update profile error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -519,7 +520,7 @@ router.put('/password', async (req: Request, res: Response) => {
       message: 'Password changed successfully',
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Change password error:', error);
+    logger.error('[CustomerAuth API] Change password error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -582,7 +583,7 @@ router.get('/me', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[CustomerAuth API] Get me error:', error);
+    logger.error('[CustomerAuth API] Get me error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',

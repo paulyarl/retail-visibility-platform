@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { requirePlatformAdmin } from '../../middleware/auth';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -106,7 +107,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[ADMIN NOTIFICATIONS] Error:', error);
+    logger.error('[ADMIN NOTIFICATIONS] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'failed_to_fetch_logs',
       message: 'Failed to fetch notification logs',
@@ -202,7 +203,7 @@ router.get('/stats', requirePlatformAdmin, async (req: Request, res: Response) =
       daily: [], // Placeholder - can implement with date range iteration if needed
     });
   } catch (error: any) {
-    console.error('[ADMIN NOTIFICATIONS STATS] Error:', error);
+    logger.error('[ADMIN NOTIFICATIONS STATS] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'failed_to_fetch_stats',
       message: 'Failed to fetch notification statistics',
@@ -246,7 +247,7 @@ router.get('/:id', requirePlatformAdmin, async (req: Request, res: Response) => 
       tenant,
     });
   } catch (error: any) {
-    console.error('[ADMIN NOTIFICATIONS] Error fetching log:', error);
+    logger.error('[ADMIN NOTIFICATIONS] Error fetching log:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'failed_to_fetch_log',
       message: 'Failed to fetch notification log',

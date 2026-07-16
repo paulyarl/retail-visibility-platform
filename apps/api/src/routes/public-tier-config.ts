@@ -5,6 +5,7 @@
  */
 import { Router } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -91,7 +92,7 @@ router.get('/', async (_req, res) => {
       limits,
     });
   } catch (error) {
-    console.error('[GET /api/public/tier-config] Error:', error);
+    logger.error('[GET /api/public/tier-config] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_load_tier_config' });
   }
 });

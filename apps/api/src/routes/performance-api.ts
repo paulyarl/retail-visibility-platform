@@ -9,6 +9,7 @@ import { Router } from 'express';
 import ShopsPerformanceMonitor from '../services/ShopsPerformanceMonitor';
 import ShopsPerformanceTester from '../services/ShopsPerformanceTester';
 import ShopsFeaturedService from '../services/ShopsFeaturedService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/dashboard', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Dashboard error:', error);
+    logger.error('[PERFORMANCE API] Dashboard error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch dashboard data'
@@ -59,7 +60,7 @@ router.get('/report/:tenantId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Report error:', error);
+    logger.error('[PERFORMANCE API] Report error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to generate performance report'
@@ -86,7 +87,7 @@ router.post('/optimize/:tenantId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Optimization error:', error);
+    logger.error('[PERFORMANCE API] Optimization error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to optimize cache'
@@ -115,7 +116,7 @@ router.get('/export', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Export error:', error);
+    logger.error('[PERFORMANCE API] Export error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to export performance data'
@@ -143,7 +144,7 @@ router.delete('/clear/:tenantId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Clear error:', error);
+    logger.error('[PERFORMANCE API] Clear error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear performance history'
@@ -184,7 +185,7 @@ router.post('/load-test', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Load test error:', error);
+    logger.error('[PERFORMANCE API] Load test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to run load test'
@@ -217,7 +218,7 @@ router.post('/cache-test', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Cache test error:', error);
+    logger.error('[PERFORMANCE API] Cache test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to test cache effectiveness'
@@ -241,7 +242,7 @@ router.get('/benchmarks', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Benchmarks error:', error);
+    logger.error('[PERFORMANCE API] Benchmarks error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to run benchmarks'
@@ -266,7 +267,7 @@ router.get('/full-report/:tenantId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Full report error:', error);
+    logger.error('[PERFORMANCE API] Full report error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to generate performance report'
@@ -319,7 +320,7 @@ router.get('/health', async (req, res) => {
       data: health
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Health check error:', error);
+    logger.error('[PERFORMANCE API] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check system health'
@@ -366,7 +367,7 @@ router.get('/stats', async (req, res) => {
       data: stats
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Stats error:', error);
+    logger.error('[PERFORMANCE API] Stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch system statistics'
@@ -454,7 +455,7 @@ router.post('/cache/warm/:tenantId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Cache warm error:', error);
+    logger.error('[PERFORMANCE API] Cache warm error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to warm cache'
@@ -483,7 +484,7 @@ router.delete('/cache/clear/:tenantId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[PERFORMANCE API] Cache clear error:', error);
+    logger.error('[PERFORMANCE API] Cache clear error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'

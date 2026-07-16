@@ -4,6 +4,7 @@ import { prisma } from '../prisma'
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth'
 import { audit } from '../audit'
 import { invalidateEffectiveFlagCaches } from '../utils/effectiveFlags'
+import { logger } from '../logger';
 
 const router = Router()
 
@@ -94,7 +95,7 @@ router.post('/platform-flags/:flag/override', requirePlatformAdmin, async (req, 
     if (error.code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Flag not found' })
     }
-    console.error('[platform-flags] Override error:', error)
+    logger.error('[platform-flags] Override error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message || 'Failed to override flag' })
   }
 })

@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { randomUUID } from 'crypto';
 import { generateQuickStart } from '../lib/id-generator';
+import { logger } from '../logger';
 
 /**
  * Middleware to log all write operations to audit_log table
@@ -26,7 +27,7 @@ export async function auditLogger(req: Request, res: Response, next: NextFunctio
     if (res.statusCode < 400) {
       // Don't await - log asynchronously
       logAudit(req, res, requestId).catch(err => {
-        console.error('[Audit] Failed to log:', err.message);
+        logger.error('[Audit] Failed to log:', undefined, { error: { name: 'Error', message: String(err.message) } });
       });
     }
     return originalJson(body);
@@ -90,6 +91,6 @@ async function logAudit(req: Request, res: Response, requestId: string) {
     });
   } catch (err: any) {
     // Don't fail the request if audit logging fails
-    console.error('[Audit] Error:', err.message);
+    logger.error('[Audit] Error:', undefined, { error: { name: 'Error', message: String(err.message) } });
   }
 }

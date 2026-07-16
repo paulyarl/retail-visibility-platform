@@ -22,6 +22,7 @@ import storefrontPolicyService from '../services/StorefrontPolicyService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 import type { PolicyType } from '../services/StorefrontPolicyService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.get('/public/policy-templates', async (req, res) => {
     });
     res.json({ success: true, templates });
   } catch (error) {
-    console.error('Error fetching public policy templates:', error);
+    logger.error('Error fetching public policy templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch templates' });
   }
 });
@@ -109,7 +110,7 @@ router.get('/public/policy-templates/:id', async (req, res) => {
     }
     res.json({ success: true, template });
   } catch (error) {
-    console.error('Error fetching policy template:', error);
+    logger.error('Error fetching policy template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch template' });
   }
 });
@@ -136,7 +137,7 @@ router.get('/tenants/:tenantId/storefront-policies/templates', authenticateToken
     const templates = await policyTemplateService.getTemplatesForTenant(tenantId);
     res.json({ success: true, templates });
   } catch (error) {
-    console.error('Error fetching tenant policy templates:', error);
+    logger.error('Error fetching tenant policy templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch templates' });
   }
 });
@@ -151,7 +152,7 @@ router.get('/tenants/:tenantId/storefront-policies/templates/recommended', authe
     const recommended = await policyTemplateService.getRecommendedTemplates(tenantId);
     res.json({ success: true, recommended });
   } catch (error) {
-    console.error('Error fetching recommended templates:', error);
+    logger.error('Error fetching recommended templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch recommendations' });
   }
 });
@@ -166,7 +167,7 @@ router.get('/tenants/:tenantId/storefront-policies/templates/usage', authenticat
     const usage = await policyTemplateService.getTemplateUsage(tenantId);
     res.json({ success: true, usage });
   } catch (error) {
-    console.error('Error fetching template usage:', error);
+    logger.error('Error fetching template usage:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch usage' });
   }
 });
@@ -181,7 +182,7 @@ router.get('/tenants/:tenantId/storefront-policies/completeness', authenticateTo
     const completeness = await policyTemplateService.getPolicyCompleteness(tenantId);
     res.json({ success: true, completeness });
   } catch (error) {
-    console.error('Error fetching policy completeness:', error);
+    logger.error('Error fetching policy completeness:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch completeness' });
   }
 });
@@ -208,7 +209,7 @@ router.get('/tenants/:tenantId/storefront-policies/templates/outdated', authenti
     }));
     res.json({ success: true, outdated: result });
   } catch (error) {
-    console.error('Error fetching outdated templates:', error);
+    logger.error('Error fetching outdated templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch outdated templates' });
   }
 });
@@ -227,7 +228,7 @@ router.get('/tenants/:tenantId/storefront-policies/templates/:templateId/auto-fi
     const defaults = await policyTemplateService.autoFillPlaceholderDefaults(tenantId, template);
     res.json({ success: true, defaults });
   } catch (error) {
-    console.error('Error fetching auto-fill defaults:', error);
+    logger.error('Error fetching auto-fill defaults:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch defaults' });
   }
 });
@@ -293,7 +294,7 @@ router.post('/tenants/:tenantId/storefront-policies/templates/apply', authentica
 
     res.json({ success: true, policy_type: template.policyType, policies: updated });
   } catch (error) {
-    console.error('Error applying policy template:', error);
+    logger.error('Error applying policy template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to apply template' });
   }
 });
@@ -311,7 +312,7 @@ router.get('/admin/policy-templates/needing-review', authenticateToken, requireP
     const needingReview = await policyTemplateService.getTemplatesNeedingReview();
     res.json({ success: true, needingReview });
   } catch (error) {
-    console.error('Error fetching templates needing review:', error);
+    logger.error('Error fetching templates needing review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch needing review' });
   }
 });
@@ -332,7 +333,7 @@ router.get('/admin/policy-templates', authenticateToken, requirePlatformAdmin, a
     });
     res.json({ success: true, templates });
   } catch (error) {
-    console.error('Error fetching admin policy templates:', error);
+    logger.error('Error fetching admin policy templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch templates' });
   }
 });
@@ -369,7 +370,7 @@ router.post('/admin/policy-templates', authenticateToken, requirePlatformAdmin, 
 
     res.json({ success: true, template });
   } catch (error) {
-    console.error('Error creating policy template:', error);
+    logger.error('Error creating policy template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to create template' });
   }
 });
@@ -407,7 +408,7 @@ router.put('/admin/policy-templates/:id', authenticateToken, requirePlatformAdmi
 
     res.json({ success: true, template });
   } catch (error) {
-    console.error('Error updating policy template:', error);
+    logger.error('Error updating policy template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update template' });
   }
 });
@@ -421,7 +422,7 @@ router.delete('/admin/policy-templates/:id', authenticateToken, requirePlatformA
     await policyTemplateService.deleteTemplate(req.params.id);
     res.json({ success: true, message: 'Template deactivated' });
   } catch (error) {
-    console.error('Error deactivating policy template:', error);
+    logger.error('Error deactivating policy template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to deactivate template' });
   }
 });

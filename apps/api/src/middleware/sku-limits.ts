@@ -16,6 +16,7 @@ import { prisma } from '../prisma';
 import { getSKULimit } from '../utils/tier-limits';
 import TierService from '../services/TierService';
 import { getMaintenanceState } from '../utils/subscription-status';
+import { logger } from '../logger';
 
 /**
  * Validate SKU limits for product creation/import
@@ -99,7 +100,7 @@ export async function validateSKULimits(
     console.log(`[SKU Limits] Validated: ${currentCount} + ${productCount} = ${totalAfter} / ${skuLimit} for tier ${tier}`);
     next();
   } catch (error) {
-    console.error('[validateSKULimits] Error:', error);
+    logger.error('[validateSKULimits] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'sku_validation_failed',
       message: 'Failed to validate SKU limits',
@@ -162,7 +163,7 @@ export async function validateTierSKUCompatibility(
     console.log(`[SKU Limits] Tier change validated: ${currentCount} SKUs fits in ${subscriptionTier} limit of ${newLimit}`);
     next();
   } catch (error) {
-    console.error('[validateTierSKUCompatibility] Error:', error);
+    logger.error('[validateTierSKUCompatibility] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'tier_sku_compatibility_check_failed',
       message: 'Failed to validate tier SKU compatibility',

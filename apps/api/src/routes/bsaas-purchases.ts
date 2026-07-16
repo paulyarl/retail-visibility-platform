@@ -741,7 +741,7 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: catalogWithStatus });
   } catch (error: any) {
-    console.error('[BSaaS] Error fetching feature catalog:', error);
+    logger.error('[BSaaS] Error fetching feature catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch feature catalog' });
   }
 });
@@ -850,7 +850,7 @@ router.get('/feature-purchases', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: purchases });
   } catch (error: any) {
-    console.error('[BSaaS] Error listing purchases:', error);
+    logger.error('[BSaaS] Error listing purchases:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to list purchases' });
   }
 });
@@ -1258,7 +1258,7 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error purchasing feature:', error);
+    logger.error('[BSaaS] Error purchasing feature:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase feature' });
   }
 });
@@ -1602,7 +1602,7 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error purchasing bundle:', error);
+    logger.error('[BSaaS] Error purchasing bundle:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase bundle' });
   }
 });
@@ -1672,7 +1672,7 @@ router.post('/validate-promo', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error validating promo code:', error);
+    logger.error('[BSaaS] Error validating promo code:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to validate promo code' });
   }
 });
@@ -1818,7 +1818,7 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error cancelling purchase:', error);
+    logger.error('[BSaaS] Error cancelling purchase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to cancel purchase' });
   }
 });
@@ -1994,7 +1994,7 @@ router.post('/redeem-grant', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error redeeming grant token:', error);
+    logger.error('[BSaaS] Error redeeming grant token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to redeem grant token' });
   }
 });

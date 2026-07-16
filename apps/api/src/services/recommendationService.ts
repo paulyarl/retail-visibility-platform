@@ -7,6 +7,7 @@
 
 import { Pool } from 'pg';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 export interface Recommendation {
   tenantId: string;
@@ -186,7 +187,7 @@ export async function getStoresViewedBySameUsers(
     };
 
   } catch (error) {
-    console.error('Error in getStoresViewedBySameUsers:', error);
+    logger.error('Error in getStoresViewedBySameUsers:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'same_users', generatedAt: new Date() };
   }
 }
@@ -281,7 +282,7 @@ export async function getPopularStoresInCategory(
     };
 
   } catch (error) {
-    console.error('Error in getPopularStoresInCategory:', error);
+    logger.error('Error in getPopularStoresInCategory:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'popular_category', generatedAt: new Date() };
   }
 }
@@ -397,7 +398,7 @@ export async function getTrendingNearby(
     };
 
   } catch (error) {
-    console.error('Error in getTrendingNearby:', error);
+    logger.error('Error in getTrendingNearby:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'trending_nearby', generatedAt: new Date() };
   }
 }
@@ -478,7 +479,7 @@ export async function trackUserBehavior({
     await pool.query(query, queryParams);
 
   } catch (error) {
-    console.error('Error tracking user behavior:', error);
+    logger.error('Error tracking user behavior:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw - tracking failures shouldn't break the app
   }
 }
@@ -668,7 +669,7 @@ export async function getProductsViewedBySameUsers(
     };
 
   } catch (error) {
-    console.error('Error in getProductsViewedBySameUsers:', error);
+    logger.error('Error in getProductsViewedBySameUsers:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'same_users_products', generatedAt: new Date() };
   }
 }
@@ -770,7 +771,7 @@ export async function getStoresInUserFavoriteCategories(
     };
 
   } catch (error) {
-    console.error('Error in getStoresInUserFavoriteCategories:', error);
+    logger.error('Error in getStoresInUserFavoriteCategories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'user_favorite_categories_enhanced', generatedAt: new Date() };
   }
 }
@@ -942,7 +943,7 @@ export async function getSimilarStoresInCategory(
     };
 
   } catch (error) {
-    console.error('Error in getSimilarStoresInCategory:', error);
+    logger.error('Error in getSimilarStoresInCategory:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'similar_category', generatedAt: new Date() };
   }
 }
@@ -1194,7 +1195,7 @@ export async function getLastViewedItems(
     };
 
   } catch (error) {
-    console.error('Error in getLastViewedItems:', error);
+    logger.error('Error in getLastViewedItems:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { recommendations: [], algorithm: 'last_viewed', generatedAt: new Date() };
   }
 }
@@ -1251,7 +1252,7 @@ export async function getUserBadgePreferences(
 
     return preferences;
   } catch (error) {
-    console.error('Error in getUserBadgePreferences:', error);
+    logger.error('Error in getUserBadgePreferences:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return new Map<string, number>();
   }
 }

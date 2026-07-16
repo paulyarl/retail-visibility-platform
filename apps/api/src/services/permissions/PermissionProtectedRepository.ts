@@ -17,6 +17,7 @@
 
 import { permissionServiceFactory } from './PermissionServiceFactory';
 import { PermissionError } from './PermissionDecorators';
+import { logger } from '../../logger';
 
 // Repository operation types
 export type RepositoryOperation = 'create' | 'read' | 'update' | 'delete' | 'list';
@@ -80,7 +81,7 @@ export abstract class PermissionProtectedRepository {
       }
     } catch (error) {
       if (error instanceof PermissionError) throw error;
-      console.error(`[PermissionProtectedRepository] Error enforcing feature:`, error);
+      logger.error(`[PermissionProtectedRepository] Error enforcing feature:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new PermissionError(
         'Permission check failed',
         'PERMISSION_CHECK_FAILED',
@@ -129,7 +130,7 @@ export abstract class PermissionProtectedRepository {
       }
     } catch (error) {
       if (error instanceof PermissionError) throw error;
-      console.error(`[PermissionProtectedRepository] Error enforcing limit:`, error);
+      logger.error(`[PermissionProtectedRepository] Error enforcing limit:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new PermissionError(
         'Permission check failed',
         'PERMISSION_CHECK_FAILED',
@@ -169,7 +170,7 @@ export abstract class PermissionProtectedRepository {
       }
     } catch (error) {
       if (error instanceof PermissionError) throw error;
-      console.error(`[PermissionProtectedRepository] Error enforcing access:`, error);
+      logger.error(`[PermissionProtectedRepository] Error enforcing access:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new PermissionError(
         'Permission check failed',
         'PERMISSION_CHECK_FAILED',

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -120,7 +121,7 @@ router.post('/publish', async (req, res) => {
       message: 'Publishing job started successfully'
     });
   } catch (error) {
-    console.error('[Publish Shop Error]', error);
+    logger.error('[Publish Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -164,7 +165,7 @@ router.get('/status/:jobId', async (req, res) => {
       data: jobStatus
     });
   } catch (error) {
-    console.error('[Get Publishing Status Error]', error);
+    logger.error('[Get Publishing Status Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -211,7 +212,7 @@ router.get('/:tenantId/history', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Get Publishing History Error]', error);
+    logger.error('[Get Publishing History Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -283,7 +284,7 @@ router.post('/validate', async (req, res) => {
       data: validationResults
     });
   } catch (error) {
-    console.error('[Validate Shop Data Error]', error);
+    logger.error('[Validate Shop Data Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -330,7 +331,7 @@ router.delete('/:tenantId', async (req, res) => {
       message: 'Shop unpublished successfully'
     });
   } catch (error) {
-    console.error('[Unpublish Shop Error]', error);
+    logger.error('[Unpublish Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

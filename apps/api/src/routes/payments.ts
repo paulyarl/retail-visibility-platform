@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { PaymentGatewayFactory } from '../services/payments/PaymentGatewayFactory';
 import { PlatformFeeCalculator } from '../services/payments/PlatformFeeCalculator';
 import { stripeConnectService } from '../services/payments/StripeConnectService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -138,7 +139,7 @@ router.post('/:orderId/payments/authorize', async (req: Request, res: Response) 
       },
     });
   } catch (error: any) {
-    console.error('[Payments] Authorization error:', error);
+    logger.error('[Payments] Authorization error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'authorization_error',
@@ -249,7 +250,7 @@ router.post('/:orderId/payments/capture', async (req: Request, res: Response) =>
           });
         }
       } catch (revenueError) {
-        console.error('[Payments] Failed to record revenue transaction:', revenueError);
+        logger.error('[Payments] Failed to record revenue transaction:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
         // Don't fail the capture if revenue recording fails
       }
     }
@@ -286,7 +287,7 @@ router.post('/:orderId/payments/capture', async (req: Request, res: Response) =>
       captured_amount: captureAmount,
     });
   } catch (error: any) {
-    console.error('[Payments] Capture error:', error);
+    logger.error('[Payments] Capture error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'capture_error',
@@ -439,7 +440,7 @@ router.post('/:orderId/payments/charge', async (req: Request, res: Response) => 
       },
     });
   } catch (error: any) {
-    console.error('[Payments] Charge error:', error);
+    logger.error('[Payments] Charge error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'charge_error',
@@ -566,7 +567,7 @@ router.post('/:paymentId/refund', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[Payments] Refund error:', error);
+    logger.error('[Payments] Refund error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'refund_error',
@@ -621,7 +622,7 @@ router.get('/:paymentId', async (req: Request, res: Response) => {
       payment: payment,
     });
   } catch (error: any) {
-    console.error('[Payments] Get payment error:', error);
+    logger.error('[Payments] Get payment error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'get_payment_error',
@@ -677,7 +678,7 @@ router.get('/:orderId/payments', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[Payments] Get order payments error:', error);
+    logger.error('[Payments] Get order payments error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'get_payments_error',

@@ -12,6 +12,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface PayPalOnboardingResult {
   success: boolean;
@@ -99,7 +100,7 @@ export class PayPalConnectService {
       const data = await response.json() as { access_token?: string; expires_in?: number };
 
       if (!response.ok || !data.access_token) {
-        console.error('[PayPalConnect] Failed to get access token:', data);
+        logger.error('[PayPalConnect] Failed to get access token:', undefined, { error: { name: (data as any)?.name || 'Error', message: (data as any)?.message || String(data), stack: (data as any)?.stack } });
         return null;
       }
 
@@ -108,7 +109,7 @@ export class PayPalConnectService {
 
       return this.accessToken;
     } catch (error) {
-      console.error('[PayPalConnect] Error getting access token:', error);
+      logger.error('[PayPalConnect] Error getting access token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -216,7 +217,7 @@ export class PayPalConnectService {
       };
 
       if (!response.ok) {
-        console.error('[PayPalConnect] Failed to create referral:', data);
+        logger.error('[PayPalConnect] Failed to create referral:', undefined, { error: { name: (data as any)?.name || 'Error', message: (data as any)?.message || String(data), stack: (data as any)?.stack } });
         return {
           success: false,
           error: 'Failed to create onboarding link',
@@ -248,7 +249,7 @@ export class PayPalConnectService {
         merchantId: data.id,
       };
     } catch (error: any) {
-      console.error('[PayPalConnect] Error creating onboarding link:', error);
+      logger.error('[PayPalConnect] Error creating onboarding link:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to create onboarding link',
@@ -302,7 +303,7 @@ export class PayPalConnectService {
 
       return { success: true };
     } catch (error: any) {
-      console.error('[PayPalConnect] Error handling callback:', error);
+      logger.error('[PayPalConnect] Error handling callback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: error.message };
     }
   }
@@ -390,7 +391,7 @@ export class PayPalConnectService {
       };
 
       if (!response.ok) {
-        console.error('[PayPalConnect] Failed to create order:', data);
+        logger.error('[PayPalConnect] Failed to create order:', undefined, { error: { name: (data as any)?.name || 'Error', message: (data as any)?.message || String(data), stack: (data as any)?.stack } });
         return {
           success: false,
           error: data.message || 'Failed to create PayPal order',
@@ -406,7 +407,7 @@ export class PayPalConnectService {
         platformFeeCents,
       };
     } catch (error: any) {
-      console.error('[PayPalConnect] Error creating order:', error);
+      logger.error('[PayPalConnect] Error creating order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to create order',
@@ -458,7 +459,7 @@ export class PayPalConnectService {
       };
 
       if (!response.ok) {
-        console.error('[PayPalConnect] Failed to capture order:', data);
+        logger.error('[PayPalConnect] Failed to capture order:', undefined, { error: { name: (data as any)?.name || 'Error', message: (data as any)?.message || String(data), stack: (data as any)?.stack } });
         return {
           success: false,
           error: data.message || 'Failed to capture payment',
@@ -505,7 +506,7 @@ export class PayPalConnectService {
         captureId: capture?.id,
       };
     } catch (error: any) {
-      console.error('[PayPalConnect] Error capturing order:', error);
+      logger.error('[PayPalConnect] Error capturing order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to capture payment',
@@ -564,7 +565,7 @@ export class PayPalConnectService {
         status: isEnabled ? 'enabled' : 'restricted',
       };
     } catch (error: any) {
-      console.error('[PayPalConnect] Error refreshing status:', error);
+      logger.error('[PayPalConnect] Error refreshing status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: error.message };
     }
   }

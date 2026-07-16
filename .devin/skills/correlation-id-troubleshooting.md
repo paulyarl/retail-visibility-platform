@@ -208,6 +208,10 @@ curl -H "Authorization: Bearer <ADMIN_TOKEN>" \
 
 Client error context includes: `url` (page URL), `user_agent`, `client_timestamp`, `stack_trace`.
 
+### Stack trace quality
+
+Client error `stack_trace` values contain the **real error location** (not the logger internals) because all error capture surfaces (`GlobalErrorHandler`, `ErrorBoundary`, `global-error.tsx`) pass the original `Error` object to `clientLogger.error()`. In production, stack traces are minified — Sentry de-minifies them using source maps uploaded during build (see `structured-logging.md` → Sentry config notes).
+
 ### Correlating client and server errors
 
 - **Both client + server errors with same ID**: server error is likely root cause; client error is downstream symptom
@@ -331,6 +335,7 @@ This sets `resolved=true`, `resolved_at=now()`, and `resolved_by=<admin_user_id>
 - **sessionStorage cleared on logout**: `clearCorrelationId()` is called on logout. If a user logs out and back in, they get a new correlation ID — the old one won't trace subsequent requests.
 - **Background jobs without correlation ID**: Jobs triggered by cron (not by a request) won't have a correlation ID unless the job code explicitly generates one. Search by tenant or service name instead.
 - **File logs on container restart**: If the API runs in a container, file logs may be lost on restart. The database is the persistent source of truth for errors.
+- **Minified client stack traces**: In production, client `stack_trace` values are minified (e.g., `at o.aW (chunk-abc.js:1:2345)`). Sentry de-minifies these using source maps uploaded during build. The admin error log API returns the raw minified stack — use Sentry's UI or the `sentry_event_id` cross-reference for readable traces. Source map upload requires `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` env vars at build time.
 
 ---
 

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import TierService from '../services/TierService';
 import { getMaintenanceState } from '../utils/subscription-status';
+import { logger } from '../logger';
 
 /**
  * Tier-Based Feature Access Control
@@ -408,7 +409,7 @@ export function requireTierFeature(feature: string) {
       // Access granted
       next();
     } catch (error) {
-      console.error('[requireTierFeature] Error:', error);
+      logger.error('[requireTierFeature] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'feature_check_failed',
         message: 'Failed to check feature access',
@@ -475,7 +476,7 @@ export function requireAnyTierFeature(features: string[]) {
       
       next();
     } catch (error) {
-      console.error('[requireAnyTierFeature] Error:', error);
+      logger.error('[requireAnyTierFeature] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({ error: 'feature_check_failed' });
     }
   };
@@ -531,7 +532,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
 
     return next();
   } catch (error) {
-    console.error('[requireWritableSubscription] Error:', error);
+    logger.error('[requireWritableSubscription] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'subscription_check_failed',
       message: 'Failed to check subscription status',

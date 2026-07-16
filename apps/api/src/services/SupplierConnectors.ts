@@ -319,7 +319,7 @@ export class BarcodeLookupConnector implements SupplierConnector {
     } catch (error: any) {
       logger.warn('BarcodeLookup.com fetchByBarcode failed', undefined, {
         gtin,
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return null;
     }
@@ -360,7 +360,7 @@ export class BarcodeLookupConnector implements SupplierConnector {
     } catch (error: any) {
       logger.warn('BarcodeLookup.com searchByText failed', undefined, {
         query,
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return [];
     }
@@ -420,7 +420,7 @@ export class GoUpcConnector implements SupplierConnector {
     } catch (error: any) {
       logger.warn('Go-UPC fetchByBarcode failed', undefined, {
         gtin,
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return null;
     }
@@ -482,7 +482,7 @@ export class KrogerConnector implements SupplierConnector {
       return this.token;
     } catch (error: any) {
       logger.warn('Kroger OAuth2 token fetch failed', undefined, {
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return null;
     }
@@ -565,7 +565,7 @@ export class KrogerConnector implements SupplierConnector {
     } catch (error: any) {
       logger.warn('Kroger fetchByBarcode failed', undefined, {
         gtin,
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return null;
     }
@@ -611,7 +611,7 @@ export class KrogerConnector implements SupplierConnector {
     } catch (error: any) {
       logger.warn('Kroger searchByText failed', undefined, {
         query,
-        error: { name: error?.name, message: error?.message },
+        error: { name: (error as any)?.name, message: (error as any)?.message },
       });
       return [];
     }

@@ -13,6 +13,7 @@ import { requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { paypalConnectService } from '../services/payments/PayPalConnectService';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get('/status', requireAdmin, async (req: Request, res: Response) => {
       configured: isConfigured,
     });
   } catch (error) {
-    console.error('[PayPalConnect] Error checking status:', error);
+    logger.error('[PayPalConnect] Error checking status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'status_check_failed',
@@ -72,7 +73,7 @@ router.get('/merchants', requireAdmin, async (req: Request, res: Response) => {
       connections: result,
     });
   } catch (error) {
-    console.error('[PayPalConnect] Error listing merchants:', error);
+    logger.error('[PayPalConnect] Error listing merchants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_failed',
@@ -114,7 +115,7 @@ router.post('/merchants/:tenantId/onboarding', requireAdmin, async (req: Request
       merchant_id: result.merchantId,
     });
   } catch (error: any) {
-    console.error('[PayPalConnect] Error creating onboarding:', error);
+    logger.error('[PayPalConnect] Error creating onboarding:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'onboarding_failed',
@@ -155,7 +156,7 @@ router.post('/merchants/:tenantId/callback', requireAdmin, async (req: Request, 
       message: 'PayPal onboarding completed',
     });
   } catch (error: any) {
-    console.error('[PayPalConnect] Error handling callback:', error);
+    logger.error('[PayPalConnect] Error handling callback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'callback_failed',
@@ -187,7 +188,7 @@ router.post('/merchants/:tenantId/refresh', requireAdmin, async (req: Request, r
       status: result.status,
     });
   } catch (error: any) {
-    console.error('[PayPalConnect] Error refreshing status:', error);
+    logger.error('[PayPalConnect] Error refreshing status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'refresh_failed',
@@ -229,7 +230,7 @@ router.put('/merchants/:tenantId/fee', requireAdmin, async (req: Request, res: R
       connection: updated,
     });
   } catch (error) {
-    console.error('[PayPalConnect] Error updating fee:', error);
+    logger.error('[PayPalConnect] Error updating fee:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fee_update_failed',
@@ -283,7 +284,7 @@ router.post('/tenants/:tenantId/paypal/orders', async (req: Request, res: Respon
       platform_fee_cents: result.platformFeeCents,
     });
   } catch (error: any) {
-    console.error('[PayPalConnect] Error creating order:', error);
+    logger.error('[PayPalConnect] Error creating order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_failed',
@@ -317,7 +318,7 @@ router.post('/tenants/:tenantId/paypal/orders/:orderId/capture', async (req: Req
       net_to_merchant_cents: result.netToMerchantCents,
     });
   } catch (error: any) {
-    console.error('[PayPalConnect] Error capturing order:', error);
+    logger.error('[PayPalConnect] Error capturing order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'capture_failed',

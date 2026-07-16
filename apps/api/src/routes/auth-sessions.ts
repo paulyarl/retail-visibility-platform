@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { authenticateToken, optionalAuth } from '../middleware/auth';
 import { basePrisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ router.get('/sessions', optionalAuth, async (req, res) => {
       total: sessionsWithCurrent.length,
     });
   } catch (error) {
-    console.error('[GET /api/auth/sessions] Error:', error);
+    logger.error('[GET /api/auth/sessions] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
@@ -132,7 +133,7 @@ router.delete('/sessions/:sessionId', optionalAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Session revoked successfully' });
   } catch (error) {
-    console.error('[DELETE /api/auth/sessions/:sessionId] Error:', error);
+    logger.error('[DELETE /api/auth/sessions/:sessionId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to revoke session' });
   }
 });
@@ -182,7 +183,7 @@ router.post('/sessions/revoke-all', optionalAuth, async (req, res) => {
       revokedCount: result 
     });
   } catch (error) {
-    console.error('[POST /api/auth/sessions/revoke-all] Error:', error);
+    logger.error('[POST /api/auth/sessions/revoke-all] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to revoke sessions' });
   }
 });
@@ -210,7 +211,7 @@ router.put('/sessions/:sessionId/activity', optionalAuth, async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[PUT /api/auth/sessions/:sessionId/activity] Error:', error);
+    logger.error('[PUT /api/auth/sessions/:sessionId/activity] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update session activity' });
   }
 });

@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -305,7 +306,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           });
         }
       } catch (e) {
-        console.error('[Directory Consolidated] Error parsing primary category:', e);
+        logger.error('[Directory Consolidated] Error parsing primary category:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
       }
     }
     
@@ -341,7 +342,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           });
         }
       } catch (e) {
-        console.error('[Directory Consolidated] Error parsing secondary categories:', e);
+        logger.error('[Directory Consolidated] Error parsing secondary categories:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
       }
     }
 
@@ -400,7 +401,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           };
         }
       } catch (error) {
-        console.error('[Directory Consolidated] Error checking payment gateway:', error);
+        logger.error('[Directory Consolidated] Error checking payment gateway:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -431,11 +432,11 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Directory Consolidated] Error:', error);
+    logger.error('[Directory Consolidated] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_consolidated_data',
-      message: error?.message
+      message: (error as any)?.message
     });
   }
 });

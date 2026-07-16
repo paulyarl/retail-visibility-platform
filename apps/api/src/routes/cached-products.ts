@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -133,7 +134,7 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[Cached Products] List error:', error);
+    logger.error('[Cached Products] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to list cached products', message: error.message });
   }
 });
@@ -184,7 +185,7 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req, res) => 
       },
     });
   } catch (error: any) {
-    console.error('[Cached Products] Get error:', error);
+    logger.error('[Cached Products] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get cached product', message: error.message });
   }
 });
@@ -223,7 +224,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req, res) => 
       },
     });
   } catch (error: any) {
-    console.error('[Cached Products] Update error:', error);
+    logger.error('[Cached Products] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update cached product', message: error.message });
   }
 });
@@ -250,7 +251,7 @@ router.delete('/bulk', authenticateToken, requirePlatformAdmin, async (req, res)
       deleted: result.count,
     });
   } catch (error: any) {
-    console.error('[Cached Products] Bulk delete error:', error);
+    logger.error('[Cached Products] Bulk delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to bulk delete cached products', message: error.message });
   }
 });
@@ -280,7 +281,7 @@ router.delete('/:id', authenticateToken, requirePlatformAdmin, async (req, res) 
       message: 'Cached product deleted',
     });
   } catch (error: any) {
-    console.error('[Cached Products] Delete error:', error);
+    logger.error('[Cached Products] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to delete cached product', message: error.message });
   }
 });
@@ -310,7 +311,7 @@ router.post('/clear-category', authenticateToken, requirePlatformAdmin, async (r
       message: `Cleared ${result.count} products from ${businessType} > ${categoryName}`,
     });
   } catch (error: any) {
-    console.error('[Cached Products] Clear category error:', error);
+    logger.error('[Cached Products] Clear category error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to clear category', message: error.message });
   }
 });

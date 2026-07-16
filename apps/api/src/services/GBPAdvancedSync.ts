@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
+import { logger } from '../logger';
 
 const GBP_API_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 const GBP_MEDIA_API = 'https://mybusiness.googleapis.com/v4';
@@ -39,7 +40,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
         const newTokens = await refreshAccessToken(refreshToken);
 
         if (!newTokens) {
-          console.error(`[GBPAdvanced] Token refresh failed for tenant ${tenantId}`);
+          logger.error(`[GBPAdvanced] Token refresh failed for tenant ${tenantId}`, undefined);
           return null;
         }
 
@@ -94,7 +95,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
           
           return credentials.access_token!;
         } catch (refreshError) {
-          console.error(`[GBPAdvanced] Legacy token refresh failed:`, refreshError);
+          logger.error(`[GBPAdvanced] Legacy token refresh failed:`, undefined, { error: { name: (refreshError as any)?.name || 'Error', message: (refreshError as any)?.message || String(refreshError), stack: (refreshError as any)?.stack } });
           return null;
         }
       }
@@ -103,7 +104,7 @@ async function getValidAccessToken(tenantId: string): Promise<string | null> {
 
     return tenant.google_business_access_token;
   } catch (error) {
-    console.error(`[GBPAdvanced] Error getting token:`, error);
+    logger.error(`[GBPAdvanced] Error getting token:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -127,7 +128,7 @@ async function getLinkedLocation(tenantId: string): Promise<{ locationId: string
       accountId: account.google_account_id || account.id,
     };
   } catch (error) {
-    console.error(`[GBPAdvanced] Error getting linked location:`, error);
+    logger.error(`[GBPAdvanced] Error getting linked location:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -236,7 +237,7 @@ export async function uploadPhoto(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPAdvanced] Failed to upload photo:`, error);
+      logger.error(`[GBPAdvanced] Failed to upload photo:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: `API error: ${response.status}` };
     }
 
@@ -244,7 +245,7 @@ export async function uploadPhoto(
     console.log(`[GBPAdvanced] Uploaded photo for tenant ${tenantId}`);
     return { success: true, mediaItemId: result.name };
   } catch (error: any) {
-    console.error(`[GBPAdvanced] Error uploading photo:`, error);
+    logger.error(`[GBPAdvanced] Error uploading photo:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, error: error.message };
   }
 }
@@ -373,7 +374,7 @@ export async function createPost(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPAdvanced] Failed to create post:`, error);
+      logger.error(`[GBPAdvanced] Failed to create post:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: `API error: ${response.status}` };
     }
 
@@ -385,7 +386,7 @@ export async function createPost(
     
     return { success: true, postId: result.name };
   } catch (error: any) {
-    console.error(`[GBPAdvanced] Error creating post:`, error);
+    logger.error(`[GBPAdvanced] Error creating post:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, error: error.message };
   }
 }
@@ -549,7 +550,7 @@ export async function listReviews(
       nextPageToken: data.nextPageToken,
     };
   } catch (error: any) {
-    console.error(`[GBPAdvanced] Error listing reviews:`, error);
+    logger.error(`[GBPAdvanced] Error listing reviews:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, reviews: [], error: error.message };
   }
 }
@@ -584,14 +585,14 @@ export async function replyToReview(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPAdvanced] Failed to reply to review:`, error);
+      logger.error(`[GBPAdvanced] Failed to reply to review:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPAdvanced] Replied to review for tenant ${tenantId}`);
     return { success: true };
   } catch (error: any) {
-    console.error(`[GBPAdvanced] Error replying to review:`, error);
+    logger.error(`[GBPAdvanced] Error replying to review:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, error: error.message };
   }
 }
@@ -780,14 +781,14 @@ export async function updateAttributes(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GBPAdvanced] Failed to update attributes:`, error);
+      logger.error(`[GBPAdvanced] Failed to update attributes:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: `API error: ${response.status}` };
     }
 
     console.log(`[GBPAdvanced] Updated attributes for tenant ${tenantId}`);
     return { success: true };
   } catch (error: any) {
-    console.error(`[GBPAdvanced] Error updating attributes:`, error);
+    logger.error(`[GBPAdvanced] Error updating attributes:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, error: error.message };
   }
 }
@@ -839,7 +840,7 @@ async function storePost(tenantId: string, post: any): Promise<void> {
     
     console.log(`[GBPAdvanced] Stored post for tenant ${tenantId}:`, post.name);
   } catch (error) {
-    console.error(`[GBPAdvanced] Error storing post:`, error);
+    logger.error(`[GBPAdvanced] Error storing post:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -879,7 +880,7 @@ async function storeReviews(tenantId: string, reviews: Review[]): Promise<void> 
     
     console.log(`[GBPAdvanced] Stored ${reviews.length} reviews for tenant ${tenantId}`);
   } catch (error) {
-    console.error(`[GBPAdvanced] Error storing reviews:`, error);
+    logger.error(`[GBPAdvanced] Error storing reviews:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

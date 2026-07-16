@@ -33,6 +33,7 @@ import BotCrmAssistantService from '../services/BotCrmAssistantService';
 import { StorefrontPolicyService } from '../services/StorefrontPolicyService';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { resolveEmbedKey, getTenantIdFromRequest } from '../middleware/embed-key-validation';
+import { logger } from '../logger';
 
 const router = Router();
 const configService = BotConfigurationService.getInstance();
@@ -165,7 +166,7 @@ router.get('/config', resolveEmbedKey, async (req, res) => {
     const config = await configService.getPublicConfig(tenantId);
     res.json({ success: true, config });
   } catch (error) {
-    console.error('Error fetching bot config:', error);
+    logger.error('Error fetching bot config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch bot config' });
   }
 });
@@ -207,7 +208,7 @@ router.post('/conversations', resolveEmbedKey, async (req, res) => {
 
     res.json({ success: true, sessionId, greeting: contextualGreeting || greeting });
   } catch (error) {
-    console.error('Error starting conversation:', error);
+    logger.error('Error starting conversation:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to start conversation' });
   }
 });
@@ -461,7 +462,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
             escalated = true;
           }
         } catch (escalationError) {
-          console.error('[BotPublic] Escalation failed:', escalationError);
+          logger.error('[BotPublic] Escalation failed:', undefined, { error: { name: (escalationError as any)?.name || 'Error', message: (escalationError as any)?.message || String(escalationError), stack: (escalationError as any)?.stack } });
         }
       }
 
@@ -527,7 +528,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
           escalated = true;
         }
       } catch (escalationError) {
-        console.error('[BotPublic] Escalation failed:', escalationError);
+        logger.error('[BotPublic] Escalation failed:', undefined, { error: { name: (escalationError as any)?.name || 'Error', message: (escalationError as any)?.message || String(escalationError), stack: (escalationError as any)?.stack } });
       }
     }
 
@@ -542,7 +543,7 @@ router.post('/conversations/:sessionId/messages', async (req, res) => {
       channels: finalChannels,
     });
   } catch (error) {
-    console.error('Error processing message:', error);
+    logger.error('Error processing message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to process message' });
   }
 });
@@ -561,7 +562,7 @@ router.get('/skills/:skillName', resolveEmbedKey, async (req, res) => {
     const result = await skillService.executeSkill(tenantId, skillName, params);
     res.json({ success: result.success, data: result.data, cardSchema: result.cardSchema, error: result.error });
   } catch (error) {
-    console.error('Error executing skill:', error);
+    logger.error('Error executing skill:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to execute skill' });
   }
 });
@@ -633,7 +634,7 @@ router.get('/products/search', resolveEmbedKey, async (req, res) => {
       total: products.length,
     });
   } catch (error) {
-    console.error('[BotPublic] Product search failed:', error);
+    logger.error('[BotPublic] Product search failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -672,7 +673,7 @@ router.get('/policies', resolveEmbedKey, async (req, res) => {
 
     return res.json({ success: true, policies });
   } catch (error) {
-    console.error('[BotPublic] Policy lookup failed:', error);
+    logger.error('[BotPublic] Policy lookup failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -704,7 +705,7 @@ router.post('/preview', resolveEmbedKey, async (req, res) => {
       matchedFaqId: result.matchedFaqId,
     });
   } catch (error) {
-    console.error('Error previewing bot response:', error);
+    logger.error('Error previewing bot response:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to preview response' });
   }
 });
@@ -727,7 +728,7 @@ router.post('/conversations/:sessionId/feedback', async (req, res) => {
     await conversationService.addFeedback(messageId, conversation.id, rating);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error submitting feedback:', error);
+    logger.error('Error submitting feedback:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit feedback' });
   }
 });
@@ -756,7 +757,7 @@ router.get('/crm/ticket-status', resolveEmbedKey, async (req, res) => {
     const tickets = await crmAssistantService.lookupTickets(tenantId, customerEmail as string);
     res.json({ success: true, data: tickets });
   } catch (error) {
-    console.error('Error looking up tickets:', error);
+    logger.error('Error looking up tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to look up tickets' });
   }
 });
@@ -801,7 +802,7 @@ router.post('/crm/create-ticket', resolveEmbedKey, async (req, res) => {
     );
     res.json({ success: true, data: ticket });
   } catch (error) {
-    console.error('Error creating ticket:', error);
+    logger.error('Error creating ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to create ticket' });
   }
 });

@@ -8,6 +8,7 @@ import StorefrontTypeService, { StorefrontType } from '../services/StorefrontTyp
 import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { validateProposedChange } from '../services/resolvers';
 import { generateStorefrontTypeSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -78,7 +79,7 @@ router.get('/:tenantId/storefront-type', authenticateToken, async (req, res) => 
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching storefront type settings:', error);
+    logger.error('Error fetching storefront type settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -191,7 +192,7 @@ router.put('/:tenantId/storefront-type', authenticateToken, requireTenantAdmin, 
       },
     });
   } catch (error) {
-    console.error('Error updating storefront type settings:', error);
+    logger.error('Error updating storefront type settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -212,7 +213,7 @@ router.get('/:tenantId/storefront-type/capability', authenticateToken, async (re
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving storefront type capability:', error);
+    logger.error('Error resolving storefront type capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -276,7 +277,7 @@ router.get('/public/tenant/:tenantId/storefront-type', async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching public storefront type settings:', error);
+    logger.error('Error fetching public storefront type settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -302,7 +303,7 @@ router.get('/public/tenant/:tenantId/storefront-type/capability', async (req, re
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving public storefront type capability:', error);
+    logger.error('Error resolving public storefront type capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

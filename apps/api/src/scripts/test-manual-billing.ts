@@ -77,7 +77,7 @@ class ManualBillingBatchTester {
       await this.testIntegration();
 
     } catch (error: any) {
-      this.log('Test Suite Error', false, error?.message || 'Unknown error');
+      this.log('Test Suite Error', false, (error as any)?.message || 'Unknown error');
     }
 
     // Print summary
@@ -124,7 +124,7 @@ class ManualBillingBatchTester {
         this.log('Create Manual Invoice', false, result.error, undefined, duration);
       }
     } catch (error: any) {
-      this.log('Create Manual Invoice', false, error?.message || 'Unknown error');
+      this.log('Create Manual Invoice', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -175,7 +175,7 @@ class ManualBillingBatchTester {
         this.log('Add Manual Payment Method', false, result.error, undefined, duration);
       }
     } catch (error: any) {
-      this.log('Add Manual Payment Method', false, error?.message || 'Unknown error');
+      this.log('Add Manual Payment Method', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -240,7 +240,7 @@ class ManualBillingBatchTester {
         this.log('Add Service Charge', false, result.error, undefined, duration);
       }
     } catch (error: any) {
-      this.log('Add Service Charge', false, error?.message || 'Unknown error');
+      this.log('Add Service Charge', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -342,7 +342,7 @@ class ManualBillingBatchTester {
       }
 
     } catch (error: any) {
-      this.log('Database Schema Validation', false, error?.message || 'Unknown error');
+      this.log('Database Schema Validation', false, (error as any)?.message || 'Unknown error');
     }
   }
 
@@ -450,7 +450,7 @@ class ManualBillingBatchTester {
       this.log('Integration Test', true, 'All integration tests passed');
 
     } catch (error: any) {
-      this.log('Integration Test', false, error?.message || 'Unknown error');
+      this.log('Integration Test', false, (error as any)?.message || 'Unknown error');
     }
   }
 

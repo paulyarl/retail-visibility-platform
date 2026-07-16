@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { AnalyticsService } from '../services/analytics/AnalyticsService';
+import { logger } from '../logger';
 //import { AnalyticsService } from '../services/analytics/AnalyticsService';
 
 const router = express.Router();
@@ -39,7 +40,7 @@ router.get('/overview', async (req, res) => {
     const overview = await analyticsService.getOverviewMetrics(filters);
     res.json(overview);
   } catch (error) {
-    console.error('[Analytics API] Overview error:', error);
+    logger.error('[Analytics API] Overview error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch overview metrics' });
   }
 });
@@ -54,7 +55,7 @@ router.get('/page-traffic', async (req, res) => {
     const pageTraffic = await analyticsService.getPageTrafficAnalytics(filters);
     res.json(pageTraffic);
   } catch (error) {
-    console.error('[Analytics API] Page traffic error:', error);
+    logger.error('[Analytics API] Page traffic error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch page traffic analytics' });
   }
 });
@@ -69,7 +70,7 @@ router.get('/user-behavior', async (req, res) => {
     const userBehavior = await analyticsService.getUserBehaviorAnalytics(filters);
     res.json(userBehavior);
   } catch (error) {
-    console.error('[Analytics API] User behavior error:', error);
+    logger.error('[Analytics API] User behavior error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch user behavior analytics' });
   }
 });
@@ -84,7 +85,7 @@ router.get('/time-series', async (req, res) => {
     const timeSeries = await analyticsService.getTimeSeriesAnalytics(filters);
     res.json(timeSeries);
   } catch (error) {
-    console.error('[Analytics API] Time series error:', error);
+    logger.error('[Analytics API] Time series error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch time series analytics' });
   }
 });
@@ -99,7 +100,7 @@ router.get('/popular-content', async (req, res) => {
     const popularContent = await analyticsService.getPopularContentAnalytics(filters);
     res.json(popularContent);
   } catch (error) {
-    console.error('[Analytics API] Popular content error:', error);
+    logger.error('[Analytics API] Popular content error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch popular content analytics' });
   }
 });
@@ -114,7 +115,7 @@ router.get('/geographic', async (req, res) => {
     const geographic = await analyticsService.getGeographicAnalytics(filters);
     res.json(geographic);
   } catch (error) {
-    console.error('[Analytics API] Geographic error:', error);
+    logger.error('[Analytics API] Geographic error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch geographic analytics' });
   }
 });

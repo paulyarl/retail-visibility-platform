@@ -9,6 +9,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { generateItemId, generatePhotoId } from '../lib/id-generator';
 import sharp from 'sharp';
+import { logger } from '../logger';
 
 // Import the new Google GenAI for Imagen 3
 let GoogleGenAI: any = null;
@@ -81,7 +82,7 @@ class AIImageSingletonService extends UniversalSingleton {
         const OpenAI = require('openai').default;
         this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       } catch (error) {
-        console.error('[AI IMAGE SINGLETON] Failed to initialize OpenAI:', error);
+        logger.error('[AI IMAGE SINGLETON] Failed to initialize OpenAI:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -92,7 +93,7 @@ class AIImageSingletonService extends UniversalSingleton {
         this.gemini = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
         console.log('[AI IMAGE SINGLETON] Google Generative AI initialized for Imagen 3');
       } catch (error) {
-        console.error('[AI IMAGE SINGLETON] Failed to initialize Google Generative AI:', error);
+        logger.error('[AI IMAGE SINGLETON] Failed to initialize Google Generative AI:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -105,7 +106,7 @@ class AIImageSingletonService extends UniversalSingleton {
         );
         console.log('[AI IMAGE SINGLETON] Supabase client initialized');
       } catch (error) {
-        console.error('[AI IMAGE SINGLETON] Failed to initialize Supabase:', error);
+        logger.error('[AI IMAGE SINGLETON] Failed to initialize Supabase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
   }

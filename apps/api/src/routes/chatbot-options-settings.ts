@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import { resolveEffectiveCapabilities, invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -94,7 +95,7 @@ router.get('/:tenantId/chatbot-options', authenticateToken, async (req, res) => 
 
     res.json({ success: true, settings: tierFilteredSettings, tierState });
   } catch (error) {
-    console.error('Error fetching chatbot options settings:', error);
+    logger.error('Error fetching chatbot options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch chatbot options settings' });
   }
 });
@@ -165,7 +166,7 @@ router.put('/:tenantId/chatbot-options', authenticateToken, async (req, res) => 
       },
     });
   } catch (error) {
-    console.error('Error updating chatbot options settings:', error);
+    logger.error('Error updating chatbot options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update chatbot options settings' });
   }
 });
@@ -203,7 +204,7 @@ router.get('/public/tenant/:tenantId/chatbot-options', async (req, res) => {
 
     res.json({ success: true, settings: publicSettings, tierState });
   } catch (error) {
-    console.error('Error fetching public chatbot options settings:', error);
+    logger.error('Error fetching public chatbot options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch chatbot options settings' });
   }
 });
@@ -219,7 +220,7 @@ router.get('/:tenantId/chatbot-options/capability', authenticateToken, async (re
     const state = caps.effective.chatbot;
     res.json({ success: true, capability: state });
   } catch (error) {
-    console.error('Error resolving chatbot options capability:', error);
+    logger.error('Error resolving chatbot options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to resolve chatbot options capability' });
   }
 });

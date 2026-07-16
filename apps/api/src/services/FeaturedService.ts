@@ -1,4 +1,5 @@
 import { UniversalIdentifierCache } from './UniversalIdentifierCache';
+import { logger } from '../logger';
 
 export interface FeaturedProductQuery {
   limit?: number;
@@ -136,14 +137,14 @@ export class FeaturedService {
       products = await this.getFeaturedProductsFromMV(query, limit);
       console.log(`[FeaturedService] Primary query successful, found ${products.length} products`);
     } catch (error) {
-      console.error('[FeaturedService] Primary query failed:', error);
+      logger.error('[FeaturedService] Primary query failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
       try {
         // Fallback: Also use mv_storefront_discovery with direct pool
         products = await this.getFeaturedProductsFallback(query, limit);
         console.log(`[FeaturedService] Fallback query successful, found ${products.length} products`);
       } catch (fallbackError) {
-        console.error('[FeaturedService] Fallback query also failed:', fallbackError);
+        logger.error('[FeaturedService] Fallback query also failed:', undefined, { error: { name: (fallbackError as any)?.name || 'Error', message: (fallbackError as any)?.message || String(fallbackError), stack: (fallbackError as any)?.stack } });
         throw new Error('Unable to fetch featured products');
       }
     }

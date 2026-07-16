@@ -875,7 +875,7 @@ class ShopService extends UniversalSingleton {
   }
 
   protected logError(message: string, error: any): void {
-    logger.error(`[ShopService] ${message}:`, error);
+    logger.error(`[ShopService] ${message}:`, undefined, { error: { name: 'Error', message: String(error) } });
   }
 }
 

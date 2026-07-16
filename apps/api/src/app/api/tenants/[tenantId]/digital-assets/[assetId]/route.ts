@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -44,7 +45,7 @@ export async function GET(
       data: transformAsset(asset),
     });
   } catch (error) {
-    console.error('Error fetching digital asset:', error);
+    logger.error('Error fetching digital asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to fetch digital asset' },
       { status: 500 }
@@ -138,7 +139,7 @@ export async function PATCH(
       data: transformAsset(updatedAsset),
     });
   } catch (error) {
-    console.error('Error updating digital asset:', error);
+    logger.error('Error updating digital asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to update digital asset' },
       { status: 500 }
@@ -203,7 +204,7 @@ export async function DELETE(
       data: { message: 'Digital asset deleted successfully' },
     });
   } catch (error) {
-    console.error('Error deleting digital asset:', error);
+    logger.error('Error deleting digital asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to delete digital asset' },
       { status: 500 }

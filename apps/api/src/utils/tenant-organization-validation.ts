@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 /**
  * Check if tenant is in good standing for organization membership
@@ -101,7 +102,7 @@ export async function isTenantInGoodStanding(tenantId: string): Promise<{
     };
 
   } catch (error) {
-    console.error('[isTenantInGoodStanding] Error:', error);
+    logger.error('[isTenantInGoodStanding] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { valid: false, reason: 'validation_error' };
   }
 }

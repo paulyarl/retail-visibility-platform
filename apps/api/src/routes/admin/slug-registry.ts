@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { parseSlugToJSON } from '../../lib/slug-generator';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -78,7 +79,7 @@ router.get('/', async (req: Request, res: Response) => {
       total
     });
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error listing entries:', error);
+    logger.error('[AdminSlugRegistry] Error listing entries:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list slug registry entries' });
   }
 });
@@ -117,7 +118,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       pendingMigrationCount
     });
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error getting stats:', error);
+    logger.error('[AdminSlugRegistry] Error getting stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get slug registry stats' });
   }
 });
@@ -145,7 +146,7 @@ router.get('/:identifier', async (req: Request, res: Response) => {
 
     res.json(entry);
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error getting entry:', error);
+    logger.error('[AdminSlugRegistry] Error getting entry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get slug registry entry' });
   }
 });
@@ -170,7 +171,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     res.json(entry);
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error updating entry:', error);
+    logger.error('[AdminSlugRegistry] Error updating entry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update slug registry entry' });
   }
 });
@@ -241,7 +242,7 @@ router.post('/:id/regenerate', async (req: Request, res: Response) => {
 
     res.json(updatedEntry);
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error regenerating slug:', error);
+    logger.error('[AdminSlugRegistry] Error regenerating slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to regenerate slug' });
   }
 });
@@ -261,7 +262,7 @@ router.post('/:id/deactivate', async (req: Request, res: Response) => {
 
     res.json({ success: true, entry });
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error deactivating entry:', error);
+    logger.error('[AdminSlugRegistry] Error deactivating entry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to deactivate slug registry entry' });
   }
 });
@@ -281,7 +282,7 @@ router.post('/:id/activate', async (req: Request, res: Response) => {
 
     res.json({ success: true, entry });
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error activating entry:', error);
+    logger.error('[AdminSlugRegistry] Error activating entry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to activate slug registry entry' });
   }
 });
@@ -372,7 +373,7 @@ router.post('/bulk-migrate', async (req: Request, res: Response) => {
 
     res.json({ success, failed, results });
   } catch (error) {
-    console.error('[AdminSlugRegistry] Error bulk migrating:', error);
+    logger.error('[AdminSlugRegistry] Error bulk migrating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to bulk migrate slugs' });
   }
 });

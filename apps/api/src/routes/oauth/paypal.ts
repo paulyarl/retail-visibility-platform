@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PayPalOAuthService } from '../../services/paypal/PayPalOAuthService';
 import { requireAuth } from '../../middleware/auth';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 const router = Router();
 const paypalOAuth = new PayPalOAuthService();
@@ -35,7 +36,7 @@ router.get('/authorize', requireAuth, async (req, res) => {
     
     res.json({ authorizationUrl: authUrl });
   } catch (error: any) {
-    console.error('[PayPal OAuth] Authorization error:', error);
+    logger.error('[PayPal OAuth] Authorization error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to generate authorization URL' });
   }
 });
@@ -52,7 +53,7 @@ router.get('/callback', async (req, res) => {
 
     // Handle OAuth errors from PayPal
     if (error) {
-      console.error('[PayPal OAuth] Callback error:', error, error_description);
+      logger.error('[PayPal OAuth] Callback error:', undefined, { error: { name: 'Error', message: String(error) +  + String({ error: { name: (error_description as any)?.name || 'Error', message: (error_description as any)?.message || String(error_description), stack: (error_description as any)?.stack } }) } });
       const errorMessage = encodeURIComponent(error_description as string || error as string);
       return res.redirect(
         `${webBaseUrl}/settings/payment-gateways?error=paypal_oauth&message=${errorMessage}`
@@ -69,7 +70,7 @@ router.get('/callback', async (req, res) => {
       const stateData = paypalOAuth.verifyState(state);
       tenantId = stateData.tenantId;
     } catch (error: any) {
-      console.error('[PayPal OAuth] State verification failed:', error);
+      logger.error('[PayPal OAuth] State verification failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.redirect(
         `${webBaseUrl}/settings/payment-gateways?error=paypal_oauth&message=Invalid+or+expired+state+parameter`
       );
@@ -81,7 +82,7 @@ router.get('/callback', async (req, res) => {
     // Redirect to success page (use web domain, not API domain)
     res.redirect(`${webBaseUrl}/t/${tenantId}/settings/payment-gateways?connected=paypal&success=true`);
   } catch (error: any) {
-    console.error('[PayPal OAuth] Callback error:', error);
+    logger.error('[PayPal OAuth] Callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const webBaseUrl = unifiedConfig.webUrl;
     const errorMessage = encodeURIComponent(error.message || 'OAuth connection failed');
     res.redirect(`${webBaseUrl}/settings/payment-gateways?error=paypal_oauth&message=${errorMessage}`);
@@ -134,7 +135,7 @@ router.get('/status', requireAuth, async (req, res) => {
       lastRefreshed: tokenRecord.last_refreshed_at,
     });
   } catch (error: any) {
-    console.error('[PayPal OAuth] Status check error:', error);
+    logger.error('[PayPal OAuth] Status check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to check OAuth status' });
   }
 });
@@ -161,7 +162,7 @@ router.delete('/disconnect', requireAuth, async (req, res) => {
 
     res.json({ success: true, message: 'PayPal OAuth disconnected successfully' });
   } catch (error: any) {
-    console.error('[PayPal OAuth] Disconnect error:', error);
+    logger.error('[PayPal OAuth] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to disconnect PayPal OAuth' });
   }
 });
@@ -182,7 +183,7 @@ router.post('/refresh', requireAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Token refreshed successfully' });
   } catch (error: any) {
-    console.error('[PayPal OAuth] Refresh error:', error);
+    logger.error('[PayPal OAuth] Refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to refresh token' });
   }
 });

@@ -22,6 +22,7 @@ import {
   getAggregatedInsights,
 } from '../lib/google/gbp';
 import crypto from 'crypto';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.get('/google/auth', async (req, res) => {
     const authUrl = getAuthorizationUrl(tenant_id);
     res.json({ authUrl });
   } catch (error) {
-    console.error('[Google OAuth] Auth initiation error:', error);
+    logger.error('[Google OAuth] Auth initiation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'oauth_init_failed' });
   }
 });
@@ -68,7 +69,7 @@ router.get('/google/callback', async (req, res) => {
     const { code, state, error } = req.query;
 
     if (error) {
-      console.error('[Google OAuth] Authorization error:', error);
+      logger.error('[Google OAuth] Authorization error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.redirect(`${unifiedConfig.webUrl}/settings/tenant?google_error=${error}`);
     }
 
@@ -125,7 +126,7 @@ router.get('/google/callback', async (req, res) => {
 
     res.redirect(`${unifiedConfig.webUrl}/settings/tenant?google_connected=true`);
   } catch (error) {
-    console.error('[Google OAuth] Callback error:', error);
+    logger.error('[Google OAuth] Callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'oauth_callback_failed' });
   }
 });
@@ -156,7 +157,7 @@ router.get('/api/google/status', async (req, res) => {
       gbp_locations: 0,
     });
   } catch (error) {
-    console.error('[Google OAuth] Status check error:', error);
+    logger.error('[Google OAuth] Status check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'status_check_failed' });
   }
 });
@@ -184,7 +185,7 @@ router.delete('/google/disconnect', async (req, res) => {
     console.log('[Google OAuth] Account disconnected:', account.email);
     res.json({ success: true });
   } catch (error) {
-    console.error('[Google OAuth] Disconnect error:', error);
+    logger.error('[Google OAuth] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'disconnect_failed' });
   }
 });
@@ -208,7 +209,7 @@ router.get('/google/gmc/accounts', async (req, res) => {
     const merchants = await listMerchantAccounts(account.id);
     res.json({ merchants });
   } catch (error) {
-    console.error('[GMC] List accounts error:', error);
+    logger.error('[GMC] List accounts error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_merchants' });
   }
 });
@@ -236,7 +237,7 @@ router.post('/google/gmc/sync', async (req, res) => {
       res.status(500).json({ error: 'sync_failed' });
     }
   } catch (error) {
-    console.error('[GMC] Sync error:', error);
+    logger.error('[GMC] Sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'sync_failed' });
   }
 });
@@ -261,7 +262,7 @@ router.get('/google/gmc/products', async (req, res) => {
     const products = await listProducts(account.id, merchantId as string);
     res.json({ products });
   } catch (error) {
-    console.error('[GMC] List products error:', error);
+    logger.error('[GMC] List products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_products' });
   }
 });
@@ -286,7 +287,7 @@ router.get('/google/gmc/stats', async (req, res) => {
     const stats = await getProductStats(account.id, merchantId as string);
     res.json({ stats });
   } catch (error) {
-    console.error('[GMC] Get stats error:', error);
+    logger.error('[GMC] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_stats' });
   }
 });
@@ -315,7 +316,7 @@ router.get('/google/gbp/locations', async (req, res) => {
     const locations = await listLocations(account.id, businessAccounts[0].name);
     res.json({ locations });
   } catch (error) {
-    console.error('[GBP] List locations error:', error);
+    logger.error('[GBP] List locations error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_locations' });
   }
 });
@@ -348,7 +349,7 @@ router.post('/google/gbp/sync', async (req, res) => {
       res.status(500).json({ error: 'sync_failed' });
     }
   } catch (error) {
-    console.error('[GBP] Sync error:', error);
+    logger.error('[GBP] Sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'sync_failed' });
   }
 });
@@ -365,7 +366,7 @@ router.get('/google/gbp/insights', async (req, res) => {
     const insights = await getAggregatedInsights(locationId as string, daysNum);
     res.json({ insights });
   } catch (error) {
-    console.error('[GBP] Get insights error:', error);
+    logger.error('[GBP] Get insights error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_insights' });
   }
 });
@@ -455,7 +456,7 @@ router.get('/api/google/taxonomy/browse', async (req, res) => {
 
     res.json({ success: true, categories: categoriesWithChildInfo });
   } catch (error) {
-    console.error('[Google Taxonomy Browse] Error:', error);
+    logger.error('[Google Taxonomy Browse] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Browse failed' });
   }
 });
@@ -516,7 +517,7 @@ router.get('/api/google/taxonomy/search', async (req, res) => {
 
     res.json({ success: true, categories: results });
   } catch (error) {
-    console.error('[Google Taxonomy Search] Error:', error);
+    logger.error('[Google Taxonomy Search] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Search failed' });
   }
 });

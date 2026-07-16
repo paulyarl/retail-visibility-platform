@@ -6,6 +6,7 @@ import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEnt
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { getTierFeatures } from '../services/TierService';
 import { generateDirectoryEntrySettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -122,7 +123,7 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
       },
     });
   } catch (error) {
-    console.error('Error fetching directory entry options settings:', error);
+    logger.error('Error fetching directory entry options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -205,7 +206,7 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
       },
     });
   } catch (error) {
-    console.error('Error updating directory entry options settings:', error);
+    logger.error('Error updating directory entry options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

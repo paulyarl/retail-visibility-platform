@@ -7,6 +7,7 @@
 
 import { prisma } from '../prisma';
 import { getOrderNotificationService } from './OrderNotificationService';
+import { logger } from '../logger';
 
 // Prisma $Enums.shipment_status values
 export type ShipmentStatus =
@@ -152,7 +153,7 @@ class ShipmentStatusService {
 
       return { success: true, shipment: updatedShipment };
     } catch (error) {
-      console.error('[ShipmentStatusService] Error transitioning status:', error);
+      logger.error('[ShipmentStatusService] Error transitioning status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: 'transition_failed' };
     }
   }
@@ -212,7 +213,7 @@ class ShipmentStatusService {
         );
       }
     } catch (error) {
-      console.error('[ShipmentStatusService] Error syncing fulfillment status:', error);
+      logger.error('[ShipmentStatusService] Error syncing fulfillment status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -315,7 +316,7 @@ class ShipmentStatusService {
           break;
       }
     } catch (error) {
-      console.error('[ShipmentStatusService] Error firing notification:', error);
+      logger.error('[ShipmentStatusService] Error firing notification:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 }

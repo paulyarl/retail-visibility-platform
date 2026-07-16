@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -102,7 +103,7 @@ export async function GET(
       data: publicData,
     });
   } catch (error) {
-    console.error('Error fetching download page:', error);
+    logger.error('Error fetching download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to fetch download page' },
       { status: 500 }

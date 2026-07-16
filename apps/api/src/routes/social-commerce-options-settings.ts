@@ -5,6 +5,7 @@ import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -108,7 +109,7 @@ router.get('/:tenantId/social-commerce-options', authenticateToken, async (req, 
 
     res.json({ success: true, settings: tierFilteredSettings, tierState });
   } catch (error) {
-    console.error('Error fetching social commerce options settings:', error);
+    logger.error('Error fetching social commerce options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch social commerce options settings' });
   }
 });
@@ -182,7 +183,7 @@ router.put('/:tenantId/social-commerce-options', authenticateToken, requireTenan
       },
     });
   } catch (error) {
-    console.error('Error updating social commerce options settings:', error);
+    logger.error('Error updating social commerce options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update social commerce options settings' });
   }
 });
@@ -198,7 +199,7 @@ router.get('/:tenantId/social-commerce-options/capability', authenticateToken, a
     }
     res.json({ success: true, capability: state });
   } catch (error) {
-    console.error('Error resolving social commerce options capability:', error);
+    logger.error('Error resolving social commerce options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to resolve social commerce options capability' });
   }
 });

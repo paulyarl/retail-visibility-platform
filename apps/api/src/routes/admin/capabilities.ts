@@ -4,6 +4,7 @@
  */
 import { Router } from 'express';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 // Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
@@ -113,7 +114,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[GET /api/admin/capabilities] Error:', error);
+    logger.error('[GET /api/admin/capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_capabilities' });
   }
 });

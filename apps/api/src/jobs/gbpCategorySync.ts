@@ -4,6 +4,7 @@ import { categoryMirrorSuccess, categoryMirrorFail, categoryMirrorDurationMs, ca
 import { prisma } from '../prisma';
 import { gbpClient } from '../clients/gbp';
 import { generateCategoryMirrorId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 export type MirrorStrategy = 'platform_to_gbp' | 'gbp_to_platform';
 
@@ -153,7 +154,7 @@ export async function runGbpCategoryMirrorJob(jobId: string, payload: MirrorJobP
 
   categoryMirrorFail.inc({ strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all') });
   categoryMirrorDurationMs.observe(Date.now() - startedAt, { strategy: payload.strategy, tenant: String(payload.tenant_id ?? 'all') });
-  console.error(`[GBP_SYNC][${jobId}] failed after ${maxAttempts} attempts`);
+  logger.error(`[GBP_SYNC][${jobId}] failed after ${maxAttempts} attempts`, undefined);
   // Record failure
   try {
     if (runId) {

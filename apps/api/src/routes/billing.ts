@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requireAdmin, getTenantId } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.get('/tenant/billing/counters', requireAuth, async (req, res) => {
               limit && billableCount >= limit * 0.9 ? 'warning' : 'ok',
     });
   } catch (error: any) {
-    console.error('[Billing] Counters error:', error);
+    logger.error('[Billing] Counters error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_counters' });
   }
 });
@@ -105,7 +106,7 @@ router.get('/tenant/billing/status', requireAuth, async (req, res) => {
       status: status.status,
     });
   } catch (error: any) {
-    console.error('[Billing] Status error:', error);
+    logger.error('[Billing] Status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_status' });
   }
 });
@@ -140,7 +141,7 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
 
     res.json({ success: true, tenantId, skuLimit });
   } catch (error: any) {
-    console.error('[Billing] Override error:', error);
+    logger.error('[Billing] Override error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_set_override' });
   }
 });
@@ -222,7 +223,7 @@ router.get('/organization/billing/counters', requireAuth, async (req, res) => {
       locationBreakdown,
     });
   } catch (error: any) {
-    console.error('[Organization Billing] Counters error:', error);
+    logger.error('[Organization Billing] Counters error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_counters' });
   }
 });
@@ -247,7 +248,7 @@ router.post('/admin/organization/override', requireAdmin, async (req, res) => {
 
     res.json({ success: true, organizationId, ...updateData });
   } catch (error: any) {
-    console.error('[Organization Billing] Override error:', error);
+    logger.error('[Organization Billing] Override error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_set_override' });
   }
 });

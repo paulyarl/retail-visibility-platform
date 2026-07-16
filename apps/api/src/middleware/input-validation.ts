@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import validator from 'validator';
+import { logger } from '../logger';
 
 /**
  * Comprehensive input validation and sanitization middleware
@@ -237,7 +238,7 @@ export function inputValidationMiddleware(req: Request, res: Response, next: Nex
 
     next();
   } catch (error) {
-    console.error('Input validation middleware error:', error);
+    logger.error('Input validation middleware error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'validation_error',
       message: 'Input validation failed'

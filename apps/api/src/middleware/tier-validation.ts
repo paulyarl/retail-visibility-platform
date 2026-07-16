@@ -14,6 +14,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { checkTierFeatureAccess, getMinimumTierForFeature, isValidTier, getValidTierKeys } from '../services/TierService';
+import { logger } from '../logger';
 
 type SubscriptionTier = 'trial' | 'google_only' | 'discovery' | 'starter' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
 
@@ -104,7 +105,7 @@ export async function validateTierAssignment(
     console.log(`[Tier Validation] Tier ${subscriptionTier} validated successfully`);
     next();
   } catch (error) {
-    console.error('[validateTierAssignment] Error:', error);
+    logger.error('[validateTierAssignment] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'tier_validation_failed',
       message: 'Failed to validate tier assignment',
@@ -168,7 +169,7 @@ export async function validateTierCompatibility(
 
     next();
   } catch (error) {
-    console.error('[validateTierCompatibility] Error:', error);
+    logger.error('[validateTierCompatibility] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'tier_compatibility_check_failed',
       message: 'Failed to validate tier compatibility',
@@ -273,7 +274,7 @@ export function requirePropagationTier(
 
       next();
     } catch (error) {
-      console.error('[requirePropagationTier] Error:', error);
+      logger.error('[requirePropagationTier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'tier_validation_failed',
         message: 'Failed to validate tier requirements'

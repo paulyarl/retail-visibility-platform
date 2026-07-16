@@ -269,6 +269,20 @@ class CheckoutService extends PublicApiSingleton {
     cardBrand?: string;
     expiryMonth?: number;
     expiryYear?: number;
+    funnelNextStep?: {
+      funnelId: string;
+      stepId: string;
+      step: {
+        id: string;
+        step_type: string;
+        offer_item_id: string;
+        display_title: string | null;
+        display_description: string | null;
+        price_cents: number | null;
+        discount_cents: number;
+        sort_order: number;
+      };
+    } | null;
   } | null> {
     try {
       const result = await this.makeDefaultRequest<{
@@ -279,6 +293,20 @@ class CheckoutService extends PublicApiSingleton {
         cardBrand?: string;
         expiryMonth?: number;
         expiryYear?: number;
+        funnelNextStep?: {
+          funnelId: string;
+          stepId: string;
+          step: {
+            id: string;
+            step_type: string;
+            offer_item_id: string;
+            display_title: string | null;
+            display_description: string | null;
+            price_cents: number | null;
+            discount_cents: number;
+            sort_order: number;
+          };
+        } | null;
       }>(
         '/api/checkout/stripe/confirm-payment',
         {
@@ -303,6 +331,7 @@ class CheckoutService extends PublicApiSingleton {
         cardBrand: result.data?.cardBrand,
         expiryMonth: result.data?.expiryMonth,
         expiryYear: result.data?.expiryYear,
+        funnelNextStep: result.data?.funnelNextStep || null,
       };
     } catch (error) {
       console.error('[CheckoutService] Confirm payment error:', error);

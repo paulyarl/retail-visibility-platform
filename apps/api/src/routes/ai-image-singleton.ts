@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import AIImageSingletonService from '../services/AIImageSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/generate', async (req, res) => {
       message: 'Image generated successfully'
     });
   } catch (error) {
-    console.error('[AI IMAGE SINGLETON] Generate image error:', error);
+    logger.error('[AI IMAGE SINGLETON] Generate image error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to generate image',
@@ -84,7 +85,7 @@ router.get('/stats', async (req, res) => {
       message: 'Image generation statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[AI IMAGE SINGLETON] Get stats error:', error);
+    logger.error('[AI IMAGE SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch image generation statistics'
@@ -109,7 +110,7 @@ router.get('/health', async (req, res) => {
       message: 'AI image service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[AI IMAGE SINGLETON] Health check error:', error);
+    logger.error('[AI IMAGE SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -143,7 +144,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Cache cleared successfully'
     });
   } catch (error) {
-    console.error('[AI IMAGE SINGLETON] Clear cache error:', error);
+    logger.error('[AI IMAGE SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'

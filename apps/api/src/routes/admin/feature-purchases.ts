@@ -22,6 +22,7 @@ import { audit } from '../../audit';
 import { signGrantToken } from '../../services/GrantTokenService';
 import { unifiedConfig } from '../../config/unifiedConfig';
 import { generateGrantTokenId } from '../../lib/id-generator';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: purchases });
   } catch (error) {
-    console.error('[FeaturePurchases] Error listing:', error);
+    logger.error('[FeaturePurchases] Error listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list feature purchases' });
   }
 });
@@ -138,7 +139,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: purchase });
   } catch (error) {
-    console.error('[FeaturePurchases] Error creating:', error);
+    logger.error('[FeaturePurchases] Error creating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create feature purchase' });
   }
 });
@@ -216,7 +217,7 @@ router.post('/grant-complimentary', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: purchase });
   } catch (error) {
-    console.error('[FeaturePurchases] Error granting complimentary access:', error);
+    logger.error('[FeaturePurchases] Error granting complimentary access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to grant complimentary access' });
   }
 });
@@ -255,7 +256,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: purchase });
   } catch (error) {
-    console.error('[FeaturePurchases] Error updating:', error);
+    logger.error('[FeaturePurchases] Error updating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update feature purchase' });
   }
 });
@@ -281,7 +282,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[FeaturePurchases] Error deleting:', error);
+    logger.error('[FeaturePurchases] Error deleting:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete feature purchase' });
   }
 });
@@ -360,7 +361,7 @@ router.get('/grants', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: enriched });
   } catch (error) {
-    console.error('[FeaturePurchases] Error listing grants:', error);
+    logger.error('[FeaturePurchases] Error listing grants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list grant tokens' });
   }
 });
@@ -466,7 +467,7 @@ router.post('/create-grant-token', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[FeaturePurchases] Error creating grant token:', error);
+    logger.error('[FeaturePurchases] Error creating grant token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create grant token' });
   }
 });

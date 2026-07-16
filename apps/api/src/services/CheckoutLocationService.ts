@@ -8,6 +8,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 // Earth's radius in miles
 const EARTH_RADIUS_MILES = 3959;
@@ -348,7 +349,7 @@ export class CheckoutLocationService {
 
       return result;
     } catch (error: any) {
-      console.error('[CheckoutLocationService] Error finding locations:', error);
+      logger.error('[CheckoutLocationService] Error finding locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to find locations',

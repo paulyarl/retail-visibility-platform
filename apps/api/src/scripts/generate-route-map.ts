@@ -13,6 +13,7 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { routeRegistry, AuthLevel } from '../routes/routeRegistry';
+import { logger } from '../logger';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -181,6 +182,6 @@ try {
   console.log(`✅ Route map generated: ${outputFile}`);
   console.log(`   ${routeMap.totalMounts} mounts, ${routeMap.totalRoutes} routes`);
 } catch (error) {
-  console.error('❌ Failed to generate route map:', error);
+  logger.error('❌ Failed to generate route map:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   process.exit(1);
 }

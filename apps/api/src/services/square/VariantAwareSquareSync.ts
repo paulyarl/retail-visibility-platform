@@ -232,7 +232,7 @@ export class VariantAwareSquareSync {
       }
 
     } catch (error) {
-      logger.error(`Failed to upsert Square product for ${product.name}:`, { region: 'unknown' });
+      logger.error(`Failed to upsert Square product for ${product.name}:`, undefined, { error: { name: 'Error', message: String({ region: 'unknown' }) } });
       throw error;
     }
   }
@@ -258,7 +258,7 @@ export class VariantAwareSquareSync {
       logger.info(`Synced stock ${product.stock} to Square for ${product.name}`);
 
     } catch (error) {
-      logger.error(`Failed to sync stock for ${product.name}:`, { region: 'unknown' });
+      logger.error(`Failed to sync stock for ${product.name}:`, undefined, { error: { name: 'Error', message: String({ region: 'unknown' }) } });
       throw error;
     }
   }

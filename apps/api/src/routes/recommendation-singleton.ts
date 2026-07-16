@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import RecommendationSingletonService from '../services/RecommendationSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ router.post('/same-users', async (req, res) => {
       message: 'Same users recommendations retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Same users error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Same users error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to get same users recommendations',
@@ -127,7 +128,7 @@ router.post('/similar-area', async (req, res) => {
       message: 'Similar area recommendations retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Similar area error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Similar area error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to get similar area recommendations',
@@ -176,7 +177,7 @@ router.post('/trending', async (req, res) => {
       message: 'Trending recommendations retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Trending error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Trending error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to get trending recommendations',
@@ -224,7 +225,7 @@ router.post('/personalized', async (req, res) => {
       message: 'Personalized recommendations retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Personalized error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Personalized error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to get personalized recommendations',
@@ -268,7 +269,7 @@ router.get('/stats', async (req, res) => {
       message: 'Recommendation statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Get stats error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recommendation statistics'
@@ -301,7 +302,7 @@ router.get('/health', async (req, res) => {
       message: 'Recommendation service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Health check error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -333,7 +334,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Recommendation cache cleared successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Clear cache error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -411,7 +412,7 @@ router.post('/test', async (req, res) => {
       message: `Test recommendation (${type}) completed successfully`
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Test error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test recommendation generation',
@@ -470,7 +471,7 @@ router.get('/algorithms', async (req, res) => {
       message: 'Supported algorithms retrieved successfully'
     });
   } catch (error) {
-    console.error('[RECOMMENDATION SINGLETON] Algorithms error:', error);
+    logger.error('[RECOMMENDATION SINGLETON] Algorithms error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported algorithms'

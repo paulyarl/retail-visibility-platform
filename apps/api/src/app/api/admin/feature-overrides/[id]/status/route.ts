@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -59,7 +60,7 @@ export async function PUT(
     return NextResponse.json(updatedOverride);
 
   } catch (error) {
-    console.error('Error updating feature override status:', error);
+    logger.error('Error updating feature override status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { error: 'Failed to update feature override status' },
       { status: 500 }

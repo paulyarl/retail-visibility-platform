@@ -1,0 +1,228 @@
+import { Router } from 'express';
+import { prisma } from '../prisma';
+import { authenticateToken } from '../middleware/auth';
+import { requireOrgMember, requireOrgAdminForRequest } from '../middleware/permissions';
+
+const router = Router();
+
+// GET /organization-requests - List all requests (with filters)
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const { status, tenantId, userId, organizationId } = req.query;
+
+    const where: any = {};
+    
+    if (status) {
+      where.status = status as string;
+    }
+    
+    if (tenantId) {
+      where.tenantId = tenantId as string;
+    }
+    
+    if (userId) {
+      where.requestedBy = userId as string;
+    }
+
+    if (organizationId) {
+      where.organizationId = organizationId as string;
+    }
+
+    const requests = await prisma.organization_requests_list.findMany({
+      where,
+      select: {
+        id: true,
+        tenant_id: true,
+        organization_id: true,
+        requested_by: true,
+        status: true,
+        request_type: true,
+        notes: true,
+        estimated_cost: true,
+        cost_currency: true,
+        admin_notes: true,
+        cost_agreed: true,
+        processed_by: true,
+        processed_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    res.json(requests);
+  } catch (error) {
+    console.error('[Organization Requests] GET error:', error);
+    res.status(500).json({ error: 'Failed to fetch organization requests' });
+  }
+});
+
+// GET /organization-requests/:id - Get a specific request
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const organizationRequest = await prisma.organization_requests_list.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        tenant_id: true,
+        organization_id: true,
+        requested_by: true,
+        status: true,
+        request_type: true,
+        notes: true,
+        estimated_cost: true,
+        cost_currency: true,
+        admin_notes: true,
+        cost_agreed: true,
+        processed_by: true,
+        processed_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (!organizationRequest) {
+      return res.status(404).json({ error: 'Organization request not found' });
+    }
+
+    res.json(organizationRequest);
+  } catch (error) {
+    console.error('[Organization Request] GET error:', error);
+    res.status(500).json({ error: 'Failed to fetch organization request' });
+  }
+});
+
+// POST /organization-requests - Create a new request
+router.post('/', authenticateToken, requireOrgMember, async (req, res) => {
+  try {
+    const { tenantId, organizationId, requestedBy, requestType, notes, estimatedCost, costCurrency } = req.body;
+
+    if (!tenantId || !organizationId || !requestedBy) {
+      return res.status(400).json({
+        error: 'Missing required fields: tenantId, organizationId, requestedBy'
+      });
+    }
+
+    // Check if there's already a pending request
+    const existingRequest = await prisma.organization_requests_list.findFirst({
+      where: {
+        tenant_id: tenantId,
+        organization_id: organizationId,
+        status: 'pending',
+      },
+    });
+
+    if (existingRequest) {
+      return res.status(409).json({
+        error: 'A pending request already exists for this tenant and organization'
+      });
+    }
+
+    const organizationRequest = await prisma.organization_requests_list.create({
+      data: {
+        tenant_id: tenantId,
+        organization_id: organizationId,
+        requested_by: requestedBy,
+        request_type: requestType || 'join',
+        notes,
+        estimated_cost: estimatedCost,
+        cost_currency: costCurrency || 'USD',
+        status: 'pending',
+      } as any,
+    });
+
+    res.status(201).json(organizationRequest);
+  } catch (error) {
+    console.error('[Organization Requests] POST error:', error);
+    res.status(500).json({ error: 'Failed to create organization request' });
+  }
+});
+
+// PATCH /organization-requests/:id - Update request (approve/reject/agree to cost)
+router.patch('/:id', authenticateToken, requireOrgAdminForRequest, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes, processedBy, costAgreed, estimatedCost } = req.body;
+
+    const updateData: any = {};
+
+    if (status) {
+      updateData.status = status;
+      updateData.processed_at = new Date();
+      if (processedBy) {
+        updateData.processed_by = processedBy;
+      }
+    }
+
+    if (adminNotes !== undefined) {
+      updateData.admin_notes = adminNotes;
+    }
+
+    if (estimatedCost !== undefined) {
+      updateData.estimated_cost = estimatedCost;
+    }
+
+    if (costAgreed !== undefined) {
+      updateData.cost_agreed = costAgreed;
+      if (costAgreed) {
+        updateData.cost_agreed_at = new Date();
+      }
+    }
+
+    const organizationRequest = await prisma.organization_requests_list.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        tenant_id: true,
+        organization_id: true,
+        requested_by: true,
+        status: true,
+        request_type: true,
+        notes: true,
+        estimated_cost: true,
+        cost_currency: true,
+        admin_notes: true,
+        cost_agreed: true,
+        processed_by: true,
+        processed_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    // If approved and cost agreed, assign tenant to organization
+    if (status === 'approved' && organizationRequest.cost_agreed) {
+      await prisma.tenants.update({
+        where: { id: organizationRequest.tenant_id },
+        data: {
+          organization_id: organizationRequest.organization_id,
+        },
+      });
+    }
+
+    res.json(organizationRequest);
+  } catch (error) {
+    console.error('[Organization Request] PATCH error:', error);
+    res.status(500).json({ error: 'Failed to update organization request' });
+  }
+});
+
+// DELETE /organization-requests/:id - Cancel/delete a request
+router.delete('/:id', authenticateToken, requireOrgAdminForRequest, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.organization_requests_list.delete({
+      where: { id },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Organization Request] DELETE error:', error);
+    res.status(500).json({ error: 'Failed to delete organization request' });
+  }
+});
+
+export default router;

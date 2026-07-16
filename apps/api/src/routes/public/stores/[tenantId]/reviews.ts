@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../../../../utils/db-pool';
+import { logger } from '../../../../logger';
 
 const router = Router();
 
@@ -53,7 +54,7 @@ router.get('/summary', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error fetching public review summary:', error);
+    logger.error('Error fetching public review summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review summary'
@@ -190,7 +191,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error fetching public reviews:', error);
+    logger.error('Error fetching public reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch reviews'
@@ -281,7 +282,7 @@ router.get('/approved', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error fetching approved public reviews:', error);
+    logger.error('Error fetching approved public reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch approved reviews'

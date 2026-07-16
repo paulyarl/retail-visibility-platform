@@ -16,6 +16,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { audit } from '../../audit';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -98,7 +99,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: enriched });
   } catch (error) {
-    console.error('[BSaaS Catalog] Error listing:', error);
+    logger.error('[BSaaS Catalog] Error listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list catalog' });
   }
 });
@@ -134,7 +135,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: entry });
   } catch (error: any) {
-    console.error('[BSaaS Catalog] Error creating:', error);
+    logger.error('[BSaaS Catalog] Error creating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create catalog entry' });
   }
 });
@@ -167,7 +168,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: entry });
   } catch (error: any) {
-    console.error('[BSaaS Catalog] Error updating:', error);
+    logger.error('[BSaaS Catalog] Error updating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update catalog entry' });
   }
 });
@@ -192,7 +193,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Catalog entry removed' });
   } catch (error: any) {
-    console.error('[BSaaS Catalog] Error deleting:', error);
+    logger.error('[BSaaS Catalog] Error deleting:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete catalog entry' });
   }
 });

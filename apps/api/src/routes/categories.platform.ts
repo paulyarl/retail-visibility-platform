@@ -4,6 +4,7 @@ import { categoryService } from '../services/CategoryService';
 import { generateProductCatId } from '../lib/id-generator';
 import * as path from 'path';
 import * as fs from 'fs';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -19,7 +20,7 @@ router.get('/categories', authenticateToken, requireAdmin, async (_req: Request,
     });
     return res.json({ success: true, data: categories });
   } catch (e: any) {
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -76,10 +77,10 @@ router.post('/categories', authenticateToken, requireAdmin, async (req: Request,
     return res.status(201).json({ success: true, data: created });
   } catch (e: any) {
     // Check for unique constraint violation on slug
-    if (e?.code === 'P2002' || e?.message?.includes('Unique constraint')) {
+    if (e?.code === 'P2002' || (e as any)?.message?.includes('Unique constraint')) {
       return res.status(409).json({ success: false, error: 'duplicate_slug', message: `A category with slug "${req.body?.slug}" already exists` });
     }
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -123,8 +124,8 @@ router.patch('/categories/:id', authenticateToken, requireAdmin, async (req: Req
     
     return res.json({ success: true, data: updated });
   } catch (e: any) {
-    console.error('[PATCH /categories/:id] Error:', e);
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    logger.error('[PATCH /categories/:id] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -134,7 +135,7 @@ router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Re
     await categoryService.softDeleteDirectoryCategory('platform', id);
     return res.status(204).send();
   } catch (e: any) {
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -326,7 +327,7 @@ router.post('/categories/quick-start', authenticateToken, checkTenantAccess, asy
         });
         createdCategories.push(created);
       } catch (error: any) {
-        console.error(`[Platform Quick Start] Failed to create category ${cat.name}:`, error);
+        logger.error(`[Platform Quick Start] Failed to create category ${cat.name}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
     
@@ -348,8 +349,8 @@ router.post('/categories/quick-start', authenticateToken, checkTenantAccess, asy
       ...(responseMessage && { message: responseMessage }),
     });
   } catch (e: any) {
-    console.error('[Platform Quick Start] Error:', e);
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    logger.error('[Platform Quick Start] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -446,7 +447,7 @@ router.post('/categories/bulk-import', authenticateToken, requireAdmin, async (r
           });
         }
       } catch (error: any) {
-        console.error(`[Bulk Import] Failed to process category ${category.name}:`, error);
+        logger.error(`[Bulk Import] Failed to process category ${category.name}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.errors++;
         results.details.push({
           name: category.name,
@@ -468,8 +469,8 @@ router.post('/categories/bulk-import', authenticateToken, requireAdmin, async (r
       message: `Import completed: ${results.created} created, ${results.updated} updated, ${results.errors} errors`,
     });
   } catch (e: any) {
-    console.error('[Bulk Import] Error:', e);
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    logger.error('[Bulk Import] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -491,8 +492,8 @@ router.get('/categories/gbp-seed', authenticateToken, async (req: Request, res: 
       categories,
     });
   } catch (e: any) {
-    console.error('[GBP Seed] Error:', e);
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    logger.error('[GBP Seed] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 

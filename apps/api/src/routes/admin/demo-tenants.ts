@@ -14,6 +14,7 @@
 
 import { Router, Request, Response } from 'express';
 import demoTenantService, { DemoTemplate } from '../../services/DemoTenantService';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ router.get('/', async (req: Request, res: Response) => {
       total: result.total,
     });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error listing:', error);
+    logger.error('[Admin Demo Tenants] Error listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -65,7 +66,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
     res.json({ success: true, data: tenant });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error getting tenant:', error);
+    logger.error('[Admin Demo Tenants] Error getting tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -96,7 +97,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: result });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error creating:', error);
+    logger.error('[Admin Demo Tenants] Error creating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -133,7 +134,7 @@ router.post('/convert', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error converting to demo:', error);
+    logger.error('[Admin Demo Tenants] Error converting to demo:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -152,7 +153,7 @@ router.post('/:id/revoke-demo', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error revoking demo status:', error);
+    logger.error('[Admin Demo Tenants] Error revoking demo status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -178,7 +179,7 @@ router.patch('/:id/tier', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error changing tier:', error);
+    logger.error('[Admin Demo Tenants] Error changing tier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -195,7 +196,7 @@ router.post('/:id/expire', async (req: Request, res: Response) => {
     }
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error expiring:', error);
+    logger.error('[Admin Demo Tenants] Error expiring:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -212,7 +213,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     }
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('[Admin Demo Tenants] Error deleting:', error);
+    logger.error('[Admin Demo Tenants] Error deleting:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 });

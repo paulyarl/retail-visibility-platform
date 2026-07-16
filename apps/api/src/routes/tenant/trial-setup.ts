@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[Trial Setup] Error:', error);
+    logger.error('[Trial Setup] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     if (error instanceof z.ZodError) {
       return NextResponse.json({ 
@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[Trial Setup] GET Error:', error);
+    logger.error('[Trial Setup] GET Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json({ 
       error: 'Failed to get trial status',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -228,6 +228,7 @@ export async function GET(request: NextRequest) {
 
 // Default export for Express router
 import { Router } from 'express';
+import { logger } from '../../logger';
 const router = Router();
 
 // POST /:tenantId/trial-setup - Activate trial
@@ -333,7 +334,7 @@ router.post('/:tenantId/trial-setup', async (req: any, res: any) => {
     });
 
   } catch (error: any) {
-    console.error('[Trial Setup] Error:', error);
+    logger.error('[Trial Setup] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
@@ -422,7 +423,7 @@ router.get('/:tenantId/trial-setup', async (req: any, res: any) => {
     });
 
   } catch (error: any) {
-    console.error('[Trial Setup] GET Error:', error);
+    logger.error('[Trial Setup] GET Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to get trial status',
       message: error instanceof Error ? error.message : 'Unknown error'

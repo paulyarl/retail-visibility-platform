@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { featuredStoresService } from '../services/featured-stores.service';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[FEATURED-STORES] Error fetching featured stores:', error);
+    logger.error('[FEATURED-STORES] Error fetching featured stores:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
     res.status(500).json({
       success: false,

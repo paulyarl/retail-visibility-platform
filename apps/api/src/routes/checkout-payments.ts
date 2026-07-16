@@ -8,6 +8,7 @@ import { prisma } from '../prisma';
 import { StripeGateway } from '../services/payments/gateways/StripeGateway';
 import { generatePaymentId } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -130,7 +131,7 @@ router.post('/payments/charge', async (req: Request, res: Response) => {
 
     res.json(responseData);
   } catch (error) {
-    console.error('Guest payment processing error:', error);
+    logger.error('Guest payment processing error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'payment_processing_failed',
@@ -171,7 +172,7 @@ router.get('/payments/:id', async (req: Request, res: Response) => {
       payment,
     });
   } catch (error) {
-    console.error('Guest payment retrieval error:', error);
+    logger.error('Guest payment retrieval error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'payment_retrieval_failed',

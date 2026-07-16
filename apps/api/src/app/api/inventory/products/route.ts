@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import InventorySingletonService from '../../../../services/InventorySingletonService';
+import { logger } from '../../../../logger';
 
 /**
  * GET /api/inventory/products
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error fetching products:', error);
+    logger.error('Error fetching products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     return NextResponse.json({
       success: false,

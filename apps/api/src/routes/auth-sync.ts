@@ -10,6 +10,7 @@ import { user_role } from '@prisma/client';
 import { generateUserId, generateUserTenantId } from '../lib/id-generator';
 import { audit } from '../audit';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -64,7 +65,7 @@ async function autoAcceptPendingInvitations(userId: string, email: string) {
     }
   } catch (error) {
     // Non-fatal: log but don't block login
-    console.error('[AuthSync] Error auto-accepting invitations:', error);
+    logger.error('[AuthSync] Error auto-accepting invitations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -379,7 +380,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
       isNewUser: true,
     });
   } catch (error: any) {
-    console.error('[AuthSync] Error syncing user:', error);
+    logger.error('[AuthSync] Error syncing user:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to sync user',
@@ -439,7 +440,7 @@ router.get('/lookup', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[AuthSync] Error looking up user:', error);
+    logger.error('[AuthSync] Error looking up user:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to lookup user',

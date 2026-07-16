@@ -9,6 +9,7 @@ import { basePrisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { getDirectPool } from '../utils/db-pool';
 import bcrypt from 'bcryptjs';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -104,7 +105,7 @@ router.post('/delete', authenticateToken, async (req, res) => {
       message
     });
   } catch (error) {
-    console.error('[POST /api/gdpr/delete] Error:', error);
+    logger.error('[POST /api/gdpr/delete] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to request account deletion' });
   }
 });
@@ -141,7 +142,7 @@ router.get('/delete/status', authenticateToken, async (req, res) => {
       data: deletionRequest || null
     });
   } catch (error) {
-    console.error('[GET /api/gdpr/delete/status] Error:', error);
+    logger.error('[GET /api/gdpr/delete/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get deletion status' });
   }
 });
@@ -178,7 +179,7 @@ router.delete('/delete', authenticateToken, async (req, res) => {
       message: 'Account deletion request cancelled successfully'
     });
   } catch (error) {
-    console.error('[DELETE /api/gdpr/delete] Error:', error);
+    logger.error('[DELETE /api/gdpr/delete] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to cancel deletion request' });
   }
 });
@@ -254,7 +255,7 @@ router.get('/admin/deletion-requests', authenticateToken, requireAdmin, async (r
       client.release();
     }
   } catch (error) {
-    console.error('[GET /api/admin/deletion-requests] Error:', error);
+    logger.error('[GET /api/admin/deletion-requests] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch deletion requests' });
   }
 });
@@ -321,7 +322,7 @@ router.get('/admin/deletion-requests/stats', authenticateToken, requireAdmin, as
       client.release();
     }
   } catch (error) {
-    console.error('[GET /api/admin/deletion-requests/stats] Error:', error);
+    logger.error('[GET /api/admin/deletion-requests/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch deletion stats' });
   }
 });
@@ -365,7 +366,7 @@ router.put('/admin/deletion-requests/:id', authenticateToken, requireAdmin, asyn
       message: 'Deletion request updated successfully'
     });
   } catch (error) {
-    console.error('[PUT /api/admin/deletion-requests/:id] Error:', error);
+    logger.error('[PUT /api/admin/deletion-requests/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update deletion request' });
   }
 });

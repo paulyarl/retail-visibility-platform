@@ -13,6 +13,7 @@
 import { prisma } from '../prisma';
 import { decryptToken, refreshAccessToken, encryptToken } from '../lib/google/oauth';
 import { validateProductForGMC } from './GMCValidationService';
+import { logger } from '../logger';
 
 const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
 const CONTENT_API_VERSION = 'v2.1';
@@ -113,7 +114,7 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; m
       const newTokens = await refreshAccessToken(refreshToken);
       
       if (!newTokens) {
-        console.error('[GMCProductSync] Failed to refresh token');
+        logger.error('[GMCProductSync] Failed to refresh token', undefined);
         return null;
       }
 
@@ -135,7 +136,7 @@ async function getValidAccessToken(tenantId: string): Promise<{ token: string; m
       merchantId: merchantLink.merchant_id 
     };
   } catch (error) {
-    console.error(`[GMCProductSync] Error getting token for tenant ${tenantId}:`, error);
+    logger.error(`[GMCProductSync] Error getting token for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -423,7 +424,7 @@ export async function syncProduct(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GMCProductSync] Failed to sync product ${itemId}:`, error);
+      logger.error(`[GMCProductSync] Failed to sync product ${itemId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { 
         success: false, 
         productId: itemId, 
@@ -481,11 +482,11 @@ export async function syncProduct(
         } else {
           variantFailed++;
           const vError = await variantResponse.text();
-          console.error(`[GMCProductSync] Failed to sync variant ${variant.id}:`, vError);
+          logger.error(`[GMCProductSync] Failed to sync variant ${variant.id}:`, undefined, { error: { name: (vError as any)?.name || 'Error', message: (vError as any)?.message || String(vError), stack: (vError as any)?.stack } });
         }
       } catch (variantError) {
         variantFailed++;
-        console.error(`[GMCProductSync] Error syncing variant ${variant.id}:`, variantError);
+        logger.error(`[GMCProductSync] Error syncing variant ${variant.id}:`, undefined, { error: { name: (variantError as any)?.name || 'Error', message: (variantError as any)?.message || String(variantError), stack: (variantError as any)?.stack } });
       }
     }
 
@@ -503,7 +504,7 @@ export async function syncProduct(
       validationWarnings,
     };
   } catch (error: any) {
-    console.error(`[GMCProductSync] Error syncing product ${itemId}:`, error);
+    logger.error(`[GMCProductSync] Error syncing product ${itemId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, productId: itemId, offerId: '', error: error.message };
   }
 }
@@ -726,7 +727,7 @@ export async function batchSyncProducts(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`[GMCProductSync] Batch sync failed:`, error);
+      logger.error(`[GMCProductSync] Batch sync failed:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { 
         success: false, 
         total: items.length, 
@@ -804,7 +805,7 @@ export async function batchSyncProducts(
       validationSummary: { errors: totalValidationErrors, warnings: totalValidationWarnings },
     };
   } catch (error: any) {
-    console.error(`[GMCProductSync] Batch sync error:`, error);
+    logger.error(`[GMCProductSync] Batch sync error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { 
       success: false, 
       total: 0, 
@@ -864,7 +865,7 @@ export async function updateInventory(
     console.log(`[GMCProductSync] Updated inventory for ${itemId}: ${availability}`);
     return { success: true, productId: itemId, offerId };
   } catch (error: any) {
-    console.error(`[GMCProductSync] Error updating inventory:`, error);
+    logger.error(`[GMCProductSync] Error updating inventory:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, productId: itemId, offerId: '', error: error.message };
   }
 }
@@ -922,7 +923,7 @@ export async function updatePrice(
     console.log(`[GMCProductSync] Updated price for ${itemId}: ${priceValue} ${currency}`);
     return { success: true, productId: itemId, offerId };
   } catch (error: any) {
-    console.error(`[GMCProductSync] Error updating price:`, error);
+    logger.error(`[GMCProductSync] Error updating price:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, productId: itemId, offerId: '', error: error.message };
   }
 }
@@ -980,7 +981,7 @@ export async function deleteProduct(
     console.log(`[GMCProductSync] Deleted product ${itemId} from GMC`);
     return { success: true, productId: itemId, offerId };
   } catch (error: any) {
-    console.error(`[GMCProductSync] Error deleting product:`, error);
+    logger.error(`[GMCProductSync] Error deleting product:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { success: false, productId: itemId, offerId: '', error: error.message };
   }
 }
@@ -1098,7 +1099,7 @@ export async function getGMCSyncStatus(tenantId: string): Promise<{
       }),
     };
   } catch (error) {
-    console.error(`[GMCProductSync] Error getting sync status:`, error);
+    logger.error(`[GMCProductSync] Error getting sync status:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       hasGMCConnection: false,
       hasMerchantLink: false,

@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { UniversalIdentifierCache } from '../services/UniversalIdentifierCache';
 import { CacheMonitoringDashboard } from '../monitoring/CacheMetrics';
 import { CacheKeyManager } from '../security/CacheEncryption';
+import { logger } from '../logger';
 
 const router = Router();
 const dashboard = new CacheMonitoringDashboard();
@@ -33,7 +34,7 @@ router.get('/metrics', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error getting metrics:', error);
+    logger.error('[Cache Monitoring] Error getting metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get cache metrics',
@@ -69,7 +70,7 @@ router.get('/health', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error getting health:', error);
+    logger.error('[Cache Monitoring] Error getting health:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       status: 'critical',
@@ -101,7 +102,7 @@ router.get('/analytics', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error getting analytics:', error);
+    logger.error('[Cache Monitoring] Error getting analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get cache analytics',
@@ -136,7 +137,7 @@ router.post('/warm', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error warming cache:', error);
+    logger.error('[Cache Monitoring] Error warming cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to warm cache',
@@ -163,7 +164,7 @@ router.post('/invalidate/:tenantId', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error invalidating cache:', error);
+    logger.error('[Cache Monitoring] Error invalidating cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to invalidate cache',
@@ -187,7 +188,7 @@ router.post('/clear', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error clearing cache:', error);
+    logger.error('[Cache Monitoring] Error clearing cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache',
@@ -223,7 +224,7 @@ router.get('/keys', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error getting key info:', error);
+    logger.error('[Cache Monitoring] Error getting key info:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get key information',
@@ -246,7 +247,7 @@ router.post('/keys/rotate', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error rotating key:', error);
+    logger.error('[Cache Monitoring] Error rotating key:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to rotate encryption key',
@@ -275,7 +276,7 @@ router.get('/export', async (req, res) => {
     
     res.send(exportData);
   } catch (error) {
-    console.error('[Cache Monitoring] Error exporting metrics:', error);
+    logger.error('[Cache Monitoring] Error exporting metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to export metrics',
@@ -333,7 +334,7 @@ router.get('/test', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Cache Monitoring] Error testing cache:', error);
+    logger.error('[Cache Monitoring] Error testing cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to test cache',

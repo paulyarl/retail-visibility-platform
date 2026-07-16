@@ -3,6 +3,7 @@ import { getDirectPool } from '../utils/db-pool';
 import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
 import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -282,7 +283,7 @@ router.get('/', async (req, res) => {
     return res.json(responseData);
 
   } catch (error) {
-    console.error('[GET /api/directory/premium-featured-products] Error:', error);
+    logger.error('[GET /api/directory/premium-featured-products] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'Failed to fetch premium featured products',
       details: unifiedConfig.isDevelopment ? (error as Error).message : undefined

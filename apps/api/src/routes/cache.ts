@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { memoryCache } from '../utils/cache'
 import { getDirectPool } from '../utils/db-pool'
+import { logger } from '../logger';
 
 const router = Router()
 
@@ -36,7 +37,7 @@ router.get('/stats', async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Error getting cache stats:', error)
+    logger.error('Error getting cache stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get cache statistics'
@@ -60,7 +61,7 @@ router.post('/cleanup', async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Error during cache cleanup:', error)
+    logger.error('Error during cache cleanup:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to cleanup cache'
@@ -77,7 +78,7 @@ router.post('/reset-metrics', async (req, res) => {
       message: 'Cache metrics reset successfully'
     })
   } catch (error) {
-    console.error('Error resetting cache metrics:', error)
+    logger.error('Error resetting cache metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to reset cache metrics'
@@ -136,7 +137,7 @@ router.post('/refresh-mv', async (req, res) => {
       }
     });
   } catch (error: any) {
-    console.error('Error refreshing MVs:', error);
+    logger.error('Error refreshing MVs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to refresh materialized views',

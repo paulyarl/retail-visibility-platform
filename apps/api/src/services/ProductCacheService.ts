@@ -13,6 +13,7 @@
 import { prisma } from '../prisma';
 import { generateItemId } from '../lib/id-generator';
 import { aiProviderService } from './AIProviderService';
+import { logger } from '../logger';
 
 export interface CachedProduct {
   id: string;
@@ -231,7 +232,7 @@ export class ProductCacheService {
         lastUsedAt: p.last_used_at,
       }));
     } catch (error: any) {
-      console.error('[ProductCache] Cache lookup failed:', error.message);
+      logger.error('[ProductCache] Cache lookup failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
       return [];
     }
   }
@@ -269,7 +270,7 @@ export class ProductCacheService {
       }));
       
     } catch (error: any) {
-      console.error('[ProductCache] AI generation failed:', error.message);
+      logger.error('[ProductCache] AI generation failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
       return this.getFallbackProducts(businessType, categoryName, count);
     }
   }
@@ -341,7 +342,7 @@ export class ProductCacheService {
         });
         console.log(`[ProductCache] ✓ Saved: ${product.name}`);
       } catch (error: any) {
-        console.error(`[ProductCache] Failed to save product "${product.name}":`, error.message);
+        logger.error(`[ProductCache] Failed to save product "${product.name}":`, undefined, { error: { name: 'Error', message: String(error.message) } });
       }
     }
   }
@@ -363,7 +364,7 @@ export class ProductCacheService {
           }
         });
       } catch (error: any) {
-        console.error(`[ProductCache] Failed to increment usage for ${id}:`, error.message);
+        logger.error(`[ProductCache] Failed to increment usage for ${id}:`, undefined, { error: { name: 'Error', message: String(error.message) } });
       }
     }
   }
@@ -498,7 +499,7 @@ export class ProductCacheService {
       
       console.log(`[ProductCache] ✓ Updated cache with photo for: ${productName}`);
     } catch (error: any) {
-      console.error(`[ProductCache] Failed to update cache with photo for "${productName}":`, error.message);
+      logger.error(`[ProductCache] Failed to update cache with photo for "${productName}":`, undefined, { error: { name: 'Error', message: String(error.message) } });
     }
   }
   
