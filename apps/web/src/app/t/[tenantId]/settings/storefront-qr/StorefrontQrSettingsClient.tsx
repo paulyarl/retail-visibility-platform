@@ -26,6 +26,7 @@ interface StorefrontQrSettings {
   qr_dot_color: string;
   qr_corner_color: string;
   qr_bg_color: string;
+  qr_custom_colors_enabled: boolean;
   qr_gradient_enabled: boolean;
   qr_gradient_start: string;
   qr_gradient_end: string;
@@ -52,6 +53,7 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_dot_color: '#1a56db',
   qr_corner_color: '#1a56db',
   qr_bg_color: '#ffffff',
+  qr_custom_colors_enabled: false,
   qr_gradient_enabled: false,
   qr_gradient_start: '#1a56db',
   qr_gradient_end: '#7c3aed',
@@ -257,14 +259,14 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
               </div>
             </div>
 
-            {/* QR Content Types */}
+            {/* QR Display Surfaces — public surfaces where QR codes can appear */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">QR Content Types</p>
-              <div className="grid grid-cols-2 gap-3">
+              <p className="text-sm font-medium text-neutral-700">QR Display Surfaces</p>
+              <p className="text-xs text-neutral-500">Choose which public surfaces display QR codes</p>
+              <div className="grid grid-cols-3 gap-3">
                 {[
                   { key: 'qr_product' as const, label: 'Product QR' },
                   { key: 'qr_store' as const, label: 'Store QR' },
-                  { key: 'qr_logo' as const, label: 'Logo QR' },
                   { key: 'qr_directory' as const, label: 'Directory QR' },
                 ].map(item => {
                   const tierAllowed = isTierFlexible || tierQrContentTypes.includes(item.key);
@@ -287,6 +289,23 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Logo on QR Code — controls whether the merchant's logo appears on the QR */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700">Logo on QR Code</p>
+              <p className="text-xs text-neutral-500">Choose whether your merchant logo appears embedded in QR codes</p>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={settings.qr_logo}
+                    onCheckedChange={(v) => updateSetting('qr_logo', v)}
+                    disabled={!(isTierFlexible || tierQrContentTypes.includes('qr_logo'))}
+                  />
+                  <span className="text-sm text-neutral-700">Embed Logo in QR</span>
+                </div>
+                {!(isTierFlexible || tierQrContentTypes.includes('qr_logo')) && <Lock className="h-3 w-3 text-neutral-400" />}
               </div>
             </div>
           </CardContent>
@@ -413,28 +432,24 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
               <div className="grid grid-cols-5 gap-2">
                 {DOT_STYLES.map(style => {
                   const tierAllowed = isTierFlexible || tierDotStyles.includes(style.value as any);
+                  const isSelected = settings.qr_dot_type === style.value;
                   return (
-                    <label
+                    <div
                       key={style.value}
-                      className={`flex items-center justify-center p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                      onClick={() => {
+                        if (!tierAllowed) return;
+                        updateSetting('qr_dot_type', style.value);
+                      }}
+                      className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
                         tierAllowed
-                          ? settings.qr_dot_type === style.value
-                            ? 'border-purple-300 bg-purple-50 text-purple-700'
-                            : 'border-neutral-200 hover:border-neutral-300'
+                          ? isSelected
+                            ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                            : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
                           : 'border-neutral-200 opacity-50 cursor-not-allowed'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="qr_dot_type"
-                        value={style.value}
-                        checked={settings.qr_dot_type === style.value}
-                        disabled={!tierAllowed}
-                        onChange={(e) => updateSetting('qr_dot_type', e.target.value)}
-                        className="sr-only"
-                      />
                       {style.label}
-                    </label>
+                    </div>
                   );
                 })}
               </div>
@@ -446,28 +461,24 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
               <div className="grid grid-cols-3 gap-2">
                 {CORNER_STYLES.map(style => {
                   const tierAllowed = isTierFlexible || tierCornerStyles.includes(style.value as any);
+                  const isSelected = settings.qr_corner_type === style.value;
                   return (
-                    <label
+                    <div
                       key={style.value}
-                      className={`flex items-center justify-center p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                      onClick={() => {
+                        if (!tierAllowed) return;
+                        updateSetting('qr_corner_type', style.value);
+                      }}
+                      className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
                         tierAllowed
-                          ? settings.qr_corner_type === style.value
-                            ? 'border-purple-300 bg-purple-50 text-purple-700'
-                            : 'border-neutral-200 hover:border-neutral-300'
+                          ? isSelected
+                            ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                            : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
                           : 'border-neutral-200 opacity-50 cursor-not-allowed'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="qr_corner_type"
-                        value={style.value}
-                        checked={settings.qr_corner_type === style.value}
-                        disabled={!tierAllowed}
-                        onChange={(e) => updateSetting('qr_corner_type', e.target.value)}
-                        className="sr-only"
-                      />
                       {style.label}
-                    </label>
+                    </div>
                   );
                 })}
               </div>
@@ -482,8 +493,9 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                     <p className="text-xs text-neutral-500">Override default QR code colors</p>
                   </div>
                   <Switch
-                    checked={settings.qr_dot_color !== '#1a56db' || settings.qr_corner_color !== '#1a56db' || settings.qr_bg_color !== '#ffffff'}
+                    checked={settings.qr_custom_colors_enabled}
                     onCheckedChange={(v) => {
+                      updateSetting('qr_custom_colors_enabled', v);
                       if (!v) {
                         updateSetting('qr_dot_color', '#1a56db');
                         updateSetting('qr_corner_color', '#1a56db');
@@ -492,35 +504,37 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                     }}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs text-neutral-500">Dot Color</label>
-                    <input
-                      type="color"
-                      value={settings.qr_dot_color}
-                      onChange={(e) => updateSetting('qr_dot_color', e.target.value)}
-                      className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                    />
+                {settings.qr_custom_colors_enabled && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-neutral-500">Dot Color</label>
+                      <input
+                        type="color"
+                        value={settings.qr_dot_color}
+                        onChange={(e) => updateSetting('qr_dot_color', e.target.value)}
+                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-neutral-500">Corner Color</label>
+                      <input
+                        type="color"
+                        value={settings.qr_corner_color}
+                        onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
+                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-neutral-500">Background</label>
+                      <input
+                        type="color"
+                        value={settings.qr_bg_color}
+                        onChange={(e) => updateSetting('qr_bg_color', e.target.value)}
+                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-neutral-500">Corner Color</label>
-                    <input
-                      type="color"
-                      value={settings.qr_corner_color}
-                      onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
-                      className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-neutral-500">Background</label>
-                    <input
-                      type="color"
-                      value={settings.qr_bg_color}
-                      onChange={(e) => updateSetting('qr_bg_color', e.target.value)}
-                      className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             )}
 

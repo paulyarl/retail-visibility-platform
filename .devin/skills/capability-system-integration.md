@@ -363,6 +363,8 @@ This ensures the job respects both the tier gate AND the merchant's toggle prefe
 
 All backend resolvers are pure functions called by `EffectiveCapabilityResolver.ts`. The frontend `UnifiedCapabilityService` maps their output. The old `*OptionsService` classes are deprecated.
 
+**Critical boundary (R33)**: Tier-level fields in resolver output (`allowed_*_types`, `*_styled_enabled`, `*_classic_enabled`, feature-level booleans) must be derived from `features` only — never gated by `merchantPrefs`. Merchant preferences belong in `merchant_preferences` and `can_use_*` / `effective_*` fields. See `capability-data-flow-rules.md` R33 for the full rule and bug pattern.
+
 ## Advanced Patterns from the Chatbot Integration
 
 The chatbot capability introduced several patterns that future capabilities should follow, especially complex domains with sub-categories, flexible-tier organizations, and public-facing APIs.

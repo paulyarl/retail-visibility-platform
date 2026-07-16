@@ -30,6 +30,7 @@ const storefrontQrSettingsSchema = z.object({
   qr_dot_color: z.string().optional(),
   qr_corner_color: z.string().optional(),
   qr_bg_color: z.string().optional(),
+  qr_custom_colors_enabled: z.boolean().optional(),
   qr_gradient_enabled: z.boolean().optional(),
   qr_gradient_start: z.string().optional(),
   qr_gradient_end: z.string().optional(),
@@ -54,6 +55,7 @@ export const DEFAULT_QR_SETTINGS = {
   qr_dot_color: '#1a56db',
   qr_corner_color: '#1a56db',
   qr_bg_color: '#ffffff',
+  qr_custom_colors_enabled: false,
   qr_gradient_enabled: false,
   qr_gradient_start: '#1a56db',
   qr_gradient_end: '#7c3aed',
@@ -85,6 +87,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
           qr_logo: false,
           qr_directory: false,
           qr_gradient_enabled: false,
+          qr_custom_colors_enabled: false,
         },
         tierState,
       });
@@ -120,6 +123,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierFilteredSettings.qr_dot_color = rawSettings.qr_dot_color || '#1a56db';
       tierFilteredSettings.qr_corner_color = rawSettings.qr_corner_color || '#1a56db';
       tierFilteredSettings.qr_bg_color = rawSettings.qr_bg_color || '#ffffff';
+      tierFilteredSettings.qr_custom_colors_enabled = tierState.qrCustomColors ? !!rawSettings.qr_custom_colors_enabled : false;
       tierFilteredSettings.qr_gradient_enabled = tierState.qrGradients ? !!rawSettings.qr_gradient_enabled : false;
       tierFilteredSettings.qr_gradient_start = rawSettings.qr_gradient_start || '#1a56db';
       tierFilteredSettings.qr_gradient_end = rawSettings.qr_gradient_end || '#7c3aed';
@@ -129,6 +133,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierFilteredSettings.qr_dot_color = '#1a56db';
       tierFilteredSettings.qr_corner_color = '#1a56db';
       tierFilteredSettings.qr_bg_color = '#ffffff';
+      tierFilteredSettings.qr_custom_colors_enabled = false;
       tierFilteredSettings.qr_gradient_enabled = false;
       tierFilteredSettings.qr_gradient_start = '#1a56db';
       tierFilteredSettings.qr_gradient_end = '#7c3aed';
@@ -214,6 +219,7 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
         qr_dot_color: settings.qr_dot_color,
         qr_corner_color: settings.qr_corner_color,
         qr_bg_color: settings.qr_bg_color,
+        qr_custom_colors_enabled: settings.qr_custom_colors_enabled,
         qr_gradient_enabled: settings.qr_gradient_enabled,
         qr_gradient_start: settings.qr_gradient_start,
         qr_gradient_end: settings.qr_gradient_end,
