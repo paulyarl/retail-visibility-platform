@@ -191,7 +191,6 @@ export default function ProductQuickCommerceLayout({
           showsHours={s.showsHours}
           isRetailStore={isRetailStore}
           isOnlineStore={isOnlineStore}
-          showStatusPanel={s.showStatusPanel}
           hoursStatus={s.hoursStatus}
         />
       </div>

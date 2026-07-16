@@ -140,7 +140,6 @@ export function ProductShowcaseLayout({
           showsHours={s.showsHours}
           isRetailStore={s.isRetailStore}
           isOnlineStore={s.isOnlineStore}
-          showStatusPanel={s.showStatusPanel}
           hoursStatus={s.hoursStatus}
         />
       </div>

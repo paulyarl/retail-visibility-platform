@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { ProductDetailTabs } from '@/app/products/[id]/layouts/shared/ProductDetailTabs';
 import ProductActions from '@/components/products/ProductActions';
-import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import TenantMapSection from '@/components/tenant/TenantMapSection';
 import { ChevronDown, MapPin, Phone, Clock } from 'lucide-react';
 
@@ -21,7 +20,6 @@ interface ProductBottomSectionsProps {
   showsHours: boolean;
   isRetailStore: boolean;
   isOnlineStore: boolean;
-  showStatusPanel: boolean;
   hoursStatus: any;
 }
 
@@ -36,7 +34,6 @@ export function ProductBottomSections({
   showsHours,
   isRetailStore,
   isOnlineStore,
-  showStatusPanel,
   hoursStatus,
 }: ProductBottomSectionsProps) {
   const isQuickCommerce = layoutVariant === 'quick-commerce';
@@ -71,7 +68,7 @@ export function ProductBottomSections({
       </section>
 
       {/* Store Info Accordion (quick-commerce only) */}
-      {isQuickCommerce && showsLocation && !isOnlineStore && tenant && !showStatusPanel && (
+      {isQuickCommerce && showsLocation && !isOnlineStore && tenant && (
         <section className="mb-6 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
           <details className="group">
             <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
@@ -82,19 +79,19 @@ export function ProductBottomSections({
               <ChevronDown className="w-4 h-4 text-neutral-500 group-open:rotate-180 transition-transform" />
             </summary>
             <div className="px-4 pb-4 space-y-3 text-sm text-neutral-600 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-800 pt-3">
-              {(tenant.metadata?.businessName || tenant.name) && (
-                <p className="font-medium text-neutral-800 dark:text-neutral-200">{tenant.metadata?.businessName || tenant.name}</p>
+              {(tenant.businessName || tenant.metadata?.businessName || tenant.name) && (
+                <p className="font-medium text-neutral-800 dark:text-neutral-200">{tenant.businessName || tenant.metadata?.businessName || tenant.name}</p>
               )}
-              {tenant.metadata?.address && (
+              {(tenant.address || tenant.metadata?.address) && (
                 <p className="flex items-start gap-2">
                   <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-neutral-400" />
-                  <span>{tenant.metadata?.address}</span>
+                  <span>{tenant.address || tenant.metadata?.address}</span>
                 </p>
               )}
-              {tenant.metadata?.phone && (
+              {(tenant.phone || tenant.metadata?.phone) && (
                 <p className="flex items-center gap-2">
                   <Phone className="w-4 h-4 flex-shrink-0 text-neutral-400" />
-                  <span>{tenant.metadata?.phone}</span>
+                  <span>{tenant.phone || tenant.metadata?.phone}</span>
                 </p>
               )}
               {showsHours && hoursStatus && (
@@ -116,17 +113,10 @@ export function ProductBottomSections({
         </section>
       )}
 
-      {/* Status Panel */}
-      {showStatusPanel && (
-        <section className={mbClass}>
-          <StorefrontStatusPanel tenantId={product.tenantId} tenantInfo={tenant as any} />
-        </section>
-      )}
-
       {/* Map Section (quick-commerce only) */}
-      {isQuickCommerce && showsMap && tenant?.metadata?.location && (
+      {isQuickCommerce && showsMap && (tenant?.metadata?.location || tenant?.profileData?.location) && (
         <section className="mb-6 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-          <TenantMapSection location={tenant.metadata.location} className="h-48" />
+          <TenantMapSection location={tenant.metadata?.location || tenant.profileData?.location} className="h-48" />
         </section>
       )}
     </>
