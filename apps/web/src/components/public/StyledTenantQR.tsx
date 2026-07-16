@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import type { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import type { StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
 export interface StyledTenantQRProps {
   url: string;
   tenantId: string;
   tenantLogo?: string | null;
-  capabilityFlags?: StorefrontOptionFlags | null;
+  qrState?: StorefrontQrState | null;
   exportSize?: number;
   errorCorrection?: 'H' | 'M';
   label?: string;
@@ -22,7 +22,7 @@ export function StyledTenantQR({
   url,
   tenantId,
   tenantLogo,
-  capabilityFlags,
+  qrState,
   exportSize,
   errorCorrection = 'H',
   label = 'QR Code',
@@ -35,24 +35,24 @@ export function StyledTenantQR({
   const [isGenerating, setIsGenerating] = useState(false);
   const qrInstanceRef = useRef<any>(null);
 
-  const flags = capabilityFlags;
+  const prefs = qrState?.merchantPreferences as any;
   const resolvedExportSize = exportSize
-    || (flags?.qrResolution === '2048' ? 2048
-      : flags?.qrResolution === '1024' ? 1024
-      : flags?.qrResolution === '512' ? 512
+    || (prefs?.default_qr_resolution === '2048' ? 2048
+      : prefs?.default_qr_resolution === '1024' ? 1024
+      : prefs?.default_qr_resolution === '512' ? 512
       : 512);
 
   const generateStyledQR = async (targetSize: number): Promise<string> => {
     const { default: QRCodeStyling } = await import('qr-code-styling');
 
-    const dotType = (flags?.qrDotType || flags?.allowedQRDotStyles?.[0] || 'rounded') as any;
-    const cornerType = (flags?.qrCornerType || flags?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-    const dotColor = flags?.qrDotColor || '#1a56db';
-    const cornerColor = flags?.qrCornerColor || '#1a56db';
-    const bgColor = flags?.qrBgColor || '#ffffff';
-    const useGradient = flags?.qrGradients && flags?.qrGradientEnabled;
-    const gradientStart = flags?.qrGradientStart || '#1a56db';
-    const gradientEnd = flags?.qrGradientEnd || '#7c3aed';
+    const dotType = (prefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded') as any;
+    const cornerType = (prefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+    const dotColor = prefs?.qr_dot_color || '#1a56db';
+    const cornerColor = prefs?.qr_corner_color || '#1a56db';
+    const bgColor = prefs?.qr_bg_color || '#ffffff';
+    const useGradient = qrState?.qrGradients && prefs?.qr_gradient_enabled;
+    const gradientStart = prefs?.qr_gradient_start || '#1a56db';
+    const gradientEnd = prefs?.qr_gradient_end || '#7c3aed';
 
     const qr = new QRCodeStyling({
       width: targetSize,
@@ -135,7 +135,7 @@ export function StyledTenantQR({
   };
 
   const sizeOptions = (() => {
-    const res = flags?.qrResolutions || [];
+    const res = qrState?.allowedQRResolutions || [];
     const options = [{ size: 256, label: 'Small (256px)', description: 'Mobile friendly' }];
     if (res.includes('qr_codes_512') || res.includes('qr_codes_1024') || res.includes('qr_codes_2048')) {
       options.push({ size: 512, label: 'Medium (512px)', description: 'Web quality' });
@@ -201,7 +201,7 @@ export function StyledTenantQR({
 
       <div className="mt-3 space-y-1">
         <p className="text-xs text-neutral-500 text-center">Scan to visit</p>
-        {tenantLogo && flags?.showQRLogo && (
+        {tenantLogo && prefs?.qr_logo && (
           <p className="text-xs text-purple-600 font-medium text-center">✨ Branded with store logo</p>
         )}
       </div>
