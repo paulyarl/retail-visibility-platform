@@ -160,8 +160,8 @@ export class CrmTenantService extends BaseService {
           tenant_id: tenantId,
           OR: [
             { ticket_id: null, task_id: null },
-            { ticket: { status: { in: ['open', 'in_progress', 'waiting'] } } },
-            { task: { status: { in: ['pending', 'in_progress'] } } },
+            { crm_support_tickets: { status: { in: ['open', 'in_progress', 'waiting'] } } },
+            { crm_tasks: { status: { in: ['pending', 'in_progress'] } } },
           ],
         },
         orderBy: { created_at: 'desc' },
@@ -247,8 +247,8 @@ export class CrmTenantService extends BaseService {
           is_internal: false,
           OR: [
             { ticket_id: null, task_id: null },
-            { ticket: { status: { in: ['open', 'in_progress', 'waiting'] } } },
-            { task: { status: { in: ['pending', 'in_progress'] } } },
+            { crm_support_tickets: { status: { in: ['open', 'in_progress', 'waiting'] } } },
+            { crm_tasks: { status: { in: ['pending', 'in_progress'] } } },
           ],
         },
         orderBy: { created_at: 'desc' },
