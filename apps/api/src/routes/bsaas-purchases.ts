@@ -1220,6 +1220,27 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       })();
     }
 
+    // 5e. If this is a funnel_builder re-purchase, re-activate paused funnels — fire-and-forget
+    if (featureKey === 'funnel_builder') {
+      (async () => {
+        try {
+          const paused = await prisma.tenant_sales_funnels.findMany({
+            where: { tenant_id: tenantId, is_active: false },
+            select: { id: true },
+          });
+          if (paused.length > 0) {
+            await prisma.tenant_sales_funnels.updateMany({
+              where: { tenant_id: tenantId, is_active: false },
+              data: { is_active: true, updated_at: new Date() },
+            });
+            logger.info('[BSaaS] Re-activated paused funnels after re-purchase', undefined, { tenantId, count: paused.length });
+          }
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to re-activate funnels after re-purchase', undefined, { error: (err as Error).message });
+        }
+      })();
+    }
+
     // 6. Audit log
     await audit({
       tenantId,
@@ -1585,6 +1606,27 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       billingCycle: billingCycle as 'weekly' | 'monthly' | 'annual',
       metadata: { bundleKey, bundleName: bundle.marketing_name, featureKeys },
     }).catch(err => console.error('[BSaaS] Failed to send bundle notification:', err));
+
+    // 10b. If bundle includes funnel_builder, re-activate paused funnels — fire-and-forget
+    if (featureKeys.includes('funnel_builder')) {
+      (async () => {
+        try {
+          const paused = await prisma.tenant_sales_funnels.findMany({
+            where: { tenant_id: tenantId, is_active: false },
+            select: { id: true },
+          });
+          if (paused.length > 0) {
+            await prisma.tenant_sales_funnels.updateMany({
+              where: { tenant_id: tenantId, is_active: false },
+              data: { is_active: true, updated_at: new Date() },
+            });
+            logger.info('[BSaaS] Re-activated paused funnels after bundle re-purchase', undefined, { tenantId, count: paused.length });
+          }
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to re-activate funnels after bundle re-purchase', undefined, { error: (err as Error).message });
+        }
+      })();
+    }
 
     res.json({
       success: true,

@@ -366,6 +366,33 @@ A scheduled job runs daily at 2 AM UTC:
 
 ---
 
+## Frontend Migration Guide: console.* → clientLogger.*
+
+> **Migration complete (July 2026):** All `console.error` and `console.warn` calls in `apps/web/src/` have been replaced with `clientLogger.error` and `clientLogger.warn`. The migration covered 681 files, ~3,268 replacements. `console.log` calls were intentionally deferred.
+
+### Mapping table
+
+| console.* | clientLogger.* | Notes |
+|-----------|----------------|-------|
+| `console.error('Failed:', err)` | `clientLogger.error(err, { message: 'Failed:' })` | Pass `Error` object directly as first arg for stack trace preservation |
+| `console.error(err)` | `clientLogger.error(err)` | Direct pass-through |
+| `console.error('Something failed')` | `clientLogger.error(new Error('Something failed'))` | String wrapped in `Error` |
+| `console.warn('Deprecated')` | `clientLogger.warn('Deprecated')` | Direct mapping |
+| `console.warn('Failed:', err)` | `clientLogger.warn('Failed:', { detail: err })` | Context object as second arg |
+
+### When it's OK to keep console.*
+
+- `console.*` in `app/api/` route handlers (server-side — use backend `logger` instead)
+- `console.*` in test files
+- `console.*` in `client-logger.ts` itself (to avoid circular dependency)
+- `console.log` — intentionally not migrated (use `clientLogger.info` or `clientLogger.debug` for new code)
+
+### Migration script (reference only — already applied)
+
+- `scripts/migrate-frontend-console-to-logger.js` — Bulk migration of `console.error`/`console.warn` to `clientLogger.error`/`clientLogger.warn`
+
+---
+
 ## Frontend Logging
 
 The frontend has a parallel logging stack that mirrors the backend: structured logger, correlation IDs, Sentry integration, and backend persistence via batched POST.

@@ -94,6 +94,14 @@ export interface FunnelTimeSeries {
   revenue_cents: number;
 }
 
+export interface FunnelAovComparison {
+  aov_with_funnel_cents: number;
+  aov_without_funnel_cents: number;
+  orders_with_funnel: number;
+  orders_without_funnel: number;
+  uplift_percent: number;
+}
+
 interface ApiEnvelope<T> {
   success?: boolean;
   error?: string;
@@ -102,6 +110,7 @@ interface ApiEnvelope<T> {
   summary?: FunnelAnalyticsSummary;
   steps?: FunnelStepConversion[];
   timeseries?: FunnelTimeSeries[];
+  aov?: FunnelAovComparison;
   [key: string]: any;
 }
 
@@ -207,7 +216,7 @@ class FunnelServiceClass extends TenantApiSingleton {
   async getFunnelAnalytics(
     tenantId: string,
     funnelId: string
-  ): Promise<{ summary: FunnelAnalyticsSummary | null; steps: FunnelStepConversion[]; timeseries: FunnelTimeSeries[] }> {
+  ): Promise<{ summary: FunnelAnalyticsSummary | null; steps: FunnelStepConversion[]; timeseries: FunnelTimeSeries[]; aov: FunnelAovComparison | null }> {
     const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
       `/api/tenants/${tenantId}/funnels/${funnelId}/analytics`,
       { method: 'GET' },
@@ -220,6 +229,7 @@ class FunnelServiceClass extends TenantApiSingleton {
       summary: result.data.summary || null,
       steps: result.data.steps || [],
       timeseries: result.data.timeseries || [],
+      aov: result.data.aov || null,
     };
   }
 }

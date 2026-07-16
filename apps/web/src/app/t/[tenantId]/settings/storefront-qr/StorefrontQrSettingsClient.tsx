@@ -293,193 +293,276 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
         </Card>
       )}
 
-      {/* QR Styling Card */}
-      {isTierEnabled && tierStyledEnabled && (
+      {/* QR Code Style — Radio Selection (Classic vs Styled) */}
+      {isTierEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5 text-blue-600" />
+              QR Code Style
+            </CardTitle>
+            <p className="text-sm text-neutral-600 mt-1">
+              Choose between classic black-and-white QR codes or styled QR codes with custom dot patterns, colors, and gradients.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {/* Classic Option */}
+              <div
+                onClick={() => {
+                  updateSetting('qr_classic_enabled', true);
+                  updateSetting('qr_styled_enabled', false);
+                }}
+                className={`flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${
+                  !settings.qr_styled_enabled
+                    ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300'
+                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                  !settings.qr_styled_enabled ? 'bg-blue-100' : 'bg-gray-200'
+                }`}>
+                  <QrCode className={`h-5 w-5 ${!settings.qr_styled_enabled ? 'text-blue-600' : 'text-neutral-500'}`} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className={`font-medium ${!settings.qr_styled_enabled ? 'text-blue-700' : 'text-neutral-900'}`}>
+                      Classic
+                    </p>
+                    {!settings.qr_styled_enabled && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-neutral-600">Standard black-and-white QR codes with default styling</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  !settings.qr_styled_enabled ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                }`}>
+                  {!settings.qr_styled_enabled && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+              </div>
+
+              {/* Styled Option */}
+              <div
+                onClick={() => {
+                  if (!tierStyledEnabled) return;
+                  updateSetting('qr_classic_enabled', false);
+                  updateSetting('qr_styled_enabled', true);
+                }}
+                className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
+                  settings.qr_styled_enabled && tierStyledEnabled
+                    ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300 cursor-pointer'
+                    : tierStyledEnabled
+                      ? 'bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer'
+                      : 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                  settings.qr_styled_enabled && tierStyledEnabled ? 'bg-purple-100' : 'bg-gray-200'
+                }`}>
+                  <Sparkles className={`h-5 w-5 ${settings.qr_styled_enabled && tierStyledEnabled ? 'text-purple-600' : 'text-neutral-500'}`} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className={`font-medium ${settings.qr_styled_enabled && tierStyledEnabled ? 'text-purple-700' : 'text-neutral-900'}`}>
+                      Styled
+                    </p>
+                    {settings.qr_styled_enabled && tierStyledEnabled && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                    )}
+                    {!tierStyledEnabled && (
+                      <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-neutral-600">Custom dot styles, corner styles, colors, and gradient effects</p>
+                </div>
+                {!tierStyledEnabled && <Lock className="h-4 w-4 text-neutral-400" />}
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  settings.qr_styled_enabled && tierStyledEnabled ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
+                }`}>
+                  {settings.qr_styled_enabled && tierStyledEnabled && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+              </div>
+            </div>
+
+            {!tierStyledEnabled && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                <Lock className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-800">
+                  Styled QR codes are not available on your current plan. Upgrade to access custom dot patterns, colors, and gradients.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* QR Styling Options — only shown when Styled is selected */}
+      {isTierEnabled && tierStyledEnabled && settings.qr_styled_enabled && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5 text-purple-600" />
-              QR Code Styling
-              {!tierStyledEnabled && (
-                <span className="inline-flex items-center gap-1 text-xs text-neutral-500 ml-2">
-                  <Lock className="h-3 w-3" /> Not available on your plan
-                </span>
-              )}
+              QR Styling Options
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Styled QR Toggle */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
-              <div>
-                <p className="font-medium text-sm text-neutral-900">Enable Styled QR</p>
-                <p className="text-xs text-neutral-500">Use custom dot styles, colors, and gradients</p>
+            {/* Dot Style */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700">Dot Style</p>
+              <div className="grid grid-cols-5 gap-2">
+                {DOT_STYLES.map(style => {
+                  const tierAllowed = isTierFlexible || tierDotStyles.includes(style.value as any);
+                  return (
+                    <label
+                      key={style.value}
+                      className={`flex items-center justify-center p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                        tierAllowed
+                          ? settings.qr_dot_type === style.value
+                            ? 'border-purple-300 bg-purple-50 text-purple-700'
+                            : 'border-neutral-200 hover:border-neutral-300'
+                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="qr_dot_type"
+                        value={style.value}
+                        checked={settings.qr_dot_type === style.value}
+                        disabled={!tierAllowed}
+                        onChange={(e) => updateSetting('qr_dot_type', e.target.value)}
+                        className="sr-only"
+                      />
+                      {style.label}
+                    </label>
+                  );
+                })}
               </div>
-              <Switch
-                checked={settings.qr_styled_enabled}
-                onCheckedChange={(v) => updateSetting('qr_styled_enabled', v)}
-              />
             </div>
 
-            {settings.qr_styled_enabled && (
-              <>
-                {/* Dot Style */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-neutral-700">Dot Style</p>
-                  <div className="grid grid-cols-5 gap-2">
-                    {DOT_STYLES.map(style => {
-                      const tierAllowed = isTierFlexible || tierDotStyles.includes(style.value as any);
-                      return (
-                        <label
-                          key={style.value}
-                          className={`flex items-center justify-center p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
-                            tierAllowed
-                              ? settings.qr_dot_type === style.value
-                                ? 'border-purple-300 bg-purple-50 text-purple-700'
-                                : 'border-neutral-200 hover:border-neutral-300'
-                              : 'border-neutral-200 opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="qr_dot_type"
-                            value={style.value}
-                            checked={settings.qr_dot_type === style.value}
-                            disabled={!tierAllowed}
-                            onChange={(e) => updateSetting('qr_dot_type', e.target.value)}
-                            className="sr-only"
-                          />
-                          {style.label}
-                        </label>
-                      );
-                    })}
+            {/* Corner Style */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700">Corner Style</p>
+              <div className="grid grid-cols-3 gap-2">
+                {CORNER_STYLES.map(style => {
+                  const tierAllowed = isTierFlexible || tierCornerStyles.includes(style.value as any);
+                  return (
+                    <label
+                      key={style.value}
+                      className={`flex items-center justify-center p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                        tierAllowed
+                          ? settings.qr_corner_type === style.value
+                            ? 'border-purple-300 bg-purple-50 text-purple-700'
+                            : 'border-neutral-200 hover:border-neutral-300'
+                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="qr_corner_type"
+                        value={style.value}
+                        checked={settings.qr_corner_type === style.value}
+                        disabled={!tierAllowed}
+                        onChange={(e) => updateSetting('qr_corner_type', e.target.value)}
+                        className="sr-only"
+                      />
+                      {style.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Colors */}
+            {tierQrCustomColors && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
+                  <div>
+                    <p className="font-medium text-sm text-neutral-900">Custom Colors</p>
+                    <p className="text-xs text-neutral-500">Override default QR code colors</p>
+                  </div>
+                  <Switch
+                    checked={settings.qr_dot_color !== '#1a56db' || settings.qr_corner_color !== '#1a56db' || settings.qr_bg_color !== '#ffffff'}
+                    onCheckedChange={(v) => {
+                      if (!v) {
+                        updateSetting('qr_dot_color', '#1a56db');
+                        updateSetting('qr_corner_color', '#1a56db');
+                        updateSetting('qr_bg_color', '#ffffff');
+                      }
+                    }}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-neutral-500">Dot Color</label>
+                    <input
+                      type="color"
+                      value={settings.qr_dot_color}
+                      onChange={(e) => updateSetting('qr_dot_color', e.target.value)}
+                      className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-500">Corner Color</label>
+                    <input
+                      type="color"
+                      value={settings.qr_corner_color}
+                      onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
+                      className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-500">Background</label>
+                    <input
+                      type="color"
+                      value={settings.qr_bg_color}
+                      onChange={(e) => updateSetting('qr_bg_color', e.target.value)}
+                      className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                    />
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Corner Style */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-neutral-700">Corner Style</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {CORNER_STYLES.map(style => {
-                      const tierAllowed = isTierFlexible || tierCornerStyles.includes(style.value as any);
-                      return (
-                        <label
-                          key={style.value}
-                          className={`flex items-center justify-center p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
-                            tierAllowed
-                              ? settings.qr_corner_type === style.value
-                                ? 'border-purple-300 bg-purple-50 text-purple-700'
-                                : 'border-neutral-200 hover:border-neutral-300'
-                              : 'border-neutral-200 opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="qr_corner_type"
-                            value={style.value}
-                            checked={settings.qr_corner_type === style.value}
-                            disabled={!tierAllowed}
-                            onChange={(e) => updateSetting('qr_corner_type', e.target.value)}
-                            className="sr-only"
-                          />
-                          {style.label}
-                        </label>
-                      );
-                    })}
+            {/* Gradients */}
+            {tierQrGradients && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <div>
+                      <p className="font-medium text-sm text-neutral-900">Gradient Effect</p>
+                      <p className="text-xs text-neutral-500">Apply a color gradient to QR dots</p>
+                    </div>
                   </div>
+                  <Switch
+                    checked={settings.qr_gradient_enabled}
+                    onCheckedChange={(v) => updateSetting('qr_gradient_enabled', v)}
+                  />
                 </div>
-
-                {/* Custom Colors */}
-                {tierQrCustomColors && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
-                      <div>
-                        <p className="font-medium text-sm text-neutral-900">Custom Colors</p>
-                        <p className="text-xs text-neutral-500">Override default QR code colors</p>
-                      </div>
-                      <Switch
-                        checked={settings.qr_dot_color !== '#1a56db' || settings.qr_corner_color !== '#1a56db' || settings.qr_bg_color !== '#ffffff'}
-                        onCheckedChange={(v) => {
-                          if (!v) {
-                            updateSetting('qr_dot_color', '#1a56db');
-                            updateSetting('qr_corner_color', '#1a56db');
-                            updateSetting('qr_bg_color', '#ffffff');
-                          }
-                        }}
+                {settings.qr_gradient_enabled && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-neutral-500">Gradient Start</label>
+                      <input
+                        type="color"
+                        value={settings.qr_gradient_start}
+                        onChange={(e) => updateSetting('qr_gradient_start', e.target.value)}
+                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-xs text-neutral-500">Dot Color</label>
-                        <input
-                          type="color"
-                          value={settings.qr_dot_color}
-                          onChange={(e) => updateSetting('qr_dot_color', e.target.value)}
-                          className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-neutral-500">Corner Color</label>
-                        <input
-                          type="color"
-                          value={settings.qr_corner_color}
-                          onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
-                          className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-neutral-500">Background</label>
-                        <input
-                          type="color"
-                          value={settings.qr_bg_color}
-                          onChange={(e) => updateSetting('qr_bg_color', e.target.value)}
-                          className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs text-neutral-500">Gradient End</label>
+                      <input
+                        type="color"
+                        value={settings.qr_gradient_end}
+                        onChange={(e) => updateSetting('qr_gradient_end', e.target.value)}
+                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                      />
                     </div>
                   </div>
                 )}
-
-                {/* Gradients */}
-                {tierQrGradients && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-purple-600" />
-                        <div>
-                          <p className="font-medium text-sm text-neutral-900">Gradient Effect</p>
-                          <p className="text-xs text-neutral-500">Apply a color gradient to QR dots</p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={settings.qr_gradient_enabled}
-                        onCheckedChange={(v) => updateSetting('qr_gradient_enabled', v)}
-                      />
-                    </div>
-                    {settings.qr_gradient_enabled && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs text-neutral-500">Gradient Start</label>
-                          <input
-                            type="color"
-                            value={settings.qr_gradient_start}
-                            onChange={(e) => updateSetting('qr_gradient_start', e.target.value)}
-                            className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-neutral-500">Gradient End</label>
-                          <input
-                            type="color"
-                            value={settings.qr_gradient_end}
-                            onChange={(e) => updateSetting('qr_gradient_end', e.target.value)}
-                            className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
+              </div>
             )}
           </CardContent>
         </Card>

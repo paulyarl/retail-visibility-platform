@@ -400,6 +400,23 @@ class BotDynamicResponseService {
           error: policyTemplateError instanceof Error ? policyTemplateError.message : String(policyTemplateError),
         });
       }
+
+      // Funnel offer context — inject when customer asks about products
+      try {
+        const hasFunnel = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'funnel');
+        if (hasFunnel && isProductQuery(message)) {
+          const funnelResult = await knowledgeService.searchKnowledge(tenantId, message, ['funnel'], 3);
+          if (funnelResult.chunks.length > 0) {
+            knowledgeContext += '\n\nActive sales funnel offers context (mention these offers when relevant to product questions):\n' +
+              funnelResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      } catch (funnelError) {
+        logger.warn('[BotDynamicResponseService] Funnel RAG search failed, continuing without funnel context', undefined, {
+          error: funnelError instanceof Error ? funnelError.message : String(funnelError),
+        });
+      }
     } catch (knowledgeError) {
       logger.warn('[BotDynamicResponseService] Knowledge RAG search failed, continuing without knowledge context', undefined, {
         error: knowledgeError instanceof Error ? knowledgeError.message : String(knowledgeError),

@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { ArrowLeft, BarChart3, Eye, Check, X, DollarSign, TrendingUp, Zap, ArrowDownCircle, Sparkles } from 'lucide-react';
-import FunnelService, { type FunnelAnalyticsSummary, type FunnelStepConversion, type FunnelTimeSeries } from '@/services/FunnelService';
+import { ArrowLeft, BarChart3, Eye, Check, X, DollarSign, TrendingUp, Zap, ArrowDownCircle, Sparkles, Scale } from 'lucide-react';
+import FunnelService, { type FunnelAnalyticsSummary, type FunnelStepConversion, type FunnelTimeSeries, type FunnelAovComparison } from '@/services/FunnelService';
 
 interface FunnelAnalyticsClientProps {
   tenantId: string;
@@ -34,6 +34,7 @@ export default function FunnelAnalyticsClient({ tenantId, funnelId }: FunnelAnal
   const [summary, setSummary] = useState<FunnelAnalyticsSummary | null>(null);
   const [steps, setSteps] = useState<FunnelStepConversion[]>([]);
   const [timeseries, setTimeseries] = useState<FunnelTimeSeries[]>([]);
+  const [aov, setAov] = useState<FunnelAovComparison | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +46,7 @@ export default function FunnelAnalyticsClient({ tenantId, funnelId }: FunnelAnal
       setSummary(data.summary);
       setSteps(data.steps);
       setTimeseries(data.timeseries);
+      setAov(data.aov);
     } catch (err: any) {
       setError(err?.message || 'Failed to load analytics');
     } finally {
@@ -141,6 +143,41 @@ export default function FunnelAnalyticsClient({ tenantId, funnelId }: FunnelAnal
                   <span className="text-sm">
                     Revenue Uplift: <strong>{formatCurrency(summary.revenue_uplift_cents)}</strong> from funnel offers
                   </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AOV Comparison */}
+          {aov && (aov.orders_with_funnel > 0 || aov.orders_without_funnel > 0) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Scale className="h-5 w-5" />
+                  Average Order Value Comparison
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="border rounded-lg p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Without Funnel</div>
+                    <p className="text-xl font-bold">{formatCurrency(aov.aov_without_funnel_cents)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{aov.orders_without_funnel} orders</p>
+                  </div>
+                  <div className="border rounded-lg p-3 bg-green-50 dark:bg-green-950/20">
+                    <div className="text-xs text-muted-foreground mb-1">With Funnel</div>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(aov.aov_with_funnel_cents)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{aov.orders_with_funnel} orders</p>
+                  </div>
+                  <div className="border rounded-lg p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Uplift</div>
+                    <p className="text-xl font-bold">
+                      {aov.uplift_percent > 0 ? '+' : ''}{aov.uplift_percent}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatCurrency(aov.aov_with_funnel_cents - aov.aov_without_funnel_cents)} per order
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

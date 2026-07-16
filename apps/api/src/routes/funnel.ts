@@ -108,17 +108,31 @@ router.get('/tenants/:tenantId/funnels/:funnelId/analytics', authenticateToken, 
   try {
     const { tenantId, funnelId } = req.params;
     const analytics = FunnelAnalyticsService.getInstance();
-    const [summary, steps, timeseries] = await Promise.all([
+    const [dashboard, steps, timeseries, aov] = await Promise.all([
       analytics.getDashboard(tenantId, funnelId),
       analytics.getStepConversion(tenantId, funnelId),
       analytics.getTimeSeries(tenantId, funnelId, 30),
+      analytics.getAovComparison(tenantId, funnelId),
     ]);
+
+    const raw = dashboard[0] || null;
+    const summary = raw
+      ? {
+          total_views: raw.total_views,
+          total_accepts: raw.total_accepts,
+          total_skips: raw.total_declines,
+          total_revenue_cents: raw.revenue_cents,
+          conversion_rate: raw.conversion_rate,
+          revenue_uplift_cents: raw.revenue_cents,
+        }
+      : null;
 
     res.json({
       success: true,
-      summary: summary[0] || null,
+      summary,
       steps,
       timeseries,
+      aov,
     });
   } catch (error) {
     logger.error('[funnel] Failed to get analytics', undefined, { tenantId: req.params.tenantId, funnelId: req.params.funnelId, error: (error as Error).message });

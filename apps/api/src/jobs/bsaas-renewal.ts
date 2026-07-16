@@ -593,6 +593,10 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         },
       });
 
+      if (purchase.feature_key === 'funnel_builder') {
+        await autoPauseFunnels(purchase.tenant_id, 'Funnel builder purchase expired');
+      }
+
       invalidateEffectiveCapabilities(purchase.tenant_id);
       result.expired++;
       console.log(`[BSaaS Renewal] Expired cancelled purchase ${purchase.id} for tenant ${purchase.tenant_id}`);
@@ -674,7 +678,8 @@ async function enterGracePeriod(
 }
 
 /**
- * Suspend a purchase and invalidate capabilities
+ * Suspend a purchase and invalidate capabilities.
+ * If the suspended feature is funnel_builder, auto-pause all active funnels.
  */
 async function suspendPurchase(
   purchaseId: string,
@@ -690,8 +695,33 @@ async function suspendPurchase(
     },
   });
 
+  if (featureKey === 'funnel_builder') {
+    await autoPauseFunnels(tenantId, reason);
+  }
+
   invalidateEffectiveCapabilities(tenantId);
   console.log(`[BSaaS Renewal] Suspended purchase ${purchaseId} (feature: ${featureKey}, tenant: ${tenantId}): ${reason}`);
+}
+
+/**
+ * Pause all active funnels for a tenant (used when funnel_builder expires/suspends).
+ * Funnels are paused, not deleted, so they can be re-activated on re-purchase.
+ */
+async function autoPauseFunnels(tenantId: string, reason: string): Promise<void> {
+  try {
+    const result = await prisma.tenant_sales_funnels.updateMany({
+      where: { tenant_id: tenantId, is_active: true },
+      data: { is_active: false, updated_at: new Date() },
+    });
+    if (result.count > 0) {
+      console.log(`[BSaaS Renewal] Auto-paused ${result.count} funnels for tenant ${tenantId}: ${reason}`);
+    }
+  } catch (error: any) {
+    logger.error('[BSaaS Renewal] Failed to auto-pause funnels', undefined, {
+      tenantId,
+      error: error?.message || String(error),
+    });
+  }
 }
 
 /**

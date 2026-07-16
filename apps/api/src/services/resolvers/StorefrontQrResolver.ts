@@ -148,16 +148,16 @@ export function resolveStorefrontQr(
     qr_enabled: mainOn && (qrGroupEnabled || allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
     allowed_qr_resolutions: allowedQRResolutions,
     allowed_qr_content_types: allowedQRContentTypes,
-    qr_classic_enabled: mainOn && prefs.qr_classic_enabled && (flexible
+    qr_classic_enabled: mainOn && (flexible
       || !!features.storefront_qr_classic || !!features.storefront_qr_classic_on
       || !!features.storefront_qr_on || !!features.storefront_qr
       || !!fallbackFeatures.storefront_opt_qr_on || !!fallbackFeatures.storefront_opt_qr
       || !!fallbackFeatures.storefront_opt_qr_enabled),
-    qr_styled_enabled: mainOn && showQRStyled && prefs.qr_styled_enabled,
+    qr_styled_enabled: mainOn && showQRStyled,
     allowed_qr_dot_styles: allowedQRDotStyles,
     allowed_qr_corner_styles: allowedQRCornerStyles,
-    qr_custom_colors: mainOn && qrCustomColors && prefs.qr_styled_enabled,
-    qr_gradients: mainOn && qrGradients && prefs.qr_styled_enabled,
+    qr_custom_colors: mainOn && qrCustomColors,
+    qr_gradients: mainOn && qrGradients,
     can_use_qr_codes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
     merchant_preferences: prefs,
   };
