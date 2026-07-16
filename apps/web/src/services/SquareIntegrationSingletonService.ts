@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SquareIntegrationData {
   enabled: boolean;
@@ -88,13 +89,13 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         `square-oauth-${tenantId}`
       );
       if (!result.success){
-        console.error('[SquareIntegrationSingleton] Failed to get Square OAuth authorize:', result.error);
+        clientLogger.error('[SquareIntegrationSingleton] Failed to get Square OAuth authorize:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[SquareIntegrationSingleton] Failed to get Square OAuth authorize:', error);
+      clientLogger.error('[SquareIntegrationSingleton] Failed to get Square OAuth authorize:', { detail: error });
       return null;
     }
   }
@@ -117,7 +118,7 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
       // Invalidate all Square cache for this tenant
       await this.invalidateCache(`square-${tenantId}*`);
     } catch (error) {
-      console.error('[SquareIntegrationSingleton] Failed to disconnect Square:', error);
+      clientLogger.error('[SquareIntegrationSingleton] Failed to disconnect Square:', { detail: error });
       throw error;
     }
   }
@@ -140,7 +141,7 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
       // Invalidate Square status cache to reflect sync results
       await this.invalidateCache(`square-status-${tenantId}*`);
     } catch (error) {
-      console.error('[SquareIntegrationSingleton] Failed to sync Square:', error);
+      clientLogger.error('[SquareIntegrationSingleton] Failed to sync Square:', { detail: error });
       throw error;
     }
   }

@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Dynamically import Google Maps to avoid SSR issues
 const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
@@ -193,7 +194,7 @@ export default function StoreTypeViewClient({
           },
         });
       } catch (err) {
-        console.error('Error fetching store type data:', err);
+        clientLogger.error('Error fetching store type data:', { detail: err });
         setError('Failed to load store type. Please try again.');
       } finally {
         setLoading(false);
@@ -372,7 +373,7 @@ function StoreTypeRecommendations({ storeTypeSlug }: { storeTypeSlug: string }) 
         const data = await recommendationsService.getStoreTypeRecommendations(storeTypeSlug);
         setRecommendations(data?.recommendations || []);
       } catch (error) {
-        console.error('Error fetching store type recommendations:', error);
+        clientLogger.error('Error fetching store type recommendations:', { detail: error });
       } finally {
         setLoading(false);
       }

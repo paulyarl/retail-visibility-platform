@@ -7,6 +7,7 @@
  */
 
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantDashboardData {
   tenant: {
@@ -91,7 +92,7 @@ class TenantDashboardService extends TenantApiSingleton {
    */
   async getTenantDashboard(tenantId: string): Promise<TenantDashboardData | null> {
     if (!tenantId) {
-      console.error('[TenantDashboardService] Tenant ID is required');
+      clientLogger.error('[TenantDashboardService] Tenant ID is required');
       return null;
     }
 
@@ -104,13 +105,13 @@ class TenantDashboardService extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[TenantDashboardService] Failed to get tenant dashboard:', result.error);
+        clientLogger.error('[TenantDashboardService] Failed to get tenant dashboard:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDashboardService] Failed to get tenant dashboard:', error);
+      clientLogger.error('[TenantDashboardService] Failed to get tenant dashboard:', { detail: error });
       return null;
     }
   }
@@ -121,7 +122,7 @@ class TenantDashboardService extends TenantApiSingleton {
    */
   async getTenantMetrics(tenantId: string): Promise<TenantDashboardData['metrics'] | null> {
     if (!tenantId) {
-      console.error('[TenantDashboardService] Tenant ID is required');
+      clientLogger.error('[TenantDashboardService] Tenant ID is required');
       return null;
     }
 
@@ -134,13 +135,13 @@ class TenantDashboardService extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[TenantDashboardService] Failed to get tenant metrics:', result.error);
+        clientLogger.error('[TenantDashboardService] Failed to get tenant metrics:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDashboardService] Failed to get tenant metrics:', error);
+      clientLogger.error('[TenantDashboardService] Failed to get tenant metrics:', { detail: error });
       return null;
     }
   }
@@ -151,7 +152,7 @@ class TenantDashboardService extends TenantApiSingleton {
    */
   async getTenantActivity(tenantId: string, limit: number = 20): Promise<TenantDashboardData['activity'] | null> {
     if (!tenantId) {
-      console.error('[TenantDashboardService] Tenant ID is required');
+      clientLogger.error('[TenantDashboardService] Tenant ID is required');
       return null;
     }
 
@@ -164,13 +165,13 @@ class TenantDashboardService extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[TenantDashboardService] Failed to get tenant activity:', result.error);
+        clientLogger.error('[TenantDashboardService] Failed to get tenant activity:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDashboardService] Failed to get tenant activity:', error);
+      clientLogger.error('[TenantDashboardService] Failed to get tenant activity:', { detail: error });
       return null;
     }
   }
@@ -181,7 +182,7 @@ class TenantDashboardService extends TenantApiSingleton {
    */
   async getTenantPerformance(tenantId: string): Promise<TenantDashboardData['performance'] | null> {
     if (!tenantId) {
-      console.error('[TenantDashboardService] Tenant ID is required');
+      clientLogger.error('[TenantDashboardService] Tenant ID is required');
       return null;
     }
 
@@ -194,13 +195,13 @@ class TenantDashboardService extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[TenantDashboardService] Failed to get tenant performance:', result.error);
+        clientLogger.error('[TenantDashboardService] Failed to get tenant performance:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDashboardService] Failed to get tenant performance:', error);
+      clientLogger.error('[TenantDashboardService] Failed to get tenant performance:', { detail: error });
       return null;
     }
   }
@@ -218,7 +219,7 @@ class TenantDashboardService extends TenantApiSingleton {
       await this.invalidateCache(`tenant-activity-${tenantId}*`);
       await this.invalidateCache(`tenant-performance-${tenantId}`);
     } catch (error) {
-      console.error('[TenantDashboardService] Failed to refresh tenant dashboard cache:', error);
+      clientLogger.error('[TenantDashboardService] Failed to refresh tenant dashboard cache:', { detail: error });
     }
   }
 }

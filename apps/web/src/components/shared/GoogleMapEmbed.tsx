@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GoogleMapEmbedProps {
   address: string;
@@ -34,7 +35,7 @@ export default function GoogleMapEmbed({
   };
 
   const handleIframeError = () => {
-    console.error('[GoogleMapEmbed] Iframe failed to load');
+    clientLogger.error('[GoogleMapEmbed] Iframe failed to load');
     setMapError('Failed to load map');
   };
 

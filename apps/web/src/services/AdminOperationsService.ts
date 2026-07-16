@@ -9,6 +9,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdminStats {
   totalUsers: number;
@@ -111,7 +112,7 @@ class AdminOperationsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminOperationsService] Failed to get admin stats:', result.error);
+      clientLogger.error('[AdminOperationsService] Failed to get admin stats:', { detail: result.error });
       return null;
     }
 
@@ -143,7 +144,7 @@ class AdminOperationsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminOperationsService] Failed to get users:', result.error);
+      clientLogger.error('[AdminOperationsService] Failed to get users:', { detail: result.error });
       return { users: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
 
@@ -176,7 +177,7 @@ class AdminOperationsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminOperationsService] Failed to get tenants:', result.error);
+        clientLogger.error('[AdminOperationsService] Failed to get tenants:', { detail: result.error });
         return { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
       }
 
@@ -186,7 +187,7 @@ class AdminOperationsService extends AdminApiSingleton {
         pagination: { page, limit, total: tenants.length, totalPages: Math.ceil(tenants.length / limit) }
       };
     } catch (error) {
-      console.error('[AdminOperationsService] Failed to get tenants:', error);
+      clientLogger.error('[AdminOperationsService] Failed to get tenants:', { detail: error });
       return { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
   }
@@ -204,13 +205,13 @@ class AdminOperationsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminOperationsService] Failed to get system alerts:', result.error);
+        clientLogger.error('[AdminOperationsService] Failed to get system alerts:', { detail: result.error });
         return { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
       }
 
       return result.data || { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     } catch (error) {
-      console.error('[AdminOperationsService] Failed to get system alerts:', error);
+      clientLogger.error('[AdminOperationsService] Failed to get system alerts:', { detail: error });
       return { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
   }
@@ -227,7 +228,7 @@ class AdminOperationsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminOperationsService] Failed to get security metrics:', result.error);
+      clientLogger.error('[AdminOperationsService] Failed to get security metrics:', { detail: result.error });
       return null;
     }
 
@@ -249,7 +250,7 @@ class AdminOperationsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminOperationsService] Failed to resolve alert:', result.error);
+      clientLogger.error('[AdminOperationsService] Failed to resolve alert:', { detail: result.error });
       return false;
     }
 
@@ -274,7 +275,7 @@ class AdminOperationsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminOperationsService] Failed to update user status:', result.error);
+      clientLogger.error('[AdminOperationsService] Failed to update user status:', { detail: result.error });
       return false;
     }
 
@@ -300,7 +301,7 @@ class AdminOperationsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminOperationsService] Failed to update tenant status:', result.error);
+      clientLogger.error('[AdminOperationsService] Failed to update tenant status:', { detail: result.error });
       return false;
     }
 
@@ -339,13 +340,13 @@ class AdminOperationsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminOperationsService] Failed to get activity logs:', result.error);
+        clientLogger.error('[AdminOperationsService] Failed to get activity logs:', { detail: result.error });
         return { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
       }
 
       return result.data || { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     } catch (error) {
-      console.error('[AdminOperationsService] Failed to get activity logs:', error);
+      clientLogger.error('[AdminOperationsService] Failed to get activity logs:', { detail: error });
       return { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
   }
@@ -368,13 +369,13 @@ class AdminOperationsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminOperationsService] Failed to export data:', result.error);
+        clientLogger.error('[AdminOperationsService] Failed to export data:', { detail: result.error });
         throw new Error(getErrorMessage(result.error) || 'Failed to export data');
       }
 
       return result.data || (() => { throw new Error('No export data received'); })();
     } catch (error) {
-      console.error('[AdminOperationsService] Failed to export data:', error);
+      clientLogger.error('[AdminOperationsService] Failed to export data:', { detail: error });
       throw error;
     }
   }

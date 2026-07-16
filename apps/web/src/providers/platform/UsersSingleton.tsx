@@ -8,6 +8,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // User Types (matching server-side)
 export interface User {
@@ -143,7 +144,7 @@ class UsersSingleton extends TenantApiSingleton {
       if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching user', result.error);
+      clientLogger.error('Error fetching user', { detail: result.error });
       return null;
     }
     
@@ -164,7 +165,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error creating user', result.error);
+      clientLogger.error('Error creating user', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to create user');
     }
 
@@ -188,7 +189,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error updating user', result.error);
+      clientLogger.error('Error updating user', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to update user');
     }
 
@@ -211,7 +212,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error deleting user', result.error);
+      clientLogger.error('Error deleting user', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to delete user');
     }
 
@@ -245,13 +246,13 @@ class UsersSingleton extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error listing users', result.error);
+        clientLogger.error('Error listing users', { detail: result.error });
         return { users: [], total: 0 };
       }
 
       return result.data || { users: [], total: 0 };
     } catch (error) {
-      console.error('Error listing users', error);
+      clientLogger.error('Error listing users', { detail: error });
       throw error;
     }
   }
@@ -271,7 +272,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error fetching user activity', result.error);
+      clientLogger.error('Error fetching user activity', { detail: result.error });
       return [];
     }
 
@@ -292,7 +293,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error recording activity', result.error);
+      clientLogger.error('Error recording activity', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to record activity');
     }
 
@@ -317,7 +318,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error fetching user stats', result.error);
+      clientLogger.error('Error fetching user stats', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch user stats');
     }
 
@@ -350,7 +351,7 @@ class UsersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error searching users', result.error);
+      clientLogger.error('Error searching users', { detail: result.error });
       return [];
     }
 

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/Badge';
 import { AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import * as securityMonitoringService from '@/services/securityMonitoring';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ThreatMonitorProps {
   threats: SecurityThreat[];
@@ -27,7 +28,7 @@ export function ThreatMonitor({ threats }: ThreatMonitorProps) {
       await securityMonitoringService.resolveThreat(threatId, 'Resolved via UI');
       window.location.reload();
     } catch (error) {
-      console.error('Failed to resolve threat:', error);
+      clientLogger.error('Failed to resolve threat:', { detail: error });
     } finally {
       setResolving(null);
     }

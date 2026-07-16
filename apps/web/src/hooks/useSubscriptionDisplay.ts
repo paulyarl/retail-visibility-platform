@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 // Available display fields
 export type SubscriptionDisplayField =
@@ -139,7 +140,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
           });
         }
       } catch (error) {
-        console.warn('[useSubscriptionDisplay] Failed to load config:', error);
+        clientLogger.warn('[useSubscriptionDisplay] Failed to load config:', { detail: error });
       } finally {
         setIsLoading(false);
       }
@@ -169,7 +170,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
       setConfig(newConfig);
       window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: { storageKey } }));
     } catch (error) {
-      console.warn('[useSubscriptionDisplay] Failed to save config:', error);
+      clientLogger.warn('[useSubscriptionDisplay] Failed to save config:', { detail: error });
     }
   }, [storageKey]);
 

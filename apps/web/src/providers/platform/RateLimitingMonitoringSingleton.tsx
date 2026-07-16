@@ -8,6 +8,7 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { RateLimitRule, RateLimitConfig, RateLimitStatus, RateLimitMetrics } from './RateLimitingControllerSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Rate Limiting Monitoring Data Interfaces
 export interface RateLimitingDashboardData {
@@ -101,7 +102,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
 
       return dashboardData;
     } catch (error) {
-      console.error('Error fetching rate limiting dashboard data:', error);
+      clientLogger.error('Error fetching rate limiting dashboard data:', { detail: error });
       throw error;
     }
   }
@@ -113,7 +114,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
     
     if (!result.success) {
-      console.error('Error fetching rate limit config:', result.error);
+      clientLogger.error('Error fetching rate limit config:', { detail: result.error });
       
       // Return default config
       return {
@@ -143,7 +144,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
     
     if (!result.success) {
-      console.error('Error fetching rate limit rules:', result.error);
+      clientLogger.error('Error fetching rate limit rules:', { detail: result.error });
       return [];
     }
     
@@ -157,7 +158,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
     
     if (!result.success) {
-      console.error('Error fetching rate limit metrics:', result.error);
+      clientLogger.error('Error fetching rate limit metrics:', { detail: result.error });
       
       // Return default metrics
       return {
@@ -197,7 +198,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>>('/api/admin/rate-limiting/blocks', {}, 'active-blocks');
     
     if (!result.success) {
-      console.error('Error fetching active blocks:', result.error);
+      clientLogger.error('Error fetching active blocks:', { detail: result.error });
       return [];
     }
     
@@ -219,7 +220,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>>(`/api/admin/rate-limiting/violators?hours=${hours}`, {}, `top-violators-${hours}`);
     
     if (!result.success) {
-      console.error('Error fetching top violators:', result.error);
+      clientLogger.error('Error fetching top violators:', { detail: result.error });
       return [];
     }
     
@@ -237,7 +238,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}`, {}, `ip-status-${ip}`);
     
     if (!result.success) {
-      console.error('Error getting IP status:', result.error);
+      clientLogger.error('Error getting IP status:', { detail: result.error });
       
       // Return default status
       return {
@@ -272,7 +273,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>>(`/api/admin/rate-limiting/history/${ip}?hours=${hours}`, {}, `ip-history-${ip}-${hours}`);
     
     if (!result.success) {
-      console.error('Error getting IP history:', result.error);
+      clientLogger.error('Error getting IP history:', { detail: result.error });
       return [];
     }
     
@@ -310,7 +311,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>(`/api/admin/rate-limiting/analytics/${routeType}?hours=${hours}`, {}, `route-analytics-${routeType}-${hours}`);
     
     if (!result.success) {
-      console.error('Error getting route analytics:', result.error);
+      clientLogger.error('Error getting route analytics:', { detail: result.error });
       
       // Return default analytics
       return {
@@ -358,7 +359,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>>(`/api/admin/rate-limiting/analytics?hours=${hours}`, {}, `all-route-analytics-${hours}`);
     
     if (!result.success) {
-      console.error('Error getting all route analytics:', result.error);
+      clientLogger.error('Error getting all route analytics:', { detail: result.error });
       return {};
     }
     
@@ -383,7 +384,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
       await this.invalidateCache('active-blocks');
       await this.invalidateCache(`ip-status-${ip}`);
     } catch (error) {
-      console.error('Error blocking IP:', error);
+      clientLogger.error('Error blocking IP:', { detail: error });
       throw error;
     }
   }
@@ -401,7 +402,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
       await this.invalidateCache('active-blocks');
       await this.invalidateCache(`ip-status-${ip}`);
     } catch (error) {
-      console.error('Error unblocking IP:', error);
+      clientLogger.error('Error unblocking IP:', { detail: error });
       throw error;
     }
   }
@@ -418,7 +419,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
       // Clear relevant cache
       await this.invalidateCache(`ip-status-${ip}`);
     } catch (error) {
-      console.error('Error resetting IP limit:', error);
+      clientLogger.error('Error resetting IP limit:', { detail: error });
       throw error;
     }
   }
@@ -465,7 +466,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>('/api/admin/rate-limiting/health', {}, 'rate-limiting-health-status');
     
     if (!result.success) {
-      console.error('Error fetching rate limiting health status:', result.error);
+      clientLogger.error('Error fetching rate limiting health status:', { detail: result.error });
       return {
         status: 'warning',
         score: 75,
@@ -501,7 +502,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     }>>(`/api/admin/rate-limiting/trends?days=${days}`, {}, `rate-limiting-trends-${days}`);
     
     if (!result.success) {
-      console.error('Error fetching rate limiting trends:', result.error);
+      clientLogger.error('Error fetching rate limiting trends:', { detail: result.error });
       return [];
     }
     

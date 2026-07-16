@@ -1,5 +1,6 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Location status info returned by public API
@@ -146,7 +147,7 @@ class TenantPublicService extends PublicApiSingleton {
       );
 
       if (!response.success){
-        console.error('[TenantPublicService] Failed to get public tenant info:', response.error);
+        clientLogger.error('[TenantPublicService] Failed to get public tenant info:', { detail: response.error });
         return null;
       }
 
@@ -156,7 +157,7 @@ class TenantPublicService extends PublicApiSingleton {
       const data = response.data as any;
       return data?.data || data;
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get public tenant info:', error);
+      clientLogger.error('[TenantPublicService] Failed to get public tenant info:', { detail: error });
       return null;
     }
   }
@@ -175,7 +176,7 @@ class TenantPublicService extends PublicApiSingleton {
       );
 
       if (!response.success){
-        console.error('[TenantPublicService] Failed to get tenant logo:', response.error);
+        clientLogger.error('[TenantPublicService] Failed to get tenant logo:', { detail: response.error });
         return null;
       }
 
@@ -183,7 +184,7 @@ class TenantPublicService extends PublicApiSingleton {
 
       return response.data;
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get tenant logo:', error);
+      clientLogger.error('[TenantPublicService] Failed to get tenant logo:', { detail: error });
       return null;
     }
   }
@@ -202,14 +203,14 @@ class TenantPublicService extends PublicApiSingleton {
       );
 
       if (!response.success){
-        console.error('[TenantPublicService] Failed to get public tenant tier:', response.error);
+        clientLogger.error('[TenantPublicService] Failed to get public tenant tier:', { detail: response.error });
         return null;
       }
    //   console.log(`${this.constructor.name} - Tier Response:`, response.data);
 
       return response.data;
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get public tenant tier:', error);
+      clientLogger.error('[TenantPublicService] Failed to get public tenant tier:', { detail: error });
       return null;
     }
   }
@@ -227,14 +228,14 @@ class TenantPublicService extends PublicApiSingleton {
         this.PROFILE_TTL
       );
       if (!response.success){
-        console.error('[TenantPublicService] Failed to get public tenant profile:', response.error);
+        clientLogger.error('[TenantPublicService] Failed to get public tenant profile:', { detail: response.error });
         return null;
       }
     //  console.log(`${this.constructor.name} - Profile Response:`, response.data);
 
       return response.data||null;
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get public tenant profile:', error);
+      clientLogger.error('[TenantPublicService] Failed to get public tenant profile:', { detail: error });
       return null;
     }
   }
@@ -253,14 +254,14 @@ class TenantPublicService extends PublicApiSingleton {
       );
 
       if (!response.success){
-        console.error('[TenantPublicService] Failed to get tenant business hours:', response.error);
+        clientLogger.error('[TenantPublicService] Failed to get tenant business hours:', { detail: response.error });
         return null;
       }
     //  console.log(`${this.constructor.name} - Hours Response:`, response.data);
 
       return response.data;
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get tenant business hours:', error);
+      clientLogger.error('[TenantPublicService] Failed to get tenant business hours:', { detail: error });
       return null;
     }
   }
@@ -279,13 +280,13 @@ class TenantPublicService extends PublicApiSingleton {
       );
 
       if (!response.success){
-        console.error('[TenantPublicService] Failed to get business hours:', response.error);
+        clientLogger.error('[TenantPublicService] Failed to get business hours:', { detail: response.error });
         return null;
       }
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get business hours:', error);
+      clientLogger.error('[TenantPublicService] Failed to get business hours:', { detail: error });
       return null;
     }
   }
@@ -319,7 +320,7 @@ class TenantPublicService extends PublicApiSingleton {
         contact: profile.contact
       };
     } catch (error) {
-      console.error('[TenantPublicService] Failed to get tenant directory info:', error);
+      clientLogger.error('[TenantPublicService] Failed to get tenant directory info:', { detail: error });
       return null;
     }
   }

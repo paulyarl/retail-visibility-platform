@@ -40,6 +40,7 @@ import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageSta
 import { resolveProductLayout, type ProductLayoutKey } from './layouts/types';
 import ProductShowcaseLayout from './ProductShowcaseLayout';
 import ProductQuickCommerceLayout from './ProductQuickCommerceLayout';
+import { clientLogger } from '@/lib/client-logger';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -137,7 +138,7 @@ async function getProduct(id: string): Promise<ProductData | null> {
     const product = await productDataService.fetchProduct(id);
     return product;
   } catch (error) {
-    console.error('[ProductPage] Error fetching product:', error);
+    clientLogger.error('[ProductPage] Error fetching product:', { detail: error });
     return null;
   }
 }
@@ -147,7 +148,7 @@ async function getShopData(tenantId: string) {
     // For now, return null since we don't have shop data in the API response
     return null;
   } catch (error) {
-    console.error('Error fetching shop data:', error);
+    clientLogger.error('Error fetching shop data:', { detail: error });
     return null;
   }
 }
@@ -158,7 +159,7 @@ async function getTenantProfile(tenantId: string) {
     // console.log(`[ProductPage] Tenant profile for ${tenantId}:`, profile);
     return profile || null;
   } catch (error) {
-    console.error('Error fetching tenant profile:', error);
+    clientLogger.error('Error fetching tenant profile:', { detail: error });
     return null;
   }
 }
@@ -172,7 +173,7 @@ async function getFeaturedProductsByType(tenantId: string): Promise<{ counts: Re
     }
     return { counts, groupedProducts: featuredData || {} };
   } catch (error) {
-    console.error('Error fetching featured products by type:', error);
+    clientLogger.error('Error fetching featured products by type:', { detail: error });
     return { counts: {}, groupedProducts: {} };
   }
 }
@@ -231,7 +232,7 @@ async function getStorefrontCategories(tenantId: string) {
     const data = await directoryService.getStorefrontCategories(tenantId);
     return data;
   } catch (error) {
-    console.error('Error fetching storefront categories:', error);
+    clientLogger.error('Error fetching storefront categories:', { detail: error });
     return { categories: [], uncategorizedCount: 0 };
   }
 }
@@ -374,7 +375,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
-    console.error('Failed to fetch storefront type:', e);
+    clientLogger.error('Failed to fetch storefront type:', { detail: e });
   }
 
   // Fetch social commerce flags for share buttons + social proof gating
@@ -387,7 +388,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       canUseSocialProof: socialCommerceState.canUseSocialProof,
     };
   } catch (e) {
-    console.error('Failed to fetch social commerce options:', e);
+    clientLogger.error('Failed to fetch social commerce options:', { detail: e });
   }
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);

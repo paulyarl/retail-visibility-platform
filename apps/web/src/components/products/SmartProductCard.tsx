@@ -17,6 +17,7 @@ import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@m
 import { distanceUtils } from '@/lib/utils';
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
 import { PromotedBadge, promotedCardClass } from './PromotedBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 // Type-aware CTA: renders the correct button based on productType
 function TypeAwareCTA({
@@ -697,7 +698,7 @@ export default function SmartProductCard({
           setCanPurchase(false);
         }
       } catch (error) {
-        console.error('Failed to check payment gateway:', error);
+        clientLogger.error('Failed to check payment gateway:', { detail: error });
         setCanPurchase(false);
       }
     };

@@ -5,6 +5,7 @@ import { ArrowLeft, MapPin } from 'lucide-react';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface LocationPageProps {
   params: Promise<{
@@ -42,7 +43,7 @@ async function getLocationListings(city: string, state: string, page: number = 1
   try {
     return await recommendationsService.searchByLocation(city, state, page, limit);
   } catch (error) {
-    console.error('Error fetching location listings:', error);
+    clientLogger.error('Error fetching location listings:', { detail: error });
     return null;
   }
 }
@@ -62,7 +63,7 @@ async function getNearbyLocations(currentCity: string, currentState: string) {
       )
       .slice(0, 6);
   } catch (error) {
-    console.error('Error fetching nearby locations:', error);
+    clientLogger.error('Error fetching nearby locations:', { detail: error });
     return [];
   }
 }

@@ -33,6 +33,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { type Shop } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopAnalyticsProps {
   tenantId: string;
@@ -188,7 +189,7 @@ export default function ShopAnalytics({ tenantId, shops }: ShopAnalyticsProps) {
 
       setAnalytics(mockAnalytics);
     } catch (error) {
-      console.error('Error fetching analytics:', error);
+      clientLogger.error('Error fetching analytics:', { detail: error });
       setAnalytics(null);
     } finally {
       setLoading(false);

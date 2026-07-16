@@ -17,6 +17,7 @@ import {
 
 // Import existing ProductSingleton
 import { PublicProduct } from '@/providers/data/ProductSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UseTenantFeaturedProductsOptions {
   autoInitialize?: boolean;
@@ -297,10 +298,10 @@ export function useTenantFeaturedProducts(
     if (autoInitialize && singleton) {
       try {
         singleton.forceRefresh().catch(error => {
-          console.error('Failed to initialize singleton:', error);
+          clientLogger.error('Failed to initialize singleton:', { detail: error });
         });
       } catch (error) {
-        console.error('Error during manual initialization:', error);
+        clientLogger.error('Error during manual initialization:', { detail: error });
       }
     }
   }, [autoInitialize, singleton]);

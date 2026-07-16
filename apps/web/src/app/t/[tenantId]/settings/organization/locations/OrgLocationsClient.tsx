@@ -14,6 +14,7 @@ import { organizationsService } from '@/services/OrganizationsSingletonService';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastContainer, Spinner } from '@/components/ui';
 import AccessDenied from '@/components/AccessDenied';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrgTenant {
   id: string;
@@ -86,7 +87,7 @@ export default function OrgLocationsClient({ organizationId: propOrgId }: { orga
 
       setAvailableTenants(available);
     } catch (err) {
-      console.error('Failed to load org locations:', err);
+      clientLogger.error('Failed to load org locations:', { detail: err });
     } finally {
       setLoading(false);
     }

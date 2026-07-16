@@ -16,6 +16,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { tenantBillingService } from '@/services/TenantBillingService';
+import { clientLogger } from '@/lib/client-logger';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -121,7 +122,7 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
       console.log('[Invoices] Transformed invoice data:', invoiceData);
       setInvoices(invoiceData);
     } catch (err: any) {
-      console.error('[Invoices] Error:', err);
+      clientLogger.error('[Invoices] Error:', { detail: err });
       setError(err.message || 'Failed to load invoices');
     } finally {
       setLoading(false);
@@ -133,7 +134,7 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
       const methods = await tenantBillingService.getPaymentMethods(tenantId);
       setPaymentMethods(methods);
     } catch (err) {
-      console.error('Failed to load payment methods:', err);
+      clientLogger.error('Failed to load payment methods:', { detail: err });
     }
   };
 
@@ -214,7 +215,7 @@ export default function TenantInvoicesPage({ params }: { params: Promise<{ tenan
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading invoice:', error);
+      clientLogger.error('Error downloading invoice:', { detail: error });
       setError('Failed to download invoice PDF');
     }
   };

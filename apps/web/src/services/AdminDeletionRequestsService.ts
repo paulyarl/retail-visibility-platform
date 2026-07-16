@@ -7,6 +7,7 @@
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DeletionRequest {
   id: string;
@@ -80,12 +81,12 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminDeletionRequestsService] Failed to get deletion requests:', response.error);
+      clientLogger.error('[AdminDeletionRequestsService] Failed to get deletion requests:', { detail: response.error });
       
       // Handle specific database errors
       const errorMessage = typeof response.error === 'string' ? response.error : response.error?.message || '';
       if (errorMessage.includes('42P01') || errorMessage.includes('account_deletion_requests')) {
-        console.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
+        clientLogger.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
         return { 
           data: [], 
           pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
@@ -110,12 +111,12 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminDeletionRequestsService] Failed to get deletion stats:', response.error);
+      clientLogger.error('[AdminDeletionRequestsService] Failed to get deletion stats:', { detail: response.error });
 
       // Handle specific database errors
       const errorMessage = typeof response.error === 'string' ? response.error : response.error?.message || '';
       if (errorMessage.includes('42P01') || errorMessage.includes('account_deletion_requests')) {
-        console.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
+        clientLogger.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
         return null;
       }
       
@@ -143,7 +144,7 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminDeletionRequestsService] Failed to update deletion request:', response.error);
+      clientLogger.error('[AdminDeletionRequestsService] Failed to update deletion request:', { detail: response.error });
       return null;
     }
 
@@ -179,7 +180,7 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminDeletionRequestsService] Failed to get deletion request:', response.error);
+      clientLogger.error('[AdminDeletionRequestsService] Failed to get deletion request:', { detail: response.error });
       return null;
     }
 
@@ -204,7 +205,7 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminDeletionRequestsService] Failed to search deletion requests:', response.error);
+      clientLogger.error('[AdminDeletionRequestsService] Failed to search deletion requests:', { detail: response.error });
       return { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
 

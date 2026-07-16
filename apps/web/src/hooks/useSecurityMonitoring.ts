@@ -12,6 +12,7 @@ import {
   PaginationInfo,
 } from '@/types/security';
 import * as monitoringService from '@/services/securityMonitoring';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useSecurityMonitoring(hours: number = 24) {
   const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
@@ -28,7 +29,7 @@ export function useSecurityMonitoring(hours: number = 24) {
       const data = await monitoringService.getSecurityMetrics(hours);
       setMetrics(data);
     } catch (err) {
-      console.error('Failed to fetch metrics:', err);
+      clientLogger.error('Failed to fetch metrics:', { detail: err });
     }
   }, [hours]);
 
@@ -38,7 +39,7 @@ export function useSecurityMonitoring(hours: number = 24) {
       setThreats(data.threats);
       setThreatsPagination(data.pagination);
     } catch (err) {
-      console.error('Failed to fetch threats:', err);
+      clientLogger.error('Failed to fetch threats:', { detail: err });
     }
   }, [hours]);
 
@@ -48,7 +49,7 @@ export function useSecurityMonitoring(hours: number = 24) {
       setBlockedIPs(data.blockedIPs);
       setBlockedIPsPagination(data.pagination);
     } catch (err) {
-      console.error('Failed to fetch blocked IPs:', err);
+      clientLogger.error('Failed to fetch blocked IPs:', { detail: err });
     }
   }, [hours]);
 
@@ -57,7 +58,7 @@ export function useSecurityMonitoring(hours: number = 24) {
       const data = await monitoringService.getSecurityHealth();
       setHealth(data);
     } catch (err) {
-      console.error('Failed to fetch health:', err);
+      clientLogger.error('Failed to fetch health:', { detail: err });
     }
   }, []);
 

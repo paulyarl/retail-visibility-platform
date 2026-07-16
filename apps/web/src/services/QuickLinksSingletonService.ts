@@ -9,6 +9,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type LinkCategory = 'store' | 'commerce' | 'engagement' | 'settings' | 'visibility';
 
@@ -64,13 +65,13 @@ class QuickLinksSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[QuickLinksService] Failed to fetch quick links:', (result as any).error);
+        clientLogger.error('[QuickLinksService] Failed to fetch quick links:', { detail: (result as any).error });
         return null;
       }
 
       return (result as any).data?.data ?? null;
     } catch (error) {
-      console.error('[QuickLinksService] Error fetching quick links:', error);
+      clientLogger.error('[QuickLinksService] Error fetching quick links:', { detail: error });
       return null;
     }
   }

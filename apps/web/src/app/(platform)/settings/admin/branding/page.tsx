@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Switch } from '@/components/ui/Switch';
 import { adminPlatformFlagsService } from '@/services/AdminPlatformFlagsService';
 import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PlatformBranding {
   platformName: string;
@@ -100,7 +101,7 @@ export default function PlatformBrandingPage() {
       setUseDatabaseNav(newDbNav);
       invalidateNavLinksCache();
     } catch (err) {
-      console.error('Failed to toggle navigation source:', err);
+      clientLogger.error('Failed to toggle navigation source:', { detail: err });
     } finally {
       setNavSourceLoading(false);
     }
@@ -156,7 +157,7 @@ export default function PlatformBrandingPage() {
         throw new Error('Failed to fetch branding settings');
       }
     } catch (error) {
-      console.error('Error fetching branding:', error);
+      clientLogger.error('Error fetching branding:', { detail: error });
       toast('Failed to load branding settings', { variant: 'error' });
     } finally {
       setLoading(false);
@@ -246,7 +247,7 @@ export default function PlatformBrandingPage() {
         throw new Error('Failed to update branding');
       }
     } catch (error) {
-      console.error('Error saving branding:', error);
+      clientLogger.error('Error saving branding:', { detail: error });
       setError('Failed to update branding settings');
       toast('Failed to update branding settings', { variant: 'error' });
     } finally {
@@ -267,7 +268,7 @@ export default function PlatformBrandingPage() {
       setLogoPreview(result.dataUrl);
       setSuccess('Logo uploaded successfully!');
     } catch (error: any) {
-      console.error('Logo upload error:', error);
+      clientLogger.error('Logo upload error:', { detail: error });
       setError(error.message || 'Failed to upload logo');
     } finally {
       setUploadingLogo(false);
@@ -287,7 +288,7 @@ export default function PlatformBrandingPage() {
       setFaviconPreview(result.dataUrl);
       setSuccess('Favicon uploaded successfully!');
     } catch (error: any) {
-      console.error('Favicon upload error:', error);
+      clientLogger.error('Favicon upload error:', { detail: error });
       setError(error.message || 'Failed to upload favicon');
     } finally {
       setUploadingFavicon(false);
@@ -307,7 +308,7 @@ export default function PlatformBrandingPage() {
       setBannerPreview(result.dataUrl);
       setSuccess('Banner uploaded successfully!');
     } catch (error: any) {
-      console.error('Banner upload error:', error);
+      clientLogger.error('Banner upload error:', { detail: error });
       setError(error.message || 'Failed to upload banner');
     } finally {
       setUploadingBanner(false);

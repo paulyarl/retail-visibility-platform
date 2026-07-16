@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StorefrontCategory {
   id: string;
@@ -103,7 +104,7 @@ class TenantStorefrontService extends TenantApiSingleton {
    */
   async getStorefrontCategories(tenantId: string): Promise<StorefrontCategoriesResponse> {
     if (!tenantId) {
-      console.error('[TenantStorefrontService] getStorefrontCategories: tenantId is required');
+      clientLogger.error('[TenantStorefrontService] getStorefrontCategories: tenantId is required');
       return { categories: [], uncategorizedCount: 0 };
     }
 
@@ -116,13 +117,13 @@ class TenantStorefrontService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantStorefrontService] Failed to get storefront categories:', result.error);
+        clientLogger.error('[TenantStorefrontService] Failed to get storefront categories:', { detail: result.error });
         return { categories: [], uncategorizedCount: 0 };
       }
 
       return result.data || { categories: [], uncategorizedCount: 0 };
     } catch (error) {
-      console.error('[TenantStorefrontService] Failed to get storefront categories:', error);
+      clientLogger.error('[TenantStorefrontService] Failed to get storefront categories:', { detail: error });
       return { categories: [], uncategorizedCount: 0 };
     }
   }
@@ -144,7 +145,7 @@ class TenantStorefrontService extends TenantApiSingleton {
     } = {}
   ): Promise<StorefrontProductsResponse> {
     if (!tenantId) {
-      console.error('[TenantStorefrontService] getStorefrontProducts: tenantId is required');
+      clientLogger.error('[TenantStorefrontService] getStorefrontProducts: tenantId is required');
       return { items: [], total: 0, page: 1, limit: 20, hasMore: false };
     }
 
@@ -181,13 +182,13 @@ class TenantStorefrontService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantStorefrontService] Failed to get storefront products:', result.error);
+        clientLogger.error('[TenantStorefrontService] Failed to get storefront products:', { detail: result.error });
         return { items: [], total: 0, page: 1, limit: 20, hasMore: false };
       }
 
       return result.data || { items: [], total: 0, page: 1, limit: 20, hasMore: false };
     } catch (error) {
-      console.error('[TenantStorefrontService] Failed to get storefront products:', error);
+      clientLogger.error('[TenantStorefrontService] Failed to get storefront products:', { detail: error });
       return { items: [], total: 0, page: 1, limit: 20, hasMore: false };
     }
   }
@@ -206,7 +207,7 @@ class TenantStorefrontService extends TenantApiSingleton {
     } = {}
   ): Promise<StorefrontProductsResponse> {
     if (!tenantId) {
-      console.error('[TenantStorefrontService] getFeaturedProducts: tenantId is required');
+      clientLogger.error('[TenantStorefrontService] getFeaturedProducts: tenantId is required');
       return { items: [], count: 0 };
     }
 
@@ -234,7 +235,7 @@ class TenantStorefrontService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantStorefrontService] Failed to get featured products:', result.error);
+        clientLogger.error('[TenantStorefrontService] Failed to get featured products:', { detail: result.error });
         return { items: [], count: 0 };
       }
 
@@ -252,7 +253,7 @@ class TenantStorefrontService extends TenantApiSingleton {
 
       return data.items ? data : { items: [], count: 0 };
     } catch (error) {
-      console.error('[TenantStorefrontService] Failed to get featured products:', error);
+      clientLogger.error('[TenantStorefrontService] Failed to get featured products:', { detail: error });
       return { items: [], count: 0 };
     }
   }

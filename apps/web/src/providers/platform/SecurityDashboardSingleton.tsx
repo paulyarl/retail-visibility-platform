@@ -9,6 +9,7 @@ import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { LoginSession, SecurityAlert, SecurityMetrics, SecurityThreat, BlockedIP } from '@/types/security';
+import { clientLogger } from '@/lib/client-logger';
 
 // Security Dashboard Data Interfaces
 export interface SecurityDashboardData {
@@ -93,7 +94,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
 
       return dashboardData;
     } catch (error) {
-      console.error('Error fetching security dashboard data:', error);
+      clientLogger.error('Error fetching security dashboard data:', { detail: error });
       throw error;
     }
   }
@@ -113,7 +114,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
       const result = await this.makeDefaultRequest<{ data: LoginSession[] }>('/api/auth/sessions', {}, 'active_sessions_raw');
       
       if (!result.success) {
-        console.error('Error fetching active sessions:', result.error);
+        clientLogger.error('Error fetching active sessions:', { detail: result.error });
         return [];
       }
       
@@ -137,7 +138,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
       await this.setCache(cacheKey, filteredSessions);
       return filteredSessions;
     } catch (error) {
-      console.error('Error fetching active sessions:', error);
+      clientLogger.error('Error fetching active sessions:', { detail: error });
       return [];
     }
   }
@@ -149,7 +150,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<SecurityMetrics>(`/api/security/metrics?hours=${hours}`, {}, `security-metrics-${hours}`);
     
     if (!result.success) {
-      console.error('Error fetching security metrics:', result.error);
+      clientLogger.error('Error fetching security metrics:', { detail: result.error });
       return {
         failedLoginAttempts: 0,
         blockedRequests: 0,
@@ -191,7 +192,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
       const result = await this.makeDefaultRequest<{ threats: SecurityThreat[] }>(`/api/security/threats?${params}`, {}, `recent-threats-${threatStatus}-${hours}`);
       
       if (!result.success) {
-        console.error('Error fetching security threats:', result.error);
+        clientLogger.error('Error fetching security threats:', { detail: result.error });
         return [];
       }
       
@@ -199,7 +200,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
 
       return threats;
     } catch (error) {
-      console.error('Error fetching security threats:', error);
+      clientLogger.error('Error fetching security threats:', { detail: error });
       return [];
     }
   }
@@ -211,7 +212,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<{ data: BlockedIP[] }>(`/api/security/blocked-ips?hours=${hours}`, {}, `blocked-ips-${hours}`);
     
     if (!result.success) {
-      console.error('Error fetching blocked IPs:', result.error);
+      clientLogger.error('Error fetching blocked IPs:', { detail: result.error });
       return [];
     }
     
@@ -236,7 +237,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
       const result = await this.makeDefaultRequest<{ data: SecurityAlert[] }>(`/api/security/alerts?${params}`, {}, `security-alerts-${alertLevel}-${hours}`);
       
       if (!result.success) {
-        console.error('Error fetching security alerts:', result.error);
+        clientLogger.error('Error fetching security alerts:', { detail: result.error });
         return [];
       }
       
@@ -244,7 +245,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
 
       return alerts;
     } catch (error) {
-      console.error('Error fetching security alerts:', error);
+      clientLogger.error('Error fetching security alerts:', { detail: error });
       return [];
     }
   }
@@ -262,7 +263,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error revoking session:', result.error);
+      clientLogger.error('Error revoking session:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to revoke session');
     }
 
@@ -279,7 +280,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error revoking all sessions:', result.error);
+      clientLogger.error('Error revoking all sessions:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to revoke all sessions');
     }
 
@@ -327,7 +328,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     }>('/api/security/health', {}, 'security-health-status');
     
     if (!result.success) {
-      console.error('Error fetching security health status:', result.error);
+      clientLogger.error('Error fetching security health status:', { detail: result.error });
       return {
         status: 'warning',
         score: 75,

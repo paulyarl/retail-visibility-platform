@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Multi-Cart Manager
  * Handles cart management per tenant (gateway selection at checkout)
@@ -109,7 +111,7 @@ export function getCart(tenantId: string): Cart | null {
   try {
     return JSON.parse(data);
   } catch (error) {
-    console.error('[Cart] Failed to parse cart:', error);
+    clientLogger.error('[Cart] Failed to parse cart:', { detail: error });
     return null;
   }
 }
@@ -359,7 +361,7 @@ export async function migrateCartLogos(): Promise<void> {
         saveCart(cart);
       }
     } catch (error) {
-      console.error(`[Cart] Failed to fetch logo for tenant ${cart.tenant_id}:`, error);
+      clientLogger.error(`[Cart] Failed to fetch logo for tenant ${cart.tenant_id}:`, { detail: error });
     }
   }
 }
@@ -430,7 +432,7 @@ export function migrateOldCarts(): void {
       localStorage.removeItem(oldKey);
       console.log(`[Cart] Migrated gateway-wrapped cart: ${oldKey}`);
     } catch (error) {
-      console.error(`[Cart] Failed to migrate ${oldKey}:`, error);
+      clientLogger.error(`[Cart] Failed to migrate ${oldKey}:`, { detail: error });
     }
   });
   

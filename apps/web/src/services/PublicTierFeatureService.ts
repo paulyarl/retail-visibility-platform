@@ -17,6 +17,7 @@ import {
   TIER_FEATURE_LIMITS,
 } from '@/lib/tiers/tier-features';
 import type { TierConfigData, TierConfigTier, TierConfigFeature } from './TierFeatureService';
+import { clientLogger } from '@/lib/client-logger';
 
 class PublicTierFeatureService extends PublicApiSingleton {
   private config: TierConfigData | null = null;
@@ -62,7 +63,7 @@ class PublicTierFeatureService extends PublicApiSingleton {
         return this.config;
       }
     } catch (error) {
-      console.warn('[PublicTierFeatureService] Failed to load config from API, using fallback:', error);
+      clientLogger.warn('[PublicTierFeatureService] Failed to load config from API, using fallback:', { detail: error });
     }
 
     return this._buildFallback();

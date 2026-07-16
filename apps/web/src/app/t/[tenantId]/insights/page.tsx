@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ContextBadges } from '@/components/ContextBadges';
 import { scanAnalyticsService } from '@/services/ScanAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Analytics {
   totalScanned: number;
@@ -67,7 +68,7 @@ export default function TenantInsightsPage() {
         setAnalytics(analytics);
       }
     } catch (error) {
-      console.error('Failed to load analytics:', error);
+      clientLogger.error('Failed to load analytics:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -85,7 +86,7 @@ export default function TenantInsightsPage() {
         setPreviewResult(result);
       }
     } catch (error) {
-      console.error('Failed to preview:', error);
+      clientLogger.error('Failed to preview:', { detail: error });
     } finally {
       setPreviewLoading(false);
     }

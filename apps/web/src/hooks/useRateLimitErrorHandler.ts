@@ -4,6 +4,7 @@
  */
 
 import { useToast } from '@/components/ui/use-toast';
+import { clientLogger } from '@/lib/client-logger';
 
 interface RateLimitError {
   error: string;
@@ -67,7 +68,7 @@ export function useRateLimitErrorHandler() {
 
       return true; // Handled
     } catch (err) {
-      console.error('[RateLimit] Error handling rate limit response:', err);
+      clientLogger.error('[RateLimit] Error handling rate limit response:', { detail: err });
       return false; // Not handled
     }
   };

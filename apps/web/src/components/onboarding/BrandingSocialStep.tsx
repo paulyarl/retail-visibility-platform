@@ -6,6 +6,7 @@ import { Input, Alert, Button } from '@/components/ui';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BrandingSocialStepProps {
   tenantId: string;
@@ -108,7 +109,7 @@ export default function BrandingSocialStep({
         setLogoPreview(uploadResult.data.url);
       }
     } catch (err) {
-      console.error('Logo URL upload error:', err);
+      clientLogger.error('Logo URL upload error:', { detail: err });
     } finally {
       setUploadingLogo(false);
     }

@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface RecommendationContext {
   userId?: string;
@@ -188,13 +189,13 @@ class AIRecommendationService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AIRecommendationService] Failed to get personalized recommendations:', response.error);
+        clientLogger.error('[AIRecommendationService] Failed to get personalized recommendations:', { detail: response.error });
         return this.getFallbackRecommendations(context, limit);
       }
 
       return response.data?.recommendations || this.getFallbackRecommendations(context, limit);
     } catch (error) {
-      console.error('[AIRecommendationService] Error getting personalized recommendations:', error);
+      clientLogger.error('[AIRecommendationService] Error getting personalized recommendations:', { detail: error });
       return this.getFallbackRecommendations(context, limit);
     }
   }
@@ -228,13 +229,13 @@ class AIRecommendationService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AIRecommendationService] Failed to get similar products:', response.error);
+        clientLogger.error('[AIRecommendationService] Failed to get similar products:', { detail: response.error });
         return [];
       }
 
       return response.data?.recommendations || [];
     } catch (error) {
-      console.error('[AIRecommendationService] Error getting similar products:', error);
+      clientLogger.error('[AIRecommendationService] Error getting similar products:', { detail: error });
       return [];
     }
   }
@@ -270,13 +271,13 @@ class AIRecommendationService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AIRecommendationService] Failed to get trending recommendations:', response.error);
+        clientLogger.error('[AIRecommendationService] Failed to get trending recommendations:', { detail: response.error });
         return [];
       }
 
       return response.data?.recommendations || [];
     } catch (error) {
-      console.error('[AIRecommendationService] Error getting trending recommendations:', error);
+      clientLogger.error('[AIRecommendationService] Error getting trending recommendations:', { detail: error });
       return [];
     }
   }
@@ -314,13 +315,13 @@ class AIRecommendationService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AIRecommendationService] Failed to get category recommendations:', response.error);
+        clientLogger.error('[AIRecommendationService] Failed to get category recommendations:', { detail: response.error });
         return [];
       }
 
       return response.data?.recommendations || [];
     } catch (error) {
-      console.error('[AIRecommendationService] Error getting category recommendations:', error);
+      clientLogger.error('[AIRecommendationService] Error getting category recommendations:', { detail: error });
       return [];
     }
   }
@@ -352,7 +353,7 @@ class AIRecommendationService extends PublicApiSingleton {
         0 // No caching for interactions - must be recorded immediately
       );
     } catch (error) {
-      console.error('[AIRecommendationService] Failed to record interaction:', error);
+      clientLogger.error('[AIRecommendationService] Failed to record interaction:', { detail: error });
       // Don't throw - interaction recording failures shouldn't break the user experience
     }
   }
@@ -396,13 +397,13 @@ class AIRecommendationService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AIRecommendationService] Failed to get performance metrics:', response.error);
+        clientLogger.error('[AIRecommendationService] Failed to get performance metrics:', { detail: response.error });
         return this.getDefaultMetrics();
       }
 
       return response.data?.metrics || this.getDefaultMetrics();
     } catch (error) {
-      console.error('[AIRecommendationService] Error getting performance metrics:', error);
+      clientLogger.error('[AIRecommendationService] Error getting performance metrics:', { detail: error });
       return this.getDefaultMetrics();
     }
   }

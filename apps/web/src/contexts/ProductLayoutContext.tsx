@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 type LayoutVariant = 'classic' | 'enhanced' | 'compact' | 'premium' | 'zoom';
 
@@ -32,7 +33,7 @@ export function ProductLayoutProvider({
         setVariantState(saved as LayoutVariant);
       }
     } catch (error) {
-      console.warn('[ProductLayoutProvider] Failed to load layout preference:', error);
+      clientLogger.warn('[ProductLayoutProvider] Failed to load layout preference:', { detail: error });
     }
   }, []);
 
@@ -48,7 +49,7 @@ export function ProductLayoutProvider({
       try {
         localStorage.setItem('productLayoutVariant', newVariant);
       } catch (error) {
-        console.warn('[ProductLayoutProvider] Failed to save layout preference:', error);
+        clientLogger.warn('[ProductLayoutProvider] Failed to save layout preference:', { detail: error });
       }
     }, 150);
   };

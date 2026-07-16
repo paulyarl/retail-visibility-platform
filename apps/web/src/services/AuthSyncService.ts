@@ -8,6 +8,7 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { SystemSingleton } from '../providers/base/SystemSingleton';
 import { RequestTarget, RequestType } from '../providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Auth0User {
   sub: string;
@@ -109,7 +110,7 @@ export default class AuthSyncService extends SystemSingleton {
       return result.data;
       
     } catch (error) {
-      console.error('[AuthSyncService] syncUser error:', error);
+      clientLogger.error('[AuthSyncService] syncUser error:', { detail: error });
       return { success: false, user: null, isNewUser: false };
     }
   }

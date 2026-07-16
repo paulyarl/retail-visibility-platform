@@ -16,6 +16,7 @@ import {
 import Image from 'next/image';
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useTenantFeaturedProducts } from '@/hooks/useTenantFeaturedProducts';
+import { clientLogger } from '@/lib/client-logger';
 
 // Helper functions for featured type badges
 const getFeaturedBadgeStyle = (typeId: string): string => {
@@ -198,7 +199,7 @@ export default function FeaturedProductsManagerSingleton({ tenantId }: { tenantI
     try {
       await action();
     } catch (error) {
-      console.error(errorMessage, error);
+      clientLogger.error(errorMessage, { detail: error });
       alert(error instanceof Error ? error.message : errorMessage);
     }
   };

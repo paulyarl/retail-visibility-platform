@@ -15,6 +15,7 @@
 
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 import { photoService } from '@/services/PhotoService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // TYPES
@@ -86,7 +87,7 @@ class PhotoSingleton extends UniversalSingleton {
     try {
       return await photoService.fetchItemPhotos(itemId);
     } catch (error) {
-      console.error('[PhotoSingleton] Error fetching item photos:', error);
+      clientLogger.error('[PhotoSingleton] Error fetching item photos:', { detail: error });
       throw error;
     }
   }
@@ -99,7 +100,7 @@ class PhotoSingleton extends UniversalSingleton {
     try {
       return await photoService.fetchVariantPhotos(variantId);
     } catch (error) {
-      console.error('[PhotoSingleton] Error fetching variant photos:', error);
+      clientLogger.error('[PhotoSingleton] Error fetching variant photos:', { detail: error });
       throw error;
     }
   }
@@ -119,7 +120,7 @@ class PhotoSingleton extends UniversalSingleton {
       console.log('[PhotoSingleton] Photo uploaded successfully for item:', itemId);
       return result;
     } catch (error) {
-      console.error('[PhotoSingleton] Error uploading item photo:', error);
+      clientLogger.error('[PhotoSingleton] Error uploading item photo:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed',
@@ -138,7 +139,7 @@ class PhotoSingleton extends UniversalSingleton {
       console.log('[PhotoSingleton] Photo deleted successfully:', photoId);
       return result;
     } catch (error) {
-      console.error('[PhotoSingleton] Error deleting photo:', error);
+      clientLogger.error('[PhotoSingleton] Error deleting photo:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Delete failed',
@@ -157,7 +158,7 @@ class PhotoSingleton extends UniversalSingleton {
       console.log('[PhotoSingleton] Photos reordered successfully for item:', itemId);
       return result.success;
     } catch (error) {
-      console.error('[PhotoSingleton] Error reordering photos:', error);
+      clientLogger.error('[PhotoSingleton] Error reordering photos:', { detail: error });
       return false;
     }
   }
@@ -173,7 +174,7 @@ class PhotoSingleton extends UniversalSingleton {
       console.log('[PhotoSingleton] Primary photo set successfully:', photoId);
       return result.success;
     } catch (error) {
-      console.error('[PhotoSingleton] Error setting primary photo:', error);
+      clientLogger.error('[PhotoSingleton] Error setting primary photo:', { detail: error });
       return false;
     }
   }
@@ -190,7 +191,7 @@ class PhotoSingleton extends UniversalSingleton {
       await photoService.invalidateItemCache(itemId);
       console.log('[PhotoSingleton] Cache invalidated for item:', itemId);
     } catch (error) {
-      console.error('[PhotoSingleton] Error invalidating item cache:', error);
+      clientLogger.error('[PhotoSingleton] Error invalidating item cache:', { detail: error });
     }
   }
 
@@ -202,7 +203,7 @@ class PhotoSingleton extends UniversalSingleton {
       await photoService.invalidateVariantCache(variantId);
       console.log('[PhotoSingleton] Cache invalidated for variant:', variantId);
     } catch (error) {
-      console.error('[PhotoSingleton] Error invalidating variant cache:', error);
+      clientLogger.error('[PhotoSingleton] Error invalidating variant cache:', { detail: error });
     }
   }
 
@@ -214,7 +215,7 @@ class PhotoSingleton extends UniversalSingleton {
       await photoService.clearAllCache();
       console.log('[PhotoSingleton] All photo cache cleared');
     } catch (error) {
-      console.error('[PhotoSingleton] Error clearing all cache:', error);
+      clientLogger.error('[PhotoSingleton] Error clearing all cache:', { detail: error });
     }
   }
 

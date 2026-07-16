@@ -7,6 +7,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PlatformFlag {
   id: string;
@@ -102,14 +103,14 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminPlatformFlagsService] Failed to get platform flags:', result.error);
+        clientLogger.error('[AdminPlatformFlagsService] Failed to get platform flags:', { detail: result.error });
         return [];
       }
 
       const rawData: any = result.data;
       return Array.isArray(rawData) ? rawData : (rawData?.data || []);
     } catch (error) {
-      console.error('[AdminPlatformFlagsService] Failed to get platform flags:', error);
+      clientLogger.error('[AdminPlatformFlagsService] Failed to get platform flags:', { detail: error });
       return [];
     }
   }
@@ -136,7 +137,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminPlatformFlagsService] Failed to get effective flags:', result.error);
+        clientLogger.error('[AdminPlatformFlagsService] Failed to get effective flags:', { detail: result.error });
         return {};
       }
 
@@ -148,7 +149,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       }
       return record;
     } catch (error) {
-      console.error('[AdminPlatformFlagsService] Failed to get effective flags:', error);
+      clientLogger.error('[AdminPlatformFlagsService] Failed to get effective flags:', { detail: error });
       return {};
     }
   }
@@ -159,7 +160,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
    */
   async updatePlatformFlag(flag: string, updateData: FlagUpdateRequest): Promise<PlatformFlag | null> {
     if (!flag) {
-      console.error('[AdminPlatformFlagsService] Flag name is required');
+      clientLogger.error('[AdminPlatformFlagsService] Flag name is required');
       return null;
     }
 
@@ -175,7 +176,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminPlatformFlagsService] Failed to update platform flag:', result.error);
+        clientLogger.error('[AdminPlatformFlagsService] Failed to update platform flag:', { detail: result.error });
         return null;
       }
 
@@ -185,7 +186,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[AdminPlatformFlagsService] Failed to update platform flag:', error);
+      clientLogger.error('[AdminPlatformFlagsService] Failed to update platform flag:', { detail: error });
       return null;
     }
   }
@@ -196,7 +197,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
    */
   async setFlagOverride(flag: string, value: boolean | null): Promise<void> {
     if (!flag) {
-      console.error('[AdminPlatformFlagsService] Flag name is required');
+      clientLogger.error('[AdminPlatformFlagsService] Flag name is required');
       return;
     }
 
@@ -212,14 +213,14 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminPlatformFlagsService] Failed to set flag override:', result.error);
+        clientLogger.error('[AdminPlatformFlagsService] Failed to set flag override:', { detail: result.error });
         throw new Error('Failed to set flag override');
       }
 
       // Invalidate relevant caches after override change
       await this.invalidateCachePattern('admin-effective-flags*');
     } catch (error) {
-      console.error('[AdminPlatformFlagsService] Failed to set flag override:', error);
+      clientLogger.error('[AdminPlatformFlagsService] Failed to set flag override:', { detail: error });
       throw error;
     }
   }
@@ -230,7 +231,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
    */
   async resetFlagOverride(flag: string): Promise<void> {
     if (!flag) {
-      console.error('[AdminPlatformFlagsService] Flag name is required');
+      clientLogger.error('[AdminPlatformFlagsService] Flag name is required');
       return;
     }
 
@@ -245,14 +246,14 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminPlatformService] Failed to reset flag override:', result.error);
+        clientLogger.error('[AdminPlatformService] Failed to reset flag override:', { detail: result.error });
         throw new Error('Failed to reset flag override');
       }
 
       // Invalidate relevant caches after override reset
       await this.invalidateCachePattern('admin-effective-flags*');
     } catch (error) {
-      console.error('[AdminPlatformService] Failed to reset flag override:', error);
+      clientLogger.error('[AdminPlatformService] Failed to reset flag override:', { detail: error });
       throw error;
     }
   }
@@ -263,7 +264,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
    */
   async deletePlatformFlag(flag: string): Promise<boolean> {
     if (!flag) {
-      console.error('[AdminPlatformFlagsService] Flag name is required');
+      clientLogger.error('[AdminPlatformFlagsService] Flag name is required');
       return false;
     }
 
@@ -279,7 +280,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminPlatformFlagsService] Failed to delete platform flag:', result.error);
+        clientLogger.error('[AdminPlatformFlagsService] Failed to delete platform flag:', { detail: result.error });
         return false;
       }
 
@@ -289,7 +290,7 @@ class AdminPlatformFlagsService extends AdminApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[AdminPlatformFlagsService] Failed to delete platform flag:', error);
+      clientLogger.error('[AdminPlatformFlagsService] Failed to delete platform flag:', { detail: error });
       return false;
     }
   }

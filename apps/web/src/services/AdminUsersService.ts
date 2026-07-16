@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AdminUser {
   id: string;
@@ -130,7 +131,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to get users:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to get users:', { detail: response.error });
       return [];
     }
 
@@ -176,7 +177,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to get user:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to get user:', { detail: response.error });
       return null;
     }
 
@@ -198,7 +199,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to create user:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to create user:', { detail: response.error });
       return null;
     }
 
@@ -242,7 +243,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to update user:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to update user:', { detail: response.error });
       return null;
     }
 
@@ -293,7 +294,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to delete user:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to delete user:', { detail: response.error });
       return false;
     }
 
@@ -319,7 +320,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to send invitation:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to send invitation:', { detail: response.error });
       return false;
     }
 
@@ -341,7 +342,7 @@ class AdminUsersService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminUsersService] Failed to reset password:', response.error);
+      clientLogger.error('[AdminUsersService] Failed to reset password:', { detail: response.error });
       return false;
     }
 
@@ -383,7 +384,7 @@ class AdminUsersService extends AdminApiSingleton {
               tenants: transformedTenants
             };
           } catch (error) {
-            console.error(`[AdminUsersService] Failed to get tenants for user ${user.id}:`, error);
+            clientLogger.error(`[AdminUsersService] Failed to get tenants for user ${user.id}:`, { detail: error });
             return user;
           }
         })
@@ -391,7 +392,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return usersWithTenants;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to get users with tenants:', error);
+      clientLogger.error('[AdminUsersService] Failed to get users with tenants:', { detail: error });
       return [];
     }
   }
@@ -428,7 +429,7 @@ class AdminUsersService extends AdminApiSingleton {
         unverifiedUsers: 0
       };
     } catch (error) {
-      console.error('[AdminUsersService] Failed to get user stats:', error);
+      clientLogger.error('[AdminUsersService] Failed to get user stats:', { detail: error });
       return {
         totalUsers: 0,
         activeUsers: 0,
@@ -464,7 +465,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to create test tenant:', error);
+      clientLogger.error('[AdminUsersService] Failed to create test tenant:', { detail: error });
       throw error;
     }
   }
@@ -493,7 +494,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to create test chain:', error);
+      clientLogger.error('[AdminUsersService] Failed to create test chain:', { detail: error });
       throw error;
     }
   }
@@ -512,7 +513,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to delete test chain:', error);
+      clientLogger.error('[AdminUsersService] Failed to delete test chain:', { detail: error });
       throw error;
     }
   }
@@ -531,7 +532,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to delete test tenant:', error);
+      clientLogger.error('[AdminUsersService] Failed to delete test tenant:', { detail: error });
       throw error;
     }
   }
@@ -553,7 +554,7 @@ class AdminUsersService extends AdminApiSingleton {
       
       return tenantsArray || [];
     } catch (error) {
-      console.error('[AdminUsersService] Failed to get user tenants:', error);
+      clientLogger.error('[AdminUsersService] Failed to get user tenants:', { detail: error });
       return [];
     }
   }
@@ -576,7 +577,7 @@ class AdminUsersService extends AdminApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdminUsersService] Failed to add user tenant:', response.error);
+        clientLogger.error('[AdminUsersService] Failed to add user tenant:', { detail: response.error });
         return null;
       }
 
@@ -585,7 +586,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return response.data;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to add user tenant:', error);
+      clientLogger.error('[AdminUsersService] Failed to add user tenant:', { detail: error });
       return null;
     }
   }
@@ -607,7 +608,7 @@ class AdminUsersService extends AdminApiSingleton {
       
       return tenantsArray || [];
     } catch (error) {
-      console.error('[AdminUsersService] Failed to get all tenants:', error);
+      clientLogger.error('[AdminUsersService] Failed to get all tenants:', { detail: error });
       return [];
     }
   }
@@ -633,7 +634,7 @@ class AdminUsersService extends AdminApiSingleton {
       // Response structure: {success: true, message: string, tenant: {...}}
       return response.data?.tenant || null;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to assign tenant to user:', error);
+      clientLogger.error('[AdminUsersService] Failed to assign tenant to user:', { detail: error });
       throw error;
     }
   }
@@ -655,7 +656,7 @@ class AdminUsersService extends AdminApiSingleton {
       
       return response;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to remove tenant from user:', error);
+      clientLogger.error('[AdminUsersService] Failed to remove tenant from user:', { detail: error });
       throw error;
     }
   }
@@ -671,7 +672,7 @@ class AdminUsersService extends AdminApiSingleton {
       // Then add with new role
       return await this.assignTenantToUser(userId, tenantId, newRole);
     } catch (error) {
-      console.error('[AdminUsersService] Failed to update user tenant role:', error);
+      clientLogger.error('[AdminUsersService] Failed to update user tenant role:', { detail: error });
       throw error;
     }
   }
@@ -700,7 +701,7 @@ class AdminUsersService extends AdminApiSingleton {
       // Return the updated user data for instant UI update
       return response.data?.user || null;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to update user status:', error);
+      clientLogger.error('[AdminUsersService] Failed to update user status:', { detail: error });
       throw error;
     }
   }
@@ -719,7 +720,7 @@ class AdminUsersService extends AdminApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to send verification email:', error);
+      clientLogger.error('[AdminUsersService] Failed to send verification email:', { detail: error });
       throw error;
     }
   }
@@ -745,7 +746,7 @@ class AdminUsersService extends AdminApiSingleton {
       // Return the updated user data for instant UI update
       return response.data?.user || null;
     } catch (error) {
-      console.error('[AdminUsersService] Failed to update user verification status:', error);
+      clientLogger.error('[AdminUsersService] Failed to update user verification status:', { detail: error });
       throw error;
     }
   }

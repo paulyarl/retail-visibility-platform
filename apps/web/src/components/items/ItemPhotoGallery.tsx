@@ -6,6 +6,7 @@ import { itemsService } from "@/services/ItemsSingletonService";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 import PhotoSingleton from "@/lib/singletons/PhotoSingleton";
 import { useVariantsSingleton } from "@/lib/singletons/VariantsSingleton";
+import { clientLogger } from '@/lib/client-logger';
 
 type Photo = {
   id: string;
@@ -74,7 +75,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
         setPhotos(photoAssets);
       }
     } catch (e) {
-      console.error("Failed to load photos:", e);
+      clientLogger.error("Failed to load photos:", { detail: e });
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
           setVariants(result.variants);
         }
       } catch (e) {
-        console.error("Failed to load variants:", e);
+        clientLogger.error("Failed to load variants:", { detail: e });
       } finally {
         setVariantsLoading(false);
       }
@@ -162,7 +163,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       await loadPhotos();
       onUpdate?.();
     } catch (err) {
-      console.error("Failed to set primary:", err);
+      clientLogger.error("Failed to set primary:", { detail: err });
       setError("Failed to set primary photo");
     }
   };
@@ -177,7 +178,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       await loadPhotos();
       onUpdate?.();
     } catch (err) {
-      console.error("Failed to delete:", err);
+      clientLogger.error("Failed to delete:", { detail: err });
       setError("Failed to delete photo");
     }
   };
@@ -193,7 +194,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       await loadPhotos();
       onUpdate?.();
     } catch (err: any) {
-      console.error("Failed to migrate legacy image:", err);
+      clientLogger.error("Failed to migrate legacy image:", { detail: err });
       setError(err.message || "Failed to migrate legacy image");
     } finally {
       setUploading(false);
@@ -218,7 +219,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       await loadPhotos();
       setEditingId(null);
     } catch (err) {
-      console.error("Failed to update:", err);
+      clientLogger.error("Failed to update:", { detail: err });
       setError("Failed to update photo");
     }
   };

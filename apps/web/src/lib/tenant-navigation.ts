@@ -6,6 +6,7 @@
 
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { LocalStorageCache } from './cache/local-storage-cache';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantNavigationOptions {
   tenantId: string;
@@ -32,7 +33,7 @@ export async function storeLastVisitedPage(tenantId: string, path: string): Prom
       });
     }
   } catch (error) {
-    console.warn('[TenantNavigation] Failed to store last visited page:', error);
+    clientLogger.warn('[TenantNavigation] Failed to store last visited page:', { detail: error });
   }
 }
 
@@ -44,7 +45,7 @@ export async function getLastVisitedPage(tenantId: string): Promise<string | nul
     const lastPage = await LocalStorageCache.get<string>('last-visited-page', { tenantId });
     return lastPage;
   } catch (error) {
-    console.warn('[TenantNavigation] Failed to get last visited page:', error);
+    clientLogger.warn('[TenantNavigation] Failed to get last visited page:', { detail: error });
     return null;
   }
 }
@@ -101,7 +102,7 @@ export async function checkTenantOnboarding(tenantId: string): Promise<Onboardin
       }
     }
   } catch (error) {
-    console.warn('[TenantNavigation] Onboarding check failed:', error);
+    clientLogger.warn('[TenantNavigation] Onboarding check failed:', { detail: error });
   }
 
   return { needsOnboarding: false };

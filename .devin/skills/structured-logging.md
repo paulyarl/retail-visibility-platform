@@ -7,6 +7,11 @@ Use this skill when writing or reviewing code that logs errors, warnings, or ope
 > New code must use `logger.error` exclusively. See [Migration Guide](#migration-guide-console--logger) below.
 > The only exceptions are: test files, standalone scripts in `scripts/`, and `logger.ts` itself.
 
+> **DEPRECATED: `console.error` and `console.warn` are no longer permitted in frontend source code (`apps/web/src/`).**
+> All `console.error` and `console.warn` calls have been migrated to `clientLogger.error` and `clientLogger.warn` as of July 2026.
+> New code must use `clientLogger` exclusively. See [Frontend Migration Guide](#frontend-migration-guide-console--clientlogger) below.
+> The only exceptions are: `app/api/` route handlers (server-side), test files, `client-logger.ts` itself, and commented-out console calls.
+
 ---
 
 ## Quick Reference

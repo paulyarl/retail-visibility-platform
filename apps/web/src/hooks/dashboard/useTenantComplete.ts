@@ -17,6 +17,7 @@ import {
   TierFeature
 } from '@/lib/tiers/tier-resolver';
 import { canBypassTierRestrictions, canBypassRoleRestrictions, forceAdminBypass } from '@/lib/auth/platform-admin';
+import { clientLogger } from '@/lib/client-logger';
 
 // Consolidated response from /api/tenants/:id/complete
 interface TenantCompleteResponse {
@@ -177,7 +178,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
         // console.log(`[useTenantComplete] Tenant info fetched:`, data);
         return data;
       } catch (error) {
-        console.warn('[useTenantComplete] Tenant info fetch failed:', error);
+        clientLogger.warn('[useTenantComplete] Tenant info fetch failed:', { detail: error });
         throw error;
       }
     },
@@ -217,7 +218,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
           try {
             return tenantInfoService.getTenantTier(tenantId);
           } catch (error) {
-            console.warn('[useTenantComplete] Tier fetch failed, returning null:', error);
+            clientLogger.warn('[useTenantComplete] Tier fetch failed, returning null:', { detail: error });
             return null;
           }
         },
@@ -234,7 +235,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
           try {
             return tenantManagementService.getTenantUsage(tenantId);
           } catch (error) {
-            console.warn('[useTenantComplete] Usage fetch failed, returning null:', error);
+            clientLogger.warn('[useTenantComplete] Usage fetch failed, returning null:', { detail: error });
             return null;
           }
         },
@@ -252,7 +253,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
             const result = await tenantInfoService.getOrganization(tenantId);
             return result?.data || null;
           } catch (error) {
-            console.warn('[useTenantComplete] Organization fetch failed, returning null:', error);
+            clientLogger.warn('[useTenantComplete] Organization fetch failed, returning null:', { detail: error });
             return null;
           }
         },
@@ -415,7 +416,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
         rawTierData,
       };
     } catch (err) {
-      console.warn('[useTenantComplete] Error resolving tier:', err);
+      clientLogger.warn('[useTenantComplete] Error resolving tier:', { detail: err });
       return null;
     }
   }, [rawTier, tenant]);

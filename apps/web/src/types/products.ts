@@ -392,6 +392,7 @@ export interface ProductTrend {
 
 // React hooks for product management
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useShopProducts(shopId: string, filters?: ProductFilter) {
   const [products, setProducts] = useState<ShopProduct[]>([]);
@@ -406,7 +407,7 @@ export function useShopProducts(shopId: string, filters?: ProductFilter) {
       setProducts(mockProducts.products);
       setTotal(mockProducts.total);
     } catch (error) {
-      console.error('Error loading products:', error);
+      clientLogger.error('Error loading products:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -435,7 +436,7 @@ export function useProduct(productId: string) {
       const mockProduct = await getMockProduct(productId);
       setProduct(mockProduct);
     } catch (error) {
-      console.error('Error loading product:', error);
+      clientLogger.error('Error loading product:', { detail: error });
     } finally {
       setLoading(false);
     }

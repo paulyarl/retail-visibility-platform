@@ -10,6 +10,7 @@ import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tena
 import { getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StorefrontOptionsSettings {
   storefront_opt_enabled: boolean;
@@ -197,7 +198,7 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
         setSettings({ ...DEFAULT_SETTINGS, ...data });
       }
     } catch (err) {
-      console.error('Failed to load storefront options settings:', err);
+      clientLogger.error('Failed to load storefront options settings:', { detail: err });
     } finally {
       setLoading(false);
     }

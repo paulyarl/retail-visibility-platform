@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { itemsService } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ItemPickerModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId }:
         setHasMore(result.pagination?.hasMore ?? result.items.length === 20);
       }
     } catch (error) {
-      console.error('[ItemPickerModal] Failed to load items:', error);
+      clientLogger.error('[ItemPickerModal] Failed to load items:', { detail: error });
     } finally {
       setIsLoading(false);
     }

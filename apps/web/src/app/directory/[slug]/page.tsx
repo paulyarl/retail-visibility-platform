@@ -80,6 +80,7 @@ import { useRouter } from 'next/navigation';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StoreDetailPageProps {
   params: Promise<{
@@ -121,7 +122,7 @@ async function getConsolidatedDirectoryData(identifier: string): Promise<Directo
 
     return null;
   } catch (error) {
-    console.error(`[Directory] Error fetching consolidated directory data for ${identifier}:`, error);
+    clientLogger.error(`[Directory] Error fetching consolidated directory data for ${identifier}:`, { detail: error });
     return null;
   }
 }
@@ -131,7 +132,7 @@ async function getStorefrontCategories(tenantId: string) {
     const data = await directoryService.getStorefrontCategories(tenantId);
     return data;
   } catch (error) {
-    console.error('Error fetching storefront categories:', error);
+    clientLogger.error('Error fetching storefront categories:', { detail: error });
     return { categories: [], uncategorizedCount: 0 };
   }
 }
@@ -141,7 +142,7 @@ async function getActualProductCount(tenantId: string) {
     const count = await directoryService.getStorefrontProductCount(tenantId);
     return count;
   } catch (error) {
-    console.error('Error fetching actual product count:', error);
+    clientLogger.error('Error fetching actual product count:', { detail: error });
     return 0;
   }
 }
@@ -151,7 +152,7 @@ async function getBusinessProfile(tenantId: string) {
     const profile = await directoryService.getBusinessProfile(tenantId);
     return profile;
   } catch (error) {
-    console.error('Error fetching business profile:', error);
+    clientLogger.error('Error fetching business profile:', { detail: error });
     return null;
   }
 }
@@ -190,7 +191,7 @@ async function getBusinessHours(tenantId: string) {
       return hoursData;
     }
   } catch (error) {
-    console.error('Error fetching business hours:', error);
+    clientLogger.error('Error fetching business hours:', { detail: error });
     return null;
   }
 }
@@ -201,7 +202,7 @@ async function getFeaturedProducts(tenantId: string, limit: number = 6) {
     const items = await directoryService.getFeaturedProducts(tenantId, limit);
     return items;
   } catch (error) {
-    console.error('Error fetching featured products:', error);
+    clientLogger.error('Error fetching featured products:', { detail: error });
     return [];
   }
 }
@@ -231,7 +232,7 @@ async function getRelatedProducts(categorySlug: string, excludeTenantId: string,
     const allProducts = (await Promise.all(productPromises)).flat();
     return allProducts.slice(0, limit);
   } catch (error) {
-    console.error('Error fetching related products:', error);
+    clientLogger.error('Error fetching related products:', { detail: error });
     return [];
   }
 }
@@ -261,7 +262,7 @@ async function trackStoreView(tenantId: string, categories: any[] = []) {
       pageType: 'directory_detail'
     });
   } catch (error) {
-    console.error('Error tracking store view:', error);
+    clientLogger.error('Error tracking store view:', { detail: error });
     // Don't throw - tracking failures shouldn't break the page
   }
 }
@@ -285,7 +286,7 @@ async function getStoreRecommendations(tenantId: string, categorySlug?: string) 
 
     return response;
   } catch (error) {
-    console.error('Error getting recommendations:', error);
+    clientLogger.error('Error getting recommendations:', { detail: error });
     return { recommendations: [] };
   }
 }
@@ -322,7 +323,7 @@ async function getUserLocation(): Promise<{
       return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
     }
   } catch (error) {
-    console.warn('Geolocation failed, falling back to IP-based location');
+    clientLogger.warn('Geolocation failed, falling back to IP-based location');
   }
 
   // Fallback to IP-based location
@@ -360,7 +361,7 @@ async function getUserLocation(): Promise<{
     const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
 
     if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
-      console.warn('Invalid location data received from external API');
+      clientLogger.warn('Invalid location data received from external API');
       return null;
     }
 
@@ -371,7 +372,7 @@ async function getUserLocation(): Promise<{
       state: ipLocation.region || 'Unknown'
     };
   } catch (error) {
-    console.warn('Failed to get IP location:', error);
+    clientLogger.warn('Failed to get IP location:', { detail: error });
     return null;
   }
 }
@@ -517,11 +518,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
         // Track user behavior for recommendations (fire and forget, don't await)
         trackStoreView(data.listing.tenantId, data.listing.categories).catch(err =>
-          console.error('Failed to track store view:', err)
+          clientLogger.error('Failed to track store view:', { detail: err })
         );
 
       } catch (error) {
-        console.error('Error fetching store data:', error);
+        clientLogger.error('Error fetching store data:', { detail: error });
       } finally {
         setLoading(false);
       }

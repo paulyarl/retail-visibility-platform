@@ -5,6 +5,7 @@
 
 import { CachedTenantService } from '@/lib/cache/cached-tenant-service';
 import { LocalStorageCache } from '@/lib/cache/local-storage-cache';
+import { clientLogger } from '@/lib/client-logger';
 
 // Test tenant ID - change this to match your test tenant
 const TEST_TENANT_ID = 'tid-r6cccpag';
@@ -32,7 +33,7 @@ export const cacheTestUtils = {
       console.log('🎉 Basic cache test complete!');
       return true;
     } catch (error) {
-      console.error('❌ Basic cache test failed:', error);
+      clientLogger.error('❌ Basic cache test failed:', { detail: error });
       return false;
     }
   },
@@ -66,7 +67,7 @@ export const cacheTestUtils = {
       console.log('🎉 Tenant service test complete!');
       return true;
     } catch (error) {
-      console.error('❌ Tenant service test failed:', error);
+      clientLogger.error('❌ Tenant service test failed:', { detail: error });
       return false;
     }
   },
@@ -95,7 +96,7 @@ export const cacheTestUtils = {
       console.log('🎉 Cache invalidation test complete!');
       return true;
     } catch (error) {
-      console.error('❌ Cache invalidation test failed:', error);
+      clientLogger.error('❌ Cache invalidation test failed:', { detail: error });
       return false;
     }
   },
@@ -122,7 +123,7 @@ export const cacheTestUtils = {
 
       return allPassed;
     } catch (error) {
-      console.error('❌ Test suite failed:', error);
+      clientLogger.error('❌ Test suite failed:', { detail: error });
       return false;
     }
   },

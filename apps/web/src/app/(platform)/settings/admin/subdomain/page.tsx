@@ -22,6 +22,7 @@ import {
   Clock,
   Activity
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SubdomainStats {
   totalTenants: number;
@@ -95,7 +96,7 @@ export default function AdminSubdomainPage() {
       const stats = await platformHomeService.getAdminSubdomainStats();
       setStats(stats);
     } catch (error) {
-      console.error('Failed to fetch subdomain stats:', error);
+      clientLogger.error('Failed to fetch subdomain stats:', { detail: error });
       setError('Failed to load subdomain statistics');
     }
   };
@@ -110,7 +111,7 @@ export default function AdminSubdomainPage() {
         subdomainResolve: { maxRequests: 100, windowMs: 60 * 1000 },
       });
     } catch (error) {
-      console.error('Failed to fetch rate limits:', error);
+      clientLogger.error('Failed to fetch rate limits:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -124,7 +125,7 @@ export default function AdminSubdomainPage() {
       setRateLimits(newLimits);
       setError('');
     } catch (error) {
-      console.error('Failed to update rate limits:', error);
+      clientLogger.error('Failed to update rate limits:', { detail: error });
       setError('Failed to update rate limits');
     } finally {
       setUpdatingLimits(false);

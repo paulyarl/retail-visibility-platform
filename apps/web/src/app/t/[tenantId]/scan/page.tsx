@@ -12,6 +12,7 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { TierGate } from '@/components/tier/TierGate';
 import { useBarcodeScanCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { Button } from '@mantine/core';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ScanSession {
   id: string;
@@ -63,7 +64,7 @@ export default function TenantScanPage() {
       const data = await itemsSingletonService.getMyScanSessions(tenantId);
       setSessions(data.sessions || []);
     } catch (err) {
-      console.error('[ScanPage] Failed to load sessions:', err);
+      clientLogger.error('[ScanPage] Failed to load sessions:', { detail: err });
       setError('Failed to load scan sessions');
     } finally {
       setLoading(false);
@@ -96,11 +97,11 @@ export default function TenantScanPage() {
         if (data && data.session && data.session.id) {
           router.push(`/t/${tenantId}/scan/${data.session.id}`);
         } else {
-          console.error('Invalid session response:', data);
+          clientLogger.error('Invalid session response:', { detail: data });
           alert('Failed to start session: Invalid response from server');
         }
       } catch (error) {
-        console.error('Failed to start session:', error);
+        clientLogger.error('Failed to start session:', { detail: error });
         if (error instanceof Error && error.message === 'rate_limit_exceeded') {
           setRateLimitError(true);
         } else {
@@ -110,7 +111,7 @@ export default function TenantScanPage() {
         setCreating(false);
       }
     } catch (error) {
-      console.error('Failed to start session:', error);
+      clientLogger.error('Failed to start session:', { detail: error });
       setCreating(false);
     }
   };
@@ -120,7 +121,7 @@ export default function TenantScanPage() {
       await itemsSingletonService.cancelScanSession(sessionId);
       await loadSessions(); // Refresh the list
     } catch (err) {
-      console.error('[ScanPage] Failed to cancel session:', err);
+      clientLogger.error('[ScanPage] Failed to cancel session:', { detail: err });
       setError('Failed to cancel session');
     }
   };
@@ -138,7 +139,7 @@ export default function TenantScanPage() {
       setRateLimitError(false);
       await loadSessions();
     } catch (error) {
-      console.error('Failed to cleanup sessions:', error);
+      clientLogger.error('Failed to cleanup sessions:', { detail: error });
       alert('Failed to cleanup sessions');
     } finally {
       setCleaningUp(false);

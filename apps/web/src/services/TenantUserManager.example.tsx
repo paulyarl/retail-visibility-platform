@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { tenantUserService } from '../services';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Example component demonstrating the new service architecture
@@ -23,7 +24,7 @@ export function TenantUserManager({ tenantId }: { tenantId: string }) {
         setUsers(userList || []);
         console.log('Users loaded successfully:', userList?.length || 0);
       } catch (err) {
-        console.error('Failed to load users:', err);
+        clientLogger.error('Failed to load users:', { detail: err });
         setError('Failed to load users. Please try again.');
       } finally {
         setLoading(false);
@@ -47,7 +48,7 @@ export function TenantUserManager({ tenantId }: { tenantId: string }) {
       console.log('User added successfully:', newUser);
       return newUser;
     } catch (err) {
-      console.error('Failed to add user:', err);
+      clientLogger.error('Failed to add user:', { detail: err });
       setError('Failed to add user. Please check the details and try again.');
       throw err;
     }
@@ -65,7 +66,7 @@ export function TenantUserManager({ tenantId }: { tenantId: string }) {
       console.log('User role updated successfully:', updatedUser);
       return updatedUser;
     } catch (err) {
-      console.error('Failed to update user role:', err);
+      clientLogger.error('Failed to update user role:', { detail: err });
       setError('Failed to update user role. Please try again.');
       throw err;
     }
@@ -80,7 +81,7 @@ export function TenantUserManager({ tenantId }: { tenantId: string }) {
       setUsers(prev => prev.filter(user => user.id !== userId));
       console.log('User removed successfully:', userId);
     } catch (err) {
-      console.error('Failed to remove user:', err);
+      clientLogger.error('Failed to remove user:', { detail: err });
       setError('Failed to remove user. Please try again.');
       throw err;
     }

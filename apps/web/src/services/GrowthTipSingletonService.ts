@@ -9,6 +9,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GrowthTipDTO {
   id: string;
@@ -58,7 +59,7 @@ class GrowthTipSingletonService extends TenantApiSingleton {
    */
   async getGrowthTips(tenantId: string, limit: number = 5): Promise<GrowthTipDTO[] | null> {
     if (!tenantId) {
-      console.error('[GrowthTipSingleton] getGrowthTips: tenantId is required');
+      clientLogger.error('[GrowthTipSingleton] getGrowthTips: tenantId is required');
       return null;
     }
 
@@ -79,7 +80,7 @@ class GrowthTipSingletonService extends TenantApiSingleton {
       const tips = Array.isArray(data) ? data : data?.data;
       return Array.isArray(tips) ? tips : null;
     } catch (error) {
-      console.error('[GrowthTipSingleton] Failed to get growth tips:', error);
+      clientLogger.error('[GrowthTipSingleton] Failed to get growth tips:', { detail: error });
       return null;
     }
   }

@@ -8,6 +8,7 @@ import { adminOperationsService, type AdminTenant, type AdminUser } from '@/serv
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTask, TaskStatus, TaskPriority } from '@/types/crm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -66,7 +67,7 @@ export default function CrmGlobalTasksPage() {
           return true;
         }));
       } catch (err) {
-        console.error('[CRM Global Tasks] Options load error:', err);
+        clientLogger.error('[CRM Global Tasks] Options load error:', { detail: err });
       } finally {
         setOptionsLoading(false);
       }
@@ -97,7 +98,7 @@ export default function CrmGlobalTasksPage() {
       });
       setTasks(result);
     } catch (err) {
-      console.error('[CRM Global Tasks] Load error:', err);
+      clientLogger.error('[CRM Global Tasks] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -124,7 +125,7 @@ export default function CrmGlobalTasksPage() {
       setNewTask(EMPTY_TASK);
       await load();
     } catch (err) {
-      console.error('[CRM Global Tasks] Create error:', err);
+      clientLogger.error('[CRM Global Tasks] Create error:', { detail: err });
     } finally {
       setCreating(false);
     }
@@ -147,7 +148,7 @@ export default function CrmGlobalTasksPage() {
       setEditTask(null);
       await load();
     } catch (err) {
-      console.error('[CRM Global Tasks] Edit error:', err);
+      clientLogger.error('[CRM Global Tasks] Edit error:', { detail: err });
     } finally {
       setEditing(false);
     }
@@ -161,7 +162,7 @@ export default function CrmGlobalTasksPage() {
       setDeleteTaskId(null);
       await load();
     } catch (err) {
-      console.error('[CRM Global Tasks] Delete error:', err);
+      clientLogger.error('[CRM Global Tasks] Delete error:', { detail: err });
     } finally {
       setDeleting(false);
     }
@@ -173,7 +174,7 @@ export default function CrmGlobalTasksPage() {
       await crmAdminService.updateTask(taskId, { status: newStatus });
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     } catch (err) {
-      console.error('[CRM Global Tasks] Status change error:', err);
+      clientLogger.error('[CRM Global Tasks] Status change error:', { detail: err });
     } finally {
       setUpdatingId(null);
     }

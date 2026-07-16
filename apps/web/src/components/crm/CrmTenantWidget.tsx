@@ -8,6 +8,7 @@ import { tenantUserService } from '@/services/TenantUserService';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry, CrmAlert } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -96,7 +97,7 @@ export default function CrmTenantWidget({ tenantId, isWritable = true }: CrmTena
         }
         localStorage.removeItem(legacyKey);
       } catch (err) {
-        console.error('[CRM Tenant Widget] Legacy read state migration failed:', err);
+        clientLogger.error('[CRM Tenant Widget] Legacy read state migration failed:', { detail: err });
       }
     }
     const legacyPrefix = 'crm-widget-activity-last-read-';
@@ -204,7 +205,7 @@ export default function CrmTenantWidget({ tenantId, isWritable = true }: CrmTena
       await crmTenantCrmService.setReadState('activity_feed');
       await queryClient.invalidateQueries({ queryKey: ['crm', 'stats'] });
     } catch (err) {
-      console.error('[CRM Tenant Widget] Mark activities read error:', err);
+      clientLogger.error('[CRM Tenant Widget] Mark activities read error:', { detail: err });
     }
   }
 
@@ -213,7 +214,7 @@ export default function CrmTenantWidget({ tenantId, isWritable = true }: CrmTena
       await crmTenantCrmService.setReadState('alert_feed');
       await queryClient.invalidateQueries({ queryKey: ['crm', 'stats'] });
     } catch (err) {
-      console.error('[CRM Tenant Widget] Mark alerts read error:', err);
+      clientLogger.error('[CRM Tenant Widget] Mark alerts read error:', { detail: err });
     }
   }
 
@@ -231,7 +232,7 @@ export default function CrmTenantWidget({ tenantId, isWritable = true }: CrmTena
       await queryClient.invalidateQueries({ queryKey: ['crm', 'stats'] });
       toast({ title: 'Ticket Created', description: 'Your support ticket has been submitted', variant: 'success' });
     } catch (err) {
-      console.error('[CRM Tenant Widget] Create ticket error:', err);
+      clientLogger.error('[CRM Tenant Widget] Create ticket error:', { detail: err });
       toast({ title: 'Error', description: 'Failed to create ticket', variant: 'destructive' });
     } finally {
       setSubmitting(false);

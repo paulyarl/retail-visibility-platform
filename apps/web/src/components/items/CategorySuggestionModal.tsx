@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal, ModalFooter, Button, Input } from '@/components/ui';
 import TenantCategorySelector from './TenantCategorySelector';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CategorySuggestion {
   suggestedName: string;
@@ -53,7 +54,7 @@ export default function CategorySuggestionModal({
       await onCreateAndAssign(categoryName, suggestion.googleCategoryId);
       onClose();
     } catch (error) {
-      console.error('Failed to create category:', error);
+      clientLogger.error('Failed to create category:', { detail: error });
       alert(error instanceof Error ? error.message : 'Failed to create category');
     } finally {
       setLoading(false);
@@ -68,7 +69,7 @@ export default function CategorySuggestionModal({
       await onAssignToExisting(selectedCategoryId);
       onClose();
     } catch (error) {
-      console.error('Failed to assign category:', error);
+      clientLogger.error('Failed to assign category:', { detail: error });
       alert(error instanceof Error ? error.message : 'Failed to assign category');
     } finally {
       setLoading(false);

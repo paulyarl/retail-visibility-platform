@@ -9,6 +9,7 @@
 
 import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Customer {
   id: string;
@@ -187,7 +188,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         error: result.data?.error || getErrorMessage(result.error) || 'Registration failed',
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Register error:', error);
+      clientLogger.error('[CustomerAuth] Register error:', { detail: error });
       return {
         success: false,
         error: 'Failed to register. Please try again.',
@@ -226,7 +227,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         error: result.data?.error || getErrorMessage(result.error) || 'Login failed',
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Login error:', error);
+      clientLogger.error('[CustomerAuth] Login error:', { detail: error });
       return {
         success: false,
         error: 'Failed to log in. Please try again.',
@@ -270,7 +271,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         error: result.data?.error || getErrorMessage(result.error) || 'OAuth login failed',
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] OAuth error:', error);
+      clientLogger.error('[CustomerAuth] OAuth error:', { detail: error });
       return {
         success: false,
         error: 'Failed to authenticate with social account.',
@@ -292,7 +293,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         'customer-auth-logout'
       );
     } catch (error) {
-      console.warn('[CustomerAuth] Logout API error:', error);
+      clientLogger.warn('[CustomerAuth] Logout API error:', { detail: error });
     }
 
     // Clear local state, token, and customer context
@@ -331,7 +332,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         error: result.data?.error || getErrorMessage(result.error) || 'Failed to update profile',
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Update profile error:', error);
+      clientLogger.error('[CustomerAuth] Update profile error:', { detail: error });
       return {
         success: false,
         error: 'Failed to update profile. Please try again.',
@@ -359,7 +360,7 @@ class CustomerAuthService extends CustomerApiSingleton {
 
       return result.data || { success: false, error: 'Failed to change password' };
     } catch (error: any) {
-      console.error('[CustomerAuth] Change password error:', error);
+      clientLogger.error('[CustomerAuth] Change password error:', { detail: error });
       return {
         success: false,
         error: 'Failed to change password. Please try again.',
@@ -383,7 +384,7 @@ class CustomerAuthService extends CustomerApiSingleton {
 
       return { success: result.success };
     } catch (error: any) {
-      console.error('[CustomerAuth] Request reset error:', error);
+      clientLogger.error('[CustomerAuth] Request reset error:', { detail: error });
       return { success: false, error: 'Failed to request reset.' };
     }
   }
@@ -415,7 +416,7 @@ class CustomerAuthService extends CustomerApiSingleton {
         error: result.data?.error || getErrorMessage(result.error) || 'Password reset failed',
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Reset password error:', error);
+      clientLogger.error('[CustomerAuth] Reset password error:', { detail: error });
       return {
         success: false,
         error: 'Failed to reset password.',
@@ -439,7 +440,7 @@ class CustomerAuthService extends CustomerApiSingleton {
 
       return result.data || { success: false, error: 'Verification failed' };
     } catch (error: any) {
-      console.error('[CustomerAuth] Verify email error:', error);
+      clientLogger.error('[CustomerAuth] Verify email error:', { detail: error });
       return { success: false, error: 'Failed to verify email.' };
     }
   }

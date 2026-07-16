@@ -11,6 +11,7 @@ import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { unifiedCapabilityService } from './UnifiedCapabilityService';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PaymentGateway {
   id: string;
@@ -96,7 +97,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getPaymentGateways: tenantId is required');
+        clientLogger.error('[TenantInfoService] getPaymentGateways: tenantId is required');
         return [];
       }
 
@@ -112,13 +113,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get payment gateways:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get payment gateways:', { detail: result.error });
         return [];
       }
 
       return Array.isArray(result.data) ? result.data : [];
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get payment gateways:', error);
+      clientLogger.error('[TenantInfoService] Failed to get payment gateways:', { detail: error });
       return [];
     }
   }
@@ -139,7 +140,7 @@ class TenantInfoService extends TenantApiSingleton {
   }> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getPaymentGatewaysWithStripeConnect: tenantId is required');
+        clientLogger.error('[TenantInfoService] getPaymentGatewaysWithStripeConnect: tenantId is required');
         return { gateways: [], stripeConnect: null };
       }
 
@@ -155,7 +156,7 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get payment gateways:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get payment gateways:', { detail: result.error });
         return { gateways: [], stripeConnect: null };
       }
 
@@ -164,7 +165,7 @@ class TenantInfoService extends TenantApiSingleton {
         stripeConnect: result.data?.stripeConnect || null,
       };
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get payment gateways:', error);
+      clientLogger.error('[TenantInfoService] Failed to get payment gateways:', { detail: error });
       return { gateways: [], stripeConnect: null };
     }
   }
@@ -180,7 +181,7 @@ class TenantInfoService extends TenantApiSingleton {
   }> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] startStripeConnectOnboarding: tenantId is required');
+        clientLogger.error('[TenantInfoService] startStripeConnectOnboarding: tenantId is required');
         return { success: false, error: 'tenantId is required' };
       }
 
@@ -199,7 +200,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       console.log(`[TenantInfoService] Start Stripe Connect onboarding result for tenant ${tenantId}:`, result);
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', { detail: result.error });
         const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to start onboarding';
         return { success: false, error: errorMessage };
       }
@@ -209,7 +210,7 @@ class TenantInfoService extends TenantApiSingleton {
         onboardingUrl: result.data?.onboarding_url,
       };
     } catch (error) {
-      console.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', error);
+      clientLogger.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', { detail: error });
       const errorMessage = error instanceof Error ? error.message : 'Failed to start onboarding';
       return { success: false, error: errorMessage };
     }
@@ -225,7 +226,7 @@ class TenantInfoService extends TenantApiSingleton {
   }> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] refreshStripeConnectStatus: tenantId is required');
+        clientLogger.error('[TenantInfoService] refreshStripeConnectStatus: tenantId is required');
         return { success: false, error: 'tenantId is required' };
       }
 
@@ -244,14 +245,14 @@ class TenantInfoService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to refresh Stripe Connect status:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to refresh Stripe Connect status:', { detail: result.error });
         const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to refresh status';
         return { success: false, error: errorMessage };
       }
 
       return { success: true };
     } catch (error) {
-      console.error('[TenantInfoService] Failed to refresh Stripe Connect status:', error);
+      clientLogger.error('[TenantInfoService] Failed to refresh Stripe Connect status:', { detail: error });
       const errorMessage = error instanceof Error ? error.message : 'Failed to refresh status';
       return { success: false, error: errorMessage };
     }
@@ -264,7 +265,7 @@ class TenantInfoService extends TenantApiSingleton {
   async unlinkGBPLocation(tenantId: string): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] unlinkGBPLocation: tenantId is required');
+        clientLogger.error('[TenantInfoService] unlinkGBPLocation: tenantId is required');
         return null;
       }
 
@@ -277,13 +278,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gbp-unlink-${tenantId}`
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to unlink GBP location:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to unlink GBP location:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to unlink GBP location:', error);
+      clientLogger.error('[TenantInfoService] Failed to unlink GBP location:', { detail: error });
       return null;
     }
   }
@@ -295,7 +296,7 @@ class TenantInfoService extends TenantApiSingleton {
   async linkGBPLocation(tenantId: string, locationId: string, locationName: string, fullAddress: string): Promise<any> {
     try {
       if (!tenantId || !locationId) {
-        console.error('[TenantInfoService] linkGBPLocation: tenantId and locationId are required');
+        clientLogger.error('[TenantInfoService] linkGBPLocation: tenantId and locationId are required');
         return null;
       }
 
@@ -312,13 +313,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gbp-link-${tenantId}-${locationId}`
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to link GBP location:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to link GBP location:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to link GBP location:', error);
+      clientLogger.error('[TenantInfoService] Failed to link GBP location:', { detail: error });
       return null;
     }
   }
@@ -330,7 +331,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getGBPLocations(tenantId: string): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getGBPLocations: tenantId is required');
+        clientLogger.error('[TenantInfoService] getGBPLocations: tenantId is required');
         return null;
       }
 
@@ -341,13 +342,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get GBP locations:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get GBP locations:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get GBP locations:', error);
+      clientLogger.error('[TenantInfoService] Failed to get GBP locations:', { detail: error });
       return null;
     }
   }
@@ -359,7 +360,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getGBPLinkedLocation(tenantId: string): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getGBPLinkedLocation: tenantId is required');
+        clientLogger.error('[TenantInfoService] getGBPLinkedLocation: tenantId is required');
         return null;
       }
 
@@ -370,13 +371,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get GBP linked location:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get GBP linked location:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get GBP linked location:', error);
+      clientLogger.error('[TenantInfoService] Failed to get GBP linked location:', { detail: error });
       return null;
     }
   }
@@ -388,7 +389,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getGBPConnectionStatus(tenantId: string): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getGBPConnectionStatus: tenantId is required');
+        clientLogger.error('[TenantInfoService] getGBPConnectionStatus: tenantId is required');
         return null;
       }
 
@@ -399,13 +400,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get GBP connection status:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get GBP connection status:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get GBP connection status:', error);
+      clientLogger.error('[TenantInfoService] Failed to get GBP connection status:', { detail: error });
       return null;
     }
   }
@@ -419,7 +420,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getTenantInfo(tenantId: string, ssrAuth?: { auth0Email?: string; auth0Id?: string }): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getTenantInfo: tenantId is required');
+        clientLogger.error('[TenantInfoService] getTenantInfo: tenantId is required');
         return null;
       }
 
@@ -449,7 +450,7 @@ class TenantInfoService extends TenantApiSingleton {
       const responseData = result.data;
       return responseData?.data || responseData || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get tenant info:', error);
+      clientLogger.error('[TenantInfoService] Failed to get tenant info:', { detail: error });
       return null;
     }
   }
@@ -462,7 +463,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getBusinessHours(tenantId: string): Promise<BusinessHours | null> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getBusinessHours: tenantId is required');
+        clientLogger.error('[TenantInfoService] getBusinessHours: tenantId is required');
         return null;
       }
 
@@ -489,7 +490,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get business hours:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get business hours:', { detail: result.error });
         return null;
       }
 
@@ -523,7 +524,7 @@ class TenantInfoService extends TenantApiSingleton {
 
       return null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get business hours:', error);
+      clientLogger.error('[TenantInfoService] Failed to get business hours:', { detail: error });
       return null;
     }
   }
@@ -535,7 +536,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getTenantTier(tenantId: string): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getTenantTier: tenantId is required');
+        clientLogger.error('[TenantInfoService] getTenantTier: tenantId is required');
         return null;
       }
 
@@ -551,13 +552,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get tenant tier:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get tenant tier:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get tenant tier:', error);
+      clientLogger.error('[TenantInfoService] Failed to get tenant tier:', { detail: error });
       return null;
     }
   }
@@ -574,7 +575,7 @@ class TenantInfoService extends TenantApiSingleton {
   }> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getCompleteTenantInfo: tenantId is required');
+        clientLogger.error('[TenantInfoService] getCompleteTenantInfo: tenantId is required');
         return {
           tenant: null,
           businessProfile: null,
@@ -596,21 +597,21 @@ class TenantInfoService extends TenantApiSingleton {
         businessProfile = orgResult?.success ? orgResult.data : null;
       } catch (error) {
         // Organization failure doesn't break the entire operation
-        console.warn('[TenantInfoService] Organization data unavailable:', error);
+        clientLogger.warn('[TenantInfoService] Organization data unavailable:', { detail: error });
       }
 
       try {
         businessHours = await this.getBusinessHours(tenantId);
       } catch (error) {
         // Business hours failure doesn't break the entire operation
-        console.warn('[TenantInfoService] Business hours unavailable:', error);
+        clientLogger.warn('[TenantInfoService] Business hours unavailable:', { detail: error });
       }
 
       try {
         paymentGateways = await this.getPaymentGateways(tenantId);
       } catch (error) {
         // Payment gateways failure doesn't break the entire operation
-        console.warn('[TenantInfoService] Payment gateways unavailable:', error);
+        clientLogger.warn('[TenantInfoService] Payment gateways unavailable:', { detail: error });
       }
 
       return {
@@ -620,7 +621,7 @@ class TenantInfoService extends TenantApiSingleton {
         paymentGateways: paymentGateways
       };
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get complete tenant info:', error);
+      clientLogger.error('[TenantInfoService] Failed to get complete tenant info:', { detail: error });
       return {
         tenant: null,
         businessProfile: null,
@@ -637,7 +638,7 @@ class TenantInfoService extends TenantApiSingleton {
   async getOAuthStatus(tenantId: string, provider: string): Promise<any> {
     try {
       if (!tenantId || !provider) {
-        console.error('[TenantInfoService] getOAuthStatus: tenantId and provider are required');
+        clientLogger.error('[TenantInfoService] getOAuthStatus: tenantId and provider are required');
         return null;
       }
 
@@ -653,13 +654,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get OAuth status:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get OAuth status:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get OAuth status:', error);
+      clientLogger.error('[TenantInfoService] Failed to get OAuth status:', { detail: error });
       return null;
     }
   }
@@ -671,7 +672,7 @@ class TenantInfoService extends TenantApiSingleton {
   async updatePaymentGatewayStatus(tenantId: string, gatewayId: string, isActive: boolean): Promise<any> {
     try {
       if (!tenantId || !gatewayId) {
-        console.error('[TenantInfoService] updatePaymentGatewayStatus: tenantId and gatewayId are required');
+        clientLogger.error('[TenantInfoService] updatePaymentGatewayStatus: tenantId and gatewayId are required');
         return null;
       }
 
@@ -684,13 +685,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gateway-update-${tenantId}-${gatewayId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to update payment gateway status:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to update payment gateway status:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update payment gateway status:', error);
+      clientLogger.error('[TenantInfoService] Failed to update payment gateway status:', { detail: error });
       return null;
     }
   }
@@ -702,7 +703,7 @@ class TenantInfoService extends TenantApiSingleton {
   async setDefaultPaymentGateway(tenantId: string, gatewayId: string): Promise<any> {
     try {
       if (!tenantId || !gatewayId) {
-        console.error('[TenantInfoService] setDefaultPaymentGateway: tenantId and gatewayId are required');
+        clientLogger.error('[TenantInfoService] setDefaultPaymentGateway: tenantId and gatewayId are required');
         return null;
       }
 
@@ -715,13 +716,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gateway-set-default-${tenantId}-${gatewayId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to set default payment gateway:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to set default payment gateway:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to set default payment gateway:', error);
+      clientLogger.error('[TenantInfoService] Failed to set default payment gateway:', { detail: error });
       return null;
     }
   }
@@ -733,7 +734,7 @@ class TenantInfoService extends TenantApiSingleton {
   async deletePaymentGateway(tenantId: string, gatewayId: string): Promise<any> {
     try {
       if (!tenantId || !gatewayId) {
-        console.error('[TenantInfoService] deletePaymentGateway: tenantId and gatewayId are required');
+        clientLogger.error('[TenantInfoService] deletePaymentGateway: tenantId and gatewayId are required');
         return null;
       }
 
@@ -745,13 +746,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gateway-delete-${tenantId}-${gatewayId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to delete payment gateway:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to delete payment gateway:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to delete payment gateway:', error);
+      clientLogger.error('[TenantInfoService] Failed to delete payment gateway:', { detail: error });
       return null;
     }
   }
@@ -771,7 +772,7 @@ class TenantInfoService extends TenantApiSingleton {
   }): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] savePayPalGateway: tenantId is required');
+        clientLogger.error('[TenantInfoService] savePayPalGateway: tenantId is required');
         return null;
       }
 
@@ -784,13 +785,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gateway-save-paypal-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to save PayPal gateway:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to save PayPal gateway:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to save PayPal gateway:', error);
+      clientLogger.error('[TenantInfoService] Failed to save PayPal gateway:', { detail: error });
       return null;
     }
   }
@@ -811,7 +812,7 @@ class TenantInfoService extends TenantApiSingleton {
   }): Promise<any> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] saveSquareGateway: tenantId is required');
+        clientLogger.error('[TenantInfoService] saveSquareGateway: tenantId is required');
         return null;
       }
 
@@ -824,13 +825,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gateway-save-square-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to save Square gateway:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to save Square gateway:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to save Square gateway:', error);
+      clientLogger.error('[TenantInfoService] Failed to save Square gateway:', { detail: error });
       return null;
     }
   }
@@ -857,7 +858,7 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get users:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get users:', { detail: result.error });
         return [];
       }
 
@@ -872,7 +873,7 @@ class TenantInfoService extends TenantApiSingleton {
  
       return Array.isArray(users) ? users : [];
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get users:', error);
+      clientLogger.error('[TenantInfoService] Failed to get users:', { detail: error });
       return [];
     }
   }
@@ -899,13 +900,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-invite-user-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to invite user:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to invite user:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to invite user:', error);
+      clientLogger.error('[TenantInfoService] Failed to invite user:', { detail: error });
       return null;
     }
   }
@@ -928,13 +929,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-delete-user-${tenantId}-${userId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to delete user:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to delete user:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to delete user:', error);
+      clientLogger.error('[TenantInfoService] Failed to delete user:', { detail: error });
       return null;
     }
   }
@@ -958,13 +959,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-update-role-${tenantId}-${userId}`
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to update user role:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to update user role:', { detail: result.error });
         throw result.error;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update user role:', error);
+      clientLogger.error('[TenantInfoService] Failed to update user role:', { detail: error });
       throw error;
     }
   }
@@ -991,14 +992,14 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get invitations:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get invitations:', { detail: result.error });
         return [];
       }
 
       const invitations = result.data?.invitations || [];
       return Array.isArray(invitations) ? invitations : [];
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get invitations:', error);
+      clientLogger.error('[TenantInfoService] Failed to get invitations:', { detail: error });
       return [];
     }
   }
@@ -1019,13 +1020,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-cancel-invite-${tenantId}-${invitationId}`
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to cancel invitation:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to cancel invitation:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to cancel invitation:', error);
+      clientLogger.error('[TenantInfoService] Failed to cancel invitation:', { detail: error });
       return null;
     }
   }
@@ -1052,13 +1053,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get OAuth authorization URL:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get OAuth authorization URL:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get OAuth authorization URL:', error);
+      clientLogger.error('[TenantInfoService] Failed to get OAuth authorization URL:', { detail: error });
       return null;
     }
   }
@@ -1085,13 +1086,13 @@ class TenantInfoService extends TenantApiSingleton {
         `oauth-disconnect-${gatewayType}-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to disconnect OAuth:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to disconnect OAuth:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to disconnect OAuth:', error);
+      clientLogger.error('[TenantInfoService] Failed to disconnect OAuth:', { detail: error });
       return null;
     }
   }
@@ -1130,7 +1131,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to register Square test token:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to register Square test token:', { detail: result.error });
         const errorMsg = typeof result.error === 'string' ? result.error : 
           (result.error as any)?.message || 'Failed to register test token';
         return { success: false, error: errorMsg };
@@ -1138,7 +1139,7 @@ class TenantInfoService extends TenantApiSingleton {
 
       return { success: true };
     } catch (error) {
-      console.error('[TenantInfoService] Failed to register Square test token:', error);
+      clientLogger.error('[TenantInfoService] Failed to register Square test token:', { detail: error });
       const errorMsg = error instanceof Error ? error.message : 'Failed to register test token';
       return { success: false, error: errorMsg };
     }
@@ -1162,7 +1163,7 @@ class TenantInfoService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get tenant subdomain:', error);
+      clientLogger.error('[TenantInfoService] Failed to get tenant subdomain:', { detail: error });
       throw error;
     }
   }
@@ -1183,13 +1184,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get user subdomains:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get user subdomains:', { detail: result.error });
         throw new Error(getErrorMessage(result.error) || 'Failed to get user subdomains');
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get user subdomains:', error);
+      clientLogger.error('[TenantInfoService] Failed to get user subdomains:', { detail: error });
       throw error;
     }
   }
@@ -1210,13 +1211,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to check subdomain availability:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to check subdomain availability:', { detail: result.error });
         throw new Error(getErrorMessage(result.error) || 'Failed to check subdomain availability');
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to check subdomain availability:', error);
+      clientLogger.error('[TenantInfoService] Failed to check subdomain availability:', { detail: error });
       throw error;
     }
   }
@@ -1239,7 +1240,7 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-update-subdomain-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to update tenant subdomain:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to update tenant subdomain:', { detail: result.error });
         const error = new Error(getErrorMessage(result.error) || 'Failed to update tenant subdomain');
         (error as any).cause = result.error;
         throw error;
@@ -1256,7 +1257,7 @@ class TenantInfoService extends TenantApiSingleton {
       
       return result.data!;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update tenant subdomain:', error);
+      clientLogger.error('[TenantInfoService] Failed to update tenant subdomain:', { detail: error });
       throw error;
     }
   }
@@ -1276,7 +1277,7 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-delete-subdomain-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to delete tenant subdomain:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to delete tenant subdomain:', { detail: result.error });
         const error = new Error(getErrorMessage(result.error) || 'Failed to delete tenant subdomain');
         (error as any).cause = result.error;
         throw error;
@@ -1293,7 +1294,7 @@ class TenantInfoService extends TenantApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to delete tenant subdomain:', error);
+      clientLogger.error('[TenantInfoService] Failed to delete tenant subdomain:', { detail: error });
       throw error;
     }
   }
@@ -1313,7 +1314,7 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-delete-subdomain-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to delete subdomain:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to delete subdomain:', { detail: result.error });
         const error = new Error(getErrorMessage(result.error) || 'Failed to delete subdomain');
         (error as any).cause = result.error;
         throw error;
@@ -1321,7 +1322,7 @@ class TenantInfoService extends TenantApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to delete subdomain:', error);
+      clientLogger.error('[TenantInfoService] Failed to delete subdomain:', { detail: error });
       throw error;
     }
   }
@@ -1351,14 +1352,14 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get tenant data with cache busting:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get tenant data with cache busting:', { detail: result.error });
         throw new Error(getErrorMessage(result.error) || 'Failed to get tenant data with cache busting');
       }
 
       const responseData = result.data;
       return responseData?.data || responseData;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get tenant data with cache busting:', error);
+      clientLogger.error('[TenantInfoService] Failed to get tenant data with cache busting:', { detail: error });
       throw error;
     }
   }
@@ -1381,7 +1382,7 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-status-preview-${tenantId}-${status || 'default'}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get tenant status preview:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get tenant status preview:', { detail: result.error });
         const error = new Error(getErrorMessage(result.error) || 'Failed to get tenant status preview');
         (error as any).cause = result.error;
         throw error;
@@ -1389,7 +1390,7 @@ class TenantInfoService extends TenantApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get tenant status preview:', error);
+      clientLogger.error('[TenantInfoService] Failed to get tenant status preview:', { detail: error });
       throw error;
     }
   }
@@ -1420,7 +1421,7 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to update tenant status:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to update tenant status:', { detail: result.error });
         const error = new Error(getErrorMessage(result.error) || 'Failed to update tenant status');
         (error as any).cause = result.error;
         throw error;
@@ -1431,7 +1432,7 @@ class TenantInfoService extends TenantApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update tenant status:', error);
+      clientLogger.error('[TenantInfoService] Failed to update tenant status:', { detail: error });
       throw error;
     }
   }
@@ -1478,7 +1479,7 @@ class TenantInfoService extends TenantApiSingleton {
       console.log(`[Frontend Cache] Invalidated keys for slug: ${slug || 'no-slug'}`);
       
     } catch (error) {
-      console.error(`[Frontend Cache] Error invalidating caches for tenant ${tenantId}:`, error);
+      clientLogger.error(`[Frontend Cache] Error invalidating caches for tenant ${tenantId}:`, { detail: error });
       // Don't throw - cache invalidation failure shouldn't break the status update
     }
   }
@@ -1504,13 +1505,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get Google Business Profile status:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get Google Business Profile status:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get Google Business Profile status:', error);
+      clientLogger.error('[TenantInfoService] Failed to get Google Business Profile status:', { detail: error });
       return null;
     }
   }
@@ -1531,13 +1532,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get Google Business Profile linked location:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get Google Business Profile linked location:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get Google Business Profile linked location:', error);
+      clientLogger.error('[TenantInfoService] Failed to get Google Business Profile linked location:', { detail: error });
       return null;
     }
   }
@@ -1558,13 +1559,13 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get Google Business Profile locations:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get Google Business Profile locations:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get Google Business Profile locations:', error);
+      clientLogger.error('[TenantInfoService] Failed to get Google Business Profile locations:', { detail: error });
       return null;
     }
   }
@@ -1587,13 +1588,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gbp-link-location-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to link Google Business Profile location:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to link Google Business Profile location:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to link Google Business Profile location:', error);
+      clientLogger.error('[TenantInfoService] Failed to link Google Business Profile location:', { detail: error });
       return null;
     }
   }
@@ -1616,13 +1617,13 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gbp-unlink-location-${tenantId}`
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to unlink Google Business Profile location:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to unlink Google Business Profile location:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to unlink Google Business Profile location:', error);
+      clientLogger.error('[TenantInfoService] Failed to unlink Google Business Profile location:', { detail: error });
       return null;
     }
   }
@@ -1644,13 +1645,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get user preferences:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get user preferences:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get user preferences:', error);
+      clientLogger.error('[TenantInfoService] Failed to get user preferences:', { detail: error });
       return null;
     }
   }
@@ -1735,7 +1736,7 @@ class TenantInfoService extends TenantApiSingleton {
   } | null> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] getPaymentGatewaySettings: tenantId is required');
+        clientLogger.error('[TenantInfoService] getPaymentGatewaySettings: tenantId is required');
         return null;
       }
 
@@ -1760,13 +1761,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get payment gateway settings:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get payment gateway settings:', { detail: result.error });
         return null;
       }
 
       return result.data?.settings ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get payment gateway settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get payment gateway settings:', { detail: error });
       return null;
     }
   }
@@ -1786,7 +1787,7 @@ class TenantInfoService extends TenantApiSingleton {
   } | null> {
     try {
       if (!tenantId) {
-        console.error('[TenantInfoService] updatePaymentGatewaySettings: tenantId is required');
+        clientLogger.error('[TenantInfoService] updatePaymentGatewaySettings: tenantId is required');
         return null;
       }
 
@@ -1808,14 +1809,14 @@ class TenantInfoService extends TenantApiSingleton {
         `tenant-gateway-settings-update-${tenantId}`
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to update payment gateway settings:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to update payment gateway settings:', { detail: result.error });
         return null;
       }
 
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update payment gateway settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update payment gateway settings:', { detail: error });
       return null;
     }
   }
@@ -1852,7 +1853,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get product options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get product options settings:', { detail: error });
       return null;
     }
   }
@@ -1886,7 +1887,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get featured options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get featured options settings:', { detail: error });
       return null;
     }
   }
@@ -1915,7 +1916,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get integration options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get integration options settings:', { detail: error });
       return null;
     }
   }
@@ -1948,7 +1949,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get quickstart options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get quickstart options settings:', { detail: error });
       return null;
     }
   }
@@ -1997,7 +1998,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront options settings:', { detail: error });
       return null;
     }
   }
@@ -2021,7 +2022,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update storefront options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update storefront options settings:', { detail: error });
       return null;
     }
   }
@@ -2062,7 +2063,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront QR settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront QR settings:', { detail: error });
       return null;
     }
   }
@@ -2086,7 +2087,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update storefront QR settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update storefront QR settings:', { detail: error });
       return null;
     }
   }
@@ -2114,7 +2115,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront gallery settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront gallery settings:', { detail: error });
       return null;
     }
   }
@@ -2138,7 +2139,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update storefront gallery settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update storefront gallery settings:', { detail: error });
       return null;
     }
   }
@@ -2164,7 +2165,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront hours settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront hours settings:', { detail: error });
       return null;
     }
   }
@@ -2188,7 +2189,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update storefront hours settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update storefront hours settings:', { detail: error });
       return null;
     }
   }
@@ -2212,7 +2213,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront layouts settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront layouts settings:', { detail: error });
       return null;
     }
   }
@@ -2236,7 +2237,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update storefront layouts settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update storefront layouts settings:', { detail: error });
       return null;
     }
   }
@@ -2262,7 +2263,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront maps settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront maps settings:', { detail: error });
       return null;
     }
   }
@@ -2286,7 +2287,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update storefront maps settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update storefront maps settings:', { detail: error });
       return null;
     }
   }
@@ -2310,7 +2311,7 @@ class TenantInfoService extends TenantApiSingleton {
       await unifiedCapabilityService.invalidateTenantCapabilities(tenantId);
       return result.data?.settings as any ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to update quickstart options settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to update quickstart options settings:', { detail: error });
       return null;
     }
   }
@@ -2348,7 +2349,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get quickstart eligibility:', error);
+      clientLogger.error('[TenantInfoService] Failed to get quickstart eligibility:', { detail: error });
       return null;
     }
   }
@@ -2381,7 +2382,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to generate quickstart products:', error);
+      clientLogger.error('[TenantInfoService] Failed to generate quickstart products:', { detail: error });
       return null;
     }
   }
@@ -2413,7 +2414,7 @@ class TenantInfoService extends TenantApiSingleton {
         barcode_camera_enabled: s.barcode_camera_enabled !== false,
       } : null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get barcode scan settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get barcode scan settings:', { detail: error });
       return null;
     }
   }
@@ -2437,7 +2438,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get feed validation:', error);
+      clientLogger.error('[TenantInfoService] Failed to get feed validation:', { detail: error });
       return null;
     }
   }
@@ -2460,7 +2461,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get category coverage:', error);
+      clientLogger.error('[TenantInfoService] Failed to get category coverage:', { detail: error });
       return null;
     }
   }
@@ -2484,7 +2485,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get feed setup status:', error);
+      clientLogger.error('[TenantInfoService] Failed to get feed setup status:', { detail: error });
       return null;
     }
   }
@@ -2504,7 +2505,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to run feed precheck:', error);
+      clientLogger.error('[TenantInfoService] Failed to run feed precheck:', { detail: error });
       return null;
     }
   }
@@ -2530,7 +2531,7 @@ class TenantInfoService extends TenantApiSingleton {
       }
       return result.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to create feed job:', error);
+      clientLogger.error('[TenantInfoService] Failed to create feed job:', { detail: error });
       throw error;
     }
   }
@@ -2558,7 +2559,7 @@ class TenantInfoService extends TenantApiSingleton {
         selected_storefront_type: s.selected_storefront_type || 'online',
       } : null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get storefront type settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get storefront type settings:', { detail: error });
       return null;
     }
   }
@@ -2584,7 +2585,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       return Array.isArray(result.data) ? result.data : null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get tiers with capability:', error);
+      clientLogger.error('[TenantInfoService] Failed to get tiers with capability:', { detail: error });
       return null;
     }
   }
@@ -2609,7 +2610,7 @@ class TenantInfoService extends TenantApiSingleton {
       const s = result.data?.settings;
       return s ? { deposit_enabled: !!s.deposit_enabled, full_payment_enabled: !!s.full_payment_enabled } : null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get commerce settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get commerce settings:', { detail: error });
       return null;
     }
   }
@@ -2635,7 +2636,7 @@ class TenantInfoService extends TenantApiSingleton {
       const s = result.data?.settings;
       return s ? { pickup_enabled: !!s.pickup_enabled, delivery_enabled: !!s.delivery_enabled, shipping_enabled: !!s.shipping_enabled } : null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get fulfillment settings:', error);
+      clientLogger.error('[TenantInfoService] Failed to get fulfillment settings:', { detail: error });
       return null;
     }
   }
@@ -2653,7 +2654,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.history ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get status history:', error);
+      clientLogger.error('[TenantInfoService] Failed to get status history:', { detail: error });
       return null;
     }
   }
@@ -2671,7 +2672,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.items ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get popular GBP categories:', error);
+      clientLogger.error('[TenantInfoService] Failed to get popular GBP categories:', { detail: error });
       return null;
     }
   }
@@ -2689,7 +2690,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.items ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to search GBP categories:', error);
+      clientLogger.error('[TenantInfoService] Failed to search GBP categories:', { detail: error });
       return null;
     }
   }
@@ -2705,14 +2706,14 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success) {
         if (result.status === 404) {
-          console.warn('[TenantInfoService] Enrichment API not available');
+          clientLogger.warn('[TenantInfoService] Enrichment API not available');
           return null;
         }
         return null;
       }
       return result.data?.products ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get products needing enrichment:', error);
+      clientLogger.error('[TenantInfoService] Failed to get products needing enrichment:', { detail: error });
       return null;
     }
   }
@@ -2730,7 +2731,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get promotion status:', error);
+      clientLogger.error('[TenantInfoService] Failed to get promotion status:', { detail: error });
       return null;
     }
   }
@@ -2749,7 +2750,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to enable promotion:', error);
+      clientLogger.error('[TenantInfoService] Failed to enable promotion:', { detail: error });
       return null;
     }
   }
@@ -2765,7 +2766,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to disable promotion:', error);
+      clientLogger.error('[TenantInfoService] Failed to disable promotion:', { detail: error });
       return null;
     }
   }
@@ -2783,7 +2784,7 @@ class TenantInfoService extends TenantApiSingleton {
       if (!result.success) return null;
       return result.data?.items ?? result.data?.data ?? null;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get items:', error);
+      clientLogger.error('[TenantInfoService] Failed to get items:', { detail: error });
       return null;
     }
   }
@@ -2802,13 +2803,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get organizations:', result.error);
+        clientLogger.error('[TenantInfoService] Failed to get organizations:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get organizations:', error);
+      clientLogger.error('[TenantInfoService] Failed to get organizations:', { detail: error });
       return null;
     }
   }

@@ -36,6 +36,7 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { manualBillingService, type ManualInvoice } from '@/services/ManualBillingService';
 import { useBillingData } from '../../hooks/useBillingData';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function ManualInvoicesTab() {
   const { tenants, loading: tenantsLoading } = useBillingData();
@@ -107,7 +108,7 @@ export default function ManualInvoicesTab() {
       setInvoices(invoices);
       setTotalPages(Math.ceil(invoices.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching invoices:', error);
+      clientLogger.error('Error fetching invoices:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to fetch invoices',
@@ -146,7 +147,7 @@ export default function ManualInvoicesTab() {
         });
       }
     } catch (error) {
-      console.error('Error creating invoice:', error);
+      clientLogger.error('Error creating invoice:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to create invoice',
@@ -187,7 +188,7 @@ export default function ManualInvoicesTab() {
         });
       }
     } catch (error) {
-      console.error('Error marking invoice as paid:', error);
+      clientLogger.error('Error marking invoice as paid:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to mark invoice as paid',
@@ -261,7 +262,7 @@ export default function ManualInvoicesTab() {
         });
       }
     } catch (error) {
-      console.error('Error editing invoice:', error);
+      clientLogger.error('Error editing invoice:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to edit invoice',
@@ -300,7 +301,7 @@ export default function ManualInvoicesTab() {
         });
       }
     } catch (error) {
-      console.error('Error cancelling invoice:', error);
+      clientLogger.error('Error cancelling invoice:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to cancel invoice',

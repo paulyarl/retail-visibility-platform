@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Package, Calendar, Download, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DownloadItem {
   productName: string;
@@ -74,7 +75,7 @@ export default function DigitalDownloadsCard({ orderId, downloads: propDownloads
           setDownloads(data?.downloads || []);
         }
       } catch (error) {
-        console.error('[DigitalDownloadsCard] Error fetching downloads:', error);
+        clientLogger.error('[DigitalDownloadsCard] Error fetching downloads:', { detail: error });
         if (!cancelled) {
           setDownloads([]);
         }

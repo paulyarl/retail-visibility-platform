@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Input, Alert, Button } from '@/components/ui';
 import { BusinessProfile, geocodeAddress } from '@/lib/validation/businessProfile';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdditionalSettingsStepProps {
   tenantId: string;
@@ -57,7 +58,7 @@ export default function AdditionalSettingsStep({
         onDataChange(updated);
       }
     } catch (err) {
-      console.error('Geocoding failed:', err);
+      clientLogger.error('Geocoding failed:', { detail: err });
     } finally {
       setGeocoding(false);
     }

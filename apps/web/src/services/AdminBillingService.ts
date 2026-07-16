@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface FinancialMetrics {
   totalMRR: number;
@@ -200,7 +201,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to get revenue overview:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to get revenue overview:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch revenue overview');
     }
 
@@ -219,7 +220,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to get revenue trends:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to get revenue trends:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch revenue trends');
     }
 
@@ -238,7 +239,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to get tenant financial metrics:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to get tenant financial metrics:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch tenant financial metrics');
     }
 
@@ -263,7 +264,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to get tenant payment history:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to get tenant payment history:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch tenant payment history');
     }
 
@@ -304,7 +305,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to get tenant account health:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to get tenant account health:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch tenant account health');
     }
 
@@ -329,7 +330,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to send payment reminder:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to send payment reminder:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to send payment reminder');
     }
 
@@ -355,7 +356,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to apply manual credit:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to apply manual credit:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to apply manual credit');
     }
 
@@ -381,7 +382,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to update subscription status:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to update subscription status:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update subscription status');
     }
 
@@ -423,7 +424,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to get platform invoices:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to get platform invoices:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch platform invoices');
     }
 
@@ -469,7 +470,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to generate invoice PDF:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to generate invoice PDF:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate invoice PDF');
     }
 
@@ -494,7 +495,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to send invoice reminder:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to send invoice reminder:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to send invoice reminder');
     }
 
@@ -520,7 +521,7 @@ export class AdminBillingService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminBillingService] Failed to waive invoice fees:', result.error);
+      clientLogger.error('[AdminBillingService] Failed to waive invoice fees:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to waive invoice fees');
     }
 

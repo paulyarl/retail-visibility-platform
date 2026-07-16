@@ -16,6 +16,7 @@ import QuickStockEditor from '@/components/shared/QuickStockEditor';
 import { StockUpdateService } from '@/services/stockUpdateService';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -357,11 +358,11 @@ export default function ProductFeaturingPage() {
           singleton.forceRefresh();
         },
         onError: (error: Error) => {
-          console.error('[ProductFeaturingPage] Stock update failed:', error);
+          clientLogger.error('[ProductFeaturingPage] Stock update failed:', { detail: error });
         }
       });
     } catch (error) {
-      console.error('[ProductFeaturingPage] Stock update error:', error);
+      clientLogger.error('[ProductFeaturingPage] Stock update error:', { detail: error });
       throw error;
     }
   };
@@ -400,7 +401,7 @@ export default function ProductFeaturingPage() {
         setTenant(tenantData);
       }
     } catch (error) {
-      console.error('Error fetching tenant:', error);
+      clientLogger.error('Error fetching tenant:', { detail: error });
     }
   };
 
@@ -430,7 +431,7 @@ export default function ProductFeaturingPage() {
   const handleUnfeature = async (product: FeaturedProduct) => {
     const productId = getProductInventoryId(product);
     if (!productId) {
-      console.error('Cannot unfeature - no inventory_item_id found:', product);
+      clientLogger.error('Cannot unfeature - no inventory_item_id found:', { detail: product });
       return;
     }
     await unfeatureProduct(productId);
@@ -439,7 +440,7 @@ export default function ProductFeaturingPage() {
   const handleStartEditExpiration = (product: FeaturedProduct) => {
     const productId = getProductInventoryId(product);
     if (!productId) {
-      console.error('Cannot edit expiration - no inventory_item_id found:', product);
+      clientLogger.error('Cannot edit expiration - no inventory_item_id found:', { detail: product });
       return;
     }
     setEditingExpiration(productId);
@@ -492,7 +493,7 @@ export default function ProductFeaturingPage() {
       //   });
         
     } catch (error) {
-      console.error('[ProductFeaturingPage] Error featuring product:', error);
+      clientLogger.error('[ProductFeaturingPage] Error featuring product:', { detail: error });
       throw error;
     }
   };
@@ -526,7 +527,7 @@ export default function ProductFeaturingPage() {
       // console.log('✅ Using inventory_item_id:', inventoryItemId);
       handleToggleActive(inventoryItemId, isActive);
     } else {
-      console.error('❌ No valid inventory_item_id found for product:', product);
+      clientLogger.error('❌ No valid inventory_item_id found for product:', { detail: product });
     }
   };
 

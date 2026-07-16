@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Modal, Input, Select } from '@/components/ui';
 import { botPlatformAdminService, type BotGuardrailRule } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
+import { clientLogger } from '@/lib/client-logger';
 
 const SEVERITY_COLORS: Record<string, any> = {
   low: 'default',
@@ -34,7 +35,7 @@ export default function BotGuardrailsPage() {
       const data = await botPlatformAdminService.listGuardrails();
       setRules(data);
     } catch (err) {
-      console.error('[Bot Guardrails] Load error:', err);
+      clientLogger.error('[Bot Guardrails] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -84,7 +85,7 @@ export default function BotGuardrailsPage() {
       setShowModal(false);
       await loadRules();
     } catch (err) {
-      console.error('[Bot Guardrails] Save error:', err);
+      clientLogger.error('[Bot Guardrails] Save error:', { detail: err });
     } finally {
       setSaving(false);
     }
@@ -96,7 +97,7 @@ export default function BotGuardrailsPage() {
       await botPlatformAdminService.deleteGuardrail(id);
       await loadRules();
     } catch (err) {
-      console.error('[Bot Guardrails] Delete error:', err);
+      clientLogger.error('[Bot Guardrails] Delete error:', { detail: err });
     }
   }
 

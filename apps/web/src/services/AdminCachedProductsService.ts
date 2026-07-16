@@ -7,6 +7,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CachedProduct {
   id: string;
@@ -126,7 +127,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminCachedProducts] Failed to get cached products:', result.error);
+        clientLogger.error('[AdminCachedProducts] Failed to get cached products:', { detail: result.error });
         throw new Error('Failed to fetch cached products');
       }
 
@@ -140,7 +141,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
         categories: []
       };
     } catch (error) {
-      console.error('[AdminCachedProducts] Failed to get cached products:', error);
+      clientLogger.error('[AdminCachedProducts] Failed to get cached products:', { detail: error });
       throw error;
     }
   }
@@ -151,7 +152,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
    */
   async deleteCachedProduct(id: string): Promise<boolean> {
     if (!id) {
-      console.error('[AdminCachedProducts] Product ID is required');
+      clientLogger.error('[AdminCachedProducts] Product ID is required');
       return false;
     }
 
@@ -166,7 +167,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminCachedProducts] Failed to delete cached product:', result.error);
+        clientLogger.error('[AdminCachedProducts] Failed to delete cached product:', { detail: result.error });
         return false;
       }
 
@@ -175,7 +176,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       
       return true;
     } catch (error) {
-      console.error('[AdminCachedProducts] Failed to delete cached product:', error);
+      clientLogger.error('[AdminCachedProducts] Failed to delete cached product:', { detail: error });
       return false;
     }
   }
@@ -186,7 +187,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
    */
   async bulkDeleteCachedProducts(ids: string[]): Promise<{ success: number; failed: string[] }> {
     if (!ids || ids.length === 0) {
-      console.error('[AdminCachedProducts] Product IDs are required');
+      clientLogger.error('[AdminCachedProducts] Product IDs are required');
       return { success: 0, failed: [] };
     }
 
@@ -202,7 +203,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminCachedProducts] Failed to bulk delete cached products:', result.error);
+        clientLogger.error('[AdminCachedProducts] Failed to bulk delete cached products:', { detail: result.error });
         return { success: 0, failed: ids };
       }
 
@@ -211,7 +212,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       
       return (result.data as { success: number; failed: string[] }) || { success: 0, failed: ids };
     } catch (error) {
-      console.error('[AdminCachedProducts] Failed to bulk delete cached products:', error);
+      clientLogger.error('[AdminCachedProducts] Failed to bulk delete cached products:', { detail: error });
       return { success: 0, failed: ids };
     }
   }
@@ -222,7 +223,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
    */
   async updateCachedProduct(id: string, formData: Partial<CachedProduct>): Promise<CachedProduct | null> {
     if (!id) {
-      console.error('[AdminCachedProducts] Product ID is required');
+      clientLogger.error('[AdminCachedProducts] Product ID is required');
       return null;
     }
 
@@ -238,7 +239,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminCachedProducts] Failed to update cached product:', result.error);
+        clientLogger.error('[AdminCachedProducts] Failed to update cached product:', { detail: result.error });
         return null;
       }
 
@@ -247,7 +248,7 @@ class AdminCachedProductsService extends AdminApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[AdminCachedProducts] Failed to update cached product:', error);
+      clientLogger.error('[AdminCachedProducts] Failed to update cached product:', { detail: error });
       return null;
     }
   }
@@ -269,13 +270,13 @@ class AdminCachedProductsService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminCachedProducts] Failed to get filter options:', result.error);
+        clientLogger.error('[AdminCachedProducts] Failed to get filter options:', { detail: result.error });
         return { businessTypes: [], categories: [] };
       }
 
       return result.data || { businessTypes: [], categories: [] };
     } catch (error) {
-      console.error('[AdminCachedProducts] Failed to get filter options:', error);
+      clientLogger.error('[AdminCachedProducts] Failed to get filter options:', { detail: error });
       return { businessTypes: [], categories: [] };
     }
   }

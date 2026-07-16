@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
 import { toast } from '@/hooks/use-toast';
 import type { CrmTicket, CrmInquiry, CrmAlert } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'blue',
@@ -89,7 +90,7 @@ export default function CrmCustomerWidget() {
       setUnreadAlertCount(newUnreadAlertCount);
       isFirstLoadRef.current = false;
     } catch (err) {
-      console.error('[CRM Customer Widget] Load error:', err);
+      clientLogger.error('[CRM Customer Widget] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }

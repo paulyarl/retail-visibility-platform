@@ -11,6 +11,7 @@
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, TenantRequestOptions, TenantApiResponse, PublicRequestOptions } from './FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // TENANT API SINGLETON
@@ -70,7 +71,7 @@ export abstract class TenantApiSingleton extends FlexibleApiSingleton {
           const serviceInstance = service();
           return serviceInstance[method](...depParams);
         } catch (error) {
-          console.warn(`[TenantApiSingleton] Failed to invalidate cross-service cache:`, error);
+          clientLogger.warn(`[TenantApiSingleton] Failed to invalidate cross-service cache:`, { detail: error });
           return Promise.resolve(); // Don't fail the main invalidation
         }
       })

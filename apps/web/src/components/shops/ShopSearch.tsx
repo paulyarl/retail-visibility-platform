@@ -31,6 +31,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useShopCategories } from '@/hooks/shops/useShopCategories';
 import { Button } from '@mantine/core';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopSearchProps {
   onSearch: (query: string, filters?: SearchFilters) => void;
@@ -198,7 +199,7 @@ export function ShopSearch({
         setSearchHistory(parsed.slice(0, 10)); // Keep only last 10
       }
     } catch (error) {
-      console.error('Error loading search history:', error);
+      clientLogger.error('Error loading search history:', { detail: error });
     }
   };
 
@@ -222,7 +223,7 @@ export function ShopSearch({
         });
       }
     } catch (error) {
-      console.error('Error loading search analytics:', error);
+      clientLogger.error('Error loading search analytics:', { detail: error });
     }
   };
 
@@ -240,7 +241,7 @@ export function ShopSearch({
     try {
       localStorage.setItem('shopSearchHistory', JSON.stringify(updatedHistory));
     } catch (error) {
-      console.error('Error saving search history:', error);
+      clientLogger.error('Error saving search history:', { detail: error });
     }
   };
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GBPCategory {
   id: string;
@@ -51,7 +52,7 @@ export default function GBPCategorySelector({
           setPopularCategories(mappedCategories);
         }
       } catch (error) {
-        console.error('[GBPCategorySelector] Failed to load popular categories:', error);
+        clientLogger.error('[GBPCategorySelector] Failed to load popular categories:', { detail: error });
       } finally {
         setLoadingPopular(false);
       }
@@ -88,7 +89,7 @@ export default function GBPCategorySelector({
           setResults(filteredCategories);
         }
       } catch (error) {
-        console.error('[GBPCategorySelector] Search error:', error);
+        clientLogger.error('[GBPCategorySelector] Search error:', { detail: error });
       } finally {
         if (active) setLoading(false);
       }

@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantAnalytics {
   performanceMetrics: {
@@ -101,7 +102,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant usage:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant usage:', { detail: result.error });
       throw result.error;
     }
 
@@ -124,7 +125,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant category:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant category:', { detail: result.error });
       throw result.error;
     }
 
@@ -147,7 +148,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant performance metrics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant performance metrics:', { detail: result.error });
       return null;
     }
 
@@ -170,7 +171,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant product analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant product analytics:', { detail: result.error });
       return null;
     }
 
@@ -193,7 +194,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant customer analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant customer analytics:', { detail: result.error });
       return null;
     }
 
@@ -216,7 +217,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant sales analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant sales analytics:', { detail: result.error });
       return null;
     }
 
@@ -239,7 +240,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant inventory analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant inventory analytics:', { detail: result.error });
       return null;
     }
 
@@ -262,7 +263,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant engagement metrics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant engagement metrics:', { detail: result.error });
       return null;
     }
 
@@ -285,7 +286,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant API usage analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant API usage analytics:', { detail: result.error });
       return null;
     }
 
@@ -308,7 +309,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant error analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant error analytics:', { detail: result.error });
       return null;
     }
 
@@ -331,7 +332,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant storage analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant storage analytics:', { detail: result.error });
       return null;
     }
 
@@ -354,7 +355,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant bandwidth analytics:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant bandwidth analytics:', { detail: result.error });
       return null;
     }
 
@@ -378,7 +379,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[TenantAnalyticsService] Failed to export tenant ${type} analytics:`, result.error);
+      clientLogger.error(`[TenantAnalyticsService] Failed to export tenant ${type} analytics:`, { detail: result.error });
       return null;
     }
 
@@ -401,7 +402,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantAnalyticsService] Failed to get tenant dashboard summary:', result.error);
+      clientLogger.error('[TenantAnalyticsService] Failed to get tenant dashboard summary:', { detail: result.error });
       return null;
     }
 

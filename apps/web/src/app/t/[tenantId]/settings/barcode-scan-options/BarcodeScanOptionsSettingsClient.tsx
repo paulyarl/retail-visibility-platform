@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useBarcodeScanCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BarcodeScanSettings {
   barcode_enabled: boolean;
@@ -108,7 +109,7 @@ export default function BarcodeScanOptionsSettingsClient({ tenantId }: BarcodeSc
         });
       }
     } catch (err) {
-      console.error('Failed to load barcode scan settings:', err);
+      clientLogger.error('Failed to load barcode scan settings:', { detail: err });
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { navigateToTenant } from '@/lib/tenant-navigation'
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 export type TenantOption = { id: string; name: string }
 
@@ -40,7 +41,7 @@ export default function TenantSwitcher({ currentTenantId, tenants }: { currentTe
           return;
         }
       } catch (error) {
-        console.warn('Failed to load preference from server, using localStorage:', error);
+        clientLogger.warn('Failed to load preference from server, using localStorage:', { detail: error });
       }
       
       // Fallback to localStorage

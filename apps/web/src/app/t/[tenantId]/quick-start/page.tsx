@@ -10,6 +10,7 @@ import { Button } from '@mantine/core';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { StorefrontType, STOREFRONT_BUSINESS_PRIORITY, STOREFRONT_DEFAULT_PRODUCT_TYPE, STOREFRONT_DEFAULT_PRODUCT_COUNT } from '@/lib/storefront-business-mapping';
+import { clientLogger } from '@/lib/client-logger';
 
 // Add slider thumb styling
 const sliderStyles = `
@@ -184,7 +185,7 @@ export default function QuickStartPage() {
       }
       setEligibility(data);
     } catch (err: any) {
-      console.error('Failed to check eligibility:', err);
+      clientLogger.error('Failed to check eligibility:', { detail: err });
       setError('Unable to connect to server');
     }
   };

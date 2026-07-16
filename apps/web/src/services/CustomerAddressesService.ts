@@ -7,6 +7,7 @@
 import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import customerAuthService from './CustomerAuthService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CustomerAddress {
   id: string;
@@ -90,7 +91,7 @@ class CustomerAddressesService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerAddresses] List error:', error);
+      clientLogger.error('[CustomerAddresses] List error:', { detail: error });
       return { success: false, error: 'Failed to list addresses' };
     }
   }
@@ -118,7 +119,7 @@ class CustomerAddressesService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerAddresses] Get error:', error);
+      clientLogger.error('[CustomerAddresses] Get error:', { detail: error });
       return { success: false, error: 'Failed to get address' };
     }
   }
@@ -162,7 +163,7 @@ class CustomerAddressesService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerAddresses] Create error:', error);
+      clientLogger.error('[CustomerAddresses] Create error:', { detail: error });
       return { success: false, error: 'Failed to create address' };
     }
   }
@@ -206,7 +207,7 @@ class CustomerAddressesService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerAddresses] Update error:', error);
+      clientLogger.error('[CustomerAddresses] Update error:', { detail: error });
       return { success: false, error: 'Failed to update address' };
     }
   }
@@ -233,7 +234,7 @@ class CustomerAddressesService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerAddresses] Delete error:', error);
+      clientLogger.error('[CustomerAddresses] Delete error:', { detail: error });
       return { success: false, error: 'Failed to delete address' };
     }
   }
@@ -263,7 +264,7 @@ class CustomerAddressesService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerAddresses] Set default error:', error);
+      clientLogger.error('[CustomerAddresses] Set default error:', { detail: error });
       return { success: false, error: 'Failed to set default address' };
     }
   }

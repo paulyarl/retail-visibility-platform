@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, ReactNode } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // BASE API SINGLETON CLASSES
@@ -120,7 +121,7 @@ abstract class ApiSingletonBase {
       
       return data;
     } catch (error) {
-      console.error(`API request failed for ${url}:`, error);
+      clientLogger.error(`API request failed for ${url}:`, { detail: error });
       throw error;
     }
   }
@@ -194,7 +195,7 @@ abstract class AuthenticatedApiSingleton extends ApiSingletonBase {
   protected handleAuthError(error: any): void {
     if (error.status === 401) {
       // Token expired, trigger refresh or logout
-      console.warn('Authentication token expired');
+      clientLogger.warn('Authentication token expired');
       // This would trigger token refresh or logout
     }
   }
@@ -232,7 +233,7 @@ abstract class PublicApiSingleton extends ApiSingletonBase {
    * Handle public API errors
    */
   protected handlePublicError(error: any): void {
-    console.error('Public API error:', error);
+    clientLogger.error('Public API error:', { detail: error });
     // Public APIs might have different error handling needs
   }
 }

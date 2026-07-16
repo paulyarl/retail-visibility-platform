@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { adminInventoryService, PlatformInventoryStats, TenantInventoryBreakdown } from '@/services/AdminInventorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function InventoryDashboardAdminPage() {
   const { hasAccess, loading: accessLoading } = useAccessControl(
@@ -35,7 +36,7 @@ export default function InventoryDashboardAdminPage() {
         setTenants(tenantsResult.tenants);
       }
     } catch (error) {
-      console.error('Failed to load inventory stats:', error);
+      clientLogger.error('Failed to load inventory stats:', { detail: error });
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { itemsService, ItemsCompleteResponse, ItemsStats, Item } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 function normalizeItem(raw: any): Item {
   return {
@@ -178,7 +179,7 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load items";
       setError(msg);
-      console.error("[useItemsComplete] fetchItems failed:", err);
+      clientLogger.error("[useItemsComplete] fetchItems failed:", { detail: err });
       
       // Set fallback state on error
       setItems([]);

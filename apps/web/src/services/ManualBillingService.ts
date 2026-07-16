@@ -6,6 +6,7 @@
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { ResponseType } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ManualInvoice {
   id: string;
@@ -156,7 +157,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error creating manual invoice:', error);
+      clientLogger.error('Error creating manual invoice:', { detail: error });
       return {
         success: false,
         error: 'Failed to create manual invoice'
@@ -169,7 +170,7 @@ class ManualBillingService extends AdminApiSingleton {
       const result = await this.makeDefaultRequest(`/api/admin/manual-billing/invoices/${tenantId}`, {}, `manual-invoices-${tenantId}`, this.cacheTTL);
       return result.success ? ((result.data as any) || []) : [];
     } catch (error) {
-      console.error('Error fetching manual invoices:', error);
+      clientLogger.error('Error fetching manual invoices:', { detail: error });
       return [];
     }
   }
@@ -191,7 +192,7 @@ class ManualBillingService extends AdminApiSingleton {
         updatedAt: invoice.updatedAt
       }));
     } catch (error) {
-      console.error('Error fetching all manual invoices:', error);
+      clientLogger.error('Error fetching all manual invoices:', { detail: error });
       return [];
     }
   }
@@ -226,7 +227,7 @@ class ManualBillingService extends AdminApiSingleton {
       
       return (result.data as any)?.invoices || [];
     } catch (error) {
-      console.error('Error fetching all invoices:', error);
+      clientLogger.error('Error fetching all invoices:', { detail: error });
       return [];
     }
   }
@@ -253,7 +254,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error marking invoice as paid:', error);
+      clientLogger.error('Error marking invoice as paid:', { detail: error });
       return {
         success: false,
         error: 'Failed to mark invoice as paid'
@@ -286,7 +287,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error updating invoice:', error);
+      clientLogger.error('Error updating invoice:', { detail: error });
       return {
         success: false,
         error: 'Failed to update invoice'
@@ -312,7 +313,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : undefined
       };
     } catch (error) {
-      console.error('Error cancelling invoice:', error);
+      clientLogger.error('Error cancelling invoice:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to cancel invoice'
@@ -338,7 +339,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : undefined
       };
     } catch (error) {
-      console.error('Error sending invoice:', error);
+      clientLogger.error('Error sending invoice:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to send invoice'
@@ -386,7 +387,7 @@ class ManualBillingService extends AdminApiSingleton {
         pdfUrl,
       };
     } catch (error) {
-      console.error('Error generating invoice PDF:', error);
+      clientLogger.error('Error generating invoice PDF:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to generate invoice PDF'
@@ -420,7 +421,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error adding manual payment method:', error);
+      clientLogger.error('Error adding manual payment method:', { detail: error });
       return {
         success: false,
         error: 'Failed to add manual payment method'
@@ -454,7 +455,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error updating payment method:', error);
+      clientLogger.error('Error updating payment method:', { detail: error });
       return {
         success: false,
         error: 'Failed to update payment method'
@@ -481,7 +482,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error deleting payment method:', error);
+      clientLogger.error('Error deleting payment method:', { detail: error });
       return {
         success: false,
         error: 'Failed to delete payment method'
@@ -494,7 +495,7 @@ class ManualBillingService extends AdminApiSingleton {
       const result = await this.makeDefaultRequest(`/api/admin/manual-billing/payment-methods/${tenantId}`, {}, `manual-payment-methods-${tenantId}`, this.cacheTTL);
       return result.success ? ((result.data as any) || []) : [];
     } catch (error) {
-      console.error('Error fetching manual payment methods:', error);
+      clientLogger.error('Error fetching manual payment methods:', { detail: error });
       return [];
     }
   }
@@ -519,7 +520,7 @@ class ManualBillingService extends AdminApiSingleton {
         updatedAt: method.updatedAt
       }));
     } catch (error) {
-      console.error('Error fetching all manual payment methods:', error);
+      clientLogger.error('Error fetching all manual payment methods:', { detail: error });
       return [];
     }
   }
@@ -553,7 +554,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error adding service charge:', error);
+      clientLogger.error('Error adding service charge:', { detail: error });
       return {
         success: false,
         error: 'Failed to add service charge'
@@ -586,7 +587,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error updating service charge:', error);
+      clientLogger.error('Error updating service charge:', { detail: error });
       return {
         success: false,
         error: 'Failed to update service charge'
@@ -635,7 +636,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error updating subscription control:', error);
+      clientLogger.error('Error updating subscription control:', { detail: error });
       return {
         success: false,
         error: 'Failed to update subscription control'
@@ -658,7 +659,7 @@ class ManualBillingService extends AdminApiSingleton {
         invoicedCharges: 0
       };
     } catch (error) {
-      console.error('Error fetching service charge stats:', error);
+      clientLogger.error('Error fetching service charge stats:', { detail: error });
       return {
         totalCharges: 0,
         totalAmountCents: 0,
@@ -674,7 +675,7 @@ class ManualBillingService extends AdminApiSingleton {
       // Handle nested structure: result.data.data contains the actual array
       return result.success ? ((result.data as any).data || []) : [];
     } catch (error) {
-      console.error('Error fetching all tenants:', error);
+      clientLogger.error('Error fetching all tenants:', { detail: error });
       return [];
     }
   }
@@ -684,7 +685,7 @@ class ManualBillingService extends AdminApiSingleton {
       const result = await this.makeDefaultRequest(`/api/admin/service-charges/${tenantId}`, {}, `service-charges-${tenantId}`, this.cacheTTL);
       return result.success ? ((result.data as any) || []) : [];
     } catch (error) {
-      console.error('Error fetching service charges:', error);
+      clientLogger.error('Error fetching service charges:', { detail: error });
       return [];
     }
   }
@@ -707,7 +708,7 @@ class ManualBillingService extends AdminApiSingleton {
         createdAt: charge.createdAt
       }));
     } catch (error) {
-      console.error('Error fetching all service charges:', error);
+      clientLogger.error('Error fetching all service charges:', { detail: error });
       return [];
     }
   }
@@ -721,7 +722,7 @@ class ManualBillingService extends AdminApiSingleton {
       const result = await this.makeDefaultRequest('/api/admin/service-charges/configurations', {}, 'service-charge-configurations', this.cacheTTL);
       return result.success ? ((result.data as any)?.configurations || []) : [];
     } catch (error) {
-      console.error('Error fetching service charge configurations:', error);
+      clientLogger.error('Error fetching service charge configurations:', { detail: error });
       return [];
     }
   }
@@ -751,7 +752,7 @@ class ManualBillingService extends AdminApiSingleton {
         error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
       };
     } catch (error) {
-      console.error('Error creating invoice for service charges:', error);
+      clientLogger.error('Error creating invoice for service charges:', { detail: error });
       return {
         success: false,
         error: 'Failed to create invoice for service charges'

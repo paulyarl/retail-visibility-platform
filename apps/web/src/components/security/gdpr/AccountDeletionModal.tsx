@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { AlertTriangle, Loader2, Archive } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AccountDeletionModalProps {
   open: boolean;
@@ -45,7 +46,7 @@ export function AccountDeletionModal({ open, onOpenChange }: AccountDeletionModa
       onOpenChange(false);
       resetForm();
     } catch (error) {
-      console.error('Failed to request deletion:', error);
+      clientLogger.error('Failed to request deletion:', { detail: error });
     } finally {
       setSubmitting(false);
     }

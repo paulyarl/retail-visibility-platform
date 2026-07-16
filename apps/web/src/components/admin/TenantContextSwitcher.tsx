@@ -6,6 +6,7 @@ import { IconBuildingStore, IconAlertTriangle, IconCheck } from '@tabler/icons-r
 import { useAuth } from '@/contexts/AuthContext';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TenantContextSwitcherProps {
   onTenantChange?: (tenantId: string) => void;
@@ -83,7 +84,7 @@ export function TenantContextSwitcher({
       const tenants = await adminSecurityMonitoringService.getAvailableTenants();
       setTenants(tenants || []);
     } catch (error) {
-      console.error('[TenantContextSwitcher] Failed to load tenants:', error);
+      clientLogger.error('[TenantContextSwitcher] Failed to load tenants:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export function TenantContextSwitcher({
       // Show success feedback
       console.log(`[TenantContextSwitcher] Switched to tenant: ${newTenantId}`);
     } catch (error) {
-      console.error('[TenantContextSwitcher] Failed to switch tenant:', error);
+      clientLogger.error('[TenantContextSwitcher] Failed to switch tenant:', { detail: error });
     } finally {
       setSwitching(false);
     }

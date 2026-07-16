@@ -14,6 +14,7 @@ import {
 } from '@/services/DemoTenantAdminService';
 import { QrCode, Download, BarChart3, ExternalLink, RefreshCw, ArrowRightLeft, Crown } from 'lucide-react';
 import { manualBillingService } from '@/services/ManualBillingService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function DemoTenantsAdminPage() {
   const [mounted, setMounted] = useState(false);
@@ -74,7 +75,7 @@ export default function DemoTenantsAdminPage() {
         const tenantsArray = await manualBillingService.getAllTenants();
         setConvertTenants((tenantsArray || []).map((t: any) => ({ id: t.id, name: t.name })));
       } catch (error: any) {
-        console.error('Failed to load tenants for conversion:', error);
+        clientLogger.error('Failed to load tenants for conversion:', { detail: error });
         notifications.show({
           title: 'Error',
           message: error.message || 'Failed to load tenants',
@@ -299,7 +300,7 @@ export default function DemoTenantsAdminPage() {
       });
       setQrDataUrl(canvas.toDataURL('image/png', 1.0));
     } catch (err) {
-      console.error('Failed to generate QR code:', err);
+      clientLogger.error('Failed to generate QR code:', { detail: err });
       notifications.show({ title: 'Error', message: 'Failed to generate QR code', color: 'red' });
     } finally {
       setQrGenerating(false);
@@ -329,7 +330,7 @@ export default function DemoTenantsAdminPage() {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error('Failed to download QR code:', err);
+      clientLogger.error('Failed to download QR code:', { detail: err });
     } finally {
       setQrGenerating(false);
     }
@@ -407,7 +408,7 @@ export default function DemoTenantsAdminPage() {
       };
       qrImg.src = qrDataUrl;
     } catch (err) {
-      console.error('Failed to generate printable card:', err);
+      clientLogger.error('Failed to generate printable card:', { detail: err });
       setQrGenerating(false);
     }
   }
@@ -418,7 +419,7 @@ export default function DemoTenantsAdminPage() {
       const data = await demoTenantAdminService.getQRAnalytics(tenantId);
       setQrAnalytics(data);
     } catch (err) {
-      console.error('Failed to fetch QR analytics:', err);
+      clientLogger.error('Failed to fetch QR analytics:', { detail: err });
     } finally {
       setLoadingAnalytics(false);
     }

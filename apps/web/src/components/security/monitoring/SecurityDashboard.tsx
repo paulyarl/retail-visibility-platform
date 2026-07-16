@@ -24,6 +24,7 @@ import { AdminSessionsTable } from '../admin/AdminSessionsTable';
 import SecurityAlerts from '@/components/admin/SecurityAlerts';
 import { PlatformStabilityDashboard } from './PlatformStabilityDashboard';
 import Link from 'next/link';
+import { clientLogger } from '@/lib/client-logger';
 
 export function SecurityDashboard() {
   const { metrics, threats, blockedIPs, healthStatus, loading } = useSecurityMonitoring();
@@ -64,7 +65,7 @@ export function SecurityDashboard() {
         const data = await getAlertsByType(5, 168); // 5 examples per type, 7 days
         setAlertsByType(data);
       } catch (error) {
-        console.error('Failed to fetch alerts by type:', error);
+        clientLogger.error('Failed to fetch alerts by type:', { detail: error });
         setAlertsByType([]); // Set empty array on error
       } finally {
         setAlertsByTypeLoading(false);

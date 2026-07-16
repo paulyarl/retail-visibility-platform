@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 interface TenantCategory {
@@ -69,7 +70,7 @@ export default function TenantCategorySelector({
         setCategories(fetchedCategories);
         setRecentIds(fetchedCategories.slice(0, 30).map(cat => cat.id));
       } catch (error) {
-        console.error('Failed to fetch categories:', error);
+        clientLogger.error('Failed to fetch categories:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -90,7 +91,7 @@ export default function TenantCategorySelector({
         setRecentIds(JSON.parse(stored));
       }
     } catch (error) {
-      console.error('Failed to load recent category IDs:', error);
+      clientLogger.error('Failed to load recent category IDs:', { detail: error });
     }
   }, []);
 
@@ -119,7 +120,7 @@ export default function TenantCategorySelector({
           })).slice(0, 8));
         }
       } catch (err) {
-        console.error('Error searching categories:', err);
+        clientLogger.error('Error searching categories:', { detail: err });
       } finally {
         if (active) setTaxLoading(false);
       }

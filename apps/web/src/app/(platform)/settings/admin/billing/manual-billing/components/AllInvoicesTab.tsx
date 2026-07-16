@@ -27,6 +27,7 @@ import {
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { manualBillingService } from '@/services/ManualBillingService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Invoice {
   id: string;
@@ -75,7 +76,7 @@ export default function AllInvoicesTab() {
       setInvoices(invoices);
       setTotalPages(Math.ceil(invoices.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching invoices:', error);
+      clientLogger.error('Error fetching invoices:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to fetch invoices',

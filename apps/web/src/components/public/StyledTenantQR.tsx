@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StyledTenantQRProps {
   url: string;
@@ -101,7 +102,7 @@ export function StyledTenantQR({
         const dataUrl = await generateStyledQR(resolvedExportSize);
         if (!cancelled) setQrImageUrl(dataUrl);
       } catch (error) {
-        console.error('[StyledTenantQR] Failed to generate styled QR code:', error);
+        clientLogger.error('[StyledTenantQR] Failed to generate styled QR code:', { detail: error });
       } finally {
         if (!cancelled) setIsGenerating(false);
       }
@@ -127,7 +128,7 @@ export function StyledTenantQR({
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('[StyledTenantQR] Failed to download QR code:', error);
+      clientLogger.error('[StyledTenantQR] Failed to download QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }

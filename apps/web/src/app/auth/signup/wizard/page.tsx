@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { onboardingStateService } from '@/services/OnboardingStateService';
 import { tenantManagementService } from '@/services/TenantManagementService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Auth0-Connected Signup Wizard
@@ -112,7 +113,7 @@ export default function SignupWizardPage() {
               setShowReviewForm(true);
             }
           } catch (error) {
-            console.error('Failed to fetch tenant data:', error);
+            clientLogger.error('Failed to fetch tenant data:', { detail: error });
             // Fallback to dashboard if fetch fails
             router.replace(`/t/${tenantId}/dashboard`);
           }
@@ -282,7 +283,7 @@ export default function SignupWizardPage() {
             throw new Error('Failed to update tenant data');
           }
         } catch (error) {
-          console.error('Update error:', error);
+          clientLogger.error('Update error:', { detail: error });
           alert(error instanceof Error ? error.message : 'Update failed. Please try again.');
         }
       } else {
@@ -310,7 +311,7 @@ export default function SignupWizardPage() {
         window.location.href = `/auth/login?screen_hint=signup&returnTo=${returnTo}`;
       }
     } catch (error) {
-      console.error('Submit error:', error);
+      clientLogger.error('Submit error:', { detail: error });
       alert(error instanceof Error ? error.message : 'Operation failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -334,7 +335,7 @@ export default function SignupWizardPage() {
                   height={60}
                   className="max-h-8 w-auto object-contain mx-auto mb-6"
                   onError={(e) => {
-                    console.error('[SignupWizard] Logo failed to load:', settings.logoUrl);
+                    clientLogger.error('[SignupWizard] Logo failed to load:', { detail: settings.logoUrl });
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     const fallback = target.nextElementSibling as HTMLElement;

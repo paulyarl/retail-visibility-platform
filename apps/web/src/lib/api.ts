@@ -1,4 +1,5 @@
 import { getDeviceInfoHeader } from './device-info';
+import { clientLogger } from '@/lib/client-logger';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || process.env.API_BASE_URL || process.env.API_URL || '';
 
@@ -87,7 +88,7 @@ export async function apiRequest(
     try {
       headers['x-device-info'] = getDeviceInfoHeader();
     } catch (error) {
-      console.warn('[API] Failed to add device info header:', error);
+      clientLogger.warn('[API] Failed to add device info header:', { detail: error });
     }
   }
 

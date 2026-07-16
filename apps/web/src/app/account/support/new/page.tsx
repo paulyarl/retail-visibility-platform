@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, MessageSquare, ChevronLeft, HelpCircle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function NewTicketPage() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function NewTicketPage() {
       }
       setTenants(Array.from(tenantMap.entries()).map(([id, data]) => ({ id, ...data })));
     } catch (err) {
-      console.error('[New Ticket] Error loading orders:', err);
+      clientLogger.error('[New Ticket] Error loading orders:', { detail: err });
     } finally {
       setLoading(false);
     }

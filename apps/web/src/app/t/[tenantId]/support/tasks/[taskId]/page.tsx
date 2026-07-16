@@ -8,6 +8,7 @@ import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTask, CrmTaskMessage, CrmActivity, TaskStatus } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -57,7 +58,7 @@ export default function TenantTaskDetailPage() {
         setTenantUsers(users ?? []);
         setActivities(activityData ?? []);
       } catch (err) {
-        console.error('[Tenant Task Detail] Load error:', err);
+        clientLogger.error('[Tenant Task Detail] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -70,7 +71,7 @@ export default function TenantTaskDetailPage() {
       const activityList = await crmTenantCrmService.listActivities({ taskId, limit: 50 });
       setActivities(activityList ?? []);
     } catch (err) {
-      console.error('[Tenant Task Detail] Activity refresh error:', err);
+      clientLogger.error('[Tenant Task Detail] Activity refresh error:', { detail: err });
     }
   }
 
@@ -86,7 +87,7 @@ export default function TenantTaskDetailPage() {
       setReply('');
       setIsInternal(false);
     } catch (err) {
-      console.error('[Tenant Task Detail] Reply error:', err);
+      clientLogger.error('[Tenant Task Detail] Reply error:', { detail: err });
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +102,7 @@ export default function TenantTaskDetailPage() {
       setTask(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Task Detail] Status change error:', err);
+      clientLogger.error('[Tenant Task Detail] Status change error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -116,7 +117,7 @@ export default function TenantTaskDetailPage() {
       setTask(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Task Detail] Assign change error:', err);
+      clientLogger.error('[Tenant Task Detail] Assign change error:', { detail: err });
     } finally {
       setUpdating(false);
     }

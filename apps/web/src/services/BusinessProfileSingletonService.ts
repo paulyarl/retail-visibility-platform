@@ -8,6 +8,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { safeTransformToCamel } from '@/utils/case-transform';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ApiBusinessProfile {
   business_name?: string;
@@ -64,7 +65,7 @@ class BusinessProfileSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[BusinessProfileSingleton] Failed to get business profile:', result.error);
+      clientLogger.error('[BusinessProfileSingleton] Failed to get business profile:', { detail: result.error });
       return null;
     }
 
@@ -98,7 +99,7 @@ class BusinessProfileSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[BusinessProfileSingleton] Failed to update business profile:', result.error);
+      clientLogger.error('[BusinessProfileSingleton] Failed to update business profile:', { detail: result.error });
       throw result.error;
     }
 

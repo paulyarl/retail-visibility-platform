@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DirectoryListing {
   id: string;
@@ -77,13 +78,13 @@ export default function DirectoryMap({
           // console.log('[DirectoryMap] Successfully updated coordinates for', store.businessName);
           return coordinates;
         } else {
-          console.error('[DirectoryMap] Failed to update coordinates for', store.businessName);
+          clientLogger.error('[DirectoryMap] Failed to update coordinates for', { detail: store.businessName });
         }
       } else {
         console.log('[DirectoryMap] Geocoding failed for', store.businessName);
       }
     } catch (error) {
-      console.error('[DirectoryMap] Auto-geocode error for', store.businessName, ':', error);
+      clientLogger.error('[DirectoryMap] Auto-geocode error for', { detail: store.businessName, detail2: ':', detail3: error });
     }
     
     return null;
@@ -229,7 +230,7 @@ export default function DirectoryMap({
           mapRef.current.setView([39.8283, -98.5795], 4);
         }
       } catch (error) {
-        console.error('[DirectoryMap] Error initializing map:', error);
+        clientLogger.error('[DirectoryMap] Error initializing map:', { detail: error });
       }
     };
 

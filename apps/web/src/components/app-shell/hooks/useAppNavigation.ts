@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { ROLE_GROUPS } from '@/config/rbac';
+import { clientLogger } from '@/lib/client-logger';
 interface AppLinks {
   dashboard: string;
   tenants: string;
@@ -81,14 +82,14 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
         // });
 
         if (!hasTenantAccess) {
-          console.warn('User does not have access to tenant:', tenantId);
+          clientLogger.warn('User does not have access to tenant:', { detail: tenantId });
         } else {
           try {
             tenantInfo = await tenantInfoService.getTenantInfo(tenantId, { auth0Email: decodedEmail || undefined, auth0Id: decodedAuth0Id || undefined });
             tenantSlug = tenantInfo?.slug;
             hasPublishedDirectory = tenantInfo?.hasPublishedDirectory ?? tenantInfo?.has_published_directory;
           } catch (error) {
-            console.error('Failed to fetch tenant info:', error);
+            clientLogger.error('Failed to fetch tenant info:', { detail: error });
           }
         }
       }

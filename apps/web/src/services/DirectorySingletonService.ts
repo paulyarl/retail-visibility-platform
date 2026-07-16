@@ -18,6 +18,7 @@ import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 import { RequestType, RequestTarget, ApiResult } from '../providers/base/FlexibleApiSingleton';
 import { clientTenantContextManager } from '../lib/clientTenantContext';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStore {
   id: string;
@@ -203,7 +204,7 @@ class DirectorySingletonService extends PublicApiSingleton {
 
       return response?.data?.data || response?.data || response;
     } catch (error) {
-      console.error('[DirectorySingleton] Failed to get directory consolidated:', error);
+      clientLogger.error('[DirectorySingleton] Failed to get directory consolidated:', { detail: error });
       return null;
     }
   }
@@ -228,7 +229,7 @@ class DirectorySingletonService extends PublicApiSingleton {
 
       return response?.data?.slug || response?.data?.slug || null;
     } catch (error) {
-      console.error('[DirectorySingleton] Failed to get tenant slug:', error);
+      clientLogger.error('[DirectorySingleton] Failed to get tenant slug:', { detail: error });
       return null;
     }
   }
@@ -252,7 +253,7 @@ class DirectorySingletonService extends PublicApiSingleton {
 
       return response?.data?.tenantId || response?.data?.tenantId || null;
     } catch (error) {
-      console.error('[DirectorySingleton] Failed to get tenant ID:', error);
+      clientLogger.error('[DirectorySingleton] Failed to get tenant ID:', { detail: error });
       return null;
     }
   }
@@ -274,7 +275,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get directory MV categories:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get directory MV categories:', { detail: response.error });
       return null;
     }
 
@@ -297,7 +298,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get directory categories:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get directory categories:', { detail: response.error });
       return null;
     }
 
@@ -320,7 +321,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get stores by category:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get stores by category:', { detail: response.error });
       return null;
     }
 
@@ -343,7 +344,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to search by category:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to search by category:', { detail: response.error });
       return null;
     }
 
@@ -366,7 +367,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to search by location:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to search by location:', { detail: response.error });
       return null;
     }
 
@@ -398,7 +399,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingletonService] Failed to get public shops:', response.error);
+      clientLogger.error('[DirectorySingletonService] Failed to get public shops:', { detail: response.error });
       return [];
     }
 
@@ -459,7 +460,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingletonService] Failed to get promoted stores:', response.error);
+      clientLogger.error('[DirectorySingletonService] Failed to get promoted stores:', { detail: response.error });
       return [];
     }
 
@@ -506,7 +507,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingletonService] Failed to get map locations:', response.error);
+      clientLogger.error('[DirectorySingletonService] Failed to get map locations:', { detail: response.error });
       return {
         listings: [],
         total: 0
@@ -535,7 +536,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get directory locations:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get directory locations:', { detail: response.error });
       return null;
     }
 
@@ -558,7 +559,7 @@ class DirectorySingletonService extends PublicApiSingleton {
         this.CACHE_TTL_LONG
       );
       if (!response.success) {
-        console.error('[DirectorySingleton] Failed to get directory store types:', response.error);
+        clientLogger.error('[DirectorySingleton] Failed to get directory store types:', { detail: response.error });
         return null;
       }
       
@@ -566,7 +567,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       // makeDefaultRequest wraps this, so we need response.data.data.storeTypes
       return response.data?.data?.storeTypes || [];
     } catch (error) {
-      console.error('[DirectorySingleton] Failed to get directory store types:', error);
+      clientLogger.error('[DirectorySingleton] Failed to get directory store types:', { detail: error });
       return null;
     }
   }
@@ -597,7 +598,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to search categories:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to search categories:', { detail: response.error });
       return null;
     }
 
@@ -635,7 +636,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to search directory stores:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to search directory stores:', { detail: response.error });
       return null;
     }
 
@@ -669,7 +670,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get featured stores:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get featured stores:', { detail: response.error });
       return null;
     }
 
@@ -692,7 +693,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get related stores:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get related stores:', { detail: response.error });
       return [];
     }
 
@@ -716,7 +717,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get directory sitemap:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get directory sitemap:', { detail: response.error });
       return null;
     }
 
@@ -740,7 +741,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get storefront categories:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get storefront categories:', { detail: response.error });
       return { categories: [], uncategorizedCount: 0 };
     }
 
@@ -767,7 +768,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get storefront product count:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get storefront product count:', { detail: response.error });
       return 0;
     }
 
@@ -791,7 +792,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get business profile:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get business profile:', { detail: response.error });
       return null;
     }
 
@@ -818,7 +819,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get business hours:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get business hours:', { detail: response.error });
       return null;
     }
 
@@ -897,7 +898,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       const actualData = response.data?.data; // Extract nested data
 
       if (!response.success) {
-        console.error('[DirectorySingleton] Failed to get all featured products:', response.error);
+        clientLogger.error('[DirectorySingleton] Failed to get all featured products:', { detail: response.error });
         return {
           totalCount: 0,
           buckets: {},
@@ -915,7 +916,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       
       return result;
     } catch (error) {
-      console.error('[DirectorySingleton] Error fetching all featured products:', error);
+      clientLogger.error('[DirectorySingleton] Error fetching all featured products:', { detail: error });
       return {
         totalCount: 0,
         buckets: {},
@@ -942,7 +943,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get featured products:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get featured products:', { detail: response.error });
       return [];
     }
 
@@ -966,7 +967,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get stores by category for products:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get stores by category for products:', { detail: response.error });
       return [];
     }
 
@@ -990,7 +991,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get storefront products:', response.error);
+      clientLogger.error('[DirectorySingleton] Failed to get storefront products:', { detail: response.error });
       return [];
     }
 

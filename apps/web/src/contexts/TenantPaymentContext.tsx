@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 // Hooks replaced by server-fetched props to eliminate client-side waterfall
 // import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TenantPaymentContextValue {
   canPurchase: boolean;
@@ -59,7 +60,7 @@ export function TenantPaymentProvider({ tenantId, children, initialCommerceSetti
       setCanPurchase(hasActiveGateway);
       setDefaultGatewayType(gatewayType);
     } catch (err) {
-      console.error('Failed to check payment gateway:', err);
+      clientLogger.error('Failed to check payment gateway:', { detail: err });
       setCanPurchase(false);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

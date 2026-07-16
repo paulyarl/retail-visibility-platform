@@ -15,6 +15,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface QueueItem {
   id: string;
@@ -123,7 +124,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to add items to queue:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to add items to queue:', { detail: error });
       return null;
     }
   }
@@ -156,7 +157,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[InventoryQueueSingleton] Failed to get queue items:', response.error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to get queue items:', { detail: response.error });
       return null;
     }
 
@@ -180,7 +181,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[InventoryQueueSingleton] Failed to get queue stats:', response.error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to get queue stats:', { detail: response.error });
       return null;
     }
 
@@ -213,7 +214,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return !!response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to update item status:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to update item status:', { detail: error });
       return false;
     }
   }
@@ -246,7 +247,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return !!response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to remove from queue:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to remove from queue:', { detail: error });
       return false;
     }
   }
@@ -277,7 +278,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return !!response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to clear queue:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to clear queue:', { detail: error });
       return false;
     }
   }
@@ -311,7 +312,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return !!response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to update item priority:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to update item priority:', { detail: error });
       return false;
     }
   }
@@ -351,7 +352,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return !!response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to process queue:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to process queue:', { detail: error });
       return false;
     }
   }
@@ -381,7 +382,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return !!response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to cleanup old items:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to cleanup old items:', { detail: error });
       return false;
     }
   }
@@ -405,7 +406,7 @@ class InventoryQueueSingletonService extends TenantApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to export queue:', error);
+      clientLogger.error('[InventoryQueueSingleton] Failed to export queue:', { detail: error });
       return null;
     }
   }

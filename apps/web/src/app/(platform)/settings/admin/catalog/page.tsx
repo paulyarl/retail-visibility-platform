@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { adminCatalogService, GlobalCatalogProduct, CatalogStats, ProductDetail } from '@/services/AdminCatalogSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function CatalogAdminPage() {
   const [mounted, setMounted] = useState(false);
@@ -86,7 +87,7 @@ export default function CatalogAdminPage() {
         setDataLoaded(true);
       } catch (error) {
         if (cancelled) return;
-        console.error('Failed to load catalog data:', error);
+        clientLogger.error('Failed to load catalog data:', { detail: error });
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -126,7 +127,7 @@ export default function CatalogAdminPage() {
       setCategories(categoriesResult || []);
       setDataLoaded(true);
     } catch (error) {
-      console.error('Failed to load catalog data:', error);
+      clientLogger.error('Failed to load catalog data:', { detail: error });
     } finally {
       setLoading(false);
     }

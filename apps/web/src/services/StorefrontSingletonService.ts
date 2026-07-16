@@ -8,6 +8,7 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { getErrorMessage, getErrorStatus } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StorefrontCategory {
   id: string;
@@ -113,7 +114,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
     uncategorizedCount: number;
   }> {
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getStorefrontCategories: tenantId is required');
+      clientLogger.error('[StorefrontSingleton] getStorefrontCategories: tenantId is required');
       return { categories: [], uncategorizedCount: 0 };
     }
 
@@ -150,7 +151,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
         uncategorizedCount: result.data?.uncategorizedCount || 0
       };
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get storefront categories:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get storefront categories:', { detail: error });
       return { categories: [], uncategorizedCount: 0 };
     }
   }
@@ -177,7 +178,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
     total?: number;
   }> {
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getStorefrontProducts: tenantId is required');
+      clientLogger.error('[StorefrontSingleton] getStorefrontProducts: tenantId is required');
       return { items: [] };
     }
 
@@ -214,7 +215,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
         total: result.data?.pagination?.totalItems
       };
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get storefront products:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get storefront products:', { detail: error });
       return { items: [] };
     }
   }
@@ -235,7 +236,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
     count?: number;
   }> {
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getFeaturedProducts: tenantId is required');
+      clientLogger.error('[StorefrontSingleton] getFeaturedProducts: tenantId is required');
       return { items: [] };
     }
 
@@ -280,7 +281,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
 
       return data.items ? data : { items: [] };
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get featured products:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get featured products:', { detail: error });
       return { items: [] };
     }
   }
@@ -346,7 +347,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       // });
       
       if (!result.success) {
-        console.warn('[StorefrontSingleton] Failed to get featured products by type:', result.error);
+        clientLogger.warn('[StorefrontSingleton] Failed to get featured products by type:', { detail: result.error });
         return {};
       }
       
@@ -373,7 +374,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       
       return groupedProducts;
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get featured products by type:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get featured products by type:', { detail: error });
       return {};
     }
   }
@@ -384,7 +385,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
    */
   async getDirectoryListing(tenantId: string): Promise<DirectoryListing | null> {
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getDirectoryListing: tenantId is required');
+      clientLogger.error('[StorefrontSingleton] getDirectoryListing: tenantId is required');
       return null;
     }
 
@@ -405,14 +406,14 @@ class StorefrontSingletonService extends PublicApiSingleton {
         if (getErrorStatus(result.error) === 404) {
           console.log(`[StorefrontSingleton] No directory listing found for tenant ${tenantId}`);
         } else {
-          console.warn(`[StorefrontSingleton] Failed to get directory listing:`, result.error);
+          clientLogger.warn(`[StorefrontSingleton] Failed to get directory listing:`, { detail: result.error });
         }
         return null;
       }
       
       return result.data || null;
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get directory listing:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get directory listing:', { detail: error });
       return null;
     }
   }
@@ -430,7 +431,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
     } = {}
   ): Promise<StorefrontProduct[]> {
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getPublicProducts: tenantId is required');
+      clientLogger.error('[StorefrontSingleton] getPublicProducts: tenantId is required');
       return [];
     }
 
@@ -454,7 +455,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
 
       return result.data?.products || [];
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get public products:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get public products:', { detail: error });
       return [];
     }
   }
@@ -465,7 +466,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
    */
   async getTotalProductCount(tenantId: string): Promise<number> {
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getTotalProductCount: tenantId is required');
+      clientLogger.error('[StorefrontSingleton] getTotalProductCount: tenantId is required');
       return 0;
     }
 
@@ -487,7 +488,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       
       return result.data?.pagination?.totalItems || 0;
     } catch (error) {
-      console.error('[StorefrontSingleton] Failed to get total product count:', error);
+      clientLogger.error('[StorefrontSingleton] Failed to get total product count:', { detail: error });
       return 0;
     }
   }

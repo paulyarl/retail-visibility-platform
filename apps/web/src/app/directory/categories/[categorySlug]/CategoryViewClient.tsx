@@ -17,6 +17,7 @@ import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Dynamically import Google Maps to avoid SSR issues
 const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
@@ -170,7 +171,7 @@ export default function CategoryViewClient({
           },
         });
       } catch (err) {
-        console.error('Error fetching category data:', err);
+        clientLogger.error('Error fetching category data:', { detail: err });
         setError('Failed to load category. Please try again.');
       } finally {
         setLoading(false);

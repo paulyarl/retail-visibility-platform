@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface FeaturedAccessStatus {
   hasAccess: boolean;
@@ -94,7 +95,7 @@ export class TenantFeaturedAccessService extends TenantApiSingleton {
       }
       return result.data?.hasAccess || false;
     } catch (error) {
-      console.error('Error checking featured access:', error);
+      clientLogger.error('Error checking featured access:', { detail: error });
       return false; // Default to false on error
     }
   }

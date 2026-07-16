@@ -37,6 +37,7 @@ import {
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { notificationLogsService, NotificationLog, NotificationStats } from '@/services/NotificationLogsService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types imported from NotificationLogsService
 
@@ -82,7 +83,7 @@ export default function NotificationLogsPage() {
       setTotalItems(data.pagination.total);
       setAvailableTypes(data.filters.types);
     } catch (error) {
-      console.error('Error fetching notification logs:', error);
+      clientLogger.error('Error fetching notification logs:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load notification logs',
@@ -99,7 +100,7 @@ export default function NotificationLogsPage() {
       const data = await notificationLogsService.getStats();
       setStats(data);
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
+      clientLogger.error('Error fetching notification stats:', { detail: error });
     } finally {
       setStatsLoading(false);
     }

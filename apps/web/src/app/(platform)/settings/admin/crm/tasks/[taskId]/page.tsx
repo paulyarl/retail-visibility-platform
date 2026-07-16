@@ -8,6 +8,7 @@ import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminOperationsService, type AdminTenant, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTask, CrmTaskMessage, TaskStatus, TaskPriority } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
@@ -82,7 +83,7 @@ export default function CrmTaskDetailPage() {
         }));
       }
     } catch (err) {
-      console.error('[CRM Task Detail] Load error:', err);
+      clientLogger.error('[CRM Task Detail] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export default function CrmTaskDetailPage() {
       const updated = await crmAdminService.updateTask(taskId, data);
       setTask(updated);
     } catch (err) {
-      console.error('[Task Detail] Update error:', err);
+      clientLogger.error('[Task Detail] Update error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -127,7 +128,7 @@ export default function CrmTaskDetailPage() {
       setEditTask(null);
       await load();
     } catch (err) {
-      console.error('[Task Detail] Edit error:', err);
+      clientLogger.error('[Task Detail] Edit error:', { detail: err });
     } finally {
       setEditing(false);
     }
@@ -141,7 +142,7 @@ export default function CrmTaskDetailPage() {
       setMessages(prev => [...prev, message]);
       setReplyContent('');
     } catch (err) {
-      console.error('[Task Detail] Reply error:', err);
+      clientLogger.error('[Task Detail] Reply error:', { detail: err });
     } finally {
       setSending(false);
     }
@@ -155,7 +156,7 @@ export default function CrmTaskDetailPage() {
       setMessages(prev => [...prev, message]);
       setNoteContent('');
     } catch (err) {
-      console.error('[Task Detail] Note error:', err);
+      clientLogger.error('[Task Detail] Note error:', { detail: err });
     } finally {
       setSending(false);
     }
@@ -167,7 +168,7 @@ export default function CrmTaskDetailPage() {
       await crmAdminService.deleteTask(taskId);
       window.location.href = '/settings/admin/crm/tasks';
     } catch (err) {
-      console.error('[Task Detail] Delete error:', err);
+      clientLogger.error('[Task Detail] Delete error:', { detail: err });
     } finally {
       setDeleting(false);
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CloverStatus } from '@/components/clover';
 import { cloverIntegrationService } from '@/services/CloverIntegrationSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CloverIntegrationData {
   enabled: boolean;
@@ -71,7 +72,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       
       setData(responseData);
     } catch (err: any) {
-      console.error('Failed to fetch Clover status:', err);
+      clientLogger.error('Failed to fetch Clover status:', { detail: err });
       setError(err.message);
     } finally {
       setLoading(false);
@@ -93,7 +94,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
         console.log('Clover demo mode enabled successfully');
       }
     } catch (err: any) {
-      console.error('Failed to enable demo mode:', err);
+      clientLogger.error('Failed to enable demo mode:', { detail: err });
       setError(err.message);
       throw err;
     }
@@ -122,7 +123,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       // Refresh status
       await refresh();
     } catch (err: any) {
-      console.error('Failed to disable demo:', err);
+      clientLogger.error('Failed to disable demo:', { detail: err });
       setError(err.message);
       throw err;
     }
@@ -145,7 +146,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
         window.location.href = responseData.authorizationUrl;
       }
     } catch (err: any) {
-      console.error('Failed to connect Clover:', err);
+      clientLogger.error('Failed to connect Clover:', { detail: err });
       setError(err.message);
       throw err;
     }
@@ -174,7 +175,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       // Refresh status
       await refresh();
     } catch (err: any) {
-      console.error('Failed to disconnect:', err);
+      clientLogger.error('Failed to disconnect:', { detail: err });
       setError(err.message);
       throw err;
     }
@@ -195,7 +196,7 @@ export function useCloverIntegration(tenantId: string): UseCloverIntegrationResu
       // Refresh status
       await refresh();
     } catch (err: any) {
-      console.error('Failed to sync:', err);
+      clientLogger.error('Failed to sync:', { detail: err });
       setError(err.message);
       throw err;
     }

@@ -9,6 +9,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { DirectoryListing } from './DirectoryListingSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryEntrySettings {
   directory_entry_opt_enabled?: boolean;
@@ -76,7 +77,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to get directory listing:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to get directory listing:', { detail: result.error });
       return null;
     }
 
@@ -101,7 +102,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to update directory listing:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to update directory listing:', { detail: result.error });
       return null;
     }
 
@@ -175,7 +176,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to unpublish directory listing:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to unpublish directory listing:', { detail: result.error });
       return false;
     }
 
@@ -201,7 +202,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to sync profile to directory:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to sync profile to directory:', { detail: result.error });
       return { success: false, message: typeof result.error === 'string' ? result.error : 'Failed to sync profile' };
     }
 
@@ -251,7 +252,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       `directory-upload-photo-${listingId}`
     );
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to upload directory photo:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to upload directory photo:', { detail: result.error });
       return null;
     }
 
@@ -278,7 +279,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       `directory-update-photo-${listingId}-${photoId}`
     );
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to update directory photo:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to update directory photo:', { detail: result.error });
       return null;
     }
 
@@ -308,7 +309,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       return true;
     }
     
-    console.error('[TenantDirectoryManagement] Failed to delete directory photo:', result.error);
+    clientLogger.error('[TenantDirectoryManagement] Failed to delete directory photo:', { detail: result.error });
     return null;
   }
 
@@ -328,7 +329,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to get directory entry options:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to get directory entry options:', { detail: result.error });
       return null;
     }
 
@@ -353,7 +354,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to update directory entry options:', result.error);
+      clientLogger.error('[TenantDirectoryManagement] Failed to update directory entry options:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update directory entry options');
     }
 

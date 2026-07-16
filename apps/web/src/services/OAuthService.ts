@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * OAuth 2.0 Authentication Service
  * 
@@ -215,7 +217,7 @@ export class OAuthService {
           tenant_ids: payload['https://yourapp.com/tenant_ids'],
         };
       } catch (error) {
-        console.warn('Failed to decode ID token, falling back to user info endpoint');
+        clientLogger.warn('Failed to decode ID token, falling back to user info endpoint');
       }
     }
 

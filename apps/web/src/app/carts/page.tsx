@@ -11,6 +11,7 @@ import { ProductTypeBadge } from '@/components/products/ProductTypeBadge';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { useCommerceCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Gateway {
   id: string;
@@ -135,7 +136,7 @@ export default function MultiCartPage() {
             commerceData[tenantId] = { enabled: true, cartVisible: true };
           }
         } catch (err) {
-          console.warn(`Failed to fetch data for tenant ${tenantId}:`, err);
+          clientLogger.warn(`Failed to fetch data for tenant ${tenantId}:`, { detail: err });
           gatewayData[tenantId] = [];
           tenantInfoData[tenantId] = { name: tenantId };
           commerceData[tenantId] = { enabled: true, cartVisible: true };

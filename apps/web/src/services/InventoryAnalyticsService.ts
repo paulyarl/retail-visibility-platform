@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { safeTransformToCamel } from '@/utils/case-transform';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 export interface TransferAnalytics {
@@ -92,7 +93,7 @@ export class InventoryAnalyticsService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
+      clientLogger.error('Failed to fetch analytics:', { detail: error });
       throw error;
     }
   }
@@ -119,7 +120,7 @@ export class InventoryAnalyticsService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to fetch status breakdown:', error);
+      clientLogger.error('Failed to fetch status breakdown:', { detail: error });
       throw error;
     }
   }
@@ -146,7 +147,7 @@ export class InventoryAnalyticsService extends TenantApiSingleton {
 
       return (result.data as unknown as any[]).map((sku: any) => safeTransformToCamel(sku));
     } catch (error) {
-      console.error('Failed to fetch top SKUs:', error);
+      clientLogger.error('Failed to fetch top SKUs:', { detail: error });
       throw error;
     }
   }
@@ -173,7 +174,7 @@ export class InventoryAnalyticsService extends TenantApiSingleton {
 
       return (result.data as unknown as any[]).map((trend: any) => safeTransformToCamel(trend));
     } catch (error) {
-      console.error('Failed to fetch monthly trends:', error);
+      clientLogger.error('Failed to fetch monthly trends:', { detail: error });
       throw error;
     }
   }
@@ -205,7 +206,7 @@ export class InventoryAnalyticsService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to fetch performance metrics:', error);
+      clientLogger.error('Failed to fetch performance metrics:', { detail: error });
       throw error;
     }
   }

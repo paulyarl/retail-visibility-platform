@@ -9,6 +9,7 @@ import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSing
 import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { LoginSession, SecurityAlert, ApiResponse, MFAStatus, MFASetupData, MFAVerificationResult, MFASetupFormData } from '@/types/security';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 class SecuritySingletonService extends AuthenticatedApiSingleton {
   private static instance: SecuritySingletonService;
@@ -48,13 +49,13 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[SecuritySingletonService] Failed to get active sessions:', result.error);
+        clientLogger.error('[SecuritySingletonService] Failed to get active sessions:', { detail: result.error });
         return [];
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingletonService] Error fetching active sessions:', error);
+      clientLogger.error('[SecuritySingletonService] Error fetching active sessions:', { detail: error });
       return [];
     }
   }
@@ -107,7 +108,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting session info:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting session info:', { detail: error });
       return { isAuthenticated: false };
     }
   }
@@ -125,7 +126,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-revoke-session'
       );
     } catch (error) {
-      console.error('[SecuritySingletonService] Error revoking session:', error);
+      clientLogger.error('[SecuritySingletonService] Error revoking session:', { detail: error });
       throw error;
     }
   }
@@ -143,7 +144,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-revoke-all-sessions'
       );
     } catch (error) {
-      console.error('[SecuritySingletonService] Error revoking all sessions:', error);
+      clientLogger.error('[SecuritySingletonService] Error revoking all sessions:', { detail: error });
       throw error;
     }
   }
@@ -165,7 +166,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || { enabled: false };
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting MFA status:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting MFA status:', { detail: error });
       return { enabled: false };
     }
   }
@@ -192,7 +193,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[SecuritySingletonService] Error setting up MFA:', error);
+      clientLogger.error('[SecuritySingletonService] Error setting up MFA:', { detail: error });
       throw error;
     }
   }
@@ -216,7 +217,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.success && result.data;
     } catch (error) {
-      console.error('[SecuritySingletonService] Error verifying MFA setup:', error);
+      clientLogger.error('[SecuritySingletonService] Error verifying MFA setup:', { detail: error });
       return false;
     }
   }
@@ -246,7 +247,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[SecuritySingletonService] Error verifying MFA login:', error);
+      clientLogger.error('[SecuritySingletonService] Error verifying MFA login:', { detail: error });
       throw error;
     }
   }
@@ -264,7 +265,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-mfa-disable'
       );
     } catch (error) {
-      console.error('[SecuritySingletonService] Error disabling MFA:', error);
+      clientLogger.error('[SecuritySingletonService] Error disabling MFA:', { detail: error });
       throw error;
     }
   }
@@ -294,7 +295,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingletonService] Error regenerating backup codes:', error);
+      clientLogger.error('[SecuritySingletonService] Error regenerating backup codes:', { detail: error });
       throw error;
     }
   }
@@ -317,7 +318,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting security alerts:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting security alerts:', { detail: error });
       return [];
     }
   }
@@ -335,7 +336,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-mark-alert-read'
       );
     } catch (error) {
-      console.error('[SecuritySingletonService] Error marking alert as read:', error);
+      clientLogger.error('[SecuritySingletonService] Error marking alert as read:', { detail: error });
       throw error;
     }
   }
@@ -353,7 +354,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-dismiss-alert'
       );
     } catch (error) {
-      console.error('[SecuritySingletonService] Error dismissing alert:', error);
+      clientLogger.error('[SecuritySingletonService] Error dismissing alert:', { detail: error });
       throw error;
     }
   }
@@ -375,7 +376,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || {};
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting alert preferences:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting alert preferences:', { detail: error });
       return {};
     }
   }
@@ -397,7 +398,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-update-alert-preferences'
       );
     } catch (error) {
-      console.error('[SecuritySingletonService] Error updating alert preferences:', error);
+      clientLogger.error('[SecuritySingletonService] Error updating alert preferences:', { detail: error });
       throw error;
     }
   }
@@ -443,7 +444,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin stability insights:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin stability insights:', { detail: error });
       return {
         summary: {
           totalIncidents: 0,
@@ -489,7 +490,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin tenants:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin tenants:', { detail: error });
       return [];
     }
   }
@@ -511,7 +512,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || { total: 0, successful: 0, failed: 0 };
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin sync stats:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin sync stats:', { detail: error });
       return { total: 0, successful: 0, failed: 0 };
     }
   }
@@ -538,7 +539,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || { sessions: [], total: 0 };
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin security sessions:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin security sessions:', { detail: error });
       return { sessions: [], total: 0 };
     }
   }
@@ -560,7 +561,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || { total: 0, active: 0, expired: 0 };
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin security sessions stats:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin security sessions stats:', { detail: error });
       return { total: 0, active: 0, expired: 0 };
     }
   }
@@ -582,7 +583,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin security alerts:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin security alerts:', { detail: error });
       return [];
     }
   }
@@ -604,7 +605,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || { total: 0, critical: 0, warning: 0, info: 0 };
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin security alerts stats:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin security alerts stats:', { detail: error });
       return { total: 0, critical: 0, warning: 0, info: 0 };
     }
   }
@@ -626,7 +627,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       
       return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingletonService] Error getting admin failed logins:', error);
+      clientLogger.error('[SecuritySingletonService] Error getting admin failed logins:', { detail: error });
       return [];
     }
   }

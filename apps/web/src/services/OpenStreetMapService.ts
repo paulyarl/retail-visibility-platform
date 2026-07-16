@@ -1,5 +1,6 @@
 import { ExternalApiSingleton } from '@/providers/base/ExternalApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ReverseGeocodingResponse {
   place_id: number;
@@ -75,13 +76,13 @@ export class OpenStreetMapService extends ExternalApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[OpenStreetMapService] API error:', result.error);
+        clientLogger.error('[OpenStreetMapService] API error:', { detail: result.error });
         return null;
       }
       
       return result.data || null;
     } catch (error) {
-      console.error('[OpenStreetMapService] Failed to reverse geocode:', error);
+      clientLogger.error('[OpenStreetMapService] Failed to reverse geocode:', { detail: error });
       return null;
     }
   }
@@ -111,13 +112,13 @@ export class OpenStreetMapService extends ExternalApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[OpenStreetMapService] Search API error:', result.error);
+        clientLogger.error('[OpenStreetMapService] Search API error:', { detail: result.error });
         return null;
       }
       
       return result.data || null;
     } catch (error) {
-      console.error('[OpenStreetMapService] Failed to forward geocode:', error);
+      clientLogger.error('[OpenStreetMapService] Failed to forward geocode:', { detail: error });
       return null;
     }
   }

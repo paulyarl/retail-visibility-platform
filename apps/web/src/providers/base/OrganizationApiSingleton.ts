@@ -14,6 +14,7 @@ import { TenantApiSingleton } from './TenantApiSingleton';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 import { ApiResult, ApiEnhancedCacheOptions } from './EnhancedFlexibleApiSingleton';
 import { PERMISSION_GROUPS, ROLE_GROUPS, USER_ROLES, type UserRole } from '@/config/rbac';
+import { clientLogger } from '@/lib/client-logger';
 
 // Platform role hierarchy (for role level comparisons)
 export enum PlatformRole {
@@ -551,7 +552,7 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   }
 
   public logError(message: string, error: any): void {
-    console.error(`[OrganizationApiSingleton] ${message}:`, error);
+    clientLogger.error(`[OrganizationApiSingleton] ${message}:`, { detail: error });
   }
 
   private decrypt(encrypted: string): string {

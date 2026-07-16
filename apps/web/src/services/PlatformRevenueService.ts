@@ -12,6 +12,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // TYPES
@@ -207,7 +208,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get platform config:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get platform config:', { detail: response?.error });
       return null;
     }
 
@@ -232,7 +233,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to update platform config:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to update platform config:', { detail: response?.error });
       return null;
     }
 
@@ -260,7 +261,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to initialize platform onboarding:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to initialize platform onboarding:', { detail: response?.error });
       return null;
     }
 
@@ -298,7 +299,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get merchant connections:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get merchant connections:', { detail: response?.error });
       return [];
     }
 
@@ -320,7 +321,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get merchant connection:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get merchant connection:', { detail: response?.error });
       return null;
     }
 
@@ -345,7 +346,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to create merchant onboarding link:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to create merchant onboarding link:', { detail: response?.error });
       return null;
     }
 
@@ -373,7 +374,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to update merchant fee:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to update merchant fee:', { detail: response?.error });
       return null;
     }
 
@@ -400,7 +401,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to refresh merchant status:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to refresh merchant status:', { detail: response?.error });
       return null;
     }
 
@@ -429,7 +430,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get revenue summary:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get revenue summary:', { detail: response?.error });
       return null;
     }
 
@@ -471,7 +472,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get revenue transactions:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get revenue transactions:', { detail: response?.error });
       return { transactions: [], total: 0 };
     }
 
@@ -506,7 +507,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get tenant revenue:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get tenant revenue:', { detail: response?.error });
       return null;
     }
 
@@ -536,7 +537,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get pending payouts:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get pending payouts:', { detail: response?.error });
       return null;
     }
 
@@ -564,7 +565,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to trigger payout:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to trigger payout:', { detail: response?.error });
       return null;
     }
 
@@ -596,7 +597,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get fee tiers:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get fee tiers:', { detail: response?.error });
       return [];
     }
 
@@ -621,7 +622,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to create fee tier:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to create fee tier:', { detail: response?.error });
       return null;
     }
 
@@ -647,7 +648,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to update fee tier:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to update fee tier:', { detail: response?.error });
       return null;
     }
 
@@ -671,7 +672,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to delete fee tier:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to delete fee tier:', { detail: response?.error });
       return false;
     }
 
@@ -698,7 +699,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to get fee overrides:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to get fee overrides:', { detail: response?.error });
       return [];
     }
 
@@ -723,7 +724,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to create fee override:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to create fee override:', { detail: response?.error });
       return null;
     }
 
@@ -747,7 +748,7 @@ class PlatformRevenueService extends AdminApiSingleton {
     );
 
     if (!response?.data?.success) {
-      console.error('[PlatformRevenueService] Failed to delete fee override:', response?.error);
+      clientLogger.error('[PlatformRevenueService] Failed to delete fee override:', { detail: response?.error });
       return false;
     }
 

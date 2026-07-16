@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { crossTenantProductService, TrendingProduct, BrandAnalytics, CategoryAnalytics, PlatformProductAnalytics } from '@/services/CrossTenantProductService';
 import Link from 'next/link';
 import Image from 'next/image';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function CrossTenantProductsPage() {
   const [activeTab, setActiveTab] = useState<'trending' | 'brands' | 'categories' | 'search'>('trending');
@@ -67,7 +68,7 @@ export default function CrossTenantProductsPage() {
       });
       setTrendingProducts(result || []);
     } catch (err) {
-      console.error('Failed to fetch trending products:', err);
+      clientLogger.error('Failed to fetch trending products:', { detail: err });
       setError('Failed to load trending products');
     } finally {
       setLoading(false);
@@ -81,7 +82,7 @@ export default function CrossTenantProductsPage() {
       const result = await crossTenantProductService.getBrandAnalytics({ limit: 20 });
       setBrandAnalytics(result || []);
     } catch (err) {
-      console.error('Failed to fetch brand analytics:', err);
+      clientLogger.error('Failed to fetch brand analytics:', { detail: err });
       setError('Failed to load brand analytics');
     } finally {
       setLoading(false);
@@ -95,7 +96,7 @@ export default function CrossTenantProductsPage() {
       const result = await crossTenantProductService.getCategoryAnalytics({ limit: 20 });
       setCategoryAnalytics(result || []);
     } catch (err) {
-      console.error('Failed to fetch category analytics:', err);
+      clientLogger.error('Failed to fetch category analytics:', { detail: err });
       setError('Failed to load category analytics');
     } finally {
       setLoading(false);
@@ -115,7 +116,7 @@ export default function CrossTenantProductsPage() {
       });
       setSearchResults(result || []);
     } catch (err) {
-      console.error('Failed to search products:', err);
+      clientLogger.error('Failed to search products:', { detail: err });
       setError('Search failed');
     } finally {
       setLoading(false);

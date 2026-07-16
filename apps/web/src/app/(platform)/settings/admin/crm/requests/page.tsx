@@ -6,6 +6,7 @@ import { Card, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { RequestType } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const TYPE_ICONS: Record<string, string> = {
   ticket: '🎫',
@@ -45,7 +46,7 @@ export default function CrmRequestsHubPage() {
         });
         setRequests(result);
       } catch (err) {
-        console.error('[CRM Requests Hub] Load error:', err);
+        clientLogger.error('[CRM Requests Hub] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -58,7 +59,7 @@ export default function CrmRequestsHubPage() {
       await crmAdminService.markAllRequestsRead();
       setRequests(prev => prev.map(r => ({ ...r, is_read: true })));
     } catch (err) {
-      console.error('[CRM Requests Hub] Mark all read error:', err);
+      clientLogger.error('[CRM Requests Hub] Mark all read error:', { detail: err });
     }
   }
 
@@ -67,7 +68,7 @@ export default function CrmRequestsHubPage() {
       await crmAdminService.markRequestRead(requestId);
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, is_read: true } : r));
     } catch (err) {
-      console.error('[CRM Requests Hub] Mark read error:', err);
+      clientLogger.error('[CRM Requests Hub] Mark read error:', { detail: err });
     }
   }
 

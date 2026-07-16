@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { tenantSlugService } from '@/services/TenantSlugService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SlugPattern {
   pattern: string;
@@ -77,7 +78,7 @@ export default function SlugPatternSelector({
           }
         }
       } catch (err) {
-        console.error('Error fetching slug patterns:', err);
+        clientLogger.error('Error fetching slug patterns:', { detail: err });
         setError('Failed to load slug options. Please try again.');
       } finally {
         setLoading(false);

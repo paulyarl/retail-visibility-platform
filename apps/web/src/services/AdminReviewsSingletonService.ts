@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Admin-specific interfaces
 export interface AdminReview {
@@ -112,7 +113,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
         console.log('[AdminReviewsSingleton] User not authorized for admin reviews');
         return [];
       }
-      console.error('[AdminReviewsSingleton] Failed to get admin reviews:', error);
+      clientLogger.error('[AdminReviewsSingleton] Failed to get admin reviews:', { detail: error });
       return [];
     }
   }
@@ -143,7 +144,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
         console.log('[AdminReviewsSingleton] User not authorized for admin stats');
         return null;
       }
-      console.error('[AdminReviewsSingleton] Failed to get admin review stats:', error);
+      clientLogger.error('[AdminReviewsSingleton] Failed to get admin review stats:', { detail: error });
       return null;
     }
   }
@@ -155,7 +156,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
    */
   async approveReview(reviewId: string): Promise<boolean> {
     if (!reviewId) {
-      console.error('[AdminReviewsSingleton] approveReview: reviewId is required');
+      clientLogger.error('[AdminReviewsSingleton] approveReview: reviewId is required');
       return false;
     }
 
@@ -171,7 +172,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[AdminReviewsSingleton] Failed to approve review:', error);
+      clientLogger.error('[AdminReviewsSingleton] Failed to approve review:', { detail: error });
       return false;
     }
   }
@@ -183,7 +184,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
    */
   async rejectReview(reviewId: string): Promise<boolean> {
     if (!reviewId) {
-      console.error('[AdminReviewsSingleton] rejectReview: reviewId is required');
+      clientLogger.error('[AdminReviewsSingleton] rejectReview: reviewId is required');
       return false;
     }
 
@@ -199,7 +200,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[AdminReviewsSingleton] Failed to reject review:', error);
+      clientLogger.error('[AdminReviewsSingleton] Failed to reject review:', { detail: error });
       return false;
     }
   }
@@ -210,7 +211,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
    */
   async bulkApproveReviews(reviewIds: string[]): Promise<boolean> {
     if (!reviewIds.length) {
-      console.error('[AdminReviewsSingleton] bulkApproveReviews: reviewIds array is required');
+      clientLogger.error('[AdminReviewsSingleton] bulkApproveReviews: reviewIds array is required');
       return false;
     }
 
@@ -229,7 +230,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[AdminReviewsSingleton] Failed to bulk approve reviews:', error);
+      clientLogger.error('[AdminReviewsSingleton] Failed to bulk approve reviews:', { detail: error });
       return false;
     }
   }
@@ -240,7 +241,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
    */
   async bulkRejectReviews(reviewIds: string[]): Promise<boolean> {
     if (!reviewIds.length) {
-      console.error('[AdminReviewsSingleton] bulkRejectReviews: reviewIds array is required');
+      clientLogger.error('[AdminReviewsSingleton] bulkRejectReviews: reviewIds array is required');
       return false;
     }
 
@@ -259,7 +260,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[AdminReviewsSingleton] Failed to bulk reject reviews:', error);
+      clientLogger.error('[AdminReviewsSingleton] Failed to bulk reject reviews:', { detail: error });
       return false;
     }
   }

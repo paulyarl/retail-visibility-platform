@@ -13,6 +13,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface InventoryStats {
   totalProducts: number;
@@ -97,7 +98,7 @@ class InventoryStatsSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[InventoryStatsSingleton] Failed to get inventory stats:', response.error);
+      clientLogger.error('[InventoryStatsSingleton] Failed to get inventory stats:', { detail: response.error });
       return null;
     }
 
@@ -121,7 +122,7 @@ class InventoryStatsSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[InventoryStatsSingleton] Failed to get inventory metrics:', response.error);
+      clientLogger.error('[InventoryStatsSingleton] Failed to get inventory metrics:', { detail: response.error });
       return null;
     }
 
@@ -147,7 +148,7 @@ class InventoryStatsSingletonService extends TenantApiSingleton {
 
       return response?.data || response;
     } catch (error) {
-      console.error('[InventoryStatsSingleton] Failed to get inventory health:', error);
+      clientLogger.error('[InventoryStatsSingleton] Failed to get inventory health:', { detail: error });
       return null;
     }
   }
@@ -180,7 +181,7 @@ class InventoryStatsSingletonService extends TenantApiSingleton {
 
       return response?.data || response;
     } catch (error) {
-      console.error('[InventoryStatsSingleton] Failed to get inventory trends:', error);
+      clientLogger.error('[InventoryStatsSingleton] Failed to get inventory trends:', { detail: error });
       return null;
     }
   }
@@ -203,7 +204,7 @@ class InventoryStatsSingletonService extends TenantApiSingleton {
       const stats = await this.getInventoryStats(tenantId);
       return stats;
     } catch (error) {
-      console.error('[InventoryStatsSingleton] Failed to refresh inventory stats:', error);
+      clientLogger.error('[InventoryStatsSingleton] Failed to refresh inventory stats:', { detail: error });
       return null;
     }
   }

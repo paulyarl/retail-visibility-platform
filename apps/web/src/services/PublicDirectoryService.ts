@@ -8,6 +8,7 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { ResolverType } from '@/types/resolver';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryItem {
   id: string;
@@ -142,7 +143,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to search directory:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to search directory:', { detail: error });
       return {
         items: [],
         total: 0,
@@ -166,7 +167,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get directory item:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get directory item:', { detail: error });
       return null;
     }
   }
@@ -186,7 +187,7 @@ class PublicDirectoryService extends PublicApiSingleton {
      }
      return result.data || null;
    } catch (error) {
-     console.error('[PublicDirectoryService] Failed to get shop info:', error);
+     clientLogger.error('[PublicDirectoryService] Failed to get shop info:', { detail: error });
      return null;
    }
  }
@@ -216,7 +217,7 @@ class PublicDirectoryService extends PublicApiSingleton {
     }
     return result.data || null;
   } catch (error) {
-    console.error('[PublicDirectoryService] Failed to get shop info by ID:', error);
+    clientLogger.error('[PublicDirectoryService] Failed to get shop info by ID:', { detail: error });
     return null;
   }
 }
@@ -240,7 +241,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data?.items || [];
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get featured listings:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get featured listings:', { detail: error });
       return [];
     }
   }
@@ -266,7 +267,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data?.items || [];
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get nearby listings:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get nearby listings:', { detail: error });
       return [];
     }
   }
@@ -289,7 +290,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data?.categories || [];
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get categories:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get categories:', { detail: error });
       return [];
     }
   }
@@ -312,7 +313,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data?.locations || [];
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get locations:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get locations:', { detail: error });
       return [];
     }
   }
@@ -335,7 +336,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data?.entries || [];
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get sitemap:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get sitemap:', { detail: error });
       return [];
     }
   }
@@ -358,7 +359,7 @@ class PublicDirectoryService extends PublicApiSingleton {
       
       return result.data?.items || [];
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get last viewed:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get last viewed:', { detail: error });
       return [];
     }
   }
@@ -382,7 +383,7 @@ class PublicDirectoryService extends PublicApiSingleton {
         0 // No caching for tracking
       );
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to track view:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to track view:', { detail: error });
       // Don't throw error for tracking failures
     }
   }
@@ -426,7 +427,7 @@ class PublicDirectoryService extends PublicApiSingleton {
         publishedShops: 0
       };
     } catch (error) {
-      console.error('[PublicDirectoryService] Failed to get statistics:', error);
+      clientLogger.error('[PublicDirectoryService] Failed to get statistics:', { detail: error });
       return {
         totalShops: 0,
         totalProducts: 0,

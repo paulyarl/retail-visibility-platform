@@ -9,6 +9,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { useBarcodeScanCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { UserTenantSelector } from '@/components/tenant/UserTenantSelector';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +66,7 @@ export default function ScanPage() {
       const data = await itemsSingletonService.getMyScanSessions(selectedTenant);
       setSessions(data.sessions || []);
     } catch (error) {
-      console.error('Failed to load sessions:', error);
+      clientLogger.error('Failed to load sessions:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -76,7 +77,7 @@ export default function ScanPage() {
       await itemsSingletonService.cancelScanSession(sessionId);
       await loadSessions(); // Refresh the list
     } catch (err) {
-      console.error('[ScanPage] Failed to cancel session:', err);
+      clientLogger.error('[ScanPage] Failed to cancel session:', { detail: err });
       notifications.show({ title: 'Error', message: 'Failed to cancel session', color: 'red' });
     }
   };
@@ -98,7 +99,7 @@ export default function ScanPage() {
       notifications.show({ title: 'Success', message: 'Cleaned up active sessions. You can now start a new scan.', color: 'green' });
       await loadSessions();
     } catch (error) {
-      console.error('Failed to cleanup sessions:', error);
+      clientLogger.error('Failed to cleanup sessions:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to cleanup sessions', color: 'red' });
     } finally {
       setCleaningUp(false);
@@ -139,11 +140,11 @@ export default function ScanPage() {
         localStorage.setItem('lastTenantId', selectedTenant);
         router.push(`/scan/${data.session.id}`);
       } else {
-        console.error('Invalid session response:', data);
+        clientLogger.error('Invalid session response:', { detail: data });
         notifications.show({ title: 'Error', message: 'Failed to start session: Invalid response from server', color: 'red' });
       }
     } catch (error) {
-      console.error('Failed to start session:', error);
+      clientLogger.error('Failed to start session:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to start scanning session', color: 'red' });
     } finally {
       setCreating(false);

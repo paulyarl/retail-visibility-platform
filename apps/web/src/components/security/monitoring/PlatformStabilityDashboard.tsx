@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 // import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StabilityInsights {
   summary: {
@@ -92,7 +93,7 @@ export function PlatformStabilityDashboard() {
       const data = await securitySingletonService.getAdminStabilityInsights(timeframe.toString());
       setInsights(data);
     } catch (err) {
-      console.error('Failed to fetch stability insights:', err);
+      clientLogger.error('Failed to fetch stability insights:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch insights');
     } finally {
       setLoading(false);

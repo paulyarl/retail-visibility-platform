@@ -9,6 +9,7 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import HeroLocationService from './HeroLocationService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 export interface CartItem {
@@ -137,7 +138,7 @@ class CheckoutLocationService extends PublicApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[CheckoutLocationService] Error finding locations:', error);
+      clientLogger.error('[CheckoutLocationService] Error finding locations:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to find locations',
@@ -189,7 +190,7 @@ class CheckoutLocationService extends PublicApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[CheckoutLocationService] Error getting organization locations:', error);
+      clientLogger.error('[CheckoutLocationService] Error getting organization locations:', { detail: error });
       return {
         productSlug,
         organizationId,
@@ -228,7 +229,7 @@ class CheckoutLocationService extends PublicApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[CheckoutLocationService] Error validating location:', error);
+      clientLogger.error('[CheckoutLocationService] Error validating location:', { detail: error });
       return {
         tenantId,
         valid: false,
@@ -308,7 +309,7 @@ class CheckoutLocationService extends PublicApiSingleton {
       
       return await heroLocationService.getPaymentConfig(pickupTenantId);
     } catch (error) {
-      console.error('[CheckoutLocationService] Error getting payment routing:', error);
+      clientLogger.error('[CheckoutLocationService] Error getting payment routing:', { detail: error });
       // Fallback to pickup tenant
       return {
         paymentTenantId: pickupTenantId,

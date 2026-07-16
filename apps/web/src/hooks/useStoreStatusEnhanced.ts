@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { hoursStatusService, StoreStatus } from '@/services/HoursStatusService';
 import { hoursStatusSingleton } from '@/providers/data/HoursStatusSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Enhanced useStoreStatus hook that uses the HoursStatusSingleton
@@ -27,7 +28,7 @@ export function useStoreStatusEnhanced(tenantId?: string) {
       const statusData = await hoursStatusService.getStoreStatus(tenantId);
       setStatus(statusData);
     } catch (err) {
-      console.error('Failed to fetch store status:', err);
+      clientLogger.error('Failed to fetch store status:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setStatus(null);
     } finally {
@@ -88,7 +89,7 @@ export function useMultipleStoreStatus(tenantIds: string[]) {
       const statusMap = await hoursStatusSingleton.getMultipleStoreStatus(tenantIds);
       setStatuses(statusMap);
     } catch (err) {
-      console.error('Failed to fetch multiple store statuses:', err);
+      clientLogger.error('Failed to fetch multiple store statuses:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setStatuses(new Map());
     } finally {

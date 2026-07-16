@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
 import { productReviewsService } from '@/services/ProductReviewsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductRatingBadgeProps {
   productId: string;
@@ -26,7 +27,7 @@ export default function ProductRatingBadge({ productId, tenantId, size = 'sm', s
           setCount(data.rating_count);
         }
       } catch (error) {
-        console.error('Error fetching product rating:', error);
+        clientLogger.error('Error fetching product rating:', { detail: error });
       } finally {
         setLoading(false);
       }

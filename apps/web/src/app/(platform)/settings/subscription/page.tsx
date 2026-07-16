@@ -21,6 +21,7 @@ import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionS
 import { SelfServiceBillingWithStripe } from '@/components/subscription/SelfServiceBilling';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import CapabilityFeatureList from '@/components/subscription/CapabilityFeatureList';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,7 +78,7 @@ export default function SubscriptionPage({ embedded = false, tenantId: propTenan
     const isPlatformAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT';
     const isAuthorized = isPlatformAdmin || userTenants.includes(urlTenantId);
     if (!isAuthorized) {
-      console.warn(`[Subscription] User ${user.id} attempted to access tenant ${urlTenantId} without authorization`);
+      clientLogger.warn(`[Subscription] User ${user.id} attempted to access tenant ${urlTenantId} without authorization`);
       // Fall back to user's first tenant or localStorage
       tenantId = (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || user.tenants[0]?.id || null;
     }

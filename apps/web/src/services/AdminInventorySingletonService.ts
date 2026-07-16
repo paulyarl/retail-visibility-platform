@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ========================================
 // Transfer Types
@@ -185,7 +186,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get transfers:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get transfers:', { detail: result.error });
       return null;
     }
 
@@ -213,7 +214,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get transfer:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get transfer:', { detail: result.error });
       return null;
     }
 
@@ -242,7 +243,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to create transfer:', result.error);
+      clientLogger.error('[AdminInventory] Failed to create transfer:', { detail: result.error });
       return null;
     }
 
@@ -265,7 +266,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to approve transfer:', result.error);
+      clientLogger.error('[AdminInventory] Failed to approve transfer:', { detail: result.error });
       return null;
     }
 
@@ -292,7 +293,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to ship transfer:', result.error);
+      clientLogger.error('[AdminInventory] Failed to ship transfer:', { detail: result.error });
       return null;
     }
 
@@ -318,7 +319,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to receive transfer:', result.error);
+      clientLogger.error('[AdminInventory] Failed to receive transfer:', { detail: result.error });
       return null;
     }
 
@@ -341,7 +342,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to cancel transfer:', result.error);
+      clientLogger.error('[AdminInventory] Failed to cancel transfer:', { detail: result.error });
       return false;
     }
 
@@ -385,7 +386,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get location inventory:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get location inventory:', { detail: result.error });
       return null;
     }
 
@@ -431,7 +432,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get low stock alerts:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get low stock alerts:', { detail: result.error });
       return null;
     }
 
@@ -462,7 +463,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get platform stats:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get platform stats:', { detail: result.error });
       return null;
     }
 
@@ -488,7 +489,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get tenant breakdown:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get tenant breakdown:', { detail: result.error });
       return null;
     }
 
@@ -524,7 +525,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get category distribution:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get category distribution:', { detail: result.error });
       return null;
     }
 
@@ -555,7 +556,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to get top products:', result.error);
+      clientLogger.error('[AdminInventory] Failed to get top products:', { detail: result.error });
       return null;
     }
 
@@ -601,7 +602,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to bulk update inventory:', result.error);
+      clientLogger.error('[AdminInventory] Failed to bulk update inventory:', { detail: result.error });
       return null;
     }
 
@@ -638,7 +639,7 @@ class AdminInventorySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminInventory] Failed to bulk initiate transfers:', result.error);
+      clientLogger.error('[AdminInventory] Failed to bulk initiate transfers:', { detail: result.error });
       return null;
     }
 

@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 
 import { MantineTest } from '@/components/MantineTest';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function TestPage() {
   const [testResults, setTestResults] = useState<Record<string, any>>({});
@@ -59,7 +60,7 @@ export default function TestPage() {
       };
 
     } catch (error) {
-      console.error('Test failed:', error);
+      clientLogger.error('Test failed:', { detail: error });
       results.error = {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error'

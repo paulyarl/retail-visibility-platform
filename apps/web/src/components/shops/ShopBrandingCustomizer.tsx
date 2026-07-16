@@ -44,6 +44,7 @@ function SiLinkedin({ className }: { className?: string }) {
   );
 }
 import { type Shop } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopBrandingCustomizerProps {
   shop: Shop;
@@ -159,7 +160,7 @@ export default function ShopBrandingCustomizer({ shop, onUpdate, onCancel }: Sho
       };
       onUpdate(updatedShop);
     } catch (error) {
-      console.error('Error saving branding:', error);
+      clientLogger.error('Error saving branding:', { detail: error });
     } finally {
       setIsSaving(false);
     }

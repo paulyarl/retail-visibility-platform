@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import type { TenantRequestOptions } from '@/providers/base/EnhancedFlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TrialStatus {
   hasActiveTrial: boolean;
@@ -125,7 +126,7 @@ export class TrialService extends TenantApiSingleton {
       const status = await this.getTrialStatus(tenantId);
       return status.canStartTrial;
     } catch (error) {
-      console.error('[TrialService] Failed to check trial eligibility:', error);
+      clientLogger.error('[TrialService] Failed to check trial eligibility:', { detail: error });
       return true; // Default to allowing trial if check fails
     }
   }

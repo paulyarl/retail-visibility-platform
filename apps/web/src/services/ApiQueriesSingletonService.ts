@@ -7,6 +7,7 @@
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Category {
   id: string;
@@ -132,7 +133,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
    */
   async getOrganizationBillingCounters(organizationId: string): Promise<OrganizationData> {
     if (!organizationId) {
-      console.error('[ApiQueriesSingleton] Organization ID is required for billing counters');
+      clientLogger.error('[ApiQueriesSingleton] Organization ID is required for billing counters');
       return {} as OrganizationData;
     }
 
@@ -145,7 +146,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ApiQueriesSingleton] Failed to get organization billing counters:', result.error);
+      clientLogger.error('[ApiQueriesSingleton] Failed to get organization billing counters:', { detail: result.error });
       console.error('[ApiQueriesSingleton] Response details:', {
         success: result.success,
         error: result.error,
@@ -170,7 +171,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ApiQueriesSingleton] Failed to get tenant:', result.error);
+      clientLogger.error('[ApiQueriesSingleton] Failed to get tenant:', { detail: result.error });
       return {} as Tenant;
     }
 
@@ -188,7 +189,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ApiQueriesSingleton] Failed to get tenant categories:', result.error);
+      clientLogger.error('[ApiQueriesSingleton] Failed to get tenant categories:', { detail: result.error });
       return [];
     }
 
@@ -212,7 +213,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ApiQueriesSingleton] Failed to get upgrade requests:', result.error);
+      clientLogger.error('[ApiQueriesSingleton] Failed to get upgrade requests:', { detail: result.error });
       return [];
     }
 

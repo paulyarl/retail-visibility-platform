@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PWAConfig {
   name: string;
@@ -119,7 +120,7 @@ class PWAService extends PublicApiSingleton {
    */
   private async registerServiceWorker(): Promise<void> {
     if (!('serviceWorker' in navigator)) {
-      console.warn('[PWAService] Service Worker not supported');
+      clientLogger.warn('[PWAService] Service Worker not supported');
       return;
     }
 
@@ -144,7 +145,7 @@ class PWAService extends PublicApiSingleton {
       });
 
     } catch (error) {
-      console.error('[PWAService] Service Worker registration failed:', error);
+      clientLogger.error('[PWAService] Service Worker registration failed:', { detail: error });
     }
   }
 
@@ -313,7 +314,7 @@ class PWAService extends PublicApiSingleton {
    */
   async subscribeToPushNotifications(): Promise<boolean> {
     if (!this.swRegistration) {
-      console.warn('[PWAService] Service Worker not registered');
+      clientLogger.warn('[PWAService] Service Worker not registered');
       return false;
     }
 
@@ -321,7 +322,7 @@ class PWAService extends PublicApiSingleton {
       // Request permission
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        console.warn('[PWAService] Notification permission denied');
+        clientLogger.warn('[PWAService] Notification permission denied');
         return false;
       }
 
@@ -340,7 +341,7 @@ class PWAService extends PublicApiSingleton {
       return true;
 
     } catch (error) {
-      console.error('[PWAService] Push notification subscription failed:', error);
+      clientLogger.error('[PWAService] Push notification subscription failed:', { detail: error });
       return false;
     }
   }
@@ -364,7 +365,7 @@ class PWAService extends PublicApiSingleton {
       return true;
 
     } catch (error) {
-      console.error('[PWAService] Failed to unsubscribe from push notifications:', error);
+      clientLogger.error('[PWAService] Failed to unsubscribe from push notifications:', { detail: error });
       return false;
     }
   }
@@ -385,13 +386,13 @@ class PWAService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[PWAService] Failed to send push notification:', response.error);
+        clientLogger.error('[PWAService] Failed to send push notification:', { detail: response.error });
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('[PWAService] Error sending push notification:', error);
+      clientLogger.error('[PWAService] Error sending push notification:', { detail: error });
       return false;
     }
   }
@@ -405,7 +406,7 @@ class PWAService extends PublicApiSingleton {
     options: NotificationOptions = {}
   ): Promise<void> {
     if (!('Notification' in window)) {
-      console.warn('[PWAService] Notifications not supported');
+      clientLogger.warn('[PWAService] Notifications not supported');
       return;
     }
 
@@ -443,7 +444,7 @@ class PWAService extends PublicApiSingleton {
 
       console.log(`[PWAService] Cached ${content.type} ${content.id}`);
     } catch (error) {
-      console.error('[PWAService] Failed to cache content:', error);
+      clientLogger.error('[PWAService] Failed to cache content:', { detail: error });
     }
   }
 
@@ -469,7 +470,7 @@ class PWAService extends PublicApiSingleton {
 
       return response.data?.content || null;
     } catch (error) {
-      console.error('[PWAService] Failed to get cached content:', error);
+      clientLogger.error('[PWAService] Failed to get cached content:', { detail: error });
       return null;
     }
   }
@@ -492,7 +493,7 @@ class PWAService extends PublicApiSingleton {
         console.log(`[PWAService] Loaded ${response.data?.content?.length || 0} offline items`);
       }
     } catch (error) {
-      console.error('[PWAService] Failed to load offline content:', error);
+      clientLogger.error('[PWAService] Failed to load offline content:', { detail: error });
     }
   }
 
@@ -518,7 +519,7 @@ class PWAService extends PublicApiSingleton {
       this.offlineQueue = [];
       console.log('[PWAService] Offline content synced successfully');
     } catch (error) {
-      console.error('[PWAService] Failed to sync offline content:', error);
+      clientLogger.error('[PWAService] Failed to sync offline content:', { detail: error });
     }
   }
 
@@ -546,10 +547,10 @@ class PWAService extends PublicApiSingleton {
             // Sync wishlist actions
             break;
           default:
-            console.warn(`[PWAService] Unknown offline action type: ${action.type}`);
+            clientLogger.warn(`[PWAService] Unknown offline action type: ${action.type}`);
         }
       } catch (error) {
-        console.error(`[PWAService] Failed to process offline action:`, error);
+        clientLogger.error(`[PWAService] Failed to process offline action:`, { detail: error });
       }
     }
   }
@@ -690,7 +691,7 @@ class PWAService extends PublicApiSingleton {
 
       return response.data?.manifest || this.getDefaultManifest();
     } catch (error) {
-      console.error('[PWAService] Failed to get manifest:', error);
+      clientLogger.error('[PWAService] Failed to get manifest:', { detail: error });
       return this.getDefaultManifest();
     }
   }

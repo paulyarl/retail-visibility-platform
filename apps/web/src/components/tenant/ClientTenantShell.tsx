@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import TenantShell from './TenantShell';
 import { TenantOption } from './TenantSwitcher';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ClientTenantShellProps {
   tenantId: string;
@@ -36,7 +37,7 @@ export default function ClientTenantShell({
           setTenantLogoUrl(tenantData.metadata?.logo_url);
         }
       } catch (error) {
-        console.warn('Failed to fetch tenant data:', error);
+        clientLogger.warn('Failed to fetch tenant data:', { detail: error });
         // Keep the fallback values
       } finally {
         setLoading(false);

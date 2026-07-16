@@ -8,6 +8,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Tenant Profile Data Interfaces
 export interface TenantProfile {
@@ -224,7 +225,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
       if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tenant profile:', result.error);
+      clientLogger.error('Error fetching tenant profile:', { detail: result.error });
       return null;
     }
     
@@ -258,7 +259,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     }, `create-tenant-profile-${tenantId}`);
     
     if (!result.success) {
-      console.error('Error creating tenant profile:', result.error);
+      clientLogger.error('Error creating tenant profile:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to create tenant profile');
     }
     
@@ -302,7 +303,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
 
       return updatedProfile;
     } catch (error) {
-      console.error('Error updating tenant profile:', error);
+      clientLogger.error('Error updating tenant profile:', { detail: error });
       throw error;
     }
   }
@@ -320,7 +321,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     }, `update-tenant-profile-${tenantId}`);
     
     if (!result.success) {
-      console.error('Error processing profile update:', result.error);
+      clientLogger.error('Error processing profile update:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to process profile update');
     }
 
@@ -356,7 +357,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
 
         await this.processProfileUpdate(tenantId, mergedUpdates);
       } catch (error) {
-        console.error(`Error processing updates for tenant ${tenantId}:`, error);
+        clientLogger.error(`Error processing updates for tenant ${tenantId}:`, { detail: error });
       }
     }
   }
@@ -372,7 +373,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     const result = await this.makeDefaultRequest<TenantProfileStats>(`/api/tenants/${tenantId}/profile/stats`, {}, `tenant-profile-stats-${tenantId}`);
     
     if (!result.success) {
-      console.error('Error fetching tenant profile stats:', result.error);
+      clientLogger.error('Error fetching tenant profile stats:', { detail: result.error });
       
       // Return default stats
       return {
@@ -410,7 +411,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     }, `update-tenant-analytics-${tenantId}`);
     
     if (!result.success) {
-      console.error('Error updating tenant analytics:', result.error);
+      clientLogger.error('Error updating tenant analytics:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to update tenant analytics');
     }
 
@@ -438,7 +439,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     }, `record-tenant-activity-${tenantId}`);
     
     if (!result.success) {
-      console.error('Error recording tenant activity:', result.error);
+      clientLogger.error('Error recording tenant activity:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to record tenant activity');
     }
 
@@ -464,7 +465,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
           profiles.set(tenantId, profile);
         }
       } catch (error) {
-        console.error(`Failed to fetch profile for tenant ${tenantId}:`, error);
+        clientLogger.error(`Failed to fetch profile for tenant ${tenantId}:`, { detail: error });
       }
     });
 
@@ -497,13 +498,13 @@ class TenantProfileSingleton extends TenantApiSingleton {
       const result = await this.makeDefaultRequest<TenantProfile[]>(`/api/tenants/search?${params}`, {}, `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`);
       
       if (!result.success) {
-        console.error('Error searching tenant profiles:', result.error);
+        clientLogger.error('Error searching tenant profiles:', { detail: result.error });
         return [];
       }
       
       return result.data || [];
     } catch (error) {
-      console.error('Error searching tenant profiles:', error);
+      clientLogger.error('Error searching tenant profiles:', { detail: error });
       return [];
     }
   }
@@ -515,7 +516,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     const result = await this.makeDefaultRequest<TenantProfile[]>(`/api/tenants/featured?limit=${limit}`, {}, `featured-tenant-profiles-${limit}`);
     
     if (!result.success) {
-      console.error('Error fetching featured tenant profiles:', result.error);
+      clientLogger.error('Error fetching featured tenant profiles:', { detail: result.error });
       return [];
     }
     

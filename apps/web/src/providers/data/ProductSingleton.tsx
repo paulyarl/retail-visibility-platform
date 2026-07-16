@@ -2,6 +2,7 @@
 
 import { createContext, useContext, ReactNode, useEffect, useState } from 'react';
 import { PublicApiSingleton } from '../base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // PUBLIC PRODUCT INTERFACES
@@ -170,7 +171,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return products;
     } catch (error) {
-      console.error('Failed to fetch products:', error);
+      clientLogger.error('Failed to fetch products:', { detail: error });
       throw error;
     }
   }
@@ -203,7 +204,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return product;
     } catch (error) {
-      console.error(`Failed to fetch product ${productId}:`, error);
+      clientLogger.error(`Failed to fetch product ${productId}:`, { detail: error });
       return null;
     }
   }
@@ -228,7 +229,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       const products: PublicProduct[] = response?.data?.products || [];
       if (!products.length) {
-        console.warn('[ProductSingleton] Global featured products API failed, falling back to legacy method');
+        clientLogger.warn('[ProductSingleton] Global featured products API failed, falling back to legacy method');
         return this.fetchRandomFeaturedLegacy(location, limit);
       }
       
@@ -245,7 +246,7 @@ class ProductSingleton extends PublicApiSingleton {
       return products;
       
     } catch (error) {
-      console.error('[ProductSingleton] Error in fetchRandomFeaturedProducts:', error);
+      clientLogger.error('[ProductSingleton] Error in fetchRandomFeaturedProducts:', { detail: error });
       // Fallback to legacy method
       return this.fetchRandomFeaturedLegacy(location, limit);
     }
@@ -291,7 +292,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return products;
     } catch (error) {
-      console.error('[ProductSingleton] Legacy fallback failed:', error);
+      clientLogger.error('[ProductSingleton] Legacy fallback failed:', { detail: error });
       throw error;
     }
   }
@@ -319,7 +320,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return categories;
     } catch (error) {
-      console.error('Failed to fetch product categories:', error);
+      clientLogger.error('Failed to fetch product categories:', { detail: error });
       throw error;
     }
   }
@@ -362,7 +363,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return response?.data?.products || [];
     } catch (error) {
-      console.error('Failed to fetch trending products:', error);
+      clientLogger.error('Failed to fetch trending products:', { detail: error });
       return [];
     }
   }
@@ -383,7 +384,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return response?.data?.products || [];
     } catch (error) {
-      console.error('Failed to fetch new arrivals:', error);
+      clientLogger.error('Failed to fetch new arrivals:', { detail: error });
       return [];
     }
   }
@@ -404,7 +405,7 @@ class ProductSingleton extends PublicApiSingleton {
       
       return response?.data?.products || [];
     } catch (error) {
-      console.error('Failed to fetch on-sale products:', error);
+      clientLogger.error('Failed to fetch on-sale products:', { detail: error });
       return [];
     }
   }

@@ -10,6 +10,7 @@ import Image from 'next/image';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
+import { clientLogger } from '@/lib/client-logger';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -78,7 +79,7 @@ export default function TenantBrandingPage() {
           // console.log(`[Branding] Banner URL after profile check: ${bannerUrl}`);
         }
       } catch (profileErr) {
-        console.warn('Profile fetch failed, using tenant name:', profileErr);
+        clientLogger.warn('Profile fetch failed, using tenant name:', { detail: profileErr });
       }
       
       // If no logo found, try to get it from mv_global_discovery
@@ -91,7 +92,7 @@ export default function TenantBrandingPage() {
             // console.log('[Branding] Found logo from mv_global_discovery:', logoUrl);
           }
         } catch (logoErr) {
-          console.warn('Failed to fetch logo from mv_global_discovery:', logoErr);
+          clientLogger.warn('Failed to fetch logo from mv_global_discovery:', { detail: logoErr });
         }
       }
       
@@ -103,7 +104,7 @@ export default function TenantBrandingPage() {
       setBannerUrl(bannerUrl);
       setBannerPreview(bannerUrl);
     } catch (err) {
-      console.error('Failed to load branding:', err);
+      clientLogger.error('Failed to load branding:', { detail: err });
       setError('Failed to load branding settings');
     } finally {
       setLoading(false);
@@ -130,11 +131,11 @@ export default function TenantBrandingPage() {
         setSuccess('Logo uploaded successfully!');
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        console.error('[Branding] Logo upload response missing URL:', payload);
+        clientLogger.error('[Branding] Logo upload response missing URL:', { detail: payload });
         setError('Logo upload succeeded but no URL was returned');
       }
     } catch (err: any) {
-      console.error('Logo upload error:', err);
+      clientLogger.error('Logo upload error:', { detail: err });
       setError(err.message || 'Failed to upload logo');
     } finally {
       setUploadingLogo(false);
@@ -168,11 +169,11 @@ export default function TenantBrandingPage() {
         setSuccess('Banner uploaded successfully!');
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        console.error('[Branding] Banner upload response missing URL:', payload);
+        clientLogger.error('[Branding] Banner upload response missing URL:', { detail: payload });
         setError('Banner upload succeeded but no URL was returned');
       }
     } catch (err: any) {
-      console.error('Banner upload error:', err);
+      clientLogger.error('Banner upload error:', { detail: err });
       setError(err.message || 'Failed to upload banner');
     } finally {
       setUploadingBanner(false);
@@ -220,7 +221,7 @@ export default function TenantBrandingPage() {
       setSuccess('Branding updated successfully!');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      console.error('Save error:', err);
+      clientLogger.error('Save error:', { detail: err });
       setError(err.message || 'Failed to save branding');
     } finally {
       setSaving(false);

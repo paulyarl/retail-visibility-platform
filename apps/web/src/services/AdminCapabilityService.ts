@@ -7,6 +7,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CapabilityData {
   capability_type_key: string;
@@ -162,7 +163,7 @@ export class AdminCapabilityService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCapabilityService] Failed to get capabilities:', result.error);
+      clientLogger.error('[AdminCapabilityService] Failed to get capabilities:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch capabilities');
     }
 
@@ -181,7 +182,7 @@ export class AdminCapabilityService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[AdminCapabilityService] Failed to get tier capabilities for ${tierKey}:`, result.error);
+      clientLogger.error(`[AdminCapabilityService] Failed to get tier capabilities for ${tierKey}:`, { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : `Failed to fetch tier capabilities for ${tierKey}`);
     }
 
@@ -203,7 +204,7 @@ export class AdminCapabilityService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[AdminCapabilityService] Failed to update tier capabilities for ${tierKey}:`, result.error);
+      clientLogger.error(`[AdminCapabilityService] Failed to update tier capabilities for ${tierKey}:`, { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : `Failed to update tier capabilities for ${tierKey}`);
     }
 
@@ -236,7 +237,7 @@ export class AdminCapabilityService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCapabilityService] Failed to create tier capability:', result.error);
+      clientLogger.error('[AdminCapabilityService] Failed to create tier capability:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create tier capability');
     }
 
@@ -258,7 +259,7 @@ export class AdminCapabilityService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCapabilityService] Failed to delete tier capability:', result.error);
+      clientLogger.error('[AdminCapabilityService] Failed to delete tier capability:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete tier capability');
     }
 

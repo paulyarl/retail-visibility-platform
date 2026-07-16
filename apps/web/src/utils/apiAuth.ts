@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth0 } from '@/lib/auth0';
 import AuthSyncService from '@/services/AuthSyncService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Get Auth0 session and access token for API authentication
@@ -32,7 +33,7 @@ export async function getAuth0Session(req: NextRequest): Promise<{
       accessToken: accessToken?.token || null
     };
   } catch (error) {
-    console.error('[API Auth] Failed to get Auth0 session:', error);
+    clientLogger.error('[API Auth] Failed to get Auth0 session:', { detail: error });
     return null;
   }
 }
@@ -88,7 +89,7 @@ export async function requirePlatformAdmin(req: NextRequest): Promise<{
     
     return authResult;
   } catch (error) {
-    console.error('[API Auth] Failed to verify platform admin:', error);
+    clientLogger.error('[API Auth] Failed to verify platform admin:', { detail: error });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to verify permissions' },
       { status: 500 }

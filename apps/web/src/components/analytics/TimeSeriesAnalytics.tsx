@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, Activity, BarChart3 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TimeSeriesAnalyticsProps {
   filters: {
@@ -128,7 +129,7 @@ export default function TimeSeriesAnalytics({ filters }: TimeSeriesAnalyticsProp
       setTimeSeriesData(mockTimeSeriesData);
       setTrendMetrics(mockTrendMetrics);
     } catch (error) {
-      console.error('Error fetching time series data:', error);
+      clientLogger.error('Error fetching time series data:', { detail: error });
     } finally {
       setLoading(false);
     }

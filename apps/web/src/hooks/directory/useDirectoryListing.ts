@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryListing {
   id: string;
@@ -57,7 +58,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       
       setListing(response);
     } catch (err) {
-      console.error('Error fetching directory listing:', err);
+      clientLogger.error('Error fetching directory listing:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load listing');
     } finally {
       setLoading(false);
@@ -80,7 +81,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       
       await fetchListing();
     } catch (err: any) {
-      console.error('Error publishing listing:', err);
+      clientLogger.error('Error publishing listing:', { detail: err });
       
       // Extract the detailed error message
       const errorMessage = err?.message || err?.response?.data?.message || err?.response?.data?.error || 'Failed to publish';
@@ -100,7 +101,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       
       await fetchListing();
     } catch (err) {
-      console.error('Error unpublishing listing:', err);
+      clientLogger.error('Error unpublishing listing:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to unpublish');
       throw err;
     }
@@ -125,7 +126,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       // Refetch to get complete data including businessProfile
       await fetchListing();
     } catch (err) {
-      console.error('Error updating listing:', err);
+      clientLogger.error('Error updating listing:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to update');
       throw err;
     }
@@ -146,7 +147,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       
       return result;
     } catch (err) {
-      console.error('Error syncing profile:', err);
+      clientLogger.error('Error syncing profile:', { detail: err });
       const message = err instanceof Error ? err.message : 'Failed to sync profile';
       setError(message);
       return { success: false, message };

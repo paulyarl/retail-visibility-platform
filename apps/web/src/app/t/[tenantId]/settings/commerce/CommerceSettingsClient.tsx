@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CommerceSettings {
   // Payment Options
@@ -175,7 +176,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
           });
         }
       } catch (tierError) {
-        console.error('Error fetching tenant tier:', tierError);
+        clientLogger.error('Error fetching tenant tier:', { detail: tierError });
         // Set default tier if fetch fails
         setCurrentTier('');
       }
@@ -186,7 +187,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
         setSettings(response);
       }
     } catch (error) {
-      console.error('Error fetching commerce settings:', error);
+      clientLogger.error('Error fetching commerce settings:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to load settings' });
     } finally {
       setLoading(false);
@@ -206,7 +207,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
         setTimeout(() => setMessage(null), 3000);
       }
     } catch (error) {
-      console.error('Error saving commerce settings:', error);
+      clientLogger.error('Error saving commerce settings:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to save settings' });
     } finally {
       setSaving(false);

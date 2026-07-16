@@ -9,6 +9,7 @@ import { tenantStorefrontPolicyService } from '@/services/TenantStorefrontPolicy
 import { policyTemplateService, OutdatedUsageRecord } from '@/services/PolicyTemplateService';
 import TemplateGallery from './TemplateGallery';
 import ComplianceChecklist from './ComplianceChecklist';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StorefrontPolicies {
   return_policy: string | null;
@@ -90,7 +91,7 @@ export default function StorefrontPoliciesClient({ tenantId, effectiveStorefront
         setPolicies(result);
       }
     } catch (error) {
-      console.error('Error fetching policies:', error);
+      clientLogger.error('Error fetching policies:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to load policies' });
     } finally {
       setLoading(false);
@@ -110,7 +111,7 @@ export default function StorefrontPoliciesClient({ tenantId, effectiveStorefront
         setMessage({ type: 'error', text: 'Failed to save policies' });
       }
     } catch (error) {
-      console.error('Error saving policies:', error);
+      clientLogger.error('Error saving policies:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to save policies' });
     } finally {
       setSaving(false);

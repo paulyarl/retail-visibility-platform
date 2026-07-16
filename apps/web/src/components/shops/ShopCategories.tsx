@@ -34,6 +34,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopCategoriesProps {
   selectedCategory?: string;
@@ -215,7 +216,7 @@ export function ShopCategories({ selectedCategory, onCategorySelect, className }
 
       setCategories(mockCategories);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      clientLogger.error('Error fetching categories:', { detail: error });
       setCategories([]);
     } finally {
       setLoading(false);

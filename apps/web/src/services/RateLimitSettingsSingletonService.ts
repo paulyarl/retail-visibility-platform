@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface RateLimitConfiguration {
   route_type: string;
@@ -40,13 +41,13 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
         'rate_limit_settings'
       );
       if (!response.success) {
-        console.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', response.error);
+        clientLogger.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', { detail: response.error });
         return null;
       }
 
       return response.data||null;
     } catch (error) {
-      console.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', error);
+      clientLogger.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', { detail: error });
       return null;
     }
   }
@@ -69,13 +70,13 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
         'rate_limit_settings'
       );
       if (!response.success) {
-        console.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', response.error);
+        clientLogger.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', { detail: response.error });
         return null;
       }
 
       return response.data||null;
     } catch (error) {
-      console.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', error);
+      clientLogger.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', { detail: error });
       return null;
     }
   }

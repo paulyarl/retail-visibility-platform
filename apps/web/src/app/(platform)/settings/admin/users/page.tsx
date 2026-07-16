@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 import { adminUsersService } from '@/services/AdminUsersService';
 import { adminUserService } from '@/services/AdminUserService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 interface User {
@@ -100,7 +101,7 @@ export default function PlatformUserMaintenancePage() {
       
       setUsers(usersWithTenants || []);
     } catch (error) {
-      console.error('Failed to load users:', error);
+      clientLogger.error('Failed to load users:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -120,7 +121,7 @@ export default function PlatformUserMaintenancePage() {
         alert('Failed to delete user');
       }
     } catch (error) {
-      console.error('Delete user error:', error);
+      clientLogger.error('Delete user error:', { detail: error });
       alert('Failed to delete user');
     }
   };
@@ -165,7 +166,7 @@ export default function PlatformUserMaintenancePage() {
         alert('Failed to update user status');
       }
     } catch (error) {
-      console.error('Failed to update user status:', error);
+      clientLogger.error('Failed to update user status:', { detail: error });
       alert('Failed to update user status');
     }
   };
@@ -280,7 +281,7 @@ export default function PlatformUserMaintenancePage() {
       }
       setEditingTenantRole(null);
     } catch (error) {
-      console.error('Failed to update tenant role:', error);
+      clientLogger.error('Failed to update tenant role:', { detail: error });
       alert(`Failed to update tenant role: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };

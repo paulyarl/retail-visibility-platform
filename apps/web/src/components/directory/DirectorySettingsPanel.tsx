@@ -16,6 +16,7 @@ import {
   DIRECTORY_ENTRY_LAYOUT_ORDER,
   getLayoutPreviewSlides,
 } from '@/utils/directoryEntryLayouts';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
@@ -64,7 +65,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
         setCapState(opts);
       })
       .catch((err) => {
-        console.error('Error fetching directory entry options:', err);
+        clientLogger.error('Error fetching directory entry options:', { detail: err });
       });
   }, [tenantId]);
 
@@ -75,7 +76,7 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       .then((settings) => {
         if (settings) setRawSettings(settings);
       })
-      .catch((err) => console.error('Error fetching directory entry raw settings:', err));
+      .catch((err) => clientLogger.error('Error fetching directory entry raw settings:', { detail: err }));
   }, [tenantId]);
 
   const handleSave = async () => {

@@ -8,6 +8,7 @@ import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTicket, CrmActivity } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -47,7 +48,7 @@ export default function TenantTicketsPage() {
         setTenantUsers(users ?? []);
         setActivities(activityList ?? []);
       } catch (err) {
-        console.error('[Tenant Tickets] Load error:', err);
+        clientLogger.error('[Tenant Tickets] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }

@@ -6,6 +6,7 @@ import { Card, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { TicketStatus, TicketPriority } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -41,7 +42,7 @@ export default function CrmGlobalTicketsPage() {
         });
         setTickets(result);
       } catch (err) {
-        console.error('[CRM Global Tickets] Load error:', err);
+        clientLogger.error('[CRM Global Tickets] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -135,7 +136,7 @@ export default function CrmGlobalTicketsPage() {
                           try {
                             const updated = await crmAdminService.updateTicket(t.id, { status: e.target.value as TicketStatus });
                             setTickets(prev => prev.map(ticket => ticket.id === t.id ? { ...ticket, ...updated } : ticket));
-                          } catch (err) { console.error(err); }
+                          } catch (err) { clientLogger.error(err instanceof Error ? err : new Error(String(err))); }
                           setUpdatingId(null);
                         }}
                         className={`text-xs rounded-full px-2 py-0.5 border-0 font-medium cursor-pointer ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}
@@ -159,7 +160,7 @@ export default function CrmGlobalTicketsPage() {
                           try {
                             const updated = await crmAdminService.updateTicket(t.id, { priority: e.target.value as TicketPriority });
                             setTickets(prev => prev.map(ticket => ticket.id === t.id ? { ...ticket, ...updated } : ticket));
-                          } catch (err) { console.error(err); }
+                          } catch (err) { clientLogger.error(err instanceof Error ? err : new Error(String(err))); }
                           setUpdatingId(null);
                         }}
                         className={`text-xs rounded-full px-2 py-0.5 border-0 font-medium cursor-pointer ${PRIORITY_COLORS[t.priority] || 'bg-gray-100 text-gray-800'}`}

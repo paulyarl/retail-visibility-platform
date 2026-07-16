@@ -10,6 +10,7 @@ import { CreditCard, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/Label';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Gateway {
   id: string;
@@ -86,7 +87,7 @@ export default function PaymentGatewaySelector({
           setSelectedGatewayId(activeGateways[0].id);
         }
       } catch (error) {
-        console.error('Failed to load payment gateways:', error);
+        clientLogger.error('Failed to load payment gateways:', { detail: error });
         setError('Failed to load payment gateways');
       } finally {
         setLoading(false);

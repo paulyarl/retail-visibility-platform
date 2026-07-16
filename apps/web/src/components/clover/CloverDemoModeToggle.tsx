@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Package, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils'; 
 import { Button } from '../ui/Button';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CloverDemoModeToggleProps {
   tenantId: string;
@@ -27,7 +28,7 @@ export function CloverDemoModeToggle({
     try {
       await onToggle(checked);
     } catch (error) {
-      console.error('Failed to toggle demo mode:', error);
+      clientLogger.error('Failed to toggle demo mode:', { detail: error });
     } finally {
       setIsLoading(false);
     }

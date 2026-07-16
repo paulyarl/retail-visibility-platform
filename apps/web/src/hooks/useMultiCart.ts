@@ -16,6 +16,7 @@ import {
   migrateOldCarts,
   migrateCartLogos
 } from '@/lib/cart/cartManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useMultiCart(tenantId?: string) {
   const [carts, setCarts] = useState<CartSummary[]>([]);
@@ -41,7 +42,7 @@ export function useMultiCart(tenantId?: string) {
       setCarts(allCarts);
       setTotalItems(getTotalItemCount(tenantId));
     } catch (error) {
-      console.error('[useMultiCart] Failed to load carts:', error);
+      clientLogger.error('[useMultiCart] Failed to load carts:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ export function useMultiCart(tenantId?: string) {
       loadCarts();
       return { success: true };
     } catch (error) {
-      console.error('[useMultiCart] Failed to add to cart:', error);
+      clientLogger.error('[useMultiCart] Failed to add to cart:', { detail: error });
       return { success: false, error };
     }
   }, [loadCarts]);
@@ -106,7 +107,7 @@ export function useMultiCart(tenantId?: string) {
       loadCarts();
       return { success: true };
     } catch (error) {
-      console.error('[useMultiCart] Failed to update quantity:', error);
+      clientLogger.error('[useMultiCart] Failed to update quantity:', { detail: error });
       return { success: false, error };
     }
   }, [loadCarts]);
@@ -122,7 +123,7 @@ export function useMultiCart(tenantId?: string) {
       loadCarts();
       return { success: true };
     } catch (error) {
-      console.error('[useMultiCart] Failed to remove item:', error);
+      clientLogger.error('[useMultiCart] Failed to remove item:', { detail: error });
       return { success: false, error };
     }
   }, [loadCarts]);
@@ -136,7 +137,7 @@ export function useMultiCart(tenantId?: string) {
       loadCarts();
       return { success: true };
     } catch (error) {
-      console.error('[useMultiCart] Failed to clear cart:', error);
+      clientLogger.error('[useMultiCart] Failed to clear cart:', { detail: error });
       return { success: false, error };
     }
   }, [loadCarts]);

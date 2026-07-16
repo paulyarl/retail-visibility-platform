@@ -11,6 +11,7 @@ import customerAddressesService, {
 import { AddressCard } from '@/components/customer/AddressCard';
 import { AddressForm } from '@/components/customer/AddressForm';
 import { MapPin, Plus, Loader2 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function AddressesPage() {
   const { customer } = useCustomerAuth();
@@ -31,7 +32,7 @@ export default function AddressesPage() {
         setAddresses(result.addresses);
       }
     } catch (error) {
-      console.error('Failed to load addresses:', error);
+      clientLogger.error('Failed to load addresses:', { detail: error });
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +59,7 @@ export default function AddressesPage() {
         alert('Failed to delete address: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Failed to delete address:', error);
+      clientLogger.error('Failed to delete address:', { detail: error });
       alert('Failed to delete address');
     }
   };
@@ -78,7 +79,7 @@ export default function AddressesPage() {
         alert('Failed to set default address: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Failed to set default address:', error);
+      clientLogger.error('Failed to set default address:', { detail: error });
       alert('Failed to set default address');
     }
   };
@@ -109,7 +110,7 @@ export default function AddressesPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to save address:', error);
+      clientLogger.error('Failed to save address:', { detail: error });
       alert('Failed to save address');
     } finally {
       setIsSaving(false);

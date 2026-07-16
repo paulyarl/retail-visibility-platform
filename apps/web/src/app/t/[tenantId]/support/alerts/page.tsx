@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@/components/
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmAlert, AlertType } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const TYPE_COLORS: Record<string, string> = {
   milestone: 'bg-emerald-100 text-emerald-800',
@@ -42,7 +43,7 @@ export default function TenantAlertsPage() {
         );
         setAlerts(data ?? []);
       } catch (err) {
-        console.error('[Tenant Alerts] Load error:', err);
+        clientLogger.error('[Tenant Alerts] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -55,7 +56,7 @@ export default function TenantAlertsPage() {
       await crmTenantCrmService.markAlertRead(alertId);
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_read: true } : a));
     } catch (err) {
-      console.error('[Tenant Alerts] Mark read error:', err);
+      clientLogger.error('[Tenant Alerts] Mark read error:', { detail: err });
     }
   }
 
@@ -64,7 +65,7 @@ export default function TenantAlertsPage() {
       await crmTenantCrmService.markAllAlertsRead();
       setAlerts(prev => prev.map(a => ({ ...a, is_read: true })));
     } catch (err) {
-      console.error('[Tenant Alerts] Mark all read error:', err);
+      clientLogger.error('[Tenant Alerts] Mark all read error:', { detail: err });
     }
   }
 
@@ -73,7 +74,7 @@ export default function TenantAlertsPage() {
       await crmTenantCrmService.dismissAlert(alertId);
       setAlerts(prev => prev.filter(a => a.id !== alertId));
     } catch (err) {
-      console.error('[Tenant Alerts] Dismiss error:', err);
+      clientLogger.error('[Tenant Alerts] Dismiss error:', { detail: err });
     }
   }
 

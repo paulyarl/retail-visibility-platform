@@ -19,6 +19,7 @@ import {
 import { Monitor, Smartphone, Tablet, LogOut, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Pagination } from '@/components/ui/Pagination';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdminSession {
   id: string;
@@ -83,7 +84,7 @@ export function AdminSessionsTable({
       setRevoking(sessionId);
       await onRevoke(sessionId);
     } catch (error) {
-      console.error('Failed to revoke session:', error);
+      clientLogger.error('Failed to revoke session:', { detail: error });
     } finally {
       setRevoking(null);
     }

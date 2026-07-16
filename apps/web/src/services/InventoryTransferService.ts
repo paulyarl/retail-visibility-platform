@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { safeTransformToCamel } from '@/utils/case-transform';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 export interface InventoryTransfer {
@@ -130,13 +131,13 @@ export class InventoryTransferService extends TenantApiSingleton {
         transfersData = result.data;
         console.log('[InventoryTransferService] Using direct array fallback:', transfersData.length, 'items');
       } else {
-        console.warn('[InventoryTransferService] Unexpected transfers data structure:', result.data);
+        clientLogger.warn('[InventoryTransferService] Unexpected transfers data structure:', { detail: result.data });
         transfersData = [];
       }
 
       return transfersData.map((transfer: any) => safeTransformToCamel(transfer));
     } catch (error) {
-      console.error('Failed to fetch transfers:', error);
+      clientLogger.error('Failed to fetch transfers:', { detail: error });
       throw error;
     }
   }
@@ -190,13 +191,13 @@ export class InventoryTransferService extends TenantApiSingleton {
         inventoryData = result.data;
         console.log('[InventoryTransferService] Using direct array fallback:', inventoryData.length, 'items');
       } else {
-        console.warn('[InventoryTransferService] Unexpected inventory data structure:', result.data);
+        clientLogger.warn('[InventoryTransferService] Unexpected inventory data structure:', { detail: result.data });
         inventoryData = [];
       }
 
       return inventoryData.map((item: any) => safeTransformToCamel(item));
     } catch (error) {
-      console.error('Failed to fetch location inventory:', error);
+      clientLogger.error('Failed to fetch location inventory:', { detail: error });
       throw error;
     }
   }
@@ -241,7 +242,7 @@ export class InventoryTransferService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to initiate transfer:', error);
+      clientLogger.error('Failed to initiate transfer:', { detail: error });
       throw error;
     }
   }
@@ -273,7 +274,7 @@ export class InventoryTransferService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to approve transfer:', error);
+      clientLogger.error('Failed to approve transfer:', { detail: error });
       throw error;
     }
   }
@@ -315,7 +316,7 @@ export class InventoryTransferService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to ship transfer:', error);
+      clientLogger.error('Failed to ship transfer:', { detail: error });
       throw error;
     }
   }
@@ -355,7 +356,7 @@ export class InventoryTransferService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to receive transfer:', error);
+      clientLogger.error('Failed to receive transfer:', { detail: error });
       throw error;
     }
   }
@@ -387,7 +388,7 @@ export class InventoryTransferService extends TenantApiSingleton {
 
       return safeTransformToCamel(result.data);
     } catch (error) {
-      console.error('Failed to cancel transfer:', error);
+      clientLogger.error('Failed to cancel transfer:', { detail: error });
       throw error;
     }
   }
@@ -418,7 +419,7 @@ export class InventoryTransferService extends TenantApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('Failed to fetch low stock alerts:', error);
+      clientLogger.error('Failed to fetch low stock alerts:', { detail: error });
       throw error;
     }
   }
@@ -466,13 +467,13 @@ export class InventoryTransferService extends TenantApiSingleton {
         transfersData = result.data;
         console.log('[InventoryTransferService] Using direct array fallback for incoming transfers:', transfersData.length, 'items');
       } else {
-        console.warn('[InventoryTransferService] Unexpected incoming transfers data structure:', result.data);
+        clientLogger.warn('[InventoryTransferService] Unexpected incoming transfers data structure:', { detail: result.data });
         transfersData = [];
       }
 
       return transfersData.map((transfer: any) => safeTransformToCamel(transfer));
     } catch (error) {
-      console.error('Failed to fetch incoming transfers:', error);
+      clientLogger.error('Failed to fetch incoming transfers:', { detail: error });
       throw error;
     }
   }
@@ -532,7 +533,7 @@ export class InventoryTransferService extends TenantApiSingleton {
       const transferResponse = (apiResult.data as any)?.data || apiResult.data;
       return safeTransformToCamel(transferResponse);
     } catch (error) {
-      console.error('Failed to create transfer:', error);
+      clientLogger.error('Failed to create transfer:', { detail: error });
       throw error;
     }
   }

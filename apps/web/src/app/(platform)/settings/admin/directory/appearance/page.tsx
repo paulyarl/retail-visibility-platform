@@ -16,6 +16,7 @@ import {
   DIRECTORY_LAYOUT_META,
   type DirectoryLayoutKey,
 } from '@/components/directory/redesign/types';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export default function DirectoryAppearancePage() {
           setSavedLayout(stored as DirectoryLayoutKey);
         }
       } catch (err) {
-        console.error('Failed to load platform settings:', err);
+        clientLogger.error('Failed to load platform settings:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -58,7 +59,7 @@ export default function DirectoryAppearancePage() {
         setMessage({ type: 'error', text: 'Failed to save layout. Please try again.' });
       }
     } catch (err) {
-      console.error('Failed to save directory layout:', err);
+      clientLogger.error('Failed to save directory layout:', { detail: err });
       setMessage({ type: 'error', text: 'An error occurred while saving.' });
     } finally {
       setSaving(false);

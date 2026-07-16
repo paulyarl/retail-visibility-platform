@@ -14,6 +14,7 @@ import { tenantManagementService } from '@/services/TenantManagementService'
 import { tenantInfoService } from '@/services/TenantInfoService'
 import { organizationsService } from '@/services/OrganizationsSingletonService'
 import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess'
+import { clientLogger } from '@/lib/client-logger';
 
 interface Category {
   id: string
@@ -93,7 +94,7 @@ function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }
           setPath(pathString)
         }
       } catch (error) {
-        console.error('Failed to fetch Google category path:', error)
+        clientLogger.error('Failed to fetch Google category path:', { detail: error })
       } finally {
         setLoading(false)
       }
@@ -268,7 +269,7 @@ export default function CategoriesPage() {
 
         setError(null)
       } catch (err) {
-        console.error('[Categories] Error loading data:', err);
+        clientLogger.error('[Categories] Error loading data:', { detail: err });
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
@@ -486,7 +487,7 @@ export default function CategoriesPage() {
         showToast('error', 'Failed to create categories')
       }
     } catch (err: any) {
-      console.error('Failed to create categories:', err)
+      clientLogger.error('Failed to create categories:', { detail: err })
       showToast('error', err?.message || 'Failed to create categories')
     } finally {
       setLoading(false)

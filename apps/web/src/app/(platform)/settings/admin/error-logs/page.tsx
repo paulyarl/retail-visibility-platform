@@ -40,6 +40,7 @@ import {
   ErrorLogStats,
   ErrorLogFilters,
 } from '@/services/AdminErrorLogService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function AdminErrorLogsPage() {
   const [errors, setErrors] = useState<ErrorLogEntry[]>([]);
@@ -78,7 +79,7 @@ export default function AdminErrorLogsPage() {
       setTotalPages(data.pagination.totalPages);
       setTotalItems(data.pagination.total);
     } catch (error) {
-      console.error('Error fetching error logs:', error);
+      clientLogger.error('Error fetching error logs:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to load error logs', color: 'red' });
     } finally {
       setLoading(false);
@@ -91,7 +92,7 @@ export default function AdminErrorLogsPage() {
       const data = await adminErrorLogService.getStats(7);
       setStats(data);
     } catch (error) {
-      console.error('Error fetching error stats:', error);
+      clientLogger.error('Error fetching error stats:', { detail: error });
     } finally {
       setStatsLoading(false);
     }

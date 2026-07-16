@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export type ViewMode = 'grid' | 'list';
 
@@ -28,7 +29,7 @@ export function useItemsViewMode(): UseItemsViewModeReturn {
         setViewModeState(saved as ViewMode);
       }
     } catch (error) {
-      console.error('[useItemsViewMode] Failed to load view mode:', error);
+      clientLogger.error('[useItemsViewMode] Failed to load view mode:', { detail: error });
     }
   }, []);
 
@@ -39,7 +40,7 @@ export function useItemsViewMode(): UseItemsViewModeReturn {
     try {
       localStorage.setItem(STORAGE_KEY, viewMode);
     } catch (error) {
-      console.error('[useItemsViewMode] Failed to save view mode:', error);
+      clientLogger.error('[useItemsViewMode] Failed to save view mode:', { detail: error });
     }
   }, [viewMode]);
 

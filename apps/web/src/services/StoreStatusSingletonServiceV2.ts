@@ -6,6 +6,7 @@
  */
 
 import { FlexibleApiSingletonV2, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingletonV2';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -64,13 +65,13 @@ class StoreStatusSingletonServiceV2 extends FlexibleApiSingletonV2 {
       );
       
       if (!result.success){
-        console.error('[StoreStatusSingletonV2] Failed to get store status:', result.error);
+        clientLogger.error('[StoreStatusSingletonV2] Failed to get store status:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[StoreStatusSingletonV2] Failed to get store status:', error);
+      clientLogger.error('[StoreStatusSingletonV2] Failed to get store status:', { detail: error });
       return null;
     }
   }
@@ -109,7 +110,7 @@ class StoreStatusSingletonServiceV2 extends FlexibleApiSingletonV2 {
 
       return statusMap;
     } catch (error) {
-      console.error('[StoreStatusSingletonV2] Failed to get multiple store statuses:', error);
+      clientLogger.error('[StoreStatusSingletonV2] Failed to get multiple store statuses:', { detail: error });
       return new Map();
     }
   }
@@ -161,13 +162,13 @@ class StoreStatusSingletonServiceV2 extends FlexibleApiSingletonV2 {
       );
       
       if (!result.success){
-        console.error('[StoreStatusSingletonV2] Failed to get real-time store status:', result.error);
+        clientLogger.error('[StoreStatusSingletonV2] Failed to get real-time store status:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[StoreStatusSingletonV2] Failed to get real-time store status:', error);
+      clientLogger.error('[StoreStatusSingletonV2] Failed to get real-time store status:', { detail: error });
       return null;
     }
   }

@@ -7,6 +7,7 @@
 
 import { UniversalStorageManager, StorageType, UniversalCacheOptions, CacheEntry } from './universalStorageManager';
 import { AppContext, CacheIsolation } from './contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StorageRegistry {
   [key: string]: {
@@ -131,7 +132,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
           return await (this as any).processEntryForRetrieval(entry, options);
         }
       } catch (error) {
-        console.warn(`[EnhancedStorageManager] ${storageType} access failed:`, error);
+        clientLogger.warn(`[EnhancedStorageManager] ${storageType} access failed:`, { detail: error });
         continue; // Try next storage type
       }
     }
@@ -204,7 +205,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
         });
       }
     } catch (error) {
-      console.warn('[EnhancedStorageManager] Failed to persist storage registry:', error);
+      clientLogger.warn('[EnhancedStorageManager] Failed to persist storage registry:', { detail: error });
     }
   }
 
@@ -244,7 +245,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
         // console.log(`[EnhancedStorageManager] Loaded ${Object.keys(this.storageRegistry).length} registry entries`);
       }
     } catch (error) {
-      console.warn('[EnhancedStorageManager] Failed to load storage registry:', error);
+      clientLogger.warn('[EnhancedStorageManager] Failed to load storage registry:', { detail: error });
     }
   }
 

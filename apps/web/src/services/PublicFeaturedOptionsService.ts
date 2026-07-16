@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface FeaturedOptionsSettings {
   featured_enabled: boolean;
@@ -45,7 +46,7 @@ class PublicFeaturedOptionsService extends PublicApiSingleton {
    */
   async getFeaturedOptionsSettings(tenantId: string): Promise<FeaturedOptionsSettings | null> {
     if (!tenantId) {
-      console.error('[PublicFeaturedOptions] getFeaturedOptionsSettings: tenantId is required');
+      clientLogger.error('[PublicFeaturedOptions] getFeaturedOptionsSettings: tenantId is required');
       return null;
     }
 
@@ -58,13 +59,13 @@ class PublicFeaturedOptionsService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[PublicFeaturedOptions] Failed to get settings:', result.error);
+        clientLogger.error('[PublicFeaturedOptions] Failed to get settings:', { detail: result.error });
         return null;
       }
 
       return result.data?.settings || null;
     } catch (error) {
-      console.error('[PublicFeaturedOptions] Failed to get settings:', error);
+      clientLogger.error('[PublicFeaturedOptions] Failed to get settings:', { detail: error });
       return null;
     }
   }

@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ErrorLogEntry {
   id: string;
@@ -83,7 +84,7 @@ class AdminErrorLogService extends AdminApiSingleton {
       }
       return result.data as ErrorLogResponse;
     } catch (error) {
-      console.error('[AdminErrorLogService] Error fetching errors:', error);
+      clientLogger.error('[AdminErrorLogService] Error fetching errors:', { detail: error });
       return { errors: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
   }
@@ -97,7 +98,7 @@ class AdminErrorLogService extends AdminApiSingleton {
 
       return result.success ? (result.data as ErrorLogStats) : null;
     } catch (error) {
-      console.error('[AdminErrorLogService] Error fetching stats:', error);
+      clientLogger.error('[AdminErrorLogService] Error fetching stats:', { detail: error });
       return null;
     }
   }
@@ -107,7 +108,7 @@ class AdminErrorLogService extends AdminApiSingleton {
       const result = await this.makeDefaultRequest(`/api/admin/errors/${id}`, {}, `error-log-${id}`, 0);
       return result.success ? (result.data as ErrorLogDetail) : null;
     } catch (error) {
-      console.error('[AdminErrorLogService] Error fetching error detail:', error);
+      clientLogger.error('[AdminErrorLogService] Error fetching error detail:', { detail: error });
       return null;
     }
   }
@@ -120,7 +121,7 @@ class AdminErrorLogService extends AdminApiSingleton {
 
       return result.success ? (result.data as ErrorLogEntry) : null;
     } catch (error) {
-      console.error('[AdminErrorLogService] Error resolving error:', error);
+      clientLogger.error('[AdminErrorLogService] Error resolving error:', { detail: error });
       return null;
     }
   }

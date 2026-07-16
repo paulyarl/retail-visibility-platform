@@ -37,6 +37,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 /* import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton'; */
+import { clientLogger } from '@/lib/client-logger';
 
 interface InventoryStatsProps {
   tenantId: string;
@@ -77,7 +78,7 @@ export default function InventoryStats({ tenantId, loading = false, refresh }: I
       const stats = await inventoryStatsService.getInventoryStats(tenantId);
       setStats(stats);
     } catch (err) {
-      console.error('Error fetching inventory stats:', err);
+      clientLogger.error('Error fetching inventory stats:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load stats');
     } finally {
       setStatsLoading(false);

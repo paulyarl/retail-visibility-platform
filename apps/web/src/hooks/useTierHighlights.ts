@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { TierSystemService, TierFeature } from '@/services/TierSystemService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TierWithHighlights {
   tierKey: string;
@@ -89,7 +90,7 @@ export function useTierHighlights(tierType: 'individual' | 'organization' = 'ind
 
       setTiers(transformedTiers);
     } catch (err) {
-      console.error('[useTierHighlights] Error:', err);
+      clientLogger.error('[useTierHighlights] Error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);

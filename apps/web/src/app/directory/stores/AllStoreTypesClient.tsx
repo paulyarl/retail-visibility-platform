@@ -6,6 +6,7 @@ import { Store, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StoreType {
   name: string;
@@ -40,7 +41,7 @@ export default function AllStoreTypesClient() {
           : (result?.storeTypes || result?.data?.storeTypes || []);
         setStoreTypes(storeTypesArray);
       } catch (err) {
-        console.error('Error fetching store types:', err);
+        clientLogger.error('Error fetching store types:', { detail: err });
         setError('Failed to load store types. Please try again.');
       } finally {
         setLoading(false);

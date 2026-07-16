@@ -16,6 +16,7 @@ import { PublicProduct } from '@/providers/data/ProductSingleton';
 
 // Import FeaturedType from the existing singleton
 import { FeaturedType } from '@/providers/data/FeaturedProductsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Import the existing UniversalProduct interface
 interface UniversalProduct {
@@ -210,7 +211,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.syncWithProductProvider(); // Sync after fetching assignments
       }
     } catch (error) {
-      console.error('Error fetching featured assignments:', error);
+      clientLogger.error('Error fetching featured assignments:', { detail: error });
       this.setState({ featuredAssignments: {} });
     }
   }
@@ -249,7 +250,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         throw new Error(getErrorMessage(error) || 'Failed to feature product');
       }
     } catch (error) {
-      console.error('Error featuring product:', error);
+      clientLogger.error('Error featuring product:', { detail: error });
       throw error;
     } finally {
       this.setState({ processing: false });
@@ -281,7 +282,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         throw new Error('Failed to unfeature product');
       }
     } catch (error) {
-      console.error('Error unfeaturing product:', error);
+      clientLogger.error('Error unfeaturing product:', { detail: error });
       throw error;
     } finally {
       this.setState({ processing: false });
@@ -305,7 +306,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         })
       });
     } catch (error) {
-      console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to trigger revalidation:', error);
+      clientLogger.error('[EnhancedTenantFeaturedProductsSingleton] Failed to trigger revalidation:', { detail: error });
     }
   }
 
@@ -327,7 +328,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         return null;
       }
     } catch (error) {
-      console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get featured types:', error);
+      clientLogger.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get featured types:', { detail: error });
       return null;
     }
   }
@@ -350,7 +351,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         return null;
       }
     } catch (error) {
-      console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get product photos:', error);
+      clientLogger.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get product photos:', { detail: error });
       return null;
     }
   }

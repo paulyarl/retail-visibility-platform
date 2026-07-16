@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
+import { clientLogger } from '@/lib/client-logger';
 
 
 
@@ -60,7 +61,7 @@ export default function LocationStatusPage() {
         setHistory(historyData);
       }
     } catch (error) {
-      console.error('Failed to fetch location status data:', error);
+      clientLogger.error('Failed to fetch location status data:', { detail: error });
     } finally {
       setLoading(false);
     }

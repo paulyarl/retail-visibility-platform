@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getOrgRole } from '@/lib/auth/access-control';
 import AccessDenied from '@/components/AccessDenied';
 import { Spinner } from '@/components/ui';
+import { clientLogger } from '@/lib/client-logger';
 
 const ORG_ROLE_LABELS: Record<string, string> = {
   ORG_OWNER: 'Organization Owner',
@@ -69,7 +70,7 @@ export default function OrgUsersPage() {
       setUsers(usersData);
       setInvitations(invitesData);
     } catch (err) {
-      console.error('Failed to load org users:', err);
+      clientLogger.error('Failed to load org users:', { detail: err });
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,7 @@ import { useMantineTheme } from '@mantine/core';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { tenantBrandingSettingsService } from '@/services/TenantBrandingSettingsSingletonService';
 import { CheckCircle, Palette, Type, Layout, Eye, Save, RefreshCw } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 
 // Theme presets
@@ -156,7 +157,7 @@ export default function ThemeSettingsPage() {
       }
 
       if (!settings) {
-        console.warn('[Appearance] No settings found, using defaults');
+        clientLogger.warn('[Appearance] No settings found, using defaults');
         // Fallback to defaults if API fails or no data
         setSelectedPreset('default');
         setCustomColors({
@@ -171,7 +172,7 @@ export default function ThemeSettingsPage() {
         setSpacing(16);
       }
     } catch (error) {
-      console.error('Failed to load theme settings:', error);
+      clientLogger.error('Failed to load theme settings:', { detail: error });
       // Fallback to defaults if API fails
       setSelectedPreset('default');
       setCustomColors({
@@ -250,7 +251,7 @@ export default function ThemeSettingsPage() {
       }
 
     } catch (error) {
-      console.error('Failed to save theme:', error);
+      clientLogger.error('Failed to save theme:', { detail: error });
       alert('Failed to save theme settings. Please try again.');
     } finally {
       setIsLoading(false);

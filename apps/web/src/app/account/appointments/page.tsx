@@ -8,6 +8,7 @@ import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, ServiceBooking } from '@/services/CustomerOrderService';
 import ServiceAppointmentCard from '@/components/orders/ServiceAppointmentCard';
 import { Calendar, Loader2, ChevronLeft } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function AppointmentsPage() {
   const { customer } = useCustomerAuth();
@@ -32,7 +33,7 @@ export default function AppointmentsPage() {
       });
       setBookings(sorted);
     } catch (error) {
-      console.error('Failed to load service bookings:', error);
+      clientLogger.error('Failed to load service bookings:', { detail: error });
     } finally {
       setIsLoading(false);
     }

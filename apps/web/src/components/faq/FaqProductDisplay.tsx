@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Search, MessageSquare, ThumbsUp, ThumbsDown, Package, Store } from 'lucide-react';
 import { publicFaqService, PublicFaq } from '@/services/PublicFaqService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeedbackState {
   [faqId: string]: 'up' | 'down' | null;
@@ -48,7 +49,7 @@ export default function FaqProductDisplay({
         setProductFAQs(data.productFAQs);
         setStorefrontFAQs(data.storefrontFAQs);
       } catch (err) {
-        console.error('Failed to load product FAQs:', err);
+        clientLogger.error('Failed to load product FAQs:', { detail: err });
       } finally {
         setLoading(false);
       }

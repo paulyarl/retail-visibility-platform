@@ -6,6 +6,7 @@ import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
 import { PublicProduct } from '@/providers/data/ProductSingleton';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { useProduct } from '@/providers/ProductProvider';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeaturedProductsSectionProps {
   tenantId: string;
@@ -79,7 +80,7 @@ export default function FeaturedProductsSection({
         
         setFeaturedData({ products, totalCount: products.length });
       } catch (err) {
-        console.error('Failed to load featured products:', err);
+        clientLogger.error('Failed to load featured products:', { detail: err });
         setError(err instanceof Error ? err.message : 'Failed to load featured products');
       } finally {
         setLoading(false);

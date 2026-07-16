@@ -11,6 +11,7 @@
 
 import { resolveCacheOptions, AutoUserCacheOptions } from './userIdentification';
 import { AppContext, CacheIsolation } from './contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // ==================== STORAGE TYPE DEFINITIONS ====================
 
@@ -108,7 +109,7 @@ export class UniversalStorageManager {
     this.estimateStorageQuotas().then(quotas => {
       this.quotas = quotas;
     }).catch(error => {
-      console.warn('[UniversalStorageManager] Failed to estimate storage quotas:', error);
+      clientLogger.warn('[UniversalStorageManager] Failed to estimate storage quotas:', { detail: error });
       // Set fallback quotas
       this.quotas = {
         [StorageType.CACHE_STORAGE]: 100,
@@ -196,7 +197,7 @@ export class UniversalStorageManager {
         quotas[StorageType.INDEXED_DB] = estimate.quota || null;
         quotas[StorageType.CACHE_STORAGE] = estimate.quota || null;
       } catch (error) {
-        console.warn('[UniversalStorageManager] Storage quota estimation failed:', error);
+        clientLogger.warn('[UniversalStorageManager] Storage quota estimation failed:', { detail: error });
       }
     }
 
@@ -591,7 +592,7 @@ export class UniversalStorageManager {
         // console.log(`[UniversalStorageManager] ${strategy.primary} HIT for ${context}:${key}`);
       }
     } catch (error) {
-      console.warn(`[UniversalStorageManager] ${strategy.primary} access failed:`, error);
+      clientLogger.warn(`[UniversalStorageManager] ${strategy.primary} access failed:`, { detail: error });
     }
 
     // 🔄 Try fallback storages if primary failed
@@ -604,7 +605,7 @@ export class UniversalStorageManager {
             break;
           }
         } catch (error) {
-          console.warn(`[UniversalStorageManager] ${fallbackType} fallback failed:`, error);
+          clientLogger.warn(`[UniversalStorageManager] ${fallbackType} fallback failed:`, { detail: error });
           continue;
         }
       }
@@ -635,7 +636,7 @@ export class UniversalStorageManager {
         try {
           await this.removeFromStorage(key, storageType);
         } catch (error) {
-          console.warn(`[UniversalStorageManager] Failed to remove from ${storageType}:`, error);
+          clientLogger.warn(`[UniversalStorageManager] Failed to remove from ${storageType}:`, { detail: error });
         }
       }
     }
@@ -655,7 +656,7 @@ export class UniversalStorageManager {
         try {
           await this.clearStorage(storageType);
         } catch (error) {
-          console.warn(`[UniversalStorageManager] Failed to clear ${storageType}:`, error);
+          clientLogger.warn(`[UniversalStorageManager] Failed to clear ${storageType}:`, { detail: error });
         }
       }
     }
@@ -670,7 +671,7 @@ export class UniversalStorageManager {
     try {
       await this.setToStorage(key, entry, strategy.primary);
     } catch (error) {
-      console.warn(`[UniversalStorageManager] Primary storage ${strategy.primary} failed, trying fallbacks:`, error);
+      clientLogger.warn(`[UniversalStorageManager] Primary storage ${strategy.primary} failed, trying fallbacks:`, { detail: error });
       
       // Try fallbacks in order
       for (const fallbackType of strategy.fallbacks) {
@@ -678,7 +679,7 @@ export class UniversalStorageManager {
           await this.setToStorage(key, entry, fallbackType);
           return; // Success, exit fallback loop
         } catch (fallbackError) {
-          console.warn(`[UniversalStorageManager] Fallback storage ${fallbackType} failed:`, fallbackError);
+          clientLogger.warn(`[UniversalStorageManager] Fallback storage ${fallbackType} failed:`, { detail: fallbackError });
         }
       }
       
@@ -777,7 +778,7 @@ export class UniversalStorageManager {
         return JSON.parse(data) as CacheEntry<T>;
       }
     } catch (error) {
-      console.warn('[UniversalStorageManager] CacheStorage get failed:', error);
+      clientLogger.warn('[UniversalStorageManager] CacheStorage get failed:', { detail: error });
     }
     return null;
   }
@@ -788,7 +789,7 @@ export class UniversalStorageManager {
       const response = new Response(JSON.stringify(entry));
       await cache.put(key, response);
     } catch (error) {
-      console.warn('[UniversalStorageManager] CacheStorage set failed:', error);
+      clientLogger.warn('[UniversalStorageManager] CacheStorage set failed:', { detail: error });
     }
   }
 
@@ -797,7 +798,7 @@ export class UniversalStorageManager {
       const cache = await caches.open('universal-cache');
       await cache.delete(key);
     } catch (error) {
-      console.warn('[UniversalStorageManager] CacheStorage remove failed:', error);
+      clientLogger.warn('[UniversalStorageManager] CacheStorage remove failed:', { detail: error });
     }
   }
 
@@ -807,7 +808,7 @@ export class UniversalStorageManager {
       const keys = await cache.keys();
       await Promise.all(keys.map(key => cache.delete(key)));
     } catch (error) {
-      console.warn('[UniversalStorageManager] CacheStorage clear failed:', error);
+      clientLogger.warn('[UniversalStorageManager] CacheStorage clear failed:', { detail: error });
     }
   }
 
@@ -843,7 +844,7 @@ export class UniversalStorageManager {
         return JSON.parse(item) as CacheEntry<T>;
       }
     } catch (error) {
-      console.warn('[UniversalStorageManager] localStorage get failed:', error);
+      clientLogger.warn('[UniversalStorageManager] localStorage get failed:', { detail: error });
     }
     return null;
   }
@@ -852,7 +853,7 @@ export class UniversalStorageManager {
     try {
       localStorage.setItem(key, JSON.stringify(entry));
     } catch (error) {
-      console.warn('[UniversalStorageManager] localStorage set failed:', error);
+      clientLogger.warn('[UniversalStorageManager] localStorage set failed:', { detail: error });
     }
   }
 
@@ -860,7 +861,7 @@ export class UniversalStorageManager {
     try {
       localStorage.removeItem(key);
     } catch (error) {
-      console.warn('[UniversalStorageManager] localStorage remove failed:', error);
+      clientLogger.warn('[UniversalStorageManager] localStorage remove failed:', { detail: error });
     }
   }
 
@@ -868,7 +869,7 @@ export class UniversalStorageManager {
     try {
       localStorage.clear();
     } catch (error) {
-      console.warn('[UniversalStorageManager] localStorage clear failed:', error);
+      clientLogger.warn('[UniversalStorageManager] localStorage clear failed:', { detail: error });
     }
   }
 
@@ -881,7 +882,7 @@ export class UniversalStorageManager {
         return JSON.parse(item) as CacheEntry<T>;
       }
     } catch (error) {
-      console.warn('[UniversalStorageManager] sessionStorage get failed:', error);
+      clientLogger.warn('[UniversalStorageManager] sessionStorage get failed:', { detail: error });
     }
     return null;
   }
@@ -890,7 +891,7 @@ export class UniversalStorageManager {
     try {
       sessionStorage.setItem(key, JSON.stringify(entry));
     } catch (error) {
-      console.warn('[UniversalStorageManager] sessionStorage set failed:', error);
+      clientLogger.warn('[UniversalStorageManager] sessionStorage set failed:', { detail: error });
     }
   }
 
@@ -898,7 +899,7 @@ export class UniversalStorageManager {
     try {
       sessionStorage.removeItem(key);
     } catch (error) {
-      console.warn('[UniversalStorageManager] sessionStorage remove failed:', error);
+      clientLogger.warn('[UniversalStorageManager] sessionStorage remove failed:', { detail: error });
     }
   }
 
@@ -906,7 +907,7 @@ export class UniversalStorageManager {
     try {
       sessionStorage.clear();
     } catch (error) {
-      console.warn('[UniversalStorageManager] sessionStorage clear failed:', error);
+      clientLogger.warn('[UniversalStorageManager] sessionStorage clear failed:', { detail: error });
     }
   }
 
@@ -922,7 +923,7 @@ export class UniversalStorageManager {
         }
       }
     } catch (error) {
-      console.warn('[UniversalStorageManager] cookies get failed:', error);
+      clientLogger.warn('[UniversalStorageManager] cookies get failed:', { detail: error });
     }
     return null;
   }
@@ -938,7 +939,7 @@ export class UniversalStorageManager {
       
       document.cookie = cookieString;
     } catch (error) {
-      console.warn('[UniversalStorageManager] cookies set failed:', error);
+      clientLogger.warn('[UniversalStorageManager] cookies set failed:', { detail: error });
     }
   }
 
@@ -946,7 +947,7 @@ export class UniversalStorageManager {
     try {
       document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
     } catch (error) {
-      console.warn('[UniversalStorageManager] cookies remove failed:', error);
+      clientLogger.warn('[UniversalStorageManager] cookies remove failed:', { detail: error });
     }
   }
 
@@ -960,7 +961,7 @@ export class UniversalStorageManager {
         }
       }
     } catch (error) {
-      console.warn('[UniversalStorageManager] cookies clear failed:', error);
+      clientLogger.warn('[UniversalStorageManager] cookies clear failed:', { detail: error });
     }
   }
 
@@ -1036,7 +1037,7 @@ export class UniversalStorageManager {
       
       return data as T;
     } catch (error) {
-      console.error('[UniversalStorageManager] Error processing entry for retrieval:', error);
+      clientLogger.error('[UniversalStorageManager] Error processing entry for retrieval:', { detail: error });
       return null;
     }
   }
@@ -1091,7 +1092,7 @@ export class UniversalStorageManager {
       const decryptedString = atob(data);
       return JSON.parse(decryptedString);
     } catch (error) {
-      console.warn('[UniversalStorageManager] Decryption failed:', error);
+      clientLogger.warn('[UniversalStorageManager] Decryption failed:', { detail: error });
       return data;
     }
   }

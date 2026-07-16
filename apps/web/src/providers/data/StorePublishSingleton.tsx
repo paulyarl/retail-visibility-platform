@@ -9,6 +9,7 @@
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Directory Category Types
 export interface DirectoryCategory {
@@ -184,7 +185,7 @@ class StorePublishSingleton extends PublicApiSingleton {
       );
       
       if (!result.success || !result.data || !result.data.stores) {
-        console.error('[StorePublishSingleton] Failed to fetch published stores:', result.error);
+        clientLogger.error('[StorePublishSingleton] Failed to fetch published stores:', { detail: result.error });
         return defaultResult;
       }
 
@@ -195,7 +196,7 @@ class StorePublishSingleton extends PublicApiSingleton {
         categories: result.data.categories
       };
     } catch (error) {
-      console.warn('Store publish API error:', error);
+      clientLogger.warn('Store publish API error:', { detail: error });
       return defaultResult;
     }
   }
@@ -210,13 +211,13 @@ class StorePublishSingleton extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('Error fetching published store:', result.error);
+        clientLogger.error('Error fetching published store:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('Error fetching published store:', error);
+      clientLogger.error('Error fetching published store:', { detail: error });
       return null;
     }
   }
@@ -233,7 +234,7 @@ class StorePublishSingleton extends PublicApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error publishing store:', result.error);
+      clientLogger.error('Error publishing store:', { detail: result.error });
       return null;
     }
     
@@ -251,7 +252,7 @@ class StorePublishSingleton extends PublicApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error unpublishing store:', result.error);
+      clientLogger.error('Error unpublishing store:', { detail: result.error });
       return false;
     }
     
@@ -270,7 +271,7 @@ class StorePublishSingleton extends PublicApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error updating published store:', result.error);
+      clientLogger.error('Error updating published store:', { detail: result.error });
       return null;
     }
     
@@ -286,7 +287,7 @@ class StorePublishSingleton extends PublicApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error fetching directory categories:', result.error);
+      clientLogger.error('Error fetching directory categories:', { detail: result.error });
       return [];
     }
     
@@ -357,7 +358,7 @@ class StorePublishSingleton extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('Error checking publishing permissions:', result.error);
+      clientLogger.error('Error checking publishing permissions:', { detail: result.error });
       return { canPublish: false, canPublishAny: false, reason: 'Permission check error' };
     }
 

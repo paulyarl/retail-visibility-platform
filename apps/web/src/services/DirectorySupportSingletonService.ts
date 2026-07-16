@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStatus {
   tenant: {
@@ -103,7 +104,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to get directory status:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to get directory status:', { detail: response.error });
       return null;
     }
 
@@ -127,7 +128,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to get directory quality check:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to get directory quality check:', { detail: response.error });
       return null;
     }
 
@@ -151,7 +152,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to get directory notes:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to get directory notes:', { detail: response.error });
       return null;
     }
 
@@ -181,7 +182,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to add directory note:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to add directory note:', { detail: response.error });
       return null;
     }
 
@@ -210,7 +211,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[DirectorySupportSingleton] Failed to search directory:', error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to search directory:', { detail: error });
       return null;
     }
   }

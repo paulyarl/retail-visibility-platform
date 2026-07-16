@@ -6,6 +6,7 @@ import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface RelatedStore {
   id: string;
@@ -92,7 +93,7 @@ export default function RelatedStores({
 
         setStores(mappedStores);
       } catch (err) {
-        console.error('Error fetching related stores:', err);
+        clientLogger.error('Error fetching related stores:', { detail: err });
         setError('Failed to load related stores');
       } finally {
         setLoading(false);

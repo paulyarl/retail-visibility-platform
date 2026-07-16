@@ -57,6 +57,7 @@ import InventoryTransferAnalytics from './InventoryTransferAnalytics';
 import NewTransferModal from './NewTransferModal';
 import { inventoryTransferService } from '@/services/InventoryTransferService';
 import type { InventoryTransfer, LocationInventory } from '@/services/InventoryTransferService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Component-specific types
 interface TransferActionData {
@@ -123,7 +124,7 @@ export default function InventoryTransferDashboard() {
       console.log(`[InventoryTransferDashboard] Using tenant ID: ${tenantId}`);
       
       if (!tenantId) {
-        console.error('[InventoryTransferDashboard] No tenant ID found in context or URL params');
+        clientLogger.error('[InventoryTransferDashboard] No tenant ID found in context or URL params');
         notifications.show({
           title: 'Error',
           message: 'Tenant ID is required',
@@ -161,7 +162,7 @@ export default function InventoryTransferDashboard() {
       const inventoryPromises = Array.from(uniqueLocationIds).map(locationId =>
         inventoryTransferService.getLocationInventory(tenantId, locationId)
           .catch(error => {
-            console.warn(`[InventoryTransferDashboard] Failed to load inventory for location ${locationId}:`, error);
+            clientLogger.warn(`[InventoryTransferDashboard] Failed to load inventory for location ${locationId}:`, { detail: error });
             return []; // Return empty array for failed locations
           })
       );
@@ -178,7 +179,7 @@ export default function InventoryTransferDashboard() {
       console.log(`[InventoryTransferDashboard] Loaded ${uniqueInventory.length} total inventory items`);
       setInventory(uniqueInventory);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      clientLogger.error('Failed to load data:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load transfer data',
@@ -200,7 +201,7 @@ export default function InventoryTransferDashboard() {
       const tenantId = tenant?.tenantId || params.tenantId as string;
       
       if (!tenantId) {
-        console.error('[InventoryTransferDashboard] No tenant ID found in context or URL params');
+        clientLogger.error('[InventoryTransferDashboard] No tenant ID found in context or URL params');
         notifications.show({
           title: 'Error',
           message: 'Tenant ID is required',
@@ -242,7 +243,7 @@ export default function InventoryTransferDashboard() {
       setActionModalOpen(false);
       loadData();
     } catch (error) {
-      console.error(`Failed to ${action} transfer:`, error);
+      clientLogger.error(`Failed to ${action} transfer:`, { detail: error });
       notifications.show({
         title: 'Error',
         message: `Failed to ${action} transfer`,

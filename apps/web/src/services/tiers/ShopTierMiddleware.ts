@@ -318,6 +318,7 @@ export const shopTierMiddleware = ShopTierMiddlewareService.getInstance();
 
 // React hook for tier management
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useShopTier(shopId: string) {
   const [tier, setTier] = useState<ShopTier>('basic');
@@ -336,7 +337,7 @@ export function useShopTier(shopId: string) {
         setTier(currentTier);
         setFeatures(availableFeatures);
       } catch (error) {
-        console.error('Error loading tier data:', error);
+        clientLogger.error('Error loading tier data:', { detail: error });
       } finally {
         setLoading(false);
       }

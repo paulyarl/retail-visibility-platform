@@ -21,6 +21,7 @@ import {
   Package
 } from 'lucide-react';
 import Image from 'next/image';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopProductsProps {
   tenantId: string;
@@ -57,7 +58,7 @@ export default function ShopProducts({
       setTotalCount(result.total);
       setCategories(result.categories);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      clientLogger.error('Error fetching products:', { detail: error });
       setProducts([]);
       setTotalCount(0);
       setCategories([]);

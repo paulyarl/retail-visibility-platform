@@ -11,6 +11,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
 
@@ -100,7 +101,7 @@ class FunnelCheckoutService extends PublicApiSingleton {
       if (!result.success) return null;
       return result.data?.funnel || null;
     } catch (error) {
-      console.error('[FunnelCheckoutService] Failed to resolve checkout funnel:', error);
+      clientLogger.error('[FunnelCheckoutService] Failed to resolve checkout funnel:', { detail: error });
       return null;
     }
   }
@@ -151,7 +152,7 @@ class FunnelCheckoutService extends PublicApiSingleton {
         revenue_cents: result.data?.revenue_cents || 0,
       };
     } catch (error) {
-      console.error('[FunnelCheckoutService] Failed to process order bump:', error);
+      clientLogger.error('[FunnelCheckoutService] Failed to process order bump:', { detail: error });
       return null;
     }
   }
@@ -205,7 +206,7 @@ class FunnelCheckoutService extends PublicApiSingleton {
         revenue_cents: result.data?.revenue_cents || 0,
       };
     } catch (error) {
-      console.error('[FunnelCheckoutService] Failed to process funnel step:', error);
+      clientLogger.error('[FunnelCheckoutService] Failed to process funnel step:', { detail: error });
       return null;
     }
   }

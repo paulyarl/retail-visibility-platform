@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopLocation {
   city: string;
@@ -90,7 +91,7 @@ class LocationCache extends PublicApiSingleton {
 
       return response.data || [];
     } catch (error) {
-      console.error('[LocationCache] Error fetching locations:', error);
+      clientLogger.error('[LocationCache] Error fetching locations:', { detail: error });
       throw error;
     }
   }
@@ -134,7 +135,7 @@ export function useShopLocations(): UseShopLocationsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch locations';
       setError(errorMessage);
-      console.error('[SHOP LOCATIONS] Error:', err);
+      clientLogger.error('[SHOP LOCATIONS] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

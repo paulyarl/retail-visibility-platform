@@ -6,6 +6,7 @@
 
 import { FlexibleApiSingleton, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GlobalProduct {
   id: string;
@@ -135,7 +136,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
         brands: []
       };
     } catch (error) {
-      console.error('[GlobalCatalogService] Error browsing catalog:', error);
+      clientLogger.error('[GlobalCatalogService] Error browsing catalog:', { detail: error });
       return {
         products: [],
         total: 0,
@@ -162,7 +163,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[GlobalCatalogService] Error fetching product by slug:', error);
+      clientLogger.error('[GlobalCatalogService] Error fetching product by slug:', { detail: error });
       return null;
     }
   }
@@ -181,7 +182,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[GlobalCatalogService] Error fetching product by UPC:', error);
+      clientLogger.error('[GlobalCatalogService] Error fetching product by UPC:', { detail: error });
       return null;
     }
   }
@@ -222,7 +223,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
         hasMore: false
       };
     } catch (error) {
-      console.error('[GlobalCatalogService] Error searching catalog:', error);
+      clientLogger.error('[GlobalCatalogService] Error searching catalog:', { detail: error });
       return {
         products: [],
         total: 0,
@@ -279,7 +280,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
 
       return result.data || [];
     } catch (error) {
-      console.error('[GlobalCatalogService] Error fetching popular products:', error);
+      clientLogger.error('[GlobalCatalogService] Error fetching popular products:', { detail: error });
       return [];
     }
   }
@@ -298,7 +299,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
 
       return result.data || [];
     } catch (error) {
-      console.error('[GlobalCatalogService] Error fetching recent products:', error);
+      clientLogger.error('[GlobalCatalogService] Error fetching recent products:', { detail: error });
       return [];
     }
   }
@@ -327,7 +328,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[GlobalCatalogService] Error fetching catalog stats:', error);
+      clientLogger.error('[GlobalCatalogService] Error fetching catalog stats:', { detail: error });
       return null;
     }
   }
@@ -360,7 +361,7 @@ class GlobalCatalogService extends FlexibleApiSingleton {
 
       return result.data || { success: false, error: 'Failed to adopt product' };
     } catch (error) {
-      console.error('[GlobalCatalogService] Error adopting product:', error);
+      clientLogger.error('[GlobalCatalogService] Error adopting product:', { detail: error });
       return { success: false, error: error instanceof Error ? error.message : 'Failed to adopt product' };
     }
   }

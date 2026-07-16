@@ -1,4 +1,5 @@
 import { itemsSingletonService, Item, ProductVariant } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Re-export Item and ProductVariant types for backward compatibility
 export type { Item, ProductVariant };
@@ -60,13 +61,13 @@ export class ItemsDataService {
       const result = await itemsSingletonService.getItemsComplete({ tenant_id: tenantId, page: 1, limit: 1 });
       
       if (!result) {
-        console.error('[fetchStats] API error: No result returned');
+        clientLogger.error('[fetchStats] API error: No result returned');
         return { total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0 };
       }
 
       return result.stats;
     } catch (error) {
-      console.error('[fetchStats] Error:', error);
+      clientLogger.error('[fetchStats] Error:', { detail: error });
       return { total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0 };
     }
   }
@@ -175,7 +176,7 @@ export class ItemsDataService {
 
       return result;
     } catch (error) {
-      console.error('[createItem] Error:', error);
+      clientLogger.error('[createItem] Error:', { detail: error });
       throw error;
     }
   }
@@ -200,7 +201,7 @@ export class ItemsDataService {
         condition: result.condition,
       };
     } catch (error) {
-      console.error('[updateItem] Error:', error);
+      clientLogger.error('[updateItem] Error:', { detail: error });
       // Error will be caught and displayed in UI
       throw error;
     }

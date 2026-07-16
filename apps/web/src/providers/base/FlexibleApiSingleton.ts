@@ -45,6 +45,7 @@ export type {
 } from './EnhancedFlexibleApiSingleton';
 
 export type { SingletonMetrics } from './UniversalSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Helper functions for safe error handling
 export function getErrorMessage(error?: string | { status: number; message: string; code: string }): string {
@@ -228,7 +229,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           }
         } catch (parseError) {
           // If we can't parse JSON, use default message
-          console.warn('[FlexibleApiSingleton] Could not parse error response:', parseError);
+          clientLogger.warn('[FlexibleApiSingleton] Could not parse error response:', { detail: parseError });
         }
 
         return {
@@ -280,7 +281,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         data: data
       } as ApiResult<T>;
     } catch (error) {
-      console.error(`[FlexibleApiSingleton] Request failed:`, error);
+      clientLogger.error(`[FlexibleApiSingleton] Request failed:`, { detail: error });
       this.errors++;
 
       return {
@@ -310,10 +311,10 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
 
     if (status >= 400 && status < 500) {
       // Expected client errors - use warn to avoid error overlay
-      console.warn(`[${this.constructor.name}] ${context} (HTTP ${status}):`, message);
+      clientLogger.warn(`[${this.constructor.name}] ${context} (HTTP ${status}):`, { detail: message });
     } else {
       // Unexpected server errors, network issues, etc. - use error
-      console.error(`[${this.constructor.name}] ${context}:`, error);
+      clientLogger.error(`[${this.constructor.name}] ${context}:`, { detail: error });
     }
   }
 
@@ -1420,7 +1421,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     requestTarget?: RequestTarget
   ): boolean {
     if (typeof window === 'undefined' || !navigator.sendBeacon) {
-      console.warn(`[${this.constructor.name}] Beacon API not available, skipping beacon send`);
+      clientLogger.warn(`[${this.constructor.name}] Beacon API not available, skipping beacon send`);
       return false;
     }
 
@@ -1431,12 +1432,12 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       const success = navigator.sendBeacon(fullUrl, blob);
 
       if (!success) {
-        console.warn(`[${this.constructor.name}] Beacon send failed to ${fullUrl}`);
+        clientLogger.warn(`[${this.constructor.name}] Beacon send failed to ${fullUrl}`);
       }
 
       return success;
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Beacon send error:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Beacon send error:`, { detail: error });
       return false;
     }
   }
@@ -1523,7 +1524,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
               headers: { 'Content-Type': 'application/json' }
             });
           } catch (jsonError) {
-            console.warn(`[${this.constructor.name}] Invalid JSON in cache for key: ${cacheKey}, fetching fresh:`, jsonError);
+            clientLogger.warn(`[${this.constructor.name}] Invalid JSON in cache for key: ${cacheKey}, fetching fresh:`, { detail: jsonError });
             // Continue to fetch fresh data
           }
         }
@@ -1546,7 +1547,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
               headers: { 'Content-Type': 'application/json' }
             });
           } catch (jsonError) {
-            console.warn(`[${this.constructor.name}] Invalid JSON in generic cache for key: ${cacheKey}, fetching fresh:`, jsonError);
+            clientLogger.warn(`[${this.constructor.name}] Invalid JSON in generic cache for key: ${cacheKey}, fetching fresh:`, { detail: jsonError });
             // Continue to fetch fresh data
           }
         }
@@ -1701,11 +1702,11 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         console.log(`[${this.constructor.name}] MV refresh successful: ${result.data.refreshed}/${result.data.total} views`);
         return { success: true, ...result.data };
       } else {
-        console.warn(`[${this.constructor.name}] MV refresh failed:`, result.error);
+        clientLogger.warn(`[${this.constructor.name}] MV refresh failed:`, { detail: result.error });
         return { success: false, refreshed: 0, total: viewArray?.length || 0, results: [] };
       }
     } catch (error) {
-      console.error(`[${this.constructor.name}] MV refresh error:`, error);
+      clientLogger.error(`[${this.constructor.name}] MV refresh error:`, { detail: error });
       return { success: false, refreshed: 0, total: 0, results: [] };
     }
   }

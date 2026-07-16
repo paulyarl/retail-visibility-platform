@@ -5,6 +5,7 @@ import { Star, Settings, Package, Users, Search, AlertCircle } from 'lucide-reac
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager';
 import { Tenant } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdminDirectoryFeaturedManagementProps {
   pendingTenants?: Array<{id: string, name: string, featured_access_approved?: boolean, subscription_status?: string}>;
@@ -40,7 +41,7 @@ export default function AdminDirectoryFeaturedManagement({ pendingTenants = [] }
       const result = await platformHomeService.getTenants();
       setTenants(result || []);
     } catch (error) {
-      console.error('Failed to fetch tenants:', error);
+      clientLogger.error('Failed to fetch tenants:', { detail: error });
     } finally {
       setLoading(false);
     }

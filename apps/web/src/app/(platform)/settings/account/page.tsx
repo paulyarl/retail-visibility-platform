@@ -29,6 +29,7 @@ import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageB
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 import { userManagementService } from '@/services/UserManagementService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 export default function AccountPage() {
@@ -79,7 +80,7 @@ export default function AccountPage() {
           }
         }
       } catch (error) {
-        console.error('Failed to load navigation preference:', error);
+        clientLogger.error('Failed to load navigation preference:', { detail: error });
       }
     };
 
@@ -101,7 +102,7 @@ export default function AccountPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to save navigation preference:', error);
+      clientLogger.error('Failed to save navigation preference:', { detail: error });
     } finally {
       setSavingPreference(false);
     }
@@ -249,7 +250,7 @@ export default function AccountPage() {
       setIsEditing(false);
       window.location.reload();
     } catch (error) {
-      console.error('Failed to save profile:', error);
+      clientLogger.error('Failed to save profile:', { detail: error });
     } finally {
       setSavingProfile(false);
     }

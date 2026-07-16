@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Building2, Plus, Trash2, Loader2, AlertTriangle, Users } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { adminUsersService } from '@/services/AdminUsersService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ManageTenantsModalProps {
   isOpen: boolean;
@@ -97,7 +98,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
         setError('Failed to load tenant data');
       }
     } catch (error) {
-      console.error('Failed to load tenant data:', error);
+      clientLogger.error('Failed to load tenant data:', { detail: error });
       setError('Failed to load tenant data');
     } finally {
       setLoadingTenants(false);

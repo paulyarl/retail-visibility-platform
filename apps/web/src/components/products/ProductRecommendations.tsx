@@ -6,6 +6,7 @@ import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { Button } from '../ui';
+import { clientLogger } from '@/lib/client-logger';
 
 interface RecommendedProduct {
   id: string;
@@ -65,7 +66,7 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug, produc
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
-          console.error('Error fetching product recommendations:', error);
+          clientLogger.error('Error fetching product recommendations:', { detail: error });
         }
       } finally {
         if (isMounted) {

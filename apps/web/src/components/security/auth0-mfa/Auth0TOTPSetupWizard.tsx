@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Key, QrCode, CheckCircle, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function Auth0TOTPSetupWizard() {
   const { initiateTOTPEnrollment, verifyTOTPEnrollment, loading, error, clearError } = useAuth0MFA();
@@ -28,7 +29,7 @@ export function Auth0TOTPSetupWizard() {
       setEnrollmentData(data);
       setStep('scan');
     } catch (err) {
-      console.error('Failed to start TOTP setup:', err);
+      clientLogger.error('Failed to start TOTP setup:', { detail: err });
     }
   };
 
@@ -45,7 +46,7 @@ export function Auth0TOTPSetupWizard() {
       await verifyTOTPEnrollment(enrollmentData.factorId || 'placeholder', verificationCode);
       setStep('success');
     } catch (err) {
-      console.error('Failed to verify TOTP:', err);
+      clientLogger.error('Failed to verify TOTP:', { detail: err });
     } finally {
       setVerifying(false);
     }

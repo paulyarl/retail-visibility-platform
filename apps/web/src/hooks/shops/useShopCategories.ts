@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 import { shopsService } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopCategory {
   id: string;
@@ -112,7 +113,7 @@ export function useShopCategories() {
       setCategories(fetchedCategories);
       
     } catch (err) {
-      console.error('[useShopCategories] Error fetching categories:', err);
+      clientLogger.error('[useShopCategories] Error fetching categories:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');
     } finally {
       setLoading(false);

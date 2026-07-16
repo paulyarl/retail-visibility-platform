@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Analytics {
   totalProducts: number;
@@ -268,7 +269,7 @@ export class AnalyticsService extends AdminApiSingleton {
     );
 
     if (!response?.success) {
-      console.error('[AnalyticsService] Failed to get source analytics:', response?.error);
+      clientLogger.error('[AnalyticsService] Failed to get source analytics:', { detail: response?.error });
       return null;
     }
 
@@ -303,7 +304,7 @@ export class AnalyticsService extends AdminApiSingleton {
     );
 
     if (!response?.success) {
-      console.error('[AnalyticsService] Failed to get category enrichment analytics:', response?.error);
+      clientLogger.error('[AnalyticsService] Failed to get category enrichment analytics:', { detail: response?.error });
       return null;
     }
 
@@ -362,7 +363,7 @@ export class AnalyticsService extends AdminApiSingleton {
     );
 
     if (!response?.success) {
-      console.error('[AnalyticsService] Failed to get failed enrichment reasons:', response?.error);
+      clientLogger.error('[AnalyticsService] Failed to get failed enrichment reasons:', { detail: response?.error });
       return null;
     }
 
@@ -389,7 +390,7 @@ export class AnalyticsService extends AdminApiSingleton {
     );
 
     if (!response?.success) {
-      console.error('[AnalyticsService] Failed to export enrichment data:', response?.error);
+      clientLogger.error('[AnalyticsService] Failed to export enrichment data:', { detail: response?.error });
       return null;
     }
 

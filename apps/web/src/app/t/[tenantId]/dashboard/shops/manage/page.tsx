@@ -36,6 +36,7 @@ import ShopCreationWizard from '@/components/shops/ShopCreationWizard';
 import ShopAnalytics from '@/components/shops/ShopAnalytics';
 import ShopBrandingCustomizer from '@/components/shops/ShopBrandingCustomizer';
 import ShopPublishingWorkflow from '@/components/shops/ShopPublishingWorkflow';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopManagementProps {
   params: Promise<{
@@ -67,7 +68,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
 
   // Add debugging and guard clause
   if (!tenantId) {
-    console.error('[ShopManagementPage] No tenantId provided');
+    clientLogger.error('[ShopManagementPage] No tenantId provided');
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -134,7 +135,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
       
       setShops(shops);
     } catch (error) {
-      console.error('Error fetching shops:', error);
+      clientLogger.error('Error fetching shops:', { detail: error });
       setShops([]);
     } finally {
       setLoading(false);
@@ -176,7 +177,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
         setStats(emptyStats);
       }
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      clientLogger.error('Error fetching stats:', { detail: error });
       setStats(null);
     }
   };
@@ -218,7 +219,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
       // You could add a toast notification here
       console.log('URL copied to clipboard:', text);
     } catch (err) {
-      console.error('Failed to copy URL:', err);
+      clientLogger.error('Failed to copy URL:', { detail: err });
     }
   };
 
@@ -232,7 +233,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
           const shopUrls = await shopsService.getShopUrls(shop.tenantId, shop.slug);
           setUrls(shopUrls);
         } catch (error) {
-          console.error('Error fetching shop URLs:', error);
+          clientLogger.error('Error fetching shop URLs:', { detail: error });
         } finally {
           setLoadingUrls(false);
         }

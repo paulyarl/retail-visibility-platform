@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress, validateCoordinates } from '@/lib/geocoding';
 import { directorySingletonService } from '@/services/DirectorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Google Maps type declarations
 declare global {
@@ -132,7 +133,7 @@ export default function DirectoryMapGoogle({
             console.log(`[DirectoryMap] Geocoded "${listing.businessName}": ${geocodeResult.latitude}, ${geocodeResult.longitude}`);
           }
         } else {
-          console.warn(`[DirectoryMap] Failed to geocode "${listing.businessName}"`);
+          clientLogger.warn(`[DirectoryMap] Failed to geocode "${listing.businessName}"`);
         }
 
         // Rate limiting: 10 requests per second
@@ -167,7 +168,7 @@ export default function DirectoryMapGoogle({
         
         setMapListings(result.listings);
       } catch (err) {
-        console.error('[DirectoryMapGoogle] Error fetching map data:', err);
+        clientLogger.error('[DirectoryMapGoogle] Error fetching map data:', { detail: err });
       }
     };
 
@@ -212,7 +213,7 @@ export default function DirectoryMapGoogle({
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       setError('Google Maps API key not configured');
-      console.error('[DirectoryMapGoogle] NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set');
+      clientLogger.error('[DirectoryMapGoogle] NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set');
       return;
     }
 
@@ -311,7 +312,7 @@ export default function DirectoryMapGoogle({
         };
         img.onerror = () => {
           // Logo failed to load, reset to default marker
-          console.warn(`[DirectoryMap] Logo failed to load for ${listing.businessName}: ${listing.logoUrl}`);
+          clientLogger.warn(`[DirectoryMap] Logo failed to load for ${listing.businessName}: ${listing.logoUrl}`);
           marker.setIcon(null); // Reset to default red marker
         };
         img.src = listing.logoUrl;

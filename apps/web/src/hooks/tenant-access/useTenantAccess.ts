@@ -13,6 +13,7 @@ import { useUserRole } from './useUserRole';
 import { useUsageData } from './useUsageData';
 import { useFeatureAccess } from './useFeatureAccess';
 import type { TenantAccessResult } from './types';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Main tenant access hook - New Phase 2 Architecture
@@ -103,7 +104,7 @@ export function useTenantAccess(tenantId: string | null): TenantAccessResult {
  * @deprecated Use useTenantAccess instead
  */
 export function useTenantTierCompat(tenantId: string | null) {
-  console.warn('[useTenantTierCompat] DEPRECATED: Use useTenantAccess instead. This hook will be removed in Phase 3.');
+  clientLogger.warn('[useTenantTierCompat] DEPRECATED: Use useTenantAccess instead. This hook will be removed in Phase 3.');
   
   const accessResult = useTenantAccess(tenantId);
   

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Package, Truck, MapPin, CreditCard, CheckCircle2 } from 'lucide-react';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FulfillmentSettings {
   pickup_enabled: boolean;
@@ -64,7 +65,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
         setFulfillmentSettings(fulfillmentSettings);
       }
     } catch (error) {
-      console.error('Error fetching fulfillment info:', error);
+      clientLogger.error('Error fetching fulfillment info:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
         setPaymentGateways(paymentGateways.filter((g: PaymentGateway) => g.is_active));
       }
     } catch (error) {
-      console.error('Error fetching fulfillment/payment info:', error);
+      clientLogger.error('Error fetching fulfillment/payment info:', { detail: error });
     } finally {
       setLoading(false);
     }

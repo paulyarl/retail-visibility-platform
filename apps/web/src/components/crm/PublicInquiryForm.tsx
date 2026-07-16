@@ -10,6 +10,7 @@ import {
   AccordionContent,
 } from '@/components/ui/Accordion';
 import { MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PublicInquiryFormProps {
   tenantId: string;
@@ -66,13 +67,13 @@ export default function PublicInquiryForm({ tenantId, tenantName, sourceLabel, o
           setFaqs(faqData);
           setFaqCategories(catData);
         })
-        .catch((err) => console.error('Failed to load FAQs for inquiry form:', err))
+        .catch((err) => clientLogger.error('Failed to load FAQs for inquiry form:', { detail: err }))
         .finally(() => setFaqsLoading(false));
     } else {
       // Still load categories for the inquiry dropdown
       publicFaqService.getCategories(tenantId)
         .then((catData) => setFaqCategories(catData))
-        .catch((err) => console.error('Failed to load FAQ categories:', err));
+        .catch((err) => clientLogger.error('Failed to load FAQ categories:', { detail: err }));
     }
   }, [tenantId, showFaqs]);
 

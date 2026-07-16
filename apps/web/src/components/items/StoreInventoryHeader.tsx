@@ -6,6 +6,7 @@ import TenantSKUPrefix from './TenantSKUPrefix';
 import { Button, Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { googleIntegrationService } from '@/services/GoogleIntegrationService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StoreInventoryHeaderProps {
   stats: {
@@ -67,14 +68,14 @@ export default function StoreInventoryHeader({
       } catch (error) {
         // Handle 403 Forbidden and 404 Not Found errors gracefully (permission/endpoint issues)
         if (error instanceof Error && (error.message.includes('403') || error.message.includes('404'))) {
-          console.warn('[StoreInventoryHeader] Access denied or endpoint not found, using fallback');
+          clientLogger.warn('[StoreInventoryHeader] Access denied or endpoint not found, using fallback');
           // Set minimal tenant info from tenantId
           setTenantInfo({
             name: `Store ${tenantId}`,
             subdomain: tenantId,
           });
         } else {
-          console.error('Failed to fetch tenant info:', error);
+          clientLogger.error('Failed to fetch tenant info:', { detail: error });
         }
       } finally {
         setLoading(false);
@@ -101,7 +102,7 @@ export default function StoreInventoryHeader({
           syncing: false,
         });
       } catch (err) {
-        console.error('[StoreInventoryHeader] Failed to check GMC status:', err);
+        clientLogger.error('[StoreInventoryHeader] Failed to check GMC status:', { detail: err });
       }
     };
     checkGmcStatus();

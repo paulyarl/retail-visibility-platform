@@ -5,6 +5,7 @@ import { Check, X, Tag, DollarSign, Package, Power, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { variantOperationsService } from '@/services/VariantOperationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ProductVariant {
   id?: string;
@@ -166,7 +167,7 @@ export default function VariantBulkOperations({
       }
       
     } catch (error) {
-      console.error('Bulk operation failed:', error);
+      clientLogger.error('Bulk operation failed:', { detail: error });
       alert(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsApplying(false);

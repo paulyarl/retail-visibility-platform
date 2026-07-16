@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { directorySupportService } from '@/services/DirectorySupportSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStatus {
   tenant: {
@@ -76,7 +77,7 @@ export function useDirectorySupport() {
           : null,
       };
     } catch (error) {
-      console.error('Failed to get directory status:', error);
+      clientLogger.error('Failed to get directory status:', { detail: error });
       setError('Failed to get directory status');
       return null;
     } finally {
@@ -92,7 +93,7 @@ export function useDirectorySupport() {
       const qualityCheck = await directorySupportService.getDirectoryQualityCheck(tenantId);
       return qualityCheck;
     } catch (err) {
-      console.error('Error checking quality:', err);
+      clientLogger.error('Error checking quality:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to check quality');
       return null;
     } finally {
@@ -107,9 +108,14 @@ export function useDirectorySupport() {
 
       const raw = await directorySupportService.getDirectoryNotes(tenantId) as any;
       if (!raw) return [];
-      return Array.isArray(raw) ? raw : (raw.notes || []);
+      const notes = Array.isArray(raw) ? raw : (raw.notes || []);
+      return notes.map((n: any) => ({
+        ...n,
+        createdAt: n.created_at || n.createdAt,
+        createdBy: n.created_by || n.createdBy,
+      }));
     } catch (err) {
-      console.error('Error fetching notes:', err);
+      clientLogger.error('Error fetching notes:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load notes');
       return [];
     } finally {
@@ -125,7 +131,7 @@ export function useDirectorySupport() {
       const result = await directorySupportService.addDirectoryNote(tenantId, note);
       return !!result;
     } catch (err) {
-      console.error('Error adding note:', err);
+      clientLogger.error('Error adding note:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to add note');
       return false;
     } finally {
@@ -159,7 +165,7 @@ export function useDirectorySupport() {
           : undefined,
       }));
     } catch (err) {
-      console.error('Error searching tenants:', err);
+      clientLogger.error('Error searching tenants:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to search');
       return [];
     } finally {

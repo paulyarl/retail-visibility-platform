@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { clientTenantContextManager } from "@/lib/clientTenantContext";
+import { clientLogger } from '@/lib/client-logger';
 
 export default function SetTenantId({ tenantId }: { tenantId: string }) {
   const hasSetRef = useRef(false);
@@ -19,7 +20,7 @@ export default function SetTenantId({ tenantId }: { tenantId: string }) {
         clientTenantContextManager.setTenantContext(tenantId, 'url_param' as any);
       }
     } catch (err) {
-      console.error('[SetTenantId] error:', err);
+      clientLogger.error('[SetTenantId] error:', { detail: err });
     }
   }, [tenantId]);
 

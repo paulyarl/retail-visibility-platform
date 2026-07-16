@@ -11,6 +11,7 @@ import { Package, Search, Filter, ChevronLeft, ChevronRight, Loader2, ShoppingBa
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import DigitalDownloadsCard from '@/components/downloads/DigitalDownloadsCard';
 import ProductTypeBadge from '@/components/products/ProductTypeBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function OrdersPage() {
   const { customer } = useCustomerAuth();
@@ -77,7 +78,7 @@ export default function OrdersPage() {
       setTotalPages(result.pagination.totalPages);
       setTotalCount(result.pagination.total);
     } catch (error) {
-      console.error('Failed to load orders:', error);
+      clientLogger.error('Failed to load orders:', { detail: error });
     } finally {
       setIsLoading(false);
     }
@@ -180,7 +181,7 @@ export default function OrdersPage() {
         throw new Error('Failed to confirm fulfillment');
       }
     } catch (error) {
-      console.error('Error confirming fulfillment:', error);
+      clientLogger.error('Error confirming fulfillment:', { detail: error });
       alert('Failed to confirm fulfillment. Please try again.');
     } finally {
       setConfirmingPickup(false);
@@ -224,7 +225,7 @@ export default function OrdersPage() {
         throw new Error('Failed to cancel order');
       }
     } catch (error) {
-      console.error('Error cancelling order:', error);
+      clientLogger.error('Error cancelling order:', { detail: error });
       alert('Failed to cancel order. Please try again.');
     } finally {
       setCancellingOrder(false);

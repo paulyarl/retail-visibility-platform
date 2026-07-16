@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
 import SupplierImportService, { type TenantCatalogItem, type TenantSupplier, type BarcodeEnrichment } from '@/services/SupplierImportService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CatalogSearchStepProps {
   tenantId: string;
@@ -57,7 +58,7 @@ export default function CatalogSearchStep({ tenantId, onUseProduct, onUseEnrichm
             const enrichment = await SupplierImportService.enrichBarcode(tenantId, gtinQuery);
             setEnrichmentResult(enrichment);
           } catch (enrichErr) {
-            console.error('[CatalogSearchStep] Enrichment error:', enrichErr);
+            clientLogger.error('[CatalogSearchStep] Enrichment error:', { detail: enrichErr });
           } finally {
             setEnrichmentLoading(false);
           }
@@ -71,7 +72,7 @@ export default function CatalogSearchStep({ tenantId, onUseProduct, onUseEnrichm
         setResults(result.items);
       }
     } catch (err) {
-      console.error('[CatalogSearchStep] Search error:', err);
+      clientLogger.error('[CatalogSearchStep] Search error:', { detail: err });
       setResults([]);
     } finally {
       setLoading(false);

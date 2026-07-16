@@ -19,6 +19,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { platformAnalyticsService } from '@/services/analytics/PlatformAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AnalyticsOverviewProps {
   filters: {
@@ -106,7 +107,7 @@ export default function AnalyticsOverview({ filters }: AnalyticsOverviewProps) {
         setMetrics(formattedMetrics);
         setError(null);
       } catch (err) {
-        console.error('Error fetching overview analytics:', err);
+        clientLogger.error('Error fetching overview analytics:', { detail: err });
         setError('Failed to load analytics data');
       } finally {
         setLoading(false);

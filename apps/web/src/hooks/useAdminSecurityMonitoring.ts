@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 interface AdminSession {
@@ -119,7 +120,7 @@ export function useAdminSecurityMonitoring() {
       setSessions(response.sessions);
       setTotalSessions(response.total);
     } catch (err) {
-      console.error('Failed to fetch admin sessions:', err);
+      clientLogger.error('Failed to fetch admin sessions:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
     }
   }, [currentPage, pageSize]);
@@ -136,7 +137,7 @@ export function useAdminSecurityMonitoring() {
       
       setSessionStats(stats);
     } catch (err) {
-      console.error('Failed to fetch session stats:', err);
+      clientLogger.error('Failed to fetch session stats:', { detail: err });
     }
   }, []);
 
@@ -151,7 +152,7 @@ export function useAdminSecurityMonitoring() {
       
       setAlerts(alerts);
     } catch (err) {
-      console.error('Failed to fetch admin alerts:', err);
+      clientLogger.error('Failed to fetch admin alerts:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
     }
   }, []);
@@ -174,7 +175,7 @@ export function useAdminSecurityMonitoring() {
       
       setAlertStats(stats);
     } catch (err) {
-      console.error('Failed to fetch alert stats:', err);
+      clientLogger.error('Failed to fetch alert stats:', { detail: err });
     }
   }, []);
 
@@ -190,7 +191,7 @@ export function useAdminSecurityMonitoring() {
       
       setFailedLogins(failedLogins);
     } catch (err) {
-      console.error('Failed to fetch failed logins:', err);
+      clientLogger.error('Failed to fetch failed logins:', { detail: err });
     }
   }, []);
 

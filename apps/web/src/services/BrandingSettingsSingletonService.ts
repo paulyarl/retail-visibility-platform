@@ -7,6 +7,7 @@
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { PlatformSettings } from './PlatformSettingsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface BrandingSettings {
   platformName: string;
@@ -38,7 +39,7 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[BrandingSettingsSingleton] Failed to get branding settings:', result.error);
+      clientLogger.error('[BrandingSettingsSingleton] Failed to get branding settings:', { detail: result.error });
       return null;
     }
 
@@ -59,7 +60,7 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[BrandingSettingsSingleton] Failed to update branding settings:', result.error);
+      clientLogger.error('[BrandingSettingsSingleton] Failed to update branding settings:', { detail: result.error });
       return null;
     }
 
@@ -84,7 +85,7 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[BrandingSettingsSingleton] Failed to update branding settings with FormData:', result.error);
+      clientLogger.error('[BrandingSettingsSingleton] Failed to update branding settings with FormData:', { detail: result.error });
       return null;
     }
 

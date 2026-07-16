@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { globalCatalogService, GlobalProduct } from '@/services/GlobalCatalogService';
 import ProductAdoptionModal from './ProductAdoptionModal';
+import { clientLogger } from '@/lib/client-logger';
 
 type ViewMode = 'grid' | 'list';
 
@@ -94,7 +95,7 @@ export default function GlobalCatalogBrowser({
         setBrands(result.brands);
       }
     } catch (err) {
-      console.error('[GlobalCatalogBrowser] Error loading catalog:', err);
+      clientLogger.error('[GlobalCatalogBrowser] Error loading catalog:', { detail: err });
       setError('Failed to load catalog. Please try again.');
     } finally {
       setLoading(false);
@@ -126,7 +127,7 @@ export default function GlobalCatalogBrowser({
       setTotalProducts(result.total);
       setHasMore(result.hasMore);
     } catch (err) {
-      console.error('[GlobalCatalogBrowser] Error searching catalog:', err);
+      clientLogger.error('[GlobalCatalogBrowser] Error searching catalog:', { detail: err });
       setError('Search failed. Please try again.');
     } finally {
       setLoading(false);

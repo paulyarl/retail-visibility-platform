@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
+import { clientLogger } from '@/lib/client-logger';
 
 interface QueueItem {
   id: string;
@@ -104,7 +105,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
             });
           }
         } catch (error) {
-          console.error('Error parsing draft data:', error);
+          clientLogger.error('Error parsing draft data:', { detail: error });
         }
       }
       
@@ -121,7 +122,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
       
       return items;
     } catch (error) {
-      console.error('Error reading localStorage items:', error);
+      clientLogger.error('Error reading localStorage items:', { detail: error });
       return [];
     }
   };
@@ -153,7 +154,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
       await fetchQueueData();
       
     } catch (error) {
-      console.error('Error syncing localStorage items:', error);
+      clientLogger.error('Error syncing localStorage items:', { detail: error });
       setError('Failed to sync local items');
     }
   };
@@ -195,7 +196,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
       await fetchQueueData();
       
     } catch (error) {
-      console.error('Error clearing queue:', error);
+      clientLogger.error('Error clearing queue:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to clear queue');
     }
   };
@@ -216,7 +217,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
       setQueueItems(itemsData || []);
       setStats(statsData);
     } catch (err) {
-      console.error('Error fetching queue:', err);
+      clientLogger.error('Error fetching queue:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load queue');
     } finally {
       setLoading(false);
@@ -257,7 +258,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
-      console.error('Error adding to queue:', error);
+      clientLogger.error('Error adding to queue:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to add item');
     }
   };
@@ -271,7 +272,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
-      console.error('Error updating item status:', error);
+      clientLogger.error('Error updating item status:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to update item status');
     }
   };
@@ -308,7 +309,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         }
       }
     } catch (error) {
-      console.error('Error removing from queue:', error);
+      clientLogger.error('Error removing from queue:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to remove item');
     }
   };
@@ -336,7 +337,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         }
       }
     } catch (error) {
-      console.error('Error processing queue:', error);
+      clientLogger.error('Error processing queue:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to process queue');
     } finally {
       setIsProcessing(false);
@@ -352,7 +353,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
-      console.error('Error updating priority:', error);
+      clientLogger.error('Error updating priority:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to update priority');
     }
   };
@@ -366,7 +367,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
-      console.error('Error cleaning up old items:', error);
+      clientLogger.error('Error cleaning up old items:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to cleanup old items');
     }
   };
@@ -387,7 +388,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
         URL.revokeObjectURL(url);
       }
     } catch (error) {
-      console.error('Error exporting queue:', error);
+      clientLogger.error('Error exporting queue:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to export queue');
     }
   };
@@ -899,7 +900,7 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
                             localStorage.setItem(`queue-${tenantId}`, JSON.stringify(filteredItems));
                             fetchQueueData();
                           } catch (error) {
-                            console.error('Error removing item from localStorage:', error);
+                            clientLogger.error('Error removing item from localStorage:', { detail: error });
                             // Clear corrupted data
                             localStorage.setItem(`queue-${tenantId}`, JSON.stringify([]));
                             fetchQueueData();

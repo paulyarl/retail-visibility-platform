@@ -9,6 +9,7 @@ import TenantQRCode from '@/components/public/TenantQRCode';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrderReceiptProps {
   cart: {
@@ -91,7 +92,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
         const percentage = await publicPlatformFeeService.getPlatformFeePercentage();
         setEffectivePlatformFeePercentage(percentage);
       } catch (error) {
-        console.warn('[OrderReceipt] Failed to fetch platform fee, using default:', error);
+        clientLogger.warn('[OrderReceipt] Failed to fetch platform fee, using default:', { detail: error });
         setEffectivePlatformFeePercentage(3.0);
       }
     };
@@ -112,7 +113,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
           setStatusHistory(orderData.statusHistory);
         }
       } catch (error) {
-        console.warn('[OrderReceipt] Failed to fetch status history:', error);
+        clientLogger.warn('[OrderReceipt] Failed to fetch status history:', { detail: error });
       }
     };
 
@@ -213,7 +214,7 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
           // console.log('[OrderReceipt] Fetched business hours:', hours);
           setBusinessHours(hours);
         } else {
-          console.error('[OrderReceipt] Failed to fetch business hours');
+          clientLogger.error('[OrderReceipt] Failed to fetch business hours');
         }
 
         // Fetch fulfillment settings for pickup ready time
@@ -222,10 +223,10 @@ export default function OrderReceipt({ cart, platformFeePercentage: propPlatform
           // console.log('[OrderReceipt] Fetched fulfillment settings:', fulfillmentSettings);
           setFulfillmentSettings(fulfillmentSettings);
         } else {
-          console.error('[OrderReceipt] Failed to fetch fulfillment settings');
+          clientLogger.error('[OrderReceipt] Failed to fetch fulfillment settings');
         }
       } catch (error) {
-        console.error('[OrderReceipt] Error fetching tenant data:', error);
+        clientLogger.error('[OrderReceipt] Error fetching tenant data:', { detail: error });
       } finally {
         setIsLoadingProfile(false);
       }

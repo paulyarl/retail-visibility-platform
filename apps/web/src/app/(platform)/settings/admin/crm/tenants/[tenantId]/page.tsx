@@ -9,6 +9,7 @@ import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminOperationsService, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTenantDetail, TicketPriority, TaskPriority, TaskStatus } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -33,7 +34,7 @@ export default function CrmTenantDetailPage() {
         const detail = await crmAdminService.getTenantDetail(tenantId);
         setTenant(detail);
       } catch (err) {
-        console.error('[CRM Tenant Detail] Load error:', err);
+        clientLogger.error('[CRM Tenant Detail] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -154,7 +155,7 @@ function OverviewTab({ tenant }: { tenant: CrmTenantDetail }) {
       setShowAlert(false);
       setAlertForm({ type: 'info', title: '', body: '', icon: '📢' });
     } catch (err) {
-      console.error('[OverviewTab] Send alert error:', err);
+      clientLogger.error('[OverviewTab] Send alert error:', { detail: err });
     } finally {
       setSendingAlert(false);
     }
@@ -264,7 +265,7 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
       const result = await crmAdminService.listActivities(tenantId, { limit: 20 });
       setActivities(result);
     } catch (err) {
-      console.error('[Activity Tab] Error:', err);
+      clientLogger.error('[Activity Tab] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -287,7 +288,7 @@ function ActivityTab({ tenantId }: { tenantId: string }) {
       setNoteContent('');
       await load();
     } catch (err) {
-      console.error('[Activity Tab] Add note error:', err);
+      clientLogger.error('[Activity Tab] Add note error:', { detail: err });
     } finally {
       setAddingNote(false);
     }
@@ -341,7 +342,7 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
       const result = await crmAdminService.listTickets(tenantId);
       setTickets(result);
     } catch (err) {
-      console.error('[Tickets Tab] Error:', err);
+      clientLogger.error('[Tickets Tab] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -365,7 +366,7 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
       setNewTicket({ title: '', description: '', priority: 'medium' });
       await load();
     } catch (err) {
-      console.error('[Tickets Tab] Create error:', err);
+      clientLogger.error('[Tickets Tab] Create error:', { detail: err });
     } finally {
       setCreating(false);
     }
@@ -482,7 +483,7 @@ function TasksTab({ tenantId }: { tenantId: string }) {
       const result = await crmAdminService.listTasks({ tenantId });
       setTasks(result);
     } catch (err) {
-      console.error('[Tasks Tab] Error:', err);
+      clientLogger.error('[Tasks Tab] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -509,7 +510,7 @@ function TasksTab({ tenantId }: { tenantId: string }) {
           return true;
         }));
       } catch (err) {
-        console.error('[Tasks Tab] Staff users load error:', err);
+        clientLogger.error('[Tasks Tab] Staff users load error:', { detail: err });
       }
     })();
   }, [tenantId]);
@@ -536,7 +537,7 @@ function TasksTab({ tenantId }: { tenantId: string }) {
       setNewTask({ title: '', description: '', priority: 'medium', due_date: '', assigned_to: '' });
       await load();
     } catch (err) {
-      console.error('[Tasks Tab] Create error:', err);
+      clientLogger.error('[Tasks Tab] Create error:', { detail: err });
     } finally {
       setCreating(false);
     }
@@ -548,7 +549,7 @@ function TasksTab({ tenantId }: { tenantId: string }) {
       await crmAdminService.updateTask(taskId, { status: newStatus });
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     } catch (err) {
-      console.error('[Tasks Tab] Status change error:', err);
+      clientLogger.error('[Tasks Tab] Status change error:', { detail: err });
     } finally {
       setUpdatingId(null);
     }
@@ -561,7 +562,7 @@ function TasksTab({ tenantId }: { tenantId: string }) {
       setDeleteTaskId(null);
       await load();
     } catch (err) {
-      console.error('[Tasks Tab] Delete error:', err);
+      clientLogger.error('[Tasks Tab] Delete error:', { detail: err });
     }
   }
 
@@ -740,7 +741,7 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
       const result = await crmAdminService.listContacts(tenantId);
       setContacts(result);
     } catch (err) {
-      console.error('[Contacts Tab] Error:', err);
+      clientLogger.error('[Contacts Tab] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -767,7 +768,7 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
       setNewContact({ first_name: '', last_name: '', email: '', phone: '', role: '', is_primary: false });
       await load();
     } catch (err) {
-      console.error('[Contacts Tab] Create error:', err);
+      clientLogger.error('[Contacts Tab] Create error:', { detail: err });
     } finally {
       setCreating(false);
     }
@@ -790,7 +791,7 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
       setEditContact(null);
       await load();
     } catch (err) {
-      console.error('[Contacts Tab] Edit error:', err);
+      clientLogger.error('[Contacts Tab] Edit error:', { detail: err });
     } finally {
       setEditing(false);
     }
@@ -803,7 +804,7 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
       setDeleteContactId(null);
       await load();
     } catch (err) {
-      console.error('[Contacts Tab] Delete error:', err);
+      clientLogger.error('[Contacts Tab] Delete error:', { detail: err });
     }
   }
 
@@ -962,7 +963,7 @@ function TransactionsTab({ tenantId }: { tenantId: string }) {
   useEffect(() => {
     crmAdminService.getTenantTransactions(tenantId, page)
       .then(res => setOrders(res.data))
-      .catch(err => console.error('[Transactions Tab] Error:', err))
+      .catch(err => clientLogger.error('[Transactions Tab] Error:', { detail: err }))
       .finally(() => setLoading(false));
   }, [tenantId, page]);
 
@@ -1006,7 +1007,7 @@ function PromotionTab({ tenantId }: { tenantId: string }) {
   useEffect(() => {
     crmAdminService.getTenantPromotion(tenantId)
       .then(setData)
-      .catch(err => console.error('[Promotion Tab] Error:', err))
+      .catch(err => clientLogger.error('[Promotion Tab] Error:', { detail: err }))
       .finally(() => setLoading(false));
   }, [tenantId]);
 

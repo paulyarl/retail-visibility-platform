@@ -9,6 +9,7 @@ import { adminCategoriesService } from '@/services/AdminCategoriesService';
 import { adminUsersService } from '@/services/AdminUsersService';
 import { organizationService } from '@/services/OrganizationService';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -81,7 +82,7 @@ function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }
           setPath(pathString);
         }
       } catch (error) {
-        console.error('Failed to fetch Google category path:', error);
+        clientLogger.error('Failed to fetch Google category path:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -171,7 +172,7 @@ export default function AdminCategoriesPage() {
       const tenants = await adminUsersService.getAllTenants();
       setTenants(Array.isArray(tenants) ? tenants : []);
     } catch (e) {
-      console.error('Failed to load tenants:', e);
+      clientLogger.error('Failed to load tenants:', { detail: e });
     } finally {
       setLoadingTenants(false);
     }
@@ -182,7 +183,7 @@ export default function AdminCategoriesPage() {
       const orgs = await organizationService.getOrganizations({});
       setOrganizations(Array.isArray(orgs) ? orgs : []);
     } catch (e) {
-      console.error('Failed to load organizations:', e);
+      clientLogger.error('Failed to load organizations:', { detail: e });
     } finally {
       setLoadingOrgs(false);
     }
@@ -210,7 +211,7 @@ export default function AdminCategoriesPage() {
       // Ensure categories is always an array
       setCategories(Array.isArray(categories) ? categories : []);
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      clientLogger.error('Failed to load categories:', { detail: error });
       setCategories([]);
     } finally {
       setLoading(false);
@@ -293,7 +294,7 @@ export default function AdminCategoriesPage() {
         alert(`Successfully propagated ${response.propagated} categories to ${response.tenantsAffected} tenants`);
       }
     } catch (error: any) {
-      console.error('Propagation failed:', error);
+      clientLogger.error('Propagation failed:', { detail: error });
       setLastResult({ error: true, message: error.message || 'Propagation failed' });
     } finally {
       setPropagationLoading(false);

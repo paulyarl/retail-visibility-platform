@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { StockUpdateService } from '@/services/stockUpdateService';
 import { Check, X, Edit2, Package, AlertTriangle } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface QuickStockEditorProps {
   itemId: string;
@@ -82,7 +83,7 @@ export default function QuickStockEditor({
         console.log(`[QuickStockEditor] Update complete, editor closed`);
       }, 100);
     } catch (error) {
-      console.error('[QuickStockEditor] Failed to update stock:', error);
+      clientLogger.error('[QuickStockEditor] Failed to update stock:', { detail: error });
       alert(`Failed to update stock: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setStockValue(currentStock.toString());
     } finally {

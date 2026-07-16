@@ -36,6 +36,7 @@ import { Button } from '@mantine/core';
 import { Switch } from '@/components/ui/Switch';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ContentStepProps {
   data: {
@@ -230,7 +231,7 @@ export default function ContentStep({ data, errors, onChange }: ContentStepProps
         specifications: { ...data.specifications, ...mockSpecs }
       });
     } catch (error) {
-      console.error('Error generating content:', error);
+      clientLogger.error('Error generating content:', { detail: error });
     } finally {
       setIsGeneratingContent(false);
     }

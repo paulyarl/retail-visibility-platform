@@ -24,6 +24,7 @@ import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface SocialCommerceFlags {
   enabled?: boolean;
@@ -294,7 +295,7 @@ export function useStorefrontState({
           setFeaturedCounts(transformedData.bucketCounts || {});
         }
       } catch (err) {
-        console.error('[useStorefrontState] Failed to load featured counts:', err);
+        clientLogger.error('[useStorefrontState] Failed to load featured counts:', { detail: err });
       }
     };
 

@@ -8,6 +8,7 @@ import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import Link from 'next/link';
 import type { CrmTask, TaskStatus, TaskPriority } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -45,7 +46,7 @@ export default function TenantTasksPage() {
       setTasks(data ?? []);
       setTenantUsers(users ?? []);
     } catch (err) {
-      console.error('[Tenant Tasks] Load error:', err);
+      clientLogger.error('[Tenant Tasks] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ export default function TenantTasksPage() {
       await crmTenantCrmService.updateTaskStatus(taskId, newStatus);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     } catch (err) {
-      console.error('[Tenant Tasks] Status change error:', err);
+      clientLogger.error('[Tenant Tasks] Status change error:', { detail: err });
     } finally {
       setUpdatingId(null);
     }

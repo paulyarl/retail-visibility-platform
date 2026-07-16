@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Ban, Unlock, AlertTriangle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import * as securityMonitoringService from '@/services/securityMonitoring';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BlockedIPsTableProps {
   blockedIPs: BlockedIP[];
@@ -27,7 +28,7 @@ export function BlockedIPsTable({ blockedIPs }: BlockedIPsTableProps) {
       await securityMonitoringService.unblockIP(ipAddress, 'Unblocked via UI');
       window.location.reload();
     } catch (error) {
-      console.error('Failed to unblock IP:', error);
+      clientLogger.error('Failed to unblock IP:', { detail: error });
     } finally {
       setUnblocking(null);
     }

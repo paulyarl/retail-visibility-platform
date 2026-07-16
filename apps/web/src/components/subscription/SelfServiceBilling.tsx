@@ -5,6 +5,7 @@ import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, Segmente
 import { IconCreditCard, IconPlus, IconTrash, IconStar, IconCheck, IconAlertCircle, IconBrandPaypal } from '@tabler/icons-react';
 import { subscriptionBillingService, type TierPricing, type PaymentMethod, type SubscriptionPreview } from '@/services/SubscriptionBillingService';
 import { PayPalSmartButtons } from './PayPalButtons';
+import { clientLogger } from '@/lib/client-logger';
 
 // Stripe packages are optional - may not be installed or configured
 let stripePromise: Promise<any> | null = null;
@@ -56,7 +57,7 @@ async function loadStripePackages(): Promise<boolean> {
       return true;
     }
   } catch (e) {
-    console.warn('[SelfServiceBilling] Stripe packages not available');
+    clientLogger.warn('[SelfServiceBilling] Stripe packages not available');
   }
   return false;
 }
@@ -144,7 +145,7 @@ export function SelfServiceBilling({
           // Reload data
           loadData();
         } catch (err: any) {
-          console.error('[SelfServiceBilling] PayPal return error:', err);
+          clientLogger.error('[SelfServiceBilling] PayPal return error:', { detail: err });
           setError(err.message || 'Failed to process PayPal return');
         } finally {
           setProcessing(false);
@@ -331,11 +332,11 @@ export function SelfServiceBilling({
               // console.log('[SelfServiceBilling] Stripe loaded:', !!stripe);
             }
           } catch (e) {
-            console.error('[SelfServiceBilling] Failed to load Stripe:', e);
+            clientLogger.error('[SelfServiceBilling] Failed to load Stripe:', { detail: e });
           }
           
           if (!stripe) {
-            console.error('[SelfServiceBilling] Stripe not available');
+            clientLogger.error('[SelfServiceBilling] Stripe not available');
             setError('Stripe not configured for payment confirmation');
             return;
           }
@@ -432,7 +433,7 @@ export function SelfServiceBilling({
         throw new Error('No approval URL returned from PayPal');
       }
     } catch (err: any) {
-      console.error('[PayPal] Error:', err);
+      clientLogger.error('[PayPal] Error:', { detail: err });
       setError(err.message || 'Failed to add PayPal');
       setProcessing(false);
     }

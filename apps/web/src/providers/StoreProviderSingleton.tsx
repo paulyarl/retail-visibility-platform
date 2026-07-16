@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { storefrontService } from '@/services/StorefrontService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // STORE PROVIDER SINGLETON - CLIENT-SIDE IMPLEMENTATION
@@ -88,7 +89,7 @@ class StoreProviderSingleton {
 
   private logError(message: string, error?: any): void {
     if (this.options.enableLogging) {
-      console.error(`[StoreProvider] ERROR: ${message}`, error || '');
+      clientLogger.error(`[StoreProvider] ERROR: ${message}`, { detail: error || '' });
     }
   }
 

@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Encryption utilities for secure localStorage caching
  * Uses Web Crypto API with AES-GCM encryption
@@ -86,7 +88,7 @@ export class CacheEncryption {
       }
       return btoa(binary);
     } catch (error) {
-      console.warn('[CacheEncryption] Encryption failed:', error);
+      clientLogger.warn('[CacheEncryption] Encryption failed:', { detail: error });
       // Fallback to plain data if encryption fails (for development/debugging)
       // Prepend marker to identify unencrypted data
       return `PLAIN:${data}`;
@@ -125,7 +127,7 @@ export class CacheEncryption {
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch (error) {
-      console.warn('[CacheEncryption] Decryption failed:', error);
+      clientLogger.warn('[CacheEncryption] Decryption failed:', { detail: error });
       // Fallback to plain data if decryption fails (handles unencrypted legacy data)
       if (encryptedData.startsWith('PLAIN:')) {
         return encryptedData.slice(6);

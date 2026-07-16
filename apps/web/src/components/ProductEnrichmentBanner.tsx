@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductNeedingEnrichment {
   id: string;
@@ -65,7 +66,7 @@ export default function ProductEnrichmentBanner({ tenantId }: ProductEnrichmentB
         setProducts(data);
       }
     } catch (error) {
-      console.error('[ProductEnrichmentBanner] Failed to fetch products:', error);
+      clientLogger.error('[ProductEnrichmentBanner] Failed to fetch products:', { detail: error });
     } finally {
       setLoading(false);
     }

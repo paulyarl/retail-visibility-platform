@@ -8,6 +8,7 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { SecurityThreat, SecurityAlert, BlockedIP, SecurityMetrics } from '@/types/security';
+import { clientLogger } from '@/lib/client-logger';
 
 // Security Monitoring Data Interfaces
 export interface SecurityEvent {
@@ -138,7 +139,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
       // Mark as processed
       event.resolved = true;
     } catch (error) {
-      console.error('Error processing security event:', error);
+      clientLogger.error('Error processing security event:', { detail: error });
     }
   }
 
@@ -205,7 +206,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
       const cacheKey = `security-threat-${threat.id}`;
       await this.setCache(cacheKey, threat);
     } catch (error) {
-      console.error('Error handling threat event:', error);
+      clientLogger.error('Error handling threat event:', { detail: error });
     }
   }
 
@@ -232,7 +233,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
       const cacheKey = `security-alert-${alert.id}`;
       await this.setCache(cacheKey, alert);
     } catch (error) {
-      console.error('Error generating security alert:', error);
+      clientLogger.error('Error generating security alert:', { detail: error });
     }
   }
 
@@ -259,7 +260,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
       const cacheKey = `blocked-ip-${blockedIP.id}`;
       await this.setCache(cacheKey, blockedIP);
     } catch (error) {
-      console.error('Error blocking IP address:', error);
+      clientLogger.error('Error blocking IP address:', { detail: error });
     }
   }
 
@@ -311,7 +312,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<SecurityMonitoringStats>('/api/security/monitoring/stats', {}, 'monitoring-stats');
     
     if (!result.success) {
-      console.error('Error fetching monitoring stats:', result.error);
+      clientLogger.error('Error fetching monitoring stats:', { detail: result.error });
       return {
         totalEvents: 0,
         activeThreats: 0,
@@ -405,7 +406,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error sending threat to API:', result.error);
+      clientLogger.error('Error sending threat to API:', { detail: result.error });
     }
   }
 
@@ -416,7 +417,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error sending alert to API:', result.error);
+      clientLogger.error('Error sending alert to API:', { detail: result.error });
     }
   }
 
@@ -427,7 +428,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error sending IP block to API:', result.error);
+      clientLogger.error('Error sending IP block to API:', { detail: result.error });
     }
   }
 

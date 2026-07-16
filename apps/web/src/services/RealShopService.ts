@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ShopData {
   id: string;
@@ -172,7 +173,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       if (error.message?.includes('404') || error.message?.includes('Not Found')) {
         return null;
       }
-      console.error('Error getting shop:', error);
+      clientLogger.error('Error getting shop:', { detail: error });
       throw error;
     }
   }
@@ -196,7 +197,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error saving shop:', error);
+      clientLogger.error('Error saving shop:', { detail: error });
       throw error;
     }
   }
@@ -220,7 +221,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error updating shop:', error);
+      clientLogger.error('Error updating shop:', { detail: error });
       throw error;
     }
   }
@@ -243,7 +244,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error publishing shop:', error);
+      clientLogger.error('Error publishing shop:', { detail: error });
       throw error;
     }
   }
@@ -266,7 +267,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error unpublishing shop:', error);
+      clientLogger.error('Error unpublishing shop:', { detail: error });
       throw error;
     }
   }
@@ -290,7 +291,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error updating shop category:', error);
+      clientLogger.error('Error updating shop category:', { detail: error });
       throw error;
     }
   }
@@ -318,7 +319,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error updating shop branding:', error);
+      clientLogger.error('Error updating shop branding:', { detail: error });
       throw error;
     }
   }
@@ -350,7 +351,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error updating shop hours:', error);
+      clientLogger.error('Error updating shop hours:', { detail: error });
       throw error;
     }
   }
@@ -380,7 +381,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error updating social links:', error);
+      clientLogger.error('Error updating social links:', { detail: error });
       throw error;
     }
   }
@@ -401,7 +402,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error getting shop analytics:', error);
+      clientLogger.error('Error getting shop analytics:', { detail: error });
       throw error;
     }
   }
@@ -422,7 +423,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error checking shop limits:', error);
+      clientLogger.error('Error checking shop limits:', { detail: error });
       throw error;
     }
   }
@@ -440,7 +441,7 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-delete-${tenantId}`
       );
     } catch (error) {
-      console.error('Error deleting shop:', error);
+      clientLogger.error('Error deleting shop:', { detail: error });
       throw error;
     }
   }
@@ -461,7 +462,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error getting available categories:', error);
+      clientLogger.error('Error getting available categories:', { detail: error });
       throw error;
     }
   }
@@ -485,7 +486,7 @@ class RealShopService extends AuthenticatedApiSingleton {
       }
       return result.data;
     } catch (error) {
-      console.error('Error setting shop category:', error);
+      clientLogger.error('Error setting shop category:', { detail: error });
       throw error;
     }
   }

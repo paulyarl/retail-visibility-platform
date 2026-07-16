@@ -23,6 +23,7 @@ import { useProduct } from '@/providers/ProductProvider';
 import { PublicProduct } from '@/providers/data/ProductSingleton';
 import { useTenantFeaturedProducts } from '@/hooks/useTenantFeaturedProducts';
 import { useBadgeRuleValidation } from '@/hooks/useBadgeRegistry';
+import { clientLogger } from '@/lib/client-logger';
 
 // Helper functions for featured type badges
 const getFeaturedBadgeStyle = (typeId: string): string => {
@@ -381,7 +382,7 @@ export default function FeaturedProductsManager({
         }
       });
     } catch (error) {
-      console.error('[FeaturedProductsManager] Stock update error:', error);
+      clientLogger.error('[FeaturedProductsManager] Stock update error:', { detail: error });
       throw error;
     }
   };
@@ -391,7 +392,7 @@ export default function FeaturedProductsManager({
     try {
       await action();
     } catch (error) {
-      console.error(errorMessage, error);
+      clientLogger.error(errorMessage, { detail: error });
       alert(error instanceof Error ? error.message : errorMessage);
     }
   };
@@ -424,7 +425,7 @@ export default function FeaturedProductsManager({
     // Featured products use inventory_item_id, active products use id
     const productId = product.inventory_item_id || product.id;
     if (!productId) {
-      console.error('Missing product ID for expiration edit:', product);
+      clientLogger.error('Missing product ID for expiration edit:', { detail: product });
       return;
     }
     setEditingExpiration(productId);

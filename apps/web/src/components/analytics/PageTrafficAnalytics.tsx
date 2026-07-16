@@ -18,6 +18,7 @@ import {
   Store
 } from 'lucide-react';
 import { platformAnalyticsService } from '@/services/analytics/PlatformAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PageTrafficAnalyticsProps {
   filters: {
@@ -64,7 +65,7 @@ export default function PageTrafficAnalytics({ filters }: PageTrafficAnalyticsPr
         setTopPages(data.topPages);
         setError(null);
       } catch (err) {
-        console.error('Error fetching page traffic analytics:', err);
+        clientLogger.error('Error fetching page traffic analytics:', { detail: err });
         setError('Failed to load page traffic data');
       } finally {
         setLoading(false);

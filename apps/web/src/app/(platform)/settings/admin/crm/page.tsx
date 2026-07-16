@@ -7,6 +7,7 @@ import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { useAuth } from '@/contexts/AuthContext';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import { IconBroadcast } from '@tabler/icons-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DashboardStats {
   openTickets: number;
@@ -65,7 +66,7 @@ export default function CrmDashboardPage() {
         if (promoRes.status === 'fulfilled') setPromoStats(promoRes.value);
         if (serviceRes.status === 'fulfilled') setServiceTickets(serviceRes.value);
       } catch (err) {
-        console.error('[CRM Dashboard] Load error:', err);
+        clientLogger.error('[CRM Dashboard] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }

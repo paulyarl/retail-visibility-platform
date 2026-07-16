@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { getTodaySpecialHours } from "@/lib/hours-utils";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { tenantManagementService } from "@/services/TenantManagementService";
+import { clientLogger } from '@/lib/client-logger';
 
 interface HoursPreviewProps {
   tenantId: string;
@@ -66,7 +67,7 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch special hours:', error);
+        clientLogger.error('Failed to fetch special hours:', { detail: error });
         if (mountedRef.current) {
           setSpecialHours(null);
         }

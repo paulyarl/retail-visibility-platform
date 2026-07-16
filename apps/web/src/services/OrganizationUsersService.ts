@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface OrgUser {
   id: string;
@@ -50,7 +51,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to get users:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to get users:', { detail: result.error });
       return [];
     }
 
@@ -70,7 +71,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to add user:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to add user:', { detail: result.error });
       throw result.error;
     }
 
@@ -91,7 +92,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to update role:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to update role:', { detail: result.error });
       throw result.error;
     }
 
@@ -109,7 +110,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to remove user:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to remove user:', { detail: result.error });
       throw result.error;
     }
 
@@ -129,7 +130,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to invite user:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to invite user:', { detail: result.error });
       throw result.error;
     }
 
@@ -147,7 +148,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to get invitations:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to get invitations:', { detail: result.error });
       return [];
     }
 
@@ -164,7 +165,7 @@ export class OrganizationUsersService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationUsersService] Failed to cancel invitation:', result.error);
+      clientLogger.error('[OrganizationUsersService] Failed to cancel invitation:', { detail: result.error });
       throw result.error;
     }
 

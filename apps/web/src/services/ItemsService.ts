@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Item {
   id: string;
@@ -98,7 +99,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to clone product:', response.error);
+      clientLogger.error('[ItemsService] Failed to clone product:', { detail: response.error });
       throw response.error;
     }
 
@@ -153,7 +154,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to get items:', response.error);
+      clientLogger.error('[ItemsService] Failed to get items:', { detail: response.error });
       return {
         items: [],
         total: 0,
@@ -184,7 +185,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to get item:', response.error);
+      clientLogger.error('[ItemsService] Failed to get item:', { detail: response.error });
       return null;
     }
 
@@ -206,7 +207,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to create item:', response.error);
+      clientLogger.error('[ItemsService] Failed to create item:', { detail: response.error });
       throw response.error;
     }
 
@@ -232,7 +233,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to create item (legacy):', response.error);
+      clientLogger.error('[ItemsService] Failed to create item (legacy):', { detail: response.error });
       throw response.error;
     }
 
@@ -257,7 +258,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to create items in bulk:', response.error);
+      clientLogger.error('[ItemsService] Failed to create items in bulk:', { detail: response.error });
       throw response.error;
     }
 
@@ -282,7 +283,7 @@ class ItemsService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[ItemsService] Failed to update item:', response.error);
+      clientLogger.error('[ItemsService] Failed to update item:', { detail: response.error });
       return null;
     }
 
@@ -311,7 +312,7 @@ class ItemsService extends TenantApiSingleton {
       
       return true;
     } catch (error) {
-      console.error('[ItemsService] Failed to delete item:', error);
+      clientLogger.error('[ItemsService] Failed to delete item:', { detail: error });
       return false;
     }
   }
@@ -344,7 +345,7 @@ class ItemsService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[ItemsService] Failed to quick start tenant:', error);
+      clientLogger.error('[ItemsService] Failed to quick start tenant:', { detail: error });
       throw error;
     }
   }

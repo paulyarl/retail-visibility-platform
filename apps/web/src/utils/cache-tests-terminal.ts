@@ -6,6 +6,7 @@
  */
 
 import { LocalStorageCache } from '../lib/cache/local-storage-cache';
+import { clientLogger } from '@/lib/client-logger';
 
 // Mock localStorage for Node.js environment
 const mockLocalStorage = new Map<string, string>();
@@ -47,7 +48,7 @@ async function testBasicCache() {
     console.log('🎉 Basic cache test complete!\n');
     return true;
   } catch (error) {
-    console.error('❌ Basic cache test failed:', error, '\n');
+    clientLogger.error('❌ Basic cache test failed:', { detail: error, detail2: '\n' });
     return false;
   }
 }
@@ -74,7 +75,7 @@ function testCacheExpiration() {
 
     return true;
   } catch (error) {
-    console.error('❌ Cache expiration test failed:', error, '\n');
+    clientLogger.error('❌ Cache expiration test failed:', { detail: error, detail2: '\n' });
     return false;
   }
 }
@@ -107,7 +108,7 @@ async function testCacheInvalidation() {
     console.log('🎉 Cache invalidation test complete!\n');
     return true;
   } catch (error) {
-    console.error('❌ Cache invalidation test failed:', error, '\n');
+    clientLogger.error('❌ Cache invalidation test failed:', { detail: error, detail2: '\n' });
     return false;
   }
 }
@@ -138,7 +139,7 @@ function testCacheStats() {
     console.log('🎉 Cache statistics test complete!\n');
     return true;
   } catch (error) {
-    console.error('❌ Cache statistics test failed:', error, '\n');
+    clientLogger.error('❌ Cache statistics test failed:', { detail: error, detail2: '\n' });
     return false;
   }
 }

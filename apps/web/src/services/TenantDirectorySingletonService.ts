@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantSlugResponse {
   slug: string;
@@ -83,7 +84,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
    */
   async getTenantDirectoryStatus(tenantId: string): Promise<TenantDirectoryStatus | null> {
     if (!tenantId) {
-      console.error('[TenantDirectorySingleton] getTenantDirectoryStatus: tenantId is required');
+      clientLogger.error('[TenantDirectorySingleton] getTenantDirectoryStatus: tenantId is required');
       return null;
     }
 
@@ -105,7 +106,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to get tenant directory status:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to get tenant directory status:', { detail: error });
       return null;
     }
   }
@@ -116,7 +117,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
    */
   async getTenantSlug(tenantId: string): Promise<string | undefined> {
     if (!tenantId) {
-      console.error('[TenantDirectorySingleton] getTenantSlug: tenantId is required');
+      clientLogger.error('[TenantDirectorySingleton] getTenantSlug: tenantId is required');
       return undefined;
     }
 
@@ -136,7 +137,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
 
         return result.data?.slug ?? undefined;
       } catch (error) {
-        console.warn('[TenantDirectorySingleton] Failed to fetch tenant slug during SSR:', error);
+        clientLogger.warn('[TenantDirectorySingleton] Failed to fetch tenant slug during SSR:', { detail: error });
         return undefined;
       }
     }
@@ -155,13 +156,13 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
         
         // Handle legitimate API responses (should not be 404 for missing records)
         if (!result) {
-          console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, 'No data');
+          clientLogger.warn('[TenantDirectorySingleton] No directory listing found for tenant:', { detail: tenantId, detail2: 'No data' });
           return undefined;
         }
         
         // Check if response looks like an error response (has error property instead of slug)
         if (!result.data || 'error' in result.data || !result.data.slug) {
-          console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, (result.data as any)?.error || 'Missing slug');
+          clientLogger.warn('[TenantDirectorySingleton] No directory listing found for tenant:', { detail: tenantId, detail2: (result.data as any)?.error || 'Missing slug' });
           return undefined;
         }
         
@@ -174,12 +175,12 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
                                error?.message?.includes('fetch failed');
         
         if (isConnectionError && attempt < maxRetries) {
-          console.warn(`[TenantDirectorySingleton] Connection failed (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
+          clientLogger.warn(`[TenantDirectorySingleton] Connection failed (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
         
-        console.error('[TenantDirectorySingleton] Failed to get tenant slug:', error);
+        clientLogger.error('[TenantDirectorySingleton] Failed to get tenant slug:', { detail: error });
         return undefined;
       }
     }
@@ -193,7 +194,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
    */
   async getTenantIdentifiers(tenantId: string): Promise<TenantIdentifiers | undefined> {
     if (!tenantId) {
-      console.error('[TenantDirectorySingleton] getTenantIdentifiers: tenantId is required');
+      clientLogger.error('[TenantDirectorySingleton] getTenantIdentifiers: tenantId is required');
       return undefined;
     }
 
@@ -210,7 +211,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
         autoId
       };
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to get tenant identifiers:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to get tenant identifiers:', { detail: error });
       return undefined;
     }
   }
@@ -250,7 +251,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
   async getDirectoryListing(tenantId: string): Promise<TenantDirectoryListing | null> {
     try {
       if (!tenantId) {
-        console.error('[TenantDirectorySingleton] getDirectoryListing: tenantId is required');
+        clientLogger.error('[TenantDirectorySingleton] getDirectoryListing: tenantId is required');
         return null;
       }
 
@@ -262,7 +263,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to get directory listing:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to get directory listing:', { detail: error });
       return null;
     }
   }
@@ -274,7 +275,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
   async createDirectoryListing(tenantId: string, listingData: Partial<TenantDirectoryListing>): Promise<TenantDirectoryListing | null> {
     try {
       if (!tenantId || !listingData) {
-        console.error('[TenantDirectorySingleton] createDirectoryListing: tenantId and listingData are required');
+        clientLogger.error('[TenantDirectorySingleton] createDirectoryListing: tenantId and listingData are required');
         return null;
       }
 
@@ -292,7 +293,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to create directory listing:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to create directory listing:', { detail: error });
       return null;
     }
   }
@@ -304,7 +305,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
   async updateDirectoryListing(tenantId: string, listingData: Partial<TenantDirectoryListing>): Promise<TenantDirectoryListing | null> {
     try {
       if (!tenantId || !listingData) {
-        console.error('[TenantDirectorySingleton] updateDirectoryListing: tenantId and listingData are required');
+        clientLogger.error('[TenantDirectorySingleton] updateDirectoryListing: tenantId and listingData are required');
         return null;
       }
 
@@ -322,7 +323,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to update directory listing:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to update directory listing:', { detail: error });
       return null;
     }
   }
@@ -334,7 +335,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
   async patchDirectoryListing(tenantId: string, listingData: Partial<TenantDirectoryListing>): Promise<TenantDirectoryListing | null> {
     try {
       if (!tenantId || !listingData) {
-        console.error('[TenantDirectorySingleton] patchDirectoryListing: tenantId and listingData are required');
+        clientLogger.error('[TenantDirectorySingleton] patchDirectoryListing: tenantId and listingData are required');
         return null;
       }
 
@@ -352,7 +353,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to patch directory listing:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to patch directory listing:', { detail: error });
       return null;
     }
   }
@@ -364,7 +365,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
   async deleteDirectoryListing(tenantId: string): Promise<boolean> {
     try {
       if (!tenantId) {
-        console.error('[TenantDirectorySingleton] deleteDirectoryListing: tenantId is required');
+        clientLogger.error('[TenantDirectorySingleton] deleteDirectoryListing: tenantId is required');
         return false;
       }
 
@@ -381,14 +382,14 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       
       return !!result;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to delete directory listing:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to delete directory listing:', { detail: error });
       return false;
     }
   }
 
   async getQualityCheck(tenantId: string): Promise<any | null> {
     if (!tenantId) {
-      console.error('[TenantDirectorySingleton] getQualityCheck: tenantId is required');
+      clientLogger.error('[TenantDirectorySingleton] getQualityCheck: tenantId is required');
       return null;
     }
 
@@ -400,14 +401,14 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantDirectorySingleton] Failed to get quality check:', result.error);
+        clientLogger.error('[TenantDirectorySingleton] Failed to get quality check:', { detail: result.error });
         return null;
       }
 
       const responseData = result.data;
       return responseData?.data || responseData;
     } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to get quality check:', error);
+      clientLogger.error('[TenantDirectorySingleton] Failed to get quality check:', { detail: error });
       return null;
     }
   }

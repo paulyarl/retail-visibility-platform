@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { itemsDataService, Item, ItemFilters, ItemStats } from "@/services/itemsDataService";
+import { clientLogger } from '@/lib/client-logger';
 
 // Keep status and visibility aligned with backend ItemFilters for now
 export type ItemStatusFilter = "all" | "active" | "inactive" | "syncing";
@@ -95,7 +96,7 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
       const statsData = await itemsDataService.fetchStats(tenantId);
       setStats(statsData);
     } catch (err) {
-      console.error("[useTenantItems] fetchStats failed:", err);
+      clientLogger.error("[useTenantItems] fetchStats failed:", { detail: err });
     }
   }, [tenantId]);
 
@@ -127,7 +128,7 @@ export function useTenantItems(options: UseTenantItemsOptions): UseTenantItemsRe
       const msg = err instanceof Error ? err.message : "Failed to load items";
       setError(msg);
       // eslint-disable-next-line no-console
-      console.error("[useTenantItems] fetchItems failed:", err);
+      clientLogger.error("[useTenantItems] fetchItems failed:", { detail: err });
     } finally {
       setLoading(false);
     }

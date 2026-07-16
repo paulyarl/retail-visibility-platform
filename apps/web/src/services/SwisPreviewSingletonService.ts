@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SwisPreviewItem {
   sku: string;
@@ -77,13 +78,13 @@ class SwisPreviewSingletonService extends AuthenticatedApiSingleton {
         `swis-preview-${tenantId}-${limit}-${sortOrder}`
       );
       if (!result.success){
-        console.error('[SwisPreviewSingleton] Failed to get SWIS preview:', result.error);
+        clientLogger.error('[SwisPreviewSingleton] Failed to get SWIS preview:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[SwisPreviewSingleton] Failed to get SWIS preview:', error);
+      clientLogger.error('[SwisPreviewSingleton] Failed to get SWIS preview:', { detail: error });
       return null;
     }
   }

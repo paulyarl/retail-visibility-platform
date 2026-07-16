@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Star, Plus, X, GripVertical } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Generic category type that can represent both GBP and Directory categories
@@ -106,7 +107,7 @@ export default function CategorySelectorMulti({
           setPrimarySearchResults(results);
         }
       } catch (error) {
-        console.error('[CategorySelector] Primary search error:', error);
+        clientLogger.error('[CategorySelector] Primary search error:', { detail: error });
       } finally {
         if (active) setPrimarySearching(false);
       }
@@ -134,7 +135,7 @@ export default function CategorySelectorMulti({
           setSecondarySearchResults(results);
         }
       } catch (error) {
-        console.error('[CategorySelector] Secondary search error:', error);
+        clientLogger.error('[CategorySelector] Secondary search error:', { detail: error });
       } finally {
         if (active) setSecondarySearching(false);
       }

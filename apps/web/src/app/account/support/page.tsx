@@ -7,6 +7,7 @@ import { crmCustomerService } from '@/services/crm/CrmCustomerService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import type { CrmTicket, CrmAlert } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -78,7 +79,7 @@ export default function CustomerSupportPage() {
           setTenants(eligibleTenants);
         }
       } catch (err) {
-        console.error('[Customer Support] Load error:', err);
+        clientLogger.error('[Customer Support] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -102,7 +103,7 @@ export default function CustomerSupportPage() {
       setNewDescription('');
       setNewTenantId('');
     } catch (err: any) {
-      console.error('[Customer Support] Create ticket error:', err);
+      clientLogger.error('[Customer Support] Create ticket error:', { detail: err });
       const msg = err?.message || '';
       if (msg.includes('crm_disabled') || msg.includes('not enabled')) {
         setCreateError('Support tickets are not available for this store.');

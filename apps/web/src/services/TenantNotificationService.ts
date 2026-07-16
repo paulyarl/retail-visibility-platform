@@ -74,7 +74,7 @@ class TenantNotificationService extends AuthenticatedApiSingleton {
       
       return result.data as TenantNotificationsResponse;
     } catch (error) {
-      console.error('Error fetching tenant notifications:', error);
+      clientLogger.error('Error fetching tenant notifications:', { detail: error });
       return { 
         notifications: [], 
         unread_count: 0, 
@@ -102,7 +102,7 @@ class TenantNotificationService extends AuthenticatedApiSingleton {
       
       return result.success;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      clientLogger.error('Error marking notification as read:', { detail: error });
       return false;
     }
   }
@@ -126,7 +126,7 @@ class TenantNotificationService extends AuthenticatedApiSingleton {
       
       return result.success;
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      clientLogger.error('Error marking all notifications as read:', { detail: error });
       return false;
     }
   }
@@ -150,7 +150,7 @@ class TenantNotificationService extends AuthenticatedApiSingleton {
       
       return result.success;
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      clientLogger.error('Error deleting notification:', { detail: error });
       return false;
     }
   }
@@ -174,7 +174,7 @@ class TenantNotificationService extends AuthenticatedApiSingleton {
       
       return result.success ? (result.data as any) : null;
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
+      clientLogger.error('Error fetching notification stats:', { detail: error });
       return null;
     }
   }
@@ -193,7 +193,7 @@ class TenantNotificationService extends AuthenticatedApiSingleton {
       
       return result.success ? ((result.data as any)?.count || 0) : 0;
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      clientLogger.error('Error fetching unread count:', { detail: error });
       return 0;
     }
   }
@@ -204,6 +204,7 @@ export const tenantNotificationService = new TenantNotificationService();
 
 // React hook for tenant notifications
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useTenantNotifications(tenantId: string) {
   const [notifications, setNotifications] = useState<TenantNotification[]>([]);

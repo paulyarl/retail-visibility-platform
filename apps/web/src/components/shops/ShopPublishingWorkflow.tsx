@@ -38,6 +38,7 @@ import {
 import { type Shop } from '@/services/ShopsService';
 import RealShopService from '@/services/RealShopService';
 import { Button } from '@mantine/core';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopPublishingWorkflowProps {
   shop: Shop;
@@ -304,7 +305,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
       onUpdate(updatedShop);
       setIsPublished(true);
     } catch (error) {
-      console.error('Error publishing shop:', error);
+      clientLogger.error('Error publishing shop:', { detail: error });
       setPublishingSteps(prev => 
         prev.map(s => ({ ...s, status: 'error', error: 'Failed to publish shop' }))
       );
@@ -343,7 +344,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
       );
       setCurrentStep(1);
     } catch (error) {
-      console.error('Error unpublishing shop:', error);
+      clientLogger.error('Error unpublishing shop:', { detail: error });
     } finally {
       setIsPublishing(false);
     }

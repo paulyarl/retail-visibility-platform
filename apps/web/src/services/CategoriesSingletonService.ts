@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Category {
   id: string;
@@ -57,7 +58,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CategoriesSingleton] Failed to get categories:', result.error);
+      clientLogger.error('[CategoriesSingleton] Failed to get categories:', { detail: result.error });
       return [];
     }
 
@@ -72,7 +73,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
    */
   async getCategoryBySlug(slug: string): Promise<Category | null> {
     if (!slug) {
-      console.error('[CategoriesSingleton] getCategoryBySlug: slug is required');
+      clientLogger.error('[CategoriesSingleton] getCategoryBySlug: slug is required');
       return null;
     }
 
@@ -83,7 +84,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CategoriesSingleton] Failed to get category by slug:', result.error);
+      clientLogger.error('[CategoriesSingleton] Failed to get category by slug:', { detail: result.error });
       return null;
     }
 
@@ -96,7 +97,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
    */
   async getCategoriesByTenant(tenantId: string, includeChildren: boolean = true): Promise<Category[]> {
     if (!tenantId) {
-      console.error('[CategoriesSingleton] getCategoriesByTenant: tenantId is required');
+      clientLogger.error('[CategoriesSingleton] getCategoriesByTenant: tenantId is required');
       return [];
     }
 
@@ -107,7 +108,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CategoriesSingleton] Failed to get categories by tenant:', result.error);
+      clientLogger.error('[CategoriesSingleton] Failed to get categories by tenant:', { detail: result.error });
       return [];
     }
 

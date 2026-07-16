@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { tenantManagementService } from "@/services/TenantManagementService";
+import { clientLogger } from '@/lib/client-logger';
 
 
 
@@ -16,7 +17,7 @@ export default function SyncStateBadge({ tenantId }: { tenantId: string }) {
         setStatus(data || null);
       }
     } catch (error) {
-      console.error('Failed to load GBP hours status:', error);
+      clientLogger.error('Failed to load GBP hours status:', { detail: error });
     }
   };
 
@@ -35,7 +36,7 @@ export default function SyncStateBadge({ tenantId }: { tenantId: string }) {
     try {
       await tenantManagementService.triggerGBPHoursMirror(tenantId);
     } catch (error) {
-      console.error('Failed to trigger GBP hours mirroring:', error);
+      clientLogger.error('Failed to trigger GBP hours mirroring:', { detail: error });
     }
 
     // Poll for a short window to reflect runner update

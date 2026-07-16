@@ -6,6 +6,7 @@ import { tenantPublicService } from '@/services/TenantPublicService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
 import { StorefrontOptionFlags, StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { StyledTenantQR } from '@/components/public/StyledTenantQR';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantQRCodeProps {
   /** The URL to encode in the QR code */
@@ -116,12 +117,12 @@ export function TenantQRCode({
                 setTenantLogo(profileData.logo_url || null);
               }
             } catch (profileError) {
-              console.error('Error fetching tenant profile:', profileError);
+              clientLogger.error('Error fetching tenant profile:', { detail: profileError });
             }
           }
         }
       } catch (error) {
-        console.error('[TenantQRCode] Error fetching tenant info:', error);
+        clientLogger.error('[TenantQRCode] Error fetching tenant info:', { detail: error });
       } finally {
         setIsFetchingTierAndLogo(false);
       }
@@ -430,7 +431,7 @@ export function TenantQRCode({
         try {
           finalCanvas = await overlayLogoOnQR(exportCanvas, tenantLogo!);
         } catch (logoError) {
-          console.warn('Failed to overlay logo, using plain QR code:', logoError);
+          clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
         }
       }
 
@@ -438,7 +439,7 @@ export function TenantQRCode({
       const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
       setQrImageUrl(dataUrl);
     } catch (error) {
-      console.error('Failed to generate QR code:', error);
+      clientLogger.error('Failed to generate QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }
@@ -559,7 +560,7 @@ export function TenantQRCode({
       try {
         finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
       } catch (logoError) {
-        console.warn('Failed to overlay logo, using plain QR code:', logoError);
+        clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
       }
     }
 
@@ -588,7 +589,7 @@ export function TenantQRCode({
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Failed to download QR code:', error);
+      clientLogger.error('Failed to download QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }

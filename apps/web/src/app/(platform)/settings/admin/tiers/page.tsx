@@ -7,6 +7,7 @@ import { Button, TextInput, Group, Stack } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { tenantTierService, type Tenant as ServiceTenant } from '@/services/TenantTierService';
 import { useToast } from '@/components/ui/use-toast';
+import { clientLogger } from '@/lib/client-logger';
 
 type Tenant = {
   id: string;
@@ -99,7 +100,7 @@ export default function AdminTiersPage() {
       }));
       setDbTiers(transformedTiers);
     } catch (e) {
-      console.error('Failed to load tiers:', e);
+      clientLogger.error('Failed to load tiers:', { detail: e });
     } finally {
       setTiersLoading(false);
     }
@@ -126,7 +127,7 @@ export default function AdminTiersPage() {
       }));
       setTenants(transformedTenants);
     } catch (err: any) {
-      console.error('Failed to load tenants:', err);
+      clientLogger.error('Failed to load tenants:', { detail: err });
       setError(err.message || 'Failed to load tenants');
       setTenants([]);
     } finally {

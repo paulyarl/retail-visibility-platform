@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { type Shop } from '@/services/ShopsService';
 import SlugPatternSelector from './SlugPatternSelector';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopCreationWizardProps {
   tenantId: string;
@@ -221,7 +222,7 @@ export default function ShopCreationWizard({ tenantId, onComplete, onCancel }: S
 
       onComplete(newShop);
     } catch (error) {
-      console.error('Error creating shop:', error);
+      clientLogger.error('Error creating shop:', { detail: error });
       setErrors({ submit: 'Failed to create shop. Please try again.' });
     } finally {
       setIsSubmitting(false);

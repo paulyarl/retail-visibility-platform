@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { adminSlugRegistryService, SlugRegistryEntry, SlugRegistryStats, SlugComponents } from '@/services/AdminSlugRegistrySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function SlugRegistryAdminPage() {
   const { hasAccess, loading: accessLoading } = useAccessControl(
@@ -49,7 +50,7 @@ export default function SlugRegistryAdminPage() {
         setStats(statsResult);
       }
     } catch (error) {
-      console.error('Failed to load slug registry data:', error);
+      clientLogger.error('Failed to load slug registry data:', { detail: error });
     } finally {
       setLoading(false);
     }

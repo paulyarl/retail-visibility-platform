@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { Tenant } from '@/services/TenantTierService';
 import GeneralSidebar from '@/components/GeneralSidebar';
+import { clientLogger } from '@/lib/client-logger';
 
 // Local NavItem interface (matching GeneralSidebar)
 type NavItem = { 
@@ -371,7 +372,7 @@ export const PlatformSidebarTemplate = () => {
         const data = await tenantManagementService.getAllTenants();
         setTenants(data);
       } catch (error) {
-        console.error('Failed to fetch tenants:', error);
+        clientLogger.error('Failed to fetch tenants:', { detail: error });
       } finally {
         setLoading(false);
       }

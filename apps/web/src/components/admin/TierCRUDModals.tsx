@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Button, Spinner, Badge, Tooltip } from '@/components/ui';
 import { tenantTierService, TierFeature as TierSystemFeature } from '@/services/TenantTierService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TierFeature {
   id: string;
@@ -803,7 +804,7 @@ export function AddFeatureModal({ isOpen, tier, onClose, onSubmit, submitting }:
       const features = await tenantTierService.getTierSystemFeaturesList();
       setExistingFeatures(features);
     } catch (error) {
-      console.error('Failed to load tier features:', error);
+      clientLogger.error('Failed to load tier features:', { detail: error });
     } finally {
       setLoadingFeatures(false);
     }

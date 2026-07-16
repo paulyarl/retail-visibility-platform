@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Modal
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTenantSummary, AlertType } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const ALERT_TYPE_PRESETS = [
   { type: 'info' as AlertType, label: 'Announcement', icon: '📢', color: 'blue', description: 'General platform news or updates' },
@@ -60,7 +61,7 @@ export default function BroadcastAlertsClient() {
         const result = await crmAdminService.listTenants({ limit: 500 });
         setTenants(result.data);
       } catch (err) {
-        console.error('[Broadcast] Load tenants error:', err);
+        clientLogger.error('[Broadcast] Load tenants error:', { detail: err });
         setError('Failed to load tenants');
       } finally {
         setLoading(false);
@@ -156,7 +157,7 @@ export default function BroadcastAlertsClient() {
       setSelectedIds(new Set());
       setSendToAll(false);
     } catch (err) {
-      console.error('[Broadcast] Send error:', err);
+      clientLogger.error('[Broadcast] Send error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to send broadcast');
       setShowConfirm(false);
     } finally {

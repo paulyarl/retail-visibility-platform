@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, ConfirmDialog } from '@/components/ui';
 import { adminCachedProductsService, type CachedProduct, type FilterOption } from '@/services/AdminCachedProductsService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function CachedProductsClient() {
   const [products, setProducts] = useState<CachedProduct[]>([]);
@@ -78,7 +79,7 @@ export default function CachedProductsClient() {
       setBusinessTypes(response.businessTypes);
       setCategories(response.categories);
     } catch (error) {
-      console.error('Failed to fetch cached products:', error);
+      clientLogger.error('Failed to fetch cached products:', { detail: error });
       setError('Failed to fetch cached products');
     } finally {
       setLoading(false);
@@ -107,7 +108,7 @@ export default function CachedProductsClient() {
       // Refresh products list
       await fetchProducts();
     } catch (error) {
-      console.error('Failed to delete products:', error);
+      clientLogger.error('Failed to delete products:', { detail: error });
       setError('Failed to delete products');
     }
   };
@@ -610,7 +611,7 @@ function EditCachedProductModal({
       // Call onSave to refresh the products list
       onSave();
     } catch (error) {
-      console.error('Failed to update product:', error);
+      clientLogger.error('Failed to update product:', { detail: error });
       setError('Failed to update product');
     } finally {
       setSaving(false);

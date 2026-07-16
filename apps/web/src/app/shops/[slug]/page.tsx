@@ -18,6 +18,7 @@ import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SocialPixels } from '@/components/tracking/SocialPixels';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -106,7 +107,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
       tenantInfo = await tenantPublicService.getPublicTenantInfo(tenantId);
     }
   } catch (error) {
-    console.error('Error fetching tenant info:', error);
+    clientLogger.error('Error fetching tenant info:', { detail: error });
   }
 
   // Fetch storefront option flags server-side (prioritized — no client waterfall)
@@ -116,7 +117,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
       storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(tenantId, { isPublic: true });
     }
   } catch (error) {
-    console.error('Error fetching storefront option flags:', error);
+    clientLogger.error('Error fetching storefront option flags:', { detail: error });
   }
 
   // Fetch FAQ options flags server-side (no client waterfall)
@@ -126,7 +127,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
       faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(tenantId, { isPublic: true });
     }
   } catch (error) {
-    console.error('Error fetching FAQ options flags:', error);
+    clientLogger.error('Error fetching FAQ options flags:', { detail: error });
   }
 
   // Check if tenant has non-active status - show status panel instead of "not found"

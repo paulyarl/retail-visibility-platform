@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import { clientLogger } from '@/lib/client-logger';
 
 export async function GET() {
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -48,7 +49,7 @@ ${listings.items
       },
     });
   } catch (error) {
-    console.error('Sitemap generation error:', error);
+    clientLogger.error('Sitemap generation error:', { detail: error });
     
     // Return minimal sitemap on error
     const fallbackSitemap = `<?xml version="1.0" encoding="UTF-8"?>

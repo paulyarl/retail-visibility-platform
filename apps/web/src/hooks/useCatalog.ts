@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { storefrontService, type CatalogProduct, type Category, type ProductResponse } from '@/services/StorefrontService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Re-export types for use by components
 export type { CatalogProduct, Category, ProductResponse };
@@ -113,7 +114,7 @@ export function useCatalog(options: UseCatalogOptions): UseCatalogReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch products';
       setError(errorMessage);
-      console.error('Error fetching products:', err);
+      clientLogger.error('Error fetching products:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -128,7 +129,7 @@ export function useCatalog(options: UseCatalogOptions): UseCatalogReturn {
       const categoriesData: Category[] = await storefrontService.getCategories(tenantId);
       setCategories(categoriesData);
     } catch (err) {
-      console.error('Error fetching categories:', err);
+      clientLogger.error('Error fetching categories:', { detail: err });
       // Don't set error state for categories failure, just log it
     } finally {
       setLoadingCategories(false);

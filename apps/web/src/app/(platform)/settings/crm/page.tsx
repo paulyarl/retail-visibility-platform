@@ -13,6 +13,7 @@ import type {
   PersonalCrmAlert, PersonalCrmActivity,
 } from '@/services/crm/PersonalCrmService';
 import type { CrmTicketMessage } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,35 +62,35 @@ export default function PersonalCrmPage() {
     try {
       const data = await personalCrmService.getDashboard();
       setDashboard(data);
-    } catch (e) { console.error('Failed to load dashboard:', e); }
+    } catch (e) { clientLogger.error('Failed to load dashboard:', { detail: e }); }
   }, []);
 
   const loadTickets = useCallback(async () => {
     try {
       const data = await personalCrmService.listTickets();
       setTickets(data);
-    } catch (e) { console.error('Failed to load tickets:', e); }
+    } catch (e) { clientLogger.error('Failed to load tickets:', { detail: e }); }
   }, []);
 
   const loadTasks = useCallback(async () => {
     try {
       const data = await personalCrmService.listTasks();
       setTasks(data);
-    } catch (e) { console.error('Failed to load tasks:', e); }
+    } catch (e) { clientLogger.error('Failed to load tasks:', { detail: e }); }
   }, []);
 
   const loadAlerts = useCallback(async () => {
     try {
       const data = await personalCrmService.listAlerts();
       setAlerts(data);
-    } catch (e) { console.error('Failed to load alerts:', e); }
+    } catch (e) { clientLogger.error('Failed to load alerts:', { detail: e }); }
   }, []);
 
   const loadActivities = useCallback(async () => {
     try {
       const data = await personalCrmService.listActivities();
       setActivities(data);
-    } catch (e) { console.error('Failed to load activities:', e); }
+    } catch (e) { clientLogger.error('Failed to load activities:', { detail: e }); }
   }, []);
 
   useEffect(() => {
@@ -114,7 +115,7 @@ export default function PersonalCrmPage() {
       setNewTicket({ title: '', description: '', category: 'general', priority: 'medium' });
       await Promise.all([loadDashboard(), loadTickets()]);
     } catch (e) {
-      console.error('Failed to create ticket:', e);
+      clientLogger.error('Failed to create ticket:', { detail: e });
     } finally {
       setCreatingTicket(false);
     }
@@ -127,7 +128,7 @@ export default function PersonalCrmPage() {
       const msgs = await personalCrmService.listTicketMessages(ticketId);
       setTicketMessages(msgs);
     } catch (e) {
-      console.error('Failed to load messages:', e);
+      clientLogger.error('Failed to load messages:', { detail: e });
     } finally {
       setLoadingMessages(false);
     }
@@ -142,7 +143,7 @@ export default function PersonalCrmPage() {
       const msgs = await personalCrmService.listTicketMessages(selectedTicketId);
       setTicketMessages(msgs);
     } catch (e) {
-      console.error('Failed to send reply:', e);
+      clientLogger.error('Failed to send reply:', { detail: e });
     } finally {
       setSendingReply(false);
     }
@@ -152,21 +153,21 @@ export default function PersonalCrmPage() {
     try {
       await personalCrmService.markAlertRead(alertId);
       await Promise.all([loadAlerts(), loadDashboard()]);
-    } catch (e) { console.error('Failed to mark alert read:', e); }
+    } catch (e) { clientLogger.error('Failed to mark alert read:', { detail: e }); }
   };
 
   const handleDismissAlert = async (alertId: string) => {
     try {
       await personalCrmService.dismissAlert(alertId);
       await Promise.all([loadAlerts(), loadDashboard()]);
-    } catch (e) { console.error('Failed to dismiss alert:', e); }
+    } catch (e) { clientLogger.error('Failed to dismiss alert:', { detail: e }); }
   };
 
   const handleMarkAllAlertsRead = async () => {
     try {
       await personalCrmService.markAllAlertsRead();
       await Promise.all([loadAlerts(), loadDashboard()]);
-    } catch (e) { console.error('Failed to mark all alerts read:', e); }
+    } catch (e) { clientLogger.error('Failed to mark all alerts read:', { detail: e }); }
   };
 
   if (authLoading || loading) {

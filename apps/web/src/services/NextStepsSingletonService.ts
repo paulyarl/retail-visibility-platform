@@ -9,6 +9,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type TaskCategory = 'profile' | 'visibility' | 'commerce' | 'engagement' | 'subscription';
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
@@ -64,13 +65,13 @@ class NextStepsSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[NextStepsService] Failed to fetch next steps:', result.error);
+        clientLogger.error('[NextStepsService] Failed to fetch next steps:', { detail: result.error });
         return [];
       }
 
       return result.data?.data ?? [];
     } catch (error) {
-      console.error('[NextStepsService] Error fetching next steps:', error);
+      clientLogger.error('[NextStepsService] Error fetching next steps:', { detail: error });
       return [];
     }
   }

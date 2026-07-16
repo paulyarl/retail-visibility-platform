@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface MinimumPaymentAmount {
   amount: number; // in cents
@@ -46,7 +47,7 @@ class AdminSettingsService extends AdminApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdminSettingsService] Failed to get payment settings:', response.error);
+        clientLogger.error('[AdminSettingsService] Failed to get payment settings:', { detail: response.error });
         return null;
       }
 
@@ -57,7 +58,7 @@ class AdminSettingsService extends AdminApiSingleton {
 
       return data as PaymentSettings;
     } catch (error) {
-      console.error('[AdminSettingsService] Error getting payment settings:', error);
+      clientLogger.error('[AdminSettingsService] Error getting payment settings:', { detail: error });
       return null;
     }
   }
@@ -77,7 +78,7 @@ class AdminSettingsService extends AdminApiSingleton {
       });
 
       if (!response.success) {
-        console.error('[AdminSettingsService] Failed to update payment settings:', response.error);
+        clientLogger.error('[AdminSettingsService] Failed to update payment settings:', { detail: response.error });
         return null;
       }
 
@@ -88,7 +89,7 @@ class AdminSettingsService extends AdminApiSingleton {
 
       return data as PaymentSettingsResponse;
     } catch (error) {
-      console.error('[AdminSettingsService] Error updating payment settings:', error);
+      clientLogger.error('[AdminSettingsService] Error updating payment settings:', { detail: error });
       return null;
     }
   }

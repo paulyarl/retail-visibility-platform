@@ -17,6 +17,7 @@ import {
   Target
 } from 'lucide-react';
 import { platformAnalyticsService } from '@/services/analytics/PlatformAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UserBehaviorAnalyticsProps {
   filters: {
@@ -59,7 +60,7 @@ export default function UserBehaviorAnalytics({ filters }: UserBehaviorAnalytics
         setEngagementPatterns(data.timeOfDayEngagement);
         setError(null);
       } catch (err) {
-        console.error('Error fetching user behavior analytics:', err);
+        clientLogger.error('Error fetching user behavior analytics:', { detail: err });
         setError('Failed to load user behavior data');
       } finally {
         setLoading(false);

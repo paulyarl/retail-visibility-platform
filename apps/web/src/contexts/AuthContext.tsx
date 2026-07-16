@@ -174,7 +174,7 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
         setUser(null);
       }
     } catch (error) {
-      console.warn('[AuthContext] fetchUser error:', error);
+      clientLogger.warn('[AuthContext] fetchUser error:', { detail: error });
       fetchErrorRef.current = true; // Mark as errored to prevent retry loop
       setUser(null);
     } finally {
@@ -221,7 +221,7 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
         window.location.href = '/auth/logout';
       }
     } catch (error) {
-      console.error('[AuthContext] Logout failed:', error);
+      clientLogger.error('[AuthContext] Logout failed:', { detail: error });
       // Still redirect to Auth0 logout even if local clear fails
       if (typeof window !== 'undefined') {
         // Still try to clear cookies

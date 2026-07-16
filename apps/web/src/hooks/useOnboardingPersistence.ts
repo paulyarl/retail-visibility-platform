@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UseOnboardingPersistenceOptions {
   tenantId: string;
@@ -60,7 +61,7 @@ export function useOnboardingPersistence({
         setCurrentStep(savedProgress.currentStep);
       }
     } catch (err) {
-      console.error('[useOnboardingPersistence] Failed to load from storage:', err);
+      clientLogger.error('[useOnboardingPersistence] Failed to load from storage:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load saved progress');
     } finally {
       setIsLoading(false);
@@ -82,7 +83,7 @@ export function useOnboardingPersistence({
       
       // console.log('[useOnboardingPersistence] Saved to storage:', { currentStep, businessData });
     } catch (err) {
-      console.error('[useOnboardingPersistence] Failed to save to storage:', err);
+      clientLogger.error('[useOnboardingPersistence] Failed to save to storage:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to save progress');
     } finally {
       setIsSaving(false);

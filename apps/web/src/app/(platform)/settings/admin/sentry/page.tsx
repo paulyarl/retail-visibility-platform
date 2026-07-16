@@ -9,6 +9,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { clientLogger } from '@/lib/client-logger';
 
 type SentryMetric = {
   title: string;
@@ -66,7 +67,7 @@ export default function SentryMonitoringPage() {
           setProjects(data?.mockData?.projects || []);
         }
       } catch (error) {
-        console.error('Failed to load Sentry data:', error);
+        clientLogger.error('Failed to load Sentry data:', { detail: error });
         setError('Failed to connect to Sentry monitoring service');
         setSentryConfigured(false);
         // Fallback to basic mock data

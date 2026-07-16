@@ -9,6 +9,7 @@ import { Package, CheckCircle, AlertCircle, Loader2, ArrowRight } from 'lucide-r
 import Link from 'next/link';
 import { itemsDataService, Item } from '@/services/itemsDataService';
 import ItemUpdateService from '@/lib/singletons/ItemUpdateService';
+import { clientLogger } from '@/lib/client-logger';
 
 type ConditionType = 'new' | 'used' | 'refurbished';
 
@@ -61,7 +62,7 @@ export default function ProductConditionsClient({ tenantId }: ProductConditionsC
       }
       setItems(allItems);
     } catch (error) {
-      console.error('Error fetching items:', error);
+      clientLogger.error('Error fetching items:', { detail: error });
       toast({ title: 'Error', description: 'Failed to load products', variant: 'destructive' });
     } finally {
       setLoading(false);

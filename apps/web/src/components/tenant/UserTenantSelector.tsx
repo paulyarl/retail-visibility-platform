@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Select, Text, Group, Stack, Box, LoadingOverlay } from '@mantine/core';
 import { IconBuilding, IconUsers } from '@tabler/icons-react';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UserTenantSelectorProps {
   selectedTenant?: string | null;
@@ -49,7 +50,7 @@ export function UserTenantSelector({
       console.log('[UserTenantSelector] Tenants array:', tenantsArray);
       setTenants(tenantsArray);
     } catch (error) {
-      console.error('Failed to load user tenants:', error);
+      clientLogger.error('Failed to load user tenants:', { detail: error });
       setError('Failed to load tenants');
       setTenants([]);
     } finally {

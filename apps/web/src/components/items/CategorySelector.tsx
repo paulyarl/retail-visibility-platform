@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Input } from '@/components/ui';
 import { googleTaxonomyService, type GoogleTaxonomyCategory } from '@/services/GoogleTaxonomyService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CategorySelectorProps {
   currentCategory: string[];
@@ -108,7 +109,7 @@ export default function CategorySelector({
         setFilteredCategories([]);
       }
     } catch (error) {
-      console.error('[CategorySelector] Failed to fetch children:', error);
+      clientLogger.error('[CategorySelector] Failed to fetch children:', { detail: error });
       setFilteredCategories([]);
     } finally {
       setLoading(false);
@@ -126,7 +127,7 @@ export default function CategorySelector({
         setFilteredCategories(categories);
       }
     } catch (error) {
-      console.error('[CategorySelector] Failed to load categories:', error);
+      clientLogger.error('[CategorySelector] Failed to load categories:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -149,7 +150,7 @@ export default function CategorySelector({
         setFilteredCategories([]);
       }
     } catch (error) {
-      console.error('[CategorySelector] Failed to search categories:', error);
+      clientLogger.error('[CategorySelector] Failed to search categories:', { detail: error });
       setFilteredCategories([]);
     } finally {
       setLoading(false);

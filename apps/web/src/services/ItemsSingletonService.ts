@@ -9,6 +9,7 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import { ResponseType } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Item {
   id: string;
@@ -192,7 +193,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     const result = await this.makeDefaultRequest<ItemsCompleteResponse>(endpoint, {}, cacheKey);
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to get items complete:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to get items complete:', { detail: result.error });
       return null;
     }
 
@@ -210,7 +211,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to get item:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to get item:', { detail: result.error });
       return null;
     }
 
@@ -232,7 +233,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to create item:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to create item:', { detail: result.error });
       return null;
     }
 
@@ -267,7 +268,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to update item:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to update item:', { detail: result.error });
       return null;
     }
 
@@ -305,7 +306,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to upload photo:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to upload photo:', { detail: result.error });
       throw result.error;
     }
 
@@ -331,7 +332,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to upload temp photo:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to upload temp photo:', { detail: result.error });
       throw result.error;
     }
 
@@ -460,7 +461,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to delete temp photo:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to delete temp photo:', { detail: result.error });
       return false;
     }
 
@@ -485,7 +486,7 @@ class ItemsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[ItemsSingleton] Failed to upload photos:', result.error);
+      clientLogger.error('[ItemsSingleton] Failed to upload photos:', { detail: result.error });
       throw result.error;
     }
 
@@ -511,13 +512,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         15 * 60 * 1000 // 15 minutes
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to get photos:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to get photos:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to get photos:', error);
+      clientLogger.error('[ItemsSingleton] Failed to get photos:', { detail: error });
       throw error;
     }
   }
@@ -541,13 +542,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-set-primary-photo-${itemId}-${photoId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to set primary photo:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to set primary photo:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to set primary photo:', error);
+      clientLogger.error('[ItemsSingleton] Failed to set primary photo:', { detail: error });
       throw error;
     }
   }
@@ -570,13 +571,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-delete-photo-${itemId}-${photoId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to delete photo:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to delete photo:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to delete photo:', error);
+      clientLogger.error('[ItemsSingleton] Failed to delete photo:', { detail: error });
       throw error;
     }
   }
@@ -600,13 +601,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-migrate-photos-${itemId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to migrate legacy photos:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to migrate legacy photos:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to migrate legacy photos:', error);
+      clientLogger.error('[ItemsSingleton] Failed to migrate legacy photos:', { detail: error });
       throw error;
     }
   }
@@ -633,13 +634,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-update-photo-${itemId}-${photoId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to update photo:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to update photo:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to update photo:', error);
+      clientLogger.error('[ItemsSingleton] Failed to update photo:', { detail: error });
       throw error;
     }
   }
@@ -660,13 +661,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         5 * 60 * 1000 // 5 minutes for capacity data
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to get trash capacity:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to get trash capacity:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to get trash capacity:', error);
+      clientLogger.error('[ItemsSingleton] Failed to get trash capacity:', { detail: error });
       throw error;
     }
   }
@@ -687,13 +688,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         5 * 60 * 1000 // 5 minutes for trash data
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to get trashed items:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to get trashed items:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to get trashed items:', error);
+      clientLogger.error('[ItemsSingleton] Failed to get trashed items:', { detail: error });
       throw error;
     }
   }
@@ -713,11 +714,11 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-restore-${itemId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to restore item:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to restore item:', { detail: result.error });
         throw result.error;
       }
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to restore item:', error);
+      clientLogger.error('[ItemsSingleton] Failed to restore item:', { detail: error });
       throw error;
     }
   }
@@ -737,11 +738,11 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-purge-${itemId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to purge item:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to purge item:', { detail: result.error });
         throw result.error;
       }
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to purge item:', error);
+      clientLogger.error('[ItemsSingleton] Failed to purge item:', { detail: error });
       throw error;
     }
   }
@@ -766,7 +767,7 @@ class ItemsSingletonService extends TenantApiSingleton {
         throw new Error('Failed to empty trash');
       }
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to empty trash:', error);
+      clientLogger.error('[ItemsSingleton] Failed to empty trash:', { detail: error });
       throw error;
     }
   }
@@ -784,13 +785,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to get user tenants:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to get user tenants:', { detail: result.error });
         throw result.error;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to get user tenants:', error);
+      clientLogger.error('[ItemsSingleton] Failed to get user tenants:', { detail: error });
       throw error;
     }
   }
@@ -811,13 +812,13 @@ class ItemsSingletonService extends TenantApiSingleton {
         10 * 60 * 1000 // 10 minutes for scan sessions
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to get my scan sessions:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to get my scan sessions:', { detail: result.error });
         throw result.error;
       }
 
       return result?.data;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to get my scan sessions:', error);
+      clientLogger.error('[ItemsSingleton] Failed to get my scan sessions:', { detail: error });
       throw error;
     }
   }
@@ -844,13 +845,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to start scan session:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to start scan session:', { detail: result.error });
         throw result.error;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to start scan session:', error);
+      clientLogger.error('[ItemsSingleton] Failed to start scan session:', { detail: error });
       throw error;
     }
   }
@@ -870,11 +871,11 @@ class ItemsSingletonService extends TenantApiSingleton {
         `items-cancel-scan-session-${sessionId}`
       );
       if (!result?.success){
-        console.error('[ItemsSingleton] Failed to cancel scan session:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to cancel scan session:', { detail: result.error });
         throw result.error;
       }
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to cancel scan session:', error);
+      clientLogger.error('[ItemsSingleton] Failed to cancel scan session:', { detail: error });
       throw error;
     }
   }
@@ -896,13 +897,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to get scan session:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to get scan session:', { detail: result.error });
         throw result.error;
       }
 
       return result; // Return full result, not just data
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to get scan session:', error);
+      clientLogger.error('[ItemsSingleton] Failed to get scan session:', { detail: error });
       throw error;
     }
   }
@@ -927,13 +928,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to lookup barcode:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to lookup barcode:', { detail: result.error });
         throw result.error;
       }
 
       return result;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to lookup barcode:', error);
+      clientLogger.error('[ItemsSingleton] Failed to lookup barcode:', { detail: error });
       throw error;
     }
   }
@@ -957,13 +958,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to update scan result:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to update scan result:', { detail: result.error });
         throw result.error;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to update scan result:', error);
+      clientLogger.error('[ItemsSingleton] Failed to update scan result:', { detail: error });
       throw error;
     }
   }
@@ -984,13 +985,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to remove scan result:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to remove scan result:', { detail: result.error });
         throw result.error;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to remove scan result:', error);
+      clientLogger.error('[ItemsSingleton] Failed to remove scan result:', { detail: error });
       throw error;
     }
   }
@@ -1014,13 +1015,13 @@ class ItemsSingletonService extends TenantApiSingleton {
       );
 
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to commit scan session:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to commit scan session:', { detail: result.error });
         throw result.error;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to commit scan session:', error);
+      clientLogger.error('[ItemsSingleton] Failed to commit scan session:', { detail: error });
       throw error;
     }
   }
@@ -1043,11 +1044,11 @@ class ItemsSingletonService extends TenantApiSingleton {
         `items-cleanup-scan-sessions-${tenantId}`
       );
       if (!results?.success) {
-        console.error('[ItemsSingleton] Failed to cleanup scan sessions:', results.error);
+        clientLogger.error('[ItemsSingleton] Failed to cleanup scan sessions:', { detail: results.error });
         throw results.error;
       }
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to cleanup scan sessions:', error);
+      clientLogger.error('[ItemsSingleton] Failed to cleanup scan sessions:', { detail: error });
       throw error;
     }
   }
@@ -1070,7 +1071,7 @@ class ItemsSingletonService extends TenantApiSingleton {
         `item-delete-${itemId}`
       );
       if (!result?.success) {
-        console.error('[ItemsSingleton] Failed to delete item:', result.error);
+        clientLogger.error('[ItemsSingleton] Failed to delete item:', { detail: result.error });
         throw result.error;
       }
 
@@ -1082,7 +1083,7 @@ class ItemsSingletonService extends TenantApiSingleton {
 
       return result.success || false;
     } catch (error) {
-      console.error('[ItemsSingleton] Failed to delete item:', error);
+      clientLogger.error('[ItemsSingleton] Failed to delete item:', { detail: error });
       return false;
     }
   }

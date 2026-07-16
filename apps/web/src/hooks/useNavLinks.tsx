@@ -188,6 +188,7 @@ function getIconComponent(iconName: string): React.ReactNode {
 
 // Re-export types for compatibility
 export type { SidebarTarget, BadgeVariant, NavLink } from '@/services/NavigationLinksService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ─── Shared in-memory cache (one fetch per browser session) ───────────────────
 
@@ -329,7 +330,7 @@ export function useNavLinks(): UseNavLinksResult {
         hasLoadedRef.current = true;
       })
       .catch(err => {
-        console.error('[useNavLinks]', err);
+        clientLogger.error('[useNavLinks]', { detail: err });
         setError(err.message);
         setLoading(false);
       });

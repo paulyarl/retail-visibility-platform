@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantSupplier {
   id: string;
@@ -147,7 +148,7 @@ class SupplierImportServiceClass extends TenantApiSingleton {
       this.cacheTTL
     );
     if (!result.success) {
-      console.error('[SupplierImportService] Failed to list suppliers:', result.error);
+      clientLogger.error('[SupplierImportService] Failed to list suppliers:', { detail: result.error });
       return [];
     }
     return result.data?.suppliers || [];

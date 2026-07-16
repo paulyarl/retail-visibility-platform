@@ -6,6 +6,7 @@ import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import ProductQueue from './ProductQueue';
 import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CartButtonProps {
   tenantId: string;
@@ -57,12 +58,12 @@ export default function CartButton({ tenantId, onOpenCart, onAddToQueue }: CartB
           console.log('Using product data from item-creation-draft');
         }
       } catch (error) {
-        console.error('Error reading item-creation-draft:', error);
+        clientLogger.error('Error reading item-creation-draft:', { detail: error });
       }
     }
     
     if (!actualProductData) {
-      console.error('No product data available');
+      clientLogger.error('No product data available');
       return;
     }
     
@@ -89,12 +90,12 @@ export default function CartButton({ tenantId, onOpenCart, onAddToQueue }: CartB
           onAddToQueue(actualProductData);
         }
       } else {
-        console.error('Failed to add item to queue');
+        clientLogger.error('Failed to add item to queue');
         // Store in localStorage as fallback
         storeItemInLocalStorage(actualProductData);
       }
     } catch (error) {
-      console.error('Error adding to queue:', error);
+      clientLogger.error('Error adding to queue:', { detail: error });
       // Store in localStorage as fallback
       storeItemInLocalStorage(actualProductData);
     }
@@ -131,7 +132,7 @@ export default function CartButton({ tenantId, onOpenCart, onAddToQueue }: CartB
         onAddToQueue(productData);
       }
     } catch (error) {
-      console.error('Error storing item in localStorage:', error);
+      clientLogger.error('Error storing item in localStorage:', { detail: error });
     }
   };
 

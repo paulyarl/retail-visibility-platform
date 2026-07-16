@@ -10,6 +10,7 @@ import customerPaymentMethodsService, {
 import { CustomerPaymentMethodCard } from '@/components/customer/CustomerPaymentMethodCard';
 import { CustomerAddCardModal } from '@/components/customer/CustomerAddCardForm';
 import { CreditCard, Plus, Loader2, AlertTriangle, Wallet } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function PaymentMethodsPage() {
   const { customer } = useCustomerAuth();
@@ -71,7 +72,7 @@ export default function PaymentMethodsPage() {
         setPaymentMethods(result.paymentMethods);
       }
     } catch (err) {
-      console.error('Failed to load payment methods:', err);
+      clientLogger.error('Failed to load payment methods:', { detail: err });
     } finally {
       setIsLoading(false);
     }

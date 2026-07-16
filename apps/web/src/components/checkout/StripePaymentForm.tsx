@@ -8,6 +8,7 @@ import { AlertCircle, Currency, Loader2 } from 'lucide-react';
 import { checkoutService } from '@/services/CheckoutService';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { validateMinimumPaymentAmount } from '@/utils/paymentValidation';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StripePaymentFormProps {
   amount: number;
@@ -95,7 +96,7 @@ function StripeCheckoutForm({
       // Payment succeeded - the redirect will happen automatically
       // onSuccess will be called on the success page
     } catch (err: any) {
-      console.error('[Stripe] Payment error:', err);
+      clientLogger.error('[Stripe] Payment error:', { detail: err });
       setError(err.message || 'Payment failed. Please try again.');
       setLoading(false);
     }
@@ -204,7 +205,7 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
           setBackendPaymentAmount(checkoutResult.paymentAmount);
         }
       } catch (err: any) {
-        console.error('[Stripe] Failed to initialize checkout:', err);
+        clientLogger.error('[Stripe] Failed to initialize checkout:', { detail: err });
         setError(err.message || 'Failed to initialize payment. Please try again.');
       } finally {
         setLoading(false);
@@ -234,7 +235,7 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   
   if (!publishableKey) {
-    console.error('[Stripe] Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable');
+    clientLogger.error('[Stripe] Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable');
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800">
@@ -259,7 +260,7 @@ export default function StripePaymentFormWrapper(props: StripePaymentFormProps) 
             setStripeError('Failed to load Stripe library');
           }
         } catch (error) {
-          console.error('[Stripe] Error loading Stripe:', error);
+          clientLogger.error('[Stripe] Error loading Stripe:', { detail: error });
           setStripeError('Stripe library failed to initialize');
         } finally {
           setIsLoading(false);

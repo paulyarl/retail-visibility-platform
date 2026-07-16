@@ -6,6 +6,7 @@
  */
 
 import { api } from './api';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantDirectorySlugResponse {
   slug: string | null;
@@ -28,7 +29,7 @@ export async function fetchTenantDirectorySlug(
     });
 
     if (!res.ok) {
-      console.warn(`[fetchTenantDirectorySlug] HTTP ${res.status} for tenant ${tenantId}`);
+      clientLogger.warn(`[fetchTenantDirectorySlug] HTTP ${res.status} for tenant ${tenantId}`);
       return null;
     }
 
@@ -40,7 +41,7 @@ export async function fetchTenantDirectorySlug(
 
     return data.slug;
   } catch (err) {
-    console.warn(`[fetchTenantDirectorySlug] Error for tenant ${tenantId}:`, err);
+    clientLogger.warn(`[fetchTenantDirectorySlug] Error for tenant ${tenantId}:`, { detail: err });
     return null;
   }
 }

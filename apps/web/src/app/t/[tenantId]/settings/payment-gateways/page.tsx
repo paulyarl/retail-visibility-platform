@@ -14,6 +14,7 @@ import { useTierConfig } from '@/lib/tiers/useTierConfig';
 import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import Link from 'next/link';
 import OAuthConnectButton from '@/components/payment-gateways/OAuthConnectButton';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,7 +138,7 @@ export default function PaymentGatewaysPage() {
         console.log('[PaymentGateways] No user data returned');
       }
     } catch (err) {
-      console.error('[PaymentGateways] Failed to check admin status:', err);
+      clientLogger.error('[PaymentGateways] Failed to check admin status:', { detail: err });
     }
   };
 
@@ -179,7 +180,7 @@ export default function PaymentGatewaysPage() {
         setTenantTier(tierData.subscription_tier);
       }
     } catch (err) {
-      console.error('Failed to load tenant tier:', err);
+      clientLogger.error('Failed to load tenant tier:', { detail: err });
     }
   };
 
@@ -197,7 +198,7 @@ export default function PaymentGatewaysPage() {
         setOauthStatus(prev => ({ ...prev, square: squareData }));
       }
     } catch (err) {
-      console.error('Failed to load OAuth status:', err);
+      clientLogger.error('Failed to load OAuth status:', { detail: err });
     }
   };
 
@@ -237,10 +238,10 @@ export default function PaymentGatewaysPage() {
     try {
       const result = await tenantInfoService.refreshStripeConnectStatus(tenantId);
       if (!result.success) {
-        console.error('Failed to refresh Stripe Connect status:', result.error);
+        clientLogger.error('Failed to refresh Stripe Connect status:', { detail: result.error });
       }
     } catch (err: any) {
-      console.error('Error refreshing Stripe Connect status:', err);
+      clientLogger.error('Error refreshing Stripe Connect status:', { detail: err });
     }
   };
 
@@ -376,7 +377,7 @@ export default function PaymentGatewaysPage() {
         setGatewaySettings(settings);
       }
     } catch (err) {
-      console.error('Failed to load gateway settings:', err);
+      clientLogger.error('Failed to load gateway settings:', { detail: err });
     }
   };
 

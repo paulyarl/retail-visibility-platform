@@ -8,6 +8,7 @@
 import { UniversalSingleton } from './UniversalSingleton';
 import { RequestSetupUtility, RequestSetupResult, PublicRequestOptions, AuthenticatedRequestOptions, TenantRequestOptions, AdminRequestOptions, SystemRequestOptions, SystemRequestOptionsExtended, RequestOptions } from './RequestSetupUtility';
 import { RequestExecutionUtility, ApiResult, PublicApiResponse, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, SystemApiResponse } from './RequestExecutionUtility';
+import { clientLogger } from '@/lib/client-logger';
 
 // Enums and interfaces
 export enum RequestType {
@@ -379,11 +380,11 @@ export abstract class FlexibleApiSingletonV2 extends UniversalSingleton {
         console.log(`[${this.constructor.name}] MV refresh successful: ${result.data.refreshed}/${result.data.total} views`);
         return { success: true, ...result.data };
       } else {
-        console.warn(`[${this.constructor.name}] MV refresh failed:`, result.error);
+        clientLogger.warn(`[${this.constructor.name}] MV refresh failed:`, { detail: result.error });
         return { success: false, refreshed: 0, total: viewArray?.length || 0, results: [] };
       }
     } catch (error) {
-      console.error(`[${this.constructor.name}] MV refresh error:`, error);
+      clientLogger.error(`[${this.constructor.name}] MV refresh error:`, { detail: error });
       return { success: false, refreshed: 0, total: 0, results: [] };
     }
   }

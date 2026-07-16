@@ -52,6 +52,7 @@ import MediaStep from './steps/MediaStep';
 import OrganizationStep from './steps/OrganizationStep';
 import ReviewStep from './steps/ReviewStep';
 import ServiceDetailsStep from './steps/ServiceDetailsStep';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ItemCreationWizardProps {
   tenantId: string;
@@ -421,7 +422,7 @@ export default function ItemCreationWizard({
             localStorage.removeItem('item-creation-draft');
           }
         } catch (error) {
-          console.error('Error loading draft:', error);
+          clientLogger.error('Error loading draft:', { detail: error });
           localStorage.removeItem('item-creation-draft');
         }
       }
@@ -582,7 +583,7 @@ export default function ItemCreationWizard({
         }
       });
     } catch (error) {
-      console.error('Error loading product:', error);
+      clientLogger.error('Error loading product:', { detail: error });
     } finally {
       setIsLoading(false);
     }
@@ -765,7 +766,7 @@ export default function ItemCreationWizard({
       
       setIsSubmitting(false);
     } catch (error) {
-      console.error('Error saving wizard data:', error);
+      clientLogger.error('Error saving wizard data:', { detail: error });
       setIsSubmitting(false);
     }
   };
@@ -855,7 +856,7 @@ export default function ItemCreationWizard({
       
       setIsSubmitting(false);
     } catch (error) {
-      console.error('Error submitting product:', error);
+      clientLogger.error('Error submitting product:', { detail: error });
       setIsSubmitting(false);
     }
   };

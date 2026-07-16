@@ -24,6 +24,7 @@ import {
   Store
 } from 'lucide-react';
 import Link from 'next/link';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrderItem {
   id: string;
@@ -135,7 +136,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
         }
       }
     } catch (error) {
-      console.error('Error fetching fulfillment settings:', error);
+      clientLogger.error('Error fetching fulfillment settings:', { detail: error });
     }
   };
 
@@ -151,7 +152,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
         setCarrier(data.carrier || '');
       }
     } catch (error) {
-      console.error('Error fetching order details:', error);
+      clientLogger.error('Error fetching order details:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -184,7 +185,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
       setShowFulfillDialog(false);
       alert('Order status updated successfully');
     } catch (error) {
-      console.error('Error updating fulfillment status:', error);
+      clientLogger.error('Error updating fulfillment status:', { detail: error });
       alert('Failed to update order status. Please try again.');
     } finally {
       setUpdating(false);
@@ -227,7 +228,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
       setCustomReason('');
       alert('Order cancelled successfully');
     } catch (error) {
-      console.error('Error cancelling order:', error);
+      clientLogger.error('Error cancelling order:', { detail: error });
       alert('Failed to cancel order. Please try again.');
     } finally {
       setUpdating(false);
@@ -248,7 +249,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
       setShowTrackingInput(false);
       await fetchOrderDetail();
     } catch (error) {
-      console.error('Error updating tracking number:', error);
+      clientLogger.error('Error updating tracking number:', { detail: error });
       alert('Failed to update tracking number. Please try again.');
     } finally {
       setUpdating(false);

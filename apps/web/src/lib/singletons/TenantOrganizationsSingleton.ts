@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 export interface Organization {
@@ -176,7 +177,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       this.setState({ organizations: transformed });
       //console.log('TenantOrganizationsSingleton: Organizations fetched successfully', transformed.length);
     } catch (error) {
-      console.error('TenantOrganizationsSingleton: Error fetching organizations:', error);
+      clientLogger.error('TenantOrganizationsSingleton: Error fetching organizations:', { detail: error });
       this.setState({ error: error instanceof Error ? error.message : 'Failed to fetch organizations' });
     } finally {
       this.setState({ loading: false });
@@ -193,7 +194,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('TenantOrganizationsSingleton: Failed to fetch available tenants:', result.error);
+        clientLogger.error('TenantOrganizationsSingleton: Failed to fetch available tenants:', { detail: result.error });
         return;
       }
 
@@ -204,7 +205,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       this.setState({ availableTenants: tenants });
       //console.log('TenantOrganizationsSingleton: Available tenants fetched successfully', tenants.length);
     } catch (error) {
-      console.error('TenantOrganizationsSingleton: Error fetching available tenants:', error);
+      clientLogger.error('TenantOrganizationsSingleton: Error fetching available tenants:', { detail: error });
       // Don't set error state for this secondary fetch
     }
   }
@@ -235,7 +236,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       // Refresh organizations list
       await this.fetchOrganizations();
     } catch (error) {
-      console.error('TenantOrganizationsSingleton: Error creating organization:', error);
+      clientLogger.error('TenantOrganizationsSingleton: Error creating organization:', { detail: error });
       this.setState({ error: error instanceof Error ? error.message : 'Failed to create organization' });
       throw error;
     } finally {
@@ -267,7 +268,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       // 🎯 Return the response data for immediate UI updates
       return updatedOrg;
     } catch (error) {
-      console.error('TenantOrganizationsSingleton: Error updating organization:', error);
+      clientLogger.error('TenantOrganizationsSingleton: Error updating organization:', { detail: error });
       this.setState({ error: error instanceof Error ? error.message : 'Failed to update organization' });
       throw error;
     } finally {
@@ -299,7 +300,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       // 🎯 Return the response data for immediate UI updates
       return responseData;
     } catch (error) {
-      console.error('TenantOrganizationsSingleton: Error adding tenant to organization:', error);
+      clientLogger.error('TenantOrganizationsSingleton: Error adding tenant to organization:', { detail: error });
       this.setState({ error: error instanceof Error ? error.message : 'Failed to add tenant to organization' });
       throw error;
     } finally {
@@ -330,7 +331,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       // 🎯 Return the response data for immediate UI updates
       return responseData;
     } catch (error) {
-      console.error('TenantOrganizationsSingleton: Error removing tenant from organization:', error);
+      clientLogger.error('TenantOrganizationsSingleton: Error removing tenant from organization:', { detail: error });
       this.setState({ error: error instanceof Error ? error.message : 'Failed to remove tenant from organization' });
       throw error;
     } finally {

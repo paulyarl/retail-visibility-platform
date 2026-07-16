@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StoreData {
   id: string;
@@ -84,13 +85,13 @@ class StoreService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.warn('[StoreService] Failed to fetch store details:', response.error);
+        clientLogger.warn('[StoreService] Failed to fetch store details:', { detail: response.error });
         return null;
       }
 
       return this.transformStoreData(response.data);
     } catch (error) {
-      console.warn(`Failed to fetch store details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch store details: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
   }
@@ -107,13 +108,13 @@ class StoreService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.warn('[StoreService] Failed to fetch store product count:', response.error);
+        clientLogger.warn('[StoreService] Failed to fetch store product count:', { detail: response.error });
         return 0;
       }
 
       return response.data.count || 0;
     } catch (error) {
-      console.warn(`Failed to fetch store product count: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch store product count: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return 0;
     }
   }

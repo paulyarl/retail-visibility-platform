@@ -10,6 +10,7 @@ import { inventoryQueueService } from '@/services/InventoryQueueSingletonService
 import { itemsService } from '@/services/ItemsSingletonService';
 import { Button } from '@mantine/core';
 import { Edit, Plus } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function CreateItemPage({
   params,
@@ -44,7 +45,7 @@ export default function CreateItemPage({
       // Show success message
       alert('Product added to queue! You can process it later from the queue button in the top-right corner.');
     } catch (error) {
-      console.error('Failed to add item to queue:', error);
+      clientLogger.error('Failed to add item to queue:', { detail: error });
       alert('Failed to add product to queue. Please try again.');
     }
   };
@@ -193,7 +194,7 @@ export default function CreateItemPage({
       // Redirect to items page
       router.push(`/t/${tenantId}/items?${isEditing ? 'updated' : 'created'}=true`);
     } catch (error) {
-      console.error('[CreateItemPage] Failed to process product:', error);
+      clientLogger.error('[CreateItemPage] Failed to process product:', { detail: error });
       alert(`Failed to ${isEditing ? 'update' : 'create'} product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };

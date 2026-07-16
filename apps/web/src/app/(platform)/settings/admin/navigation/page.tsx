@@ -9,6 +9,7 @@ import { NavItemRow } from '@/components/navigation/NavItemRow';
 import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1454,7 +1455,7 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
       const sessionInfo = await securitySingletonService.getSessionInfo();
       tenants = sessionInfo.user?.tenants || [];
     } catch (error) {
-      console.error('SidebarPreview: Error fetching tenant data:', error);
+      clientLogger.error('SidebarPreview: Error fetching tenant data:', { detail: error });
       // Fallback to mock data for preview
       tenants = [
         { id: '1', name: 'Main Store', role: 'OWNER' },
@@ -1563,7 +1564,7 @@ export default function NavigationControlPage() {
         setLinks(innerData);
       }
     } catch (error) {
-      console.error('Failed to load navigation links:', error);
+      clientLogger.error('Failed to load navigation links:', { detail: error });
       /* keep SEED_LINKS */
     } finally {
       setApiLoading(false);

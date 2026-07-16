@@ -37,6 +37,7 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PredictiveAnalyticsProps {
   tenantId: string;
@@ -343,7 +344,7 @@ export default function PredictiveAnalytics({
       console.log('Refreshing AI analytics...');
       
     } catch (error) {
-      console.error('Error refreshing analytics:', error);
+      clientLogger.error('Error refreshing analytics:', { detail: error });
     } finally {
       setIsProcessing(false);
     }

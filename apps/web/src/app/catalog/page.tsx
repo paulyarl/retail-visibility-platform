@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Star, Package, Search, Filter, Grid, List, ChevronDown, ShoppingCart, Heart, Share2, Truck, Shield, Sparkles, Store } from 'lucide-react';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
+import { clientLogger } from '@/lib/client-logger';
 
 // Dynamic import for apiRequest to avoid SSR issues
 const apiRequest = () => import('@/lib/api').then(mod => mod.apiRequest);
@@ -124,7 +125,7 @@ function CatalogPageContent() {
       const data = await response.json();
       setCategories(data.categories || []);
     } catch (err) {
-      console.error('Failed to fetch categories:', err);
+      clientLogger.error('Failed to fetch categories:', { detail: err });
     }
   };
 
@@ -139,7 +140,7 @@ function CatalogPageContent() {
       const data = await response.json();
       setTenants(data.tenants || []);
     } catch (err) {
-      console.error('Failed to fetch tenants:', err);
+      clientLogger.error('Failed to fetch tenants:', { detail: err });
     }
   };
 

@@ -28,6 +28,7 @@ import platformRevenueService, {
   FeeOverride,
   PlatformRevenueTransaction,
 } from '@/services/PlatformRevenueService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function PlatformRevenuePage() {
   const [config, setConfig] = useState<PlatformPaymentConfig | null>(null);
@@ -139,7 +140,7 @@ export default function PlatformRevenuePage() {
       setTransactions(transactionsData.transactions);
       setTransactionsTotal(transactionsData.total);
     } catch (err) {
-      console.error('Failed to load data:', err);
+      clientLogger.error('Failed to load data:', { detail: err });
       setError('Failed to load platform revenue data');
     } finally {
       setLoading(false);
@@ -306,7 +307,7 @@ export default function PlatformRevenuePage() {
         setError('Failed to save configuration');
       }
     } catch (err) {
-      console.error('Failed to save config:', err);
+      clientLogger.error('Failed to save config:', { detail: err });
       setError('Failed to save configuration');
     } finally {
       setSaving(false);
@@ -318,7 +319,7 @@ export default function PlatformRevenuePage() {
       await platformRevenueService.refreshMerchantStatus(tenantId);
       loadData();
     } catch (err) {
-      console.error('Failed to refresh merchant:', err);
+      clientLogger.error('Failed to refresh merchant:', { detail: err });
       setError('Failed to refresh merchant status');
     }
   };
@@ -330,7 +331,7 @@ export default function PlatformRevenuePage() {
         window.open(result.onboarding_link, '_blank');
       }
     } catch (err) {
-      console.error('Failed to create onboarding link:', err);
+      clientLogger.error('Failed to create onboarding link:', { detail: err });
       setError('Failed to create onboarding link');
     }
   };

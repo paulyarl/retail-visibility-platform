@@ -8,6 +8,7 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { RecentlyViewedItem } from './RecentlyViewedSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Recommendations Data Interfaces
 export interface Recommendation {
@@ -155,7 +156,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching personalized recommendations:', result.error);
+        clientLogger.error('Error fetching personalized recommendations:', { detail: result.error });
         return [];
       }
       
@@ -166,7 +167,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       
       return filteredRecommendations;
     } catch (error) {
-      console.error('Error fetching personalized recommendations:', error);
+      clientLogger.error('Error fetching personalized recommendations:', { detail: error });
       return [];
     }
   }
@@ -201,13 +202,13 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching popular recommendations:', result.error);
+        clientLogger.error('Error fetching popular recommendations:', { detail: result.error });
         return [];
       }
       
       return result.data || [];
     } catch (error) {
-      console.error('Error fetching popular recommendations:', error);
+      clientLogger.error('Error fetching popular recommendations:', { detail: error });
       return [];
     }
   }
@@ -244,13 +245,13 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching similar item recommendations:', result.error);
+        clientLogger.error('Error fetching similar item recommendations:', { detail: result.error });
         return [];
       }
       
       return result.data || [];
     } catch (error) {
-      console.error('Error fetching similar item recommendations:', error);
+      clientLogger.error('Error fetching similar item recommendations:', { detail: error });
       return [];
     }
   }
@@ -283,13 +284,13 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching recommendations from recently viewed:', result.error);
+        clientLogger.error('Error fetching recommendations from recently viewed:', { detail: result.error });
         return [];
       }
       
       return result.data || [];
     } catch (error) {
-      console.error('Error fetching recommendations from recently viewed:', error);
+      clientLogger.error('Error fetching recommendations from recently viewed:', { detail: error });
       return [];
     }
   }
@@ -327,13 +328,13 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching contextual recommendations:', result.error);
+        clientLogger.error('Error fetching contextual recommendations:', { detail: result.error });
         return [];
       }
       
       return result.data || [];
     } catch (error) {
-      console.error('Error fetching contextual recommendations:', error);
+      clientLogger.error('Error fetching contextual recommendations:', { detail: error });
       return [];
     }
   }
@@ -382,7 +383,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     try {
       await this.sendFeedbackBatch(batch);
     } catch (error) {
-      console.error('Error processing recommendation feedback batch:', error);
+      clientLogger.error('Error processing recommendation feedback batch:', { detail: error });
       // Re-add failed feedback to queue for retry
       this.feedbackQueue.unshift(...batch);
     }
@@ -403,7 +404,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error sending recommendation feedback:', result.error);
+      clientLogger.error('Error sending recommendation feedback:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to send feedback');
     }
   }
@@ -423,7 +424,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error sending recommendation feedback batch:', result.error);
+      clientLogger.error('Error sending recommendation feedback batch:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to send feedback batch');
     }
   }
@@ -449,7 +450,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching recommendation analytics:', result.error);
+        clientLogger.error('Error fetching recommendation analytics:', { detail: result.error });
         
         // Return default analytics
         return {
@@ -465,7 +466,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('Error fetching recommendation analytics:', error);
+      clientLogger.error('Error fetching recommendation analytics:', { detail: error });
       
       // Return default analytics
       return {
@@ -513,7 +514,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error fetching recommendation performance:', result.error);
+        clientLogger.error('Error fetching recommendation performance:', { detail: result.error });
         
         // Return default performance
         return {
@@ -528,7 +529,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('Error fetching recommendation performance:', error);
+      clientLogger.error('Error fetching recommendation performance:', { detail: error });
       
       // Return default performance
       return {

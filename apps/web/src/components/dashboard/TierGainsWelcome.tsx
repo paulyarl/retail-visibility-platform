@@ -4,6 +4,7 @@ import { UserProfileData } from "@/hooks/useUserProfile";
 import { Card, CardContent } from '@/components/ui';
 import Link from 'next/link';
 import { tierSystemService } from '@/services/TierSystemService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TierGainsWelcomeProps {
   currentTier: string;
@@ -151,7 +152,7 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName, organiz
         setTierGains(gains);
         setOrgGains(orgGainsResult);
       } catch (error) {
-        console.error('[TierGainsWelcome] Failed to load tier gains:', error);
+        clientLogger.error('[TierGainsWelcome] Failed to load tier gains:', { detail: error });
       } finally {
         setLoading(false);
       }

@@ -26,6 +26,7 @@ import {
   Package,
   TrendingUp
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface RealTimeUpdatesProps {
   tenantId: string;
@@ -162,7 +163,7 @@ export function useRealTimeUpdates({
           const data = JSON.parse(event.data);
           handleWebSocketMessage(data);
         } catch (error) {
-          console.error('[RealTimeUpdates] Error parsing WebSocket message:', error);
+          clientLogger.error('[RealTimeUpdates] Error parsing WebSocket message:', { detail: error });
         }
       };
 
@@ -184,7 +185,7 @@ export function useRealTimeUpdates({
       };
 
       wsRef.current.onerror = (error) => {
-        console.error('[RealTimeUpdates] WebSocket error:', error);
+        clientLogger.error('[RealTimeUpdates] WebSocket error:', { detail: error });
         setConnectionStatus(prev => ({
           ...prev,
           connected: false,
@@ -192,7 +193,7 @@ export function useRealTimeUpdates({
       };
 
     } catch (error) {
-      console.error('[RealTimeUpdates] Failed to connect WebSocket:', error);
+      clientLogger.error('[RealTimeUpdates] Failed to connect WebSocket:', { detail: error });
       attemptReconnect();
     }
   }, [tenantId, onConnectionChange, offlineQueue]);

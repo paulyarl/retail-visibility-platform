@@ -92,7 +92,7 @@ export class AddressParserMiddleware {
     if (this.config.strictValidation && parser.validate) {
       const isValid = parser.validate(parsed);
       if (!isValid) {
-        console.warn('[AddressParser] Validation failed for parsed address:', parsed);
+        clientLogger.warn('[AddressParser] Validation failed for parsed address:', { detail: parsed });
       }
     }
 
@@ -129,3 +129,4 @@ export { EuropeanAddressParser } from './parsers/eu';
 export { AustraliaNewZealandParser } from './parsers/au-nz';
 export { AsiaAddressParser } from './parsers/asia';
 export { LatinAmericaAddressParser } from './parsers/latam';
+import { clientLogger } from '@/lib/client-logger';

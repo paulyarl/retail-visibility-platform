@@ -4,6 +4,7 @@
  */
 
 import { RBACService } from '../services/RBACService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Validate user role against API-driven role groups
@@ -14,7 +15,7 @@ export async function validateRoleAgainstGroup(userRole: string, requiredGroup: 
     // console.log(`[RBACValidation] Validating role ${userRole} against group ${requiredGroup} via RBACService`);
     return await RBACService.getInstance().validateRoleAgainstGroup(userRole, requiredGroup);
   } catch (error) {
-    console.error('[RBACValidation] Failed to validate role against group:', error);
+    clientLogger.error('[RBACValidation] Failed to validate role against group:', { detail: error });
     return false;
   }
 }

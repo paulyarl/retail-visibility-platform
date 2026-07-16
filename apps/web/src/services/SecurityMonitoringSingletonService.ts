@@ -15,6 +15,7 @@ import {
   PaginatedResponse,
   PaginationInfo,
 } from '@/types/security';
+import { clientLogger } from '@/lib/client-logger';
 
 class SecurityMonitoringSingletonService extends AdminApiSingleton {
   private static instance: SecurityMonitoringSingletonService;
@@ -44,7 +45,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
       // API returns { success: true, data: { metrics: {...}, timeRange: "24 hours" } }
       return result?.data?.metrics || result?.data || {};
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to get security metrics:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to get security metrics:', { detail: error });
       return {} as SecurityMetrics;
     }
   }
@@ -85,7 +86,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to get security threats:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to get security threats:', { detail: error });
       return {
         threats: [],
         pagination: { page: 1, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
@@ -115,7 +116,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to resolve threat:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to resolve threat:', { detail: error });
       throw error;
     }
   }
@@ -154,7 +155,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to get blocked IPs:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to get blocked IPs:', { detail: error });
       return {
         blockedIPs: [],
         pagination: { page: 1, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
@@ -179,7 +180,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
       // Invalidate blocked IPs cache
       await this.invalidateCache('security-blocked-ips-*');
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to unblock IP address:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to unblock IP address:', { detail: error });
       throw error;
     }
   }
@@ -201,7 +202,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
 
       return result.data || {} as SecurityHealthStatus;
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to get security health:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to get security health:', { detail: error });
       return {} as SecurityHealthStatus;
     }
   }
@@ -228,7 +229,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
       const alertsArray = result?.data?.data;
       return Array.isArray(alertsArray) ? alertsArray : [];
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to get alerts by type:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to get alerts by type:', { detail: error });
       return [];
     }
   }
@@ -256,13 +257,13 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[SecurityMonitoringSingleton] Failed to export security report:', response.error);
+        clientLogger.error('[SecurityMonitoringSingleton] Failed to export security report:', { detail: response.error });
         throw new Error('No response from security export');
       }
 
       return await response.data!.blob()||new Blob();
     } catch (error) {
-      console.error('[SecurityMonitoringSingleton] Failed to export security report:', error);
+      clientLogger.error('[SecurityMonitoringSingleton] Failed to export security report:', { detail: error });
       throw error;
     }
   }

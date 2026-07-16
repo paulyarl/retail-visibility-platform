@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ImageFetchResult {
   blob: Blob;
@@ -36,7 +37,7 @@ class ImageFetchService extends PublicApiSingleton {
    */
   async fetchExternalImage(url: string): Promise<ImageFetchResult | null> {
     if (!url) {
-      console.error('[ImageFetchService] fetchExternalImage: URL is required');
+      clientLogger.error('[ImageFetchService] fetchExternalImage: URL is required');
       return null;
     }
 
@@ -85,7 +86,7 @@ class ImageFetchService extends PublicApiSingleton {
       console.log('[ImageFetchService] Cached external image for:', url);
       return result;
     } catch (error) {
-      console.error('[ImageFetchService] Failed to fetch external image:', error);
+      clientLogger.error('[ImageFetchService] Failed to fetch external image:', { detail: error });
       return null;
     }
   }

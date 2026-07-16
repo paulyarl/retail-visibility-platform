@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { itemsDataService, Item, ItemFilters, PaginationParams, ItemsResponse } from '@/services/itemsDataService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UseItemsDataOptions {
   tenantId: string;
@@ -65,7 +66,7 @@ export function useItemsData({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load items';
       setError(errorMessage);
-      console.error('[useItemsData] Failed to fetch items:', err);
+      clientLogger.error('[useItemsData] Failed to fetch items:', { detail: err });
     } finally {
       setLoading(false);
     }

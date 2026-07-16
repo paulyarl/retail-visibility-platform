@@ -1,4 +1,5 @@
 import { OrganizationApiSingleton, AuthorizationGroup, type OrganizationRequestOptions } from '../providers/base/OrganizationApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Service for managing organization operations
@@ -114,7 +115,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to create organization request:', result.error);
+      clientLogger.error('[OrganizationService] Failed to create organization request:', { detail: result.error });
       throw result.error;
     }
 
@@ -160,13 +161,13 @@ export class OrganizationService extends OrganizationApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[OrganizationService] Failed to get organization requests:', result.error);
+        clientLogger.error('[OrganizationService] Failed to get organization requests:', { detail: result.error });
         throw result.error;
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('[OrganizationService] Failed to get organization requests:', error);
+      clientLogger.error('[OrganizationService] Failed to get organization requests:', { detail: error });
       throw error;
     }
   }
@@ -176,7 +177,7 @@ export class OrganizationService extends OrganizationApiSingleton {
    */
   async getOrganizationRequest(requestId: string): Promise<PendingRequest | null> {
     if (!requestId) {
-      console.error('[OrganizationService] Request ID is required');
+      clientLogger.error('[OrganizationService] Request ID is required');
       return null;
     }
 
@@ -196,13 +197,13 @@ export class OrganizationService extends OrganizationApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[OrganizationService] Failed to get organization request:', result.error);
+        clientLogger.error('[OrganizationService] Failed to get organization request:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[OrganizationService] Failed to get organization request:', error);
+      clientLogger.error('[OrganizationService] Failed to get organization request:', { detail: error });
       return null;
     }
   }
@@ -228,7 +229,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to assign tenant to organization:', result.error);
+      clientLogger.error('[OrganizationService] Failed to assign tenant to organization:', { detail: result.error });
       throw result.error;
     }
 
@@ -258,7 +259,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to remove tenant from organization:', result.error);
+      clientLogger.error('[OrganizationService] Failed to remove tenant from organization:', { detail: result.error });
       throw result.error;
     }
 
@@ -289,7 +290,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to delete pending request:', result.error);
+      clientLogger.error('[OrganizationService] Failed to delete pending request:', { detail: result.error });
       throw result.error;
     }
 
@@ -320,7 +321,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to update pending request:', result.error);
+      clientLogger.error('[OrganizationService] Failed to update pending request:', { detail: result.error });
       throw result.error;
     }
 
@@ -352,7 +353,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to get organization:', result.error);
+      clientLogger.error('[OrganizationService] Failed to get organization:', { detail: result.error });
       return null;
     }
 
@@ -385,7 +386,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to get organizations:', result.error);
+      clientLogger.error('[OrganizationService] Failed to get organizations:', { detail: result.error });
       return null;
     }
 
@@ -415,7 +416,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to create organization:', result.error);
+      clientLogger.error('[OrganizationService] Failed to create organization:', { detail: result.error });
       throw result.error;
     }
 
@@ -447,7 +448,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to update organization:', result.error);
+      clientLogger.error('[OrganizationService] Failed to update organization:', { detail: result.error });
       throw result.error;
     }
 
@@ -479,7 +480,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to delete organization:', result.error);
+      clientLogger.error('[OrganizationService] Failed to delete organization:', { detail: result.error });
       throw result.error;
     }
 
@@ -509,7 +510,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to get organization members:', result.error);
+      clientLogger.error('[OrganizationService] Failed to get organization members:', { detail: result.error });
       return [];
     }
 
@@ -541,7 +542,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to add organization member:', result.error);
+      clientLogger.error('[OrganizationService] Failed to add organization member:', { detail: result.error });
       throw result.error;
     }
 
@@ -572,7 +573,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to remove organization member:', result.error);
+      clientLogger.error('[OrganizationService] Failed to remove organization member:', { detail: result.error });
       throw result.error;
     }
 
@@ -601,7 +602,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to get organization settings:', result.error);
+      clientLogger.error('[OrganizationService] Failed to get organization settings:', { detail: result.error });
       return null;
     }
 
@@ -630,7 +631,7 @@ export class OrganizationService extends OrganizationApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationService] Failed to update organization settings:', result.error);
+      clientLogger.error('[OrganizationService] Failed to update organization settings:', { detail: result.error });
       throw result.error;
     }
 

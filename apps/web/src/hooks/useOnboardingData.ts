@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BusinessProfile, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { onboardingDataService } from '@/services/onboardingDataService';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UseOnboardingDataOptions {
   tenantId: string;
@@ -69,7 +70,7 @@ export function useOnboardingData({
         setData(normalized);
         setStep(savedStep);
       } catch (err) {
-        console.error('[useOnboardingData] Failed to load data:', err);
+        clientLogger.error('[useOnboardingData] Failed to load data:', { detail: err });
         setError(err instanceof Error ? err.message : 'Failed to load onboarding data');
       } finally {
         setLoading(false);

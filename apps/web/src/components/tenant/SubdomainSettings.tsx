@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, RefreshCw } from 'lucide-react';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SubdomainSettingsProps {
   tenantId: string;
@@ -70,7 +71,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       const data = await tenantInfoService.getTenantSubdomain(tenantId);
       setCurrentSubdomain(data.subdomain || '');
     } catch (error) {
-      console.error('Failed to load current subdomain:', error);
+      clientLogger.error('Failed to load current subdomain:', { detail: error });
     }
   };
 
@@ -83,7 +84,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       setPlatformDomain(data.platformDomain || 'visibleshelf.com');
       setPlatformUrl(data.platformUrl || 'visibleshelf.com');
     } catch (error) {
-      console.error('Failed to load user subdomains:', error);
+      clientLogger.error('Failed to load user subdomains:', { detail: error });
     } finally {
       setLoadingSubdomains(false);
     }
@@ -100,7 +101,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       const result = await tenantInfoService.checkSubdomainAvailability(newSubdomain);
       setCheckResult(result);
     } catch (error) {
-      console.error('Failed to check subdomain:', error);
+      clientLogger.error('Failed to check subdomain:', { detail: error });
       setError('Failed to check subdomain availability');
     } finally {
       setIsChecking(false);
@@ -122,7 +123,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       setNewSubdomain('');
       setCheckResult(null);
     } catch (error) {
-      console.error('Failed to update subdomain:', error);
+      clientLogger.error('Failed to update subdomain:', { detail: error });
       setError('Failed to update subdomain');
     } finally {
       setIsLoading(false);
@@ -142,7 +143,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       setNewSubdomain('');
       setCheckResult(null);
     } catch (error) {
-      console.error('Failed to remove subdomain:', error);
+      clientLogger.error('Failed to remove subdomain:', { detail: error });
       setError('Failed to remove subdomain');
     } finally {
       setIsLoading(false);
@@ -164,7 +165,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
       }
       setSuccess('Subdomain removed successfully!');
     } catch (error) {
-      console.error('Failed to remove subdomain:', error);
+      clientLogger.error('Failed to remove subdomain:', { detail: error });
       setError('Failed to remove subdomain');
     }
   };

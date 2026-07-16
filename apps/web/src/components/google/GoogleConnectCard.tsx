@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
 import { Button } from '@mantine/core';
 import { googleIntegrationService } from '@/services/GoogleIntegrationService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GoogleAccount {
   connected: boolean;
@@ -49,7 +50,7 @@ export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }:
         displayName: data.businessName,
       });
     } catch (err) {
-      console.error('[GoogleConnect] Status fetch error:', err);
+      clientLogger.error('[GoogleConnect] Status fetch error:', { detail: err });
       setError('Failed to load Google account status');
     } finally {
       setLoading(false);
@@ -74,7 +75,7 @@ export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }:
 
       onConnect?.();
     } catch (err: any) {
-      console.error('[GoogleConnect] Connection error:', err);
+      clientLogger.error('[GoogleConnect] Connection error:', { detail: err });
       if (err.message?.includes('incomplete_business_profile')) {
         setError('Please complete your business profile before connecting to Google');
       } else {
@@ -99,7 +100,7 @@ export default function GoogleConnectCard({ tenantId, onConnect, onDisconnect }:
       setAccount({ connected: false });
       onDisconnect?.();
     } catch (err) {
-      console.error('[GoogleConnect] Disconnect error:', err);
+      clientLogger.error('[GoogleConnect] Disconnect error:', { detail: err });
       setError('Failed to disconnect Google account');
     } finally {
       setDisconnecting(false);

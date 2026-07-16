@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PaymentGatewaySettings {
   gateway_enabled: boolean;
@@ -38,7 +39,7 @@ class PublicPaymentGatewaySettingsService extends PublicApiSingleton {
    */
   async getPaymentGatewaySettings(tenantId: string): Promise<PaymentGatewaySettings | null> {
     if (!tenantId) {
-      console.error('[PublicPaymentGatewaySettings] getPaymentGatewaySettings: tenantId is required');
+      clientLogger.error('[PublicPaymentGatewaySettings] getPaymentGatewaySettings: tenantId is required');
       return null;
     }
 
@@ -51,13 +52,13 @@ class PublicPaymentGatewaySettingsService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[PublicPaymentGatewaySettings] Failed to get settings:', result.error);
+        clientLogger.error('[PublicPaymentGatewaySettings] Failed to get settings:', { detail: result.error });
         return null;
       }
 
       return result.data?.settings || null;
     } catch (error) {
-      console.error('[PublicPaymentGatewaySettings] Failed to get settings:', error);
+      clientLogger.error('[PublicPaymentGatewaySettings] Failed to get settings:', { detail: error });
       return null;
     }
   }

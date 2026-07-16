@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -70,7 +71,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
    */
   async getRatingSummary(tenantId: string): Promise<ReviewSummary | null> {
     if (!tenantId) {
-      console.error('[PublicReviewsSingleton] getRatingSummary: tenantId is required');
+      clientLogger.error('[PublicReviewsSingleton] getRatingSummary: tenantId is required');
       return null;
     }
 
@@ -82,7 +83,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
       );
 
       if (!result.success){
-        console.error('[PublicReviewsSingleton] Failed to get rating summary:', result.error);
+        clientLogger.error('[PublicReviewsSingleton] Failed to get rating summary:', { detail: result.error });
         return null;
       }
       
@@ -105,7 +106,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
       
       return null;
     } catch (error) {
-      console.error('[PublicReviewsSingleton] Failed to get rating summary:', error);
+      clientLogger.error('[PublicReviewsSingleton] Failed to get rating summary:', { detail: error });
       return null;
     }
   }
@@ -116,7 +117,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
    */
   async getReviews(tenantId: string, limit: number = 10): Promise<Review[]> {
     if (!tenantId) {
-      console.error('[PublicReviewsSingleton] getReviews: tenantId is required');
+      clientLogger.error('[PublicReviewsSingleton] getReviews: tenantId is required');
       return [];
     }
 
@@ -128,14 +129,14 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
       );
 
       if (!result.success){
-        console.error('[PublicReviewsSingleton] Failed to get reviews:', result.error);
+        clientLogger.error('[PublicReviewsSingleton] Failed to get reviews:', { detail: result.error });
         return [];
 
       }     
       
       return result.data?.data?.reviews || [];
     } catch (error) {
-      console.error('[PublicReviewsSingleton] Failed to get reviews:', error);
+      clientLogger.error('[PublicReviewsSingleton] Failed to get reviews:', { detail: error });
       return [];
     }
   }
@@ -151,7 +152,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
     reviewType?: 'store' | 'product' | 'all';
   }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
     if (!tenantId) {
-      console.error('[PublicReviewsSingleton] getApprovedReviews: tenantId is required');
+      clientLogger.error('[PublicReviewsSingleton] getApprovedReviews: tenantId is required');
       return null;
     }
 
@@ -187,13 +188,13 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[PublicReviewsSingleton] Failed to get approved reviews:', result.error);
+        clientLogger.error('[PublicReviewsSingleton] Failed to get approved reviews:', { detail: result.error });
         return null;
       }
 
       return result.data?.data || null;
     } catch (error) {
-      console.error('[PublicReviewsSingleton] Failed to get approved reviews:', error);
+      clientLogger.error('[PublicReviewsSingleton] Failed to get approved reviews:', { detail: error });
       return null;
     }
   }
@@ -205,7 +206,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
    */
   async submitHelpfulVote(reviewId: string, isHelpful: boolean): Promise<boolean> {
     if (!reviewId) {
-      console.error('[PublicReviewsSingleton] submitHelpfulVote: reviewId is required');
+      clientLogger.error('[PublicReviewsSingleton] submitHelpfulVote: reviewId is required');
       return false;
     }
 
@@ -221,7 +222,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
       
       return true;
     } catch (error) {
-      console.error('[PublicReviewsSingleton] Failed to submit helpful vote:', error);
+      clientLogger.error('[PublicReviewsSingleton] Failed to submit helpful vote:', { detail: error });
       return false;
     }
   }
@@ -241,7 +242,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
     userEmail?: string;
   }): Promise<Review | null> {
     if (!tenantId) {
-      console.error('[PublicReviewsSingleton] submitReview: tenantId is required');
+      clientLogger.error('[PublicReviewsSingleton] submitReview: tenantId is required');
       return null;
     }
 
@@ -276,7 +277,7 @@ class PublicReviewsSingletonService extends PublicApiSingleton {
         console.log('[PublicReviewsSingleton] User not authenticated, cannot submit review');
         return null;
       }
-      console.error('[PublicReviewsSingleton] Failed to submit review:', error);
+      clientLogger.error('[PublicReviewsSingleton] Failed to submit review:', { detail: error });
       return null;
     }
   }

@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdminSession {
   id: string;
@@ -132,7 +133,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get admin security sessions:', result.error);
+      clientLogger.error('[AdminSecurityMonitoringSingleton] Failed to get admin security sessions:', { detail: result.error });
       return null;
     }
 
@@ -164,7 +165,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get session stats:', result.error);
+      clientLogger.error('[AdminSecurityMonitoringSingleton] Failed to get session stats:', { detail: result.error });
       return null;
     }
 
@@ -184,7 +185,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get security alerts:', result.error);
+      clientLogger.error('[AdminSecurityMonitoringSingleton] Failed to get security alerts:', { detail: result.error });
       return null;
     }
 
@@ -202,7 +203,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get alert stats:', result.error);
+      clientLogger.error('[AdminSecurityMonitoringSingleton] Failed to get alert stats:', { detail: result.error });
       return null;
     }
 
@@ -223,7 +224,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get failed logins:', result.error);
+      clientLogger.error('[AdminSecurityMonitoringSingleton] Failed to get failed logins:', { detail: result.error });
       return null;
     }
 
@@ -274,7 +275,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoring] Failed to get user tenants:', result.error);
+      clientLogger.error('[AdminSecurityMonitoring] Failed to get user tenants:', { detail: result.error });
       return [];
     }
 
@@ -294,7 +295,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSecurityMonitoring] Failed to get available tenants:', result.error);
+      clientLogger.error('[AdminSecurityMonitoring] Failed to get available tenants:', { detail: result.error });
       return [];
     }
 
@@ -325,7 +326,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[AdminSecurityMonitoring] Failed to assign tenant to user:', error);
+      clientLogger.error('[AdminSecurityMonitoring] Failed to assign tenant to user:', { detail: error });
       return null;
     }
   }
@@ -350,7 +351,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[AdminSecurityMonitoring] Failed to remove tenant from user:', error);
+      clientLogger.error('[AdminSecurityMonitoring] Failed to remove tenant from user:', { detail: error });
       return null;
     }
   }
@@ -378,7 +379,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[AdminSecurityMonitoring] Failed to update user tenant role:', error);
+      clientLogger.error('[AdminSecurityMonitoring] Failed to update user tenant role:', { detail: error });
       return null;
     }
   }

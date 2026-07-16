@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface IntegrationStatus {
   id: string;
@@ -76,7 +77,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Square status:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Square status:', { detail: result.error });
       return null;
     }
 
@@ -99,7 +100,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Square OAuth authorize:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Square OAuth authorize:', { detail: result.error });
       throw result.error;
     }
 
@@ -124,7 +125,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to disconnect Square:', result.error);
+      clientLogger.error('[IntegrationService] Failed to disconnect Square:', { detail: result.error });
       throw result.error;
     }
 
@@ -152,7 +153,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to start Square sync:', result.error);
+      clientLogger.error('[IntegrationService] Failed to start Square sync:', { detail: result.error });
       throw result.error;
     }
 
@@ -175,7 +176,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Clover status:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Clover status:', { detail: result.error });
       return null;
     }
 
@@ -200,7 +201,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to enable Clover demo:', result.error);
+      clientLogger.error('[IntegrationService] Failed to enable Clover demo:', { detail: result.error });
       throw result.error;
     }
 
@@ -228,7 +229,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to disable Clover demo:', result.error);
+      clientLogger.error('[IntegrationService] Failed to disable Clover demo:', { detail: result.error });
       throw result.error;
     }
 
@@ -254,7 +255,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Clover OAuth URL:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Clover OAuth URL:', { detail: result.error });
       throw result.error;
     }
 
@@ -276,7 +277,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to disconnect Clover:', result.error);
+      clientLogger.error('[IntegrationService] Failed to disconnect Clover:', { detail: result.error });
       throw result.error;
     }
 
@@ -298,7 +299,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to start Clover sync:', result.error);
+      clientLogger.error('[IntegrationService] Failed to start Clover sync:', { detail: result.error });
       throw result.error;
     }
 
@@ -321,7 +322,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Clover demo scenarios:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Clover demo scenarios:', { detail: result.error });
       throw result.error;
     }
 
@@ -348,7 +349,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Clover mappings:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Clover mappings:', { detail: result.error });
       throw result.error;
     }
 
@@ -375,7 +376,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Clover sync history:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Clover sync history:', { detail: result.error });
       throw result.error;
     }
 
@@ -398,7 +399,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get Clover category mappings:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get Clover category mappings:', { detail: result.error });
       throw result.error;
     }
 
@@ -423,7 +424,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to start Clover simulation:', result.error);
+      clientLogger.error('[IntegrationService] Failed to start Clover simulation:', { detail: result.error });
       throw result.error;
     }
 
@@ -445,7 +446,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to execute Clover simulation:', result.error);
+      clientLogger.error('[IntegrationService] Failed to execute Clover simulation:', { detail: result.error });
       throw result.error;
     }
 
@@ -467,7 +468,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to cancel Clover simulation:', result.error);
+      clientLogger.error('[IntegrationService] Failed to cancel Clover simulation:', { detail: result.error });
       throw result.error;
     }
 
@@ -496,7 +497,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to resolve Clover mapping conflict:', result.error);
+      clientLogger.error('[IntegrationService] Failed to resolve Clover mapping conflict:', { detail: result.error });
       throw result.error;
     }
 
@@ -519,7 +520,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[IntegrationService] Failed to get ${integration} sync status:`, result.error);
+      clientLogger.error(`[IntegrationService] Failed to get ${integration} sync status:`, { detail: result.error });
       return null;
     }
 
@@ -542,7 +543,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[IntegrationService] Failed to get all integration statuses:', result.error);
+      clientLogger.error('[IntegrationService] Failed to get all integration statuses:', { detail: result.error });
       return null;
     }
 
@@ -567,7 +568,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[IntegrationService] Failed to configure ${integration}:`, result.error);
+      clientLogger.error(`[IntegrationService] Failed to configure ${integration}:`, { detail: result.error });
       throw result.error;
     }
 
@@ -592,7 +593,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[IntegrationService] Failed to test ${integration} connection:`, result.error);
+      clientLogger.error(`[IntegrationService] Failed to test ${integration} connection:`, { detail: result.error });
       throw result.error;
     }
 
@@ -615,7 +616,7 @@ export class IntegrationService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[IntegrationService] Failed to get ${integration} logs:`, result.error);
+      clientLogger.error(`[IntegrationService] Failed to get ${integration} logs:`, { detail: result.error });
       return [];
     }
 

@@ -8,6 +8,7 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Rate Limiting Data Interfaces
 export interface RateLimitRule {
@@ -107,7 +108,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
     
     if (!result.success) {
-      console.error('Error loading rate limit rules:', result.error);
+      clientLogger.error('Error loading rate limit rules:', { detail: result.error });
       return;
     }
     
@@ -141,7 +142,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error creating rate limit rule:', result.error);
+      clientLogger.error('Error creating rate limit rule:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to create rate limit rule');
     }
     
@@ -177,7 +178,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     });
     
     if (!result.success) {
-      console.error('Error updating rate limit rule:', result.error);
+      clientLogger.error('Error updating rate limit rule:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to update rate limit rule');
     }
     
@@ -201,7 +202,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     });
 
     if (!result.success) {
-      console.error('Error deleting rate limit rule:', result.error);
+      clientLogger.error('Error deleting rate limit rule:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to delete rate limit rule');
     }
 
@@ -219,7 +220,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
     
     if (!result.success) {
-      console.error('Error fetching rate limit rules:', result.error);
+      clientLogger.error('Error fetching rate limit rules:', { detail: result.error });
       return Array.from(this.rateLimitRules.values());
     }
     
@@ -251,7 +252,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}&routeType=${routeType}`, {}, `rate-limit-status-${ip}-${routeType}`);
     
     if (!result.success) {
-      console.error('Error checking rate limit status:', result.error);
+      clientLogger.error('Error checking rate limit status:', { detail: result.error });
       
       // Return default status
       return {
@@ -302,7 +303,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
         }
       }
     } catch (error) {
-      console.error('Error resetting rate limit:', error);
+      clientLogger.error('Error resetting rate limit:', { detail: error });
       throw error;
     }
   }
@@ -324,7 +325,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
         }
       }
     } catch (error) {
-      console.error('Error blocking IP address:', error);
+      clientLogger.error('Error blocking IP address:', { detail: error });
       throw error;
     }
   }
@@ -345,7 +346,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
         }
       }
     } catch (error) {
-      console.error('Error unblocking IP address:', error);
+      clientLogger.error('Error unblocking IP address:', { detail: error });
       throw error;
     }
   }
@@ -361,7 +362,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
     
     if (!result.success) {
-      console.error('Error fetching rate limit config:', result.error);
+      clientLogger.error('Error fetching rate limit config:', { detail: result.error });
       
       // Return default config
       return {
@@ -388,7 +389,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     });
 
     if (!result.success) {
-      console.error('Error updating rate limit config:', result.error);
+      clientLogger.error('Error updating rate limit config:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to update rate limit config');
     }
 
@@ -413,7 +414,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
     
     if (!result.success) {
-      console.error('Error fetching rate limit metrics:', result.error);
+      clientLogger.error('Error fetching rate limit metrics:', { detail: result.error });
       
       // Return default metrics
       return {

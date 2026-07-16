@@ -24,6 +24,7 @@ import {
   FEATURE_DISPLAY_NAMES,
   TIER_DISPLAY_NAMES,
 } from '@/lib/tiers/tier-features';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TierConfigResult {
   /** Whether config is loading from API */
@@ -87,7 +88,7 @@ export function useTierConfig(options?: { enabled?: boolean; publicMode?: boolea
       setConfig(data);
       setError(null);
     } catch (err) {
-      console.warn('[useTierConfig] Failed to load, using fallback:', err);
+      clientLogger.warn('[useTierConfig] Failed to load, using fallback:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load tier config');
     } finally {
       setLoading(false);

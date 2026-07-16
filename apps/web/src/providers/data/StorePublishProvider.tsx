@@ -14,6 +14,7 @@ import StorePublishSingleton, {
   StorePublishOptions,
   DirectoryCategory 
 } from './StorePublishSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // State Types
 interface StorePublishState {
@@ -187,7 +188,7 @@ export function StorePublishProvider({
       const categories = await storePublishSingleton.getDirectoryCategories();
       dispatch({ type: 'SET_CATEGORIES', payload: categories });
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      clientLogger.error('Failed to load categories:', { detail: error });
     }
   };
 
@@ -253,7 +254,7 @@ export function StorePublishProvider({
     try {
       return await storePublishSingleton.getPublishedStore(storeId);
     } catch (error) {
-      console.error('Failed to get store:', error);
+      clientLogger.error('Failed to get store:', { detail: error });
       return null;
     }
   };

@@ -4,6 +4,7 @@
  */
 
 import { OrganizationApiSingleton, AuthorizationGroup, type OrganizationRequestOptions, type PropagationRequest, type PropagationResult, type OrganizationTenant } from '../providers/base/OrganizationApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Re-export types for component usage
 export type { PropagationRequest, PropagationResult, OrganizationTenant };
@@ -263,7 +264,7 @@ export class PropagationService extends OrganizationApiSingleton {
         }
       }));
     } catch (error) {
-      console.error('[PropagationService] getOrganizationTenants error:', error);
+      clientLogger.error('[PropagationService] getOrganizationTenants error:', { detail: error });
       this.logError('Failed to get organization tenants', error);
       throw error;
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Check, X, Loader2 } from 'lucide-react';
 import { googleProductTaxonomyService, GoogleTaxonomyCategory } from '@/services/GoogleProductTaxonomyService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GoogleCategorySelectorProps {
   value: string;
@@ -52,7 +53,7 @@ export default function GoogleCategorySelector({
         const cats = await googleProductTaxonomyService.searchGoogleCategories(searchQuery, 30);
         setResults(cats);
       } catch (err) {
-        console.error('[GoogleCategorySelector] Search error:', err);
+        clientLogger.error('[GoogleCategorySelector] Search error:', { detail: err });
         setResults([]);
       } finally {
         setLoading(false);

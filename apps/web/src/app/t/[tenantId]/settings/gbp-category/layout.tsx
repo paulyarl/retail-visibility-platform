@@ -11,6 +11,7 @@ import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
 import { useEffect, useState } from 'react';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 
@@ -31,7 +32,7 @@ export default function GBPCategoryLayout({ children }: { children: React.ReactN
           setTier(data.subscriptionTier || data.subscription_tier || 'trial');
         }
       } catch (err) {
-        console.error('Failed to fetch tenant tier:', err);
+        clientLogger.error('Failed to fetch tenant tier:', { detail: err });
         setTier('trial'); // Default to trial on error
       } finally {
         setLoading(false);

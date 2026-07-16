@@ -6,6 +6,7 @@
 
 import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { customerAuthService } from './CustomerAuthService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CustomerOrder {
   orderId: string;
@@ -190,7 +191,7 @@ class CustomerOrderService extends CustomerApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[CustomerOrderService] Failed to get payment gateways:', response.error);
+      clientLogger.error('[CustomerOrderService] Failed to get payment gateways:', { detail: response.error });
       return { gateways: [], tenant_tier: null, commerce_features: [] };
     }
 
@@ -219,7 +220,7 @@ class CustomerOrderService extends CustomerApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[CustomerOrderService] Failed to create order:', response.error);
+      clientLogger.error('[CustomerOrderService] Failed to create order:', { detail: response.error });
       return null;
     }
 
@@ -241,7 +242,7 @@ class CustomerOrderService extends CustomerApiSingleton {
     }>(url, {}, `order-${orderId}`);
 
     if (!response.success) {
-      console.error('[CustomerOrderService] Failed to get order:', response.error);
+      clientLogger.error('[CustomerOrderService] Failed to get order:', { detail: response.error });
       return null;
     }
 
@@ -314,7 +315,7 @@ class CustomerOrderService extends CustomerApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[CustomerOrderService] Failed to get customer orders:', response.error);
+      clientLogger.error('[CustomerOrderService] Failed to get customer orders:', { detail: response.error });
       return {
         orders: [],
         pagination: {
@@ -393,13 +394,13 @@ class CustomerOrderService extends CustomerApiSingleton {
       );
 
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to update payment status:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to update payment status:', { detail: response.error });
       return false;
       }
 
       return true;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to update payment status:', error);
+      clientLogger.error('[CustomerOrderService] Failed to update payment status:', { detail: error });
       return false;
     }
   }
@@ -420,13 +421,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `order-downloads-${orderId}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to get order downloads:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to get order downloads:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to get order downloads:', error);
+      clientLogger.error('[CustomerOrderService] Failed to get order downloads:', { detail: error });
       return null;
     }
   }
@@ -447,13 +448,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `payment-details-${paymentId}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to get payment details:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to get payment details:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to get payment details:', error);
+      clientLogger.error('[CustomerOrderService] Failed to get payment details:', { detail: error });
       return null;
     }
   }
@@ -480,13 +481,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `paypal-order-${orderData.orderId}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to create PayPal order:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to create PayPal order:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to create PayPal order:', error);
+      clientLogger.error('[CustomerOrderService] Failed to create PayPal order:', { detail: error });
       return null;
     }
   }
@@ -510,13 +511,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `paypal-capture-${orderData.orderId}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to capture PayPal order:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to capture PayPal order:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to capture PayPal order:', error);
+      clientLogger.error('[CustomerOrderService] Failed to capture PayPal order:', { detail: error });
       return null;
     }
   }
@@ -569,13 +570,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `checkout-order-${orderData.paymentMethod}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to create checkout order:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to create checkout order:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to create checkout order:', error);
+      clientLogger.error('[CustomerOrderService] Failed to create checkout order:', { detail: error });
       return null;
     }
   }
@@ -603,13 +604,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `square-payment-${paymentData.orderId}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to process Square payment:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to process Square payment:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to process Square payment:', error);
+      clientLogger.error('[CustomerOrderService] Failed to process Square payment:', { detail: error });
       return null;
     }
   }
@@ -637,13 +638,13 @@ class CustomerOrderService extends CustomerApiSingleton {
         `square-charge-${paymentData.orderId}`
       );
       if (!response.success){
-          console.error('[CustomerOrderService] Failed to create Square charge:', response.error);
+          clientLogger.error('[CustomerOrderService] Failed to create Square charge:', { detail: response.error });
       return null;
       }
 
       return response;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to create Square charge:', error);
+      clientLogger.error('[CustomerOrderService] Failed to create Square charge:', { detail: error });
       return null;
     }
   }
@@ -673,7 +674,7 @@ class CustomerOrderService extends CustomerApiSingleton {
 
       return response.data;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to get buyer orders:', error);
+      clientLogger.error('[CustomerOrderService] Failed to get buyer orders:', { detail: error });
       return null;
     }
   }
@@ -695,13 +696,13 @@ class CustomerOrderService extends CustomerApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[CustomerOrderService] Failed to get customer downloads:', response.error);
+        clientLogger.error('[CustomerOrderService] Failed to get customer downloads:', { detail: response.error });
         return [];
       }
 
       return response.data?.downloads || [];
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to get customer downloads:', error);
+      clientLogger.error('[CustomerOrderService] Failed to get customer downloads:', { detail: error });
       return [];
     }
   }
@@ -730,7 +731,7 @@ class CustomerOrderService extends CustomerApiSingleton {
         fulfilledAt: response.data?.order?.fulfilledAt
       };
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to confirm fulfillment:', error);
+      clientLogger.error('[CustomerOrderService] Failed to confirm fulfillment:', { detail: error });
       return { success: false };
     }
   }
@@ -756,7 +757,7 @@ class CustomerOrderService extends CustomerApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to cancel order:', error);
+      clientLogger.error('[CustomerOrderService] Failed to cancel order:', { detail: error });
       return false;
     }
   }
@@ -773,7 +774,7 @@ class CustomerOrderService extends CustomerApiSingleton {
       );
       return response.data?.data || [];
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to fetch order service bookings:', error);
+      clientLogger.error('[CustomerOrderService] Failed to fetch order service bookings:', { detail: error });
       return [];
     }
   }
@@ -790,7 +791,7 @@ class CustomerOrderService extends CustomerApiSingleton {
       );
       return response.data?.data || [];
     } catch (error) {
-      console.error('[CustomerOrderService] Failed to fetch customer service bookings:', error);
+      clientLogger.error('[CustomerOrderService] Failed to fetch customer service bookings:', { detail: error });
       return [];
     }
   }

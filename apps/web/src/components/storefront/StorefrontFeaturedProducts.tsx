@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeaturedProduct {
   id: string;
@@ -379,7 +380,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
     return !productTypeOrder.includes(pt as any);
   });
   if (otherProducts.length > 0 && process.env.NODE_ENV === 'development') {
-    console.warn(`[StorefrontFeaturedProducts] Unknown productType(s) detected: ${[...new Set(otherProducts.map(p => p.productType))].join(', ')}. These will be grouped under "Other Products".`);
+    clientLogger.warn(`[StorefrontFeaturedProducts] Unknown productType(s) detected: ${[...new Set(otherProducts.map(p => p.productType))].join(', ')}. These will be grouped under "Other Products".`);
   }
   const hasMultipleTypes = Object.values(groupedProducts).filter(g => g.length > 0).length + (otherProducts.length > 0 ? 1 : 0) > 1;
 
@@ -641,7 +642,7 @@ export default function StorefrontFeaturedProducts({
       try {
         // Safety check: only proceed if tenantId is available
         if (!tenantId) {
-          console.warn('[StorefrontFeaturedProducts] No tenantId available, skipping featured products fetch');
+          clientLogger.warn('[StorefrontFeaturedProducts] No tenantId available, skipping featured products fetch');
           return;
         }
 
@@ -832,7 +833,7 @@ export default function StorefrontFeaturedProducts({
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
-          console.error('Error fetching featured products:', error);
+          clientLogger.error('Error fetching featured products:', { detail: error });
         }
       } finally {
         if (isMounted) {

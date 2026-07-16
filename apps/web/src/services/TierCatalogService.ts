@@ -7,6 +7,7 @@
 
 import { FlexibleApiSingleton, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TierCatalogPermissions {
   tier_id: string;
@@ -80,7 +81,7 @@ class TierCatalogService extends FlexibleApiSingleton {
       }
       return permissions;
     } catch (error) {
-      console.error('[TierCatalogService] Error fetching tier permissions:', error);
+      clientLogger.error('[TierCatalogService] Error fetching tier permissions:', { detail: error });
       return null;
     }
   }

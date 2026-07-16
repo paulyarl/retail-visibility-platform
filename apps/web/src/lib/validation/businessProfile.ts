@@ -219,6 +219,7 @@ export const onboardingProfileSchema = z.object({
 });
 
 import { externalApiService } from '@/services/ExternalApiService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Helper to geocode an address using Google Geocoding API
 export async function geocodeAddress(address: {
@@ -232,7 +233,7 @@ export async function geocodeAddress(address: {
   try {
     return await externalApiService.geocodeAddress(address);
   } catch (error) {
-    console.error('[BusinessProfile] Failed to geocode address:', error);
+    clientLogger.error('[BusinessProfile] Failed to geocode address:', { detail: error });
     return null;
   }
 }

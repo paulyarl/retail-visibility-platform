@@ -4,6 +4,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CrossTenantProduct {
   inventory_item_id: string;
@@ -155,7 +156,7 @@ class CrossTenantProductService extends PublicApiSingleton {
     }>(`/api/cross-tenant/products/${productSlug}?${params.toString()}`, {}, cachekey);
 
     if (!response.success){
-      console.error('[CrossTenantProductService] Failed to get products by slug:', response.error);
+      clientLogger.error('[CrossTenantProductService] Failed to get products by slug:', { detail: response.error });
       return {
         product_slug: productSlug,
         total_stores: 0,
@@ -195,7 +196,7 @@ class CrossTenantProductService extends PublicApiSingleton {
     }>(`/api/cross-tenant/analytics/brands?${params.toString()}`, {}, cachekey);
 
     if (!response.success){
-      console.error('[CrossTenantProductService] Failed to get brand analytics:', response.error);
+      clientLogger.error('[CrossTenantProductService] Failed to get brand analytics:', { detail: response.error });
       return [];
     }
 
@@ -227,7 +228,7 @@ class CrossTenantProductService extends PublicApiSingleton {
     }>(`/api/cross-tenant/analytics/categories?${params.toString()}`, {}, cachekey);
 
     if (!response.success){
-      console.error('[CrossTenantProductService] Failed to get category analytics:', response.error);
+      clientLogger.error('[CrossTenantProductService] Failed to get category analytics:', { detail: response.error });
       return [];
     }
 
@@ -265,7 +266,7 @@ class CrossTenantProductService extends PublicApiSingleton {
     }>(`/api/cross-tenant/analytics/products?${params.toString()}`, {}, cachekey);
 
     if (!response.success){
-        console.error('[CrossTenantProductService] Failed to get product analytics:', response.error);
+        clientLogger.error('[CrossTenantProductService] Failed to get product analytics:', { detail: response.error });
       return [];
     }
 
@@ -293,7 +294,7 @@ class CrossTenantProductService extends PublicApiSingleton {
     }>(`/api/cross-tenant/trending?${params.toString()}`, {}, cachekey);
 
     if (!response.success){
-      console.error('[CrossTenantProductService] Failed to get trending products:', response.error);
+      clientLogger.error('[CrossTenantProductService] Failed to get trending products:', { detail: response.error });
       return [];
     }
 
@@ -323,7 +324,7 @@ class CrossTenantProductService extends PublicApiSingleton {
     }>(`/api/cross-tenant/search?${params.toString()}`, {}, cachekey);
 
     if (!response.success){
-      console.error('[CrossTenantProductService] Failed to search products:', response.error);
+      clientLogger.error('[CrossTenantProductService] Failed to search products:', { detail: response.error });
       return [];
       // throw new Error(response?.error || 'Failed to search products');
     }

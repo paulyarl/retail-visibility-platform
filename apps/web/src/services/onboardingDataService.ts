@@ -1,5 +1,6 @@
 import { BusinessProfile, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Service for handling onboarding data operations
@@ -14,7 +15,7 @@ export class OnboardingDataService {
       const mergedData = await platformHomeService.getOnboardingTenantData(tenantId);
       return mergedData;
     } catch (error) {
-      console.error('[OnboardingDataService] Failed to fetch tenant data:', error);
+      clientLogger.error('[OnboardingDataService] Failed to fetch tenant data:', { detail: error });
       return {};
     }
   }

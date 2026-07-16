@@ -14,6 +14,7 @@ import { type NavLink, type DynamicTemplate } from '@/services/NavigationLinksSe
 import { type ProcessedNavLink } from '@/hooks/useNavLinks';
 import { ScopeSwitcher } from '@/components/navigation/ScopeSwitcher';
 import { SidebarAuthButton } from '@/components/navigation/SidebarAuthButton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -742,7 +743,7 @@ export function UniversalNavContent({ children, injectedItems = [] }: UniversalN
         const sessionInfo = await securitySingletonService.getSessionInfo();
         tenants = sessionInfo.user?.tenants || [];
       } catch (error) {
-        console.error('[UniversalNavContent] Error fetching tenant data:', error);
+        clientLogger.error('[UniversalNavContent] Error fetching tenant data:', { detail: error });
         // Fallback to user.tenants if available
         tenants = user.tenants || [];
       }

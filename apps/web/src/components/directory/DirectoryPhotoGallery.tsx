@@ -6,6 +6,7 @@ import { tenantDirectoryManagementService } from "@/services/TenantDirectoryMana
 import { externalApiService } from "@/services/ExternalApiService";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 import { DirectoryListing } from "@/hooks/directory/useDirectoryListing";
+import { clientLogger } from '@/lib/client-logger';
 
 type DirectoryPhoto = {
   id: string;
@@ -50,7 +51,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       console.log(`Loaded ${photoAssets.length} photos`);
       setPhotos(photoAssets);
     } catch (error) {
-      console.error("Failed to load photos:", error);
+      clientLogger.error("Failed to load photos:", { detail: error });
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       await loadPhotos();
       onUpdate?.();
     } catch (err) {
-      console.error("Failed to set primary directory photo:", err);
+      clientLogger.error("Failed to set primary directory photo:", { detail: err });
       setError("Failed to set primary photo");
     }
   };
@@ -171,7 +172,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       await loadPhotos();
       onUpdate?.();
     } catch (err) {
-      console.error("Failed to delete directory photo:", err);
+      clientLogger.error("Failed to delete directory photo:", { detail: err });
       setError("Failed to delete photo");
     }
   };
@@ -194,7 +195,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       await loadPhotos();
       setEditingId(null);
     } catch (err) {
-      console.error("Failed to update directory photo:", err);
+      clientLogger.error("Failed to update directory photo:", { detail: err });
       setError("Failed to update photo");
     }
   };
@@ -213,7 +214,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       await loadPhotos();
       onUpdate?.();
     } catch (err) {
-      console.error("Failed to move photo up:", err);
+      clientLogger.error("Failed to move photo up:", { detail: err });
       setError("Failed to reorder photo");
     }
   };
@@ -232,7 +233,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       await loadPhotos();
       onUpdate?.();
     } catch (err) {
-      console.error("Failed to move photo down:", err);
+      clientLogger.error("Failed to move photo down:", { detail: err });
       setError("Failed to reorder photo");
     }
   };

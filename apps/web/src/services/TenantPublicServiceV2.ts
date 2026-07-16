@@ -6,6 +6,7 @@
  */
 
 import { FlexibleApiSingletonV2, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingletonV2';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantProfile {
   id: string;
@@ -100,13 +101,13 @@ class TenantPublicServiceV2 extends FlexibleApiSingletonV2 {
       );
 
       if (!response.success){
-        console.error('[TenantPublicServiceV2] Failed to get public tenant info:', response.error);
+        clientLogger.error('[TenantPublicServiceV2] Failed to get public tenant info:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[TenantPublicServiceV2] Failed to get public tenant info:', error);
+      clientLogger.error('[TenantPublicServiceV2] Failed to get public tenant info:', { detail: error });
       return null;
     }
   }
@@ -132,13 +133,13 @@ class TenantPublicServiceV2 extends FlexibleApiSingletonV2 {
       );
 
       if (!response.success){
-        console.error('[TenantPublicServiceV2] Failed to get public tenant logo:', response.error);
+        clientLogger.error('[TenantPublicServiceV2] Failed to get public tenant logo:', { detail: response.error });
         return null;
       }
 
       return response.data?.logo_url || null;
     } catch (error) {
-      console.error('[TenantPublicServiceV2] Failed to get public tenant logo:', error);
+      clientLogger.error('[TenantPublicServiceV2] Failed to get public tenant logo:', { detail: error });
       return null;
     }
   }
@@ -162,13 +163,13 @@ class TenantPublicServiceV2 extends FlexibleApiSingletonV2 {
       );
 
       if (!response.success){
-        console.error('[TenantPublicServiceV2] Failed to get public tenant profile:', response.error);
+        clientLogger.error('[TenantPublicServiceV2] Failed to get public tenant profile:', { detail: response.error });
         return null;
       }
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantPublicServiceV2] Failed to get public tenant profile:', error);
+      clientLogger.error('[TenantPublicServiceV2] Failed to get public tenant profile:', { detail: error });
       return null;
     }
   }
@@ -194,13 +195,13 @@ class TenantPublicServiceV2 extends FlexibleApiSingletonV2 {
       );
 
       if (!response.success){
-        console.error('[TenantPublicServiceV2] Failed to get tenant business hours:', response.error);
+        clientLogger.error('[TenantPublicServiceV2] Failed to get tenant business hours:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[TenantPublicServiceV2] Failed to get tenant business hours:', error);
+      clientLogger.error('[TenantPublicServiceV2] Failed to get tenant business hours:', { detail: error });
       return null;
     }
   }

@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type PolicyType = 'return_policy' | 'shipping_policy' | 'privacy_policy' | 'terms_of_service' | 'refund_policy';
 
@@ -44,7 +45,7 @@ class PublicStorefrontPolicyService extends PublicApiSingleton {
    */
   async getPolicies(tenantId: string): Promise<StorefrontPolicies | null> {
     if (!tenantId) {
-      console.error('[PublicStorefrontPolicy] getPolicies: tenantId is required');
+      clientLogger.error('[PublicStorefrontPolicy] getPolicies: tenantId is required');
       return null;
     }
 
@@ -62,7 +63,7 @@ class PublicStorefrontPolicyService extends PublicApiSingleton {
 
       return result.data.policies;
     } catch (error) {
-      console.error('[PublicStorefrontPolicy] Failed to get policies:', error);
+      clientLogger.error('[PublicStorefrontPolicy] Failed to get policies:', { detail: error });
       return null;
     }
   }
@@ -72,7 +73,7 @@ class PublicStorefrontPolicyService extends PublicApiSingleton {
    */
   async getPolicy(tenantId: string, type: PolicyType): Promise<string | null> {
     if (!tenantId || !type) {
-      console.error('[PublicStorefrontPolicy] getPolicy: tenantId and type are required');
+      clientLogger.error('[PublicStorefrontPolicy] getPolicy: tenantId and type are required');
       return null;
     }
 
@@ -90,7 +91,7 @@ class PublicStorefrontPolicyService extends PublicApiSingleton {
 
       return result.data.content;
     } catch (error) {
-      console.error('[PublicStorefrontPolicy] Failed to get policy:', error);
+      clientLogger.error('[PublicStorefrontPolicy] Failed to get policy:', { detail: error });
       return null;
     }
   }

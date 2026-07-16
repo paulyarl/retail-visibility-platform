@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AnalyticsFilters {
   period?: string;
@@ -192,7 +193,7 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('PlatformAnalyticsService.getOverviewMetrics error:', error);
+      clientLogger.error('PlatformAnalyticsService.getOverviewMetrics error:', { detail: error });
       // Return fallback data to prevent UI crashes
       return {
         totalPageViews: 0,
@@ -238,7 +239,7 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('PlatformAnalyticsService.getPageTrafficAnalytics error:', error);
+      clientLogger.error('PlatformAnalyticsService.getPageTrafficAnalytics error:', { detail: error });
       // Return fallback data to prevent UI crashes
       return {
         pageTypeBreakdown: [],
@@ -276,7 +277,7 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('PlatformAnalyticsService.getUserBehaviorAnalytics error:', error);
+      clientLogger.error('PlatformAnalyticsService.getUserBehaviorAnalytics error:', { detail: error });
       // Return fallback data to prevent UI crashes
       return {
         journeyFunnel: [],
@@ -320,7 +321,7 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('PlatformAnalyticsService.getTimeSeriesAnalytics error:', error);
+      clientLogger.error('PlatformAnalyticsService.getTimeSeriesAnalytics error:', { detail: error });
       // Return fallback data to prevent UI crashes
       return {
         dailyMetrics: [],
@@ -377,7 +378,7 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('PlatformAnalyticsService.getPopularContentAnalytics error:', error);
+      clientLogger.error('PlatformAnalyticsService.getPopularContentAnalytics error:', { detail: error });
       // Return fallback data to prevent UI crashes
       return {
         contentItems: [],
@@ -419,7 +420,7 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('PlatformAnalyticsService.getGeographicAnalytics error:', error);
+      clientLogger.error('PlatformAnalyticsService.getGeographicAnalytics error:', { detail: error });
       // Return fallback data to prevent UI crashes
       return {
         countries: [],

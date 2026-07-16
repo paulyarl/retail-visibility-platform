@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/comp
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
 import { getContrastColor } from '@/lib/color-utils';
 import type { CrmTicket, CrmTicketMessage } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -37,7 +38,7 @@ export default function CustomerTicketDetailPage() {
         // Filter out internal notes for customers
         setMessages(messageData.filter(m => !m.is_internal));
       } catch (err: any) {
-        console.error('[Customer Ticket Detail] Load error:', err);
+        clientLogger.error('[Customer Ticket Detail] Load error:', { detail: err });
         const msg = err?.message || '';
         if (msg.includes('crm_disabled') || msg.includes('not enabled')) {
           setError('Support tickets are not available for this store.');
@@ -63,7 +64,7 @@ export default function CustomerTicketDetailPage() {
       setMessages(prev => [...prev, msg]);
       setReply('');
     } catch (err) {
-      console.error('[Customer Ticket Detail] Reply error:', err);
+      clientLogger.error('[Customer Ticket Detail] Reply error:', { detail: err });
     } finally {
       setSubmitting(false);
     }

@@ -5,6 +5,7 @@
  */
 
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantOrder {
   orderId: string;
@@ -213,7 +214,7 @@ class TenantOrderService extends TenantApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[TenantOrderService] Failed to get orders:', error);
+      clientLogger.error('[TenantOrderService] Failed to get orders:', { detail: error });
       return {
         orders: [],
         pagination: { page: 1, limit: 10, total: 0, totalPages: 0 }
@@ -240,7 +241,7 @@ class TenantOrderService extends TenantApiSingleton {
       // API returns { success: true, data: { orderId, ... } }
       return response.data?.data || null;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to get order:', error);
+      clientLogger.error('[TenantOrderService] Failed to get order:', { detail: error });
       return null;
     }
   }
@@ -269,7 +270,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return response.data?.order || null;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to update fulfillment:', error);
+      clientLogger.error('[TenantOrderService] Failed to update fulfillment:', { detail: error });
       return null;
     }
   }
@@ -292,7 +293,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to archive order:', error);
+      clientLogger.error('[TenantOrderService] Failed to archive order:', { detail: error });
       return false;
     }
   }
@@ -322,7 +323,7 @@ class TenantOrderService extends TenantApiSingleton {
         averageOrderValue: 0
       };
     } catch (error) {
-      console.error('[TenantOrderService] Failed to get order stats:', error);
+      clientLogger.error('[TenantOrderService] Failed to get order stats:', { detail: error });
       return {
         totalOrders: 0,
         totalRevenue: 0,
@@ -356,7 +357,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return response?.data?.settings || null;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to get fulfillment settings:', error);
+      clientLogger.error('[TenantOrderService] Failed to get fulfillment settings:', { detail: error });
       return null;
     }
   }
@@ -387,7 +388,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to update order fulfillment:', error);
+      clientLogger.error('[TenantOrderService] Failed to update order fulfillment:', { detail: error });
       return null;
     }
   }
@@ -417,7 +418,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to process refund:', error);
+      clientLogger.error('[TenantOrderService] Failed to process refund:', { detail: error });
       return false;
     }
   }
@@ -450,7 +451,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return response.data?.downloadUrl || null;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to export orders:', error);
+      clientLogger.error('[TenantOrderService] Failed to export orders:', { detail: error });
       return null;
     }
   }
@@ -481,7 +482,7 @@ class TenantOrderService extends TenantApiSingleton {
       // Return the data property which contains { success, orders, count }
       return response.data;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to get buyer orders:', error);
+      clientLogger.error('[TenantOrderService] Failed to get buyer orders:', { detail: error });
       return null;
     }
   }
@@ -510,7 +511,7 @@ class TenantOrderService extends TenantApiSingleton {
         fulfilledAt: response.data?.order?.fulfilledAt
       };
     } catch (error) {
-      console.error('[TenantOrderService] Failed to confirm pickup:', error);
+      clientLogger.error('[TenantOrderService] Failed to confirm pickup:', { detail: error });
       return { success: false };
     }
   }
@@ -536,7 +537,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to cancel order:', error);
+      clientLogger.error('[TenantOrderService] Failed to cancel order:', { detail: error });
       return false;
     }
   }
@@ -559,7 +560,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[TenantOrderService] Failed to get order downloads:', error);
+      clientLogger.error('[TenantOrderService] Failed to get order downloads:', { detail: error });
       return null;
     }
   }

@@ -15,6 +15,7 @@
 
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 import { securityAlertTrackingService } from '@/services/SecurityAlertTrackingService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SecurityAlertEvent {
   type: 'rate_limit_exceeded' | 'auth_failure' | 'suspicious_activity' | 'security_incident';
@@ -233,7 +234,7 @@ class SecurityAlertTrackingCache {
       // console.log(`[SecurityAlertTracking] Sent ${eventsToSend.length} security events in ${Object.keys(eventsByType).length} type groups (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
     } catch (error) {
       // Security tracking failures should not break the application
-      console.warn('[SecurityAlertTracking] Security alert batch failed, will retry:', error instanceof Error ? error.message : 'Unknown error');
+      clientLogger.warn('[SecurityAlertTracking] Security alert batch failed, will retry:', { detail: error instanceof Error ? error.message : 'Unknown error' });
       
       // Increment retry attempts
       this.retryState.attempts++;
@@ -301,7 +302,7 @@ class SecurityAlertTrackingCache {
 
       await securityAlertTrackingService.sendAlertEvents(serviceEvents);
     } catch (error) {
-      console.error(`[SecurityAlertTracking] Failed to send ${type} events:`, error);
+      clientLogger.error(`[SecurityAlertTracking] Failed to send ${type} events:`, { detail: error });
       throw error;
     }
   }
@@ -414,7 +415,7 @@ class SecurityAlertTrackingCache {
         this.events = Array.isArray(parsed) ? parsed : [];
       }
     } catch (error) {
-      console.warn('[SecurityAlertTracking] Failed to load from storage:', error);
+      clientLogger.warn('[SecurityAlertTracking] Failed to load from storage:', { detail: error });
       this.events = [];
     }
   }
@@ -428,7 +429,7 @@ class SecurityAlertTrackingCache {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.events));
     } catch (error) {
-      console.warn('[SecurityAlertTracking] Failed to save to storage:', error);
+      clientLogger.warn('[SecurityAlertTracking] Failed to save to storage:', { detail: error });
     }
   }
 
@@ -445,7 +446,7 @@ class SecurityAlertTrackingCache {
         this.retryState = { ...this.retryState, ...parsed };
       }
     } catch (error) {
-      console.warn('[SecurityAlertTracking] Failed to load retry state:', error);
+      clientLogger.warn('[SecurityAlertTracking] Failed to load retry state:', { detail: error });
     }
   }
 
@@ -458,7 +459,7 @@ class SecurityAlertTrackingCache {
     try {
       localStorage.setItem(this.RETRY_KEY, JSON.stringify(this.retryState));
     } catch (error) {
-      console.warn('[SecurityAlertTracking] Failed to save retry state:', error);
+      clientLogger.warn('[SecurityAlertTracking] Failed to save retry state:', { detail: error });
     }
   }
 
@@ -475,7 +476,7 @@ class SecurityAlertTrackingCache {
         this.metrics = { ...this.metrics, ...parsed };
       }
     } catch (error) {
-      console.warn('[SecurityAlertTracking] Failed to load metrics:', error);
+      clientLogger.warn('[SecurityAlertTracking] Failed to load metrics:', { detail: error });
     }
   }
 
@@ -488,7 +489,7 @@ class SecurityAlertTrackingCache {
     try {
       localStorage.setItem(this.METRICS_KEY, JSON.stringify(this.metrics));
     } catch (error) {
-      console.warn('[SecurityAlertTracking] Failed to save metrics:', error);
+      clientLogger.warn('[SecurityAlertTracking] Failed to save metrics:', { detail: error });
     }
   }
 

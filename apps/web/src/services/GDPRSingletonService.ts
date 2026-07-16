@@ -19,6 +19,7 @@ import {
   DataExportFormData,
   AccountDeletionFormData,
 } from '@/types/security';
+import { clientLogger } from '@/lib/client-logger';
 
 class GDPRSingletonService extends AuthenticatedApiSingleton {
   private static instance: GDPRSingletonService;
@@ -51,7 +52,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to request data export:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to request data export:', { detail: result.error });
       throw result.error;
     }
 
@@ -76,7 +77,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to get export status:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to get export status:', { detail: result.error });
       return {} as DataExport;
     }
 
@@ -94,7 +95,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GDPRSingleton] Failed to download export:', response.error);
+      clientLogger.error('[GDPRSingleton] Failed to download export:', { detail: response.error });
       throw response.error;
     }
 
@@ -116,7 +117,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to get exports:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to get exports:', { detail: result.error });
       return [];
     }
 
@@ -137,7 +138,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to request account deletion:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to request account deletion:', { detail: result.error });
       throw result.error;
     }
 
@@ -162,7 +163,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to get deletion status:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to get deletion status:', { detail: result.error });
       return {} as AccountDeletionRequest;
     }
 
@@ -182,7 +183,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to get consents:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to get consents:', { detail: result.error });
       return [];
     }
 
@@ -200,7 +201,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to get consent history:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to get consent history:', { detail: result.error });
       return [];
     }
 
@@ -224,7 +225,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
       // Invalidate consents cache
       await this.invalidateCache('gdpr-consents*');
     } catch (error) {
-      console.error('[GDPRSingleton] Failed to update consent:', error);
+      clientLogger.error('[GDPRSingleton] Failed to update consent:', { detail: error });
       throw error;
     }
   }
@@ -246,7 +247,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
       // Invalidate consents cache
       await this.invalidateCache('gdpr-consents*');
     } catch (error) {
-      console.error('[GDPRSingleton] Failed to bulk update consents:', error);
+      clientLogger.error('[GDPRSingleton] Failed to bulk update consents:', { detail: error });
       throw error;
     }
   }
@@ -262,7 +263,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GDPRSingleton] Failed to get user preferences:', result.error);
+      clientLogger.error('[GDPRSingleton] Failed to get user preferences:', { detail: result.error });
       return [];
     }
 
@@ -286,7 +287,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
       // Invalidate preferences cache
       await this.invalidateCache('gdpr-user-preferences*');
     } catch (error) {
-      console.error('[GDPRSingleton] Failed to update user preference:', error);
+      clientLogger.error('[GDPRSingleton] Failed to update user preference:', { detail: error });
       throw error;
     }
   }
@@ -302,7 +303,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GDPRSingleton] Failed to export user preferences:', response.error);
+      clientLogger.error('[GDPRSingleton] Failed to export user preferences:', { detail: response.error });
       throw response.error;
     }
 

@@ -32,6 +32,7 @@ import PaymentMethodsTab from './components/PaymentMethodsTab';
 import ServiceChargesTab from './components/ServiceChargesTab';
 import AllInvoicesTab from './components/AllInvoicesTab';
 import SubscriptionControlTab from './components/SubscriptionControlTab';
+import { clientLogger } from '@/lib/client-logger';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -87,7 +88,7 @@ export default function ManualBillingPage() {
         manualControlActive: manualControlActive
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      clientLogger.error('Error fetching stats:', { detail: error });
     } finally {
       setStatsLoading(false);
     }

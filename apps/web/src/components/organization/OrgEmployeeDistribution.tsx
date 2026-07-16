@@ -6,6 +6,7 @@ import { Users, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { tenantInfoService } from "@/services/TenantInfoService";
 import type { OrganizationData } from "./types";
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrgEmployeeDistributionProps {
   locations: OrganizationData["locationBreakdown"];
@@ -50,7 +51,7 @@ export default function OrgEmployeeDistribution({ locations }: OrgEmployeeDistri
         );
         setAllUsers(results.flat());
       } catch (error) {
-        console.error("Failed to fetch users:", error);
+        clientLogger.error("Failed to fetch users:", { detail: error });
       } finally {
         setLoading(false);
       }

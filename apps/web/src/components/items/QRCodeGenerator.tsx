@@ -5,6 +5,7 @@ import { Button } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import QRCode from 'qrcode';
 import { Download, Copy, RefreshCw } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface QRCodeGeneratorProps {
   url: string;
@@ -157,7 +158,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           try {
             finalCanvas = await overlayLogoOnQR(qrCanvas, logoUrl);
           } catch (logoError) {
-            console.warn('Failed to overlay logo, using plain QR code:', logoError);
+            clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
             // Fall back to plain QR code if logo overlay fails
           }
         }
@@ -170,7 +171,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           displayCtx.drawImage(finalCanvas, 0, 0);
         }
       } catch (error) {
-        console.error('QR Code generation error:', error);
+        clientLogger.error('QR Code generation error:', { detail: error });
       }
     };
 
@@ -206,7 +207,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
         try {
           finalCanvas = await overlayLogoOnQR(qrCanvas, logoUrl);
         } catch (logoError) {
-          console.warn('Failed to overlay logo on download, using plain QR code:', logoError);
+          clientLogger.warn('Failed to overlay logo on download, using plain QR code:', { detail: logoError });
           // Fall back to plain QR code if logo overlay fails
         }
       }
@@ -222,7 +223,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Download error:', error);
+      clientLogger.error('Download error:', { detail: error });
       alert('Failed to download QR code');
     } finally {
       setIsGenerating(false);
@@ -260,7 +261,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           try {
             finalCanvas = await overlayLogoOnQR(qrCanvas, logoUrl);
           } catch (logoError) {
-            console.warn('Failed to overlay logo on print, using plain QR code:', logoError);
+            clientLogger.warn('Failed to overlay logo on print, using plain QR code:', { detail: logoError });
             // Fall back to plain QR code if logo overlay fails
           }
         }
@@ -335,7 +336,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           printWindow.print();
         }, 250);
       } catch (error) {
-        console.error('Print generation error:', error);
+        clientLogger.error('Print generation error:', { detail: error });
         printWindow.close();
         alert('Failed to generate QR code for printing');
       }

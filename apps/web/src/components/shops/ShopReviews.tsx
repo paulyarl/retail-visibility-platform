@@ -16,6 +16,7 @@ import {
   User
 } from 'lucide-react';
 import Image from 'next/image';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopReviewsProps {
   shop: Shop;
@@ -56,7 +57,7 @@ export default function ShopReviews({ shop }: ShopReviewsProps) {
       setReviews(mockReviews);
       setTotalReviews(mockReviews.length);
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      clientLogger.error('Error fetching reviews:', { detail: error });
       setReviews([]);
       setTotalReviews(0);
     } finally {
@@ -74,7 +75,7 @@ export default function ShopReviews({ shop }: ShopReviewsProps) {
       console.log('Submitting review:', reviewData);
       fetchReviews(); // Refresh reviews
     } catch (error) {
-      console.error('Error submitting review:', error);
+      clientLogger.error('Error submitting review:', { detail: error });
     }
   };
 
@@ -84,7 +85,7 @@ export default function ShopReviews({ shop }: ShopReviewsProps) {
       console.log('Marking review as helpful:', reviewId);
       fetchReviews(); // Refresh reviews
     } catch (error) {
-      console.error('Error marking review helpful:', error);
+      clientLogger.error('Error marking review helpful:', { detail: error });
     }
   };
 

@@ -6,6 +6,7 @@
  */
 
 import { FlexibleApiSingletonV2, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingletonV2';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StorefrontCategory {
   id: string;
@@ -72,7 +73,7 @@ class StorefrontSingletonServiceV2 extends FlexibleApiSingletonV2 {
     uncategorizedCount: number;
   }> {
     if (!tenantId) {
-      console.error('[StorefrontSingletonV2] getStorefrontCategories: tenantId is required');
+      clientLogger.error('[StorefrontSingletonV2] getStorefrontCategories: tenantId is required');
       return { categories: [], uncategorizedCount: 0 };
     }
 
@@ -97,7 +98,7 @@ class StorefrontSingletonServiceV2 extends FlexibleApiSingletonV2 {
         uncategorizedCount: result.data?.uncategorizedCount || 0
       };
     } catch (error) {
-      console.error('[StorefrontSingletonV2] Failed to get storefront categories:', error);
+      clientLogger.error('[StorefrontSingletonV2] Failed to get storefront categories:', { detail: error });
       return { categories: [], uncategorizedCount: 0 };
     }
   }
@@ -124,7 +125,7 @@ class StorefrontSingletonServiceV2 extends FlexibleApiSingletonV2 {
     hasMore: boolean;
   }> {
     if (!tenantId) {
-      console.error('[StorefrontSingletonV2] getStorefrontProducts: tenantId is required');
+      clientLogger.error('[StorefrontSingletonV2] getStorefrontProducts: tenantId is required');
       return { products: [], total: 0, page: 1, limit: 20, hasMore: false };
     }
 
@@ -168,7 +169,7 @@ class StorefrontSingletonServiceV2 extends FlexibleApiSingletonV2 {
         hasMore: result.data?.hasMore || false
       };
     } catch (error) {
-      console.error('[StorefrontSingletonV2] Failed to get storefront products:', error);
+      clientLogger.error('[StorefrontSingletonV2] Failed to get storefront products:', { detail: error });
       return { products: [], total: 0, page: 1, limit: 20, hasMore: false };
     }
   }

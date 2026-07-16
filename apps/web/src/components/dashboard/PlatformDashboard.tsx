@@ -16,6 +16,7 @@ import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageB
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 import PublicFooter from "@/components/PublicFooter";
 import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
+import { clientLogger } from '@/lib/client-logger';
 
 export default function PlatformDashboard() {
   const { settings } = usePlatformSettings();
@@ -71,7 +72,7 @@ export default function PlatformDashboard() {
             growthMetrics: (statsData as any).growthMetrics || null
           });
         } catch (error) {
-          console.warn('[Platform Dashboard] Failed to load stats');
+          clientLogger.warn('[Platform Dashboard] Failed to load stats');
         }
       };
       fetchPlatformStats();

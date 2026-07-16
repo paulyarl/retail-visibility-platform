@@ -5,6 +5,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GoogleTaxonomyCategory {
   id: string;
@@ -51,7 +52,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GoogleTaxonomyService] Failed to get Google taxonomy:', response.error);
+      clientLogger.error('[GoogleTaxonomyService] Failed to get Google taxonomy:', { detail: response.error });
       return null;
     }
 
@@ -78,7 +79,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GoogleTaxonomyService] Failed to browse Google taxonomy:', response.error);
+      clientLogger.error('[GoogleTaxonomyService] Failed to browse Google taxonomy:', { detail: response.error });
       return null;
     }
 
@@ -91,7 +92,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
    */
   async searchGoogleTaxonomy(query: string, limit: number = 20): Promise<GoogleTaxonomyCategory[] | null> {
     if (!query) {
-      console.error('[GoogleTaxonomyService] Search query is required');
+      clientLogger.error('[GoogleTaxonomyService] Search query is required');
       return null;
     }
 
@@ -106,7 +107,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GoogleTaxonomyService] Failed to search Google taxonomy:', response.error);
+      clientLogger.error('[GoogleTaxonomyService] Failed to search Google taxonomy:', { detail: response.error });
       return null;
     }
 

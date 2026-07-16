@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { PreferenceCategory as PreferenceCategoryComponent } from './PreferenceCategory';
 import { PreferenceBackup } from './PreferenceBackup';
 import { Settings, Search, Download, Upload } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function PreferencesManager() {
   const { preferences, updatePreference, loading } = useGDPR();
@@ -55,7 +56,7 @@ export function PreferencesManager() {
     try {
       await updatePreference({ key, value });
     } catch (error) {
-      console.error('Failed to update preference:', error);
+      clientLogger.error('Failed to update preference:', { detail: error });
     }
   };
 

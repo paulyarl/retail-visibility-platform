@@ -31,6 +31,7 @@ import {
   Users,
   Package
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdvancedBulkOperationsProps {
   selectedItems: string[];
@@ -245,7 +246,7 @@ export default function AdvancedBulkOperations({
       simulateOperationProgress(operation);
 
     } catch (error) {
-      console.error('Error executing operation:', error);
+      clientLogger.error('Error executing operation:', { detail: error });
       setActiveOperations(prev => 
         prev.map(op => 
           op.id === operation.id 

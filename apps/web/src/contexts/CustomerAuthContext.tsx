@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import customerAuthService, { Customer, CustomerAuthResponse } from '@/services/CustomerAuthService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CustomerAuthContextType {
   // State
@@ -57,7 +58,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
         }
         setIsLoading(false);
       } catch (err) {
-        console.error('[CustomerAuthContext] Init error:', err);
+        clientLogger.error('[CustomerAuthContext] Init error:', { detail: err });
         setIsLoading(false);
       }
     };
@@ -131,7 +132,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       await customerAuthService.logout();
       setCustomer(null);
     } catch (err) {
-      console.error('[CustomerAuthContext] Logout error:', err);
+      clientLogger.error('[CustomerAuthContext] Logout error:', { detail: err });
       setCustomer(null); // Clear anyway
     } finally {
       setIsLoading(false);
@@ -230,7 +231,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
       }
       return success;
     } catch (err) {
-      console.error('[CustomerAuthContext] Refresh error:', err);
+      clientLogger.error('[CustomerAuthContext] Refresh error:', { detail: err });
       return false;
     }
   }, []);
@@ -242,7 +243,7 @@ export function CustomerAuthProvider({ children }: CustomerAuthProviderProps) {
         setCustomer(existingCustomer);
       }
     } catch (err) {
-      console.error('[CustomerAuthContext] Refresh customer error:', err);
+      clientLogger.error('[CustomerAuthContext] Refresh customer error:', { detail: err });
     }
   }, []);
 

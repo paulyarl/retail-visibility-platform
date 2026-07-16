@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { tenantCategoriesService } from '@/services/TenantCategoriesService'
+import { clientLogger } from '@/lib/client-logger';
 
 type Category = {
   id: string
@@ -55,7 +56,7 @@ export default function AssignCategoryModal({
           setRecentIds(categoriesData.slice(0, 30).map(cat => cat.id))
         }
       } catch (err) {
-        console.error('[AssignCategoryModal] Error fetching categories:', err)
+        clientLogger.error('[AssignCategoryModal] Error fetching categories:', { detail: err })
         setError('Failed to load categories')
       }
     }
@@ -85,7 +86,7 @@ export default function AssignCategoryModal({
           })).slice(0, 8))
         }
       } catch (err) {
-        console.error('[AssignCategoryModal] Error searching categories:', err)
+        clientLogger.error('[AssignCategoryModal] Error searching categories:', { detail: err })
       } finally {
         if (active) setTaxLoading(false)
       }
@@ -121,7 +122,7 @@ export default function AssignCategoryModal({
       onSave()
       onClose()
     } catch (err) {
-      console.error('[AssignCategoryModal] Error assigning category:', err)
+      clientLogger.error('[AssignCategoryModal] Error assigning category:', { detail: err })
       setError(err instanceof Error ? err.message : 'Failed to assign category')
     } finally {
       setSaving(false)

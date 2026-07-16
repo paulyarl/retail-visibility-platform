@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getAdminEmail } from "@/lib/admin-emails";
 import { isPlatformAdmin } from "@/lib/auth/access-control";
 import { BusinessProfile, geocodeAddress } from "@/lib/validation/businessProfile";
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,7 +128,7 @@ export default function TenantSettingsPage() {
         const organizations = await platformHomeService.getOrganizations();
         setOrganizations(organizations || []);
       } catch (e) {
-        console.error("Failed to load organizations:", e);
+        clientLogger.error("Failed to load organizations:", { detail: e });
       }
     };
 
@@ -138,7 +139,7 @@ export default function TenantSettingsPage() {
           setPendingRequest(pendingRequest);
         }
       } catch (e) {
-        console.error("Failed to load pending request:", e);
+        clientLogger.error("Failed to load pending request:", { detail: e });
       }
     };
 
@@ -215,7 +216,7 @@ export default function TenantSettingsPage() {
                 console.log('[TenantSettings] Coordinates saved to database');
               }
             } catch (err) {
-              console.error('[TenantSettings] Auto-geocoding failed:', err);
+              clientLogger.error('[TenantSettings] Auto-geocoding failed:', { detail: err });
             }
           }
           
@@ -358,7 +359,7 @@ export default function TenantSettingsPage() {
                       };
                     });
                   } catch (err) {
-                    console.error('Failed to update business profile:', err);
+                    clientLogger.error('Failed to update business profile:', { detail: err });
                     notifications.show({ title: 'Error', message: 'Failed to update business profile', color: 'red' });
                   }
                 }}
@@ -410,7 +411,7 @@ export default function TenantSettingsPage() {
                       map_privacy_mode: settings.privacyMode,
                     }) as any : prev);
                   } catch (err) {
-                    console.error('Failed to update map settings:', err);
+                    clientLogger.error('Failed to update map settings:', { detail: err });
                     notifications.show({ title: 'Error', message: 'Failed to update map settings', color: 'red' });
                   }
                 }}
@@ -538,7 +539,7 @@ export default function TenantSettingsPage() {
                         
                         setEditingOrg(false);
                       } catch (err) {
-                        console.error('Failed to update organization:', err);
+                        clientLogger.error('Failed to update organization:', { detail: err });
                         notifications.show({ title: 'Error', message: 'Failed to save changes. Please try again.', color: 'red' });
                       } finally {
                         setSavingOrg(false);
@@ -586,7 +587,7 @@ export default function TenantSettingsPage() {
                                   setPendingRequest(updated);
                                 }
                               } catch (err) {
-                                console.error('Failed to agree to cost:', err);
+                                clientLogger.error('Failed to agree to cost:', { detail: err });
                               }
                             }}
                           >
@@ -607,7 +608,7 @@ export default function TenantSettingsPage() {
                             await platformHomeService.deletePendingRequest(pendingRequest.id);
                             setPendingRequest(null);
                           } catch (err) {
-                            console.error('Failed to cancel request:', err);
+                            clientLogger.error('Failed to cancel request:', { detail: err });
                           }
                         }
                       }}
@@ -722,7 +723,7 @@ export default function TenantSettingsPage() {
                       notifications.show({ title: 'Error', message: 'Failed to submit request', color: 'red' });
                     }
                   } catch (err) {
-                    console.error('Failed to submit request:', err);
+                    clientLogger.error('Failed to submit request:', { detail: err });
                     notifications.show({ title: 'Error', message: 'Failed to submit request. Please try again.', color: 'red' });
                   }
                 }}
@@ -844,7 +845,7 @@ export default function TenantSettingsPage() {
                           setEditingRegional(false);
                         }
                       } catch (err) {
-                        console.error('Failed to update regional settings:', err);
+                        clientLogger.error('Failed to update regional settings:', { detail: err });
                         notifications.show({ title: 'Error', message: 'Failed to save changes', color: 'red' });
                       } finally {
                         setSavingRegional(false);

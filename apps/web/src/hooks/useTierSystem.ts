@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { tenantTierService, DbTier, Tier } from '@/services/TenantTierService';
 import { TIER_LIMITS, TierLimits, SubscriptionTier } from '@/lib/tiers';
 import { CHAIN_TIERS, ChainTier, ChainTierLimits } from '@/lib/chain-tiers';
+import { clientLogger } from '@/lib/client-logger';
 
 // Cache for tier data
 let _tierCache: {
@@ -145,7 +146,7 @@ export function useTierSystem(): UseTierSystemResult {
       
       if (!dbTiers || dbTiers.length === 0) {
         // Use static fallback if API fails
-        console.warn('[useTierSystem] No tiers from API, using static fallback');
+        clientLogger.warn('[useTierSystem] No tiers from API, using static fallback');
         return;
       }
 
@@ -176,7 +177,7 @@ export function useTierSystem(): UseTierSystemResult {
         timestamp: Date.now(),
       };
     } catch (err) {
-      console.error('[useTierSystem] Failed to load tiers:', err);
+      clientLogger.error('[useTierSystem] Failed to load tiers:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load tiers');
     } finally {
       setLoading(false);

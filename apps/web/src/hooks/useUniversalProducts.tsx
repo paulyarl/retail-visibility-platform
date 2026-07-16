@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useProductSingleton, PublicProduct } from '@/providers/data/ProductSingleton';
 import { featuredProductsSingleton, FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Universal Product interface that combines both singleton data
 export interface UniversalProduct extends PublicProduct {
@@ -74,7 +75,7 @@ export function useUniversalProducts(
             // Fetch products using the singleton
             baseProducts = await productSingleton.fetchProducts({ storeId: tenantId });
           } catch (productError) {
-            console.warn('Failed to load products from singleton:', productError);
+            clientLogger.warn('Failed to load products from singleton:', { detail: productError });
             // Continue without product data
           }
         }
@@ -85,7 +86,7 @@ export function useUniversalProducts(
           try {
             featuredData = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 20);
           } catch (featuredError) {
-            console.warn('Failed to load featured products:', featuredError);
+            clientLogger.warn('Failed to load featured products:', { detail: featuredError });
             // Continue without featured data
           }
         }
@@ -103,7 +104,7 @@ export function useUniversalProducts(
         setMetrics(combinedMetrics);
 
       } catch (err) {
-        console.error('Error loading universal products:', err);
+        clientLogger.error('Error loading universal products:', { detail: err });
         setError(err instanceof Error ? err.message : 'Failed to load products');
       } finally {
         setLoading(false);

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, ModalFooter, Button, Input } from '@/components/ui';
 import { tenantCategoriesService, type GoogleTaxonomyCategory } from '@/services/TenantCategoriesService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TaxonomyResult {
   id: string;
@@ -108,7 +109,7 @@ export function CategoryEditModal({
               }
             })
             .catch((err) => {
-              console.error('Failed to fetch category path:', err);
+              clientLogger.error('Failed to fetch category path:', { detail: err });
               setCurrentPath(null);
             })
             .finally(() => setCurrentPathLoading(false));
@@ -155,7 +156,7 @@ export function CategoryEditModal({
           hasChildren: false
         })));
       } catch (e) {
-        console.error('Taxonomy search failed:', e);
+        clientLogger.error('Taxonomy search failed:', { detail: e });
       } finally {
         setTaxLoading(false);
       }
@@ -177,7 +178,7 @@ export function CategoryEditModal({
         hasChildren: cat.hasChildren ?? false
       })));
     } catch (e) {
-      console.error('Taxonomy browse failed:', e);
+      clientLogger.error('Taxonomy browse failed:', { detail: e });
     } finally {
       setTaxBrowseLoading(false);
     }
@@ -203,7 +204,7 @@ export function CategoryEditModal({
       });
       onClose();
     } catch (error) {
-      console.error('Save failed:', error);
+      clientLogger.error('Save failed:', { detail: error });
     } finally {
       setSaving(false);
     }

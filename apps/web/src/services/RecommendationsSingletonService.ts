@@ -7,6 +7,7 @@
 
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StoreRecommendation {
   id: string;
@@ -104,7 +105,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       
       return allStores;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get storefront recommendations:', { detail: error });
       return [];
     }
   }
@@ -127,7 +128,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!result.success) {
-        console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', result.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get storefront recommendations:', { detail: result.error });
         return [];
       }
 
@@ -138,7 +139,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       
       return allStores;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get storefront recommendations:', { detail: error });
       return [];
     }
   }
@@ -160,13 +161,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get directory recommendations:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get directory recommendations:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get directory recommendations:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get directory recommendations:', { detail: error });
       return null;
     }
   }
@@ -185,13 +186,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get enhanced categories:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get enhanced categories:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get enhanced categories:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get enhanced categories:', { detail: error });
       return null;
     }
   }
@@ -210,13 +211,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get category counts:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get category counts:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get category counts:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get category counts:', { detail: error });
       return null;
     }
   }
@@ -239,7 +240,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       // console.log('[RecommendationsSingleton] before chedk response.data?.storeTypes store types:', response.data?.storeTypes);
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get store types:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get store types:', { detail: response.error });
         return null;
       }
 
@@ -249,7 +250,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       // console.log('[RecommendationsSingleton] response.data?.storeTypes store types:', response.data?.storeTypes);
       return response.data?.data?.storeTypes || null;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get store types:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get store types:', { detail: error });
       return null;
     }
   }
@@ -268,13 +269,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get store type recommendations:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get store type recommendations:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get store type recommendations:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get store type recommendations:', { detail: error });
       return null;
     }
   }
@@ -293,13 +294,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get store type details:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get store type details:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get store type details:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get store type details:', { detail: error });
       return null;
     }
   }
@@ -318,13 +319,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get stores by store type:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get stores by store type:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get stores by store type:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get stores by store type:', { detail: error });
       return null;
     }
   }
@@ -379,7 +380,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
 
       return true;
     } catch (error) {
-      console.warn('[RecommendationsSingleton] Behavior tracking failed:', error);
+      clientLogger.warn('[RecommendationsSingleton] Behavior tracking failed:', { detail: error });
       // Don't throw - behavior tracking failures should be silent
       return false;
     }
@@ -417,14 +418,14 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', { detail: response.error });
         return null;
       }
 
       // Response structure: { success, data: { recommendations, algorithm, generatedAt } }
       return response.data?.data || response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', { detail: error });
       return null;
     }
   }
@@ -475,13 +476,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get directory MV categories:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get directory MV categories:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get directory MV categories:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get directory MV categories:', { detail: error });
       return null;
     }
   }
@@ -500,13 +501,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get directory categories:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get directory categories:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get directory categories:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get directory categories:', { detail: error });
       return null;
     }
   }
@@ -529,13 +530,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get stores by category:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get stores by category:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get stores by category:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get stores by category:', { detail: error });
       return null;
     }
   }
@@ -563,13 +564,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to search by category:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to search by category:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to search by category:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to search by category:', { detail: error });
       return null;
     }
   }
@@ -598,13 +599,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to search by location:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to search by location:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to search by location:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to search by location:', { detail: error });
       return null;
     }
   }
@@ -623,13 +624,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get directory locations:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get directory locations:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get directory locations:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get directory locations:', { detail: error });
       return null;
     }
   }
@@ -662,7 +663,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to search categories:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to search categories:', { detail: response.error });
         return null;
       }
 
@@ -670,7 +671,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
 
 
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to search categories:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to search categories:', { detail: error });
       return null;
     }
   }
@@ -704,13 +705,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get featured stores:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get featured stores:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get featured stores:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get featured stores:', { detail: error });
       return null;
     }
   }
@@ -733,13 +734,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get directory consolidated:', response.error);
+        clientLogger.error('[RecommendationsSingleton] Failed to get directory consolidated:', { detail: response.error });
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get directory consolidated:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to get directory consolidated:', { detail: error });
       return null;
     }
   }
@@ -824,7 +825,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       // Behavior tracking is high-frequency and shouldn't clear recommendations
       // Cache invalidation should happen on meaningful events (purchases, profile updates, etc.)
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to track behavior batch:', error);
+      clientLogger.error('[RecommendationsSingleton] Failed to track behavior batch:', { detail: error });
       throw error;
     }
   }

@@ -92,6 +92,7 @@ import {
   FunnelState,
   FunnelStepType,
 } from './CapabilityResolutionService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // BACKEND RESPONSE TYPES (snake_case)
@@ -1216,7 +1217,7 @@ class UnifiedCapabilityService extends TenantApiSingleton {
             this.CACHE_TTL
           );
           if (!result.success) {
-            console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
+            clientLogger.error('[UnifiedCapabilityService] Failed to fetch capabilities:', { detail: result.error });
             return null;
           }
           return result.data?.data || null;
@@ -1235,13 +1236,13 @@ class UnifiedCapabilityService extends TenantApiSingleton {
             }
           );
           if (!result.success) {
-            console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
+            clientLogger.error('[UnifiedCapabilityService] Failed to fetch capabilities:', { detail: result.error });
             return null;
           }
           return result.data?.data || null;
         }
       } catch (error) {
-        console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
+        clientLogger.error('[UnifiedCapabilityService] Error fetching capabilities:', { detail: error });
         return null;
       } finally {
         this.inFlight.delete(cachekey);

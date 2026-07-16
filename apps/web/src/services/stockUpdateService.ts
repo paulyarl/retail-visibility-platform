@@ -2,6 +2,7 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { ItemsSingletonService, Item } from './ItemsSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StockUpdateOptions {
   tenantId?: string;
@@ -95,7 +96,7 @@ export class StockUpdateService extends TenantApiSingleton {
           await options.singletonRefresh();
           console.log(`[StockUpdateService] Singleton refresh completed`);
         } catch (refreshError) {
-          console.warn(`[StockUpdateService] Singleton refresh failed:`, refreshError);
+          clientLogger.warn(`[StockUpdateService] Singleton refresh failed:`, { detail: refreshError });
           // Don't fail the stock update if refresh fails
         }
       }
@@ -106,7 +107,7 @@ export class StockUpdateService extends TenantApiSingleton {
       }
 
     } catch (error) {
-      console.error(`[StockUpdateService] Failed to update stock:`, error);
+      clientLogger.error(`[StockUpdateService] Failed to update stock:`, { detail: error });
       
       // Call error callback
       if (options.onError) {
@@ -152,7 +153,7 @@ export class StockUpdateService extends TenantApiSingleton {
       }
 
     } catch (error) {
-      console.error(`[StockUpdateService] Failed to bulk update stock:`, error);
+      clientLogger.error(`[StockUpdateService] Failed to bulk update stock:`, { detail: error });
       
       if (options.onError) {
         options.onError(error instanceof Error ? error : new Error('Unknown error'));
@@ -218,7 +219,7 @@ export class StockUpdateService extends TenantApiSingleton {
       
       console.log(`[StockUpdateService] Cache invalidation completed for item ${itemId}`);
     } catch (error) {
-      console.warn(`[StockUpdateService] Failed to invalidate caches:`, error);
+      clientLogger.warn(`[StockUpdateService] Failed to invalidate caches:`, { detail: error });
       // Don't fail the stock update if cache invalidation fails
     }
   }

@@ -5,6 +5,7 @@ import { Store, Search, ArrowLeft, Star, Package, Users, Settings, ChevronDown, 
 import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdminTenantFeaturedManagementProps {
   selectedTenant: string;
@@ -89,7 +90,7 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
         setTenants(response);
       }
     } catch (error) {
-      console.error('Error fetching tenants:', error);
+      clientLogger.error('Error fetching tenants:', { detail: error });
       setTenants([]);
     } finally {
       setLoading(false);

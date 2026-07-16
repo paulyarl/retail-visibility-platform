@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth0 } from './lib/auth0';
 import AuthSyncService from './services/AuthSyncService';
 import { fetchTenantDirectorySlug } from './lib/directory-helpers';
+import { clientLogger } from '@/lib/client-logger';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || process.env.API_URL || 'http://localhost:4000';
@@ -74,7 +75,7 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
     
     return isAdmin;
   } catch (error) {
-    console.error('[Proxy] Error checking platform admin:', error);
+    clientLogger.error('[Proxy] Error checking platform admin:', { detail: error });
     return false;
   }
 }
@@ -164,7 +165,7 @@ export async function proxy(req: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('[Proxy] Error in subdomain routing:', error);
+      clientLogger.error('[Proxy] Error in subdomain routing:', { detail: error });
       // Continue with normal routing if subdomain lookup fails
     }
   }
@@ -270,7 +271,7 @@ export async function proxy(req: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('[Proxy] Error resolving shops tenant redirect:', error);
+      clientLogger.error('[Proxy] Error resolving shops tenant redirect:', { detail: error });
     }
     
     // Fallback: redirect to /shops/[tenantId]

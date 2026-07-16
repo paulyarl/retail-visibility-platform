@@ -7,6 +7,7 @@
 
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Product {
   id: string;
@@ -176,7 +177,7 @@ class ProductDataService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.error('[ProductDataService] Failed to fetch product:', response.error);
+        clientLogger.error('[ProductDataService] Failed to fetch product:', { detail: response.error });
         return null;
       }
 
@@ -185,7 +186,7 @@ class ProductDataService extends PublicApiSingleton {
       // console.log(`[ProductDataService] productData: ${JSON.stringify(productData)}`);
       return productData;
     } catch (error) {
-      console.error('[ProductDataService] Error in fetchProduct:', error);
+      clientLogger.error('[ProductDataService] Error in fetchProduct:', { detail: error });
       throw new Error(`Failed to fetch product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -204,7 +205,7 @@ class ProductDataService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.error('[ProductDataService] Failed to fetch tenant profile:', response.error);
+        clientLogger.error('[ProductDataService] Failed to fetch tenant profile:', { detail: response.error });
         return null;
       }
 
@@ -241,7 +242,7 @@ class ProductDataService extends PublicApiSingleton {
       const productData = await this.fetchProduct(id);
       
       if (!productData) {
-        console.error('Product data is null');
+        clientLogger.error('Product data is null');
         return null;
       }
       
@@ -304,7 +305,7 @@ class ProductDataService extends PublicApiSingleton {
           const statusResult = computeStoreStatus(profileData.hours);
           storeStatus = statusResult?.status || 'unknown';
         } catch (e) {
-          console.warn('Failed to fetch tenant profile:', e);
+          clientLogger.warn('Failed to fetch tenant profile:', { detail: e });
         }
       }
       
@@ -333,7 +334,7 @@ class ProductDataService extends PublicApiSingleton {
       
       return { product, tenant, storeStatus, directorySlug: returnSlang };
     } catch (error) {
-      console.error('Error fetching product:', error);
+      clientLogger.error('Error fetching product:', { detail: error });
       return null;
     }
   }

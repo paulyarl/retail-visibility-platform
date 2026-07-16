@@ -97,6 +97,7 @@ const RISK_ICONS = {
 import { tenantBillingService, type PaymentMethod } from '@/services/TenantBillingService';
 import { subscriptionBillingService, type TierPricing } from '@/services/SubscriptionBillingService';
 import { loadStripe } from '@stripe/stripe-js';
+import { clientLogger } from '@/lib/client-logger';
 
 // Get Stripe publishable key
 const getStripePublishableKey = () => {
@@ -534,7 +535,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
           // console.log('[BillingPage] Stripe loaded:', !!stripe);
           
           if (!stripe) {
-            console.error('[BillingPage] Stripe not available');
+            clientLogger.error('[BillingPage] Stripe not available');
             setError('Stripe not configured for payment confirmation');
             return;
           }
@@ -589,7 +590,7 @@ export default function TenantBillingDashboard({ params }: { params: Promise<{ t
         setError(result.error || 'Failed to change tier');
       }
     } catch (err: any) {
-      console.error('[BillingPage] Error:', err);
+      clientLogger.error('[BillingPage] Error:', { detail: err });
       setError(err.message || 'Failed to change tier');
     } finally {
       setProcessing(false);

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { MantineProvider, createTheme } from '@mantine/core';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PlatformTheme {
   preset: string;
@@ -58,7 +59,7 @@ export function PlatformThemeProvider({ children }: { children: React.ReactNode 
           });
         }
       } catch (error) {
-        console.error('Failed to load platform theme:', error);
+        clientLogger.error('Failed to load platform theme:', { detail: error });
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -93,7 +94,7 @@ export function PlatformThemeProvider({ children }: { children: React.ReactNode 
         });
       }
     } catch (error) {
-      console.error('Failed to refresh theme:', error);
+      clientLogger.error('Failed to refresh theme:', { detail: error });
     } finally {
       setIsLoading(false);
     }

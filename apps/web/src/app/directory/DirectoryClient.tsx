@@ -27,6 +27,7 @@ import dynamic from 'next/dynamic';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
 import { useDirectoryStores } from '@/hooks/useDirectoryStores';
+import { clientLogger } from '@/lib/client-logger';
 
 // Cache configuration for directory data
 const CACHE_CONFIG = {
@@ -58,7 +59,7 @@ function getCachedData(key: string): any | null {
 
     return data;
   } catch (error) {
-    console.warn('Error reading cache:', error);
+    clientLogger.warn('Error reading cache:', { detail: error });
     return null;
   }
 }
@@ -70,7 +71,7 @@ function setCachedData(key: string, data: any): void {
       timestamp: Date.now()
     }));
   } catch (error) {
-    console.warn('Error writing cache:', error);
+    clientLogger.warn('Error writing cache:', { detail: error });
   }
 }
 
@@ -107,7 +108,7 @@ async function getUserLocation(): Promise<{
       return { latitude, longitude, city, state };
     }
   } catch (error) {
-    console.warn('Geolocation failed, falling back to IP-based location');
+    clientLogger.warn('Geolocation failed, falling back to IP-based location');
   }
 
   // Fallback to IP-based location
@@ -141,7 +142,7 @@ async function getUserLocation(): Promise<{
     const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
 
     if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
-      console.warn('Invalid location data received from external API');
+      clientLogger.warn('Invalid location data received from external API');
       return null;
     }
 
@@ -152,7 +153,7 @@ async function getUserLocation(): Promise<{
       state: ipLocation.region || 'Unknown'
     };
   } catch (error) {
-    console.warn('Failed to get IP location:', error);
+    clientLogger.warn('Failed to get IP location:', { detail: error });
     return null;
   }
 }
@@ -314,7 +315,7 @@ export default function DirectoryClient() {
         }
       })
       .catch((error) => {
-        console.warn('Auto-location detection failed:', error);
+        clientLogger.warn('Auto-location detection failed:', { detail: error });
       });
   }, []); // Only run once on mount
 
@@ -343,7 +344,7 @@ export default function DirectoryClient() {
         getUserLocation().then((location) => {
           setUserLocation(location);
         }).catch((error) => {
-          console.warn('Location detection failed:', error);
+          clientLogger.warn('Location detection failed:', { detail: error });
           setUserLocation(null);
         });
 
@@ -364,7 +365,7 @@ export default function DirectoryClient() {
           if (categoriesData) {
             setCategories(categoriesData);
           } else {
-            console.error('Failed to fetch categories from server');
+            clientLogger.error('Failed to fetch categories from server');
             setCategories([]);
           }
         }
@@ -385,7 +386,7 @@ export default function DirectoryClient() {
           if (typesData) {
             storeTypes = typesData;
           } else {
-            console.error('Failed to fetch store types from server');
+            clientLogger.error('Failed to fetch store types from server');
             storeTypes = [];
           }
         } else {
@@ -401,7 +402,7 @@ export default function DirectoryClient() {
         //   setLocations(locData.locations || []);
         // }
       } catch (err) {
-        console.error('Error fetching filters:', err);
+        clientLogger.error('Error fetching filters:', { detail: err });
       }
     };
 
@@ -810,7 +811,7 @@ function DirectoryHomeRecommendations() {
         const data = await recommendationsService.getDirectoryRecommendations();
         setRecommendations(data?.recommendations || []);
       } catch (error) {
-        console.error('Error fetching directory recommendations:', error);
+        clientLogger.error('Error fetching directory recommendations:', { detail: error });
       } finally {
         setLoading(false);
       }

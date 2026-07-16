@@ -2,6 +2,7 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 import { StoreStatus } from '@/hooks/useStoreStatus';
 import { Tenant } from './TenantTierService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantUsage {
   items: number;
@@ -135,7 +136,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get current tenant profile:', error);
+      clientLogger.error('[TenantManagementService] Failed to get current tenant profile:', { detail: error });
       return null;
     }
   }
@@ -163,7 +164,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get tenant profile:', error);
+      clientLogger.error('[TenantManagementService] Failed to get tenant profile:', { detail: error });
       return null;
     }
   }
@@ -188,7 +189,7 @@ class TenantManagementService extends TenantApiSingleton {
       
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to update tenant profile:', error);
+      clientLogger.error('[TenantManagementService] Failed to update tenant profile:', { detail: error });
       return null;
     }
   }
@@ -237,7 +238,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response.data?.tenants || [];
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get all tenants:', error);
+      clientLogger.error('[TenantManagementService] Failed to get all tenants:', { detail: error });
       return [];
     }
   }
@@ -257,7 +258,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get tenant:', error);
+      clientLogger.error('[TenantManagementService] Failed to get tenant:', { detail: error });
       return null;
     }
   }
@@ -286,7 +287,7 @@ class TenantManagementService extends TenantApiSingleton {
       
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to update tenant:', error);
+      clientLogger.error('[TenantManagementService] Failed to update tenant:', { detail: error });
       return null;
     }
   }
@@ -306,7 +307,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get tenant limits:', error);
+      clientLogger.error('[TenantManagementService] Failed to get tenant limits:', { detail: error });
       return null;
     }
   }
@@ -326,7 +327,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response?.data?.banner || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get tenant banner:', error);
+      clientLogger.error('[TenantManagementService] Failed to get tenant banner:', { detail: error });
       return null;
     }
   }
@@ -348,7 +349,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to update tenant banner:', error);
+      clientLogger.error('[TenantManagementService] Failed to update tenant banner:', { detail: error });
       return false;
     }
   }
@@ -368,7 +369,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return response?.data?.logo || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get tenant logo:', error);
+      clientLogger.error('[TenantManagementService] Failed to get tenant logo:', { detail: error });
       return null;
     }
   }
@@ -390,7 +391,7 @@ class TenantManagementService extends TenantApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to update tenant logo:', error);
+      clientLogger.error('[TenantManagementService] Failed to update tenant logo:', { detail: error });
       return false;
     }
   }
@@ -431,7 +432,7 @@ class TenantManagementService extends TenantApiSingleton {
       );
       
       if (!response.success) {
-        console.error('[TenantManagementService] Failed to get business hours:', response.error);
+        clientLogger.error('[TenantManagementService] Failed to get business hours:', { detail: response.error });
         return null;
       }
       
@@ -439,7 +440,7 @@ class TenantManagementService extends TenantApiSingleton {
       const data = response.data as any;
       return data?.data || data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Error fetching business hours:', error);
+      clientLogger.error('[TenantManagementService] Error fetching business hours:', { detail: error });
       return null;
     }
   }
@@ -457,7 +458,7 @@ class TenantManagementService extends TenantApiSingleton {
       );
       
       if (!response.success) {
-        console.error('[TenantManagementService] Failed to get special business hours:', response.error);
+        clientLogger.error('[TenantManagementService] Failed to get special business hours:', { detail: response.error });
         return null;
       }
       
@@ -465,7 +466,7 @@ class TenantManagementService extends TenantApiSingleton {
       const data = response.data as any;
       return data?.data || data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Error fetching special business hours:', error);
+      clientLogger.error('[TenantManagementService] Error fetching special business hours:', { detail: error });
       return null;
     }
   }
@@ -582,7 +583,7 @@ class TenantManagementService extends TenantApiSingleton {
     );
 
     if (!result.success || !result.data) {
-      console.error('[TenantManagementService] Failed to get store status:', result.error);
+      clientLogger.error('[TenantManagementService] Failed to get store status:', { detail: result.error });
       return null;
     }
 

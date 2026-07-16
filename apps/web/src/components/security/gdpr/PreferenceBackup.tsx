@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Download, Upload, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import * as gdprService from '@/services/gdpr';
+import { clientLogger } from '@/lib/client-logger';
 
 export function PreferenceBackup() {
   const [exporting, setExporting] = useState(false);
@@ -22,7 +23,7 @@ export function PreferenceBackup() {
       setExporting(true);
       await gdprService.exportPreferences();
     } catch (error) {
-      console.error('Failed to export preferences:', error);
+      clientLogger.error('Failed to export preferences:', { detail: error });
     } finally {
       setExporting(false);
     }

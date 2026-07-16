@@ -6,6 +6,7 @@
  */
 
 import { adminEmailConfigService } from '@/services/AdminEmailConfigService';
+import { clientLogger } from '@/lib/client-logger';
 
 export type EmailCategory = 
   | 'subscription'
@@ -48,7 +49,7 @@ async function fetchEmailConfigs(): Promise<Record<EmailCategory, string>> {
     // Merge with defaults
     return { ...DEFAULT_ADMIN_EMAILS, ...emailMap } as Record<EmailCategory, string>;
   } catch (error) {
-    console.error('[AdminEmails] Error fetching email configs from service:', error);
+    clientLogger.error('[AdminEmails] Error fetching email configs from service:', { detail: error });
   }
   
   return DEFAULT_ADMIN_EMAILS;
@@ -126,7 +127,7 @@ export async function refreshAdminEmails(): Promise<Record<EmailCategory, string
     cacheTimestamp = Date.now();
     return configs;
   } catch (error) {
-    console.error('[AdminEmails] Failed to refresh email cache:', error);
+    clientLogger.error('[AdminEmails] Failed to refresh email cache:', { detail: error });
     return emailCache || DEFAULT_ADMIN_EMAILS;
   }
 }

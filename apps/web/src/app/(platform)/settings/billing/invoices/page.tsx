@@ -6,6 +6,7 @@ import { IconFileInvoice, IconDownload, IconChevronRight, IconAlertCircle, IconC
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { subscriptionBillingService, type Invoice, type InvoicePayment } from '@/services/SubscriptionBillingService';
 import { useAuth } from '@/contexts/AuthContext';
+import { clientLogger } from '@/lib/client-logger';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -90,7 +91,7 @@ export default function InvoiceHistoryPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading invoice:', error);
+      clientLogger.error('Error downloading invoice:', { detail: error });
       alert('Failed to download invoice PDF');
     }
   };

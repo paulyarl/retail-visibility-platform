@@ -7,6 +7,7 @@ import { useLastViewedSession } from '@/hooks/useLastViewedSession';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types for last viewed items
 interface LastViewedStore {
@@ -278,7 +279,7 @@ export default function LastViewed({
 
         setItems(transformedItems);
       } catch (err) {
-        console.error('Error fetching last viewed items:', err);
+        clientLogger.error('Error fetching last viewed items:', { detail: err });
         setError('Failed to load recently viewed items');
       } finally {
         setLoading(false);

@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PlatformSettings {
   platformName: string;
@@ -136,7 +137,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
         socialSnapchat: '',
       };
     } catch (error) {
-      console.error('[PlatformSettingsSingleton] Failed to get platform settings:', error);
+      clientLogger.error('[PlatformSettingsSingleton] Failed to get platform settings:', { detail: error });
       
       // Return default settings on error
       return {
@@ -210,7 +211,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
       
       return null;
     } catch (error) {
-      console.error('[PlatformSettingsSingleton] Failed to update platform settings:', error);
+      clientLogger.error('[PlatformSettingsSingleton] Failed to update platform settings:', { detail: error });
       return null;
     }
   }

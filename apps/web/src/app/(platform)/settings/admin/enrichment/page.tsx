@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Image as ImageIcon
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PopularProduct {
   barcode: string;
@@ -84,7 +85,7 @@ export default function EnrichmentDashboardPage() {
         estimatedCostSavings: '0'
       });
     } catch (error) {
-      console.error('Failed to load analytics:', error);
+      clientLogger.error('Failed to load analytics:', { detail: error });
       setError('Failed to load analytics');
       setAnalytics({
         totalProducts: 0,
@@ -118,7 +119,7 @@ export default function EnrichmentDashboardPage() {
       setProducts(data?.products || []);
       setTotalPages(data?.pagination?.totalPages || 1);
     } catch (error) {
-      console.error('Failed to load products:', error);
+      clientLogger.error('Failed to load products:', { detail: error });
       setProducts([]);
     } finally {
       setSearchLoading(false);
@@ -135,7 +136,7 @@ export default function EnrichmentDashboardPage() {
       const data = await platformHomeService.getAdminEnrichmentProduct(barcode);
       if (data) setSelectedProduct(data.product);
     } catch (error) {
-      console.error('Failed to load product details:', error);
+      clientLogger.error('Failed to load product details:', { detail: error });
     }
   };
 

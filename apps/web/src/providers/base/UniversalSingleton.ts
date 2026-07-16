@@ -14,6 +14,7 @@ import cacheManager, { CacheManager } from '../../utils/cacheManager';
 import { contextAwareCacheService, ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
 import { AutoUserCacheOptions } from '../../utils/userIdentification';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // INTERFACES
@@ -108,7 +109,7 @@ export abstract class UniversalSingleton {
         const data = { enabled, reason };
         localStorage.setItem(UniversalSingleton.STORAGE_KEY, JSON.stringify(data));
       } catch (error) {
-        console.warn('[UniversalSingleton] Failed to persist emergency bust mode:', error);
+        clientLogger.warn('[UniversalSingleton] Failed to persist emergency bust mode:', { detail: error });
       }
     }
     
@@ -131,7 +132,7 @@ export abstract class UniversalSingleton {
           }
         }
       } catch (error) {
-        console.warn('[UniversalSingleton] Failed to parse emergency bust mode from storage:', error);
+        clientLogger.warn('[UniversalSingleton] Failed to parse emergency bust mode from storage:', { detail: error });
         localStorage.removeItem(UniversalSingleton.STORAGE_KEY);
       }
     }
@@ -217,7 +218,7 @@ export abstract class UniversalSingleton {
         return cached as T;
       }
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Cache get failed for ${key}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Cache get failed for ${key}:`, { detail: error });
     }
 
     this.cacheMisses++;
@@ -237,7 +238,7 @@ export abstract class UniversalSingleton {
     try {
       await this.cacheManager.set(key, data, options);
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Cache set failed for ${key}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Cache set failed for ${key}:`, { detail: error });
     }
   }
 
@@ -261,7 +262,7 @@ export abstract class UniversalSingleton {
       this.cacheMisses++;
       return null;
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Context-aware cache get failed for ${key}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Context-aware cache get failed for ${key}:`, { detail: error });
       return null;
     }
   }
@@ -279,7 +280,7 @@ export abstract class UniversalSingleton {
     try {
       await this.contextCacheService.set<T>(key, data, options);
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Context-aware cache set failed for ${key}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Context-aware cache set failed for ${key}:`, { detail: error });
     }
   }
 
@@ -290,7 +291,7 @@ export abstract class UniversalSingleton {
     try {
       await this.contextCacheService.remove(key, options);
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Context-aware cache remove failed for ${key}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Context-aware cache remove failed for ${key}:`, { detail: error });
     }
   }
 
@@ -322,7 +323,7 @@ export abstract class UniversalSingleton {
         console.log(`[${this.constructor.name}] Persistent cache cleared for all keys`);
       }
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Cache clear failed:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Cache clear failed:`, { detail: error });
     }
   }
 
@@ -350,16 +351,16 @@ export abstract class UniversalSingleton {
         if (validator(cached)) {
           return cached as T;
         } else {
-          console.warn(`[${this.constructor.name}] Invalid cache data detected, clearing: ${cacheKey}`);
+          clientLogger.warn(`[${this.constructor.name}] Invalid cache data detected, clearing: ${cacheKey}`);
           await this.cacheManager.remove(cacheKey);
         }
       }
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Cache validation failed for ${cacheKey}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Cache validation failed for ${cacheKey}:`, { detail: error });
       try {
         await this.cacheManager.remove(cacheKey);
       } catch (clearError) {
-        console.warn(`[${this.constructor.name}] Failed to clear cache ${cacheKey}:`, clearError);
+        clientLogger.warn(`[${this.constructor.name}] Failed to clear cache ${cacheKey}:`, { detail: clearError });
       }
     }
     
@@ -390,7 +391,7 @@ export abstract class UniversalSingleton {
       
       return false;
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Cache version check failed for ${cacheKey}:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Cache version check failed for ${cacheKey}:`, { detail: error });
       return true;
     }
   }
@@ -468,7 +469,7 @@ export abstract class UniversalSingleton {
         await this.cacheManager.removeByPattern(pattern, context, isolation);
       }
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Enhanced cache invalidation failed for pattern '${pattern}':`, error);
+      clientLogger.warn(`[${this.constructor.name}] Enhanced cache invalidation failed for pattern '${pattern}':`, { detail: error });
     }
   }
 
@@ -547,7 +548,7 @@ export abstract class UniversalSingleton {
       
       await this.invalidateCachePattern(pattern);
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Context-aware cache invalidation failed for baseKey '${baseKey}', context '${context}', isolation '${isolation}':`, error);
+      clientLogger.warn(`[${this.constructor.name}] Context-aware cache invalidation failed for baseKey '${baseKey}', context '${context}', isolation '${isolation}':`, { detail: error });
     }
   }
 
@@ -599,7 +600,7 @@ export abstract class UniversalSingleton {
       
       await Promise.all(promises);
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Multi-context cache invalidation failed for baseKey '${baseKey}':`, error);
+      clientLogger.warn(`[${this.constructor.name}] Multi-context cache invalidation failed for baseKey '${baseKey}':`, { detail: error });
     }
   }
 
@@ -672,7 +673,7 @@ export abstract class UniversalSingleton {
    * Log cache error (can be overridden for custom logging)
    */
   protected logCacheError(operation: string, key: string, error: any): void {
-    console.error(`[${this.constructor.name}] Cache ${operation} error for ${key}:`, error);
+    clientLogger.error(`[${this.constructor.name}] Cache ${operation} error for ${key}:`, { detail: error });
   }
 
   /**
@@ -704,14 +705,14 @@ export abstract class UniversalSingleton {
         if (this.validateCachedUserData(cachedData)) {
           return cachedData;
         } else {
-          console.warn(`[${this.constructor.name}] Invalid cached user data structure, clearing cache`);
+          clientLogger.warn(`[${this.constructor.name}] Invalid cached user data structure, clearing cache`);
           await this.clearCachedUserData(cacheKey);
         }
       }
 
       return null;
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Failed to get cached user data:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Failed to get cached user data:`, { detail: error });
       await this.clearCachedUserData(cacheKey);
       return null;
     }
@@ -730,7 +731,7 @@ export abstract class UniversalSingleton {
         ttl: this.cacheOptions.defaultTTL || 60 * 60 * 1000 // 1 hour default
       });
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Failed to cache user data:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Failed to cache user data:`, { detail: error });
     }
   }
 
@@ -744,7 +745,7 @@ export abstract class UniversalSingleton {
       // Remove the specific key from all cache layers
       await cacheManager.remove(cacheKey);
     } catch (error) {
-      console.warn(`[${this.constructor.name}] Failed to clear cached user data:`, error);
+      clientLogger.warn(`[${this.constructor.name}] Failed to clear cached user data:`, { detail: error });
     }
   }
 

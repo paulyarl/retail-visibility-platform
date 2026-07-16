@@ -19,6 +19,7 @@ import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { onboardingStateService } from '@/services/OnboardingStateService';
 import { trialService } from '@/services/TrialService';
 import TrialSetupModal from './TrialSetupModal';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -92,7 +93,7 @@ export default function OnboardingWizard({
         setTenantSubscription(data);
         setCanStartTrial(data.canStartTrial);
       } catch (error) {
-        console.error('Failed to check subscription status:', error);
+        clientLogger.error('Failed to check subscription status:', { detail: error });
         // Default to showing trial option if we can't check
         setCanStartTrial(true);
       }
@@ -213,7 +214,7 @@ export default function OnboardingWizard({
       // Redirect to dashboard with success message
       router.push(`/t/${tenantId}/dashboard?trialActivated=true`);
     } catch (error) {
-      console.error('Trial setup error:', error);
+      clientLogger.error('Trial setup error:', { detail: error });
       // Still redirect to dashboard
       router.push(`/t/${tenantId}/dashboard`);
     }

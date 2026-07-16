@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { dashboardDataService } from '@/services/DashboardDataSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DashboardStats {
   totalItems: number;
@@ -88,7 +89,7 @@ export function useDashboardData(isAuthenticated: boolean, authLoading: boolean)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
       setError(errorMessage);
-      console.error('[useDashboardData] Error:', err);
+      clientLogger.error('[useDashboardData] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

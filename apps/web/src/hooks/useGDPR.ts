@@ -15,6 +15,7 @@ import {
   PreferenceUpdateData,
 } from '@/types/security';
 import * as gdprService from '@/services/gdpr';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useGDPR() {
   const [exports, setExports] = useState<DataExport[]>([]);
@@ -29,7 +30,7 @@ export function useGDPR() {
       const data = await gdprService.getExports();
       setExports(data);
     } catch (err) {
-      console.error('Failed to fetch exports:', err);
+      clientLogger.error('Failed to fetch exports:', { detail: err });
     }
   }, []);
 
@@ -38,7 +39,7 @@ export function useGDPR() {
       const data = await gdprService.getDeletionStatus();
       setDeletionRequest(data);
     } catch (err) {
-      console.error('Failed to fetch deletion status:', err);
+      clientLogger.error('Failed to fetch deletion status:', { detail: err });
     }
   }, []);
 
@@ -47,7 +48,7 @@ export function useGDPR() {
       const data = await gdprService.getConsents();
       setConsents(data);
     } catch (err) {
-      console.error('Failed to fetch consents:', err);
+      clientLogger.error('Failed to fetch consents:', { detail: err });
     }
   }, []);
 
@@ -56,7 +57,7 @@ export function useGDPR() {
       const data = await gdprService.getUserPreferences();
       setPreferences(data);
     } catch (err) {
-      console.error('Failed to fetch preferences:', err);
+      clientLogger.error('Failed to fetch preferences:', { detail: err });
     }
   }, []);
 

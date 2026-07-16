@@ -9,6 +9,7 @@ import { tenantInfoService } from '@/services/TenantInfoService';
 import TenantFeaturedAccessService from '@/services/TenantFeaturedAccessService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -86,7 +87,7 @@ export default function FeaturedProductsSettings({
         
         // Validate tenantId exists
         if (!id) {
-          console.error('FeaturedProductsSettings: No tenantId provided in route params');
+          clientLogger.error('FeaturedProductsSettings: No tenantId provided in route params');
           return;
         }
         
@@ -107,7 +108,7 @@ export default function FeaturedProductsSettings({
             
             setFeaturedAccessApproved(hasApprovedAccess);
           } catch (approvalError) {
-            console.error('FeaturedProductsSettings: Error fetching approval status', approvalError);
+            clientLogger.error('FeaturedProductsSettings: Error fetching approval status', { detail: approvalError });
             setFeaturedAccessApproved(false); // Default to locked on error
           }
 
@@ -116,15 +117,15 @@ export default function FeaturedProductsSettings({
             const optsSettings = await platformHomeService.getTenantFeaturedOptionsSettings(id);
             setMerchantFeaturedEnabled(optsSettings?.featured_enabled !== false);
           } catch (prefError) {
-            console.error('FeaturedProductsSettings: Error fetching featured options settings', prefError);
+            clientLogger.error('FeaturedProductsSettings: Error fetching featured options settings', { detail: prefError });
             setMerchantFeaturedEnabled(true); // Default to enabled on error
           }
         } else {
-          console.error('FeaturedProductsSettings: Failed to load tenant');
+          clientLogger.error('FeaturedProductsSettings: Failed to load tenant');
           setError('Failed to load tenant information');
         }
       } catch (err) {
-        console.error('FeaturedProductsSettings: Error loading tenant', err);
+        clientLogger.error('FeaturedProductsSettings: Error loading tenant', { detail: err });
         setError('Error loading tenant information');
         setDebug(err);
       } finally {

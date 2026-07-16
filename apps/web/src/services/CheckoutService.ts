@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CustomerInfo {
   email: string;
@@ -136,14 +137,14 @@ class CheckoutService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[CheckoutService] Failed to create order:', result.error);
+        clientLogger.error('[CheckoutService] Failed to create order:', { detail: result.error });
         return null;
       }
 
       // Transform API response to match service interface
       const data = result.data;
       if (!data?.order || !data?.payment) {
-        console.error('[CheckoutService] Invalid response structure:', data);
+        clientLogger.error('[CheckoutService] Invalid response structure:', { detail: data });
         return null;
       }
 
@@ -154,7 +155,7 @@ class CheckoutService extends PublicApiSingleton {
         paymentAmount: data.payment.amount_cents,
       };
     } catch (error) {
-      console.error('[CheckoutService] Create order error:', error);
+      clientLogger.error('[CheckoutService] Create order error:', { detail: error });
       return null;
     }
   }
@@ -180,13 +181,13 @@ class CheckoutService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[CheckoutService] Failed to create payment intent:', result.error);
+        clientLogger.error('[CheckoutService] Failed to create payment intent:', { detail: result.error });
         return null;
       }
 
       const data = result.data;
       if (!data?.clientSecret || !data?.paymentIntentId) {
-        console.error('[CheckoutService] Invalid payment intent response:', data);
+        clientLogger.error('[CheckoutService] Invalid payment intent response:', { detail: data });
         return null;
       }
 
@@ -195,7 +196,7 @@ class CheckoutService extends PublicApiSingleton {
         paymentIntentId: data.paymentIntentId,
       };
     } catch (error) {
-      console.error('[CheckoutService] Create payment intent error:', error);
+      clientLogger.error('[CheckoutService] Create payment intent error:', { detail: error });
       return null;
     }
   }
@@ -320,7 +321,7 @@ class CheckoutService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[CheckoutService] Failed to confirm payment:', result.error);
+        clientLogger.error('[CheckoutService] Failed to confirm payment:', { detail: result.error });
         return null;
       }
 
@@ -334,7 +335,7 @@ class CheckoutService extends PublicApiSingleton {
         funnelNextStep: result.data?.funnelNextStep || null,
       };
     } catch (error) {
-      console.error('[CheckoutService] Confirm payment error:', error);
+      clientLogger.error('[CheckoutService] Confirm payment error:', { detail: error });
       return null;
     }
   }
@@ -377,13 +378,13 @@ class CheckoutService extends PublicApiSingleton {
       );
 
       if (!result.success || !result.data?.order) {
-        console.error('[CheckoutService] Failed to get order:', result.error);
+        clientLogger.error('[CheckoutService] Failed to get order:', { detail: result.error });
         return null;
       }
 
       return result.data.order;
     } catch (error) {
-      console.error('[CheckoutService] Get order error:', error);
+      clientLogger.error('[CheckoutService] Get order error:', { detail: error });
       return null;
     }
   }

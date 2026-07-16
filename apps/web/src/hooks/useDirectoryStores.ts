@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { directoryService, DirectoryStore, DirectorySearchResult } from '@/services/DirectorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStoresResponse extends DirectorySearchResult {}
 
@@ -136,7 +137,7 @@ export const useDirectoryStores = (
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch directory stores');
-      console.error('[useDirectoryStores] Error:', err);
+      clientLogger.error('[useDirectoryStores] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

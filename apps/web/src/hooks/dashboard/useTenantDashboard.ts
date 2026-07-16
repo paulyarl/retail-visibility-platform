@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantDashboardStats {
   totalItems: number;
@@ -83,7 +84,7 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
       setError(errorMessage);
-      console.error('[useTenantDashboard] Error:', err);
+      clientLogger.error('[useTenantDashboard] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

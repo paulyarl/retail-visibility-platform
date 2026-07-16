@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { type ReviewSummary, type Review } from './ReviewsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 class PublicReviewsService extends PublicApiSingleton {
   private static instance: PublicReviewsService;
@@ -32,7 +33,7 @@ class PublicReviewsService extends PublicApiSingleton {
    */
   async getRatingSummary(tenantId: string): Promise<ReviewSummary | null> {
     if (!tenantId) {
-      console.error('[PublicReviewsService] getRatingSummary: tenantId is required');
+      clientLogger.error('[PublicReviewsService] getRatingSummary: tenantId is required');
       return null;
     }
 
@@ -45,13 +46,13 @@ class PublicReviewsService extends PublicApiSingleton {
       );
 
       if (!result.success || !result.data) {
-        console.error('[PublicReviewsService] Failed to get rating summary:', result.error);
+        clientLogger.error('[PublicReviewsService] Failed to get rating summary:', { detail: result.error });
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[PublicReviewsService] Error getting rating summary:', error);
+      clientLogger.error('[PublicReviewsService] Error getting rating summary:', { detail: error });
       return null;
     }
   }
@@ -62,7 +63,7 @@ class PublicReviewsService extends PublicApiSingleton {
    */
   async getReviews(tenantId: string, limit: number = 10): Promise<Review[]> {
     if (!tenantId) {
-      console.error('[PublicReviewsService] getReviews: tenantId is required');
+      clientLogger.error('[PublicReviewsService] getReviews: tenantId is required');
       return [];
     }
 
@@ -75,13 +76,13 @@ class PublicReviewsService extends PublicApiSingleton {
       );
 
       if (!result.success || !result.data) {
-        console.error('[PublicReviewsService] Failed to get reviews:', result.error);
+        clientLogger.error('[PublicReviewsService] Failed to get reviews:', { detail: result.error });
         return [];
       }
 
       return result.data;
     } catch (error) {
-      console.error('[PublicReviewsService] Error getting reviews:', error);
+      clientLogger.error('[PublicReviewsService] Error getting reviews:', { detail: error });
       return [];
     }
   }
@@ -96,7 +97,7 @@ class PublicReviewsService extends PublicApiSingleton {
     sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
   }): Promise<Review[]> {
     if (!tenantId) {
-      console.error('[PublicReviewsService] getApprovedReviews: tenantId is required');
+      clientLogger.error('[PublicReviewsService] getApprovedReviews: tenantId is required');
       return [];
     }
 
@@ -116,13 +117,13 @@ class PublicReviewsService extends PublicApiSingleton {
       );
 
       if (!result.success || !result.data) {
-        console.error('[PublicReviewsService] Failed to get approved reviews:', result.error);
+        clientLogger.error('[PublicReviewsService] Failed to get approved reviews:', { detail: result.error });
         return [];
       }
 
       return result.data;
     } catch (error) {
-      console.error('[PublicReviewsService] Error getting approved reviews:', error);
+      clientLogger.error('[PublicReviewsService] Error getting approved reviews:', { detail: error });
       return [];
     }
   }
@@ -137,7 +138,7 @@ class PublicReviewsService extends PublicApiSingleton {
     sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
   }): Promise<Review[]> {
     if (!productId) {
-      console.error('[PublicReviewsService] getProductApprovedReviews: productId is required');
+      clientLogger.error('[PublicReviewsService] getProductApprovedReviews: productId is required');
       return [];
     }
 
@@ -157,13 +158,13 @@ class PublicReviewsService extends PublicApiSingleton {
       );
 
       if (!result.success || !result.data) {
-        console.error('[PublicReviewsService] Failed to get product reviews:', result.error);
+        clientLogger.error('[PublicReviewsService] Failed to get product reviews:', { detail: result.error });
         return [];
       }
 
       return result.data;
     } catch (error) {
-      console.error('[PublicReviewsService] Error getting product reviews:', error);
+      clientLogger.error('[PublicReviewsService] Error getting product reviews:', { detail: error });
       return [];
     }
   }

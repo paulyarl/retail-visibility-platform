@@ -10,6 +10,7 @@ import { behaviorTrackingService } from '@/services/BehaviorTrackingService';
 //import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 import { SingletonCacheOptions } from '../base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // Behavior Tracking Data Interfaces
 export interface TrackingEvent {
@@ -330,7 +331,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
     try {
       await this.sendBatch(batch);
     } catch (error) {
-      console.error('Error processing behavior tracking batch:', error);
+      clientLogger.error('Error processing behavior tracking batch:', { detail: error });
       // Re-add failed events to queue for retry
       this.eventQueue.unshift(...batch);
     }
@@ -360,7 +361,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
       await behaviorTrackingService.sendEvent(serviceEvent);
     } catch (error) {
-      console.error('Error sending tracking event:', error);
+      clientLogger.error('Error sending tracking event:', { detail: error });
       throw error;
     }
   }
@@ -389,7 +390,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
       await behaviorTrackingService.sendBatch(serviceEvents);
     } catch (error) {
-      console.error('Error sending tracking batch:', error);
+      clientLogger.error('Error sending tracking batch:', { detail: error });
       throw error;
     }
   }
@@ -467,7 +468,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
       await behaviorTrackingService.sendSession(serviceSession);
     } catch (error) {
-      console.error('Error sending session data:', error);
+      clientLogger.error('Error sending session data:', { detail: error });
       throw error;
     }
   }
@@ -552,7 +553,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
       await this.setCache(cacheKey, analytics);
       return analytics;
     } catch (error) {
-      console.error('Error fetching behavior analytics:', error);
+      clientLogger.error('Error fetching behavior analytics:', { detail: error });
       
       // Return default analytics
       return {
@@ -599,7 +600,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
       await this.setCache(cacheKey, patterns);
       return patterns;
     } catch (error) {
-      console.error('Error fetching user behavior patterns:', error);
+      clientLogger.error('Error fetching user behavior patterns:', { detail: error });
       
       // Return default patterns
       return {

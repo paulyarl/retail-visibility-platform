@@ -5,6 +5,7 @@ import { Card, Text, Group, Stack, Button, Badge, Alert, Loader } from '@mantine
 import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import GBPCategorySelectorAdapter from './GBPCategorySelectorAdapter';
 import { gbpCategoryService } from '@/services/GBPCategoryService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SelectedCategory {
   id: string;
@@ -69,7 +70,7 @@ export default function GBPCategoryCard({
       console.log('[GBPCategoryCard] Mappings received:', mappingsData);
       setMappings(mappingsData);
     } catch (err) {
-      console.error('[GBPCategoryCard] Failed to fetch mappings:', err);
+      clientLogger.error('[GBPCategoryCard] Failed to fetch mappings:', { detail: err });
     } finally {
       setLoadingMappings(false);
     }
@@ -104,7 +105,7 @@ export default function GBPCategoryCard({
       const allCategories = [primary, ...secondary];
       await fetchMappings(allCategories);
     } catch (err) {
-      console.error('[GBPCategoryCard] Save error:', err);
+      clientLogger.error('[GBPCategoryCard] Save error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to save categories');
     } finally {
       setSaving(false);

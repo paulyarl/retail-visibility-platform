@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Frontend Telemetry Client Test Script
  * 
@@ -129,7 +131,7 @@ class MockTelemetryCache {
       });
 
     } catch (error) {
-      console.error('[Mock Telemetry] Batch failed, re-queuing events:', error);
+      clientLogger.error('[Mock Telemetry] Batch failed, re-queuing events:', { detail: error });
       // Re-queue failed events
       this.events.unshift(...eventsToSend);
       this.saveToStorage();
@@ -174,7 +176,7 @@ class MockTelemetryCache {
         console.log(`[Mock Telemetry] Loaded ${this.events.length} events from storage`);
       }
     } catch (error) {
-      console.warn('[Mock Telemetry] Failed to load from storage:', error);
+      clientLogger.warn('[Mock Telemetry] Failed to load from storage:', { detail: error });
       this.events = [];
     }
   }
@@ -185,7 +187,7 @@ class MockTelemetryCache {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.events));
     } catch (error) {
-      console.warn('[Mock Telemetry] Failed to save to storage:', error);
+      clientLogger.warn('[Mock Telemetry] Failed to save to storage:', { detail: error });
     }
   }
 

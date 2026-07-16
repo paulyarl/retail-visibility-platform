@@ -9,6 +9,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type StatusLevel = 'ok' | 'warning' | 'error' | 'inactive';
 
@@ -70,13 +71,13 @@ class SystemStatusSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[SystemStatusService] Failed to fetch system status:', (result as any).error);
+        clientLogger.error('[SystemStatusService] Failed to fetch system status:', { detail: (result as any).error });
         return null;
       }
 
       return (result as any).data?.data ?? null;
     } catch (error) {
-      console.error('[SystemStatusService] Error fetching system status:', error);
+      clientLogger.error('[SystemStatusService] Error fetching system status:', { detail: error });
       return null;
     }
   }
