@@ -99,7 +99,7 @@ export function buildQROptions(
       imageSize: 0.35,
       hideBackgroundDots: true,
       imageShape: theme.logoShape,
-    },
+    } as any,
     dotsOptions: {
       color: theme.dotColor,
       type: theme.dotType,

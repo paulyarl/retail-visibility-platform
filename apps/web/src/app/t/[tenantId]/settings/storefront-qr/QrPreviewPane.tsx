@@ -91,7 +91,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
             type: 'svg',
             data: previewUrl,
             image: logoUrl || undefined,
-            imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: settings.qr_logo_shape as any },
+            imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: settings.qr_logo_shape } as any,
             dotsOptions: {
               color: effectiveDotColor,
               type: settings.qr_dot_type as any,

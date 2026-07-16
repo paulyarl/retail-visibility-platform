@@ -62,7 +62,7 @@ export function StyledTenantQR({
       type: 'svg',
       data: url,
       image: (prefs?.qr_logo && tenantLogo) ? tenantLogo : undefined,
-      imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: (prefs?.qr_logo_shape || 'square') as any },
+      imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: (prefs?.qr_logo_shape || 'square') } as any,
       dotsOptions: {
         color: dotColor,
         type: dotType,
