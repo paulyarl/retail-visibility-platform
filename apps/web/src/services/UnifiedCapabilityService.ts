@@ -384,6 +384,7 @@ interface BackendEffectiveStorefrontQr {
   qr_styled_enabled: boolean;
   allowed_qr_dot_styles: string[];
   allowed_qr_corner_styles: string[];
+  allowed_qr_corner_dot_styles: string[];
   qr_custom_colors: boolean;
   qr_gradients: boolean;
   can_use_qr_codes: boolean;
@@ -1388,6 +1389,7 @@ class UnifiedCapabilityService extends TenantApiSingleton {
       flags.qrCornerType = qrPrefs?.qr_corner_type;
       flags.qrCornerDotType = qrPrefs?.qr_corner_dot_type;
       flags.qrCornerDotColor = qrPrefs?.qr_corner_dot_color;
+      flags.qrLogoShape = qrPrefs?.qr_logo_shape;
       flags.qrDotColor = qrPrefs?.qr_dot_color;
       flags.qrCornerColor = qrPrefs?.qr_corner_color;
       flags.qrBgColor = qrPrefs?.qr_bg_color;

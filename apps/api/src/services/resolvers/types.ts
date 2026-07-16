@@ -198,6 +198,7 @@ export interface StorefrontQrMerchantSettings {
   qr_corner_type?: string | null;
   qr_corner_dot_type?: string | null;
   qr_corner_dot_color?: string | null;
+  qr_logo_shape?: string | null;
   qr_dot_color?: string | null;
   qr_corner_color?: string | null;
   qr_bg_color?: string | null;

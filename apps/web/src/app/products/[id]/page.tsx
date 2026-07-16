@@ -564,7 +564,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // Resolve product page layout from storefront preference + preview param
   const { layout_preview } = await searchParams;
   const productLayout: ProductLayoutKey = resolveProductLayout(
-    optFlags?.storefrontLayout,
+    productOptFlags?.effectiveLayout,
     layout_preview,
   );
 
@@ -691,6 +691,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <TenantPaymentProvider tenantId={product.tenantId}>
               <ProductQuickCommerceLayout
+                disableQRCode
                 product={{
                   ...productWithEnrichment,
                   featuredTypes: merchantFilteredFeaturedTypes,

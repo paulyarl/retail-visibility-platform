@@ -2042,6 +2042,7 @@ class TenantInfoService extends TenantApiSingleton {
     qr_corner_type: string;
     qr_corner_dot_type: string;
     qr_corner_dot_color: string;
+    qr_logo_shape: string;
     qr_dot_color: string;
     qr_corner_color: string;
     qr_bg_color: string;

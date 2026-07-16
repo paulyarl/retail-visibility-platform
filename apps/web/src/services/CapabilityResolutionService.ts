@@ -533,6 +533,7 @@ export interface StorefrontOptionFlags {
   qrCornerType?: string;
   qrCornerDotType?: string;
   qrCornerDotColor?: string;
+  qrLogoShape?: string;
   qrDotColor?: string;
   qrCornerColor?: string;
   qrBgColor?: string;

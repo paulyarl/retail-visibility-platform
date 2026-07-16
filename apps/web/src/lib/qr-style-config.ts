@@ -16,6 +16,7 @@ export interface QRThemeConfig {
   cornerSquareColor: string;
   cornerDotType: 'dot' | 'square';
   cornerDotColor: string;
+  logoShape: 'square' | 'circle';
   backgroundColor: string;
   description: string;
 }
@@ -30,6 +31,7 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     cornerSquareColor: '#1a56db',
     cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#f8fafc',
     description: 'General marketing',
   },
@@ -42,6 +44,7 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     cornerSquareColor: '#dc2626',
     cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#fef2f2',
     description: 'Flash sales, limited-time',
   },
@@ -54,6 +57,7 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     cornerSquareColor: '#16a34a',
     cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#f0fdf4',
     description: 'Bundle discount campaigns',
   },
@@ -66,6 +70,7 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     cornerSquareColor: '#7c3aed',
     cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#faf5ff',
     description: 'Enterprise deals, trade shows',
   },
@@ -93,6 +98,7 @@ export function buildQROptions(
       margin: 10,
       imageSize: 0.35,
       hideBackgroundDots: true,
+      imageShape: theme.logoShape,
     },
     dotsOptions: {
       color: theme.dotColor,

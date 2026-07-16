@@ -26,6 +26,7 @@ interface StorefrontQrSettings {
   qr_corner_type: string;
   qr_corner_dot_type: string;
   qr_corner_dot_color: string;
+  qr_logo_shape: string;
   qr_dot_color: string;
   qr_corner_color: string;
   qr_bg_color: string;
@@ -55,6 +56,7 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_corner_type: 'extra-rounded',
   qr_corner_dot_type: 'dot',
   qr_corner_dot_color: '#ffffff',
+  qr_logo_shape: 'square',
   qr_dot_color: '#1a56db',
   qr_corner_color: '#1a56db',
   qr_bg_color: '#ffffff',
@@ -329,6 +331,33 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                 </div>
                 {!(isTierFlexible || tierQrContentTypes.includes('qr_logo')) && <Lock className="h-3 w-3 text-neutral-400" />}
               </div>
+              {settings.qr_logo && settings.qr_styled_enabled && (
+                <div className="space-y-2 mt-3">
+                  <p className="text-sm font-medium text-neutral-700">Logo Shape</p>
+                  <p className="text-xs text-neutral-500">Cutout shape for the embedded logo</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'square', label: 'Square' },
+                      { value: 'circle', label: 'Round' },
+                    ].map(shape => {
+                      const isSelected = settings.qr_logo_shape === shape.value;
+                      return (
+                        <div
+                          key={shape.value}
+                          onClick={() => updateSetting('qr_logo_shape', shape.value)}
+                          className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
+                            isSelected
+                              ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                              : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
+                          }`}
+                        >
+                          {shape.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

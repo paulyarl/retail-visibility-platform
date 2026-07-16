@@ -149,6 +149,7 @@ export function resolveStorefrontQr(
     qr_corner_type: merchantPrefs?.qr_corner_type ?? 'extra-rounded',
     qr_corner_dot_type: merchantPrefs?.qr_corner_dot_type ?? 'dot',
     qr_corner_dot_color: merchantPrefs?.qr_corner_dot_color ?? '#ffffff',
+    qr_logo_shape: merchantPrefs?.qr_logo_shape ?? 'square',
     qr_dot_color: merchantPrefs?.qr_dot_color ?? '#1a56db',
     qr_corner_color: merchantPrefs?.qr_corner_color ?? '#1a56db',
     qr_bg_color: merchantPrefs?.qr_bg_color ?? '#ffffff',

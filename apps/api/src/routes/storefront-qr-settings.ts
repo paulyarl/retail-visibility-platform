@@ -29,6 +29,7 @@ const storefrontQrSettingsSchema = z.object({
   qr_corner_type: z.string().optional(),
   qr_corner_dot_type: z.string().optional(),
   qr_corner_dot_color: z.string().optional(),
+  qr_logo_shape: z.string().optional(),
   qr_dot_color: z.string().optional(),
   qr_corner_color: z.string().optional(),
   qr_bg_color: z.string().optional(),
@@ -56,6 +57,7 @@ export const DEFAULT_QR_SETTINGS = {
   qr_corner_type: 'extra-rounded',
   qr_corner_dot_type: 'dot',
   qr_corner_dot_color: '#ffffff',
+  qr_logo_shape: 'square',
   qr_dot_color: '#1a56db',
   qr_corner_color: '#1a56db',
   qr_bg_color: '#ffffff',
@@ -126,6 +128,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierFilteredSettings.qr_corner_type = rawSettings.qr_corner_type || 'extra-rounded';
       tierFilteredSettings.qr_corner_dot_type = rawSettings.qr_corner_dot_type || 'dot';
       tierFilteredSettings.qr_corner_dot_color = rawSettings.qr_corner_dot_color || '#ffffff';
+      tierFilteredSettings.qr_logo_shape = rawSettings.qr_logo_shape || 'square';
       tierFilteredSettings.qr_dot_color = rawSettings.qr_dot_color || '#1a56db';
       tierFilteredSettings.qr_corner_color = rawSettings.qr_corner_color || '#1a56db';
       tierFilteredSettings.qr_bg_color = rawSettings.qr_bg_color || '#ffffff';
@@ -138,6 +141,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierFilteredSettings.qr_corner_type = 'extra-rounded';
       tierFilteredSettings.qr_corner_dot_type = 'dot';
       tierFilteredSettings.qr_corner_dot_color = '#ffffff';
+      tierFilteredSettings.qr_logo_shape = 'square';
       tierFilteredSettings.qr_dot_color = '#1a56db';
       tierFilteredSettings.qr_corner_color = '#1a56db';
       tierFilteredSettings.qr_bg_color = '#ffffff';
@@ -226,6 +230,7 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
         qr_corner_type: settings.qr_corner_type,
         qr_corner_dot_type: settings.qr_corner_dot_type,
         qr_corner_dot_color: settings.qr_corner_dot_color,
+        qr_logo_shape: settings.qr_logo_shape,
         qr_dot_color: settings.qr_dot_color,
         qr_corner_color: settings.qr_corner_color,
         qr_bg_color: settings.qr_bg_color,

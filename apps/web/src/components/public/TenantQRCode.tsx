@@ -488,7 +488,7 @@ export function TenantQRCode({
         type: 'svg',
         data: url,
         image: (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : undefined,
-        imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
+        imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: (qrPrefs?.qr_logo_shape || 'square') as any },
         dotsOptions: {
           color: dotColor,
           type: dotType,

@@ -13,6 +13,7 @@ export interface QrPreviewSettings {
   qr_corner_type: string;
   qr_corner_dot_type: string;
   qr_corner_dot_color: string;
+  qr_logo_shape: string;
   qr_dot_color: string;
   qr_corner_color: string;
   qr_bg_color: string;
@@ -90,7 +91,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
             type: 'svg',
             data: previewUrl,
             image: logoUrl || undefined,
-            imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
+            imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: settings.qr_logo_shape as any },
             dotsOptions: {
               color: effectiveDotColor,
               type: settings.qr_dot_type as any,

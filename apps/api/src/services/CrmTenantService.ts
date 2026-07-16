@@ -156,7 +156,14 @@ export class CrmTenantService extends BaseService {
         select: { id: true, first_name: true, last_name: true, email: true, phone: true, role: true, is_primary: true },
       }),
       prisma.crm_activities.findMany({
-        where: { tenant_id: tenantId },
+        where: {
+          tenant_id: tenantId,
+          OR: [
+            { ticket_id: null, task_id: null },
+            { ticket: { status: { in: ['open', 'in_progress', 'waiting'] } } },
+            { task: { status: { in: ['pending', 'in_progress'] } } },
+          ],
+        },
         orderBy: { created_at: 'desc' },
         take: 5,
         select: { id: true, actor_name: true, actor_type: true, activity_type: true, content: true, is_internal: true, created_at: true },
@@ -235,7 +242,15 @@ export class CrmTenantService extends BaseService {
         select: { id: true, title: true, status: true, due_date: true, assigned_to: true },
       }),
       prisma.crm_activities.findMany({
-        where: { tenant_id: tenantId, is_internal: false },
+        where: {
+          tenant_id: tenantId,
+          is_internal: false,
+          OR: [
+            { ticket_id: null, task_id: null },
+            { ticket: { status: { in: ['open', 'in_progress', 'waiting'] } } },
+            { task: { status: { in: ['pending', 'in_progress'] } } },
+          ],
+        },
         orderBy: { created_at: 'desc' },
         take: 5,
         select: { id: true, actor_id: true, actor_name: true, activity_type: true, content: true, ticket_id: true, task_id: true, created_at: true },
