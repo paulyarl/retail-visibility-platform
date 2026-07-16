@@ -715,6 +715,8 @@ merchant_preferences: {
 
 **Real-world example**: `StorefrontQrResolver.ts` had `qr_styled_enabled`, `qr_custom_colors`, `qr_gradients`, and `qr_classic_enabled` all gated by `prefs.qr_styled_enabled` or `prefs.qr_classic_enabled`. This caused the styled QR option to be invisible to merchants whose `qr_styled_enabled` pref defaulted to `false`, even when the tier allowed styled QR. The fix removed all `prefs.*` gating from these tier-level fields.
 
+**Companion skill**: `decoupled-domain-self-containment.md` — covers the frontend side of this boundary: components must read from dedicated domain state, not the legacy `StorefrontOptionFlags` overlay. Includes a deviation audit of Hours, Maps, Gallery, and Layout domains.
+
 ## File Reference
 
 ### Backend

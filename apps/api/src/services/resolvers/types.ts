@@ -199,6 +199,7 @@ export interface StorefrontQrMerchantSettings {
   qr_dot_color?: string | null;
   qr_corner_color?: string | null;
   qr_bg_color?: string | null;
+  qr_custom_colors_enabled?: boolean | null;
   qr_gradient_enabled?: boolean | null;
   qr_gradient_start?: string | null;
   qr_gradient_end?: string | null;

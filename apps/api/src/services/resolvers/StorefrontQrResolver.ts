@@ -136,6 +136,15 @@ export function resolveStorefrontQr(
     qr_logo: merchantPrefs?.qr_logo ?? false,
     qr_directory: merchantPrefs?.qr_directory ?? false,
     default_qr_resolution: merchantPrefs?.default_qr_resolution || '1024',
+    qr_dot_type: merchantPrefs?.qr_dot_type ?? 'rounded',
+    qr_corner_type: merchantPrefs?.qr_corner_type ?? 'extra-rounded',
+    qr_dot_color: merchantPrefs?.qr_dot_color ?? '#1a56db',
+    qr_corner_color: merchantPrefs?.qr_corner_color ?? '#1a56db',
+    qr_bg_color: merchantPrefs?.qr_bg_color ?? '#ffffff',
+    qr_custom_colors_enabled: merchantPrefs?.qr_custom_colors_enabled ?? false,
+    qr_gradient_enabled: merchantPrefs?.qr_gradient_enabled ?? false,
+    qr_gradient_start: merchantPrefs?.qr_gradient_start ?? null,
+    qr_gradient_end: merchantPrefs?.qr_gradient_end ?? null,
   };
 
   // Effective filters
