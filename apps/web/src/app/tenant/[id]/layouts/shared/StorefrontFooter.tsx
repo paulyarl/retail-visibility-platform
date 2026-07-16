@@ -220,6 +220,20 @@ export default function StorefrontFooter({
                   ))}
                 </div>
               )}
+              {/* QR Code */}
+              <div className="mt-4 flex flex-col items-start sm:items-end">
+                <h4 className="font-semibold text-white mb-2 text-sm">Share This Store</h4>
+                <TenantQRCode
+                  url={currentUrl || `/tenant/${tenantId}`}
+                  tenantId={tenantId}
+                  label="Scan to Share"
+                  downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                  size={120}
+                  showDownload={true}
+                  pageType="storefront"
+                  capabilityFlags={optFlags}
+                />
+              </div>
             </div>
           </div>
 
