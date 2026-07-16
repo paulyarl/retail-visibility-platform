@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useStorefrontQrCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import QrPreviewPane from './QrPreviewPane';
 
 interface StorefrontQrSettings {
   qr_enabled: boolean;
@@ -153,6 +154,10 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
   const tierDotStyles = tierState?.allowedQRDotStyles ?? [];
   const tierCornerStyles = tierState?.allowedQRCornerStyles ?? [];
 
+  const previewUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/tenant/${tenantId}`
+    : `/tenant/${tenantId}`;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -195,6 +200,11 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
           </CardContent>
         </Card>
       )}
+
+      {/* Two-column layout: settings + live preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column: settings cards */}
+        <div className="lg:col-span-2 space-y-6">
 
       {/* QR Code Display Card */}
       {isTierEnabled && (
@@ -582,24 +592,36 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
         </Card>
       )}
 
-      {/* Save Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          {saved && (
-            <span className="inline-flex items-center gap-1 text-sm text-green-600">
-              <CheckCircle2 className="h-4 w-4" /> Saved
-            </span>
-          )}
-          {error && (
-            <span className="inline-flex items-center gap-1 text-sm text-red-600">
-              <AlertCircle className="h-4 w-4" /> {error}
-            </span>
-          )}
         </div>
-        <Button onClick={handleSave} disabled={saving || !isTierEnabled}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Saving...' : 'Save Settings'}
-        </Button>
+
+        {/* Right column: live preview */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-6 space-y-6">
+            <QrPreviewPane
+              tenantId={tenantId}
+              settings={settings}
+              previewUrl={previewUrl}
+            />
+
+            {/* Save Button */}
+            <div className="flex flex-col gap-3">
+              {saved && (
+                <span className="inline-flex items-center gap-1 text-sm text-green-600 justify-center">
+                  <CheckCircle2 className="h-4 w-4" /> Saved successfully
+                </span>
+              )}
+              {error && (
+                <span className="inline-flex items-center gap-1 text-sm text-red-600 justify-center">
+                  <AlertCircle className="h-4 w-4" /> {error}
+                </span>
+              )}
+              <Button onClick={handleSave} disabled={saving || !isTierEnabled} className="w-full">
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Settings'}
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Next Steps */}

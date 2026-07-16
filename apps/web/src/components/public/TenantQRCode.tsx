@@ -104,10 +104,12 @@ export function TenantQRCode({
 
           setTenantTier(effectiveTierPart);
 
-          // Fetch logo if QR logo is enabled in merchant prefs (from qrState), with tier fallback
+          // Fetch logo only if qr_logo is enabled in merchant prefs (from qrState);
+          // fall back to tier-based logic only when qrState is unavailable
           const qrPrefsForLogo = qrStateResult?.merchantPreferences as any;
-          const shouldFetchLogo = qrPrefsForLogo?.qr_logo
-            || ['professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
+          const shouldFetchLogo = qrStateResult
+            ? !!(qrPrefsForLogo?.qr_logo)
+            : ['professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
               'chain_professional', 'chain_enterprise', 'chain_starter'].includes(effectiveTierPart);
 
           if (shouldFetchLogo) {
@@ -483,7 +485,7 @@ export function TenantQRCode({
         height: targetSize,
         type: 'svg',
         data: url,
-        image: tenantLogo || undefined,
+        image: (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : undefined,
         imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
         dotsOptions: {
           color: dotColor,
