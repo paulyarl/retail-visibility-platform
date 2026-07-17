@@ -59,6 +59,8 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
     demoExpiresAt,
   } = props;
 
+  const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
+
   return (
     <>
       <LocalBusinessStructuredData listing={listing} url={currentUrl} />
@@ -81,14 +83,19 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
             {showStatusPanel && tenantInfo ? (
               <div className="mt-4"><StorefrontStatusPanel tenantInfo={tenantInfo} /></div>
             ) : (
-              <div className="mt-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-2 border-blue-200 rounded-xl shadow-sm overflow-hidden">
+              <div
+                className={`mt-4 border-2 rounded-xl shadow-sm overflow-hidden ${primaryColor ? '' : 'bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-blue-200'}`}
+                style={primaryColor ? { background: `linear-gradient(135deg, ${primaryColor}22 0%, ${primaryColor}11 50%, ${primaryColor}08 100%)`, borderColor: `${primaryColor}44` } : undefined}
+              >
                 <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
                   <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Shop {listing.businessName}</h2>
                   <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
                     Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
                   </p>
                   <Link href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
-                    className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-md">
+                    className="inline-flex items-center gap-2 px-8 py-3 text-white rounded-lg transition-colors font-semibold text-lg shadow-md"
+                    style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: '#2563eb' }}
+                  >
                     <Globe className="w-5 h-5" /> Visit Storefront
                   </Link>
                   {storefrontCategories.categories.length > 0 && (

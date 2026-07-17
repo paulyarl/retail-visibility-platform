@@ -159,7 +159,7 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
 
     const theme = QR_THEMES[selectedTheme];
     const options = buildQROptions(
-      activeGrantData.qr_url,
+      activeGrantData.qr_url || '',
       activeGrantData.target_icon?.icon_name ? undefined : '/icons/visibleshelf-logo.svg',
       theme,
     );
@@ -368,10 +368,10 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                 <label className="text-xs font-medium text-neutral-600 mb-1 block">Grant Token</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 text-xs font-mono bg-gray-50 rounded-md border border-gray-200 truncate">
-                    {activeGrantData.grant_token.substring(0, 40)}...
+                    {activeGrantData.grant_token ? `${activeGrantData.grant_token.substring(0, 40)}...` : 'N/A'}
                   </code>
                   <button
-                    onClick={() => handleCopy(activeGrantData.grant_token, 'token')}
+                    onClick={() => handleCopy(activeGrantData.grant_token || '', 'token')}
                     className="p-2 rounded-md border border-gray-200 hover:bg-gray-50"
                     title="Copy token"
                   >
@@ -383,7 +383,7 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
               <div className="p-3 rounded-md bg-purple-50 border border-purple-100 text-sm">
                 <span className="text-xs font-medium text-neutral-600">Expires: </span>
                 <span className="font-medium text-purple-700">
-                  {new Date(activeGrantData.expires_at).toLocaleString()}
+                  {activeGrantData.expires_at ? new Date(activeGrantData.expires_at).toLocaleString() : 'N/A'}
                 </span>
               </div>
             </>

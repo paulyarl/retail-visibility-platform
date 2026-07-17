@@ -111,7 +111,7 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
 
   async grantComplimentary(input: GrantComplimentaryInput): Promise<FeaturePurchase> {
     const result = await this.makeDefaultRequest<FeaturePurchase>(
-      '/api/admin/feature-purchases?action=grant-complimentary',
+      '/api/admin/feature-purchases/grant-complimentary',
       { method: 'POST', body: JSON.stringify(input) },
       'admin-feature-purchases-grant',
       0,
@@ -126,14 +126,13 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
 
   async listGrants(filters?: { featureKey?: string; tenantId?: string; status?: string }): Promise<GrantToken[]> {
     const params = new URLSearchParams();
-    params.set('action', 'grants');
     if (filters?.featureKey) params.set('featureKey', filters.featureKey);
     if (filters?.tenantId) params.set('tenantId', filters.tenantId);
     if (filters?.status) params.set('status', filters.status);
     const qs = params.toString();
 
     const result = await this.makeDefaultRequest<GrantToken[]>(
-      `/api/admin/feature-purchases?${qs}`,
+      `/api/admin/feature-purchases/grants${qs ? `?${qs}` : ''}`,
       {},
       'admin-feature-purchases-grants',
       this.cacheTTL,
@@ -152,7 +151,7 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
 
   async createGrantToken(input: CreateGrantTokenInput): Promise<GrantTokenData> {
     const result = await this.makeDefaultRequest<GrantTokenData>(
-      '/api/admin/feature-purchases?action=create-grant-token',
+      '/api/admin/feature-purchases/create-grant-token',
       { method: 'POST', body: JSON.stringify(input) },
       'admin-feature-purchases-grant-token',
       0,
@@ -161,6 +160,12 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create grant token');
     }
     const data = (result.data as any)?.data || result.data;
+    if (!data || !data.grant_token) {
+      throw new Error(
+        'API did not return a grant token. The endpoint may have returned a feature purchase instead. ' +
+        'Received: ' + JSON.stringify(data).substring(0, 200)
+      );
+    }
     return data;
   }
 }

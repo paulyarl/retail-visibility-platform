@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest) {
     const id = url.searchParams.get('id');
     const requestBody = await request.json();
 
-    const endpoint = `/api/admin/bsaas-catalog${id ? `?id=${id}` : ''}`;
+    const endpoint = `/api/admin/bsaas-catalog/${id}`;
 
     const response = await authenticatedFetch(endpoint, accessToken, {
       method: 'PUT',
@@ -82,7 +82,7 @@ export async function DELETE(request: NextRequest) {
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 
-    const endpoint = `/api/admin/bsaas-catalog${id ? `?id=${id}` : ''}`;
+    const endpoint = `/api/admin/bsaas-catalog/${id}`;
 
     const response = await authenticatedFetch(endpoint, accessToken, { method: 'DELETE' });
     const data = await response.json();

@@ -96,7 +96,7 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
   const activeGrants = grants.filter((g) => g.status === 'active').length;
   const expiredGrants = grants.filter((g) => g.status === 'expired').length;
   const fullyClaimedGrants = grants.filter((g) => g.status === 'fully_claimed').length;
-  const totalClaims = grants.reduce((sum, g) => sum + g.claims_count, 0);
+  const totalClaims = grants.reduce((sum, g) => sum + (g.claims_count ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -177,7 +177,7 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
             <tbody className="divide-y divide-neutral-100">
               {grants.map((grant) => {
                 const isExpanded = expandedRows.has(grant.id);
-                const hasClaims = grant.claims.length > 0;
+                const hasClaims = (grant.claims?.length ?? 0) > 0;
                 return (
                   <React.Fragment key={grant.id}>
                     <tr className="hover:bg-neutral-50 cursor-pointer" onClick={() => hasClaims && toggleRow(grant.id)}>
@@ -227,8 +227,8 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                       <tr className="bg-neutral-50/50">
                         <td colSpan={9} className="px-8 py-3">
                           <div className="space-y-1">
-                            <p className="text-xs font-medium text-neutral-500 mb-2">Claim History ({grant.claims.length})</p>
-                            {grant.claims.map((claim) => (
+                            <p className="text-xs font-medium text-neutral-500 mb-2">Claim History ({grant.claims?.length ?? 0})</p>
+                            {(grant.claims ?? []).map((claim) => (
                               <div key={claim.id} className="flex items-center gap-4 text-xs py-1.5 border-b border-neutral-100 last:border-0">
                                 <span className="font-medium text-neutral-700">
                                   {claim.tenant_name || claim.tenant_id}

@@ -675,8 +675,8 @@ export default function StorefrontImmersiveLayout({
                     <div>
                       <h4 className="font-semibold text-sm text-neutral-900 dark:text-white mb-2">Location</h4>
                       <div className="h-48">
-                        {showsLocation ? (
-                          <TenantMapSection location={showsLocation} />
+                        {mapLocation ? (
+                          <TenantMapSection location={mapLocation} />
                         ) : contactInfo.address ? (
                           <GoogleMapEmbed address={contactInfo.address} height="h-48" showDirections={true} />
                         ) : null}
