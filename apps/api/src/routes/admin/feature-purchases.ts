@@ -35,7 +35,7 @@ const router = Router();
 const createPurchaseSchema = z.object({
   tenant_id: z.string().min(1).max(255),
   feature_key: z.string().min(1),
-  source: z.enum(['bsaas', 'promo', 'addon', 'comp', 'tier_overage']).default('bsaas'),
+  source: z.enum(['bsaas', 'promo', 'addon', 'comp', 'tier_overage', 'admin_grant', 'bsaas_bundle']).default('bsaas'),
   expires_at: z.string().datetime().optional().nullable(),
   metadata: z.any().optional(),
 });
@@ -363,6 +363,48 @@ router.get('/grants', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('[FeaturePurchases] Error listing grants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list grant tokens' });
+  }
+});
+
+// GET /api/admin/feature-purchases/complimentary-grants — list all complimentary (admin_grant) purchases
+router.get('/complimentary-grants', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, featureKey, status } = req.query;
+
+    const where: any = { source: 'admin_grant' };
+    if (tenantId) where.tenant_id = tenantId as string;
+    if (featureKey) where.feature_key = featureKey as string;
+    if (status) where.status = status as string;
+
+    const grants = await prisma.tenant_feature_purchases.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      include: {
+        tenants: { select: { id: true, name: true, subscription_tier: true } },
+      },
+    });
+
+    const enriched = grants.map((g) => ({
+      id: g.id,
+      tenant_id: g.tenant_id,
+      tenant_name: g.tenants?.name || null,
+      tenant_tier: g.tenants?.subscription_tier || null,
+      feature_key: g.feature_key,
+      source: g.source,
+      status: g.status,
+      expires_at: g.expires_at?.toISOString() || null,
+      metadata: g.metadata,
+      reason: (g.metadata as any)?.reason || null,
+      granted_by: (g.metadata as any)?.granted_by || null,
+      granted_at: (g.metadata as any)?.granted_at || null,
+      created_at: g.created_at.toISOString(),
+      updated_at: g.updated_at.toISOString(),
+    }));
+
+    res.json({ success: true, data: enriched });
+  } catch (error) {
+    logger.error('[FeaturePurchases] Error listing complimentary grants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list complimentary grants' });
   }
 });
 

@@ -74,6 +74,23 @@ export interface GrantToken {
   claims: GrantClaim[];
 }
 
+export interface ComplimentaryGrant {
+  id: string;
+  tenant_id: string;
+  tenant_name: string | null;
+  tenant_tier: string | null;
+  feature_key: string;
+  source: string;
+  status: string;
+  expires_at: string | null;
+  metadata: any;
+  reason: string | null;
+  granted_by: string | null;
+  granted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 class AdminFeaturePurchasesService extends AdminApiSingleton {
   private static instance: AdminFeaturePurchasesService;
 
@@ -120,6 +137,7 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to grant complimentary access');
     }
     await this.invalidateCachePattern('admin-feature-purchases');
+    await this.invalidateCachePattern('admin-feature-purchases-complimentary-grants');
     const data = (result.data as any)?.data || result.data;
     return data;
   }
@@ -145,8 +163,30 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
     return Array.isArray(actualData) ? actualData : [];
   }
 
+  async listComplimentaryGrants(filters?: { tenantId?: string; featureKey?: string; status?: string }): Promise<ComplimentaryGrant[]> {
+    const params = new URLSearchParams();
+    if (filters?.tenantId) params.set('tenantId', filters.tenantId);
+    if (filters?.featureKey) params.set('featureKey', filters.featureKey);
+    if (filters?.status) params.set('status', filters.status);
+    const qs = params.toString();
+
+    const result = await this.makeDefaultRequest<ComplimentaryGrant[]>(
+      `/api/admin/feature-purchases?action=complimentary-grants${qs ? `&${qs}` : ''}`,
+      {},
+      'admin-feature-purchases-complimentary-grants',
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch complimentary grants');
+    }
+    const data = result.data;
+    const actualData = Array.isArray(data) ? data : (data as any)?.data;
+    return Array.isArray(actualData) ? actualData : [];
+  }
+
   async invalidateGrantsCache(): Promise<void> {
     await this.invalidateCachePattern('admin-feature-purchases-grants');
+    await this.invalidateCachePattern('admin-feature-purchases-complimentary-grants');
   }
 
   async createGrantToken(input: CreateGrantTokenInput): Promise<GrantTokenData> {
