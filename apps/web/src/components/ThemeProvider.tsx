@@ -125,11 +125,6 @@ const theme = createTheme({
 type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  // Never render during SSR - this is the root cause
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
   return (
     <NextThemesProvider {...props}>
       <MantineProvider theme={theme}>
