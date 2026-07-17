@@ -444,12 +444,22 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Price (cents) *</label>
+                <label className="text-sm font-medium mb-1 block">Price (USD) *</label>
                 <Input
                   type="number"
-                  value={formData.price_cents}
-                  onChange={(e) => setFormData({ ...formData, price_cents: parseInt(e.target.value) || 0 })}
-                  placeholder="e.g. 1900 for $19.00"
+                  min="0"
+                  step="0.01"
+                  value={formData.price_cents === 0 ? '' : (formData.price_cents / 100).toFixed(2)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      setFormData({ ...formData, price_cents: 0 });
+                    } else {
+                      const dollars = parseFloat(raw);
+                      setFormData({ ...formData, price_cents: isNaN(dollars) ? 0 : Math.round(dollars * 100) });
+                    }
+                  }}
+                  placeholder="e.g. 19.00"
                 />
               </div>
 
@@ -473,8 +483,12 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                 <label className="text-sm font-medium mb-1 block">Trial Days</label>
                 <Input
                   type="number"
-                  value={formData.trial_days}
-                  onChange={(e) => setFormData({ ...formData, trial_days: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  value={formData.trial_days === 0 ? '' : formData.trial_days}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setFormData({ ...formData, trial_days: raw === '' ? 0 : parseInt(raw) || 0 });
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -483,8 +497,11 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                 <label className="text-sm font-medium mb-1 block">Sort Order</label>
                 <Input
                   type="number"
-                  value={formData.sort_order}
-                  onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                  value={formData.sort_order === 0 ? '' : formData.sort_order}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setFormData({ ...formData, sort_order: raw === '' ? 0 : parseInt(raw) || 0 });
+                  }}
                   placeholder="0"
                 />
               </div>

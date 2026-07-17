@@ -335,14 +335,7 @@ export function useStorefrontState({
         .replace(/\s+/g, '-') || 'uncategorized';
     return `${basePath}?category=${encodeURIComponent(category.slug || categoryName)}`;
   };
-  console.log('[Directory Debug] Layout:', effectiveLayout);
-console.log('[Directory Debug] isRetailStore:', isRetailStore);
-console.log('[Directory Debug] showsHours:', showsHours, 'showsMap:', showsMap);
-console.log('[Directory Debug] optFlags:', optFlags);
-console.log('[Directory Debug] businessHours:', businessHours);
-console.log('[Directory Debug] listing.address:', listing?.address);
-
-  // ---- Return all derived state ----
+   // ---- Return all derived state ----
   return {
     // Navigation
     router,
