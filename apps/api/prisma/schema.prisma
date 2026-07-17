@@ -72,6 +72,7 @@ model audit_log {
   action       action
 
   @@index([tenant_id, occurred_at(sort: Desc)], map: "audit_log_tenant_id_occurred_at_sort_desc_idx")
+  @@index([tenant_id, occurred_at(sort: Desc)])
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -599,6 +600,7 @@ model category_mirror_runs {
   tenants      tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([tenant_id, strategy, started_at(sort: Desc)], map: "category_mirror_runs_tenant_id_strategy_started_at_sort_desc_")
+  @@index([tenant_id, strategy, started_at(sort: Desc)])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -2186,10 +2188,10 @@ model inventory_items {
   featured_priority                                                               Int?                     @default(0)
   featured_type                                                                   String?                  @default("store_selection")
   product_slug                                                                    String?                  @db.VarChar(255)
+  seo_keywords                                                                    String[]
   download_page_id                                                                String?                  @db.VarChar(255)
   seo_title                                                                       String?
   seo_description                                                                 String?
-  seo_keywords                                                                    String[]
   enhanced_description                                                            String?
   tags                                                                            String[]
   video_url                                                                       String?
@@ -2371,16 +2373,16 @@ model location_inventory_pools {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model location_status_logs {
-  id             Int             @id @default(autoincrement())
   tenant_id      String          @db.VarChar(255)
   old_status     location_status
   new_status     location_status
   changed_by     String?         @db.VarChar(255)
   reason         String?
   reopening_date DateTime?       @db.Timestamp(6)
+  metadata       Json?
   created_at     DateTime        @default(now()) @db.Timestamp(6)
   updated_at     DateTime        @default(now()) @db.Timestamp(6)
-  metadata       Json?
+  id             Int             @id @default(autoincrement())
   tenants        tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([created_at(sort: Desc)], map: "idx_location_status_logs_created_at")
@@ -2635,11 +2637,11 @@ model oauth_integrations {
   access_token  String
   refresh_token String?
   scopes        String[]  @default([])
-  expiresAt     DateTime? @db.Timestamptz(6)
-  isActive      Boolean?  @default(true)
   metadata      Json?
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
   updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+  expiresAt     DateTime? @db.Timestamptz(6)
+  isActive      Boolean?  @default(true)
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -5027,9 +5029,6 @@ model tenants {
   @@index([featured_access_approved, subscription_tier], map: "idx_tenant_featured_approval")
   @@index([google_sync_enabled, google_last_sync], map: "idx_tenant_google_sync")
   @@index([slug], map: "idx_tenant_slug")
-  @@index([directory_visible], map: "tenant_directory_visible_idx")
-  @@index([google_sync_enabled, google_last_sync], map: "tenant_google_sync_enabled_google_last_sync_idx")
-  @@index([slug], map: "tenant_slug_idx")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -5767,6 +5766,29 @@ model funnel_events {
   @@index([tenant_id, event_type, created_at(sort: Desc)], map: "idx_funnel_events_tenant_event_type")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model navigation_links_backup_tenant_restore {
+  id                  String?
+  label               String?
+  href                String?
+  icon                String?
+  badge               String?
+  badge_variant       String?
+  targets             String[]
+  sort_order          Int?
+  is_enabled          Boolean?
+  is_divider_before   Boolean?
+  required_permission String?
+  required_group      String?
+  required_role       String?
+  created_at          DateTime? @db.Timestamptz(6)
+  updated_at          DateTime? @db.Timestamptz(6)
+  created_by          String?
+  metadata            Json?
+
+  @@ignore
+}
+
 enum action {
   create
   update
@@ -5816,10 +5838,10 @@ enum digital_delivery_status {
 }
 
 enum enrichment_status {
+  COMPLETE
   NEEDS_ENRICHMENT
   PARTIALLY_ENRICHED
   PENDING
-  COMPLETE
   FAILED
 }
 
@@ -5858,6 +5880,7 @@ enum item_status {
   inactive
   archived
   trashed
+  draft
 }
 
 enum item_visibility {
@@ -5948,11 +5971,13 @@ enum product_condition {
 
 enum product_source {
   MANUAL
-  BARCODE_SCAN
-  BULK_UPLOAD
-  API_IMPORT
   QUICK_START_WIZARD
+  PRODUCT_SCAN
+  IMPORT
+  API
+  BULK_UPLOAD
   CLOVER_DEMO
+  API_IMPORT
 }
 
 enum product_type {
@@ -6019,12 +6044,12 @@ enum transfer_status {
 }
 
 enum user_role {
-  PLATFORM_ADMIN
-  PLATFORM_SUPPORT
-  PLATFORM_VIEWER
   ADMIN
   OWNER
   USER
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+  PLATFORM_VIEWER
   TENANT_OWNER
   TENANT_ADMIN
   TENANT_MANAGER
@@ -6035,7 +6060,7 @@ enum user_role {
 enum user_tenant_role {
   OWNER
   ADMIN
-  SUPPORT
   MEMBER
   VIEWER
+  SUPPORT
 }
