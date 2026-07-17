@@ -39,6 +39,7 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
   } = props;
 
   const coverImage = listing.coverImageUrl || listing.bannerImageUrl || listing.logoUrl;
+  const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 
   return (
     <>
@@ -56,7 +57,15 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
           {coverImage ? (
             <img src={coverImage} alt={listing.businessName} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900" />
+            <div
+              className="w-full h-full"
+              style={primaryColor
+                ? { background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}88 50%, ${primaryColor}33 100%)` }
+                : undefined
+              }
+            >
+              {!primaryColor && <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900" />}
+            </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/60 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10">

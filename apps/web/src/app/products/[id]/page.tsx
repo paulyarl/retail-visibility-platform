@@ -929,6 +929,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           optFlags={optFlags}
           currentUrl={currentUrl}
           layoutVariant={productLayout === 'quick-commerce' ? 'quick-commerce' : 'classic'}
+          primaryColor={tenant?.metadata?.primaryColor || tenant?.metadata?.primary_color || undefined}
         />
       </ProductLikeProvider>
       <PublicBotWidget
