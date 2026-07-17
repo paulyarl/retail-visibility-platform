@@ -30,6 +30,7 @@ import TrustSignalsBar from './layouts/shared/TrustSignalsBar';
 import SectionDivider from './layouts/shared/SectionDivider';
 import StickySearchBar from './layouts/shared/StickySearchBar';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 
 export default function StorefrontImmersiveLayout({
   tenantId,
@@ -277,11 +278,10 @@ export default function StorefrontImmersiveLayout({
     <div className="min-h-screen bg-white dark:bg-neutral-950">
       {/* HEADER */}
       <header
-        className={`sticky top-0 z-50 transition-all duration-200 ${
-          isScrolled
+        className={`sticky top-0 z-50 transition-all duration-200 ${isScrolled
             ? 'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md shadow-sm border-b border-neutral-200 dark:border-neutral-800'
             : 'bg-white dark:bg-neutral-950 border-b border-transparent'
-        }`}
+          }`}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between h-14 gap-3">
@@ -371,150 +371,149 @@ export default function StorefrontImmersiveLayout({
 
       {/* FILTER BAR */}
       {!storefrontStatus.shouldShowPanel && (
-      <div className="sticky top-[56px] md:top-[88px] z-40 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2">
-          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-            {showsCategoryProduct && categoryChips.map((chip) => {
-              const isActive = (!activeCategorySlug && !chip.slug) || activeCategorySlug === chip.slug;
-              return (
-                <button
-                  key={chip.slug || 'all'}
-                  onClick={() => handleCategoryClick(chip.slug)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    isActive
-                      ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
-                      : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                  }`}
-                >
-                  {chip.name}
+        <div className="sticky top-[56px] md:top-[88px] z-40 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2">
+            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+              {showsCategoryProduct && categoryChips.map((chip) => {
+                const isActive = (!activeCategorySlug && !chip.slug) || activeCategorySlug === chip.slug;
+                return (
+                  <button
+                    key={chip.slug || 'all'}
+                    onClick={() => handleCategoryClick(chip.slug)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${isActive
+                        ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
+                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                      }`}
+                  >
+                    {chip.name}
+                  </button>
+                );
+              })}
+              <div className="flex-1 min-w-[1px]" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="flex-shrink-0 text-xs bg-transparent border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                aria-label="Sort products"
+              >
+                <option value="featured">Featured</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+                <option value="name">Name A-Z</option>
+              </select>
+              <div className="hidden sm:flex items-center border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden flex-shrink-0">
+                <button onClick={() => setViewMode('grid')} className={`p-1.5 ${viewMode === 'grid' ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-400'}`} aria-label="Grid view">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25A2.25 2.25 0 0110.5 15.75v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25v2.25A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z" />
+                  </svg>
                 </button>
-              );
-            })}
-            <div className="flex-1 min-w-[1px]" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="flex-shrink-0 text-xs bg-transparent border border-neutral-200 dark:border-neutral-700 rounded-lg px-2 py-1.5 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              aria-label="Sort products"
-            >
-              <option value="featured">Featured</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-              <option value="name">Name A-Z</option>
-            </select>
-            <div className="hidden sm:flex items-center border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden flex-shrink-0">
-              <button onClick={() => setViewMode('grid')} className={`p-1.5 ${viewMode === 'grid' ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-400'}`} aria-label="Grid view">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25A2.25 2.25 0 0110.5 15.75v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25v2.25A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z" />
-                </svg>
-              </button>
-              <button onClick={() => setViewMode('list')} className={`p-1.5 ${viewMode === 'list' ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-400'}`} aria-label="List view">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25h16.5M3.75 12h16.5m-16.5 6.75h16.5" />
-                </svg>
-              </button>
+                <button onClick={() => setViewMode('list')} className={`p-1.5 ${viewMode === 'list' ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-400'}`} aria-label="List view">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 5.25h16.5M3.75 12h16.5m-16.5 6.75h16.5" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* BADGE FILTER */}
       {!storefrontStatus.shouldShowPanel && (
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3">
-        <StorefrontBadgeFilter tenantId={tenantId} />
-      </div>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3">
+          <StorefrontBadgeFilter tenantId={tenantId} />
+        </div>
       )}
 
       {/* PRODUCT GRID */}
       {!storefrontStatus.shouldShowPanel && (
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
-        {isProductsOnly && featured && (
-          <div className="flex items-center gap-3 mb-4">
-            <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
-            <span className="text-neutral-300 dark:text-neutral-600">|</span>
-            <h1 className="text-lg font-semibold text-neutral-900 dark:text-white">
-              {featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}
-            </h1>
-          </div>
-        )}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            {search ? `Results for "${search}"` : `${totalItems} product${totalItems !== 1 ? 's' : ''}`}
-          </p>
-          {totalPages > 1 && (
-            <span className="text-xs text-neutral-400 dark:text-neutral-500">Page {currentPage} of {totalPages}</span>
+        <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6">
+          {isProductsOnly && featured && (
+            <div className="flex items-center gap-3 mb-4">
+              <Link href={`/tenant/${tenantId}`} className="text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">← Back to store</Link>
+              <span className="text-neutral-300 dark:text-neutral-600">|</span>
+              <h1 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                {featured === 'true' || featured === '1' ? 'All Featured Products' : getFeaturedTypeName(featured)}
+              </h1>
+            </div>
           )}
-        </div>
-
-        {sortedProducts.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-neutral-500 dark:text-neutral-400 text-lg mb-2">No products found</p>
-            {search && (
-              <button
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete('search');
-                  router.push(`/tenant/${tenantId}?${params.toString()}`);
-                }}
-                className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
-              >
-                Clear search
-              </button>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              {search ? `Results for "${search}"` : `${totalItems} product${totalItems !== 1 ? 's' : ''}`}
+            </p>
+            {totalPages > 1 && (
+              <span className="text-xs text-neutral-400 dark:text-neutral-500">Page {currentPage} of {totalPages}</span>
             )}
           </div>
-        ) : (
-          <>
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                {sortedProducts.map((product: any) => (
-                  <SmartProductCard
-                    key={product.id}
-                    product={product}
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantSlug={tenantSlug}
-                    variant="grid"
-                    showQuickAdd
-                    showQuickView
-                    imageAspectRatio="1:1"
-                    truncateTitle={40}
-                    hasActivePaymentGateway={hasActivePaymentGateway}
-                    defaultGatewayType={defaultGatewayType}
-                    allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
-                    className="border border-neutral-100 dark:border-neutral-800 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedProducts.map((product: any) => (
-                  <SmartProductCard
-                    key={product.id}
-                    product={product}
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantSlug={tenantSlug}
-                    variant="list"
-                    showQuickAdd
-                    showQuickView
-                    hasActivePaymentGateway={hasActivePaymentGateway}
-                    defaultGatewayType={defaultGatewayType}
-                    allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
-                    className="border border-neutral-100 dark:border-neutral-800 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
-                  />
-                ))}
-              </div>
-            )}
 
-            {totalPages > 1 && (
-              <div className="mt-8 flex justify-center">
-                <Pagination currentPage={currentPage} totalItems={totalItems || 0} pageSize={12} onPageChange={handlePageChange} onPageSizeChange={() => {}} />
-              </div>
-            )}
-          </>
-        )}
-      </main>
+          {sortedProducts.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-neutral-500 dark:text-neutral-400 text-lg mb-2">No products found</p>
+              {search && (
+                <button
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.delete('search');
+                    router.push(`/tenant/${tenantId}?${params.toString()}`);
+                  }}
+                  className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  Clear search
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {sortedProducts.map((product: any) => (
+                    <SmartProductCard
+                      key={product.id}
+                      product={product}
+                      tenantId={tenantId}
+                      tenantName={businessName}
+                      tenantSlug={tenantSlug}
+                      variant="grid"
+                      showQuickAdd
+                      showQuickView
+                      imageAspectRatio="1:1"
+                      truncateTitle={40}
+                      hasActivePaymentGateway={hasActivePaymentGateway}
+                      defaultGatewayType={defaultGatewayType}
+                      allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
+                      className="border border-neutral-100 dark:border-neutral-800 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sortedProducts.map((product: any) => (
+                    <SmartProductCard
+                      key={product.id}
+                      product={product}
+                      tenantId={tenantId}
+                      tenantName={businessName}
+                      tenantSlug={tenantSlug}
+                      variant="list"
+                      showQuickAdd
+                      showQuickView
+                      hasActivePaymentGateway={hasActivePaymentGateway}
+                      defaultGatewayType={defaultGatewayType}
+                      allowedFeaturedTypes={allowedFeaturedTypes.length > 0 ? allowedFeaturedTypes : undefined}
+                      className="border border-neutral-100 dark:border-neutral-800 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="mt-8 flex justify-center">
+                  <Pagination currentPage={currentPage} totalItems={totalItems || 0} pageSize={12} onPageChange={handlePageChange} onPageSizeChange={() => { }} />
+                </div>
+              )}
+            </>
+          )}
+        </main>
       )}
 
       {!isProductsOnly && !storefrontStatus.shouldShowPanel && <SectionDivider variant="gradient" />}
@@ -651,6 +650,18 @@ export default function StorefrontImmersiveLayout({
                       <div className="space-y-1 text-sm">
                         {contactInfo.phone && <a href={`tel:${contactInfo.phone}`} className="block text-primary-600 dark:text-primary-400 hover:underline">{contactInfo.phone}</a>}
                         {contactInfo.email && <a href={`mailto:${contactInfo.email}`} className="block text-primary-600 dark:text-primary-400 hover:underline">{contactInfo.email}</a>}
+                      </div>
+                    </div>
+                  )}
+                  {showsMap && showsInteractiveMaps && (mapLocation || contactInfo.address) && (
+                    <div>
+                      <h4 className="font-semibold text-sm text-neutral-900 dark:text-white mb-2">Location</h4>
+                      <div className="h-48">
+                        {mapLocation ? (
+                          <TenantMapSection location={mapLocation} />
+                        ) : contactInfo.address ? (
+                          <GoogleMapEmbed address={contactInfo.address} height="h-48" showDirections={true} />
+                        ) : null}
                       </div>
                     </div>
                   )}
