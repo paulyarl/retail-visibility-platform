@@ -1134,9 +1134,9 @@ export default function PlanSummaryPanel({ capabilities, loading, highlightCapab
                 </div>
                 {cap.featureStatuses.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
-                    {cap.featureStatuses.map(f => (
+                    {cap.featureStatuses.map((f, idx) => (
                       <span
-                        key={f.label}
+                        key={`${cap.key}-${idx}-${f.label}`}
                         className={`inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border ${f.status === 'enabled'
                           ? 'bg-green-50 text-green-800 border-green-200'
                           : f.status === 'merchant-gated'

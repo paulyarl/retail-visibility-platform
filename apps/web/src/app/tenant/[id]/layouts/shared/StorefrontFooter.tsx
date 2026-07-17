@@ -35,6 +35,8 @@ interface StorefrontFooterProps {
   /** Compact 2-column variant for Immersive layout */
   variant?: 'full' | 'compact';
   className?: string;
+  /** Tenant primary brand color for footer background (compact variant) */
+  primaryColor?: string;
   storefrontPolicies?: {
     return_policy: string | null;
     shipping_policy: string | null;
@@ -95,6 +97,7 @@ export default function StorefrontFooter({
   currentUrl,
   variant = 'full',
   className = '',
+  primaryColor,
   storefrontPolicies = null,
 }: StorefrontFooterProps) {
   const platformName = platformSettings?.platformName || 'Visible Shelf';
@@ -116,7 +119,10 @@ export default function StorefrontFooter({
   // Compact variant (2-col) for Immersive layout
   if (variant === 'compact') {
     return (
-      <footer className={`bg-neutral-900 text-white dark:bg-neutral-950 dark:text-white mt-8 ${className}`}>
+      <footer
+        className={`text-white mt-8 ${primaryColor ? '' : 'bg-neutral-900 dark:bg-neutral-950'} ${className}`}
+        style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
             {/* Col 1: Store info + links */}

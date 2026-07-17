@@ -370,7 +370,7 @@ class AdvancedAnalyticsService extends ApiSystemSingleton {
       const response = await this.makeEnhancedDefaultRequest<{
         metrics: RealTimeMetrics;
       }>(
-        '/behavior/metrics',
+        '/api/behavior/metrics',
         {},
         'analytics-realtime',
         30 * 1000 // 30 seconds cache for real-time data
@@ -509,7 +509,7 @@ class AdvancedAnalyticsService extends ApiSystemSingleton {
 
     try {
       await this.makeEnhancedDefaultRequest<void>(
-        '/behavior/events/batch',
+        '/api/behavior/events/batch',
         {
           method: 'POST',
           body: JSON.stringify({ events })

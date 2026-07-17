@@ -168,6 +168,7 @@ router.get("/public/tenant/:tenant_id", async (req, res) => {
         subscription_tier: true,
         location_status: true,
         directory_visible: true,
+        metadata: true,
       }
     });
 

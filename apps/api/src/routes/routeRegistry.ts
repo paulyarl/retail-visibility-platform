@@ -189,6 +189,7 @@ import feedValidationRoutes from '../routes/feed-validation';
 import businessProfileValidationRoutes from '../routes/business-profile-validation';
 import quickStartRoutes from '../routes/quick-start';
 import recommendationRoutes from '../routes/recommendations';
+import behaviorTrackingRoutes from '../routes/behavior-tracking';
 import cloneRoutes from '../routes/clone';
 import queueRoutes from '../routes/queue-routes';
 import subscriptionBillingRoutes from '../routes/subscription-billing';
@@ -423,6 +424,14 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'public',
     authLevel: 'public',
     comment: 'Recommendation routes (MVP recommendation system - PUBLIC)',
+  },
+
+  {
+    path: '/api/behavior',
+    router: behaviorTrackingRoutes,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Behavior tracking routes (events, sessions, analytics - PUBLIC, identity extracted server-side)',
   },
 
   // ── Variants & Scan ──────────────────────────────────────────────────
