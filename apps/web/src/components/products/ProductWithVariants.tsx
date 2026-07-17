@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import VariantSelector, { ProductVariant } from './VariantSelector';
 import VariantAttributeDisplay, { VariantComparisonGrid } from './VariantAttributeDisplay';
 import { AddToCartButton } from './AddToCartButton';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { SalePrice } from './SalePrice';
 import { FeaturedTypeBadges } from './FeaturedTypeBadges';
 import { Badge } from '@/components/ui/Badge';

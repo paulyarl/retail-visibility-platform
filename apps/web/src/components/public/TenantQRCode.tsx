@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { storefrontService } from '@/services/StorefrontService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags, StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { StyledTenantQR } from '@/components/public/StyledTenantQR';
 import { clientLogger } from '@/lib/client-logger';
@@ -27,6 +28,8 @@ export interface TenantQRCodeProps {
   pageType?: 'storefront' | 'directory' | 'product' | 'map';
   /** Pre-resolved capability flags (skips tier fetch if provided) */
   capabilityFlags?: StorefrontOptionFlags | null;
+  /** Whether this is rendered on a public (unauthenticated) page */
+  isPublic?: boolean;
 }
 
 /**
@@ -43,6 +46,7 @@ export function TenantQRCode({
   className = '',
   pageType,
   capabilityFlags,
+  isPublic = false,
 }: TenantQRCodeProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -65,8 +69,13 @@ export function TenantQRCode({
           storefrontService.getPublicTier(tenantId),
           capabilityFlags
             ? Promise.resolve(capabilityFlags)
-            : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
-          unifiedCapabilityService.getStorefrontQrState(tenantId).catch(() => null),
+            : isPublic
+              ? publicUnifiedCapabilityService.getStorefrontOptionFlags(tenantId)
+              : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
+          (isPublic
+            ? publicUnifiedCapabilityService.getStorefrontQrState(tenantId)
+            : unifiedCapabilityService.getStorefrontQrState(tenantId)
+          ).catch(() => null),
         ]);
 
         // Set QR state if fetched

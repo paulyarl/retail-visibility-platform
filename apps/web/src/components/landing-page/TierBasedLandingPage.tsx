@@ -27,7 +27,7 @@ function useResponsiveLayout() {
 import QRCode from 'qrcode';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
-import { useCommerceCapability, usePaymentGatewayCapability, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability, usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
@@ -1132,15 +1132,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const effectiveGatewayType = contextGatewayType ?? (product as any).defaultGatewayType;
 
   // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(product.tenantId);
-  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  const commerceCap = usePublicCommerceCapability(product.tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(product.tenantId);
   const commerceEnabled = commerceCap.data?.enabled ?? true;
   const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
   const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
   const effectiveCanPurchase = effectiveCanPurchaseLegacy && commerceEnabled && gatewayCapEnabled;
 
   // Storefront capability-driven content control
-  const storefrontCap = useStorefrontCapability(product.tenantId);
+  const storefrontCap = usePublicStorefrontCapability(product.tenantId);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
@@ -1899,6 +1899,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             label="Scan to Share"
             pageType="product"
             capabilityFlags={optFlags}
+            isPublic
           />
         )}
 

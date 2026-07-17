@@ -15,7 +15,7 @@ interface BotSkillsPageProps {
 }
 
 export default function BotSkillsPage({ tenantId }: BotSkillsPageProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [skills, setSkills] = useState<BotSkill[]>([]);
   const [loading, setLoading] = useState(true);
 

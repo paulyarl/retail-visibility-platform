@@ -20,7 +20,7 @@ interface StepState {
 }
 
 export default function BotSetupGuide({ tenantId }: BotSetupGuideProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [skills, setSkills] = useState<BotSkill[]>([]);
   const [loading, setLoading] = useState(true);

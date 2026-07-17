@@ -12,7 +12,7 @@ import ShopProfileClient from './ShopProfileClient';
 import { getShopBySlug, type ShopData, type ShopResponse } from './getShopBySlug';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
@@ -114,7 +114,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   let storefrontOptionFlags: StorefrontOptionFlags | null = null;
   try {
     if (tenantId) {
-      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(tenantId, { isPublic: true });
+      storefrontOptionFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(tenantId);
     }
   } catch (error) {
     clientLogger.error('Error fetching storefront option flags:', { detail: error });
@@ -124,7 +124,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
   try {
     if (tenantId) {
-      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(tenantId, { isPublic: true });
+      faqOptionsFlags = await publicUnifiedCapabilityService.getFaqOptionsFlags(tenantId);
     }
   } catch (error) {
     clientLogger.error('Error fetching FAQ options flags:', { detail: error });

@@ -41,7 +41,7 @@ import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, type StorefrontState } from '@/services/CapabilityResolutionService';
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
@@ -418,7 +418,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront option flags (capability-aware) — prioritized server-side fetch
     let storefrontOptionFlags: StorefrontOptionFlags | null = null;
     try {
-      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug, { isPublic: true });
+      storefrontOptionFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch storefront option flags:', { detail: e });
     }
@@ -426,7 +426,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch commerce state from unified capability service
     let commerceSettings: CommerceState | null = null;
     try {
-      commerceSettings = await unifiedCapabilityService.getCommerceState(idResolvedBySlug, { isPublic: true });
+      commerceSettings = await publicUnifiedCapabilityService.getCommerceState(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch commerce state:', { detail: e });
     }
@@ -434,7 +434,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch payment gateway state from unified capability service
     let paymentGatewaySettings: PaymentGatewayState | null = null;
     try {
-      paymentGatewaySettings = await unifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug, { isPublic: true });
+      paymentGatewaySettings = await publicUnifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch payment gateway state:', { detail: e });
     }
@@ -442,7 +442,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront type state from unified capability service
     let storefrontTypeSettings: StorefrontState | null = null;
     try {
-      storefrontTypeSettings = await unifiedCapabilityService.getStorefrontState(idResolvedBySlug, { isPublic: true });
+      storefrontTypeSettings = await publicUnifiedCapabilityService.getStorefrontState(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch storefront type state:', { detail: e });
     }
@@ -450,7 +450,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch FAQ option flags server-side (no client waterfall)
     let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
     try {
-      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug, { isPublic: true });
+      faqOptionsFlags = await publicUnifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch FAQ option flags:', { detail: e });
     }
@@ -458,7 +458,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch CRM option flags server-side (no client waterfall)
     let crmOptionsFlags: PublicCrmOptionsFlags | null = null;
     try {
-      crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug, { isPublic: true });
+      crmOptionsFlags = await publicUnifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch CRM option flags:', { detail: e });
     }
@@ -466,7 +466,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch product option flags server-side (no client waterfall)
     let productOptionFlags: ProductOptionFlags | null = null;
     try {
-      productOptionFlags = await unifiedCapabilityService.getProductOptionFlags(idResolvedBySlug, { isPublic: true });
+      productOptionFlags = await publicUnifiedCapabilityService.getProductOptionFlags(idResolvedBySlug);
     } catch (e) {
       clientLogger.error('Failed to fetch product option flags:', { detail: e });
     }
@@ -474,7 +474,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch social commerce options server-side (no client waterfall)
     let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
     try {
-      const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug, { isPublic: true });
+      const socialCommerceState = await publicUnifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug);
       socialCommerceFlags = {
         enabled: socialCommerceState.enabled,
         canUseShareButtons: socialCommerceState.canUseShareButtons,

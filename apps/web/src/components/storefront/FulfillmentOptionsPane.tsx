@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Package, Truck, MapPin, CreditCard, CheckCircle2 } from 'lucide-react';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
-import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicFulfillmentCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
 
 interface FulfillmentSettings {
@@ -31,11 +31,12 @@ interface FulfillmentOptionsPaneProps {
   tenantId: string;
   compact?: boolean;
   paymentGateways?: any[];
+  /** Whether this is rendered on a public (unauthenticated) page */
+  isPublic?: boolean;
 }
 
-export default function FulfillmentOptionsPane({ tenantId, compact = false, paymentGateways: propPaymentGateways }: FulfillmentOptionsPaneProps) {
-  // Fulfillment capability-driven content control (effective = tier allows AND merchant enabled)
-  const fulfillmentCap = useFulfillmentCapability(tenantId);
+export default function FulfillmentOptionsPane({ tenantId, compact = false, paymentGateways: propPaymentGateways, isPublic = false }: FulfillmentOptionsPaneProps) {
+  const fulfillmentCap = usePublicFulfillmentCapability(tenantId);
   const isFulfillmentEnabled = fulfillmentCap.data?.enabled ?? true;
   const showsPickup = fulfillmentCap.data?.effectiveShowsPickup ?? fulfillmentCap.data?.showsPickup ?? true;
   const showsDelivery = fulfillmentCap.data?.effectiveShowsDelivery ?? fulfillmentCap.data?.showsDelivery ?? true;

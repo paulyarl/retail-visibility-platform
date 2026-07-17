@@ -51,6 +51,7 @@ export default function ProductQuickCommerceLayout({
   // Use server-provided flags directly to avoid hydration mismatches
   const showsLocation = productOptFlags?.showsLocationDisplay ?? s.showsLocation ?? true;
   const showsMap = productOptFlags?.showsMapDisplay ?? s.showsMap ?? true;
+  const showsHours = productOptFlags?.showsHoursDisplay ?? s.showsHours ?? true;
   const showsLocationAvailability = productOptFlags?.showsLocationAvailability ?? s.showsLocationAvailability ?? true;
   const isOnlineStore = tenant?.storeType === 'online' || tenant?.metadata?.store_type === 'online' || false;
   const isRetailStore = !isOnlineStore && (tenant?.storeType === 'retail' || tenant?.metadata?.store_type === 'retail' || (s.isRetailStore ?? true));
@@ -188,7 +189,7 @@ export default function ProductQuickCommerceLayout({
           resolvedCurrentUrl={s.resolvedCurrentUrl}
           showsLocation={showsLocation}
           showsMap={showsMap}
-          showsHours={s.showsHours}
+          showsHours={showsHours}
           isRetailStore={isRetailStore}
           isOnlineStore={isOnlineStore}
           hoursStatus={s.hoursStatus}

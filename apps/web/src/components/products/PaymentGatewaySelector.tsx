@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { CreditCard, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/Label';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
-import { usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
 
 interface Gateway {
@@ -45,7 +45,7 @@ export default function PaymentGatewaySelector({
   const [error, setError] = useState<string | null>(null);
 
   // Capability-aware gateway filtering
-  const paymentCap = usePaymentGatewayCapability(tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(tenantId);
   const [selection, setSelection] = useState<'default' | 'square' | 'paypal'>(
     value.gateway_type ? (value.gateway_type as 'square' | 'paypal') : 'default'
   );

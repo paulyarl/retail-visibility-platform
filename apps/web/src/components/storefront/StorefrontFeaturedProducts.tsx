@@ -7,7 +7,7 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 import { Button } from '@/components/ui/Button';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
-import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicFeaturedOptionsCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
 
 interface FeaturedProduct {
@@ -632,7 +632,7 @@ export default function StorefrontFeaturedProducts({
   const [loading, setLoading] = useState(true);
 
   // Capability-aware featured options filtering
-  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const featuredCap = usePublicFeaturedOptionsCapability(tenantId);
   const featuredOptionsState = featuredCap.data;
 
   useEffect(() => {

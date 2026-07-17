@@ -38,7 +38,7 @@ function relativeTime(dateStr: string | null | undefined): string {
 }
 
 export default function BotTenantWidget({ tenantId }: BotTenantWidgetProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'overview' | 'conversations'>('overview');
 

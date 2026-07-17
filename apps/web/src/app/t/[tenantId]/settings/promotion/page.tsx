@@ -37,7 +37,7 @@ export default function PromotionSettingsPage({ tenantId: propTenantId }: { tena
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: promoCapability, loading: capLoading } = useDirectoryPromotionCapability(tenantId, { forTenant: true });
+  const { data: promoCapability, loading: capLoading } = useDirectoryPromotionCapability(tenantId);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

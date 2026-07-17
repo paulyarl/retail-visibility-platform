@@ -232,6 +232,7 @@ export default function StorefrontFooter({
                   showDownload={true}
                   pageType="storefront"
                   capabilityFlags={optFlags}
+                  isPublic
                 />
               </div>
             </div>
@@ -400,6 +401,7 @@ export default function StorefrontFooter({
               showDownload={true}
               pageType="storefront"
               capabilityFlags={optFlags}
+              isPublic
             />
           </div>
         </div>

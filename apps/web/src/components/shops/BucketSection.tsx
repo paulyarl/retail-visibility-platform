@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { ShopCard } from '@/components/shops/ShopCard';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -159,8 +159,8 @@ export function ProductBucket({
 }: ProductBucketProps) {
   const displayProducts = products.slice(0, maxItems);
   const tenantId = displayProducts[0]?.tenantId || displayProducts[0]?.tenant_id || null;
-  const commerceCap = useCommerceCapability(tenantId);
-  const paymentCap = usePaymentGatewayCapability(tenantId);
+  const commerceCap = usePublicCommerceCapability(tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(tenantId);
   const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
 
   return (

@@ -10,7 +10,7 @@ import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { ProductTypeBadge } from '@/components/products/ProductTypeBadge';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
-import { useCommerceCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
 
 interface Gateway {
@@ -100,7 +100,7 @@ export default function MultiCartPage() {
       const commerceData: Record<string, { enabled: boolean; cartVisible: boolean }> = {};
 
       // Use unified capability service (replaces CapabilityResolutionService)
-      const { unifiedCapabilityService } = await import('@/services/UnifiedCapabilityService');
+      const { publicUnifiedCapabilityService } = await import('@/services/PublicUnifiedCapabilityService');
 
       for (const tenantId of tenantIds) {
         try {
@@ -108,7 +108,7 @@ export default function MultiCartPage() {
           const [gateways, profile, commerceState] = await Promise.all([
             publicTenantInfoService.getPaymentGateways(tenantId),
             publicTenantInfoService.getTenantProfile(tenantId).catch(() => null),
-            unifiedCapabilityService.getCommerceState(tenantId).catch(() => null)
+            publicUnifiedCapabilityService.getCommerceState(tenantId).catch(() => null)
           ]);
 
           gatewayData[tenantId] = gateways.filter((g: Gateway) => g.is_active);

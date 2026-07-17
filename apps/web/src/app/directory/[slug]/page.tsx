@@ -36,7 +36,7 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 // import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import LastViewed from '@/components/directory/LastViewed';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags, PublicCrmOptionsFlags, type FeaturedOptionsState, type DirectoryEntryOptionsState, type DirectoryEntryLayoutKey } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
@@ -79,7 +79,7 @@ import { useRouter } from 'next/navigation';
 // store status
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
-import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
 
 interface StoreDetailPageProps {
@@ -405,7 +405,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const { status: hoursStatus } = useStoreStatus(consolidatedData?.listing?.tenantId || '', true); // Public scope
 
   // Storefront capability-driven content control
-  const storefrontCap = useStorefrontCapability(consolidatedData?.listing?.tenantId || null);
+  const storefrontCap = usePublicStorefrontCapability(consolidatedData?.listing?.tenantId || null);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
 
   // Active featured products (from ActiveFeaturedResolver)
@@ -490,11 +490,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
           getStorefrontCategories(data.listing.tenantId),
           getActualProductCount(data.listing.tenantId),
-          unifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId, { isPublic: true }),
-          unifiedCapabilityService.getFeaturedOptionsState(data.listing.tenantId, { isPublic: true }),
-          unifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId, { isPublic: true }),
-          unifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId, { isPublic: true }),
-          unifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId, { isPublic: true })
+          publicUnifiedCapabilityService.getStorefrontOptionFlags(data.listing.tenantId),
+          publicUnifiedCapabilityService.getFeaturedOptionsState(data.listing.tenantId),
+          publicUnifiedCapabilityService.getFaqOptionsFlags(data.listing.tenantId),
+          publicUnifiedCapabilityService.getCrmOptionsFlags(data.listing.tenantId),
+          publicUnifiedCapabilityService.getDirectoryEntryOptionsState(data.listing.tenantId)
         ]);
 
         setBusinessProfile(profile?.data);
@@ -740,7 +740,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 }
 
 function StoreComingSoon({ tenantId }: { tenantId: string }) {
-  const { data: storefrontCapability } = useStorefrontCapability(tenantId);
+  const { data: storefrontCapability } = usePublicStorefrontCapability(tenantId);
   const storefrontEnabled = storefrontCapability?.enabled ?? false;
 
   return (

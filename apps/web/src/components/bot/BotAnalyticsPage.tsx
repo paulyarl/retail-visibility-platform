@@ -26,7 +26,7 @@ interface AnalyticsData {
 }
 
 export default function BotAnalyticsPage({ tenantId }: BotAnalyticsPageProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 

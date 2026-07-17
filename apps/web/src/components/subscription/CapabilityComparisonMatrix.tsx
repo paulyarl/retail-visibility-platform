@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { Check, X, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTenantComplete } from '@/hooks/dashboard/useTenantComplete';
 import { useTierConfig } from '@/lib/tiers/useTierConfig';
-import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicAllCapabilities } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { TIER_DISPLAY_NAMES, TIER_PRICING } from '@/lib/tiers/tier-features';
 import {
   COMPARISON_TIERS,
@@ -32,7 +32,7 @@ export default function CapabilityComparisonMatrix({
   const isTenantMode = !!tenantId;
   const { tenant, tier, loading: tenantLoading } = useTenantComplete(isTenantMode ? tenantId! : null);
   const tierConfig = useTierConfig({ publicMode: !isTenantMode });
-  const { data: allCaps, loading: capsLoading } = useAllCapabilities(isTenantMode ? tenantId! : null);
+  const { data: allCaps, loading: capsLoading } = usePublicAllCapabilities(isTenantMode ? tenantId! : null);
   const [expandedCap, setExpandedCap] = useState<string | null>(null);
 
   const getTierFeatures = tierConfig.getTierFeatures;

@@ -17,7 +17,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState, type FeaturedType } from '@/services/CapabilityResolutionService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import LastViewed from '@/components/directory/LastViewed';
@@ -249,12 +249,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
-  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId, { isPublic: true });
+  const optFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
   const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
   let storefrontType: string | undefined;
   try {
-    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
+    const storefrontState = await publicUnifiedCapabilityService.getStorefrontState(product.tenantId);
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
     // Non-critical — default to undefined
@@ -354,7 +354,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const { counts: rawBucketCounts, groupedProducts: rawGroupedProducts } = await getFeaturedProductsByType(product.tenantId);
 
   // Fetch featured options state and apply merchant gate filtering at page root
-  const featuredState = await unifiedCapabilityService.getFeaturedOptionsState(product.tenantId, { isPublic: true });
+  const featuredState = await publicUnifiedCapabilityService.getFeaturedOptionsState(product.tenantId);
   const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredState);
   const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredState);
   const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredState);
@@ -363,16 +363,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
-  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId, { isPublic: true });
-  const productOptFlags = await unifiedCapabilityService.getProductOptionFlags(product.tenantId, { isPublic: true });
-  const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId, { isPublic: true });
-  const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId, { isPublic: true });
+  const optFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
+  const productOptFlags = await publicUnifiedCapabilityService.getProductOptionFlags(product.tenantId);
+  const faqOptionsFlags = await publicUnifiedCapabilityService.getFaqOptionsFlags(product.tenantId);
+  const crmOptionsFlags = await publicUnifiedCapabilityService.getCrmOptionsFlags(product.tenantId);
   const platformSettings = await platformSettingsService.getPlatformSettings();
 
   // Fetch storefront type for social behavior overlay
   let storefrontType: string | undefined;
   try {
-    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
+    const storefrontState = await publicUnifiedCapabilityService.getStorefrontState(product.tenantId);
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
     clientLogger.error('Failed to fetch storefront type:', { detail: e });
@@ -381,7 +381,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // Fetch social commerce flags for share buttons + social proof gating
   let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
   try {
-    const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId, { isPublic: true });
+    const socialCommerceState = await publicUnifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId);
     socialCommerceFlags = {
       enabled: socialCommerceState.enabled,
       canUseShareButtons: socialCommerceState.canUseShareButtons,
@@ -677,7 +677,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 storeStatus={null}
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                 videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} /> : undefined}
-                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
@@ -727,7 +727,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 storeStatus={null}
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                 videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} compact /> : undefined}
-                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
@@ -762,6 +762,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     label="Scan to Share"
                     capabilityFlags={optFlags}
                     pageType="product"
+                    isPublic
                   />
                 )}
               </div>
@@ -788,6 +789,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     label="Scan to Share"
                     capabilityFlags={optFlags}
                     pageType="product"
+                    isPublic
                   />
                 )}
               </div>
@@ -835,7 +837,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     } as any}
                     storeStatus={null}
                     gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-                    fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                    fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
                     currentUrl={currentUrl}
                     initialOptFlags={optFlags}
                   />

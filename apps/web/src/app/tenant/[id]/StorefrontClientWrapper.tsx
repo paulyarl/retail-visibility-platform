@@ -10,7 +10,7 @@ import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSing
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicFeaturedOptionsCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 // Capability data now passed as server-fetched props — eliminates client-side waterfall 
 // import SmartProductCard from '@/components/products/SmartProductCard';
 // import StorefrontActions from '@/components/products/StorefrontActions';
@@ -178,7 +178,7 @@ export default function StorefrontClientWrapper({
   const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
 
   // Featured options (capability-gated allowed types)
-  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const featuredCap = usePublicFeaturedOptionsCapability(tenantId);
   const allowedFeaturedTypes = useMemo(() => {
     if (featuredCap.data?.enabled && featuredCap.data.effectiveTypes) {
       return featuredCap.data.effectiveTypes as string[];

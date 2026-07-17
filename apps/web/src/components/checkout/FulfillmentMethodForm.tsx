@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@mantine/core';
 import { MapPin, Truck, Package, Clock } from 'lucide-react';
 import { type FulfillmentState } from '@/services/CapabilityResolutionService';
-import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicFulfillmentCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 
 export type FulfillmentMethod = 'pickup' | 'delivery' | 'shipping';
 
@@ -22,7 +22,7 @@ export default function FulfillmentMethodForm({
   initialMethod,
 }: FulfillmentMethodFormProps) {
   // Fulfillment capability-driven content control (effective = tier allows AND merchant enabled)
-  const fulfillmentCap = useFulfillmentCapability(tenantId);
+  const fulfillmentCap = usePublicFulfillmentCapability(tenantId);
   const settings = fulfillmentCap.data;
   const isFulfillmentEnabled = settings?.enabled ?? true;
   const showsPickup = settings?.effectiveShowsPickup ?? settings?.showsPickup ?? true;

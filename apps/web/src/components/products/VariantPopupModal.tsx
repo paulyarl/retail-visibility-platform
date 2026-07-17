@@ -5,7 +5,7 @@ import { Modal, Button, Text, Group, Stack, Divider, Badge } from '@mantine/core
 import { X, Package, Check } from 'lucide-react';
 import ProductVariantSelector from './ProductVariantSelector';
 import { ProductTypeBadge } from './ProductTypeBadge';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 
 interface VariantPopupModalProps {
   opened: boolean;
@@ -100,8 +100,8 @@ export default function VariantPopupModal({
   const hasGateway = hasActivePaymentGateway || product.hasActivePaymentGateway;
 
   // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(tenantId || null);
-  const paymentCap = usePaymentGatewayCapability(tenantId || null);
+  const commerceCap = usePublicCommerceCapability(tenantId || null);
+  const paymentCap = usePublicPaymentGatewayCapability(tenantId || null);
   const commerceEnabled = commerceCap.data?.enabled ?? true;
   const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
   const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));

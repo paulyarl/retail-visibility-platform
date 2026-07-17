@@ -1,23 +1,19 @@
 /**
- * Capability Access Hooks
- * 
- * React hooks for capability-aware feature state resolution.
- * These hooks fetch tenant capabilities and provide typed domain state
- * for commerce, payment gateways, and storefront types.
- * 
- * - useCommerceCapability: For cart / product listing visibility
- * - usePaymentGatewayCapability: For checkout / payment gateway options
- * - useStorefrontCapability: For storefront display / location / hours
- * - useAllCapabilities: Combined hook for all three
+ * Public Capability Access Hooks
+ *
+ * Public-facing counterpart to useCapabilityAccess.
+ * Uses publicUnifiedCapabilityService (extends PublicApiSingleton) for
+ * unauthenticated public requests — no 401 risk on public pages.
+ *
+ * - usePublicCommerceCapability: For cart / product listing visibility
+ * - usePublicPaymentGatewayCapability: For checkout / payment gateway options
+ * - usePublicStorefrontCapability: For storefront display / location / hours
+ * - usePublicAllCapabilities: Combined hook for all capabilities
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { tenantInfoService } from '@/services/TenantInfoService';
-import { faqService } from '@/services/FaqService';
-import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 
 import {
   CommerceState,
@@ -47,16 +43,6 @@ import {
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
-  resolveCommerceState,
-  resolvePaymentGatewayState,
-  resolveStorefrontState,
-  resolveBarcodeScanState,
-  resolveFulfillmentState,
-  resolveProductOptionsState,
-  resolveFeaturedOptionsState,
-  resolveIntegrationState,
-  resolveQuickstartOptionsState,
-  resolveStorefrontOptionsState,
   getCapabilityTypeForFeature,
 } from '@/services/CapabilityResolutionService';
 
@@ -72,10 +58,10 @@ export interface CapabilityHookState<T> {
 }
 
 // ====================
-// useCommerceCapability
+// usePublicCommerceCapability
 // ====================
 
-export function useCommerceCapability(
+export function usePublicCommerceCapability(
   tenantId: string | null
 ): CapabilityHookState<CommerceState> {
   const [data, setData] = useState<CommerceState | null>(null);
@@ -87,9 +73,7 @@ export function useCommerceCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getCommerceState(tenantId);
-      
-      // console.log(`useCapabilityAccess: state ${JSON.stringify(state)}`);
+      const state = await publicUnifiedCapabilityService.getCommerceState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch commerce capability');
@@ -104,10 +88,10 @@ export function useCommerceCapability(
 }
 
 // ====================
-// usePaymentGatewayCapability
+// usePublicPaymentGatewayCapability
 // ====================
 
-export function usePaymentGatewayCapability(
+export function usePublicPaymentGatewayCapability(
   tenantId: string | null
 ): CapabilityHookState<PaymentGatewayState> {
   const [data, setData] = useState<PaymentGatewayState | null>(null);
@@ -119,7 +103,7 @@ export function usePaymentGatewayCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getPaymentGatewayState(tenantId);
+      const state = await publicUnifiedCapabilityService.getPaymentGatewayState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch payment gateway capability');
@@ -134,10 +118,10 @@ export function usePaymentGatewayCapability(
 }
 
 // ====================
-// useStorefrontCapability
+// usePublicStorefrontCapability
 // ====================
 
-export function useStorefrontCapability(
+export function usePublicStorefrontCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontState> {
   const [data, setData] = useState<StorefrontState | null>(null);
@@ -149,7 +133,7 @@ export function useStorefrontCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront capability');
@@ -164,10 +148,10 @@ export function useStorefrontCapability(
 }
 
 // ====================
-// useBarcodeScanCapability
+// usePublicBarcodeScanCapability
 // ====================
 
-export function useBarcodeScanCapability(
+export function usePublicBarcodeScanCapability(
   tenantId: string | null
 ): CapabilityHookState<BarcodeScanState> {
   const [data, setData] = useState<BarcodeScanState | null>(null);
@@ -179,7 +163,7 @@ export function useBarcodeScanCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getBarcodeScanState(tenantId);
+      const state = await publicUnifiedCapabilityService.getBarcodeScanState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch barcode scan capability');
@@ -194,10 +178,10 @@ export function useBarcodeScanCapability(
 }
 
 // ====================
-// useFulfillmentCapability
+// usePublicFulfillmentCapability
 // ====================
 
-export function useFulfillmentCapability(
+export function usePublicFulfillmentCapability(
   tenantId: string | null
 ): CapabilityHookState<FulfillmentState> {
   const [data, setData] = useState<FulfillmentState | null>(null);
@@ -209,7 +193,7 @@ export function useFulfillmentCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getFulfillmentState(tenantId);
+      const state = await publicUnifiedCapabilityService.getFulfillmentState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch fulfillment capability');
@@ -224,10 +208,10 @@ export function useFulfillmentCapability(
 }
 
 // ====================
-// useProductTypeCapability
+// usePublicProductTypeCapability
 // ====================
 
-export function useProductTypeCapability(
+export function usePublicProductTypeCapability(
   tenantId: string | null
 ): CapabilityHookState<ProductTypeState> {
   const [data, setData] = useState<ProductTypeState | null>(null);
@@ -239,7 +223,7 @@ export function useProductTypeCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getProductTypeState(tenantId);
+      const state = await publicUnifiedCapabilityService.getProductTypeState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch product type capability');
@@ -254,10 +238,10 @@ export function useProductTypeCapability(
 }
 
 // ====================
-// useProductOptionsCapability
+// usePublicProductOptionsCapability
 // ====================
 
-export function useProductOptionsCapability(
+export function usePublicProductOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<ProductOptionsState> {
   const [data, setData] = useState<ProductOptionsState | null>(null);
@@ -269,7 +253,7 @@ export function useProductOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getProductOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getProductOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch product options capability');
@@ -284,10 +268,10 @@ export function useProductOptionsCapability(
 }
 
 // ====================
-// useFeaturedOptionsCapability
+// usePublicFeaturedOptionsCapability
 // ====================
 
-export function useFeaturedOptionsCapability(
+export function usePublicFeaturedOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<FeaturedOptionsState> {
   const [data, setData] = useState<FeaturedOptionsState | null>(null);
@@ -299,7 +283,7 @@ export function useFeaturedOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getFeaturedOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getFeaturedOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch featured options capability');
@@ -314,10 +298,10 @@ export function useFeaturedOptionsCapability(
 }
 
 // ====================
-// useIntegrationOptionsCapability
+// usePublicIntegrationOptionsCapability
 // ====================
 
-export function useIntegrationOptionsCapability(
+export function usePublicIntegrationOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<IntegrationOptionsState> {
   const [data, setData] = useState<IntegrationOptionsState | null>(null);
@@ -329,7 +313,7 @@ export function useIntegrationOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getIntegrationOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getIntegrationOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch integration options capability');
@@ -344,10 +328,10 @@ export function useIntegrationOptionsCapability(
 }
 
 // ====================
-// useQuickstartOptionsCapability
+// usePublicQuickstartOptionsCapability
 // ====================
 
-export function useQuickstartOptionsCapability(
+export function usePublicQuickstartOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<QuickstartOptionsState> {
   const [data, setData] = useState<QuickstartOptionsState | null>(null);
@@ -359,7 +343,7 @@ export function useQuickstartOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getQuickstartOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getQuickstartOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch quickstart options capability');
@@ -374,10 +358,10 @@ export function useQuickstartOptionsCapability(
 }
 
 // ====================
-// useStorefrontOptionsCapability
+// usePublicStorefrontOptionsCapability
 // ====================
 
-export function useStorefrontOptionsCapability(
+export function usePublicStorefrontOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontOptionsState> {
   const [data, setData] = useState<StorefrontOptionsState | null>(null);
@@ -389,7 +373,7 @@ export function useStorefrontOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront options capability');
@@ -404,10 +388,10 @@ export function useStorefrontOptionsCapability(
 }
 
 // ====================
-// useStorefrontQrCapability
+// usePublicStorefrontQrCapability
 // ====================
 
-export function useStorefrontQrCapability(
+export function usePublicStorefrontQrCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontQrState> {
   const [data, setData] = useState<StorefrontQrState | null>(null);
@@ -419,7 +403,7 @@ export function useStorefrontQrCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontQrState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontQrState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront QR capability');
@@ -434,10 +418,10 @@ export function useStorefrontQrCapability(
 }
 
 // ====================
-// useStorefrontGalleryCapability
+// usePublicStorefrontGalleryCapability
 // ====================
 
-export function useStorefrontGalleryCapability(
+export function usePublicStorefrontGalleryCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontGalleryState> {
   const [data, setData] = useState<StorefrontGalleryState | null>(null);
@@ -449,7 +433,7 @@ export function useStorefrontGalleryCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontGalleryState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontGalleryState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront gallery capability');
@@ -464,10 +448,10 @@ export function useStorefrontGalleryCapability(
 }
 
 // ====================
-// useStorefrontHoursCapability
+// usePublicStorefrontHoursCapability
 // ====================
 
-export function useStorefrontHoursCapability(
+export function usePublicStorefrontHoursCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontHoursState> {
   const [data, setData] = useState<StorefrontHoursState | null>(null);
@@ -479,7 +463,7 @@ export function useStorefrontHoursCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontHoursState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontHoursState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront hours capability');
@@ -494,10 +478,10 @@ export function useStorefrontHoursCapability(
 }
 
 // ====================
-// useStorefrontLayoutsCapability
+// usePublicStorefrontLayoutsCapability
 // ====================
 
-export function useStorefrontLayoutsCapability(
+export function usePublicStorefrontLayoutsCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontLayoutState> {
   const [data, setData] = useState<StorefrontLayoutState | null>(null);
@@ -509,7 +493,7 @@ export function useStorefrontLayoutsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontLayoutsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontLayoutsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront layouts capability');
@@ -524,10 +508,10 @@ export function useStorefrontLayoutsCapability(
 }
 
 // ====================
-// useStorefrontMapsCapability
+// usePublicStorefrontMapsCapability
 // ====================
 
-export function useStorefrontMapsCapability(
+export function usePublicStorefrontMapsCapability(
   tenantId: string | null
 ): CapabilityHookState<StorefrontMapsState> {
   const [data, setData] = useState<StorefrontMapsState | null>(null);
@@ -539,7 +523,7 @@ export function useStorefrontMapsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getStorefrontMapsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getStorefrontMapsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront maps capability');
@@ -554,10 +538,10 @@ export function useStorefrontMapsCapability(
 }
 
 // ====================
-// useFaqOptionsCapability
+// usePublicFaqOptionsCapability
 // ====================
 
-export function useFaqOptionsCapability(
+export function usePublicFaqOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<FaqOptionsState> {
   const [data, setData] = useState<FaqOptionsState | null>(null);
@@ -569,7 +553,7 @@ export function useFaqOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getFaqOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getFaqOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch FAQ options capability');
@@ -584,10 +568,10 @@ export function useFaqOptionsCapability(
 }
 
 // ====================
-// useCrmOptionsCapability
+// usePublicCrmOptionsCapability
 // ====================
 
-export function useCrmOptionsCapability(
+export function usePublicCrmOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<CrmOptionsState> {
   const [data, setData] = useState<CrmOptionsState | null>(null);
@@ -599,7 +583,7 @@ export function useCrmOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getCrmOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getCrmOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch CRM options capability');
@@ -614,10 +598,10 @@ export function useCrmOptionsCapability(
 }
 
 // ====================
-// useChatbotOptionsCapability
+// usePublicChatbotOptionsCapability
 // ====================
 
-export function useChatbotOptionsCapability(
+export function usePublicChatbotOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<ChatbotOptionsState> {
   const [data, setData] = useState<ChatbotOptionsState | null>(null);
@@ -629,7 +613,7 @@ export function useChatbotOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getChatbotOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getChatbotOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch chatbot options capability');
@@ -644,10 +628,10 @@ export function useChatbotOptionsCapability(
 }
 
 // ====================
-// useSocialCommerceOptionsCapability
+// usePublicSocialCommerceOptionsCapability
 // ====================
 
-export function useSocialCommerceOptionsCapability(
+export function usePublicSocialCommerceOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<SocialCommerceOptionsState> {
   const [data, setData] = useState<SocialCommerceOptionsState | null>(null);
@@ -659,7 +643,7 @@ export function useSocialCommerceOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getSocialCommerceOptionsState(tenantId);
+      const state = await publicUnifiedCapabilityService.getSocialCommerceOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch social commerce options capability');
@@ -674,10 +658,10 @@ export function useSocialCommerceOptionsCapability(
 }
 
 // ====================
-// useDirectoryPromotionCapability
+// usePublicDirectoryPromotionCapability
 // ====================
 
-export function useDirectoryPromotionCapability(
+export function usePublicDirectoryPromotionCapability(
   tenantId: string | null
 ): CapabilityHookState<DirectoryPromotionState> {
   const [data, setData] = useState<DirectoryPromotionState | null>(null);
@@ -689,7 +673,7 @@ export function useDirectoryPromotionCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getDirectoryPromotionState(tenantId);
+      const state = await publicUnifiedCapabilityService.getDirectoryPromotionState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch directory promotion capability');
@@ -704,10 +688,10 @@ export function useDirectoryPromotionCapability(
 }
 
 // ====================
-// useWholesaleMatchingCapability
+// usePublicWholesaleMatchingCapability
 // ====================
 
-export function useWholesaleMatchingCapability(
+export function usePublicWholesaleMatchingCapability(
   tenantId: string | null
 ): CapabilityHookState<WholesaleMatchingState> {
   const [data, setData] = useState<WholesaleMatchingState | null>(null);
@@ -719,7 +703,7 @@ export function useWholesaleMatchingCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getWholesaleMatchingState(tenantId);
+      const state = await publicUnifiedCapabilityService.getWholesaleMatchingState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch wholesale matching capability');
@@ -734,10 +718,10 @@ export function useWholesaleMatchingCapability(
 }
 
 // ====================
-// usePlatformServicesCapability
+// usePublicPlatformServicesCapability
 // ====================
 
-export function usePlatformServicesCapability(
+export function usePublicPlatformServicesCapability(
   tenantId: string | null
 ): CapabilityHookState<PlatformServicesState> {
   const [data, setData] = useState<PlatformServicesState | null>(null);
@@ -749,7 +733,7 @@ export function usePlatformServicesCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getPlatformServicesState(tenantId);
+      const state = await publicUnifiedCapabilityService.getPlatformServicesState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch platform services capability');
@@ -764,10 +748,10 @@ export function usePlatformServicesCapability(
 }
 
 // ====================
-// useFunnelCapability
+// usePublicFunnelCapability
 // ====================
 
-export function useFunnelCapability(
+export function usePublicFunnelCapability(
   tenantId: string | null
 ): CapabilityHookState<FunnelState> {
   const [data, setData] = useState<FunnelState | null>(null);
@@ -779,7 +763,7 @@ export function useFunnelCapability(
     setLoading(true);
     setError(null);
     try {
-      const state = await unifiedCapabilityService.getFunnelState(tenantId);
+      const state = await publicUnifiedCapabilityService.getFunnelState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch funnel capability');
@@ -794,17 +778,17 @@ export function useFunnelCapability(
 }
 
 // ====================
-// useAllCapabilities
+// usePublicAllCapabilities
 // ====================
 
-export function useAllCapabilities(
+export function usePublicAllCapabilities(
   tenantId: string | null
 ): CapabilityHookState<AllCapabilitiesState> {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tenant', 'capabilities', 'all', tenantId],
+    queryKey: ['tenant', 'public-capabilities', 'all', tenantId],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      return unifiedCapabilityService.getAllCapabilities(tenantId);
+      return publicUnifiedCapabilityService.getAllCapabilities(tenantId);
     },
     enabled: !!tenantId,
     staleTime: 60 * 1000,
@@ -826,14 +810,10 @@ export function useAllCapabilities(
 }
 
 // ====================
-// useCapabilityFeatureCheck
+// usePublicCapabilityFeatureCheck
 // ====================
 
-/**
- * Lightweight hook that checks a single feature key against capability data.
- * Returns null if the feature is not capability-gated (uncategorized).
- */
-export function useCapabilityFeatureCheck(
+export function usePublicCapabilityFeatureCheck(
   tenantId: string | null,
   featureKey: string
 ): { enabled: boolean | null; loading: boolean } {
@@ -845,13 +825,12 @@ export function useCapabilityFeatureCheck(
 
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) {
-      // Not a capability-gated feature
       setEnabled(null);
       return;
     }
 
     setLoading(true);
-    unifiedCapabilityService.checkFeatureByCapability(tenantId, featureKey)
+    publicUnifiedCapabilityService.checkFeatureByCapability(tenantId, featureKey)
       .then((result: boolean | null) => setEnabled(result))
       .catch(() => setEnabled(false))
       .finally(() => setLoading(false));
@@ -861,111 +840,17 @@ export function useCapabilityFeatureCheck(
 }
 
 // ====================
-// useMerchantGates
+// usePublicConstraintViolations
 // ====================
 
-/**
- * Fetches each capability's merchant-pref-aware state and determines
- * whether the merchant has disabled the entire capability (tier allows
- * but merchant turned it off). Returns a Record<capabilityKey, boolean>.
- *
- * Uses the same cached option services as the settings pages for reliable
- * master-switch detection. Falls back to resolve-service effective fields
- * when direct settings fetch fails.
- */
-export function useMerchantGates(
-  tenantId: string | null
-): { gates: Record<string, boolean>; loading: boolean } {
-  const [gates, setGates] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!tenantId) return;
-    setLoading(true);
-
-
-    Promise.all([
-      // Tier-allowed states from resolve service
-      unifiedCapabilityService.getCommerceState(tenantId).catch(() => null),
-      unifiedCapabilityService.getPaymentGatewayState(tenantId).catch(() => null),
-      unifiedCapabilityService.getStorefrontState(tenantId).catch(() => null),
-      unifiedCapabilityService.getBarcodeScanState(tenantId).catch(() => null),
-      unifiedCapabilityService.getFulfillmentState(tenantId).catch(() => null),
-      unifiedCapabilityService.getProductOptionsState(tenantId).catch(() => null),
-      unifiedCapabilityService.getFeaturedOptionsState(tenantId).catch(() => null),
-      unifiedCapabilityService.getIntegrationOptionsState(tenantId).catch(() => null),
-      unifiedCapabilityService.getQuickstartOptionsState(tenantId).catch(() => null),
-      unifiedCapabilityService.getStorefrontOptionsState(tenantId).catch(() => null),
-      unifiedCapabilityService.getFaqOptionsState(tenantId).catch(() => null),
-      unifiedCapabilityService.getCrmOptionsState(tenantId).catch(() => null),
-      // Direct merchant settings from option services (for master switches)
-      platformHomeService.getTenantBarcodeScanSettings(tenantId).catch(() => null),
-      platformHomeService.getTenantFulfillmentSettings(tenantId).catch(() => null),
-      tenantInfoService.getStorefrontOptionsSettings(tenantId).catch(() => null),
-      faqService.getOptions(tenantId).then(r => r.settings).catch(() => null),
-      tenantInfoService.getPaymentGatewaySettings(tenantId).catch(() => null),
-      platformHomeService.getTenantFeaturedOptionsSettings(tenantId).catch(() => null),
-      platformHomeService.getTenantProductOptionsSettings(tenantId).catch(() => null),
-      platformHomeService.getTenantIntegrationOptionsSettings(tenantId).catch(() => null),
-      tenantInfoService.getQuickstartOptionsSettings(tenantId).catch(() => null),
-      crmTenantCrmService.getOptions(tenantId).then(r => r.settings).catch(() => null),
-    ]).then(([c, pg, sf, bc, fl, po, fo, io, qo, so, faq, crm, bcSettings, flSettings, soSettings, faqSettings, pgSettings, foSettings, poSettings, ioSettings, qoSettings, crmSettings]) => {
-      setGates({
-        commerce_types: c ? c.enabled && c.effectivePaymentType === 'none' : false,
-        // Payment gateway: check master switch from option service
-        payment_gateway_options: pg ? pg.enabled && (pgSettings ? pgSettings.gateway_enabled === false : pg.effectiveGateways.length === 0) : false,
-        storefront_types: sf ? sf.enabled && sf.effectiveType === 'none' : false,
-        // Barcode: check master switch from option service (resolve fn doesn't accept barcode_enabled)
-        barcode_scan_options: bc ? bc.enabled && (bcSettings ? bcSettings.barcode_enabled === false : bc.effectiveModes.length === 0) : false,
-        // Fulfillment: no master switch — check all 3 individual switches against tier-allowed methods
-        fulfillment_options: fl && fl.enabled && (fl.showsPickup || fl.showsDelivery || fl.showsShipping)
-          ? flSettings
-            ? (!fl.showsPickup || !flSettings.pickup_enabled) && (!fl.showsDelivery || !flSettings.delivery_enabled) && (!fl.showsShipping || !flSettings.shipping_enabled)
-            : !fl.effectiveShowsPickup && !fl.effectiveShowsDelivery && !fl.effectiveShowsShipping
-          : false,
-        // Product options: check if capability is disabled or all creation features are off
-        product_options: po
-          ? !po.enabled || (!po.creationEnabled && !po.showsVariants && !po.showsGallery && !po.showsVideo && !po.showsSupplierCatalog && !po.layoutEnabled && !po.sectionsEnabled)
-          : false,
-        // Featured options: check master switch from option service
-        featured_options: fo ? fo.enabled && (foSettings ? foSettings.featured_enabled === false : fo.effectiveTypes.length === 0) : false,
-        // Integration options: check master switch from option service
-        integration_options: io ? io.enabled && (ioSettings ? ioSettings.integration_enabled === false : io.effectiveTypes.length === 0) : false,
-        // Quickstart options: check master switch from option service
-        quickstart_options: qo ? qo.enabled && (qoSettings ? qoSettings.quickstart_enabled === false : !qo.canUseWizard && !qo.canGenerateImages && !qo.canUseCategoryGenerator && !qo.canUseOpenAI && !qo.canUseGemini && !qo.canUseAIWizard && !qo.canUseHDImages) : false,
-        // Storefront options: check master switch from option service
-        storefront_options: so ? so.enabled && (soSettings ? soSettings.storefront_opt_enabled === false : so.merchantPreferences.storefront_opt_enabled === false) : false,
-        // FAQ: check master switch from option service (resolve fn doesn't accept merchant prefs)
-        faq_options: faq ? faq.enabled && (faqSettings ? faqSettings.faq_enabled === false : false) : false,
-        // CRM: check master switch from option service
-        crm_options: crm ? crm.enabled && (crmSettings ? crmSettings.crm_enabled === false : false) : false,
-      });
-      setLoading(false);
-    });
-  }, [tenantId]);
-
-  return { gates, loading };
-}
-
-// ====================
-// useConstraintViolations
-// ====================
-
-/**
- * Fetches cross-capability constraint violations for a tenant.
- * Returns violations array + loading/error state.
- *
- * Uses the unified capabilities endpoint (same as useAllCapabilities).
- * Constraint violations are computed server-side by the CCL post-resolution pass.
- */
-export function useConstraintViolations(
+export function usePublicConstraintViolations(
   tenantId: string | null
 ): CapabilityHookState<ConstraintViolationState[]> {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tenant', 'capabilities', 'constraints', tenantId],
+    queryKey: ['tenant', 'public-capabilities', 'constraints', tenantId],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const caps = await unifiedCapabilityService.getAllCapabilities(tenantId);
+      const caps = await publicUnifiedCapabilityService.getAllCapabilities(tenantId);
       return caps.constraintViolations;
     },
     enabled: !!tenantId,
@@ -988,24 +873,17 @@ export function useConstraintViolations(
 }
 
 // ====================
-// useConstraintStatus
+// usePublicConstraintStatus
 // ====================
 
-/**
- * Fetches cross-capability constraint status for a tenant.
- * Returns a map of capability key → { blockedTypes, warningTypes, activeViolations }.
- *
- * Settings pages use blockedTypes to disable selection controls.
- * Dashboard uses warningTypes to show amber warnings.
- */
-export function useConstraintStatus(
+export function usePublicConstraintStatus(
   tenantId: string | null
 ): CapabilityHookState<ConstraintStatusMapState> {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tenant', 'capabilities', 'constraint-status', tenantId],
+    queryKey: ['tenant', 'public-capabilities', 'constraint-status', tenantId],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const caps = await unifiedCapabilityService.getAllCapabilities(tenantId);
+      const caps = await publicUnifiedCapabilityService.getAllCapabilities(tenantId);
       return caps.constraintStatus;
     },
     enabled: !!tenantId,
