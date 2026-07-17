@@ -90,8 +90,6 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
             height: exportSize,
             type: 'svg',
             data: previewUrl,
-            image: logoUrl || undefined,
-            imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: settings.qr_logo_shape } as any,
             dotsOptions: {
               color: effectiveDotColor,
               type: settings.qr_dot_type as any,
@@ -115,13 +113,26 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
 
           const blob = await qr.getRawData('png');
           if (blob instanceof Blob && !cancelled) {
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            });
-            if (!cancelled) setQrImageUrl(dataUrl);
+            const qrImg = await createImageBitmap(blob);
+            const canvas = document.createElement('canvas');
+            canvas.width = exportSize;
+            canvas.height = exportSize;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Could not get canvas context');
+            ctx.drawImage(qrImg, 0, 0);
+
+            let finalCanvas = canvas;
+            if (logoUrl) {
+              try {
+                finalCanvas = await overlayLogoOnQR(canvas, logoUrl, settings.qr_logo_shape);
+              } catch {
+                // fallback to plain QR
+              }
+            }
+
+            if (!cancelled) {
+              setQrImageUrl(finalCanvas.toDataURL('image/png', 1.0));
+            }
           }
         } else {
           const QRCode = (await import('qrcode')).default;
