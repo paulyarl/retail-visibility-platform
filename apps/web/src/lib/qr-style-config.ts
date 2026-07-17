@@ -10,11 +10,13 @@ export type QRThemeName = 'promo' | 'promo-sale' | 'bundle-promo' | 'private-gra
 export interface QRThemeConfig {
   name: QRThemeName;
   label: string;
-  dotType: 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
+  dotType: 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded' | 'square';
   dotColor: string;
   cornerSquareType: 'dot' | 'square' | 'extra-rounded' | 'rounded';
   cornerSquareColor: string;
+  cornerDotType: 'dot' | 'square';
   cornerDotColor: string;
+  logoShape: 'square' | 'circle';
   backgroundColor: string;
   description: string;
 }
@@ -27,7 +29,9 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     dotColor: '#1a56db',
     cornerSquareType: 'extra-rounded',
     cornerSquareColor: '#1a56db',
+    cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#f8fafc',
     description: 'General marketing',
   },
@@ -38,7 +42,9 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     dotColor: '#dc2626',
     cornerSquareType: 'rounded',
     cornerSquareColor: '#dc2626',
+    cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#fef2f2',
     description: 'Flash sales, limited-time',
   },
@@ -49,7 +55,9 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     dotColor: '#16a34a',
     cornerSquareType: 'extra-rounded',
     cornerSquareColor: '#16a34a',
+    cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#f0fdf4',
     description: 'Bundle discount campaigns',
   },
@@ -60,7 +68,9 @@ export const QR_THEMES: Record<QRThemeName, QRThemeConfig> = {
     dotColor: '#7c3aed',
     cornerSquareType: 'dot',
     cornerSquareColor: '#7c3aed',
+    cornerDotType: 'dot',
     cornerDotColor: '#ffffff',
+    logoShape: 'square',
     backgroundColor: '#faf5ff',
     description: 'Enterprise deals, trade shows',
   },
@@ -88,7 +98,8 @@ export function buildQROptions(
       margin: 10,
       imageSize: 0.35,
       hideBackgroundDots: true,
-    },
+      imageShape: theme.logoShape,
+    } as any,
     dotsOptions: {
       color: theme.dotColor,
       type: theme.dotType,
@@ -99,7 +110,7 @@ export function buildQROptions(
     },
     cornersDotOptions: {
       color: theme.cornerDotColor,
-      type: 'dot' as const,
+      type: theme.cornerDotType,
     },
     backgroundOptions: {
       color: theme.backgroundColor,

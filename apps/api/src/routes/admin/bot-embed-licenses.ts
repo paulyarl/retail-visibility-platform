@@ -17,6 +17,7 @@ import { prisma } from '../../prisma';
 import { requireAdmin } from '../../middleware/auth';
 import { audit } from '../../audit';
 import { generateEmbedKey } from '../../lib/id-generator';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -66,7 +67,7 @@ router.get('/', requireAdmin, async (req: Request, res: Response) => {
 
     res.json({ success: true, data: licenses });
   } catch (error) {
-    console.error('[BotEmbedLicenses] Error listing:', error);
+    logger.error('[BotEmbedLicenses] Error listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list embed licenses' });
   }
 });
@@ -107,7 +108,7 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
 
     res.json({ success: true, data: license });
   } catch (error) {
-    console.error('[BotEmbedLicenses] Error creating:', error);
+    logger.error('[BotEmbedLicenses] Error creating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create embed license' });
   }
 });
@@ -145,7 +146,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
 
     res.json({ success: true, data: license });
   } catch (error) {
-    console.error('[BotEmbedLicenses] Error updating:', error);
+    logger.error('[BotEmbedLicenses] Error updating:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update embed license' });
   }
 });
@@ -169,7 +170,7 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[BotEmbedLicenses] Error deleting:', error);
+    logger.error('[BotEmbedLicenses] Error deleting:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete embed license' });
   }
 });

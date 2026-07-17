@@ -10,6 +10,7 @@
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, AuthenticatedApiResponse, ApiResult } from './FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // AUTHENTICATED API SINGLETON
@@ -77,7 +78,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
       try {
         await this.cacheManager.remove(key);
       } catch (error) {
-        console.warn(`[AuthenticatedApiSingleton] Failed to clear auth cache key ${key}:`, error);
+        clientLogger.warn(`[AuthenticatedApiSingleton] Failed to clear auth cache key ${key}:`, { detail: error });
       }
     }
     
@@ -104,7 +105,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
       const response = await this.makeAuthenticatedRequest('/api/health');
       return response.success;
     } catch (error) {
-      console.error('[AuthenticatedApiSingleton] Health check failed:', error);
+      clientLogger.error('[AuthenticatedApiSingleton] Health check failed:', { detail: error });
       return false;
     }
   }

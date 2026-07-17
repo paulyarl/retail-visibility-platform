@@ -7,6 +7,7 @@ import { BusinessProfile, onboardingProfileSchema, countries, normalizePhoneInpu
 import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
+import { clientLogger } from '@/lib/client-logger';
 
 // E.164 phone number validation
 const phoneRegex = /^\+[1-9]\d{1,14}$/;
@@ -324,7 +325,7 @@ export default function StoreIdentityStep({
         onDataChange(newData);
       }
     } catch (err) {
-      console.error('[StoreIdentityStep] Failed to geocode address:', err);
+      clientLogger.error('[StoreIdentityStep] Failed to geocode address:', { detail: err });
     } finally {
       setGeocoding(false);
     }

@@ -13,6 +13,7 @@ import { rateLimitSettingsService, type RateLimitConfiguration } from '@/service
 import { Zap, Shield, TrendingUp, Settings, Loader2, BarChart3 } from 'lucide-react';
 import RateLimitTrends from './RateLimitTrends';
 import SecurityAlerts from './SecurityAlerts';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PlatformSettingsData {
   rateLimitingEnabled: boolean;
@@ -132,7 +133,7 @@ export default function PlatformSettings() {
         setRateLimitConfigs(defaults);
       }
     } catch (error) {
-      console.error('Failed to load rate limiting settings:', error);
+      clientLogger.error('Failed to load rate limiting settings:', { detail: error });
       // Default settings on error
       setSettings({
         rateLimitingEnabled: true,
@@ -180,7 +181,7 @@ export default function PlatformSettings() {
         throw new Error('Failed to save settings');
       }
     } catch (error) {
-      console.error('Failed to save platform settings:', error);
+      clientLogger.error('Failed to save platform settings:', { detail: error });
       toastFunction('Failed to save platform settings. Please try again.', { variant: 'error' });
     } finally {
       setSaving(false);

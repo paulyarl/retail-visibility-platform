@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/Separator';
 import { tenantLimitsService } from '@/services/TenantLimitsSingletonService';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function TestPhase1_2() {
   const [testResults, setTestResults] = useState<Record<string, any>>({});
@@ -61,7 +62,7 @@ export default function TestPhase1_2() {
       // };
 
     } catch (error: unknown) {
-      console.error('Phase 1 test error:', error);
+      clientLogger.error('Phase 1 test error:', { detail: error });
       results.error = error instanceof Error ? error.message : 'Unknown error';
     }
 
@@ -106,7 +107,7 @@ export default function TestPhase1_2() {
       // };
 
     } catch (error: unknown) {
-      console.error('Phase 2 test error:', error);
+      clientLogger.error('Phase 2 test error:', { detail: error });
       results.error = error instanceof Error ? error.message : 'Unknown error';
     }
 
@@ -133,7 +134,7 @@ export default function TestPhase1_2() {
       };
 
     } catch (error: unknown) {
-      console.error('Test error:', error);
+      clientLogger.error('Test error:', { detail: error });
       results.error = error instanceof Error ? error.message : 'Unknown error';
       results.overall = {
         phase1Success: false,

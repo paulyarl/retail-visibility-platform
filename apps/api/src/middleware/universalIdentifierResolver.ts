@@ -8,6 +8,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UniversalIdentifierCache, ResolvedTenant } from '../services/UniversalIdentifierCache';
 import { CacheMonitoringDashboard } from '../monitoring/CacheMetrics';
+import { logger } from '../logger';
 
 // Extend Express Request interface
 declare global {
@@ -89,7 +90,7 @@ export async function resolveUniversalIdentifier(
     next?.();
   } catch (error) {
     const resolutionTime = Date.now() - startTime;
-    console.error(`[Identifier Resolver] Error resolving ${identifier} (${resolutionTime}ms):`, error);
+    logger.error(`[Identifier Resolver] Error resolving ${identifier} (${resolutionTime}ms):`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     // Record error for metrics
     const dashboard = new CacheMonitoringDashboard();

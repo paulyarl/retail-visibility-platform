@@ -23,7 +23,7 @@ interface BotConfigPageProps {
 }
 
 export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

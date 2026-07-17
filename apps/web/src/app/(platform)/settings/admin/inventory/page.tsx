@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { adminInventoryService, InventoryTransfer, TransferFilters, LowStockAlert } from '@/services/AdminInventorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function InventoryTransfersAdminPage() {
   const { hasAccess, loading: accessLoading } = useAccessControl(
@@ -47,7 +48,7 @@ export default function InventoryTransfersAdminPage() {
         setLowStockAlerts(alertsResult.alerts);
       }
     } catch (error) {
-      console.error('Failed to load inventory data:', error);
+      clientLogger.error('Failed to load inventory data:', { detail: error });
     } finally {
       setLoading(false);
     }

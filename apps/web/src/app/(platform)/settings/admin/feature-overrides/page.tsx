@@ -14,6 +14,7 @@ import { tenantTierService, type Tenant, type DbTier } from '@/services/TenantTi
 import AdminOrganizationsService, { type Organization } from '@/services/AdminOrganizationsService';
 import TenantLimitsService from '@/services/TenantLimitsService';
 import { notifications } from '@mantine/notifications';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function FeatureOverridesPage() {
   const [overrides, setOverrides] = useState<Override[]>([]);
@@ -73,7 +74,7 @@ export default function FeatureOverridesPage() {
       if (tenantLimitsData.status === 'fulfilled') setTenantLimits(tenantLimitsData.value);
       
     } catch (error) {
-      console.error('Failed to fetch dropdown data:', error);
+      clientLogger.error('Failed to fetch dropdown data:', { detail: error });
       notifications.show({
         title: 'Warning',
         message: 'Failed to load dropdown options',
@@ -155,7 +156,7 @@ export default function FeatureOverridesPage() {
         setOverrides(mockOverrides);
       }
     } catch (error) {
-      console.error('Failed to fetch overrides:', error);
+      clientLogger.error('Failed to fetch overrides:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load overrides. Using mock data.',
@@ -371,7 +372,7 @@ export default function FeatureOverridesPage() {
         throw new Error('Failed to create override');
       }
     } catch (error: any) {
-      console.error('Failed to create override:', error);
+      clientLogger.error('Failed to create override:', { detail: error });
       notifications.show({
         title: 'Error',
         message: error.message || 'Failed to create override. Please try again.',

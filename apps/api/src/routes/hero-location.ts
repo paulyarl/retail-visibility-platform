@@ -12,6 +12,7 @@ import { prisma } from '../prisma';
 import { HeroLocationService } from '../services/HeroLocationService';
 import { authenticateToken } from '../middleware/auth';
 import { canPerformSupportActions } from '../utils/platform-admin';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ router.get('/organization/:organizationId', authenticateToken, async (req: Reque
       }
     });
   } catch (error: any) {
-    console.error('[Hero Location] Get hero location error:', error);
+    logger.error('[Hero Location] Get hero location error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_hero_location',
@@ -142,7 +143,7 @@ router.get('/tenant/:tenantId', authenticateToken, async (req: Request, res: Res
       }
     });
   } catch (error: any) {
-    console.error('[Hero Location] Get hero location for tenant error:', error);
+    logger.error('[Hero Location] Get hero location for tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_hero_location',
@@ -192,7 +193,7 @@ router.post('/route-payment', authenticateToken, async (req: Request, res: Respo
       }
     });
   } catch (error: any) {
-    console.error('[Hero Location] Route payment error:', error);
+    logger.error('[Hero Location] Route payment error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_route_payment',
@@ -248,7 +249,7 @@ router.get('/organization/:organizationId/tenants', authenticateToken, async (re
       heroCount: tenants.filter(t => t.isHero).length,
     });
   } catch (error: any) {
-    console.error('[Hero Location] Get organization tenants error:', error);
+    logger.error('[Hero Location] Get organization tenants error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_tenants',

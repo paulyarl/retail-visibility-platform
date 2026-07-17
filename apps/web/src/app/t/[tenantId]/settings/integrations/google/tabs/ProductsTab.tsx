@@ -13,6 +13,7 @@ import {
   Search,
   ShoppingBag,
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductSyncItem {
   id: string;
@@ -67,7 +68,7 @@ export default function ProductsTab({
       setProducts(result.data?.products || []);
       setTotal(result.data?.total || 0);
     } catch (err) {
-      console.error('Failed to fetch product sync status:', err);
+      clientLogger.error('Failed to fetch product sync status:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -113,7 +114,7 @@ export default function ProductsTab({
       const report = await gmcValidationService.getValidationReport(tenantId);
       setValidationReport(report);
     } catch (err) {
-      console.error('Failed to load validation report:', err);
+      clientLogger.error('Failed to load validation report:', { detail: err });
     } finally {
       setLoadingValidation(false);
     }

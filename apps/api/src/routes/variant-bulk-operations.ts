@@ -122,7 +122,7 @@ router.post('/bulk/featured-type', authenticateToken, async (req: Request, res: 
     });
 
   } catch (error: any) {
-    logger.error('[BULK VARIANT] Featured type error:', error, undefined);
+    logger.error('[BULK VARIANT] Featured type error:', undefined, { error: { name: 'Error', message: String(error) } });
     
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -200,7 +200,7 @@ router.post('/bulk/sale-price', authenticateToken, async (req: Request, res: Res
     });
 
   } catch (error: any) {
-    logger.error('[BULK VARIANT] Sale price error:', error, undefined);
+    logger.error('[BULK VARIANT] Sale price error:', undefined, { error: { name: 'Error', message: String(error) } });
     
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -278,7 +278,7 @@ router.post('/bulk/stock', authenticateToken, async (req: Request, res: Response
     });
 
   } catch (error: any) {
-    logger.error('[BULK VARIANT] Stock error:', error, undefined);
+    logger.error('[BULK VARIANT] Stock error:', undefined, { error: { name: 'Error', message: String(error) } });
     
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -358,7 +358,7 @@ router.post('/bulk/activation', authenticateToken, async (req: Request, res: Res
     });
 
   } catch (error: any) {
-    logger.error('[BULK VARIANT] Activation error:', error, undefined);
+    logger.error('[BULK VARIANT] Activation error:', undefined, { error: { name: 'Error', message: String(error) } });
     
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -481,7 +481,7 @@ router.get('/bulk/preview/:operation', authenticateToken, async (req: Request, r
     });
 
   } catch (error: any) {
-    logger.error('[BULK VARIANT] Preview error:', error);
+    logger.error('[BULK VARIANT] Preview error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'preview_failed',

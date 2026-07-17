@@ -9,6 +9,7 @@ import { NavItemRow } from '@/components/navigation/NavItemRow';
 import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -541,6 +542,22 @@ function MapPinIcon() {
   );
 }
 
+function MapIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+    </svg>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-6 8v6l-6 2v-8L3 4z" />
+    </svg>
+  );
+}
+
 const IconComponents = {
   home: HomeIcon,
   user: UserIcon,
@@ -593,6 +610,8 @@ const IconComponents = {
   support: SupportIcon,
   cube: CubeIcon,
   'map-pin': MapPinIcon,
+  map: MapIcon,
+  filter: FilterIcon,
 };
 
 // Convert icon string to React component
@@ -647,6 +666,8 @@ const ICON_OPTIONS = [
   { value: 'support', label: 'Support' },
   { value: 'cube', label: 'Cube' },
   { value: 'map-pin', label: 'Map Pin' },
+  { value: 'map', label: 'Map' },
+  { value: 'filter', label: 'Filter/Funnel' },
 ];
 
 const PERMISSION_OPTIONS = [
@@ -1434,7 +1455,7 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
       const sessionInfo = await securitySingletonService.getSessionInfo();
       tenants = sessionInfo.user?.tenants || [];
     } catch (error) {
-      console.error('SidebarPreview: Error fetching tenant data:', error);
+      clientLogger.error('SidebarPreview: Error fetching tenant data:', { detail: error });
       // Fallback to mock data for preview
       tenants = [
         { id: '1', name: 'Main Store', role: 'OWNER' },
@@ -1543,7 +1564,7 @@ export default function NavigationControlPage() {
         setLinks(innerData);
       }
     } catch (error) {
-      console.error('Failed to load navigation links:', error);
+      clientLogger.error('Failed to load navigation links:', { detail: error });
       /* keep SEED_LINKS */
     } finally {
       setApiLoading(false);

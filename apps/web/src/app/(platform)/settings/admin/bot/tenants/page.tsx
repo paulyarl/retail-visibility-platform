@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, Badge, Spinner, Button, Input } from '@/components/ui';
 import { botPlatformAdminService, type BotTenantSummary } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function BotTenantsPage() {
   const [tenants, setTenants] = useState<BotTenantSummary[]>([]);
@@ -20,7 +21,7 @@ export default function BotTenantsPage() {
       setTenants(result.data || []);
       setTotal(result.total);
     } catch (err) {
-      console.error('[Bot Tenants] Load error:', err);
+      clientLogger.error('[Bot Tenants] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }

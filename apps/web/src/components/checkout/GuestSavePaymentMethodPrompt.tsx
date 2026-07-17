@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { customerAuthService } from '@/services/CustomerAuthService';
 import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
 import { CreditCard, CheckCircle, Loader2 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GuestSavePaymentMethodPromptProps {
   customerInfo: {
@@ -78,7 +79,7 @@ export function GuestSavePaymentMethodPrompt({
             type: paymentMethod === 'paypal' ? 'paypal' : 'card',
           });
         } catch (err) {
-          console.error('[GuestSavePrompt] Failed to save payment method:', err);
+          clientLogger.error('[GuestSavePrompt] Failed to save payment method:', { detail: err });
         }
       }
 

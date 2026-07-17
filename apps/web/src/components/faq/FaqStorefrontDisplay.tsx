@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Search, MessageSquare, ThumbsUp, ThumbsDown, FileEdit, Loader2, CheckCircle2, Ticket } from 'lucide-react';
 import { publicFaqService, PublicFaq, PublicFaqCategory } from '@/services/PublicFaqService';
 import Link from 'next/link';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeedbackState {
   [faqId: string]: 'up' | 'down' | null;
@@ -63,7 +64,7 @@ export default function FaqStorefrontDisplay({ tenantId, askBotCta = true, enabl
         setFaqs(faqData);
         setCategories(catData);
       } catch (err) {
-        console.error('Failed to load public FAQs:', err);
+        clientLogger.error('Failed to load public FAQs:', { detail: err });
       } finally {
         setLoading(false);
       }

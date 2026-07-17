@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { integrationService } from '@/services/IntegrationService';
 import { ArrowLeft, Play, CheckCircle, XCircle, AlertTriangle, RefreshCw, Zap, Package, DollarSign, Trash2, AlertOctagon, Layers, FolderPlus, FolderEdit, FolderSync, FolderX } from 'lucide-react';
 import { Button } from '@mantine/core';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 interface CloverStatus {
@@ -151,7 +152,7 @@ export default function CloverIntegrationPage() {
       const data = await integrationService.getCloverStatus(tenantId);
       setStatus(data);
     } catch (err) {
-      console.error('Failed to fetch status:', err);
+      clientLogger.error('Failed to fetch status:', { detail: err });
     }
   }, [tenantId]);
 
@@ -161,7 +162,7 @@ export default function CloverIntegrationPage() {
       const data = await integrationService.getCloverDemoScenarios(tenantId);
       setScenarios(data.scenarios || []);
     } catch (err) {
-      console.error('Failed to fetch scenarios:', err);
+      clientLogger.error('Failed to fetch scenarios:', { detail: err });
     }
   }, [tenantId]);
 
@@ -171,7 +172,7 @@ export default function CloverIntegrationPage() {
       const data = await integrationService.getCloverMappings(tenantId, status?.mode === 'demo');
       setMappings(data.mappings || []);
     } catch (err) {
-      console.error('Failed to fetch mappings:', err);
+      clientLogger.error('Failed to fetch mappings:', { detail: err });
     }
   }, [tenantId, status?.mode]);
 
@@ -181,7 +182,7 @@ export default function CloverIntegrationPage() {
       const data = await integrationService.getCloverSyncHistory(tenantId, status?.mode === 'demo');
       setSyncLogs(data.syncLogs || []);
     } catch (err) {
-      console.error('Failed to fetch sync history:', err);
+      clientLogger.error('Failed to fetch sync history:', { detail: err });
     }
   }, [tenantId, status?.mode]);
 
@@ -191,7 +192,7 @@ export default function CloverIntegrationPage() {
       const data = await integrationService.getCloverCategoryMappings(tenantId);
       setCategoryMappings(data.categoryMappings || []);
     } catch (err) {
-      console.error('Failed to fetch category mappings:', err);
+      clientLogger.error('Failed to fetch category mappings:', { detail: err });
     }
   }, [tenantId]);
 

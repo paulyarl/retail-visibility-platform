@@ -11,6 +11,7 @@ const supabaseService = createClient(
 );
 import { StorageBuckets } from "../storage-config";
 import { generateQuickStart } from "../lib/id-generator";
+import { logger } from '../logger';
 
 const prismaClient = prisma;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -118,10 +119,10 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
           const { data: buckets, error: listError } = await supabaseService.storage.listBuckets();
           
           if (listError) {
-            console.error('[Directory Photos] Error listing buckets:', listError);
+            logger.error('[Directory Photos] Error listing buckets:', undefined, { error: { name: (listError as any)?.name || 'Error', message: (listError as any)?.message || String(listError), stack: (listError as any)?.stack } });
           }
         } catch (bucketCheckError) {
-          console.error('[Directory Photos] Bucket check failed:', bucketCheckError);
+          logger.error('[Directory Photos] Bucket check failed:', undefined, { error: { name: (bucketCheckError as any)?.name || 'Error', message: (bucketCheckError as any)?.message || String(bucketCheckError), stack: (bucketCheckError as any)?.stack } });
         }
 
         const { error: uploadError, data: uploadData } = await supabaseService.storage
@@ -133,7 +134,7 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
           });
 
         if (uploadError) {
-          console.error('[Directory Photos] Supabase upload error:', uploadError.message);
+          logger.error('[Directory Photos] Supabase upload error:', undefined, { error: { name: 'Error', message: String(uploadError.message) } });
           return res.status(500).json({ error: uploadError.message });
         }
 
@@ -189,15 +190,15 @@ r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
 
     return res.status(201).json(created);
   } catch (e: any) {
-    console.error("directory photo upload error", e);
+    logger.error("directory photo upload error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     console.error("Error details:", {
-      message: e?.message,
+      message: (e as any)?.message,
       code: e?.code,
       meta: e?.meta,
-      stack: e?.stack
+      stack: (e as any)?.stack
     });
     return res.status(500).json({ 
-      error: e?.message || "upload failed",
+      error: (e as any)?.message || "upload failed",
       code: e?.code,
       details: e?.meta 
     });
@@ -285,7 +286,7 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
           });
         }
       } catch (swapError: any) {
-        console.error(`[Directory Photo Update] Position swap failed:`, swapError);
+        logger.error(`[Directory Photo Update] Position swap failed:`, undefined, { error: { name: (swapError as any)?.name || 'Error', message: (swapError as any)?.message || String(swapError), stack: (swapError as any)?.stack } });
         return res.status(500).json({
           error: "position_update_failed",
           details: swapError.message
@@ -312,8 +313,8 @@ r.put("/:listingId/photos/:photoId", async (req, res) => {
 
     res.json(updated);
   } catch (e: any) {
-    console.error("directory photo update error", e);
-    res.status(500).json({ error: e?.message || "update failed" });
+    logger.error("directory photo update error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "update failed" });
   }
 });
 
@@ -359,8 +360,8 @@ r.put("/:listingId/photos/reorder", async (req, res) => {
 
     res.status(204).send();
   } catch (e: any) {
-    console.error("directory photo reorder error", e);
-    res.status(500).json({ error: e?.message || "reorder failed" });
+    logger.error("directory photo reorder error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "reorder failed" });
   }
 });
 
@@ -397,7 +398,7 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
           await supabaseService.storage.from(StorageBuckets.TENANTS.name).remove([path]);
         }
       } catch (storageError) {
-        console.error("Failed to delete directory photo from storage:", storageError);
+        logger.error("Failed to delete directory photo from storage:", undefined, { error: { name: (storageError as any)?.name || 'Error', message: (storageError as any)?.message || String(storageError), stack: (storageError as any)?.stack } });
         // Continue with DB deletion even if storage fails
       }
     }
@@ -423,8 +424,8 @@ r.delete("/:listingId/photos/:photoId", async (req, res) => {
 
     res.status(204).send();
   } catch (e: any) {
-    console.error("directory photo delete error", e);
-    res.status(500).json({ error: e?.message || "delete failed" });
+    logger.error("directory photo delete error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    res.status(500).json({ error: (e as any)?.message || "delete failed" });
   }
 });
 

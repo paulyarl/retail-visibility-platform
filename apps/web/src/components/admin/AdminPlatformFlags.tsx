@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { adminPlatformFlagsService } from '@/services/AdminPlatformFlagsService';
+import { clientLogger } from '@/lib/client-logger';
 
 type FlagRow = { id: string; flag: string; enabled: boolean; description?: string | null; rollout?: string | null; allowTenantOverride?: boolean };
 type EffectiveRow = {
@@ -88,7 +89,7 @@ export default function AdminPlatformFlags() {
       setRows(flagsData);
       setEffective(effectiveData);
     } catch (err) {
-      console.error('[AdminPlatformFlags] Error loading data:', err);
+      clientLogger.error('[AdminPlatformFlags] Error loading data:', { detail: err });
       setError('Failed to load platform flags');
     } finally {
       setLoading(false);
@@ -115,7 +116,7 @@ export default function AdminPlatformFlags() {
         setRows(prev => prev.map(row => row.flag === flag ? { ...row, ...next } : row));
       }
     } catch (err) {
-      console.error('[AdminPlatformFlags] Error saving flag:', err);
+      clientLogger.error('[AdminPlatformFlags] Error saving flag:', { detail: err });
       setError(`Failed to update flag: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSaving(prev => ({ ...prev, [flag]: false }));
@@ -129,7 +130,7 @@ export default function AdminPlatformFlags() {
       await adminPlatformFlagsService.setFlagOverride(flag, value);
       await load(); // Reload to get updated effective flags
     } catch (err) {
-      console.error('[AdminPlatformFlags] Error setting override:', err);
+      clientLogger.error('[AdminPlatformFlags] Error setting override:', { detail: err });
       setError(`Failed to set override: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSaving(prev => ({ ...prev, [flag]: false }));
@@ -143,7 +144,7 @@ export default function AdminPlatformFlags() {
       await adminPlatformFlagsService.resetFlagOverride(flag);
       await load(); // Reload to get updated effective flags
     } catch (err) {
-      console.error('[AdminPlatformFlags] Error resetting override:', err);
+      clientLogger.error('[AdminPlatformFlags] Error resetting override:', { detail: err });
       setError(`Failed to reset override: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSaving(prev => ({ ...prev, [flag]: false }));
@@ -164,7 +165,7 @@ export default function AdminPlatformFlags() {
         await load(); // Reload to get updated effective flags
       }
     } catch (err) {
-      console.error('[AdminPlatformFlags] Error deleting flag:', err);
+      clientLogger.error('[AdminPlatformFlags] Error deleting flag:', { detail: err });
       setError(`Failed to delete flag: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSaving(prev => ({ ...prev, [flag]: false }));

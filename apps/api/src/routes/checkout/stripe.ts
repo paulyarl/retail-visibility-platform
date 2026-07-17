@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { stripeConnectService } from '../../services/payments/StripeConnectService';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
+import FunnelEngine from '../../services/FunnelEngine';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -74,7 +76,7 @@ router.post('/create-payment-intent', async (req, res) => {
       platformFee: result.platformFeeCents,
     });
   } catch (error) {
-    console.error('[Stripe] Create payment intent error:', error);
+    logger.error('[Stripe] Create payment intent error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to create payment intent',
       message: 'An error occurred while setting up your payment. Please try again.',
@@ -148,7 +150,7 @@ router.post('/confirm-payment', async (req, res) => {
         });
         console.log('[Stripe] Recorded revenue transaction:', payment.platform_fee_cents, 'cents');
       } catch (revenueError) {
-        console.error('[Stripe] Failed to record revenue transaction:', revenueError);
+        logger.error('[Stripe] Failed to record revenue transaction:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
         // Don't fail the confirmation if revenue recording fails
       }
     }
@@ -185,8 +187,20 @@ router.post('/confirm-payment', async (req, res) => {
         }
       }
     } catch (stripeError) {
-      console.error('[Stripe] Failed to retrieve PaymentIntent for saved payment method:', stripeError);
+      logger.error('[Stripe] Failed to retrieve PaymentIntent for saved payment method:', undefined, { error: { name: (stripeError as any)?.name || 'Error', message: (stripeError as any)?.message || String(stripeError), stack: (stripeError as any)?.stack } });
       // Don't fail the confirmation if we can't retrieve card details
+    }
+
+    // Determine whether a post-payment funnel upsell should be shown
+    let funnelNextStep = null;
+    try {
+      funnelNextStep = await FunnelEngine.getInstance().getNextStepForOrder(
+        payment.orders.tenant_id,
+        payment.orders.id
+      );
+    } catch (funnelError) {
+      logger.error('[Stripe] Failed to resolve funnel next step:', undefined, { error: { name: (funnelError as any)?.name || 'Error', message: (funnelError as any)?.message || String(funnelError), stack: (funnelError as any)?.stack } });
+      // Non-fatal: continue without funnel redirect
     }
 
     res.json({
@@ -197,9 +211,10 @@ router.post('/confirm-payment', async (req, res) => {
       cardBrand,
       expiryMonth,
       expiryYear,
+      funnelNextStep,
     });
   } catch (error) {
-    console.error('[Stripe] Confirm payment error:', error);
+    logger.error('[Stripe] Confirm payment error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to confirm payment',
       message: 'An error occurred while confirming your payment. Please try again.',

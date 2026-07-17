@@ -11,6 +11,7 @@
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions } from './FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 import { ResolverType, ResolverResponse } from '../../types/resolver';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // PUBLIC API SINGLETON
@@ -65,7 +66,7 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
         }
       );
       if (!response.success){
-        console.error(`[PublicApiSingleton] Failed to resolve ${type}/${identifier}:`, response);
+        clientLogger.error(`[PublicApiSingleton] Failed to resolve ${type}/${identifier}:`, { detail: response });
         return identifier;
       }
 
@@ -98,7 +99,7 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
       return resolvedId;
       
     } catch (error) {
-      console.error(`[PublicApiSingleton] Resolver failed for ${type}/${identifier}:`, error);
+      clientLogger.error(`[PublicApiSingleton] Resolver failed for ${type}/${identifier}:`, { detail: error });
       // Don't cache failures immediately - let the next request try again
       // This prevents permanent cache poisoning on temporary failures
       throw error;

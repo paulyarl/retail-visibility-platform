@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { X } from 'lucide-react';
 import { getIntegrationsSingleton } from '@/lib/singletons/IntegrationsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface POSIntegrationBannerProps {
   tenantId: string;
@@ -39,7 +40,7 @@ export default function POSIntegrationBanner({
         const cloverIntegration = await singleton.fetchCloverIntegration();
         setHasPOS(cloverIntegration?.connected || false);
       } catch (error) {
-        console.error('Failed to check POS connection:', error);
+        clientLogger.error('Failed to check POS connection:', { detail: error });
       } finally {
         setLoading(false);
       }

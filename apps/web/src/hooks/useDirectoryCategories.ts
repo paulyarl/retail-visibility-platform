@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Category {
   id: string;
@@ -89,7 +90,7 @@ export const useDirectoryCategories = (
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');
-      console.error('[useDirectoryCategories] Error:', err);
+      clientLogger.error('[useDirectoryCategories] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

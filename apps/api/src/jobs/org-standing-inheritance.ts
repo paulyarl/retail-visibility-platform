@@ -14,6 +14,7 @@
 import { prisma, basePrisma } from '../prisma';
 import { deriveInternalStatus } from '../utils/subscription-status';
 import { CrmAlertService } from '../services/CrmAlertService';
+import { logger } from '../logger';
 
 export const ORG_STANDING_GRACE_DAYS = 7;
 
@@ -120,7 +121,7 @@ export async function processOrgStandingInheritance(): Promise<OrgStandingJobRes
             }).catch(err => console.error(`[OrgStandingJob] Failed to create CRM alert for tenant ${tenant.id}:`, err));
             result.alertsSent++;
           } catch (error: any) {
-            console.error(`[OrgStandingJob] Error setting grace for tenant ${tenant.id}:`, error);
+            logger.error(`[OrgStandingJob] Error setting grace for tenant ${tenant.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             result.errors.push(`Grace set ${tenant.id}: ${error.message}`);
           }
         }
@@ -158,7 +159,7 @@ export async function processOrgStandingInheritance(): Promise<OrgStandingJobRes
             }).catch(err => console.error(`[OrgStandingJob] Failed to create flip alert for tenant ${tenant.id}:`, err));
             result.alertsSent++;
           } catch (error: any) {
-            console.error(`[OrgStandingJob] Error auto-flipping tenant ${tenant.id}:`, error);
+            logger.error(`[OrgStandingJob] Error auto-flipping tenant ${tenant.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             result.errors.push(`Flip ${tenant.id}: ${error.message}`);
           }
         }
@@ -189,7 +190,7 @@ export async function processOrgStandingInheritance(): Promise<OrgStandingJobRes
             }).catch(err => console.error(`[OrgStandingJob] Failed to create restore alert for tenant ${tenant.id}:`, err));
             result.alertsSent++;
           } catch (error: any) {
-            console.error(`[OrgStandingJob] Error clearing grace for tenant ${tenant.id}:`, error);
+            logger.error(`[OrgStandingJob] Error clearing grace for tenant ${tenant.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             result.errors.push(`Clear ${tenant.id}: ${error.message}`);
           }
         }
@@ -199,7 +200,7 @@ export async function processOrgStandingInheritance(): Promise<OrgStandingJobRes
     console.log(`[OrgStandingJob] Complete. Orgs bad: ${result.orgsDetectedBad}, Grace set: ${result.gracePeriodSet}, Flipped: ${result.tenantsAutoFlipped}, Cleared: ${result.graceCleared}, Alerts: ${result.alertsSent}, Errors: ${result.errors.length}`);
     return result;
   } catch (error: any) {
-    console.error('[OrgStandingJob] Fatal error:', error);
+    logger.error('[OrgStandingJob] Fatal error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     result.errors.push(`Fatal error: ${error.message}`);
     return result;
   }

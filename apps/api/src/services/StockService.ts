@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../logger';
 
 export class StockService {
   private prisma: PrismaClient;
@@ -87,7 +88,7 @@ export class StockService {
 
       console.log(`[StockService] Stock decrement completed for order: ${orderId}`);
     } catch (error) {
-      console.error(`[StockService] Error decrementing stock for order ${orderId}:`, error);
+      logger.error(`[StockService] Error decrementing stock for order ${orderId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -168,7 +169,7 @@ export class StockService {
 
       console.log(`[StockService] Stock restoration completed for order: ${orderId}`);
     } catch (error) {
-      console.error(`[StockService] Error restoring stock for order ${orderId}:`, error);
+      logger.error(`[StockService] Error restoring stock for order ${orderId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -240,7 +241,7 @@ export class StockService {
         issues,
       };
     } catch (error) {
-      console.error(`[StockService] Error checking stock availability for order ${orderId}:`, error);
+      logger.error(`[StockService] Error checking stock availability for order ${orderId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

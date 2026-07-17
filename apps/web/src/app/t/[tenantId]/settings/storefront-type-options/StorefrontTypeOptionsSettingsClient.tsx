@@ -10,6 +10,7 @@ import { useStorefrontCapability, useAllCapabilities } from '@/hooks/tenant-acce
 import type { ConstraintViolationState } from '@/services/CapabilityResolutionService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StorefrontTypeSettings {
   storefront_type_enabled: boolean;
@@ -133,7 +134,7 @@ export default function StorefrontTypeOptionsSettingsClient({ tenantId }: Storef
         });
       }
     } catch (err) {
-      console.error('Failed to load storefront type settings:', err);
+      clientLogger.error('Failed to load storefront type settings:', { detail: err });
     } finally {
       setLoading(false);
     }

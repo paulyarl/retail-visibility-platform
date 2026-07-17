@@ -50,6 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FaqHubProps {
   tenantId: string;
@@ -738,7 +739,7 @@ function FaqTemplatesTab({ tenantId, canManage }: { tenantId: string; canManage:
       setApplyTemplate(null);
       setSelectedPairs(new Set());
     } catch (err: any) {
-      console.error('Failed to apply template:', err);
+      clientLogger.error('Failed to apply template:', { detail: err });
     } finally {
       setApplying(false);
     }

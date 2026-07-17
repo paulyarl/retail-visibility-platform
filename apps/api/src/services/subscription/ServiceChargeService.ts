@@ -12,6 +12,7 @@ import { prisma } from '../../prisma';
 import { generateServiceChargeId, generateInvoiceId, generateSubscriptionPaymentId } from '../../lib/id-generator';
 import { getManualBillingService } from './ManualBillingService';
 import { audit } from '../../audit';
+import { logger } from '../../logger';
 
 export interface ServiceChargeData {
   tenantId: string;
@@ -137,7 +138,7 @@ export class ServiceChargeService {
       };
 
     } catch (error: any) {
-      console.error('[ServiceCharge] Error adding service charge:', error);
+      logger.error('[ServiceCharge] Error adding service charge:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to add service charge'
@@ -199,7 +200,7 @@ export class ServiceChargeService {
       }));
 
     } catch (error: any) {
-      console.error('[ServiceCharge] Error getting service charges:', error);
+      logger.error('[ServiceCharge] Error getting service charges:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -279,7 +280,7 @@ export class ServiceChargeService {
       };
 
     } catch (error: any) {
-      console.error('[ServiceCharge] Error creating invoice for service charges:', error);
+      logger.error('[ServiceCharge] Error creating invoice for service charges:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to create invoice for service charges'
@@ -309,7 +310,7 @@ export class ServiceChargeService {
       }));
 
     } catch (error: any) {
-      console.error('[ServiceCharge] Error getting service charge configurations:', error);
+      logger.error('[ServiceCharge] Error getting service charge configurations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -355,7 +356,7 @@ export class ServiceChargeService {
       return stats;
 
     } catch (error: any) {
-      console.error('[ServiceCharge] Error getting service charge stats:', error);
+      logger.error('[ServiceCharge] Error getting service charge stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         totalCharges: 0,
         totalAmountCents: 0,
@@ -406,7 +407,7 @@ export class ServiceChargeService {
         createdAt: charge.created_at || new Date()
       }));
     } catch (error) {
-      console.error('Error getting all service charges:', error);
+      logger.error('Error getting all service charges:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

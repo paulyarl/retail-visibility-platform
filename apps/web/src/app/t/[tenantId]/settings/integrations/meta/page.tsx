@@ -19,6 +19,7 @@ import {
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { metaIntegrationService } from '@/services/MetaIntegrationService';
 import type { MetaStatus, MetaSyncStatus, MetaBusiness } from '@/services/MetaIntegrationService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 function MetaIntegrationContent() {
@@ -62,7 +63,7 @@ function MetaIntegrationContent() {
       const data = await metaIntegrationService.getCatalogSyncStatus(tenantId);
       setSyncStatus(data);
     } catch (err) {
-      console.error('Failed to fetch sync status:', err);
+      clientLogger.error('Failed to fetch sync status:', { detail: err });
     }
   }
 
@@ -72,7 +73,7 @@ function MetaIntegrationContent() {
       const data = await metaIntegrationService.getBusinesses(tenantId);
       setBusinesses(data);
     } catch (err) {
-      console.error('Failed to fetch businesses:', err);
+      clientLogger.error('Failed to fetch businesses:', { detail: err });
     } finally {
       setLoadingBusinesses(false);
     }

@@ -6,6 +6,7 @@
  */
 
 import crypto from 'crypto';
+import { logger } from '../logger';
 
 export interface EncryptionResult {
   encrypted: Buffer;
@@ -116,7 +117,7 @@ export class CacheEncryption {
       this.decrypt(encryptedData);
       return true;
     } catch (error) {
-      console.error('[Cache Encryption] Integrity check failed:', error instanceof Error ? error.message : 'Unknown error');
+      logger.error('[Cache Encryption] Integrity check failed:', undefined, { error: { name: 'Error', message: error instanceof Error ? error.message : 'Unknown error' } });
       return false;
     }
   }

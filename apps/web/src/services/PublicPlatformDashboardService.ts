@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from './interfaces/PlatformDashboardInterfaces';
+import { clientLogger } from '@/lib/client-logger';
 
 class PublicPlatformDashboardService extends PublicApiSingleton {
   private static instance: PublicPlatformDashboardService;
@@ -36,7 +37,7 @@ class PublicPlatformDashboardService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PublicPlatformDashboardService] Failed to get public platform dashboard:', result.error);
+      clientLogger.error('[PublicPlatformDashboardService] Failed to get public platform dashboard:', { detail: result.error });
       return null;
     }
 
@@ -56,7 +57,7 @@ class PublicPlatformDashboardService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PublicPlatformDashboardService] Failed to get public platform stats:', result.error);
+      clientLogger.error('[PublicPlatformDashboardService] Failed to get public platform stats:', { detail: result.error });
       return null;
     }
 

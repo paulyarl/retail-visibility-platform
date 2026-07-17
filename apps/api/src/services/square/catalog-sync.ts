@@ -6,6 +6,7 @@
 
 import { squareIntegrationRepository } from './square-integration.repository';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface SquareProduct {
   id: string;
@@ -177,7 +178,7 @@ export class CatalogSync {
       console.log(`[CatalogSync] Successfully imported product: ${platformProduct.id}`);
       return platformProduct;
     } catch (error) {
-      console.error(`[CatalogSync] Failed to import product:`, error);
+      logger.error(`[CatalogSync] Failed to import product:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -259,7 +260,7 @@ export class CatalogSync {
       console.log(`[CatalogSync] Successfully exported product: ${squareProduct.id}`);
       return squareProduct;
     } catch (error) {
-      console.error(`[CatalogSync] Failed to export product:`, error);
+      logger.error(`[CatalogSync] Failed to export product:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

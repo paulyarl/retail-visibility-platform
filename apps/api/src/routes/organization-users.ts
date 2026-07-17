@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireOrgAdmin, requireOrgOwner } from '../middleware/permissions';
 import { isPlatformAdmin } from '../utils/platform-admin';
 import { generateUserOrgId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -60,7 +61,7 @@ router.get('/:orgId/users', authenticateToken, requireOrgAdmin, async (req, res)
 
     res.json({ users: result });
   } catch (error) {
-    console.error('[GET /:orgId/users] Error:', error);
+    logger.error('[GET /:orgId/users] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list organization users' });
   }
 });
@@ -131,7 +132,7 @@ router.post('/:orgId/users', authenticateToken, requireOrgAdmin, async (req, res
       createdAt: userOrg.created_at,
     });
   } catch (error) {
-    console.error('[POST /:orgId/users] Error:', error);
+    logger.error('[POST /:orgId/users] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to add user to organization' });
   }
 });
@@ -172,7 +173,7 @@ router.put('/:orgId/users/:userId', authenticateToken, requireOrgOwner, async (r
       updatedAt: updated.updated_at,
     });
   } catch (error) {
-    console.error('[PUT /:orgId/users/:userId] Error:', error);
+    logger.error('[PUT /:orgId/users/:userId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update user role' });
   }
 });
@@ -202,7 +203,7 @@ router.delete('/:orgId/users/:userId', authenticateToken, requireOrgOwner, async
 
     res.json({ message: 'User removed from organization' });
   } catch (error) {
-    console.error('[DELETE /:orgId/users/:userId] Error:', error);
+    logger.error('[DELETE /:orgId/users/:userId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to remove user from organization' });
   }
 });
@@ -256,7 +257,7 @@ router.post('/:orgId/users/invite', authenticateToken, requireOrgAdmin, async (r
       organizationName: organization.name,
     });
   } catch (error) {
-    console.error('[POST /:orgId/users/invite] Error:', error);
+    logger.error('[POST /:orgId/users/invite] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to send invitation' });
   }
 });
@@ -270,7 +271,7 @@ router.get('/:orgId/invitations', authenticateToken, requireOrgAdmin, async (req
     // For now, return empty list
     res.json({ invitations: [] });
   } catch (error) {
-    console.error('[GET /:orgId/invitations] Error:', error);
+    logger.error('[GET /:orgId/invitations] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list invitations' });
   }
 });
@@ -284,7 +285,7 @@ router.delete('/:orgId/invitations/:id', authenticateToken, requireOrgAdmin, asy
     // For now, return success
     res.json({ message: 'Invitation cancelled', id });
   } catch (error) {
-    console.error('[DELETE /:orgId/invitations/:id] Error:', error);
+    logger.error('[DELETE /:orgId/invitations/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to cancel invitation' });
   }
 });

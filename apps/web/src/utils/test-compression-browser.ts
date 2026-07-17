@@ -2,6 +2,7 @@
 // This can be run in the browser console or as a component
 
 import contextCacheManager, { AppContext } from './contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // Test data
 const testData = {
@@ -91,7 +92,7 @@ export async function runCompressionTest() {
       });
       
     } catch (error) {
-      console.error(`  ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+      clientLogger.error(`  ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
       results.push({
         context: test.name,
         originalSize,

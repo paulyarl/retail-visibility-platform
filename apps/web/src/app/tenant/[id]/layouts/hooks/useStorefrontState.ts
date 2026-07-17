@@ -21,9 +21,10 @@ import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
-import { useFeaturedOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicFeaturedOptionsCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
 import type { ActiveFeaturedResult } from '@/services/ActiveFeaturedService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface SocialCommerceFlags {
   enabled?: boolean;
@@ -197,7 +198,7 @@ export function useStorefrontState({
   const showsQRCodes = optFlags?.showQRCodes ?? true;
 
   // ---- Featured options (capability-gated allowed types) ----
-  const featuredCap = useFeaturedOptionsCapability(tenantId);
+  const featuredCap = usePublicFeaturedOptionsCapability(tenantId);
   const allowedFeaturedTypes = useMemo(() => {
     if (featuredCap.data?.enabled && featuredCap.data.effectiveTypes) {
       return featuredCap.data.effectiveTypes as string[];
@@ -294,7 +295,7 @@ export function useStorefrontState({
           setFeaturedCounts(transformedData.bucketCounts || {});
         }
       } catch (err) {
-        console.error('[useStorefrontState] Failed to load featured counts:', err);
+        clientLogger.error('[useStorefrontState] Failed to load featured counts:', { detail: err });
       }
     };
 

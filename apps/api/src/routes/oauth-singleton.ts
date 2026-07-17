@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import OAuthSingletonService from '../services/OAuthSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.get('/paypal/authorize', async (req, res) => {
       message: 'PayPal authorization URL generated successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] PayPal authorize error:', error);
+    logger.error('[OAUTH SINGLETON] PayPal authorize error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to generate PayPal authorization URL',
@@ -102,7 +103,7 @@ router.post('/paypal/callback', async (req, res) => {
       message: 'PayPal OAuth callback processed successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] PayPal callback error:', error);
+    logger.error('[OAUTH SINGLETON] PayPal callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to process PayPal OAuth callback',
@@ -146,7 +147,7 @@ router.post('/paypal/refresh', async (req, res) => {
       message: 'PayPal tokens refreshed successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] PayPal refresh error:', error);
+    logger.error('[OAUTH SINGLETON] PayPal refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to refresh PayPal tokens',
@@ -198,7 +199,7 @@ router.get('/square/authorize', async (req, res) => {
       message: 'Square authorization URL generated successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Square authorize error:', error);
+    logger.error('[OAUTH SINGLETON] Square authorize error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to generate Square authorization URL',
@@ -242,7 +243,7 @@ router.post('/square/callback', async (req, res) => {
       message: 'Square OAuth callback processed successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Square callback error:', error);
+    logger.error('[OAUTH SINGLETON] Square callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to process Square OAuth callback',
@@ -286,7 +287,7 @@ router.post('/square/refresh', async (req, res) => {
       message: 'Square tokens refreshed successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Square refresh error:', error);
+    logger.error('[OAUTH SINGLETON] Square refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to refresh Square tokens',
@@ -334,7 +335,7 @@ router.get('/stats', async (req, res) => {
       message: 'OAuth statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Get stats error:', error);
+    logger.error('[OAUTH SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch OAuth statistics'
@@ -367,7 +368,7 @@ router.get('/health', async (req, res) => {
       message: 'OAuth service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Health check error:', error);
+    logger.error('[OAUTH SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -399,7 +400,7 @@ router.delete('/cache', async (req, res) => {
       message: 'OAuth service cache cleared successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Clear cache error:', error);
+    logger.error('[OAUTH SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -485,7 +486,7 @@ router.post('/test', async (req, res) => {
       message: `OAuth test (${provider} ${operation}) completed successfully`
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Test error:', error);
+    logger.error('[OAUTH SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test OAuth operation',
@@ -530,7 +531,7 @@ router.get('/providers', async (req, res) => {
       message: 'Supported OAuth providers retrieved successfully'
     });
   } catch (error) {
-    console.error('[OAUTH SINGLETON] Providers error:', error);
+    logger.error('[OAUTH SINGLETON] Providers error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported providers'

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Smartphone, CheckCircle, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function Auth0SMSSetupWizard() {
   const { initiateSMSEnrollment, verifySMSEnrollment, loading, error, clearError } = useAuth0MFA();
@@ -31,7 +32,7 @@ export function Auth0SMSSetupWizard() {
       setEnrollmentData(data);
       setStep('verify');
     } catch (err) {
-      console.error('Failed to start SMS setup:', err);
+      clientLogger.error('Failed to start SMS setup:', { detail: err });
     }
   };
 
@@ -47,7 +48,7 @@ export function Auth0SMSSetupWizard() {
       await verifySMSEnrollment(enrollmentData.factorId, verificationCode);
       setStep('success');
     } catch (err) {
-      console.error('Failed to verify SMS:', err);
+      clientLogger.error('Failed to verify SMS:', { detail: err });
     } finally {
       setVerifying(false);
     }

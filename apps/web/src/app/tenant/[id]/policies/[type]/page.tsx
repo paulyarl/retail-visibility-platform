@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { publicStorefrontPolicyService, PolicyType } from '@/services/PublicStorefrontPolicyService';
+import { clientLogger } from '@/lib/client-logger';
 
 const POLICY_META: Record<string, { title: string; fallback: string }> = {
   return_policy: { title: 'Return Policy', fallback: 'Return policy has not been configured yet.' },
@@ -40,7 +41,7 @@ export default function PublicPolicyPage() {
         setNotFound(true);
       }
     } catch (error) {
-      console.error('Error fetching policy:', error);
+      clientLogger.error('Error fetching policy:', { detail: error });
       setNotFound(true);
     } finally {
       setLoading(false);

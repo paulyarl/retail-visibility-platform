@@ -26,6 +26,7 @@ import OverviewTab from './tabs/OverviewTab';
 import ProductsTab from './tabs/ProductsTab';
 import BusinessProfileTab from './tabs/BusinessProfileTab';
 import SettingsTab from './tabs/SettingsTab';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SetupStep {
   id: string;
@@ -97,7 +98,7 @@ export default function GoogleIntegrationsPage() {
       const data = await platformHomeService.getGoogleGBPStatus(tenantId);
       setGbpStatus(data);
     } catch (err) {
-      console.error('Failed to fetch GBP status:', err);
+      clientLogger.error('Failed to fetch GBP status:', { detail: err });
     }
   }
 
@@ -106,7 +107,7 @@ export default function GoogleIntegrationsPage() {
       const data = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
       setGmcStatus(data.data);
     } catch (err) {
-      console.error('Failed to fetch GMC status:', err);
+      clientLogger.error('Failed to fetch GMC status:', { detail: err });
     }
   }
 
@@ -185,7 +186,7 @@ export default function GoogleIntegrationsPage() {
         await fetchGMCStatus();
       }
     } catch (err) {
-      console.error('Failed to sync products to GMC:', err);
+      clientLogger.error('Failed to sync products to GMC:', { detail: err });
       setGmcSyncResult({ success: false, message: 'Failed to sync products' });
     } finally {
       setSyncingProducts(false);

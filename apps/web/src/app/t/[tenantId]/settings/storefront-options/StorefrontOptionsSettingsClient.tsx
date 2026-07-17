@@ -7,9 +7,10 @@ import { Switch } from '@/components/ui/Switch';
 import { Save, AlertCircle, CheckCircle2, Clock, LayoutGrid, Star, Eye, Info, QrCode, Image, Zap, ArrowRight, Building, Paintbrush, MapPin, CalendarDays, Tag, FolderOpen, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
-import { STOREFRONT_OPT_GROUPS, getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
+import { getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StorefrontOptionsSettings {
   storefront_opt_enabled: boolean;
@@ -22,7 +23,6 @@ interface StorefrontOptionsSettings {
   recently_viewed: boolean;
   storefront_social_media: boolean;
   storefront_contact: boolean;
-  interactive_maps: boolean;
   qr_codes_512: boolean;
   qr_codes_1024: boolean;
   qr_codes_2048: boolean;
@@ -44,7 +44,6 @@ interface StorefrontOptionsSettings {
   gallery_display_mode: 'carousel' | 'magazine';
   enhanced_seo: boolean;
   storefront_actions: boolean;
-  storefront_layout: 'classic' | 'editorial' | 'immersive';
   default_qr_resolution: string;
   default_gallery_limit: number;
 }
@@ -64,7 +63,6 @@ const DEFAULT_SETTINGS: StorefrontOptionsSettings = {
   recently_viewed: true,
   storefront_social_media: true,
   storefront_contact: true,
-  interactive_maps: true,
   qr_codes_512: false,
   qr_codes_1024: true,
   qr_codes_2048: false,
@@ -86,7 +84,6 @@ const DEFAULT_SETTINGS: StorefrontOptionsSettings = {
   gallery_display_mode: 'carousel',
   enhanced_seo: false,
   storefront_actions: false,
-  storefront_layout: 'classic',
   default_qr_resolution: '1024',
   default_gallery_limit: 5,
 };
@@ -115,7 +112,7 @@ function getQuickActions(settings: StorefrontOptionsSettings, tenantId: string):
     });
   }
 
-  if (settings.storefront_social_media || settings.storefront_contact || settings.interactive_maps) {
+  if (settings.storefront_social_media || settings.storefront_contact) {
     actions.push({
       id: 'tenant',
       label: 'Tenant Profile',
@@ -177,7 +174,6 @@ const GROUP_ICONS: Record<StorefrontOptGroup, React.ReactNode> = {
   gallery: <Image className="w-5 h-5 text-orange-600" />,
   gallery_mode: <Image className="w-5 h-5 text-rose-600" />,
   advanced: <Zap className="w-5 h-5 text-lime-600" />,
-  layout: <LayoutGrid className="w-5 h-5 text-violet-600" />,
 };
 
 export default function StorefrontOptionsSettingsClient({ tenantId }: StorefrontOptionsSettingsClientProps) {
@@ -202,7 +198,7 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
         setSettings({ ...DEFAULT_SETTINGS, ...data });
       }
     } catch (err) {
-      console.error('Failed to load storefront options settings:', err);
+      clientLogger.error('Failed to load storefront options settings:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -247,15 +243,11 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
 
   // Check tier-level gates for each group
   const cap = storefrontCap.data;
-  const tierAllowsHours = cap?.allowedHoursTypes.length ?? 0 > 0;
   const tierAllowsCategory = cap?.allowedCategoryTypes.length ?? 0 > 0;
   const tierAllowsRecommend = cap?.allowedRecommendTypes.length ?? 0 > 0;
   const tierAllowsRecentlyViewed = cap?.recentlyViewedEnabled ?? false;
   const tierAllowsInfo = cap?.allowedInfoTypes.length ?? 0 > 0;
-  const tierAllowsQR = (cap?.allowedQRResolutions.length ?? 0) > 0 || (cap?.allowedQRContentTypes.length ?? 0) > 0;
-  const tierAllowsGallery = cap?.allowedGalleryTypes.length ?? 0 > 0;
   const tierAllowsAdvanced = cap?.allowedAdvancedTypes.length ?? 0 > 0;
-  const tierAllowsLayout = (cap?.allowedLayouts.length ?? 0) > 0;
 
   if (loading) {
     return (
@@ -325,46 +317,6 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
           </div>
         </CardContent>
       </Card>
-
-      {/* Store Hours Group */}
-      {tierAllowsHours && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {GROUP_ICONS.hours}
-              Store Hours
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {cap?.allowedHoursTypes.includes('hours_animated') && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Animated Hours</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Animated store hours display with transitions</p>
-                </div>
-                <Switch
-                  checked={settings.hours_animated}
-                  onCheckedChange={() => handleToggle('hours_animated')}
-                  disabled={!settings.storefront_opt_enabled}
-                />
-              </div>
-            )}
-            {cap?.allowedHoursTypes.includes('hours_status') && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Open/Closed Status</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Real-time open/closed indicator badge</p>
-                </div>
-                <Switch
-                  checked={settings.hours_status}
-                  onCheckedChange={() => handleToggle('hours_status')}
-                  disabled={!settings.storefront_opt_enabled}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Category Display Group */}
       {tierAllowsCategory && (
@@ -507,431 +459,6 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
                 />
               </div>
             )}
-            {cap?.allowedInfoTypes.includes('interactive_maps') && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Interactive Maps</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Embedded interactive map on storefront</p>
-                </div>
-                <Switch
-                  checked={settings.interactive_maps}
-                  onCheckedChange={() => handleToggle('interactive_maps')}
-                  disabled={!settings.storefront_opt_enabled}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* QR Code Display Group */}
-      {tierAllowsQR && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {GROUP_ICONS.qr}
-              QR Code Display
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Resolution — multi select */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">QR Resolution</h4>
-              <div className="space-y-3">
-                {cap?.allowedQRResolutions.includes('qr_codes_512') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">512px (Standard)</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Standard resolution QR codes</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_codes_512}
-                      onCheckedChange={() => handleToggle('qr_codes_512')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-                {cap?.allowedQRResolutions.includes('qr_codes_1024') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">1024px (High)</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">High resolution QR codes</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_codes_1024}
-                      onCheckedChange={() => handleToggle('qr_codes_1024')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-                {cap?.allowedQRResolutions.includes('qr_codes_2048') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">2048px (HD)</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">HD resolution QR codes for print</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_codes_2048}
-                      onCheckedChange={() => handleToggle('qr_codes_2048')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Content — toggle select */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">QR Content Types</h4>
-              <div className="space-y-3">
-                {cap?.allowedQRContentTypes.includes('qr_product') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Product QR</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">QR codes for individual products</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_product}
-                      onCheckedChange={() => handleToggle('qr_product')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-                {cap?.allowedQRContentTypes.includes('qr_store') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Store QR</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">QR code for store page</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_store}
-                      onCheckedChange={() => handleToggle('qr_store')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-                {cap?.allowedQRContentTypes.includes('qr_logo') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Logo QR</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">QR code with embedded logo</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_logo}
-                      onCheckedChange={() => handleToggle('qr_logo')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-                {cap?.allowedQRContentTypes.includes('qr_directory') && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Directory QR</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">QR code for directory listing</p>
-                    </div>
-                    <Switch
-                      checked={settings.qr_directory}
-                      onCheckedChange={() => handleToggle('qr_directory')}
-                      disabled={!settings.storefront_opt_enabled}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* QR Code Style Group — gated by storefront_opt_qr_styled capability */}
-      {cap?.qrStyledEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Paintbrush className="h-5 w-5" />
-              QR Code Style
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Customize the visual style of your QR codes. Styled QR codes use rounded dots, custom colors, and your logo for a branded look.
-            </p>
-
-            {/* Dot Style Selector */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Dot Style</h4>
-              <div className="flex flex-wrap gap-2">
-                {cap.allowedQRDotStyles.map((style: string) => (
-                  <button
-                    key={style}
-                    onClick={() => setSettings(prev => ({ ...prev, qr_dot_type: style }))}
-                    disabled={!settings.storefront_opt_enabled}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
-                      settings.qr_dot_type === style
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                    }`}
-                  >
-                    {style.replace(/-/g, ' ')}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Corner Style Selector */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Corner Style</h4>
-              <div className="flex flex-wrap gap-2">
-                {cap.allowedQRCornerStyles.map((style: string) => (
-                  <button
-                    key={style}
-                    onClick={() => setSettings(prev => ({ ...prev, qr_corner_type: style }))}
-                    disabled={!settings.storefront_opt_enabled}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
-                      settings.qr_corner_type === style
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                    }`}
-                  >
-                    {style.replace(/-/g, ' ')}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Colors — gated by qrCustomColors */}
-            {cap.qrCustomColors && (
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Custom Colors</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Dot Color</label>
-                    <input
-                      type="color"
-                      value={settings.qr_dot_color}
-                      onChange={(e) => setSettings(prev => ({ ...prev, qr_dot_color: e.target.value }))}
-                      disabled={!settings.storefront_opt_enabled}
-                      className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Corner Color</label>
-                    <input
-                      type="color"
-                      value={settings.qr_corner_color}
-                      onChange={(e) => setSettings(prev => ({ ...prev, qr_corner_color: e.target.value }))}
-                      disabled={!settings.storefront_opt_enabled}
-                      className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Background</label>
-                    <input
-                      type="color"
-                      value={settings.qr_bg_color}
-                      onChange={(e) => setSettings(prev => ({ ...prev, qr_bg_color: e.target.value }))}
-                      disabled={!settings.storefront_opt_enabled}
-                      className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Gradient Toggle — gated by qrGradients */}
-            {cap.qrGradients && (
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-medium">Gradient Fill</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Apply a gradient to QR dots</p>
-                  </div>
-                  <Switch
-                    checked={settings.qr_gradient_enabled}
-                    onCheckedChange={() => handleToggle('qr_gradient_enabled')}
-                    disabled={!settings.storefront_opt_enabled}
-                  />
-                </div>
-                {settings.qr_gradient_enabled && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Gradient Start</label>
-                      <input
-                        type="color"
-                        value={settings.qr_gradient_start}
-                        onChange={(e) => setSettings(prev => ({ ...prev, qr_gradient_start: e.target.value }))}
-                        disabled={!settings.storefront_opt_enabled}
-                        className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Gradient End</label>
-                      <input
-                        type="color"
-                        value={settings.qr_gradient_end}
-                        onChange={(e) => setSettings(prev => ({ ...prev, qr_gradient_end: e.target.value }))}
-                        disabled={!settings.storefront_opt_enabled}
-                        className="w-full h-10 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Reset Button */}
-            <div className="border-t pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSettings(prev => ({
-                  ...prev,
-                  qr_dot_type: 'rounded',
-                  qr_corner_type: 'extra-rounded',
-                  qr_dot_color: '#1a56db',
-                  qr_corner_color: '#1a56db',
-                  qr_bg_color: '#ffffff',
-                  qr_gradient_enabled: false,
-                  qr_gradient_start: '#1a56db',
-                  qr_gradient_end: '#7c3aed',
-                }))}
-                disabled={!settings.storefront_opt_enabled}
-              >
-                Reset to Default
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gallery Display Group — Radio */}
-      {tierAllowsGallery && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {GROUP_ICONS.gallery}
-              Gallery Display
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Select the maximum number of images allowed in the product gallery
-            </p>
-            <div className="flex gap-2">
-              {cap?.allowedGalleryTypes.includes('image_gallery_5') && (
-                <button
-                  onClick={() => handleGalleryRadio('image_gallery_5')}
-                  className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                    settings.image_gallery_5
-                      ? 'bg-orange-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  5 Images
-                </button>
-              )}
-              {cap?.allowedGalleryTypes.includes('image_gallery_10') && (
-                <button
-                  onClick={() => handleGalleryRadio('image_gallery_10')}
-                  className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                    settings.image_gallery_10
-                      ? 'bg-orange-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  10 Images
-                </button>
-              )}
-              {cap?.allowedGalleryTypes.includes('image_gallery_15') && (
-                <button
-                  onClick={() => handleGalleryRadio('image_gallery_15')}
-                  className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                    settings.image_gallery_15
-                      ? 'bg-orange-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  15 Images
-                </button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gallery Display Mode — Radio (Carousel vs Magazine) */}
-      {tierAllowsGallery && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {GROUP_ICONS.gallery}
-              Gallery Display Mode
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Choose how images are displayed on product pages and directory entry pages
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => handleGalleryModeRadio('carousel')}
-                className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
-                  settings.gallery_display_mode === 'carousel'
-                    ? 'bg-orange-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                <div className="flex-shrink-0 mt-0.5">
-                  <div className={`w-4 h-4 rounded-full border-2 ${settings.gallery_display_mode === 'carousel' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
-                    {settings.gallery_display_mode === 'carousel' && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
-                </div>
-                <div>
-                  <p className="font-medium">Carousel</p>
-                  <p className={`text-sm ${settings.gallery_display_mode === 'carousel' ? 'text-orange-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                    One image at a time with navigation. Classic controlled viewing.
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={() => cap?.galleryMagazineEnabled && handleGalleryModeRadio('magazine')}
-                disabled={!cap?.galleryMagazineEnabled}
-                className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
-                  settings.gallery_display_mode === 'magazine'
-                    ? 'bg-rose-600 text-white shadow-md'
-                    : cap?.galleryMagazineEnabled
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                      : 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
-                }`}
-              >
-                <div className="flex-shrink-0 mt-0.5">
-                  <div className={`w-4 h-4 rounded-full border-2 ${settings.gallery_display_mode === 'magazine' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
-                    {settings.gallery_display_mode === 'magazine' && <div className="w-2 h-2 rounded-full bg-white" />}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">Magazine</p>
-                    {!cap?.galleryMagazineEnabled && (
-                      <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5 rounded-full">
-                        <AlertCircle className="w-3 h-3" />
-                        Upgrade
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-sm ${settings.gallery_display_mode === 'magazine' ? 'text-rose-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                    All images displayed at once in a magazine mosaic. Maximum visual impact.
-                  </p>
-                  {!cap?.galleryMagazineEnabled && (
-                    <Link href={`/t/${tenantId}/settings/store`} className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mt-1 hover:underline">
-                      Upgrade your plan <ArrowRight className="w-3 h-3" />
-                    </Link>
-                  )}
-                </div>
-              </button>
-            </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-              Applies to both product galleries and directory entry galleries
-            </p>
           </CardContent>
         </Card>
       )}
@@ -975,101 +502,6 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
           </CardContent>
         </Card>
       )}
-
-      {/* Storefront Layout Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LayoutGrid className="w-5 h-5 text-violet-600" />
-            Storefront Layout
-          </CardTitle>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Choose how your storefront and product pages look to customers
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Classic */}
-            <button
-              type="button"
-              onClick={() => {
-                if (cap?.canUseLayoutClassic) {
-                  setSettings(s => ({ ...s, storefront_layout: 'classic' }));
-                }
-              }}
-              disabled={!cap?.canUseLayoutClassic}
-              className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-colors text-left ${
-                settings.storefront_layout === 'classic'
-                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              } ${!cap?.canUseLayoutClassic ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {settings.storefront_layout === 'classic' && cap?.canUseLayoutClassic && (
-                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">✓</span>
-              )}
-              <span className="font-semibold text-sm">Classic</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Traditional single-column layout.
-                {!cap?.canUseLayoutClassic && (
-                  <span className="block text-amber-600 font-medium mt-1">Not included in your plan</span>
-                )}
-              </span>
-            </button>
-            {/* Editorial */}
-            <button
-              type="button"
-              onClick={() => {
-                if (cap?.canUseLayoutEditorial) {
-                  setSettings(s => ({ ...s, storefront_layout: 'editorial' }));
-                }
-              }}
-              disabled={!cap?.canUseLayoutEditorial}
-              className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-colors text-left ${
-                settings.storefront_layout === 'editorial'
-                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              } ${!cap?.canUseLayoutEditorial ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {settings.storefront_layout === 'editorial' && cap?.canUseLayoutEditorial && (
-                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">✓</span>
-              )}
-              <span className="font-semibold text-sm">Modern Editorial</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Storytelling emphasis, hero banner, split-panel product pages.
-                {!cap?.canUseLayoutEditorial && (
-                  <span className="block text-amber-600 font-medium mt-1">Not included in your plan</span>
-                )}
-              </span>
-            </button>
-            {/* Immersive */}
-            <button
-              type="button"
-              onClick={() => {
-                if (cap?.canUseLayoutImmersive) {
-                  setSettings(s => ({ ...s, storefront_layout: 'immersive' }));
-                }
-              }}
-              disabled={!cap?.canUseLayoutImmersive}
-              className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-colors text-left ${
-                settings.storefront_layout === 'immersive'
-                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              } ${!cap?.canUseLayoutImmersive ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {settings.storefront_layout === 'immersive' && cap?.canUseLayoutImmersive && (
-                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">✓</span>
-              )}
-              <span className="font-semibold text-sm">Immersive Commerce</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Conversion-optimized, compact purchase flow, sticky cart.
-                {!cap?.canUseLayoutImmersive && (
-                  <span className="block text-amber-600 font-medium mt-1">Not included in your plan</span>
-                )}
-              </span>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Save Button */}
       <div className="flex items-center justify-between">

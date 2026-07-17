@@ -4,6 +4,7 @@ import CategorySelector from './CategorySelector';
 import TenantCategorySelector from './TenantCategorySelector';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 import { undefined } from 'zod';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CategoryAssignmentModalProps {
   item: Item;
@@ -85,7 +86,7 @@ export default function CategoryAssignmentModal({
             setSelectedCategoryId(categoryData.id);
             setSelectedCategoryName(categoryData.name);
           } else {
-            console.error('[CategoryAssignmentModal] createCategory returned invalid response:', newCategory);
+            clientLogger.error('[CategoryAssignmentModal] createCategory returned invalid response:', { detail: newCategory });
           }
         } catch (createErr) {
           // Handle case where category already exists (race condition)
@@ -101,7 +102,7 @@ export default function CategoryAssignmentModal({
               setSelectedCategoryId(existingCategory.id);
               setSelectedCategoryName(existingCategory.name);
             } else {
-              console.error('[CategoryAssignmentModal] Could not find existing category after conflict');
+              clientLogger.error('[CategoryAssignmentModal] Could not find existing category after conflict');
               alert('Category assignment failed. Please try selecting the category manually.');
             }
           } else {
@@ -110,7 +111,7 @@ export default function CategoryAssignmentModal({
         }
       }
     } catch (err) {
-      console.error('[CategoryAssignmentModal] Error handling category selection:', err);
+      clientLogger.error('[CategoryAssignmentModal] Error handling category selection:', { detail: err });
       alert('Failed to assign category. Please try again.');
     } finally {
       setIsCreatingCategory(false);
@@ -124,7 +125,7 @@ export default function CategoryAssignmentModal({
       await onSave(item.id, selectedCategoryId);
       onClose();
     } catch (err) {
-      console.error('[CategoryAssignmentModal] Error saving category:', err);
+      clientLogger.error('[CategoryAssignmentModal] Error saving category:', { detail: err });
       alert('Failed to save category assignment.');
     }
   };

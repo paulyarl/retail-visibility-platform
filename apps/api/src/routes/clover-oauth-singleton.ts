@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import CloverOAuthSingletonService from '../services/CloverOAuthSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ router.get('/authorize', async (req, res) => {
       message: 'Clover authorization URL generated successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Authorize error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Authorize error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to generate Clover authorization URL',
@@ -98,7 +99,7 @@ router.post('/callback', async (req, res) => {
       message: 'Clover OAuth callback processed successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Callback error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to process Clover OAuth callback',
@@ -142,7 +143,7 @@ router.post('/refresh', async (req, res) => {
       message: 'Clover tokens refreshed successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Refresh error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to refresh Clover tokens',
@@ -186,7 +187,7 @@ router.get('/stats', async (req, res) => {
       message: 'Clover OAuth statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Get stats error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch OAuth statistics'
@@ -219,7 +220,7 @@ router.get('/health', async (req, res) => {
       message: 'Clover OAuth service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Health check error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -251,7 +252,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Clover OAuth service cache cleared successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Clear cache error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -316,7 +317,7 @@ router.post('/test', async (req, res) => {
       message: `Clover OAuth test (${operation}) completed successfully`
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Test error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test Clover OAuth operation',
@@ -364,7 +365,7 @@ router.get('/scopes', async (req, res) => {
       message: 'Supported Clover OAuth scopes retrieved successfully'
     });
   } catch (error) {
-    console.error('[CLOVER OAUTH SINGLETON] Scopes error:', error);
+    logger.error('[CLOVER OAUTH SINGLETON] Scopes error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported scopes'

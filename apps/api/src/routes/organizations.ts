@@ -14,6 +14,7 @@ import { requireOrgAdmin, getUserTenantRole } from '../middleware/permissions';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
 import ProductTypeService from '../services/ProductTypeService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -251,11 +252,11 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json(orgsWithStats);
   } catch (error: any) {
     // If the database is temporarily unreachable (e.g., Supabase paused), don't break the UI
-    if (error?.code === 'P1001' || (typeof error?.message === 'string' && error.message.includes("Can't reach database server"))) {
+    if (error?.code === 'P1001' || (typeof (error as any)?.message === 'string' && error.message.includes("Can't reach database server"))) {
       console.warn('[Organizations] DB unreachable (P1001). Returning empty list.');
       return res.json([]);
     }
-    console.error('[Organizations] List error:', error);
+    logger.error('[Organizations] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_organizations' });
   }
 });
@@ -315,7 +316,7 @@ router.get('/product-type-summary', authenticateToken, async (req: Request, res:
       organizations: summary.filter((s) => s.totalItems > 0),
     });
   } catch (error: any) {
-    console.error('[Organizations] Product type summary error:', error);
+    logger.error('[Organizations] Product type summary error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product type summary' });
   }
 });
@@ -503,11 +504,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
     res.json(response);
   } catch (error: any) {
     // If the database is temporarily unreachable (e.g., Supabase paused), return a helpful error
-    if (error?.code === 'P1001' || (typeof error?.message === 'string' && error.message.includes("Can't reach database server"))) {
+    if (error?.code === 'P1001' || (typeof (error as any)?.message === 'string' && error.message.includes("Can't reach database server"))) {
       console.warn('[Organizations] DB unreachable (P1001). Organization:', req.params.id);
       return res.status(503).json({ error: 'database_unavailable', message: 'Database is temporarily unavailable' });
     }
-    console.error('[Organizations] Get error:', error);
+    logger.error('[Organizations] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_organization', message: error.message });
   }
 });
@@ -554,7 +555,7 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
 
     res.status(201).json(organization);
   } catch (error: any) {
-    console.error('[Organizations] Create error:', error);
+    logger.error('[Organizations] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_organization', message: error.message });
   }
 });
@@ -597,7 +598,7 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
 
     res.json(organization);
   } catch (error: any) {
-    console.error('[Organizations] Update error:', error);
+    logger.error('[Organizations] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_organization' });
   }
 });
@@ -652,7 +653,7 @@ router.put('/:id/self-update', authenticateToken, requireOrgAdmin, async (req, r
 
     res.json(updatedOrganization);
   } catch (error: any) {
-    console.error('[Organizations] Self-update error:', error);
+    logger.error('[Organizations] Self-update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_organization' });
   }
 });
@@ -674,7 +675,7 @@ router.delete('/:id', requirePlatformAdmin, async (req, res) => {
 
     res.status(204).end();
   } catch (error: any) {
-    console.error('[Organizations] Delete error:', error);
+    logger.error('[Organizations] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_organization' });
   }
 });
@@ -704,7 +705,7 @@ router.post('/:id/tenants', requirePlatformAdmin, async (req, res) => {
 
     res.json(tenant);
   } catch (error: any) {
-    console.error('[Organizations] Add tenant error:', error);
+    logger.error('[Organizations] Add tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_add_tenant' });
   }
 });
@@ -720,7 +721,7 @@ router.delete('/:id/tenants/:tenantId', requirePlatformAdmin, async (req, res) =
 
     res.json(tenant);
   } catch (error: any) {
-    console.error('[Organizations] Remove tenant error:', error);
+    logger.error('[Organizations] Remove tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_remove_tenant' });
   }
 });
@@ -770,7 +771,7 @@ router.get('/:id/available-tenants', authenticateToken, requireOrgAdmin, async (
 
     res.json(availableTenants);
   } catch (error: any) {
-    console.error('[Organizations] Available tenants error:', error);
+    logger.error('[Organizations] Available tenants error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_available_tenants' });
   }
 });
@@ -867,7 +868,7 @@ router.post('/:id/tenants/self', authenticateToken, requireOrgAdmin, async (req,
       message: `Successfully added "${tenant.name}" to "${organization.name}"`,
     });
   } catch (error: any) {
-    console.error('[Organizations] Self-service add tenant error:', error);
+    logger.error('[Organizations] Self-service add tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_add_tenant' });
   }
 });
@@ -945,7 +946,7 @@ router.delete('/:id/tenants/:tenantId/self', authenticateToken, requireOrgAdmin,
       message: `Successfully removed "${tenant.name}" from the organization`,
     });
   } catch (error: any) {
-    console.error('[Organizations] Self-service remove tenant error:', error);
+    logger.error('[Organizations] Self-service remove tenant error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_remove_tenant' });
   }
 });
@@ -1003,7 +1004,7 @@ router.patch('/:id/tenants/:tenantId/standing-mode', authenticateToken, requireO
       message: `Standing mode for "${updated.name}" set to ${standingMode}.`,
     });
   } catch (error: any) {
-    console.error('[Organizations] Update standing mode error:', error);
+    logger.error('[Organizations] Update standing mode error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_standing_mode' });
   }
 });
@@ -1163,7 +1164,7 @@ router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (r
             continue;
           }
         } catch (capError) {
-          console.error(`[Organizations] Product type capability check failed for tenant ${tenantId}:`, capError);
+          logger.error(`[Organizations] Product type capability check failed for tenant ${tenantId}:`, undefined, { error: { name: (capError as any)?.name || 'Error', message: (capError as any)?.message || String(capError), stack: (capError as any)?.stack } });
         }
 
         // Check if SKU already exists for this tenant
@@ -1363,7 +1364,7 @@ router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (r
               console.log(`[Organizations] Global catalog entry already exists for SKU: ${sourceItem.sku}`);
             }
           } catch (error) {
-            console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, error);
+            logger.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             // Don't fail the propagation, just log the error
           }
 
@@ -1385,7 +1386,7 @@ router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (r
             console.log(`[Organizations] UPDATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
             
             if (variantResult.errors.length > 0) {
-              console.error(`[Organizations] Variant propagation errors for ${updatedItem.id}:`, variantResult.errors);
+              logger.error(`[Organizations] Variant propagation errors for ${updatedItem.id}:`, undefined, { error: { name: 'Error', message: String(variantResult.errors) } });
             }
             
             // Verify the parent item still has has_variants set correctly after update
@@ -1544,7 +1545,7 @@ router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (r
           console.log(`[Organizations] Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
           
           if (variantResult.errors.length > 0) {
-            console.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+            logger.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, undefined, { error: { name: 'Error', message: String(variantResult.errors) } });
           }
           
           // Verify the parent item still has has_variants set correctly
@@ -1557,7 +1558,7 @@ router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (r
 
         results.created.push(tenantId);
       } catch (error: any) {
-        console.error(`[Organizations] Error propagating to tenant ${tenantId}:`, error);
+        logger.error(`[Organizations] Error propagating to tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.errors.push({ tenantId, error: error.message });
       }
     }
@@ -1575,7 +1576,7 @@ router.post('/:id/items/propagate', authenticateToken, requireOrgAdmin, async (r
       },
     });
   } catch (error: any) {
-    console.error('[Organizations] Propagate item error:', error);
+    logger.error('[Organizations] Propagate item error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_propagate_item', message: error.message });
   }
 });
@@ -1830,7 +1831,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, asy
               continue;
             }
           } catch (capError) {
-            console.error(`[Organizations] Product type capability check failed for tenant ${tenantId}:`, capError);
+            logger.error(`[Organizations] Product type capability check failed for tenant ${tenantId}:`, undefined, { error: { name: (capError as any)?.name || 'Error', message: (capError as any)?.message || String(capError), stack: (capError as any)?.stack } });
           }
 
           // Check if SKU already exists for this tenant
@@ -2035,7 +2036,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, asy
                 console.log(`[Organizations] Global catalog entry already exists for SKU: ${sourceItem.sku}`);
               }
             } catch (error) {
-              console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, error);
+              logger.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
               // Don't fail the propagation, just log the error
             }
 
@@ -2057,7 +2058,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, asy
               console.log(`[Organizations] BULK UPDATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
               
               if (variantResult.errors.length > 0) {
-                console.error(`[Organizations] BULK UPDATE MODE: Variant propagation errors for ${existing.id}:`, variantResult.errors);
+                logger.error(`[Organizations] BULK UPDATE MODE: Variant propagation errors for ${existing.id}:`, undefined, { error: { name: 'Error', message: String(variantResult.errors) } });
               }
               
               // Verify the parent item still has has_variants set correctly after update
@@ -2225,7 +2226,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, asy
             console.log(`[Organizations] BULK CREATE MODE: Variant propagation result: created=${variantResult.created}, errors=${variantResult.errors.length}`);
             
             if (variantResult.errors.length > 0) {
-              console.error(`[Organizations] BULK CREATE MODE: Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+              logger.error(`[Organizations] BULK CREATE MODE: Variant propagation errors for ${newItem.id}:`, undefined, { error: { name: 'Error', message: String(variantResult.errors) } });
             }
             
             // Verify the parent item still has has_variants set correctly
@@ -2242,7 +2243,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, asy
             sku: sourceItem.sku 
           });
         } catch (error: any) {
-          console.error(`[Organizations] Error propagating ${sourceItem.sku} to tenant ${tenantId}:`, error);
+          logger.error(`[Organizations] Error propagating ${sourceItem.sku} to tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           results.errors.push({ 
             item_id: sourceItem.id, 
             tenantId, 
@@ -2266,7 +2267,7 @@ router.post('/:id/items/propagate-bulk', authenticateToken, requireOrgAdmin, asy
       },
     });
   } catch (error: any) {
-    console.error('[Organizations] Bulk propagate error:', error);
+    logger.error('[Organizations] Bulk propagate error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_bulk_propagate', message: error.message });
   }
 });
@@ -2338,7 +2339,7 @@ router.put('/:id/hero-location', authenticateToken, requireOrgAdmin, async (req,
       heroTenantName: updatedTenant?.name || tenant.name,
     });
   } catch (error: any) {
-    console.error('[Organizations] Set hero location error:', error);
+    logger.error('[Organizations] Set hero location error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_set_hero_location', message: error.message });
   }
 });
@@ -2423,7 +2424,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
               continue;
             }
           } catch (capError) {
-            console.error(`[Organizations] Product type capability check failed for tenant ${targetTenant.id}:`, capError);
+            logger.error(`[Organizations] Product type capability check failed for tenant ${targetTenant.id}:`, undefined, { error: { name: (capError as any)?.name || 'Error', message: (capError as any)?.message || String(capError), stack: (capError as any)?.stack } });
           }
 
           // Check if SKU already exists for this tenant
@@ -2564,7 +2565,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
               });
             }
           } catch (slugError) {
-            console.error(`[Organizations] Failed to propagate slug registry for SKU ${sourceItem.sku}:`, slugError);
+            logger.error(`[Organizations] Failed to propagate slug registry for SKU ${sourceItem.sku}:`, undefined, { error: { name: (slugError as any)?.name || 'Error', message: (slugError as any)?.message || String(slugError), stack: (slugError as any)?.stack } });
           }
 
           // Ensure global catalog entry exists
@@ -2611,7 +2612,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
               });
             }
           } catch (catalogError) {
-            console.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, catalogError);
+            logger.error(`[Organizations] Failed to create global catalog entry for SKU ${sourceItem.sku}:`, undefined, { error: { name: (catalogError as any)?.name || 'Error', message: (catalogError as any)?.message || String(catalogError), stack: (catalogError as any)?.stack } });
           }
 
           // Propagate variants if source item has them
@@ -2626,7 +2627,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
               'create'
             );
             if (variantResult.errors.length > 0) {
-              console.error(`[Organizations] SYNC-FROM-HERO: Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+              logger.error(`[Organizations] SYNC-FROM-HERO: Variant propagation errors for ${newItem.id}:`, undefined, { error: { name: 'Error', message: String(variantResult.errors) } });
             }
           }
 
@@ -2636,7 +2637,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
             sku: sourceItem.sku 
           });
         } catch (error: any) {
-          console.error(`[Organizations] Error syncing ${sourceItem.sku} to tenant ${targetTenant.id}:`, error);
+          logger.error(`[Organizations] Error syncing ${sourceItem.sku} to tenant ${targetTenant.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           results.errors.push({ 
             item_id: sourceItem.id,
             tenantId: targetTenant.id, 
@@ -2664,7 +2665,7 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[Organizations] Sync from hero error:', error);
+    logger.error('[Organizations] Sync from hero error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_sync_from_hero', message: error.message });
   }
 });

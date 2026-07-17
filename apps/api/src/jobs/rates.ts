@@ -6,6 +6,7 @@
 import type { Request, Response } from "express";
 import { prisma } from "../prisma";
 import { getEffectivePlatform } from "../utils/effectiveFlags";
+import { logger } from '../logger';
 
 /**
  * POST /jobs/rates/daily
@@ -61,7 +62,7 @@ export async function dailyRatesJob(req: Request, res: Response) {
 
     return res.json({ success: true, base: mockRates.base, date: mockRates.date, rows: 1 });
   } catch (e: any) {
-    console.error("rate_job_error", e);
+    logger.error("rate_job_error", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "rate_job_failed", message: e.message });
   }
 }

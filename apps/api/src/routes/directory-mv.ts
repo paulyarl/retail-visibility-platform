@@ -9,6 +9,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import tenantSingletonService from '../services/TenantSingletonService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -330,7 +331,7 @@ router.get('/search', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Directory MV search error:', error);
+    logger.error('Directory MV search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'search_failed' });
   }
 });
@@ -457,7 +458,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       total: categories.length,
     });
   } catch (error) {
-    console.error('Categories MV error:', error);
+    logger.error('Categories MV error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'categories_failed' });
   }
 });
@@ -671,7 +672,7 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Category MV error:', error);
+    logger.error('Category MV error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'category_failed' });
   }
 });
@@ -744,7 +745,7 @@ router.get('/categories/:idOrSlug/stats', async (req: Request, res: Response) =>
 
     return res.json({ stats });
   } catch (error) {
-    console.error('Category stats MV error:', error);
+    logger.error('Category stats MV error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'stats_failed' });
   }
 });
@@ -803,7 +804,7 @@ router.get('/health', async (req: Request, res: Response) => {
 
     return res.json(health);
   } catch (error) {
-    console.error('Health check error:', error);
+    logger.error('Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       status: 'unhealthy',
       error: 'health_check_failed',

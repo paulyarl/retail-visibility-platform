@@ -14,6 +14,7 @@ import { prisma } from '../../prisma';
 import { getBillingNotificationService } from './BillingNotificationService';
 import { getTrialManagementService } from './TrialManagementService';
 import { invalidateEffectiveCapabilities } from '../EffectiveCapabilityResolver';
+import { logger } from '../../logger';
 
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
 
@@ -90,7 +91,7 @@ export class SubscriptionStatusService {
         });
         console.log('[SubscriptionStatus] Platform revenue transaction created:', transactionId);
       } catch (error) {
-        console.error('[SubscriptionStatus] Failed to create platform revenue transaction:', error);
+        logger.error('[SubscriptionStatus] Failed to create platform revenue transaction:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         // Don't fail the subscription activation if revenue tracking fails
       }
     }
@@ -354,7 +355,7 @@ export class SubscriptionStatusService {
       });
     } catch (error) {
       // Don't fail the main operation if logging fails
-      console.error('[SubscriptionStatus] Failed to log status transition:', error);
+      logger.error('[SubscriptionStatus] Failed to log status transition:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

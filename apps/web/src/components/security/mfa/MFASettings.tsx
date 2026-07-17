@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/Dialog';
+import { clientLogger } from '@/lib/client-logger';
 
 export function MFASettings() {
   const { mfaStatus, disableMFA, regenerateBackupCodes, loading } = useMFA();
@@ -35,7 +36,7 @@ export function MFASettings() {
       setShowDisableDialog(false);
       window.location.reload();
     } catch (error) {
-      console.error('Failed to disable MFA:', error);
+      clientLogger.error('Failed to disable MFA:', { detail: error });
     }
   };
 
@@ -45,7 +46,7 @@ export function MFASettings() {
       setNewBackupCodes(codes);
       setShowBackupCodes(true);
     } catch (error) {
-      console.error('Failed to regenerate codes:', error);
+      clientLogger.error('Failed to regenerate codes:', { detail: error });
     }
   };
 

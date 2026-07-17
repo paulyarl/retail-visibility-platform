@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DashboardStats {
   totalItems: number;
@@ -63,7 +64,7 @@ class DashboardDataSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[DashboardDataSingleton] Failed to get dashboard data:', result.error);
+      clientLogger.error('[DashboardDataSingleton] Failed to get dashboard data:', { detail: result.error });
       return {} as DashboardData;
     }
 
@@ -87,7 +88,7 @@ class DashboardDataSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[DashboardDataSingleton] Failed to get dashboard stats:', result.error);
+      clientLogger.error('[DashboardDataSingleton] Failed to get dashboard stats:', { detail: result.error });
       return {} as DashboardStats;
     }
 

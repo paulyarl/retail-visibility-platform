@@ -16,6 +16,7 @@ import { getDirectPool } from '../utils/db-pool';
 import { tenantController } from '../controllers/tenant/TenantController';
 import { asyncErrorWrapper } from '../middleware/errorHandler';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -137,7 +138,7 @@ router.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res
 
     res.json(result);
   } catch (error) {
-    console.error('Error computing store status:', error);
+    logger.error('Error computing store status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to compute store status'
@@ -210,7 +211,7 @@ router.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => 
       scopedToTenant: !!requestedTenantId
     });
   } catch (error: any) {
-    console.error('[TENANTS] Error fetching user subdomains:', error);
+    logger.error('[TENANTS] Error fetching user subdomains:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -318,7 +319,7 @@ router.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (
     });
 
     if (!tenantCheck) {
-      console.error('[POST /tenants] CRITICAL: Tenant disappeared before UserTenant creation!');
+      logger.error('[POST /tenants] CRITICAL: Tenant disappeared before UserTenant creation!', undefined);
       return res.status(500).json({ error: "tenant_creation_failed", message: "Tenant was created but is no longer accessible" });
     }
 
@@ -351,7 +352,7 @@ router.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (
     await audit({ tenantId: tenant.id, actor: ownerId, action: "tenant.create", payload: { name: parsed.data.name, ownerId } });
     res.status(201).json(tenant);
   } catch (error) {
-    console.error('[POST /tenants] Error creating tenant:', error);
+    logger.error('[POST /tenants] Error creating tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_create_tenant", message: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
@@ -375,7 +376,7 @@ router.put("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req,
     const tenant = await prisma.tenants.update({ where: { id: req.params.id as string }, data });
     res.json(tenant);
   } catch (e) {
-    console.error('[PUT /tenants/:id] Error updating tenant:', e);
+    logger.error('[PUT /tenants/:id] Error updating tenant:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ error: "failed_to_update_tenant" });
   }
 });
@@ -468,7 +469,7 @@ router.post("/api/tenants/:id/geocode", async (req, res) => {
       business_name: listing.business_name
     });
   } catch (error) {
-    console.error('[POST /api/tenants/:id/geocode] Error:', error);
+    logger.error('[POST /api/tenants/:id/geocode] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_geocode_tenant" });
   }
 });
@@ -515,7 +516,7 @@ router.patch("/api/tenants/:id/coordinates", async (req, res) => {
       longitude
     });
   } catch (error) {
-    console.error('[PATCH /api/tenants/:id/coordinates] Error:', error);
+    logger.error('[PATCH /api/tenants/:id/coordinates] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_update_coordinates" });
   }
 });
@@ -535,7 +536,7 @@ router.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireR
 
     res.json({ success: true, message: 'Tenant deleted successfully' });
   } catch (error) {
-    console.error('[DELETE /tenants/:id] Error:', error);
+    logger.error('[DELETE /tenants/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_delete_tenant" });
   }
 });
@@ -585,7 +586,7 @@ router.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, as
       duration: Date.now() - startTime
     });
   } catch (error: any) {
-    console.error('[PATCH /tenants/:id/status] Error:', error);
+    logger.error('[PATCH /tenants/:id/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_update_status", details: error.message });
   }
 });
@@ -612,7 +613,7 @@ router.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAcc
       willShowInDirectory: statusInfo.showInDirectory,
     });
   } catch (error: any) {
-    console.error('[POST /tenants/:id/status/preview] Error:', error);
+    logger.error('[POST /tenants/:id/status/preview] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_preview_status", details: error.message });
   }
 });
@@ -652,7 +653,7 @@ router.get("/api/tenants/:id/status-history", authenticateToken, checkTenantAcce
 
     res.json({ history });
   } catch (error) {
-    console.error('[GET /tenants/:id/status-history] Error:', error);
+    logger.error('[GET /tenants/:id/status-history] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_status_history" });
   }
 });
@@ -695,7 +696,7 @@ router.get("/api/tenants/by-status/:status", authenticateToken, requireAdmin, as
       }
     });
   } catch (error) {
-    console.error('[GET /tenants/by-status/:status] Error:', error);
+    logger.error('[GET /tenants/by-status/:status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_tenants_by_status" });
   }
 });

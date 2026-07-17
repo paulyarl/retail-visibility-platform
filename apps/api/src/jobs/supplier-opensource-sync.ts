@@ -12,6 +12,7 @@
 
 import { prisma } from '../prisma';
 import SupplierCatalogService from '../services/SupplierCatalogService';
+import { logger } from '../logger';
 import {
   OpenFoodFactsConnector,
   OpenBeautyFactsConnector,
@@ -66,7 +67,7 @@ async function runIncrementalSync(connector: SupplierConnector, supplierId: stri
       );
     }
   } catch (error) {
-    console.error(`[SupplierOpenSourceSync] Incremental sync error for ${supplierId}:`, error);
+    logger.error(`[SupplierOpenSourceSync] Incremental sync error for ${supplierId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -104,7 +105,7 @@ async function runFullBackfill(connector: SupplierConnector, supplierId: string)
       `${totalUpdated} updated, ${totalQuarantined} quarantined`
     );
   } catch (error) {
-    console.error(`[SupplierOpenSourceSync] Full backfill error for ${supplierId}:`, error);
+    logger.error(`[SupplierOpenSourceSync] Full backfill error for ${supplierId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

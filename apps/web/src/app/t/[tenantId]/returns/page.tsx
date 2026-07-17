@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { ReturnsService, type ReturnRequest, type ReturnSummary } from '@/services/ReturnsService';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   requested: 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400',
@@ -63,7 +64,7 @@ export default function ReturnsPortalPage() {
       const data = await ReturnsService.getSummary(tenantId);
       setSummary(data);
     } catch (err) {
-      console.error('Failed to fetch summary:', err);
+      clientLogger.error('Failed to fetch summary:', { detail: err });
     }
   }, [tenantId]);
 

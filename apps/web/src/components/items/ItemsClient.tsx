@@ -43,6 +43,7 @@ import SyncStatusIndicator from './SyncStatusIndicator';
 // Types
 import { Item } from '@/services/itemsDataService';
 import { api } from '@/lib/api';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ItemsClientProps {
   initialItems?: Item[];
@@ -122,7 +123,7 @@ export default function ItemsClient({
         setCategories(transformedCategories || []);
         setUncategorizedCount(0); // Not available in new structure
       } catch (error) {
-        console.error('Failed to fetch categories:', error);
+        clientLogger.error('Failed to fetch categories:', { detail: error });
       }
     };
 
@@ -219,7 +220,7 @@ export default function ItemsClient({
       resetForm();
       closeForm();
     } catch (error) {
-      console.error('[ItemsClient] Create failed:', error);
+      clientLogger.error('[ItemsClient] Create failed:', { detail: error });
     }
   };
 
@@ -229,7 +230,7 @@ export default function ItemsClient({
       closeEditModal();
       return updatedItem; // Return the updated item
     } catch (error) {
-      console.error('[ItemsClient] Update failed:', error);
+      clientLogger.error('[ItemsClient] Update failed:', { detail: error });
       throw error; // Re-throw to handle in modal
     }
   };
@@ -244,7 +245,7 @@ export default function ItemsClient({
         try {
           await deleteItem(item.id);
         } catch (error) {
-          console.error('[ItemsClient] Delete failed:', error);
+          clientLogger.error('[ItemsClient] Delete failed:', { detail: error });
         }
       },
     });
@@ -254,7 +255,7 @@ export default function ItemsClient({
     try {
       await uploadPhotos(itemId, files);
     } catch (error) {
-      console.error('[ItemsClient] Photo upload failed:', error);
+      clientLogger.error('[ItemsClient] Photo upload failed:', { detail: error });
     }
   };
 
@@ -267,7 +268,7 @@ export default function ItemsClient({
 
       closeCategoryModal();
     } catch (error) {
-      console.error('[ItemsClient] Category assignment failed:', error);
+      clientLogger.error('[ItemsClient] Category assignment failed:', { detail: error });
     }
   };
 
@@ -284,11 +285,11 @@ export default function ItemsClient({
           refresh();
         },
         onError: (error) => {
-          console.error('[ItemsClient] Stock update failed:', error);
+          clientLogger.error('[ItemsClient] Stock update failed:', { detail: error });
         }
       });
     } catch (error) {
-      console.error('[ItemsClient] Stock update error:', error);
+      clientLogger.error('[ItemsClient] Stock update error:', { detail: error });
       throw error;
     }
   };
@@ -299,7 +300,7 @@ export default function ItemsClient({
       console.log('[ItemsClient] Propagate:', { itemId, targetTenants });
       closePropagateModal();
     } catch (error) {
-      console.error('[ItemsClient] Propagation failed:', error);
+      clientLogger.error('[ItemsClient] Propagation failed:', { detail: error });
     }
   };
 
@@ -329,7 +330,7 @@ export default function ItemsClient({
               newVisibility,
             });
           } catch (error) {
-            console.error('[ItemsClient] Visibility toggle failed:', error);
+            clientLogger.error('[ItemsClient] Visibility toggle failed:', { detail: error });
           }
         },
       });
@@ -351,7 +352,7 @@ export default function ItemsClient({
             newVisibility,
           });
         } catch (error) {
-          console.error('[ItemsClient] Visibility toggle failed:', error);
+          clientLogger.error('[ItemsClient] Visibility toggle failed:', { detail: error });
         }
       })();
     }
@@ -385,7 +386,7 @@ export default function ItemsClient({
               newStatus,
             });
           } catch (error) {
-            console.error('[ItemsClient] Status toggle failed:', error);
+            clientLogger.error('[ItemsClient] Status toggle failed:', { detail: error });
           }
         },
       });
@@ -407,7 +408,7 @@ export default function ItemsClient({
             newStatus,
           });
         } catch (error) {
-          console.error('[ItemsClient] Status toggle failed:', error);
+          clientLogger.error('[ItemsClient] Status toggle failed:', { detail: error });
         }
       })();
     }

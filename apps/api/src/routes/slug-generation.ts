@@ -9,6 +9,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import slugSingletonService from '../services/SlugSingletonService';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -104,7 +105,7 @@ router.post('/generate', authenticateToken, async (req: Request, res: Response) 
       suggestions: [...new Set(suggestions)], // Remove duplicates
     });
   } catch (error: any) {
-    console.error('[POST /api/slugs/generate] Error:', error);
+    logger.error('[POST /api/slugs/generate] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'slug_generation_failed',
       message: error.message 
@@ -157,7 +158,7 @@ router.get('/tenant/:tenantId', authenticateToken, async (req: Request, res: Res
       updatedAt: slugInfo.updatedAt,
     });
   } catch (error: any) {
-    console.error('[GET /api/slugs/tenant/:tenantId] Error:', error);
+    logger.error('[GET /api/slugs/tenant/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'failed_to_get_slug',
       message: error.message 
@@ -206,7 +207,7 @@ router.put('/tenant/:tenantId', authenticateToken, async (req: Request, res: Res
       slug,
     });
   } catch (error: any) {
-    console.error('[PUT /api/slugs/tenant/:tenantId] Error:', error);
+    logger.error('[PUT /api/slugs/tenant/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     if (error.message.includes('already taken')) {
       return res.status(409).json({ 
@@ -258,7 +259,7 @@ router.post('/check-availability', authenticateToken, async (req: Request, res: 
       isAvailable,
     });
   } catch (error: any) {
-    console.error('[POST /api/slugs/check-availability] Error:', error);
+    logger.error('[POST /api/slugs/check-availability] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'availability_check_failed',
       message: error.message 
@@ -292,7 +293,7 @@ router.post('/slugify', authenticateToken, async (req: Request, res: Response) =
 
     return res.json({ slug });
   } catch (error: any) {
-    console.error('[POST /api/slugs/slugify] Error:', error);
+    logger.error('[POST /api/slugs/slugify] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'slugify_failed',
       message: error.message 
@@ -337,7 +338,7 @@ router.post('/patterns', authenticateToken, async (req: Request, res: Response) 
 
     return res.json({ patterns });
   } catch (error: any) {
-    console.error('[POST /api/slugs/patterns] Error:', error);
+    logger.error('[POST /api/slugs/patterns] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'pattern_generation_failed',
       message: error.message 
@@ -395,7 +396,7 @@ router.post('/generate-with-pattern', authenticateToken, async (req: Request, re
 
     return res.json({ slug });
   } catch (error: any) {
-    console.error('[POST /api/slugs/generate-with-pattern] Error:', error);
+    logger.error('[POST /api/slugs/generate-with-pattern] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(400).json({ 
       error: 'pattern_generation_failed',
       message: error.message 
@@ -440,7 +441,7 @@ router.post('/tenant/:tenantId/regenerate', authenticateToken, async (req: Reque
       message: 'Slug regenerated from business name',
     });
   } catch (error: any) {
-    console.error('[POST /api/slugs/tenant/:tenantId/regenerate] Error:', error);
+    logger.error('[POST /api/slugs/tenant/:tenantId/regenerate] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'regeneration_failed',
       message: error.message 
@@ -473,7 +474,7 @@ router.delete('/tenant/:tenantId/cache', authenticateToken, async (req: Request,
       message: `Cache invalidated for tenant ${tenantId}`,
     });
   } catch (error: any) {
-    console.error('[DELETE /api/slugs/tenant/:tenantId/cache] Error:', error);
+    logger.error('[DELETE /api/slugs/tenant/:tenantId/cache] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'cache_invalidation_failed',
       message: error.message 

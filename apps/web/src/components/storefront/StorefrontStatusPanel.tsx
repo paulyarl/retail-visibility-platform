@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { tenantPublicService, PublicTenantInfo, LocationStatusInfo } from '@/services/TenantPublicService';
 import { AlertCircle, Clock, PauseCircle, XCircle, Archive, MapPin } from 'lucide-react';
-import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 
 /**
  * Status panel configuration for different location statuses
@@ -100,7 +100,7 @@ export interface StorefrontStatusPanelProps {
  */
 export function useStorefrontStatus(tenantId?: string, tenantInfo?: PublicTenantInfo) {
   // Capability-aware storefront resolution
-  const storefrontCap = useStorefrontCapability(tenantId || null);
+  const storefrontCap = usePublicStorefrontCapability(tenantId || null);
 
   // Calculate initial state synchronously for SSR
   const initialShouldShow = tenantInfo ? shouldShowStatusPanel(tenantInfo) : false;

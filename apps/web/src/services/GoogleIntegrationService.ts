@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GoogleCategory {
   id: string;
@@ -55,7 +56,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       return result.data?.categories || [];
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to get categories:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to get categories:', { detail: error });
       return [];
     }
   }
@@ -73,7 +74,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       return result.data?.categories || [];
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to get popular categories:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to get popular categories:', { detail: error });
       return [];
     }
   }
@@ -95,7 +96,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to get auth URL:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to get auth URL:', { detail: error });
       throw new Error('Failed to get Google authorization URL');
     }
   }
@@ -117,7 +118,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       console.log(`[GoogleIntegrationService] Disconnected Google for tenant ${tenantId}`);
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to disconnect:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to disconnect:', { detail: error });
       throw new Error('Failed to disconnect Google integration');
     }
   }
@@ -135,7 +136,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       return result.data || { isConnected: false };
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to get status:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to get status:', { detail: error });
       return { isConnected: false, error: 'Failed to get connection status' };
     }
   }
@@ -157,7 +158,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       console.log(`[GoogleIntegrationService] Synced business profile for tenant ${tenantId}`);
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to sync business profile:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to sync business profile:', { detail: error });
       throw new Error('Failed to sync Google Business Profile');
     }
   }
@@ -181,7 +182,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to get insights:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to get insights:', { detail: error });
       return null;
     }
   }
@@ -206,7 +207,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       console.log(`[GoogleIntegrationService] Updated business profile for tenant ${tenantId}`);
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to update business profile:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to update business profile:', { detail: error });
       throw new Error('Failed to update Google Business Profile');
     }
   }
@@ -224,7 +225,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       return result.data?.reviews || [];
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to get reviews:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to get reviews:', { detail: error });
       return [];
     }
   }
@@ -249,7 +250,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
       
       console.log(`[GoogleIntegrationService] Responded to review ${reviewId}`);
     } catch (error) {
-      console.error('[GoogleIntegrationService] Failed to respond to review:', error);
+      clientLogger.error('[GoogleIntegrationService] Failed to respond to review:', { detail: error });
       throw new Error('Failed to respond to Google review');
     }
   }

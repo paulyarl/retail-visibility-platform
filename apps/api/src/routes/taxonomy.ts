@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { GOOGLE_PRODUCT_TAXONOMY } from '../lib/google/taxonomy';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -180,7 +181,7 @@ router.get('/search', async (req, res) => {
       searchStrategy: categories.length > 0 ? 'found' : 'none'
     });
   } catch (error) {
-    console.error('[GET /api/taxonomy/search] Error:', error);
+    logger.error('[GET /api/taxonomy/search] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_search_taxonomy' });
   }
 });
@@ -256,7 +257,7 @@ router.get('/browse', async (req, res) => {
       total: categories.length
     });
   } catch (error) {
-    console.error('[GET /api/taxonomy/browse] Error:', error);
+    logger.error('[GET /api/taxonomy/browse] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_browse_taxonomy' });
   }
 });
@@ -290,7 +291,7 @@ router.get('/:id', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GET /api/taxonomy/:id] Error:', error);
+    logger.error('[GET /api/taxonomy/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_get_taxonomy' });
   }
 });

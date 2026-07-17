@@ -39,6 +39,7 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { manualBillingService, type ServiceCharge, type ServiceChargeConfiguration, type ServiceChargeStats } from '@/services/ManualBillingService';
 import { useBillingData } from '../../hooks/useBillingData';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function ServiceChargesTab() {
   const { tenants, loading: tenantsLoading } = useBillingData();
@@ -104,7 +105,7 @@ export default function ServiceChargesTab() {
       setCharges(charges);
       setTotalPages(Math.ceil(charges.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching service charges:', error);
+      clientLogger.error('Error fetching service charges:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to fetch service charges',
@@ -120,7 +121,7 @@ export default function ServiceChargesTab() {
       const configurations = await manualBillingService.getServiceChargeConfigurations();
       setConfigurations(configurations);
     } catch (error) {
-      console.error('Error fetching configurations:', error);
+      clientLogger.error('Error fetching configurations:', { detail: error });
     }
   };
 
@@ -137,7 +138,7 @@ export default function ServiceChargesTab() {
       };
       setStats(mockStats);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      clientLogger.error('Error fetching stats:', { detail: error });
     }
   };
 
@@ -170,7 +171,7 @@ export default function ServiceChargesTab() {
         });
       }
     } catch (error) {
-      console.error('Error adding service charge:', error);
+      clientLogger.error('Error adding service charge:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to add service charge',
@@ -229,7 +230,7 @@ export default function ServiceChargesTab() {
         });
       }
     } catch (error) {
-      console.error('Error creating invoice:', error);
+      clientLogger.error('Error creating invoice:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to create invoice',
@@ -293,7 +294,7 @@ export default function ServiceChargesTab() {
         });
       }
     } catch (error) {
-      console.error('Error editing service charge:', error);
+      clientLogger.error('Error editing service charge:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to edit service charge',

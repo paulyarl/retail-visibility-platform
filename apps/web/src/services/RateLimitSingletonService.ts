@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface RateLimitConfig {
   route_type: string;
@@ -46,13 +47,13 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
         'rate-limit-configs'
       );
       if (!response.success){
-        console.error('Failed to fetch rate limit configurations, using defaults:', response.error);
+        clientLogger.error('Failed to fetch rate limit configurations, using defaults:', { detail: response.error });
         return this.getDefaultConfigs();
       }
 
       return response.data || this.getDefaultConfigs();
     } catch (error) {
-      console.error('Failed to fetch rate limit configurations, using defaults:', error);
+      clientLogger.error('Failed to fetch rate limit configurations, using defaults:', { detail: error });
       return this.getDefaultConfigs();
     }
   }
@@ -91,13 +92,13 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
         'platform-settings-rate-limiting'
       );
       if (!response.success){
-        console.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', response.error);
+        clientLogger.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', { detail: response.error });
         return true;
       }
       
       return response?.data?.features?.rateLimitingEnabled ?? true;
     } catch (error) {
-      console.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', error);
+      clientLogger.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', { detail: error });
       // Default to enabled if we can't fetch settings
       return true;
     }
@@ -118,10 +119,10 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
         },
         `rate-limit-warning-${warning.clientId}`
       ).catch((err: Error) => {
-        console.error('Failed to log rate limit warning:', err);
+        clientLogger.error('Failed to log rate limit warning:', { detail: err });
       });
     } catch (error) {
-      console.error('Error preparing rate limit warning:', error);
+      clientLogger.error('Error preparing rate limit warning:', { detail: error });
     }
   }
 

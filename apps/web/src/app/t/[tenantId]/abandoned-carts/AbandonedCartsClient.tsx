@@ -45,7 +45,7 @@ export default function AbandonedCartsClient({ tenantId }: AbandonedCartsClientP
       setTotal(cartsResult.total);
       setSummary(summaryResult);
     } catch (error) {
-      clientLogger.error('AbandonedCartsClient: Failed to fetch data', { error });
+      clientLogger.error(error instanceof Error ? error : new Error('AbandonedCartsClient: Failed to fetch data'), { operation: 'fetch_data' });
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ export default function AbandonedCartsClient({ tenantId }: AbandonedCartsClientP
         await fetchData();
       }
     } catch (error) {
-      clientLogger.error('AbandonedCartsClient: Failed to resend email', { error, cartId });
+      clientLogger.error(error instanceof Error ? error : new Error('AbandonedCartsClient: Failed to resend email'), { operation: 'resend_email', cartId });
     } finally {
       setResending(null);
     }

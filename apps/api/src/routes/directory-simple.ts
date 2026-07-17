@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -99,7 +100,7 @@ router.get('/search', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Directory search error:', error);
+    logger.error('Directory search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'search_failed' });
   }
 });
@@ -127,7 +128,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       })),
     });
   } catch (error) {
-    console.error('Categories error:', error);
+    logger.error('Categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'categories_failed' });
   }
 });
@@ -156,7 +157,7 @@ router.get('/locations', async (req: Request, res: Response) => {
       })),
     });
   } catch (error) {
-    console.error('Locations error:', error);
+    logger.error('Locations error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'locations_failed' });
   }
 });
@@ -182,7 +183,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
 
     return res.json({ listing: listing[0] });
   } catch (error) {
-    console.error('Get listing error:', error);
+    logger.error('Get listing error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'get_listing_failed' });
   }
 });

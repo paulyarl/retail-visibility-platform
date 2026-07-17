@@ -9,6 +9,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AdminCategory {
   id: string;
@@ -86,7 +87,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCategoriesService] Failed to get categories:', result.error);
+      clientLogger.error('[AdminCategoriesService] Failed to get categories:', { detail: result.error });
       return [];
     }
 
@@ -95,7 +96,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     if (apiResponse && apiResponse.data && Array.isArray(apiResponse.data)) {
       return apiResponse.data;
     }
-    console.warn('[AdminCategoriesService] Expected array but got:', typeof apiResponse?.data, apiResponse);
+    clientLogger.warn('[AdminCategoriesService] Expected array but got:', { detail: typeof apiResponse?.data, detail2: apiResponse });
     return [];
   }
 
@@ -125,7 +126,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCategoriesService] Search failed:', result.error);
+      clientLogger.error('[AdminCategoriesService] Search failed:', { detail: result.error });
       return [];
     }
 
@@ -169,14 +170,14 @@ class AdminCategoriesService extends AdminApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdminCategoriesService] Propagation failed:', response.error);
+        clientLogger.error('[AdminCategoriesService] Propagation failed:', { detail: response.error });
         const errorMsg = typeof response.error === 'string' ? response.error : JSON.stringify(response.error);
         return { success: false, propagated: 0, tenantsAffected: 0, dryRun: params.dryRun, error: errorMsg };
       }
 
       return response.data || { success: true, propagated: 0, tenantsAffected: 0, dryRun: params.dryRun };
     } catch (error: any) {
-      console.error('[AdminCategoriesService] Propagation error:', error);
+      clientLogger.error('[AdminCategoriesService] Propagation error:', { detail: error });
       return { success: false, propagated: 0, tenantsAffected: 0, dryRun: params.dryRun, error: error.message };
     }
   }
@@ -193,7 +194,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to get premium featured products:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to get premium featured products:', { detail: response.error });
       return { products: [] };
     }
 
@@ -212,7 +213,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to get GBP seed categories:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to get GBP seed categories:', { detail: response.error });
       return { categories: [] };
     }
 
@@ -257,7 +258,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to create category:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to create category:', { detail: response.error });
       return null;
     }
 
@@ -279,7 +280,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to update category:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to update category:', { detail: response.error });
       return null;
     }
 
@@ -298,7 +299,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to delete category:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to delete category:', { detail: response.error });
       return false;
     }
 
@@ -322,7 +323,7 @@ class AdminCategoriesService extends AdminApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[AdminCategoriesService] Failed to reorder categories:', error);
+      clientLogger.error('[AdminCategoriesService] Failed to reorder categories:', { detail: error });
       return false;
     }
   }
@@ -335,7 +336,7 @@ class AdminCategoriesService extends AdminApiSingleton {
       // Use the dedicated public service for Google taxonomy operations
       return await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
     } catch (error) {
-      console.error('[AdminCategoriesService] Failed to get Google taxonomy path:', error);
+      clientLogger.error('[AdminCategoriesService] Failed to get Google taxonomy path:', { detail: error });
       return null;
     }
   }
@@ -357,7 +358,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to get quick start categories:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to get quick start categories:', { detail: response.error });
       return [];
     }
 
@@ -378,7 +379,7 @@ class AdminCategoriesService extends AdminApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[AdminCategoriesService] Failed to seed GBP categories:', error);
+      clientLogger.error('[AdminCategoriesService] Failed to seed GBP categories:', { detail: error });
       return false;
     }
   }
@@ -411,7 +412,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to get category stats:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to get category stats:', { detail: response.error });
       return {
         totalCategories: 0,
         activeCategories: 0,
@@ -455,7 +456,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[AdminCategoriesService] Failed to get mirror last run summary:', response.error);
+      clientLogger.error('[AdminCategoriesService] Failed to get mirror last run summary:', { detail: response.error });
       return null;
     }
 

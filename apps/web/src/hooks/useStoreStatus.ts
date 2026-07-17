@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { hoursStatusService } from '@/services/HoursStatusService';
 import { tenantManagementService } from '@/services/TenantManagementService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -70,7 +71,7 @@ export function useStoreStatus(tenantId?: string, isPublic: boolean = false) {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch store status:', err);
+        clientLogger.error('Failed to fetch store status:', { detail: err });
         if (mountedRef.current) {
           setError(err instanceof Error ? err.message : 'Unknown error');
           setStatus(null);
@@ -96,7 +97,7 @@ export function useStoreStatus(tenantId?: string, isPublic: boolean = false) {
           setStatus(responseData);
         }
       } catch (err) {
-        console.error('Failed to refresh store status:', err);
+        clientLogger.error('Failed to refresh store status:', { detail: err });
       }
     }, 900000); // 15 minutes
 
@@ -115,7 +116,7 @@ export function useStoreStatus(tenantId?: string, isPublic: boolean = false) {
           : await tenantManagementService.getStoreStatus(tenantId);
         if (mountedRef.current && responseData) setStatus(responseData);
       } catch (err) {
-        console.error('Failed to refresh store status:', err);
+        clientLogger.error('Failed to refresh store status:', { detail: err });
       }
     }
   };

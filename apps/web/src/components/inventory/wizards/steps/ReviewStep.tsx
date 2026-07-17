@@ -48,6 +48,7 @@ import { Progress } from '@/components/ui/Progress';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/shadcn-select';
 import { SupplierMatchSection } from '@/components/items/wholesale/SupplierMatchSection';
+import { clientLogger } from '@/lib/client-logger';
 
 // Helper component to display category name by ID using TenantCategoriesService (consistent with OrganizationStep)
 function CategoryNameDisplay({ categoryId, tenantId, categoryPath, categoryName: providedName, googleCategoryId }: { categoryId: string; tenantId?: string; categoryPath?: string; categoryName?: string; googleCategoryId?: string }) {
@@ -85,7 +86,7 @@ function CategoryNameDisplay({ categoryId, tenantId, categoryPath, categoryName:
             return;
           }
         } catch (error) {
-          console.error('[ReviewStep CategoryNameDisplay] Error loading tenant category:', error);
+          clientLogger.error('[ReviewStep CategoryNameDisplay] Error loading tenant category:', { detail: error });
         }
       } else {
         // For Google categories (numeric IDs), fetch from Google taxonomy
@@ -101,7 +102,7 @@ function CategoryNameDisplay({ categoryId, tenantId, categoryPath, categoryName:
             return;
           }
         } catch (error) {
-          console.error('[ReviewStep CategoryNameDisplay] Error fetching Google taxonomy:', error);
+          clientLogger.error('[ReviewStep CategoryNameDisplay] Error fetching Google taxonomy:', { detail: error });
         }
       }
 
@@ -313,7 +314,7 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
         };
         setFeaturedCounts(counts);
       } catch (error) {
-        console.error('Error fetching featured limits:', error);
+        clientLogger.error('Error fetching featured limits:', { detail: error });
       } finally {
         setLoadingLimits(false);
       }
@@ -442,7 +443,7 @@ export default function ReviewStep({ data, errors, onChange, onComplete, tenantI
       setIsComplete(true);
       onComplete();
     } catch (error) {
-      console.error('Publishing error:', error);
+      clientLogger.error('Publishing error:', { detail: error });
     } finally {
       setIsPublishing(false);
     }

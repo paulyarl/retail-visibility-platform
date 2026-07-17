@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { audit } from '../../audit';
 import { TRIAL_CONFIG } from '../../config/tenant-limits';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -118,7 +119,7 @@ router.get('/tiers', async (req, res) => {
 
     res.json(groupedTiers);
   } catch (error) {
-    console.error('[GET /api/admin/tier-management/tiers] Error:', error);
+    logger.error('[GET /api/admin/tier-management/tiers] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_tiers' });
   }
 });
@@ -234,7 +235,7 @@ router.get('/tenants', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[GET /api/admin/tiers/tenants] Error:', error);
+    logger.error('[GET /api/admin/tiers/tenants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tenants' });
   }
 });
@@ -280,7 +281,7 @@ router.get('/tenants/:tenantId', async (req, res) => {
 
     res.json(tenant);
   } catch (error) {
-    console.error('[GET /api/admin/tiers/tenants/:tenantId] Error:', error);
+    logger.error('[GET /api/admin/tiers/tenants/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_tenant' });
   }
 });
@@ -534,7 +535,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[PATCH /api/admin/tiers/tenants/:tenantId] Error:', error);
+    logger.error('[PATCH /api/admin/tiers/tenants/:tenantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_tenant_tier' });
   }
 });
@@ -612,7 +613,7 @@ router.get('/stats', async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[GET /api/admin/tiers/stats] Error:', error);
+    logger.error('[GET /api/admin/tiers/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_stats' });
   }
 });
@@ -722,7 +723,7 @@ router.post('/bulk-update', async (req, res) => {
       tenant: tenants.map(t => t.id),
     });
   } catch (error) {
-    console.error('[POST /api/admin/tiers/bulk-update] Error:', error);
+    logger.error('[POST /api/admin/tiers/bulk-update] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_bulk_update' });
   }
 });

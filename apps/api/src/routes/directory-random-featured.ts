@@ -3,6 +3,7 @@ import { getDirectPool } from '../utils/db-pool';
 import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
 import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -143,7 +144,7 @@ router.get('/', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/random-featured] Error:', error);
+    logger.error('[GET /api/directory/random-featured] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to fetch random featured products',
       products: [],
@@ -187,7 +188,7 @@ router.get('/debug', async (req, res) => {
       totalMerchants: result.rows.length
     });
   } catch (error) {
-    console.error('[DEBUG] Error:', error);
+    logger.error('[DEBUG] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'Debug query failed' });
   }
 });
@@ -448,7 +449,7 @@ router.get('/available', async (req, res) => {
     
     return res.json(responseData);
   } catch (error) {
-    console.error('[GET /api/directory/random-featured/available] Error:', error);
+    logger.error('[GET /api/directory/random-featured/available] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'Failed to fetch available products',
       details: unifiedConfig.isDevelopment ? (error as Error).message : undefined

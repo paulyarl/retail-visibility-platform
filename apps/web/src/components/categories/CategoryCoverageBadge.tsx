@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { googleProductTaxonomyService, GoogleCategoryCoverage } from '@/services/GoogleProductTaxonomyService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function CategoryCoverageBadge() {
   const [coverage, setCoverage] = useState<GoogleCategoryCoverage | null>(null);
@@ -13,7 +14,7 @@ export default function CategoryCoverageBadge() {
       const data = await googleProductTaxonomyService.getCoverage();
       setCoverage(data);
     } catch (err) {
-      console.error('[CategoryCoverageBadge] Error:', err);
+      clientLogger.error('[CategoryCoverageBadge] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

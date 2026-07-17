@@ -1,6 +1,7 @@
 import { ExternalApiSingleton } from '@/providers/base/ExternalApiSingleton';
 import { RequestTarget, RequestType, ExternalRequestOptions, ExternalApiResponse } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GeolocationResponse {
   ip: string;
@@ -148,7 +149,7 @@ class ExternalApiService extends ExternalApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to reverse geocode:', error);
+      clientLogger.error('[ExternalApiService] Failed to reverse geocode:', { detail: error });
       return null;
     }
   }
@@ -172,7 +173,7 @@ class ExternalApiService extends ExternalApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to get weather:', error);
+      clientLogger.error('[ExternalApiService] Failed to get weather:', { detail: error });
       return null;
     }
   }
@@ -196,7 +197,7 @@ class ExternalApiService extends ExternalApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to get timezone:', error);
+      clientLogger.error('[ExternalApiService] Failed to get timezone:', { detail: error });
       return null;
     }
   }
@@ -216,7 +217,7 @@ class ExternalApiService extends ExternalApiSingleton {
     try {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
       if (!apiKey) {
-        console.error('[ExternalApiService] Google Maps API key not found');
+        clientLogger.error('[ExternalApiService] Google Maps API key not found');
         return null;
       }
 
@@ -252,7 +253,7 @@ class ExternalApiService extends ExternalApiSingleton {
 
       return null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to geocode address:', error);
+      clientLogger.error('[ExternalApiService] Failed to geocode address:', { detail: error });
       return null;
     }
   }
@@ -286,7 +287,7 @@ class ExternalApiService extends ExternalApiSingleton {
       
       return null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to get timezone from coordinates:', error);
+      clientLogger.error('[ExternalApiService] Failed to get timezone from coordinates:', { detail: error });
       return null;
     }
   }
@@ -456,7 +457,7 @@ class ExternalApiService extends ExternalApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to fetch image:', error);
+      clientLogger.error('[ExternalApiService] Failed to fetch image:', { detail: error });
       return null;
     }
   }

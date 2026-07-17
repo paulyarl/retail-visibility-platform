@@ -21,6 +21,7 @@ import {
   Eye
 } from 'lucide-react';
 import { adminReviewsService, AdminReview, AdminReviewStats } from '@/services/AdminReviewsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdminReviewManagementProps {}
 
@@ -59,7 +60,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
       const allReviews = await adminReviewsService.getAllAdminReviews(filters);
       setReviews(allReviews);
     } catch (error) {
-      console.error('Error fetching admin reviews:', error);
+      clientLogger.error('Error fetching admin reviews:', { detail: error });
       setReviews([]);
     } finally {
       setLoading(false);
@@ -71,7 +72,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
       const stats = await adminReviewsService.getAdminReviewStats();
       setStats(stats);
     } catch (error) {
-      console.error('Error fetching admin review stats:', error);
+      clientLogger.error('Error fetching admin review stats:', { detail: error });
       setStats({
         totalReviews: 0,
         pendingReviews: 0,
@@ -93,7 +94,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
       ));
       fetchStats();
     } catch (error) {
-      console.error('Error approving review:', error);
+      clientLogger.error('Error approving review:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -114,7 +115,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
       ));
       fetchStats();
     } catch (error) {
-      console.error('Error rejecting review:', error);
+      clientLogger.error('Error rejecting review:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -140,7 +141,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
       setSelectedReviews(new Set());
       fetchStats();
     } catch (error) {
-      console.error('Error bulk approving reviews:', error);
+      clientLogger.error('Error bulk approving reviews:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -166,7 +167,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
       setSelectedReviews(new Set());
       fetchStats();
     } catch (error) {
-      console.error('Error bulk rejecting reviews:', error);
+      clientLogger.error('Error bulk rejecting reviews:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);

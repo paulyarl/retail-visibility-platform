@@ -291,6 +291,15 @@ export function generateDirectoryFeaturedId(tenantId: string = 'tid'): string {
 }
 
 /**
+ * Generates directory support note IDs
+ * Format: dsn-{tenantKey}-{nanoid}
+ */
+export function generateDirectorySupportNoteId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `dsn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generates organization IDs
  * Format: sess-abc123 (12 chars)
  */
@@ -927,6 +936,16 @@ export function generateCrmTicketMessageId(): string {
 }
 
 /**
+ * Generate CRM task message ID
+ * Format: crmtmsg-{nanoid} (15 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmTaskMessageId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmtmsg-${nanoid()}`;
+}
+
+/**
  * Generate CRM task ID
  * Format: crmtask-{tenantKey}-{nanoid} (20 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -1136,6 +1155,16 @@ export function generateStorefrontGallerySettingsId(tenantId: string): string {
 }
 
 /**
+ * Generate directory entry settings ID
+ * Format: des-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateDirectoryEntrySettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `des-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
  * Generate a tenant_storefront_hours_settings ID.
  * Format: shs-{tenantKey}-{nanoid} (18 chars)
  * URL-safe, readable, unique, tenant-traceable
@@ -1143,6 +1172,26 @@ export function generateStorefrontGallerySettingsId(tenantId: string): string {
 export function generateStorefrontHoursSettingsId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `shs-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate a tenant_storefront_layouts_settings ID.
+ * Format: sls-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontLayoutsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sls-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate storefront maps settings ID
+ * Format: sms-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateStorefrontMapsSettingsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sms-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
 
 /**
@@ -1446,4 +1495,34 @@ export function generateGrantTokenId(): string {
 export function generateGrantClaimId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `gclm-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate sales funnel ID (tenant-scoped)
+ * Format: funnel-{tenantKey}-{nanoid} (20 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFunnelId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `funnel-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate funnel step ID (tenant-scoped)
+ * Format: fstep-{tenantKey}-{nanoid} (19 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFunnelStepId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fstep-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate funnel event ID (tenant-scoped)
+ * Format: fevt-{tenantKey}-{nanoid} (18 chars)
+ * URL-safe, readable, unique, tenant-traceable
+ */
+export function generateFunnelEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `fevt-${generateTenantKey(tenantId)}-${nanoid()}`;
 }

@@ -10,6 +10,7 @@
 
 import { prisma } from '../prisma';
 import { emailService } from './email-service';
+import { logger } from '../logger';
 
 interface ReceiptItem {
   productName: string;
@@ -51,7 +52,7 @@ class OrderReceiptEmailService {
       });
 
       if (!order) {
-        console.error('[OrderReceiptEmail] Order not found:', orderId);
+        logger.error('[OrderReceiptEmail] Order not found:', undefined, { error: { name: (orderId as any)?.name || 'Error', message: (orderId as any)?.message || String(orderId), stack: (orderId as any)?.stack } });
         return;
       }
 
@@ -123,7 +124,7 @@ class OrderReceiptEmailService {
 
       console.log('[OrderReceiptEmail] Receipt email sent for order:', orderId);
     } catch (error) {
-      console.error('[OrderReceiptEmail] Error sending receipt email:', error);
+      logger.error('[OrderReceiptEmail] Error sending receipt email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

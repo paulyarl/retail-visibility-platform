@@ -10,6 +10,7 @@ import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 
 // Import existing ProductSingleton for universal product integration
 import { PublicProduct } from '@/providers/data/ProductSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 export interface FeaturedProduct {
@@ -365,7 +366,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.setState({ featuredTypes: updatedFeaturedTypes });
       }
     } catch (error) {
-      console.error('Error fetching tier limits:', error);
+      clientLogger.error('Error fetching tier limits:', { detail: error });
       // Keep default limits on error
     }
   }
@@ -540,7 +541,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         // console.log('TenantFeaturedProductsSingleton: syncWithProductProvider has no valid data, not updating state');
       }
     } catch (error) {
-      console.error('Error syncing with ProductProvider:', error);
+      clientLogger.error('Error syncing with ProductProvider:', { detail: error });
     }
   }
 
@@ -563,7 +564,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         await this.syncWithProductProvider();
       }
     } catch (error) {
-      console.error('Failed to initialize featured products:', error);
+      clientLogger.error('Failed to initialize featured products:', { detail: error });
     } finally {
       this.setState({ isLoading: false });
     }
@@ -607,10 +608,10 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         const newCurrentType = updatedTypes.find(t => t.id === this.state.selectedType) || updatedTypes[0];
         this.setState({ currentType: newCurrentType });
       } else {
-        console.error('TenantFeaturedProductsSingleton: Failed to fetch limits:', result.error);
+        clientLogger.error('TenantFeaturedProductsSingleton: Failed to fetch limits:', { detail: result.error });
       }
     } catch (error) {
-      console.error('TenantFeaturedProductsSingleton: Error fetching featured limits:', error);
+      clientLogger.error('TenantFeaturedProductsSingleton: Error fetching featured limits:', { detail: error });
       // Don't throw - continue without limits
     }
   }
@@ -634,7 +635,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
           300000
         );
       } catch (settingsErr) {
-        console.warn('[TenantFeaturedProductsSingleton] Failed to fetch featured options settings, using tier-only state:', settingsErr);
+        clientLogger.warn('[TenantFeaturedProductsSingleton] Failed to fetch featured options settings, using tier-only state:', { detail: settingsErr });
       }
 
       if (result.success) {
@@ -690,7 +691,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       }
     } catch (error) {
       // Fail-open: if capability fetch fails, allow all types
-      console.warn('[TenantFeaturedProductsSingleton] Failed to fetch capability state, allowing all types:', error);
+      clientLogger.warn('[TenantFeaturedProductsSingleton] Failed to fetch capability state, allowing all types:', { detail: error });
     }
   }
 
@@ -710,7 +711,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         // console.error('TenantFeaturedProductsSingleton: Failed to fetch featured products:', result.error);
       }
     } catch (error) {
-      console.error('TenantFeaturedProductsSingleton: Error fetching featured products:', error);
+      clientLogger.error('TenantFeaturedProductsSingleton: Error fetching featured products:', { detail: error });
     }
   }
 
@@ -779,7 +780,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.setState({ inactiveProducts: [] });
       }
     } catch (error) {
-      console.error('TenantFeaturedProductsSingleton: Error fetching inactive products:', error);
+      clientLogger.error('TenantFeaturedProductsSingleton: Error fetching inactive products:', { detail: error });
       this.setState({ inactiveProducts: [] });
     }
   }
@@ -861,7 +862,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.state.setOutOfStockProducts(outOfStock);
       }
     } catch (error) {
-      console.error('Error fetching out-of-stock products:', error);
+      clientLogger.error('Error fetching out-of-stock products:', { detail: error });
       this.state.setOutOfStockProducts([]);
     }
   }
@@ -929,7 +930,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         throw new Error(getErrorMessage(result.error) || 'Failed to feature product');
       }
     } catch (error) {
-      console.error('Error featuring product:', error);
+      clientLogger.error('Error featuring product:', { detail: error });
       throw error;
     } finally {
       this.setState({ processing: false });
@@ -991,7 +992,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
           await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
           // console.log(`[TenantFeaturedProductsSingleton] Pattern invalidation completed`);
         } catch (patternError) {
-          console.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, patternError);
+          clientLogger.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, { detail: patternError });
           this.invalidateCache(`/api/featured-products/management?tenantId=${this.tenantId}`);
         }
         
@@ -999,7 +1000,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         throw new Error(getErrorMessage(result.error) || 'Failed to feature product in directory');
       }
     } catch (error) {
-      console.error('Error featuring product in directory:', error);
+      clientLogger.error('Error featuring product in directory:', { detail: error });
       throw error;
     } finally {
       this.setState({ processing: false });
@@ -1027,7 +1028,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
           await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
           // console.log(`[TenantFeaturedProductsSingleton] Pattern invalidation completed`);
         } catch (patternError) {
-          console.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, patternError);
+          clientLogger.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, { detail: patternError });
           // Fallback: try to clear the specific cache key used by fetchFeaturedProducts
           this.invalidateCache(`/api/featured-products/management?tenantId=${this.tenantId}`);
         }
@@ -1051,7 +1052,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         throw new Error('Failed to unfeature product');
       }
     } catch (error) {
-      console.error('Error unfeaturing product:', error);
+      clientLogger.error('Error unfeaturing product:', { detail: error });
       throw error;
     } finally {
       this.setState({ processing: false });
@@ -1085,7 +1086,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
           await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
           // console.log(`[TenantFeaturedProductsSingleton] Pattern invalidation completed`);
         } catch (patternError) {
-          console.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, patternError);
+          clientLogger.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, { detail: patternError });
           // Fallback: try to clear the specific cache key used by fetchFeaturedProducts
           this.invalidateCache(`/api/featured-products/management?tenantId=${this.tenantId}`);
         }
@@ -1098,11 +1099,11 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         ]);
       } else {
         const errorData = result.error;
-        console.error('[toggleProductActive] API error:', errorData);
+        clientLogger.error('[toggleProductActive] API error:', { detail: errorData });
         throw new Error(getErrorMessage(result.error) || 'Failed to update product status');
       }
     } catch (error) {
-      console.error('[toggleProductActive] Error:', error);
+      clientLogger.error('[toggleProductActive] Error:', { detail: error });
       throw error;
     } finally {
       this.setState({ togglingActive: false });
@@ -1145,7 +1146,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         throw new Error('Failed to update expiration');
       }
     } catch (error) {
-      console.error('Error updating expiration:', error);
+      clientLogger.error('Error updating expiration:', { detail: error });
       throw error;
     } finally {
       this.setState({ processing: false });

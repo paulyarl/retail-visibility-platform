@@ -8,6 +8,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { tenantSeoService } from '@/services/TenantSeoService';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export default function SeoSettingsPage() {
         setSeoKeywords(data.seo_keywords || []);
       }
     } catch (err) {
-      console.error('Failed to load SEO settings:', err);
+      clientLogger.error('Failed to load SEO settings:', { detail: err });
       setError('Failed to load SEO settings');
     } finally {
       setLoading(false);
@@ -107,7 +108,7 @@ export default function SeoSettingsPage() {
       setSuccess('SEO settings saved successfully!');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      console.error('Save error:', err);
+      clientLogger.error('Save error:', { detail: err });
       setError(err.message || 'Failed to save SEO settings');
     } finally {
       setSaving(false);

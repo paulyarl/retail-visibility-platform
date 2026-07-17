@@ -4,6 +4,7 @@
  */
 
 import { CacheEncryption } from './cache-encryption';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CacheEntry<T> {
   data: T;
@@ -57,7 +58,7 @@ export class LocalStorageCache {
 
       return entry.data;
     } catch (error) {
-      console.warn('[LocalStorageCache] Error reading from cache:', error);
+      clientLogger.warn('[LocalStorageCache] Error reading from cache:', { detail: error });
       return null;
     }
   }
@@ -79,7 +80,7 @@ export class LocalStorageCache {
       const encrypted = await CacheEncryption.encrypt(JSON.stringify(entry), userId);
       localStorage.setItem(cacheKey, encrypted);
     } catch (error) {
-      console.warn('[LocalStorageCache] Error writing to cache:', error);
+      clientLogger.warn('[LocalStorageCache] Error writing to cache:', { detail: error });
     }
   }
 
@@ -91,7 +92,7 @@ export class LocalStorageCache {
       const cacheKey = this.getKey(key, tenantId);
       localStorage.removeItem(cacheKey);
     } catch (error) {
-      console.warn('[LocalStorageCache] Error deleting from cache:', error);
+      clientLogger.warn('[LocalStorageCache] Error deleting from cache:', { detail: error });
     }
   }
 
@@ -106,7 +107,7 @@ export class LocalStorageCache {
 
       keys.forEach(key => localStorage.removeItem(key));
     } catch (error) {
-      console.warn('[LocalStorageCache] Error clearing cache:', error);
+      clientLogger.warn('[LocalStorageCache] Error clearing cache:', { detail: error });
     }
   }
 

@@ -9,6 +9,7 @@ import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderSer
 import { customerAddressesService } from '@/services/CustomerAddressesService';
 import { Package, MapPin, ShoppingBag, Clock, TrendingUp, Download } from 'lucide-react';
 import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function AccountOverviewPage() {
   const { customer } = useCustomerAuth();
@@ -47,11 +48,11 @@ export default function AccountOverviewPage() {
         const result = await customerAddressesService.listAddresses();
         setAddressCount(result.addresses?.length || 0);
       } catch (addressError) {
-        console.error('Failed to load addresses:', addressError);
+        clientLogger.error('Failed to load addresses:', { detail: addressError });
         setAddressCount(0);
       }
     } catch (error) {
-      console.error('Failed to load recent orders:', error);
+      clientLogger.error('Failed to load recent orders:', { detail: error });
     } finally {
       setIsLoading(false);
     }

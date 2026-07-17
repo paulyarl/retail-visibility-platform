@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { UnifiedStoreCard } from '@/components/directory/UnifiedStoreCard';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 
@@ -18,7 +19,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
         const allStores = await recommendationsService.getStorefrontRecommendations(tenantId);
         setRecommendations(allStores);
       } catch (error) {
-        console.error('Error fetching storefront recommendations:', error);
+        clientLogger.error('Error fetching storefront recommendations:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -50,7 +51,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
               city: rec.city,
               state: rec.state,
               primaryCategory: rec.primaryCategory,
-              logoUrl: rec.logoUrl,
+              logoUrl: rec.logoUrl || rec.tenantLogoUrl,
               ratingAvg: rec.ratingAvg,
               ratingCount: rec.ratingCount,
               productCount: rec.productCount,

@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface BusinessHours {
   monday?: {
@@ -85,7 +86,7 @@ class BusinessHoursService extends TenantApiSingleton {
    */
   async getBusinessHours(tenantId: string): Promise<BusinessHours | null> {
     if (!tenantId) {
-      console.error('[BusinessHoursService] getBusinessHours: tenantId is required');
+      clientLogger.error('[BusinessHoursService] getBusinessHours: tenantId is required');
       return null;
     }
 
@@ -97,13 +98,13 @@ class BusinessHoursService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[BusinessHoursService] Failed to get business hours:', result.error);
+        clientLogger.error('[BusinessHoursService] Failed to get business hours:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[BusinessHoursService] Failed to get business hours:', error);
+      clientLogger.error('[BusinessHoursService] Failed to get business hours:', { detail: error });
       return null;
     }
   }
@@ -114,7 +115,7 @@ class BusinessHoursService extends TenantApiSingleton {
    */
   async updateBusinessHours(tenantId: string, hours: BusinessHours): Promise<BusinessHours | null> {
     if (!tenantId) {
-      console.error('[BusinessHoursService] updateBusinessHours: tenantId is required');
+      clientLogger.error('[BusinessHoursService] updateBusinessHours: tenantId is required');
       return null;
     }
 
@@ -129,7 +130,7 @@ class BusinessHoursService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[BusinessHoursService] Failed to update business hours:', result.error);
+        clientLogger.error('[BusinessHoursService] Failed to update business hours:', { detail: result.error });
         return null;
       }
 
@@ -138,7 +139,7 @@ class BusinessHoursService extends TenantApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[BusinessHoursService] Failed to update business hours:', error);
+      clientLogger.error('[BusinessHoursService] Failed to update business hours:', { detail: error });
       return null;
     }
   }
@@ -149,7 +150,7 @@ class BusinessHoursService extends TenantApiSingleton {
    */
   async deleteBusinessHours(tenantId: string): Promise<boolean> {
     if (!tenantId) {
-      console.error('[BusinessHoursService] deleteBusinessHours: tenantId is required');
+      clientLogger.error('[BusinessHoursService] deleteBusinessHours: tenantId is required');
       return false;
     }
 
@@ -161,7 +162,7 @@ class BusinessHoursService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[BusinessHoursService] Failed to delete business hours:', result.error);
+        clientLogger.error('[BusinessHoursService] Failed to delete business hours:', { detail: result.error });
         return false;
       }
 
@@ -170,7 +171,7 @@ class BusinessHoursService extends TenantApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[BusinessHoursService] Failed to delete business hours:', error);
+      clientLogger.error('[BusinessHoursService] Failed to delete business hours:', { detail: error });
       return false;
     }
   }

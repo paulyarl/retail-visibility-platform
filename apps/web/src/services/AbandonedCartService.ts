@@ -5,6 +5,7 @@
  */
 
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AbandonedCart {
   id: string;
@@ -99,7 +100,7 @@ class AbandonedCartService extends TenantApiSingleton {
       }
       return { carts: [], total: 0 };
     } catch (error) {
-      console.error('[AbandonedCartService] Error fetching abandoned carts:', error);
+      clientLogger.error('[AbandonedCartService] Error fetching abandoned carts:', { detail: error });
       return { carts: [], total: 0 };
     }
   }
@@ -120,7 +121,7 @@ class AbandonedCartService extends TenantApiSingleton {
       }
       return null;
     } catch (error) {
-      console.error('[AbandonedCartService] Error fetching summary:', error);
+      clientLogger.error('[AbandonedCartService] Error fetching summary:', { detail: error });
       return null;
     }
   }
@@ -136,7 +137,7 @@ class AbandonedCartService extends TenantApiSingleton {
       await this.invalidateServiceCaches(tenantId);
       return response.data?.success ?? false;
     } catch (error) {
-      console.error('[AbandonedCartService] Error resending recovery email:', error);
+      clientLogger.error('[AbandonedCartService] Error resending recovery email:', { detail: error });
       return false;
     }
   }

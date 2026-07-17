@@ -11,6 +11,7 @@
 
 import { prisma } from '../prisma';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
+import { logger } from '../logger';
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
@@ -27,7 +28,7 @@ async function getAllTenantIds(): Promise<string[]> {
     });
     return tenants.map(t => t.id);
   } catch (error) {
-    console.error('[PlatformBadgeSync] Error fetching tenants:', error);
+    logger.error('[PlatformBadgeSync] Error fetching tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -58,7 +59,7 @@ async function runScheduledSync(): Promise<void> {
         totalSynced += result.synced;
         totalDeactivated += result.deactivated;
       } catch (error) {
-        console.error(`[PlatformBadgeSync] Error syncing tenant ${tenantId}:`, error);
+        logger.error(`[PlatformBadgeSync] Error syncing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         failed++;
       }
 
@@ -72,7 +73,7 @@ async function runScheduledSync(): Promise<void> {
       `${totalSynced} synced, ${totalDeactivated} deactivated, ${failed} failed`
     );
   } catch (error) {
-    console.error('[PlatformBadgeSync] Scheduled sync failed:', error);
+    logger.error('[PlatformBadgeSync] Scheduled sync failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

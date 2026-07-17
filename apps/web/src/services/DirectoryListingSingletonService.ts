@@ -8,6 +8,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryListing {
   id: string;
@@ -63,7 +64,7 @@ export class DirectoryListingSingletonService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[DirectoryListing] Failed to get public directory listing:', result.error);
+      clientLogger.error('[DirectoryListing] Failed to get public directory listing:', { detail: result.error });
       return null;
     }
 
@@ -85,7 +86,7 @@ export class DirectoryListingSingletonService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[DirectoryListing] Failed to resolve directory listing:', result.error);
+      clientLogger.error('[DirectoryListing] Failed to resolve directory listing:', { detail: result.error });
       return null;
     }
 
@@ -108,7 +109,7 @@ export class DirectoryListingSingletonService extends PublicApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[DirectoryListing] Failed to get directory photos:', result.error);
+      clientLogger.error('[DirectoryListing] Failed to get directory photos:', { detail: result.error });
       return [];
     }
 

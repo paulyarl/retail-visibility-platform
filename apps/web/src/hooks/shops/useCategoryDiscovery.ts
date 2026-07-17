@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { shopsService } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Hook for category-based product discovery
@@ -131,7 +132,7 @@ export function useCategoryDiscovery(options: CategoryDiscoveryOptions): Categor
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch category discovery';
       setError(errorMessage);
-      console.error('[CATEGORY DISCOVERY] Error:', err);
+      clientLogger.error('[CATEGORY DISCOVERY] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

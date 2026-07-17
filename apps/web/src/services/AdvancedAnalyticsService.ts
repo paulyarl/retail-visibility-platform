@@ -6,6 +6,7 @@
  */
 
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AnalyticsEvent {
   type: 'page_view' | 'product_view' | 'add_to_cart' | 'purchase' | 'search' | 'filter' | 'review' | 'share' | 'wishlist';
@@ -376,13 +377,13 @@ class AdvancedAnalyticsService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedAnalyticsService] Failed to get real-time metrics:', response.error);
+        clientLogger.error('[AdvancedAnalyticsService] Failed to get real-time metrics:', { detail: response.error });
         return this.getDefaultRealTimeMetrics();
       }
 
       return response.data?.metrics || this.getDefaultRealTimeMetrics();
     } catch (error) {
-      console.error('[AdvancedAnalyticsService] Error getting real-time metrics:', error);
+      clientLogger.error('[AdvancedAnalyticsService] Error getting real-time metrics:', { detail: error });
       return this.getDefaultRealTimeMetrics();
     }
   }
@@ -422,13 +423,13 @@ class AdvancedAnalyticsService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedAnalyticsService] Failed to get product performance:', response.error);
+        clientLogger.error('[AdvancedAnalyticsService] Failed to get product performance:', { detail: response.error });
         return this.getDefaultProductPerformance();
       }
 
       return response.data?.performance || this.getDefaultProductPerformance();
     } catch (error) {
-      console.error('[AdvancedAnalyticsService] Error getting product performance:', error);
+      clientLogger.error('[AdvancedAnalyticsService] Error getting product performance:', { detail: error });
       return this.getDefaultProductPerformance();
     }
   }
@@ -471,13 +472,13 @@ class AdvancedAnalyticsService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedAnalyticsService] Failed to get user behavior:', response.error);
+        clientLogger.error('[AdvancedAnalyticsService] Failed to get user behavior:', { detail: response.error });
         return this.getDefaultUserBehavior();
       }
 
       return response.data?.behavior || this.getDefaultUserBehavior();
     } catch (error) {
-      console.error('[AdvancedAnalyticsService] Error getting user behavior:', error);
+      clientLogger.error('[AdvancedAnalyticsService] Error getting user behavior:', { detail: error });
       return this.getDefaultUserBehavior();
     }
   }
@@ -517,7 +518,7 @@ class AdvancedAnalyticsService extends ApiSystemSingleton {
         0 // No caching for event tracking
       );
     } catch (error) {
-      console.error('[AdvancedAnalyticsService] Failed to flush events:', error);
+      clientLogger.error('[AdvancedAnalyticsService] Failed to flush events:', { detail: error });
       // Re-queue events on failure
       this.eventQueue.unshift(...events);
     } finally {

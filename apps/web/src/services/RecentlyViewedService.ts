@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Recently Viewed Data Interfaces
 export interface RecentlyViewedItem {
@@ -109,7 +110,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       console.log('[RecentlyViewedService] ⚡ Item tracked in real-time:', recentlyViewedItem.id);
     } catch (error) {
-      console.error('[RecentlyViewedService] Failed to track item:', error);
+      clientLogger.error('[RecentlyViewedService] Failed to track item:', { detail: error });
     }
   }
 
@@ -145,7 +146,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       console.log('[RecentlyViewedService] ⚡ View duration recorded in real-time:', duration);
     } catch (error) {
-      console.error('[RecentlyViewedService] Failed to record view duration:', error);
+      clientLogger.error('[RecentlyViewedService] Failed to record view duration:', { detail: error });
     } finally {
       this.currentItemId = null;
       this.currentViewStart = null;
@@ -186,7 +187,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       return items.data || [];
     } catch (error) {
-      console.error('[RecentlyViewedService] Error fetching recently viewed items:', error);
+      clientLogger.error('[RecentlyViewedService] Error fetching recently viewed items:', { detail: error });
       return [];
     }
   }
@@ -208,7 +209,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       console.log('[RecentlyViewedService] ⚡ Item removed in real-time:', itemId);
     } catch (error) {
-      console.error('[RecentlyViewedService] Failed to remove item:', error);
+      clientLogger.error('[RecentlyViewedService] Failed to remove item:', { detail: error });
     }
   }
 
@@ -229,7 +230,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       console.log('[RecentlyViewedService] ⚡ Recently viewed cleared in real-time for user:', userId || 'anonymous');
     } catch (error) {
-      console.error('[RecentlyViewedService] Failed to clear recently viewed:', error);
+      clientLogger.error('[RecentlyViewedService] Failed to clear recently viewed:', { detail: error });
     }
   }
 
@@ -264,7 +265,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         viewTrends: []
       };
     } catch (error) {
-      console.error('[RecentlyViewedService] Error fetching recently viewed stats:', error);
+      clientLogger.error('[RecentlyViewedService] Error fetching recently viewed stats:', { detail: error });
       
       // Return default stats
       return {
@@ -302,7 +303,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       return trends.data || [];
     } catch (error) {
-      console.error('[RecentlyViewedService] Error fetching recently viewed trends:', error);
+      clientLogger.error('[RecentlyViewedService] Error fetching recently viewed trends:', { detail: error });
       return [];
     }
   }
@@ -332,7 +333,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       return recommendations.data || [];
     } catch (error) {
-      console.error('[RecentlyViewedService] Error fetching personalized recommendations:', error);
+      clientLogger.error('[RecentlyViewedService] Error fetching personalized recommendations:', { detail: error });
       return [];
     }
   }
@@ -355,7 +356,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
       return similarItems.data || [];
     } catch (error) {
-      console.error('[RecentlyViewedService] Error fetching similar items:', error);
+      clientLogger.error('[RecentlyViewedService] Error fetching similar items:', { detail: error });
       return [];
     }
   }
@@ -388,7 +389,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         trends
       };
     } catch (error) {
-      console.error('[RecentlyViewedService] Error fetching live behavior:', error);
+      clientLogger.error('[RecentlyViewedService] Error fetching live behavior:', { detail: error });
       return {
         recentViews: [],
         stats: {

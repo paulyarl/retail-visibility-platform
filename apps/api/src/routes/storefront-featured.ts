@@ -11,6 +11,7 @@ import { prisma } from '../prisma';
 import { isValidFeaturedType, getValidFeaturedTypes } from '../services/FeaturedProductsService';
 import { getDirectPool } from '../utils/db-pool';
 import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       console.log(`[FeaturedProducts] Resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
-      console.error(`[FeaturedProducts] Error resolving identifier: ${identifier}`, error);
+      logger.error(`[FeaturedProducts] Error resolving identifier: ${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         error: 'Tenant not found',
         message: `No tenant found for identifier: ${identifier}`
@@ -316,7 +317,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     });
     
   } catch (error) {
-    console.error('[Storefront Featured Products] Error:', error);
+    logger.error('[Storefront Featured Products] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch featured products' 
@@ -524,7 +525,7 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
     
   } catch (error) {
     const featuredType = req.params.type;
-    console.error(`[Storefront Featured Products - ${featuredType}] Error:`, error);
+    logger.error(`[Storefront Featured Products - ${featuredType}] Error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: `Failed to fetch featured ${featuredType} products` 
@@ -569,7 +570,7 @@ router.get('/:tenantId/featured-count', async (req: Request, res: Response) => {
       expired: parseInt(row.expired),
     });
   } catch (error) {
-    console.error('[Storefront Featured Count] Error:', error);
+    logger.error('[Storefront Featured Count] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'failed_to_count_featured_products',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -712,7 +713,7 @@ router.get('/:tenantId/products-with-featured', async (req: Request, res: Respon
       tenantId,
     });
   } catch (error) {
-    console.error('[Storefront Products with Featured] Error:', error);
+    logger.error('[Storefront Products with Featured] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'failed_to_fetch_products',
       message: error instanceof Error ? error.message : 'Unknown error'

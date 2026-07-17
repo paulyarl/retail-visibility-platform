@@ -34,6 +34,8 @@ import {
   StorefrontQrState,
   StorefrontGalleryState,
   StorefrontHoursState,
+  StorefrontLayoutState,
+  StorefrontMapsState,
   FaqOptionsState,
   CrmOptionsState,
   ChatbotOptionsState,
@@ -41,6 +43,7 @@ import {
   DirectoryPromotionState,
   WholesaleMatchingState,
   PlatformServicesState,
+  FunnelState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -69,25 +72,11 @@ export interface CapabilityHookState<T> {
 }
 
 // ====================
-// CONTEXT SELECTION
-// ====================
-
-/**
- * All capability resolution now goes through UnifiedCapabilityService.
- * Previously selected between TenantCapabilityResolutionService (dashboard)
- * and CapabilityResolutionService (public) — both unified now.
- */
-function getService(_forTenant: boolean) {
-  return unifiedCapabilityService;
-}
-
-// ====================
 // useCommerceCapability
 // ====================
 
 export function useCommerceCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<CommerceState> {
   const [data, setData] = useState<CommerceState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -98,15 +87,16 @@ export function useCommerceCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getCommerceState(tenantId);
+      const state = await unifiedCapabilityService.getCommerceState(tenantId);
+      
+      // console.log(`useCapabilityAccess: state ${JSON.stringify(state)}`);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch commerce capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -118,8 +108,7 @@ export function useCommerceCapability(
 // ====================
 
 export function usePaymentGatewayCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<PaymentGatewayState> {
   const [data, setData] = useState<PaymentGatewayState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -130,15 +119,14 @@ export function usePaymentGatewayCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getPaymentGatewayState(tenantId);
+      const state = await unifiedCapabilityService.getPaymentGatewayState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch payment gateway capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -150,8 +138,7 @@ export function usePaymentGatewayCapability(
 // ====================
 
 export function useStorefrontCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<StorefrontState> {
   const [data, setData] = useState<StorefrontState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -162,15 +149,14 @@ export function useStorefrontCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getStorefrontState(tenantId);
+      const state = await unifiedCapabilityService.getStorefrontState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -182,8 +168,7 @@ export function useStorefrontCapability(
 // ====================
 
 export function useBarcodeScanCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<BarcodeScanState> {
   const [data, setData] = useState<BarcodeScanState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -194,15 +179,14 @@ export function useBarcodeScanCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getBarcodeScanState(tenantId);
+      const state = await unifiedCapabilityService.getBarcodeScanState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch barcode scan capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -214,8 +198,7 @@ export function useBarcodeScanCapability(
 // ====================
 
 export function useFulfillmentCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<FulfillmentState> {
   const [data, setData] = useState<FulfillmentState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -226,15 +209,14 @@ export function useFulfillmentCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getFulfillmentState(tenantId);
+      const state = await unifiedCapabilityService.getFulfillmentState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch fulfillment capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -246,8 +228,7 @@ export function useFulfillmentCapability(
 // ====================
 
 export function useProductTypeCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<ProductTypeState> {
   const [data, setData] = useState<ProductTypeState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -258,15 +239,14 @@ export function useProductTypeCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getProductTypeState(tenantId);
+      const state = await unifiedCapabilityService.getProductTypeState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch product type capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -278,8 +258,7 @@ export function useProductTypeCapability(
 // ====================
 
 export function useProductOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<ProductOptionsState> {
   const [data, setData] = useState<ProductOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -290,15 +269,14 @@ export function useProductOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getProductOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getProductOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch product options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -310,8 +288,7 @@ export function useProductOptionsCapability(
 // ====================
 
 export function useFeaturedOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<FeaturedOptionsState> {
   const [data, setData] = useState<FeaturedOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -322,15 +299,14 @@ export function useFeaturedOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getFeaturedOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getFeaturedOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch featured options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -342,8 +318,7 @@ export function useFeaturedOptionsCapability(
 // ====================
 
 export function useIntegrationOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<IntegrationOptionsState> {
   const [data, setData] = useState<IntegrationOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -354,15 +329,14 @@ export function useIntegrationOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getIntegrationOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getIntegrationOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch integration options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -374,8 +348,7 @@ export function useIntegrationOptionsCapability(
 // ====================
 
 export function useQuickstartOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<QuickstartOptionsState> {
   const [data, setData] = useState<QuickstartOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -386,15 +359,14 @@ export function useQuickstartOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getQuickstartOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getQuickstartOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch quickstart options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -406,8 +378,7 @@ export function useQuickstartOptionsCapability(
 // ====================
 
 export function useStorefrontOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<StorefrontOptionsState> {
   const [data, setData] = useState<StorefrontOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -418,15 +389,14 @@ export function useStorefrontOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getStorefrontOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getStorefrontOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -438,8 +408,7 @@ export function useStorefrontOptionsCapability(
 // ====================
 
 export function useStorefrontQrCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<StorefrontQrState> {
   const [data, setData] = useState<StorefrontQrState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -450,15 +419,14 @@ export function useStorefrontQrCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getStorefrontQrState(tenantId);
+      const state = await unifiedCapabilityService.getStorefrontQrState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront QR capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -470,8 +438,7 @@ export function useStorefrontQrCapability(
 // ====================
 
 export function useStorefrontGalleryCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<StorefrontGalleryState> {
   const [data, setData] = useState<StorefrontGalleryState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -482,15 +449,14 @@ export function useStorefrontGalleryCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getStorefrontGalleryState(tenantId);
+      const state = await unifiedCapabilityService.getStorefrontGalleryState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront gallery capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -502,8 +468,7 @@ export function useStorefrontGalleryCapability(
 // ====================
 
 export function useStorefrontHoursCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<StorefrontHoursState> {
   const [data, setData] = useState<StorefrontHoursState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -514,15 +479,74 @@ export function useStorefrontHoursCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getStorefrontHoursState(tenantId);
+      const state = await unifiedCapabilityService.getStorefrontHoursState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch storefront hours capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useStorefrontLayoutsCapability
+// ====================
+
+export function useStorefrontLayoutsCapability(
+  tenantId: string | null
+): CapabilityHookState<StorefrontLayoutState> {
+  const [data, setData] = useState<StorefrontLayoutState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await unifiedCapabilityService.getStorefrontLayoutsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch storefront layouts capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useStorefrontMapsCapability
+// ====================
+
+export function useStorefrontMapsCapability(
+  tenantId: string | null
+): CapabilityHookState<StorefrontMapsState> {
+  const [data, setData] = useState<StorefrontMapsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await unifiedCapabilityService.getStorefrontMapsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch storefront maps capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -534,8 +558,7 @@ export function useStorefrontHoursCapability(
 // ====================
 
 export function useFaqOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<FaqOptionsState> {
   const [data, setData] = useState<FaqOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -546,15 +569,14 @@ export function useFaqOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getFaqOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getFaqOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch FAQ options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -566,8 +588,7 @@ export function useFaqOptionsCapability(
 // ====================
 
 export function useCrmOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<CrmOptionsState> {
   const [data, setData] = useState<CrmOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -578,15 +599,14 @@ export function useCrmOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getCrmOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getCrmOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch CRM options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -598,8 +618,7 @@ export function useCrmOptionsCapability(
 // ====================
 
 export function useChatbotOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<ChatbotOptionsState> {
   const [data, setData] = useState<ChatbotOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -610,15 +629,14 @@ export function useChatbotOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getChatbotOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getChatbotOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch chatbot options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -630,8 +648,7 @@ export function useChatbotOptionsCapability(
 // ====================
 
 export function useSocialCommerceOptionsCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<SocialCommerceOptionsState> {
   const [data, setData] = useState<SocialCommerceOptionsState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -642,15 +659,14 @@ export function useSocialCommerceOptionsCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getSocialCommerceOptionsState(tenantId);
+      const state = await unifiedCapabilityService.getSocialCommerceOptionsState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch social commerce options capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -662,8 +678,7 @@ export function useSocialCommerceOptionsCapability(
 // ====================
 
 export function useDirectoryPromotionCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<DirectoryPromotionState> {
   const [data, setData] = useState<DirectoryPromotionState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -674,15 +689,14 @@ export function useDirectoryPromotionCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getDirectoryPromotionState(tenantId);
+      const state = await unifiedCapabilityService.getDirectoryPromotionState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch directory promotion capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -694,8 +708,7 @@ export function useDirectoryPromotionCapability(
 // ====================
 
 export function useWholesaleMatchingCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<WholesaleMatchingState> {
   const [data, setData] = useState<WholesaleMatchingState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -706,15 +719,14 @@ export function useWholesaleMatchingCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getWholesaleMatchingState(tenantId);
+      const state = await unifiedCapabilityService.getWholesaleMatchingState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch wholesale matching capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -726,8 +738,7 @@ export function useWholesaleMatchingCapability(
 // ====================
 
 export function usePlatformServicesCapability(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<PlatformServicesState> {
   const [data, setData] = useState<PlatformServicesState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -738,15 +749,44 @@ export function usePlatformServicesCapability(
     setLoading(true);
     setError(null);
     try {
-      const service = getService(!!options?.forTenant);
-      const state = await service.getPlatformServicesState(tenantId);
+      const state = await unifiedCapabilityService.getPlatformServicesState(tenantId);
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch platform services capability');
     } finally {
       setLoading(false);
     }
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useFunnelCapability
+// ====================
+
+export function useFunnelCapability(
+  tenantId: string | null
+): CapabilityHookState<FunnelState> {
+  const [data, setData] = useState<FunnelState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await unifiedCapabilityService.getFunnelState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch funnel capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -758,15 +798,13 @@ export function usePlatformServicesCapability(
 // ====================
 
 export function useAllCapabilities(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<AllCapabilitiesState> {
-  const service = getService(!!options?.forTenant);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tenant', 'capabilities', 'all', tenantId],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      return service.getAllCapabilities(tenantId);
+      return unifiedCapabilityService.getAllCapabilities(tenantId);
     },
     enabled: !!tenantId,
     staleTime: 60 * 1000,
@@ -797,8 +835,7 @@ export function useAllCapabilities(
  */
 export function useCapabilityFeatureCheck(
   tenantId: string | null,
-  featureKey: string,
-  options?: { forTenant?: boolean }
+  featureKey: string
 ): { enabled: boolean | null; loading: boolean } {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
@@ -814,12 +851,11 @@ export function useCapabilityFeatureCheck(
     }
 
     setLoading(true);
-    const service = getService(!!options?.forTenant);
-    service.checkFeatureByCapability(tenantId, featureKey)
+    unifiedCapabilityService.checkFeatureByCapability(tenantId, featureKey)
       .then((result: boolean | null) => setEnabled(result))
       .catch(() => setEnabled(false))
       .finally(() => setLoading(false));
-  }, [tenantId, featureKey, options?.forTenant]);
+  }, [tenantId, featureKey]);
 
   return { enabled, loading };
 }
@@ -838,8 +874,7 @@ export function useCapabilityFeatureCheck(
  * when direct settings fetch fails.
  */
 export function useMerchantGates(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): { gates: Record<string, boolean>; loading: boolean } {
   const [gates, setGates] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -848,22 +883,21 @@ export function useMerchantGates(
     if (!tenantId) return;
     setLoading(true);
 
-    const service = getService(!!options?.forTenant);
 
     Promise.all([
       // Tier-allowed states from resolve service
-      service.getCommerceState(tenantId).catch(() => null),
-      service.getPaymentGatewayState(tenantId).catch(() => null),
-      service.getStorefrontState(tenantId).catch(() => null),
-      service.getBarcodeScanState(tenantId).catch(() => null),
-      service.getFulfillmentState(tenantId).catch(() => null),
-      service.getProductOptionsState(tenantId).catch(() => null),
-      service.getFeaturedOptionsState(tenantId).catch(() => null),
-      service.getIntegrationOptionsState(tenantId).catch(() => null),
-      service.getQuickstartOptionsState(tenantId).catch(() => null),
-      service.getStorefrontOptionsState(tenantId).catch(() => null),
-      service.getFaqOptionsState(tenantId).catch(() => null),
-      service.getCrmOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getCommerceState(tenantId).catch(() => null),
+      unifiedCapabilityService.getPaymentGatewayState(tenantId).catch(() => null),
+      unifiedCapabilityService.getStorefrontState(tenantId).catch(() => null),
+      unifiedCapabilityService.getBarcodeScanState(tenantId).catch(() => null),
+      unifiedCapabilityService.getFulfillmentState(tenantId).catch(() => null),
+      unifiedCapabilityService.getProductOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getFeaturedOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getIntegrationOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getQuickstartOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getStorefrontOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getFaqOptionsState(tenantId).catch(() => null),
+      unifiedCapabilityService.getCrmOptionsState(tenantId).catch(() => null),
       // Direct merchant settings from option services (for master switches)
       platformHomeService.getTenantBarcodeScanSettings(tenantId).catch(() => null),
       platformHomeService.getTenantFulfillmentSettings(tenantId).catch(() => null),
@@ -908,7 +942,7 @@ export function useMerchantGates(
       });
       setLoading(false);
     });
-  }, [tenantId, options?.forTenant]);
+  }, [tenantId]);
 
   return { gates, loading };
 }
@@ -925,15 +959,13 @@ export function useMerchantGates(
  * Constraint violations are computed server-side by the CCL post-resolution pass.
  */
 export function useConstraintViolations(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<ConstraintViolationState[]> {
-  const service = getService(!!options?.forTenant);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tenant', 'capabilities', 'constraints', tenantId],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const caps = await service.getAllCapabilities(tenantId);
+      const caps = await unifiedCapabilityService.getAllCapabilities(tenantId);
       return caps.constraintViolations;
     },
     enabled: !!tenantId,
@@ -967,15 +999,13 @@ export function useConstraintViolations(
  * Dashboard uses warningTypes to show amber warnings.
  */
 export function useConstraintStatus(
-  tenantId: string | null,
-  options?: { forTenant?: boolean }
+  tenantId: string | null
 ): CapabilityHookState<ConstraintStatusMapState> {
-  const service = getService(!!options?.forTenant);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tenant', 'capabilities', 'constraint-status', tenantId],
     queryFn: async () => {
       if (!tenantId) throw new Error('Tenant ID is required');
-      const caps = await service.getAllCapabilities(tenantId);
+      const caps = await unifiedCapabilityService.getAllCapabilities(tenantId);
       return caps.constraintStatus;
     },
     enabled: !!tenantId,

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { Star, Sparkles, Calendar, Tag, Award, Download, Globe, Package } from 'lucide-react';
 import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
 import { ProductTypeBadge } from './ProductTypeBadge';
@@ -17,6 +17,7 @@ import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@m
 import { distanceUtils } from '@/lib/utils';
 import HoursStatusBadge from '../storefront/HoursStatusBadge';
 import { PromotedBadge, promotedCardClass } from './PromotedBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 // Type-aware CTA: renders the correct button based on productType
 function TypeAwareCTA({
@@ -644,8 +645,8 @@ export default function SmartProductCard({
   const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : product.payment_gateway_type ?? defaultGatewayType;
 
   // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(product.tenantId);
-  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  const commerceCap = usePublicCommerceCapability(product.tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(product.tenantId);
 
   // Simplified: Check for gateway_type instead of boolean status
   const effectiveGatewayType = contextGatewayType ?? propDefaultGatewayType ?? product.payment_gateway_type ?? defaultGatewayType;
@@ -697,7 +698,7 @@ export default function SmartProductCard({
           setCanPurchase(false);
         }
       } catch (error) {
-        console.error('Failed to check payment gateway:', error);
+        clientLogger.error('Failed to check payment gateway:', { detail: error });
         setCanPurchase(false);
       }
     };

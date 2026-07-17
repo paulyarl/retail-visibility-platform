@@ -3,6 +3,7 @@ import { prisma } from '../../prisma';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
 import { randomUUID } from 'crypto';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ router.post('/process-payment', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Square] Payment processing error:', error);
+    logger.error('[Square] Payment processing error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     // Update payment record to failed
     if (req.body.paymentId) {
@@ -162,7 +163,7 @@ router.post('/process-payment', async (req, res) => {
           },
         });
       } catch (dbError) {
-        console.error('[Square] Failed to update payment status:', dbError);
+        logger.error('[Square] Failed to update payment status:', undefined, { error: { name: (dbError as any)?.name || 'Error', message: (dbError as any)?.message || String(dbError), stack: (dbError as any)?.stack } });
       }
     }
 
@@ -188,7 +189,7 @@ router.post('/webhook', async (req, res) => {
       const hash = hmac.digest('base64');
 
       if (hash !== signature) {
-        console.error('[Square] Invalid webhook signature');
+        logger.error('[Square] Invalid webhook signature', undefined);
         return res.status(401).json({ error: 'Invalid signature' });
       }
     }
@@ -244,7 +245,7 @@ router.post('/webhook', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[Square] Webhook processing error:', error);
+    logger.error('[Square] Webhook processing error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Webhook processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',

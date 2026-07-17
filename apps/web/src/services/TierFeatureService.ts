@@ -25,6 +25,7 @@ import {
   getFeatureLimits as getFeatureLimitsFallback,
   calculateUpgradeRequirements as calculateUpgradeRequirementsFallback,
 } from '@/lib/tiers/tier-features';
+import { clientLogger } from '@/lib/client-logger';
 
 // ---- Types ----
 
@@ -106,7 +107,7 @@ class TierFeatureService extends TenantApiSingleton {
         return this.config;
       }
     } catch (error) {
-      console.warn('[TierFeatureService] Failed to load config from API, using fallback:', error);
+      clientLogger.warn('[TierFeatureService] Failed to load config from API, using fallback:', { detail: error });
     }
 
     // Build fallback from hardcoded data

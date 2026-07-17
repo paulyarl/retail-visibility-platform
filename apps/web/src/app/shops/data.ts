@@ -1,6 +1,7 @@
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantStorefrontService, StorefrontProduct } from '@/services/TenantStorefrontService';
 import { Category } from '@/services/StorefrontService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Shop {
   id: string;
@@ -86,7 +87,7 @@ export async function getTenantWithProducts(id: string): Promise<TenantData | nu
         category_type: 'platform', // All storefront categories are platform categories
       }));
     } catch (e) {
-      console.error('Failed to fetch categories:', e);
+      clientLogger.error('Failed to fetch categories:', { detail: e });
     }
 
     // Calculate stats
@@ -104,7 +105,7 @@ export async function getTenantWithProducts(id: string): Promise<TenantData | nu
       stats
     };
   } catch (error) {
-    console.error('Error fetching tenant with products:', error);
+    clientLogger.error('Error fetching tenant with products:', { detail: error });
     return null;
   }
 }

@@ -7,6 +7,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 import { RequestType, ResponseType } from '@/providers/base/FlexibleApiSingleton';  
+import { clientLogger } from '@/lib/client-logger';
 // Types for billing data
 export interface BillingOverview {
   currentBalance: number;
@@ -243,10 +244,10 @@ class TenantBillingService extends TenantApiSingleton {
       if (response.success && Array.isArray(response.data)) {
         return response.data;
       }
-      console.warn('[TenantBillingService] getRecentActivity - unexpected response:', response);
+      clientLogger.warn('[TenantBillingService] getRecentActivity - unexpected response:', { detail: response });
       return [];
     } catch (error) {
-      console.error('[TenantBillingService] getRecentActivity error:', error);
+      clientLogger.error('[TenantBillingService] getRecentActivity error:', { detail: error });
       return [];
     }
   }

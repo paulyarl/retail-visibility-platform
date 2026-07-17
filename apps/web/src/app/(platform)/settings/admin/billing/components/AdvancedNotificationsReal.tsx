@@ -59,6 +59,7 @@ import { PlatformRevenueTransaction } from '@/services/PlatformRevenueService';
 import { ManualInvoice, ServiceCharge } from '@/services/ManualBillingService';
 import { Tenant } from '../types';
 import { useNotifications } from '@/services/NotificationService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AdvancedNotificationsRealProps {
   revenueTransactions?: PlatformRevenueTransaction[];
@@ -174,7 +175,7 @@ export function AdvancedNotificationsReal({
         template: 'default'
       });
     } catch (error) {
-      console.error('Failed to create notification rule:', error);
+      clientLogger.error('Failed to create notification rule:', { detail: error });
     }
   };
 
@@ -191,7 +192,7 @@ export function AdvancedNotificationsReal({
       setEditModalOpened(false);
       setModalOpened(false);
     } catch (error) {
-      console.error('Failed to update notification rule:', error);
+      clientLogger.error('Failed to update notification rule:', { detail: error });
     }
   };
 

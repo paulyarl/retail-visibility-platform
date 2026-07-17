@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { requirePlatformAdmin } from '../../middleware/auth';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -63,7 +64,7 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
 
     res.json(transformedTenants);
   } catch (error: any) {
-    console.error('[ADMIN TENANTS] Error fetching tenants:', error);
+    logger.error('[ADMIN TENANTS] Error fetching tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'internal_error',
       message: 'Failed to fetch tenants',
@@ -97,7 +98,7 @@ router.get('/list', requirePlatformAdmin, async (req: Request, res: Response) =>
 
     res.json(simplifiedList);
   } catch (error: any) {
-    console.error('[ADMIN TENANTS LIST] Error fetching tenant list:', error);
+    logger.error('[ADMIN TENANTS LIST] Error fetching tenant list:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'internal_error',
       message: 'Failed to fetch tenant list',

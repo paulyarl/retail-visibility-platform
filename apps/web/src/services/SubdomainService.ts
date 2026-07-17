@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Subdomain {
   id: string;
@@ -90,7 +91,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to get tenant subdomain:', result.error);
+      clientLogger.error('[SubdomainService] Failed to get tenant subdomain:', { detail: result.error });
       throw result.error;
     }
 
@@ -113,7 +114,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to get user subdomains:', result.error);
+      clientLogger.error('[SubdomainService] Failed to get user subdomains:', { detail: result.error });
       throw result.error;
     }
 
@@ -136,7 +137,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to check subdomain availability:', result.error);
+      clientLogger.error('[SubdomainService] Failed to check subdomain availability:', { detail: result.error });
       throw result.error;
     }
 
@@ -161,7 +162,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to update tenant subdomain:', result.error);
+      clientLogger.error('[SubdomainService] Failed to update tenant subdomain:', { detail: result.error });
       throw result.error;
     }
 
@@ -187,7 +188,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to delete tenant subdomain:', result.error);
+      clientLogger.error('[SubdomainService] Failed to delete tenant subdomain:', { detail: result.error });
       throw result.error;
     }
 
@@ -210,7 +211,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to get admin subdomain stats:', result.error);
+      clientLogger.error('[SubdomainService] Failed to get admin subdomain stats:', { detail: result.error });
       return null;
     }
 
@@ -235,7 +236,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to reserve subdomain:', result.error);
+      clientLogger.error('[SubdomainService] Failed to reserve subdomain:', { detail: result.error });
       throw result.error;
     }
 
@@ -262,7 +263,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to verify subdomain ownership:', result.error);
+      clientLogger.error('[SubdomainService] Failed to verify subdomain ownership:', { detail: result.error });
       return false;
     }
 
@@ -285,7 +286,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to get subdomain config:', result.error);
+      clientLogger.error('[SubdomainService] Failed to get subdomain config:', { detail: result.error });
       return null;
     }
 
@@ -310,7 +311,7 @@ export class SubdomainService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[SubdomainService] Failed to update subdomain config:', result.error);
+      clientLogger.error('[SubdomainService] Failed to update subdomain config:', { detail: result.error });
       throw result.error;
     }
 

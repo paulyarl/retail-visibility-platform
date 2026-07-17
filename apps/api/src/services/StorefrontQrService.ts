@@ -24,13 +24,15 @@ import { getEffectiveTier } from '../utils/trial-tier-transparency';
 
 export type StorefrontOptQRResolutionType = 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
 export type StorefrontOptQRContentType = 'qr_product' | 'qr_store' | 'qr_logo' | 'qr_directory';
-export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded';
-export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded';
+export type StorefrontOptQRDotStyleType = 'rounded' | 'dots' | 'classy' | 'classy-rounded' | 'extra-rounded' | 'square';
+export type StorefrontOptQRCornerStyleType = 'dot' | 'extra-rounded' | 'rounded' | 'square';
+export type StorefrontOptQRCornerDotStyleType = 'dot' | 'square';
 
 export const QR_RESOLUTION_TYPES: StorefrontOptQRResolutionType[] = ['qr_codes_512', 'qr_codes_1024', 'qr_codes_2048'];
 export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr_store', 'qr_logo', 'qr_directory'];
-export const QR_DOT_STYLES: StorefrontOptQRDotStyleType[] = ['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded'];
-export const QR_CORNER_STYLES: StorefrontOptQRCornerStyleType[] = ['dot', 'extra-rounded', 'rounded'];
+export const QR_DOT_STYLES: StorefrontOptQRDotStyleType[] = ['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded', 'square'];
+export const QR_CORNER_STYLES: StorefrontOptQRCornerStyleType[] = ['dot', 'extra-rounded', 'rounded', 'square'];
+export const QR_CORNER_DOT_STYLES: StorefrontOptQRCornerDotStyleType[] = ['dot', 'square'];
 
 export interface StorefrontQrState {
   enabled: boolean;
@@ -45,6 +47,7 @@ export interface StorefrontQrState {
   qrStyledEnabled: boolean;
   allowedQRDotStyles: StorefrontOptQRDotStyleType[];
   allowedQRCornerStyles: StorefrontOptQRCornerStyleType[];
+  allowedQRCornerDotStyles: StorefrontOptQRCornerDotStyleType[];
   qrCustomColors: boolean;
   qrGradients: boolean;
   // Convenience flags
@@ -182,15 +185,24 @@ class StorefrontQrService {
     const mainOn = enabled;
 
     // QR group — new keys with fallback to old storefront_opt_qr_* keys
+    // storefront_qr_enabled is the type gate (checked above), NOT a group-on key.
+    // Individual QR keys implicitly enable the group.
+    const hasAnyIndividualQRKey = !!(
+      features.storefront_qr_resolution_512 || features.storefront_qr_resolution_1024 || features.storefront_qr_resolution_2048
+      || features.storefront_qr_product || features.storefront_qr_store || features.storefront_qr_logo || features.storefront_qr_directory
+      || features.storefront_opt_qr_codes_512 || features.storefront_opt_qr_codes_1024 || features.storefront_opt_qr_codes_2048
+      || features.storefront_opt_qr_product || features.storefront_opt_qr_store || features.storefront_opt_qr_logo || features.storefront_opt_qr_directory
+    );
     const qrGroupEnabled = flexible
-      || !!features.storefront_qr_on || !!features.storefront_qr || !!features.storefront_qr_enabled
-      || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr || !!features.storefront_opt_qr_enabled;
+      || !!features.storefront_qr_on || !!features.storefront_qr
+      || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr || !!features.storefront_opt_qr_enabled
+      || hasAnyIndividualQRKey;
 
     // QR resolutions
     const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
     if (qrGroupEnabled) {
       if (flexible
-        || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+        || features.storefront_qr_on || features.storefront_qr
         || features.storefront_qr_resolution
         || features.storefront_opt_qr_on || features.storefront_opt_qr || features.storefront_opt_qr_enabled
         || features.storefront_opt_qr_resolution
@@ -207,7 +219,7 @@ class StorefrontQrService {
     const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
     if (qrGroupEnabled) {
       if (flexible
-        || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+        || features.storefront_qr_on || features.storefront_qr
         || features.storefront_qr_content
         || features.storefront_opt_qr_on || features.storefront_opt_qr || features.storefront_opt_qr_enabled
         || features.storefront_opt_qr_content
@@ -224,7 +236,7 @@ class StorefrontQrService {
     // Classic QR sub-group
     const qrClassicEnabled = mainOn && (flexible
       || !!features.storefront_qr_classic || !!features.storefront_qr_classic_on
-      || !!features.storefront_qr_enabled
+      || !!features.storefront_qr_on || !!features.storefront_qr
       || !!features.storefront_opt_qr_on || !!features.storefront_opt_qr
       || !!features.storefront_opt_qr_enabled);
 
@@ -246,13 +258,14 @@ class StorefrontQrService {
       || features.storefront_qr_dot_styles || features.storefront_qr_dot_styles_on
       || features.storefront_opt_qr_dot_styles || features.storefront_opt_qr_dot_styles_on
     )) {
-      allowedQRDotStyles.push('rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded');
+      allowedQRDotStyles.push('rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded', 'square');
     } else if (qrStyledEnabled) {
       if (features.storefront_qr_dot_rounded || features.storefront_opt_qr_dot_rounded) allowedQRDotStyles.push('rounded');
       if (features.storefront_qr_dot_dots || features.storefront_opt_qr_dot_dots) allowedQRDotStyles.push('dots');
       if (features.storefront_qr_dot_classy || features.storefront_opt_qr_dot_classy) allowedQRDotStyles.push('classy');
       if (features.storefront_qr_dot_classy_rounded || features.storefront_opt_qr_dot_classy_rounded) allowedQRDotStyles.push('classy-rounded');
       if (features.storefront_qr_dot_extra_rounded || features.storefront_opt_qr_dot_extra_rounded) allowedQRDotStyles.push('extra-rounded');
+      if (features.storefront_qr_dot_square || features.storefront_opt_qr_dot_square) allowedQRDotStyles.push('square');
     }
 
     // Corner styles
@@ -261,11 +274,18 @@ class StorefrontQrService {
       || features.storefront_qr_corner_styles || features.storefront_qr_corner_styles_on
       || features.storefront_opt_qr_corner_styles || features.storefront_opt_qr_corner_styles_on
     )) {
-      allowedQRCornerStyles.push('dot', 'extra-rounded', 'rounded');
+      allowedQRCornerStyles.push('dot', 'extra-rounded', 'rounded', 'square');
     } else if (qrStyledEnabled) {
       if (features.storefront_qr_corner_dot || features.storefront_opt_qr_corner_dot) allowedQRCornerStyles.push('dot');
       if (features.storefront_qr_corner_extra_rounded || features.storefront_opt_qr_corner_extra_rounded) allowedQRCornerStyles.push('extra-rounded');
       if (features.storefront_qr_corner_rounded || features.storefront_opt_qr_corner_rounded) allowedQRCornerStyles.push('rounded');
+      if (features.storefront_qr_corner_square || features.storefront_opt_qr_corner_square) allowedQRCornerStyles.push('square');
+    }
+
+    // Corner dot styles (inner dots inside the 3 corner squares)
+    const allowedQRCornerDotStyles: StorefrontOptQRCornerDotStyleType[] = [];
+    if (qrStyledEnabled) {
+      allowedQRCornerDotStyles.push('dot', 'square');
     }
 
     const qrCustomColors = qrStyledEnabled && (flexible
@@ -285,6 +305,7 @@ class StorefrontQrService {
       qrStyledEnabled,
       allowedQRDotStyles,
       allowedQRCornerStyles,
+      allowedQRCornerDotStyles,
       qrCustomColors,
       qrGradients,
       canUseQRCodes: mainOn && (allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
@@ -306,6 +327,7 @@ class StorefrontQrService {
       qrStyledEnabled: false,
       allowedQRDotStyles: [],
       allowedQRCornerStyles: [],
+      allowedQRCornerDotStyles: [],
       qrCustomColors: false,
       qrGradients: false,
       canUseQRCodes: false,

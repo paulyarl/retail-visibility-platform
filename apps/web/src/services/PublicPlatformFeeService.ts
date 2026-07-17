@@ -1,4 +1,5 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PlatformFeeResponse {
   success: boolean;
@@ -33,7 +34,7 @@ class PublicPlatformFeeService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[PublicPlatformFeeService] Failed to fetch platform fee:', response.error);
+        clientLogger.error('[PublicPlatformFeeService] Failed to fetch platform fee:', { detail: response.error });
         return 3.0; // Default fallback
       }
 
@@ -44,7 +45,7 @@ class PublicPlatformFeeService extends PublicApiSingleton {
 
       return 3.0; // Default fallback
     } catch (error) {
-      console.error('[PublicPlatformFeeService] Error fetching platform fee:', error);
+      clientLogger.error('[PublicPlatformFeeService] Error fetching platform fee:', { detail: error });
       return 3.0; // Default fallback
     }
   }

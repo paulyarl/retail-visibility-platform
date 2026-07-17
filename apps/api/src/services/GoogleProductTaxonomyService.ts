@@ -1,3 +1,5 @@
+import { logger } from '../logger';
+
 /**
  * Google Product Taxonomy Service
  *
@@ -53,7 +55,7 @@ export async function getGoogleProductTaxonomy(): Promise<GoogleTaxonomyCategory
     console.log(`[GoogleProductTaxonomy] Loaded ${categories.length} categories`);
     return categories;
   } catch (error) {
-    console.error('[GoogleProductTaxonomy] Error fetching taxonomy:', error);
+    logger.error('[GoogleProductTaxonomy] Error fetching taxonomy:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (cachedTaxonomy) return cachedTaxonomy;
     return [];
   }

@@ -9,6 +9,7 @@
 import { decryptToken, refreshAccessToken, encryptToken } from './oauth';
 import { prisma } from '../../prisma';
 import { generateQuickStart } from '../id-generator';
+import { logger } from '../../logger';
 
 // Content API for Shopping v2.1 (stable, widely used)
 const GMC_API_BASE = 'https://shoppingcontent.googleapis.com';
@@ -25,7 +26,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
     });
 
     if (!tokenRecord) {
-      console.error('[GMC] No token found for account:', account_id);
+      logger.error('[GMC] No token found for account:', undefined, { error: { name: (account_id as any)?.name || 'Error', message: (account_id as any)?.message || String(account_id), stack: (account_id as any)?.stack } });
       return null;
     }
 
@@ -40,7 +41,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
       // Get new access token
       const newTokens = await refreshAccessToken(refreshToken);
       if (!newTokens) {
-        console.error('[GMC] Failed to refresh token');
+        logger.error('[GMC] Failed to refresh token', undefined);
         return null;
       }
 
@@ -62,7 +63,7 @@ async function getValidAccessToken(account_id: string): Promise<string | null> {
     // Token still valid
     return decryptToken(tokenRecord.access_token_encrypted);
   } catch (error) {
-    console.error('[GMC] Error getting valid token:', error);
+    logger.error('[GMC] Error getting valid token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -88,7 +89,7 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GMC] Failed to fetch merchant accounts:', error);
+      logger.error('[GMC] Failed to fetch merchant accounts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
 
@@ -105,7 +106,7 @@ export async function listMerchantAccounts(account_id: string): Promise<any[]> {
       accountName: `Merchant Account ${acc.aggregatorId || acc.merchantId}`,
     }));
   } catch (error) {
-    console.error('[GMC] Error listing merchant accounts:', error);
+    logger.error('[GMC] Error listing merchant accounts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -134,13 +135,13 @@ export async function getMerchantAccount(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GMC] Failed to fetch merchant account:', error);
+      logger.error('[GMC] Failed to fetch merchant account:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('[GMC] Error getting merchant account:', error);
+    logger.error('[GMC] Error getting merchant account:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -173,14 +174,14 @@ export async function listProducts(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GMC] Failed to fetch products:', error);
+      logger.error('[GMC] Failed to fetch products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
 
     const data = await response.json() as { products?: any[] };
     return data.products || [];
   } catch (error) {
-    console.error('[GMC] Error listing products:', error);
+    logger.error('[GMC] Error listing products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -213,13 +214,13 @@ export async function getProduct(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[GMC] Failed to fetch product:', error);
+      logger.error('[GMC] Failed to fetch product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('[GMC] Error getting product:', error);
+    logger.error('[GMC] Error getting product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -281,7 +282,7 @@ export async function syncMerchantAccount(
     console.log('[GMC] Synced merchant account:', merchantId);
     return true;
   } catch (error) {
-    console.error('[GMC] Error syncing merchant account:', error);
+    logger.error('[GMC] Error syncing merchant account:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     // Update sync status to error
     await prisma.google_merchant_links_list.updateMany({
@@ -354,7 +355,7 @@ export async function getProductStats(
 
     return stats;
   } catch (error) {
-    console.error('[GMC] Error getting product stats:', error);
+    logger.error('[GMC] Error getting product stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }

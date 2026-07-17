@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Client-Side Tenant Context Utility
  * 
@@ -124,7 +126,7 @@ export class ClientTenantContextManager {
     try {
       localStorage.setItem(ClientTenantContextManager.TENANT_CONTEXT_KEY, JSON.stringify(contextInfo));
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to store context metadata:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to store context metadata:', { detail: error });
     }
     
     // console.log(`[ClientTenantContextManager] Tenant context set: ${tenantId} (source: ${source})`);
@@ -141,7 +143,7 @@ export class ClientTenantContextManager {
     try {
       localStorage.removeItem(ClientTenantContextManager.TENANT_CONTEXT_KEY);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to clear context metadata:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to clear context metadata:', { detail: error });
     }
     
     console.log('[ClientTenantContextManager] Tenant context cleared');
@@ -175,7 +177,7 @@ export class ClientTenantContextManager {
       
       return null;
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to extract tenant ID from URL:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to extract tenant ID from URL:', { detail: error });
       return null;
     }
   }
@@ -192,7 +194,7 @@ export class ClientTenantContextManager {
     try {
       return localStorage.getItem(ClientTenantContextManager.TENANT_ID_KEY);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to read from localStorage:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to read from localStorage:', { detail: error });
       return null;
     }
   }
@@ -209,7 +211,7 @@ export class ClientTenantContextManager {
     try {
       localStorage.setItem(ClientTenantContextManager.TENANT_ID_KEY, tenantId);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to write to localStorage:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to write to localStorage:', { detail: error });
     }
   }
   
@@ -225,7 +227,7 @@ export class ClientTenantContextManager {
     try {
       localStorage.removeItem(ClientTenantContextManager.TENANT_ID_KEY);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to remove from localStorage:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to remove from localStorage:', { detail: error });
     }
   }
   
@@ -239,7 +241,7 @@ export class ClientTenantContextManager {
     try {
       return sessionStorage.getItem(ClientTenantContextManager.TENANT_ID_KEY);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to read from sessionStorage:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to read from sessionStorage:', { detail: error });
       return null;
     }
   }
@@ -254,7 +256,7 @@ export class ClientTenantContextManager {
     try {
       sessionStorage.setItem(ClientTenantContextManager.TENANT_ID_KEY, tenantId);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to write to sessionStorage:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to write to sessionStorage:', { detail: error });
     }
   }
   
@@ -268,7 +270,7 @@ export class ClientTenantContextManager {
     try {
       sessionStorage.removeItem(ClientTenantContextManager.TENANT_ID_KEY);
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to remove from sessionStorage:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to remove from sessionStorage:', { detail: error });
     }
   }
   
@@ -289,7 +291,7 @@ export class ClientTenantContextManager {
       }
       return null;
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to read from cookie:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to read from cookie:', { detail: error });
       return null;
     }
   }
@@ -306,7 +308,7 @@ export class ClientTenantContextManager {
       expires.setFullYear(expires.getFullYear() + 1); // 1 year expiry
       document.cookie = `${ClientTenantContextManager.TENANT_ID_KEY}=${encodeURIComponent(tenantId)}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to write to cookie:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to write to cookie:', { detail: error });
     }
   }
   
@@ -320,7 +322,7 @@ export class ClientTenantContextManager {
     try {
       document.cookie = `${ClientTenantContextManager.TENANT_ID_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
     } catch (error) {
-      console.warn('[ClientTenantContextManager] Failed to remove from cookie:', error);
+      clientLogger.warn('[ClientTenantContextManager] Failed to remove from cookie:', { detail: error });
     }
   }
   

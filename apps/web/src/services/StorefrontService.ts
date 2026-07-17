@@ -3,6 +3,7 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import PublicApiSingleton from '../providers/base/PublicApiSingleton';
 // import { ProductData } from '@/components/products/ProductCardLayouts';
+import { clientLogger } from '@/lib/client-logger';
 // ====================
 // STOREFRONT SERVICE - PLATFORM-ALIGNED
 // ====================
@@ -187,7 +188,7 @@ class StorefrontService extends PublicApiSingleton {
       const result = await super.makeDefaultRequest<ProductResponse>(endpoint, {}, cacheKey, this.PRODUCTS_TTL);
       return result.data || { items: [], pagination: { page: 1, limit: 10, totalItems: 0, totalPages: 0, hasMore: false } };
     } catch (error) {
-      console.error('[StorefrontService] Failed to get products:', error);
+      clientLogger.error('[StorefrontService] Failed to get products:', { detail: error });
       throw error;
     }
   }
@@ -213,7 +214,7 @@ class StorefrontService extends PublicApiSingleton {
       
       return null;
     } catch (error) {
-      console.error('[StorefrontService] Failed to get product:', error);
+      clientLogger.error('[StorefrontService] Failed to get product:', { detail: error });
       throw error;
     }
   }
@@ -228,7 +229,7 @@ class StorefrontService extends PublicApiSingleton {
       );
       return data.data?.categories || [];
     } catch (error) {
-      console.error('[StorefrontService] Failed to get categories:', error);
+      clientLogger.error('[StorefrontService] Failed to get categories:', { detail: error });
       throw error;
     }
   }
@@ -257,7 +258,7 @@ class StorefrontService extends PublicApiSingleton {
         buckets: {} as Record<string, CatalogProduct[]>
       };
     } catch (error) {
-      console.error('[StorefrontService] Failed to get featured products:', error);
+      clientLogger.error('[StorefrontService] Failed to get featured products:', { detail: error });
       throw error;
     }
   }
@@ -281,7 +282,7 @@ class StorefrontService extends PublicApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[StorefrontService] Failed to get public tier:', error);
+      clientLogger.error('[StorefrontService] Failed to get public tier:', { detail: error });
       return null;
     }
   }
@@ -305,7 +306,7 @@ class StorefrontService extends PublicApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[StorefrontService] Failed to get public tenant profile:', error);
+      clientLogger.error('[StorefrontService] Failed to get public tenant profile:', { detail: error });
       return null;
     }
   }
@@ -332,7 +333,7 @@ class StorefrontService extends PublicApiSingleton {
 
       return response.data || [];
     } catch (error) {
-      console.error('[StorefrontService] Failed to get batch stores:', error);
+      clientLogger.error('[StorefrontService] Failed to get batch stores:', { detail: error });
       return [];
     }
   }
@@ -366,7 +367,7 @@ class StorefrontService extends PublicApiSingleton {
         error: result.status === 'rejected' ? result.reason : null
       }));
     } catch (error) {
-      console.error('[StorefrontService] Failed to get batch categories stats:', error);
+      clientLogger.error('[StorefrontService] Failed to get batch categories stats:', { detail: error });
       return [];
     }
   }

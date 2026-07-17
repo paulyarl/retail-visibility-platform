@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import UserService from '../services/UserService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get('/stats', async (req, res) => {
       message: 'User statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('User statistics retrieval failed:', error);
+    logger.error('User statistics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve user statistics',
@@ -84,7 +85,7 @@ router.get('/:id', async (req, res) => {
       message: 'User retrieved successfully'
     });
   } catch (error) {
-    console.error('User retrieval failed:', error);
+    logger.error('User retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve user',
@@ -121,7 +122,7 @@ router.post('/', async (req, res) => {
       message: 'User created successfully'
     });
   } catch (error) {
-    console.error('User creation failed:', error);
+    logger.error('User creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create user',
@@ -177,7 +178,7 @@ router.put('/:id', async (req, res) => {
       message: 'User updated successfully'
     });
   } catch (error) {
-    console.error('User update failed:', error);
+    logger.error('User update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update user',
@@ -222,7 +223,7 @@ router.delete('/:id', async (req, res) => {
       message: 'User deleted successfully'
     });
   } catch (error) {
-    console.error('User deletion failed:', error);
+    logger.error('User deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete user',
@@ -271,7 +272,7 @@ router.get('/', async (req, res) => {
       message: 'Users retrieved successfully'
     });
   } catch (error) {
-    console.error('User listing failed:', error);
+    logger.error('User listing failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to list users',
@@ -315,7 +316,7 @@ router.get('/:id/activity', async (req, res) => {
       message: 'User activity retrieved successfully'
     });
   } catch (error) {
-    console.error('User activity retrieval failed:', error);
+    logger.error('User activity retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve user activity',
@@ -362,7 +363,7 @@ router.post('/:id/activity', async (req, res) => {
       message: 'User activity recorded successfully'
     });
   } catch (error) {
-    console.error('User activity recording failed:', error);
+    logger.error('User activity recording failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to record user activity',

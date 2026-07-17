@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import type { CrmTicket, CrmAlert } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -65,7 +66,7 @@ export default function CustomerSupportPage() {
           // Fetch CRM flags for each tenant to filter by customer ticket eligibility
           const flagsEntries = await Promise.all(
             uniqueTenants.map(async (t) => {
-              const flags = await unifiedCapabilityService.getCrmOptionsFlags(t.id, { isPublic: true });
+              const flags = await publicUnifiedCapabilityService.getCrmOptionsFlags(t.id);
               return [t.id, flags] as [string, PublicCrmOptionsFlags | null];
             })
           );
@@ -78,7 +79,7 @@ export default function CustomerSupportPage() {
           setTenants(eligibleTenants);
         }
       } catch (err) {
-        console.error('[Customer Support] Load error:', err);
+        clientLogger.error('[Customer Support] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -102,7 +103,7 @@ export default function CustomerSupportPage() {
       setNewDescription('');
       setNewTenantId('');
     } catch (err: any) {
-      console.error('[Customer Support] Create ticket error:', err);
+      clientLogger.error('[Customer Support] Create ticket error:', { detail: err });
       const msg = err?.message || '';
       if (msg.includes('crm_disabled') || msg.includes('not enabled')) {
         setCreateError('Support tickets are not available for this store.');

@@ -7,6 +7,7 @@
 
 import { UniversalSingleton, SingletonMetrics } from '../lib/UniversalSingleton';
 import ShopsFeaturedService from './ShopsFeaturedService';
+import { logger } from '../logger';
 
 interface BucketPerformanceMetrics {
   bucketType: string;
@@ -238,7 +239,7 @@ export class ShopsPerformanceMonitor {
         await (service as any).clearCache(key);
         optimizedBuckets.push(bucketType);
       } catch (error) {
-        console.error(`Failed to clear cache for ${key}:`, error);
+        logger.error(`Failed to clear cache for ${key}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 

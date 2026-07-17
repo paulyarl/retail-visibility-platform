@@ -13,6 +13,7 @@ import { Button } from '@mantine/core';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
+import { clientLogger } from '@/lib/client-logger';
 
 interface VariantPhotoUploadModalProps {
   isOpen: boolean;
@@ -81,7 +82,7 @@ export default function VariantPhotoUploadModal({
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload photos');
-      console.error('[VariantPhotoUploadModal] Upload error:', err);
+      clientLogger.error('[VariantPhotoUploadModal] Upload error:', { detail: err });
     } finally {
       setUploading(false);
       setUploadProgress(0);

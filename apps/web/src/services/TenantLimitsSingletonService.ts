@@ -8,6 +8,7 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 import { RequestTarget, RequestType } from '@/providers/base/EnhancedFlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantLimitsStatus {
   current: number;
@@ -77,7 +78,7 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
    */
   async getFeaturedProductsLimits(tenantId: string): Promise<FeaturedProductsLimits | null> {
     if (!tenantId) {
-      console.error('[TenantLimitsSingleton] getFeaturedProductsLimits: tenantId is required');
+      clientLogger.error('[TenantLimitsSingleton] getFeaturedProductsLimits: tenantId is required');
       return null;
     }
 
@@ -94,13 +95,13 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantLimitsSingleton] Failed to get featured products limits:', result.error);
+        clientLogger.error('[TenantLimitsSingleton] Failed to get featured products limits:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantLimitsSingleton] Failed to get featured products limits:', error);
+      clientLogger.error('[TenantLimitsSingleton] Failed to get featured products limits:', { detail: error });
       return null;
     }
   }
@@ -123,13 +124,13 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
         }
       );
       if (!result.success){
-        console.error('[TenantLimitsSingleton] Failed to get tenant limits status:', result.error);
+        clientLogger.error('[TenantLimitsSingleton] Failed to get tenant limits status:', { detail: result.error });
         return null;
       } 
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantLimitsSingleton] Failed to get tenant limits status:', error);
+      clientLogger.error('[TenantLimitsSingleton] Failed to get tenant limits status:', { detail: error });
       return null;
     }
   }
@@ -157,7 +158,7 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
         status: limitsStatus || undefined,
       };
     } catch (error) {
-      console.error('[TenantLimitsSingleton] Failed to get tenant limits:', error);
+      clientLogger.error('[TenantLimitsSingleton] Failed to get tenant limits:', { detail: error });
       return {};
     }
   }
@@ -177,7 +178,7 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
 
       return result.data || [];
     } catch (error) {
-      console.error('[TenantLimitsSingleton] Failed to get tiers:', error);
+      clientLogger.error('[TenantLimitsSingleton] Failed to get tiers:', { detail: error });
       return [];
     }
   }

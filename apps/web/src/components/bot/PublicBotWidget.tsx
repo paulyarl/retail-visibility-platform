@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { publicBotService, type PublicBotConfig, type SteeringChannel } from '@/services/PublicBotService';
-import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicChatbotOptionsCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { getContrastColor } from '@/lib/color-utils';
 import SkillCardRenderer from './SkillCardRenderer';
@@ -50,7 +50,7 @@ export default function PublicBotWidget({
   inline = false,
   onClose,
 }: PublicBotWidgetProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
+  const { data: chatbotCaps } = usePublicChatbotOptionsCapability(tenantId);
   const [config, setConfig] = useState<PublicBotConfig | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);

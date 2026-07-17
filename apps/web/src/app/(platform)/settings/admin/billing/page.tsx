@@ -29,6 +29,7 @@ import { PredictiveAnalyticsFixed } from './components/PredictiveAnalyticsFixed'
 import { PredictiveAnalyticsReal } from './components/PredictiveAnalyticsReal';
 import { IntegrationHubSimple } from './components/IntegrationHubSimple';
 import { IntegrationHubReal } from './components/IntegrationHubReal';
+import { clientLogger } from '@/lib/client-logger';
 
 // Simple FileInvoice icon component
 const FileInvoiceIcon = () => (
@@ -117,7 +118,7 @@ export default function AdminBillingPage() {
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to update tenant';
       setError(errorMessage);
-      console.error('Failed to update tenant:', err);
+      clientLogger.error('Failed to update tenant:', { detail: err });
     } finally {
       setUpdating(null);
     }

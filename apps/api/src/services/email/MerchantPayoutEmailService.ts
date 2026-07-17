@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface PayoutEmailData {
   merchantEmail: string;
@@ -52,12 +53,12 @@ class MerchantPayoutEmailService {
       if (result.success) {
         console.log(`[MerchantPayoutEmail] ${type} email sent to ${data.merchantEmail}`);
       } else {
-        console.error(`[MerchantPayoutEmail] Failed to send ${type} email:`, result.error);
+        logger.error(`[MerchantPayoutEmail] Failed to send ${type} email:`, undefined, { error: { name: 'Error', message: result.error } });
       }
 
       return { success: result.success, error: result.error };
     } catch (error: any) {
-      console.error('[MerchantPayoutEmail] Error sending payout email:', error);
+      logger.error('[MerchantPayoutEmail] Error sending payout email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: error.message };
     }
   }
@@ -115,7 +116,7 @@ class MerchantPayoutEmailService {
         tenantName: connection.tenants.name,
       };
     } catch (error) {
-      console.error('[MerchantPayoutEmail] Error getting merchant email:', error);
+      logger.error('[MerchantPayoutEmail] Error getting merchant email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }

@@ -29,6 +29,7 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { Monitor, Smartphone, Tablet, LogOut, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { clientLogger } from '@/lib/client-logger';
 
 interface LoginActivityTableProps {
   sessions: LoginSession[];
@@ -58,7 +59,7 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
       setRevoking(sessionId);
       await onRevoke(sessionId);
     } catch (error) {
-      console.error('Failed to revoke session:', error);
+      clientLogger.error('Failed to revoke session:', { detail: error });
     } finally {
       setRevoking(null);
     }
@@ -70,7 +71,7 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
       await onRevokeAll();
       setShowRevokeAllDialog(false);
     } catch (error) {
-      console.error('Failed to revoke all sessions:', error);
+      clientLogger.error('Failed to revoke all sessions:', { detail: error });
     } finally {
       setRevokingAll(false);
     }

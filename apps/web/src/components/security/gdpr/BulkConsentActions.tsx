@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import * as gdprService from '@/services/gdpr';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BulkConsentActionsProps {
   consents: ConsentRecord[];
@@ -36,7 +37,7 @@ export function BulkConsentActions({ consents }: BulkConsentActionsProps) {
       await gdprService.bulkUpdateConsents(updates);
       window.location.reload();
     } catch (error) {
-      console.error('Failed to accept all consents:', error);
+      clientLogger.error('Failed to accept all consents:', { detail: error });
     } finally {
       setUpdating(false);
     }
@@ -54,7 +55,7 @@ export function BulkConsentActions({ consents }: BulkConsentActionsProps) {
       await gdprService.bulkUpdateConsents(updates);
       window.location.reload();
     } catch (error) {
-      console.error('Failed to reject all consents:', error);
+      clientLogger.error('Failed to reject all consents:', { detail: error });
     } finally {
       setUpdating(false);
     }

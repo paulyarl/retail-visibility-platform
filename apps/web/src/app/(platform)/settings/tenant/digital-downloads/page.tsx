@@ -10,6 +10,7 @@ import { notifications } from '@mantine/notifications';
 import PageHeader from "@/components/PageHeader";
 import { ItemsSingletonService, Item, ProductVariant } from '@/services/ItemsSingletonService';
 import { itemsService } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,7 +78,7 @@ export default function DigitalDownloadsPage() {
           details.set(itemId, item);
         }
       } catch (error) {
-        console.error(`Failed to fetch product details for ${itemId}:`, error);
+        clientLogger.error(`Failed to fetch product details for ${itemId}:`, { detail: error });
       }
     }
     
@@ -101,7 +102,7 @@ export default function DigitalDownloadsPage() {
         await fetchProductDetails(itemIds);
       }
     } catch (error) {
-      console.error('Error fetching download pages:', error);
+      clientLogger.error('Error fetching download pages:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load download pages',
@@ -146,7 +147,7 @@ export default function DigitalDownloadsPage() {
       });
       setCreateModalOpen(true);
     } catch (error) {
-      console.error('Failed to fetch item details:', error);
+      clientLogger.error('Failed to fetch item details:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load item details',
@@ -186,7 +187,7 @@ export default function DigitalDownloadsPage() {
       });
       fetchPages();
     } catch (error) {
-      console.error('Error creating page:', error);
+      clientLogger.error('Error creating page:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to create download page',
@@ -216,7 +217,7 @@ export default function DigitalDownloadsPage() {
       setSelectedPage(null);
       fetchPages();
     } catch (error) {
-      console.error('Error updating page:', error);
+      clientLogger.error('Error updating page:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to update download page',
@@ -240,7 +241,7 @@ export default function DigitalDownloadsPage() {
       });
       fetchPages();
     } catch (error) {
-      console.error('Error deleting page:', error);
+      clientLogger.error('Error deleting page:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to delete download page',
@@ -266,7 +267,7 @@ export default function DigitalDownloadsPage() {
         color: 'green'
       });
     } catch (error) {
-      console.error('Error generating preview:', error);
+      clientLogger.error('Error generating preview:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to generate preview link',
@@ -289,7 +290,7 @@ export default function DigitalDownloadsPage() {
       const items = await digitalDownloadPagesService.getDigitalItems(tenantId);
       setDigitalItems(items);
     } catch (error) {
-      console.error('Error loading digital items:', error);
+      clientLogger.error('Error loading digital items:', { detail: error });
       setDigitalItems([]);
     } finally {
       setLoadingDigitalItems(false);

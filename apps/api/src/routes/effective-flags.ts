@@ -3,6 +3,7 @@ import { prisma } from '../prisma'
 import { getEffectivePlatform, getEffectiveTenant, setPlatformOverride, setTenantOverride } from '../utils/effectiveFlags'
 import { checkTenantAccess, requirePlatformUser, requirePlatformAdmin } from '../middleware/auth'
 import { audit } from '../audit'
+import { logger } from '../logger';
 
 const router = Router()
 
@@ -16,7 +17,7 @@ router.get('/effective-flags', requirePlatformUser, async (_req, res) => {
     const effective = await Promise.all(flags.map(f => getEffectivePlatform(f)))
     res.json({ success: true, data: effective })
   } catch (e: any) {
-    console.error('[GET /effective-flags] Error:', e)
+    logger.error('[GET /effective-flags] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_get_effective_flags' })
   }
 })
@@ -37,7 +38,7 @@ router.get('/effective-flags/:tenantId', checkTenantAccess, async (req, res) => 
     const effective = await Promise.all(Array.from(allFlags).sort().map(f => getEffectiveTenant(f, tenantId)))
     res.json({ success: true, data: effective })
   } catch (e: any) {
-    console.error('[GET /effective-flags/:tenantId] Error:', e)
+    logger.error('[GET /effective-flags/:tenantId] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_get_effective_flags' })
   }
 })

@@ -10,6 +10,7 @@ import { type Organization } from '@/lib/singletons/TenantOrganizationsSingleton
 import { useToast } from '@/components/ui/use-toast';
 import { tierSystemService, type Tier } from '@/services/TierSystemService';
 import { AdminOrganizationsService } from '@/services/AdminOrganizationsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrgProductTypeEntry {
   type: string;
@@ -70,7 +71,7 @@ export default function AdminOrganizationsPage() {
         const map = await AdminOrganizationsService.getInstance().getProductTypeSummary();
         setProductTypeSummary(map as Record<string, OrgProductTypeSummary>);
       } catch (error) {
-        console.error('Failed to fetch product type summary:', error);
+        clientLogger.error('Failed to fetch product type summary:', { detail: error });
       }
     };
     fetchProductTypeSummary();
@@ -88,7 +89,7 @@ export default function AdminOrganizationsPage() {
           setTiers(orgTiers);
         }
       } catch (error) {
-        console.error('Failed to fetch tiers:', error);
+        clientLogger.error('Failed to fetch tiers:', { detail: error });
         toast('Failed to load tier data. Using fallback pricing.', { variant: 'error' });
       } finally {
         setTiersLoading(false);
@@ -172,7 +173,7 @@ export default function AdminOrganizationsPage() {
         throw new Error('Failed to add tenant to organization');
       }
     } catch (error: any) {
-      console.error('Failed to add tenant:', error);
+      clientLogger.error('Failed to add tenant:', { detail: error });
       toast(error.message || 'Failed to add tenant. Please try again.', { variant: 'error' });
     }
   };
@@ -192,7 +193,7 @@ export default function AdminOrganizationsPage() {
         throw new Error('Failed to remove tenant from organization');
       }
     } catch (error: any) {
-      console.error('Failed to remove tenant:', error);
+      clientLogger.error('Failed to remove tenant:', { detail: error });
       toast(error.message || 'Failed to remove tenant. Please try again.', { variant: 'error' });
     }
   };
@@ -233,7 +234,7 @@ export default function AdminOrganizationsPage() {
         throw new Error('Failed to update organization');
       }
     } catch (error: any) {
-      console.error('Failed to update organization:', error);
+      clientLogger.error('Failed to update organization:', { detail: error });
       toast(error.message || 'Failed to update organization. Please try again.', { variant: 'error' });
     }
   };
@@ -253,7 +254,7 @@ export default function AdminOrganizationsPage() {
       setNewOrgMaxLocations('10');
       setNewOrgMaxSKUs('50000');
     } catch (error: any) {
-      console.error('Failed to create organization:', error);
+      clientLogger.error('Failed to create organization:', { detail: error });
       toast(error.message || 'Failed to create organization. Please try again.', { variant: 'error' });
     }
   };

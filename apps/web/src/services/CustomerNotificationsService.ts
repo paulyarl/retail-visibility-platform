@@ -6,6 +6,7 @@
 import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import customerAuthService from './CustomerAuthService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface NotificationPreferences {
   // Order notifications
@@ -78,7 +79,7 @@ class CustomerNotificationsService extends CustomerApiSingleton {
         error: getErrorMessage(result.error) || 'Failed to get preferences',
       };
     } catch (error: any) {
-      console.error('[CustomerNotifications] Get preferences error:', error);
+      clientLogger.error('[CustomerNotifications] Get preferences error:', { detail: error });
       return {
         success: false,
         error: 'Failed to get notification preferences',
@@ -123,7 +124,7 @@ class CustomerNotificationsService extends CustomerApiSingleton {
         error: getErrorMessage(result.error) || 'Failed to update preferences',
       };
     } catch (error: any) {
-      console.error('[CustomerNotifications] Update preferences error:', error);
+      clientLogger.error('[CustomerNotifications] Update preferences error:', { detail: error });
       return {
         success: false,
         error: 'Failed to update notification preferences',

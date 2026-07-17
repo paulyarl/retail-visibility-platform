@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { generateTenantCommerceSettingsId } from '../lib/id-generator';
 import { getTenantCommerceCapabilities } from '../utils/commerce-capabilities';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -70,7 +71,7 @@ router.get('/:tenantId/commerce-settings', authenticateToken, async (req, res) =
       },
     });
   } catch (error) {
-    console.error('Error fetching commerce settings:', error);
+    logger.error('Error fetching commerce settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -106,7 +107,7 @@ router.get('/public/tenant/:tenantId/commerce-settings', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching public commerce settings:', error);
+    logger.error('Error fetching public commerce settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -171,7 +172,7 @@ router.put('/:tenantId/commerce-settings', authenticateToken, requireTenantAdmin
       },
     });
   } catch (error) {
-    console.error('Error updating commerce settings:', error);
+    logger.error('Error updating commerce settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

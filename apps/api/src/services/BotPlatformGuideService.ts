@@ -254,7 +254,7 @@ class BotPlatformGuideService {
     if (!effective.payment_gateway?.enabled) {
       recs.push('Connect a payment gateway to accept online payments. Go to Settings → Payments.');
     }
-    if (effective.storefront_options?.enabled && !effective.storefront_options.hours_enabled) {
+    if (effective.storefront_options?.enabled && !effective.storefront_hours?.hours_enabled) {
       recs.push('Display your business hours on your storefront. Go to Settings → Storefront Options.');
     }
     if (!effective.featured?.enabled) {

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useQuickstartOptionsCapability, useAllCapabilities, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface QuickstartOptionsSettings {
   quickstart_enabled: boolean;
@@ -125,7 +126,7 @@ export default function QuickstartOptionsSettingsClient({ tenantId }: Quickstart
         setSettings({ ...DEFAULT_SETTINGS, ...data });
       }
     } catch (err) {
-      console.error('Failed to load quickstart options settings:', err);
+      clientLogger.error('Failed to load quickstart options settings:', { detail: err });
     } finally {
       setLoading(false);
     }

@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { taxService } from '../services/TaxService';
 import { generateTenantCommerceSettingsId } from '../lib/id-generator';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -74,7 +75,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[Tax] Calculation error:', error);
+    logger.error('[Tax] Calculation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'tax_calculation_failed',
@@ -113,7 +114,7 @@ router.get('/:tenantId/tax-settings', authenticateToken, async (req: Request, re
       },
     });
   } catch (error: any) {
-    console.error('[Tax] Error fetching tax settings:', error);
+    logger.error('[Tax] Error fetching tax settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -166,7 +167,7 @@ router.put('/:tenantId/tax-settings', authenticateToken, async (req: Request, re
       },
     });
   } catch (error: any) {
-    console.error('[Tax] Error updating tax settings:', error);
+    logger.error('[Tax] Error updating tax settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

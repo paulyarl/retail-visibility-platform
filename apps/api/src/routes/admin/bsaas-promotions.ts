@@ -19,6 +19,7 @@ import { audit } from '../../audit';
 import CouponTargetService from '../../services/CouponTargetService';
 import { prisma } from '../../prisma';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -215,7 +216,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS Promotions] Error listing:', error);
+    logger.error('[BSaaS Promotions] Error listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to list promotions' });
   }
 });
@@ -260,7 +261,7 @@ router.post('/coupon', async (req: Request, res: Response) => {
           target_subscription_statuses: target_subscription_statuses ?? null,
         });
       } catch (targetErr: any) {
-        console.error('[BSaaS Promotions] Failed to store coupon targets:', targetErr);
+        logger.error('[BSaaS Promotions] Failed to store coupon targets:', undefined, { error: { name: (targetErr as any)?.name || 'Error', message: (targetErr as any)?.message || String(targetErr), stack: (targetErr as any)?.stack } });
       }
     }
 
@@ -273,7 +274,7 @@ router.post('/coupon', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: coupon });
   } catch (error: any) {
-    console.error('[BSaaS Promotions] Error creating coupon:', error);
+    logger.error('[BSaaS Promotions] Error creating coupon:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to create coupon' });
   }
 });
@@ -309,7 +310,7 @@ router.post('/promotion', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: promotionCode });
   } catch (error: any) {
-    console.error('[BSaaS Promotions] Error creating promotion code:', error);
+    logger.error('[BSaaS Promotions] Error creating promotion code:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to create promotion code' });
   }
 });
@@ -343,7 +344,7 @@ router.put('/coupon/:id/targets', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Coupon targets updated' });
   } catch (error: any) {
-    console.error('[BSaaS Promotions] Error updating coupon targets:', error);
+    logger.error('[BSaaS Promotions] Error updating coupon targets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to update coupon targets' });
   }
 });
@@ -429,7 +430,7 @@ router.get('/promotion/:id/qr', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS Promotions] Error generating QR data:', error);
+    logger.error('[BSaaS Promotions] Error generating QR data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to generate QR data' });
   }
 });
@@ -454,7 +455,7 @@ router.delete('/promotion/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, message: 'Promotion code deactivated' });
   } catch (error: any) {
-    console.error('[BSaaS Promotions] Error deactivating promotion code:', error);
+    logger.error('[BSaaS Promotions] Error deactivating promotion code:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: error.message || 'Failed to deactivate promotion code' });
   }
 });

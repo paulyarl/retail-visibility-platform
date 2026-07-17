@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Package, Search, Filter, Download, Eye, CheckCircle2, Clock, ShoppingBag, XCircle, Settings, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { tenantOrderService } from '@/services/TenantOrderService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrderItem {
   id: string;
@@ -126,7 +127,7 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
         // });
       }
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      clientLogger.error('Error fetching orders:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -204,7 +205,7 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
       // Refresh orders list
       await fetchOrders();
     } catch (error) {
-      console.error('Error archiving order:', error);
+      clientLogger.error('Error archiving order:', { detail: error });
       alert('Failed to archive order. Please try again.');
     } finally {
       setArchiving(null);

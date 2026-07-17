@@ -1,4 +1,5 @@
 import { EmailProvider, SendEmailParams, EmailResult } from '../email-service';
+import { logger } from '../../logger';
 
 export class ConsoleEmailProvider implements EmailProvider {
   async sendEmail(params: SendEmailParams): Promise<EmailResult> {
@@ -32,7 +33,7 @@ export class ConsoleEmailProvider implements EmailProvider {
         provider: 'console',
       };
     } catch (error: any) {
-      console.error('[Console] Email logging failed:', error);
+      logger.error('[Console] Email logging failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       return {
         success: false,

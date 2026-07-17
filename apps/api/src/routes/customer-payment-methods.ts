@@ -14,6 +14,7 @@ import { Router, Request, Response } from 'express';
 import { CustomerPaymentMethodsService } from '../services/CustomerPaymentMethodsService';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 const paymentMethodsService = CustomerPaymentMethodsService.getInstance();
@@ -69,7 +70,7 @@ router.get('/', requireCustomerAuth, async (req: Request, res: Response) => {
       paymentMethods: methods.map(m => paymentMethodsService.maskForResponse(m)),
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] List error:', error.message);
+    logger.error('[Customer Payment Methods] List error:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return res.status(500).json({
       success: false,
       error: 'list_failed',
@@ -103,7 +104,7 @@ router.get('/:id', requireCustomerAuth, async (req: Request, res: Response) => {
       paymentMethod: paymentMethodsService.maskForResponse(method),
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Get error:', error.message);
+    logger.error('[Customer Payment Methods] Get error:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return res.status(500).json({
       success: false,
       error: 'get_failed',
@@ -136,7 +137,7 @@ router.get('/default/:tenantId', requireCustomerAuth, async (req: Request, res: 
       paymentMethod: paymentMethodsService.maskForResponse(method),
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Get default error:', error.message);
+    logger.error('[Customer Payment Methods] Get default error:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return res.status(500).json({
       success: false,
       error: 'get_default_failed',
@@ -211,7 +212,7 @@ router.post('/', requireCustomerAuth, async (req: Request, res: Response) => {
       paymentMethod: paymentMethodsService.maskForResponse(method),
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Add error:', error.message);
+    logger.error('[Customer Payment Methods] Add error:', undefined, { error: { name: 'Error', message: String(error.message) } });
 
     // Handle Stripe configuration mismatch with a clear error
     if (error.message?.includes('Stripe configuration mismatch')) {
@@ -247,7 +248,7 @@ router.put('/:id/default', requireCustomerAuth, async (req: Request, res: Respon
       message: 'Default payment method updated',
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Set default error:', error.message);
+    logger.error('[Customer Payment Methods] Set default error:', undefined, { error: { name: 'Error', message: String(error.message) } });
 
     if (error.message === 'Payment method not found') {
       return res.status(404).json({
@@ -283,7 +284,7 @@ router.delete('/:id', requireCustomerAuth, async (req: Request, res: Response) =
       message: 'Payment method removed',
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Remove error:', error.message);
+    logger.error('[Customer Payment Methods] Remove error:', undefined, { error: { name: 'Error', message: String(error.message) } });
 
     if (error.message === 'Payment method not found') {
       return res.status(404).json({
@@ -331,7 +332,7 @@ router.post('/setup-intent', requireCustomerAuth, async (req: Request, res: Resp
       stripeCustomerId: result.stripeCustomerId,
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] SetupIntent error:', error.message);
+    logger.error('[Customer Payment Methods] SetupIntent error:', undefined, { error: { name: 'Error', message: String(error.message) } });
 
     if (error.message === 'Stripe not configured') {
       return res.status(503).json({
@@ -380,7 +381,7 @@ router.get('/checkout/:tenantId', requireCustomerAuth, async (req: Request, res:
       defaultPaymentMethodToken: stripeInfo.defaultPaymentMethodToken,
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Checkout info error:', error.message);
+    logger.error('[Customer Payment Methods] Checkout info error:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return res.status(500).json({
       success: false,
       error: 'checkout_info_failed',
@@ -407,7 +408,7 @@ router.get('/expiring', requireCustomerAuth, async (req: Request, res: Response)
       expiringMethods: methods.map(m => paymentMethodsService.maskForResponse(m)),
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] Expiring check error:', error.message);
+    logger.error('[Customer Payment Methods] Expiring check error:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return res.status(500).json({
       success: false,
       error: 'expiring_check_failed',
@@ -457,7 +458,7 @@ router.post('/paypal/create-billing-agreement', requireCustomerAuth, async (req:
       tokenId: agreement.tokenId,
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] PayPal billing agreement error:', error.message);
+    logger.error('[Customer Payment Methods] PayPal billing agreement error:', undefined, { error: { name: 'Error', message: String(error.message) } });
 
     if (error.message?.includes('credentials not configured')) {
       return res.status(503).json({
@@ -533,7 +534,7 @@ router.post('/paypal/save-payment-method', requireCustomerAuth, async (req: Requ
       paymentMethod: paymentMethodsService.maskForResponse(paymentMethod),
     });
   } catch (error: any) {
-    console.error('[Customer Payment Methods] PayPal save error:', error.message);
+    logger.error('[Customer Payment Methods] PayPal save error:', undefined, { error: { name: 'Error', message: String(error.message) } });
     return res.status(500).json({
       success: false,
       error: 'paypal_save_failed',

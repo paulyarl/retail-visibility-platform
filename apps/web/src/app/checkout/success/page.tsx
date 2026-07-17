@@ -8,6 +8,7 @@ import { checkoutService } from '@/services/CheckoutService';
 import { customerAuthService } from '@/services/CustomerAuthService';
 import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
 import { Button } from '@/components/ui/Button';
+import { clientLogger } from '@/lib/client-logger';
 
 function SuccessPageContent() {
   const searchParams = useSearchParams();
@@ -67,7 +68,18 @@ function SuccessPageContent() {
           }
           window.dispatchEvent(new Event('cart-updated'));
         } catch (err) {
-          console.error('[Checkout Success] Failed to clear cart:', err);
+          clientLogger.error('[Checkout Success] Failed to clear cart:', { detail: err });
+        }
+
+        // Check for post-purchase funnel upsell step
+        if (confirmResult.funnelNextStep && confirmResult.funnelNextStep.stepId) {
+          const fs = confirmResult.funnelNextStep;
+          const params = new URLSearchParams({
+            tenantId: order?.tenant_id || '',
+            funnelId: fs.funnelId,
+          });
+          router.replace(`/checkout/funnel/${confirmResult.orderId}/step/${fs.stepId}?${params.toString()}`);
+          return;
         }
 
         // Check if user wanted to save payment method before redirect
@@ -97,7 +109,7 @@ function SuccessPageContent() {
               });
               console.log('[Checkout Success] Payment method saved successfully');
             } catch (err) {
-              console.error('[Checkout Success] Failed to save payment method:', err);
+              clientLogger.error('[Checkout Success] Failed to save payment method:', { detail: err });
             }
             // Redirect to orders
             router.replace('/account/orders');
@@ -119,7 +131,7 @@ function SuccessPageContent() {
           router.replace(isLoggedIn ? '/account/orders' : '/my-orders');
         }
       } catch (err: any) {
-        console.error('[Checkout Success] Error:', err);
+        clientLogger.error('[Checkout Success] Error:', { detail: err });
         setError(err.message || 'Failed to process payment confirmation');
       }
     };
@@ -170,7 +182,7 @@ function SuccessPageContent() {
             expiryYear: guestExpiryYear ? String(guestExpiryYear) : undefined,
           });
         } catch (err) {
-          console.error('[Checkout Success] Failed to save guest payment method:', err);
+          clientLogger.error('[Checkout Success] Failed to save guest payment method:', { detail: err });
         }
       }
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { storeTypeDirectoryService } from '../services/store-type-directory.service';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -54,11 +55,11 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[STORE-TYPES] Error fetching store types:', error);
+    logger.error('[STORE-TYPES] Error fetching store types:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_store_types',
-      message: error?.message,
+      message: (error as any)?.message,
     });
   }
 });
@@ -87,7 +88,7 @@ router.get('/store-type-counts', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching store type counts:', error);
+    logger.error('Error fetching store type counts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch store type counts',
@@ -139,7 +140,7 @@ router.get('/:typeSlug', async (req: Request, res: Response) => {
       data: { storeType },
     });
   } catch (error) {
-    console.error('Error fetching store type details:', error);
+    logger.error('Error fetching store type details:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch store type details',
@@ -205,7 +206,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('Error fetching stores by type:', error);
+      logger.error('Error fetching stores by type:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
       res.status(500).json({
         success: false,

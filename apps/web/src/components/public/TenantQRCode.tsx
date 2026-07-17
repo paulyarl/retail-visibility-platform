@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { storefrontService } from '@/services/StorefrontService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags, StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { StyledTenantQR } from '@/components/public/StyledTenantQR';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantQRCodeProps {
   /** The URL to encode in the QR code */
@@ -26,6 +28,8 @@ export interface TenantQRCodeProps {
   pageType?: 'storefront' | 'directory' | 'product' | 'map';
   /** Pre-resolved capability flags (skips tier fetch if provided) */
   capabilityFlags?: StorefrontOptionFlags | null;
+  /** Whether this is rendered on a public (unauthenticated) page */
+  isPublic?: boolean;
 }
 
 /**
@@ -42,6 +46,7 @@ export function TenantQRCode({
   className = '',
   pageType,
   capabilityFlags,
+  isPublic = false,
 }: TenantQRCodeProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -64,10 +69,13 @@ export function TenantQRCode({
           storefrontService.getPublicTier(tenantId),
           capabilityFlags
             ? Promise.resolve(capabilityFlags)
-            : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
-          capabilityFlags
-            ? Promise.resolve(null)
-            : unifiedCapabilityService.getStorefrontQrState(tenantId).catch(() => null),
+            : isPublic
+              ? publicUnifiedCapabilityService.getStorefrontOptionFlags(tenantId)
+              : unifiedCapabilityService.getStorefrontOptionFlags(tenantId),
+          (isPublic
+            ? publicUnifiedCapabilityService.getStorefrontQrState(tenantId)
+            : unifiedCapabilityService.getStorefrontQrState(tenantId)
+          ).catch(() => null),
         ]);
 
         // Set QR state if fetched
@@ -105,9 +113,12 @@ export function TenantQRCode({
 
           setTenantTier(effectiveTierPart);
 
-          // Fetch logo if QR logo capability is enabled (capability-aware)
-          const shouldFetchLogo = flagsResult?.showQRLogo
-            || ['professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
+          // Fetch logo only if qr_logo is enabled in merchant prefs (from qrState);
+          // fall back to tier-based logic only when qrState is unavailable
+          const qrPrefsForLogo = qrStateResult?.merchantPreferences as any;
+          const shouldFetchLogo = qrStateResult
+            ? !!(qrPrefsForLogo?.qr_logo)
+            : ['professional', 'commitment', 'enterprise', 'organization', 'ecommerce', 'omnichannel',
               'chain_professional', 'chain_enterprise', 'chain_starter'].includes(effectiveTierPart);
 
           if (shouldFetchLogo) {
@@ -118,12 +129,12 @@ export function TenantQRCode({
                 setTenantLogo(profileData.logo_url || null);
               }
             } catch (profileError) {
-              console.error('Error fetching tenant profile:', profileError);
+              clientLogger.error('Error fetching tenant profile:', { detail: profileError });
             }
           }
         }
       } catch (error) {
-        console.error('[TenantQRCode] Error fetching tenant info:', error);
+        clientLogger.error('[TenantQRCode] Error fetching tenant info:', { detail: error });
       } finally {
         setIsFetchingTierAndLogo(false);
       }
@@ -318,18 +329,18 @@ export function TenantQRCode({
     }
   };
 
-  // Get capability-aware QR code quality settings
-  // Uses resolvedFlags (from storefront_options capability) when available,
-  // falls back to tier-based logic for backward compatibility
+  // Get QR code quality settings from qrState (storefront_qr namespace),
+  // falls back to tier-based logic when qrState is unavailable
   const getCapabilityQRSettings = (tier: string, organizationTier?: string | undefined) => {
     const baseSize = size;
     const colors = getTierColorPalette(tier, organizationTier);
 
-    // Capability-aware: use resolved QR resolution from flags
-    if (resolvedFlags?.showQRCodes && resolvedFlags.qrResolution) {
-      const res = resolvedFlags.qrResolution;
+    // QR namespace: use qrState for QR resolution and logo decisions
+    const qrPrefs = qrState?.merchantPreferences as any;
+    if (qrPrefs?.default_qr_resolution) {
+      const res = qrPrefs.default_qr_resolution;
       const exportSize = res === '2048' ? 2048 : res === '1024' ? 1024 : res === '512' ? 512 : baseSize;
-      const needsLogo = resolvedFlags.showQRLogo && !!tenantLogo;
+      const needsLogo = qrPrefs?.qr_logo && !!tenantLogo;
       return {
         renderSize: Math.min(baseSize * (exportSize / baseSize), exportSize),
         exportSize,
@@ -381,7 +392,9 @@ export function TenantQRCode({
       const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
       // Styled QR is handled by StyledTenantQR component — skip classic generation when styled is active
-      if (resolvedFlags?.showQRStyled) {
+      // All QR decisions come from qrState (storefront_qr namespace)
+      const styledEnabled = qrState?.merchantPreferences?.qr_styled_enabled ?? false;
+      if (styledEnabled) {
         return;
       }
 
@@ -409,9 +422,9 @@ export function TenantQRCode({
 
       let finalCanvas = exportCanvas;
 
-      // Logo eligibility: capability-aware (showQRLogo flag) with tier fallback
-      const shouldApplyLogo = resolvedFlags
-        ? resolvedFlags.showQRLogo && !!tenantLogo
+      // Logo eligibility: from qrState merchant prefs, with tier fallback
+      const shouldApplyLogo = qrState
+        ? (qrState.merchantPreferences as any)?.qr_logo && !!tenantLogo
         : (() => {
           const effectiveTier = organizationTier || tenantTier;
           return (
@@ -430,7 +443,7 @@ export function TenantQRCode({
         try {
           finalCanvas = await overlayLogoOnQR(exportCanvas, tenantLogo!);
         } catch (logoError) {
-          console.warn('Failed to overlay logo, using plain QR code:', logoError);
+          clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
         }
       }
 
@@ -438,7 +451,7 @@ export function TenantQRCode({
       const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
       setQrImageUrl(dataUrl);
     } catch (error) {
-      console.error('Failed to generate QR code:', error);
+      clientLogger.error('Failed to generate QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }
@@ -460,26 +473,31 @@ export function TenantQRCode({
     // Get capability-aware QR settings
     const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
-    // Styled QR path: use qr-code-styling when showQRStyled capability is enabled
-    if (resolvedFlags?.showQRStyled) {
+    // Styled QR path: use qr-code-styling when styled QR is enabled
+    // All QR decisions come from qrState (storefront_qr namespace)
+    const styledEnabled = qrState?.merchantPreferences?.qr_styled_enabled ?? false;
+    if (styledEnabled) {
       const { default: QRCodeStyling } = await import('qr-code-styling');
 
-      const dotType = (resolvedFlags.qrDotType || resolvedFlags.allowedQRDotStyles?.[0] || 'rounded') as any;
-      const cornerType = (resolvedFlags.qrCornerType || resolvedFlags.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-      const dotColor = resolvedFlags.qrDotColor || '#1a56db';
-      const cornerColor = resolvedFlags.qrCornerColor || '#1a56db';
-      const bgColor = resolvedFlags.qrBgColor || '#ffffff';
-      const useGradient = resolvedFlags.qrGradients && resolvedFlags.qrGradientEnabled;
-      const gradientStart = resolvedFlags.qrGradientStart || '#1a56db';
-      const gradientEnd = resolvedFlags.qrGradientEnd || '#7c3aed';
+      const qrPrefs = qrState?.merchantPreferences as any;
+      const dotType = (qrPrefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded') as any;
+      const cornerType = (qrPrefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
+      const cornerDotType = (qrPrefs?.qr_corner_dot_type || 'dot') as any;
+      const dotColor = qrPrefs?.qr_dot_color || '#1a56db';
+      const cornerColor = qrPrefs?.qr_corner_color || '#1a56db';
+      const cornerDotColor = qrPrefs?.qr_corner_dot_color || '#ffffff';
+      const bgColor = qrPrefs?.qr_bg_color || '#ffffff';
+      const useGradient = qrState?.qrGradients && qrPrefs?.qr_gradient_enabled;
+      const gradientStart = qrPrefs?.qr_gradient_start || '#1a56db';
+      const gradientEnd = qrPrefs?.qr_gradient_end || '#7c3aed';
 
       const qr = new QRCodeStyling({
         width: targetSize,
         height: targetSize,
         type: 'svg',
         data: url,
-        image: tenantLogo || undefined,
-        imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true },
+        image: (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : undefined,
+        imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: (qrPrefs?.qr_logo_shape || 'square') } as any,
         dotsOptions: {
           color: dotColor,
           type: dotType,
@@ -492,7 +510,7 @@ export function TenantQRCode({
           color: cornerColor,
           type: cornerType,
         },
-        cornersDotOptions: { color: '#ffffff', type: 'dot' },
+        cornersDotOptions: { color: cornerDotColor, type: cornerDotType },
         backgroundOptions: { color: bgColor },
         qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
       });
@@ -533,9 +551,9 @@ export function TenantQRCode({
 
     let finalCanvas = canvas;
 
-    // Logo eligibility: capability-aware with tier fallback
-    const shouldApplyLogo = resolvedFlags
-      ? resolvedFlags.showQRLogo && !!tenantLogo
+    // Logo eligibility: from qrState merchant prefs, with tier fallback
+    const shouldApplyLogo = qrState
+      ? (qrState.merchantPreferences as any)?.qr_logo && !!tenantLogo
       : (() => {
         const effectiveTier = organizationTier || tenantTier;
         return (
@@ -550,14 +568,14 @@ export function TenantQRCode({
         ) && !!tenantLogo;
       })();
 
-    // Logo minimum size: capability-aware (256px if QR logo allowed, 512px otherwise)
-    const logoMinSize = resolvedFlags?.showQRLogo ? 256 : 512;
+    // Logo minimum size: 256px if QR logo enabled in merchant prefs, 512px otherwise
+    const logoMinSize = (qrState?.merchantPreferences as any)?.qr_logo ? 256 : 512;
 
     if (shouldApplyLogo && targetSize >= logoMinSize) {
       try {
         finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
       } catch (logoError) {
-        console.warn('Failed to overlay logo, using plain QR code:', logoError);
+        clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
       }
     }
 
@@ -586,35 +604,38 @@ export function TenantQRCode({
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Failed to download QR code:', error);
+      clientLogger.error('Failed to download QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Capability gate: if flags resolved and QR codes not allowed for this page type, render nothing
-  if (resolvedFlags) {
+  // QR namespace gate: if qrState resolved and QR codes not allowed for this page type, render nothing
+  if (qrState) {
+    const qrPrefs = qrState.merchantPreferences as any;
     const pageSpecificFlag =
       pageType === 'product'
-        ? resolvedFlags.showQRProduct
+        ? qrPrefs?.qr_product
         : pageType === 'directory'
-          ? resolvedFlags.showQRDirectory
+          ? qrPrefs?.qr_directory
           : pageType === 'storefront'
-            ? resolvedFlags.showQRStore
-            : resolvedFlags.showQRCodes;
+            ? qrPrefs?.qr_store
+            : qrState.qrEnabled;
     if (!pageSpecificFlag) {
       return null;
     }
   }
 
-  // Styled QR: delegate to StyledTenantQR when effective resolver requires it
-  if (resolvedFlags?.showQRStyled && !isFetchingTierAndLogo) {
+  // Styled QR: delegate to StyledTenantQR when styled QR is effectively enabled
+  // All QR decisions come from qrState (storefront_qr namespace)
+  const styledEnabled = qrState?.merchantPreferences?.qr_styled_enabled ?? false;
+  if (styledEnabled && !isFetchingTierAndLogo) {
     return (
       <StyledTenantQR
         url={url}
         tenantId={tenantId}
         tenantLogo={tenantLogo}
-        capabilityFlags={resolvedFlags}
+        qrState={qrState}
         label={label}
         downloadName={downloadName}
         showDownload={showDownload}
@@ -655,11 +676,11 @@ export function TenantQRCode({
         {showDownload && qrImageUrl && (
           <div className="mt-3 space-y-2">
             {(() => {
-              // Capability-aware download size options
+              // QR namespace download size options
               const sizeOptions = (() => {
-                // Use resolved flags when available
-                if (resolvedFlags?.showQRCodes && resolvedFlags.qrResolutions.length > 0) {
-                  const res = resolvedFlags.qrResolutions;
+                // Use qrState allowed resolutions when available
+                if (qrState?.allowedQRResolutions && qrState.allowedQRResolutions.length > 0) {
+                  const res = qrState.allowedQRResolutions;
                   const options = [{ size: 256, label: 'Small (256px)', description: 'Mobile friendly' }];
                   if (res.includes('qr_codes_512') || res.includes('qr_codes_1024') || res.includes('qr_codes_2048')) {
                     options.push({ size: 512, label: 'Medium (512px)', description: 'Web quality' });
@@ -747,9 +768,9 @@ export function TenantQRCode({
                 tenantTier === 'organization' ? 'enterprise' : undefined;
               const colors = getTierColorPalette(tenantTier, organizationTier);
 
-              // Logo eligibility: capability-aware with tier fallback
-              const shouldShowLogo = resolvedFlags
-                ? resolvedFlags.showQRLogo && !!tenantLogo
+              // Logo eligibility: from qrState merchant prefs, with tier fallback
+              const shouldShowLogo = qrState
+                ? (qrState.merchantPreferences as any)?.qr_logo && !!tenantLogo
                 : (() => {
                   const effectiveTier = organizationTier || tenantTier;
                   return (

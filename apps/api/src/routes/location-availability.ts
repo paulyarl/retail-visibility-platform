@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { optionalAuth } from '../middleware/auth';
 import { prisma } from '../prisma';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -282,7 +283,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
 
     res.json(response);
   } catch (error) {
-    console.error('[LocationAvailability] Error fetching availability:', error);
+    logger.error('[LocationAvailability] Error fetching availability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch availability' });
   }
 });
@@ -448,7 +449,7 @@ router.get('/sku', optionalAuth, async (req: Request, res: Response) => {
       locations
     });
   } catch (error) {
-    console.error('[LocationAvailability] Error fetching SKU availability:', error);
+    logger.error('[LocationAvailability] Error fetching SKU availability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch availability' });
   }
 });
@@ -535,7 +536,7 @@ router.post('/batch', optionalAuth, async (req: Request, res: Response) => {
 
     res.json({ items: results });
   } catch (error) {
-    console.error('[LocationAvailability] Error in batch query:', error);
+    logger.error('[LocationAvailability] Error in batch query:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch batch availability' });
   }
 });
@@ -573,7 +574,7 @@ router.post('/checkout/locations', async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('[LocationAvailability] Error in checkout locations:', error);
+    logger.error('[LocationAvailability] Error in checkout locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to find checkout locations' });
   }
 });
@@ -606,7 +607,7 @@ router.get('/checkout/locations/:organizationId/:productSlug', async (req: Reque
       locations
     });
   } catch (error) {
-    console.error('[LocationAvailability] Error getting organization locations:', error);
+    logger.error('[LocationAvailability] Error getting organization locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to get organization locations' });
   }
 });
@@ -643,7 +644,7 @@ router.post('/checkout/validate-location', async (req: Request, res: Response) =
       missingItems: result.missingItems
     });
   } catch (error) {
-    console.error('[LocationAvailability] Error validating location:', error);
+    logger.error('[LocationAvailability] Error validating location:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to validate location' });
   }
 });

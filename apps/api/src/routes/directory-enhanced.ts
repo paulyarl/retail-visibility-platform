@@ -5,6 +5,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { getCategoryCounts } from '../utils/category-counts';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get('/resolve-slug/:slug', async (req: Request, res: Response) => {
     return res.json({ success: true, tenantId });
     
   } catch (error) {
-    console.error('[DIRECTORY] Error resolving slug:', error);
+    logger.error('[DIRECTORY] Error resolving slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error' });
   }
 });
@@ -472,7 +473,7 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Related Stores] Error:', error);
+    logger.error('[Related Stores] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'related_stores_failed',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -536,7 +537,7 @@ router.get('/categories/enhanced', async (req: Request, res: Response) => {
     res.send(jsonString);
 
   } catch (error) {
-    console.error('[Enhanced Categories API] Error:', error);
+    logger.error('[Enhanced Categories API] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to fetch categories',
       code: 'INTERNAL_ERROR'
@@ -612,7 +613,7 @@ router.get('/categories/types', async (req: Request, res: Response) => {
     res.send(jsonString);
 
   } catch (error) {
-    console.error('[Category Types API] Error:', error);
+    logger.error('[Category Types API] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to fetch category types',
       code: 'INTERNAL_ERROR'
@@ -747,7 +748,7 @@ router.get('/categories/storefront', async (req: Request, res: Response) => {
     res.send(jsonString);
 
   } catch (error) {
-    console.error('[Storefront Categories API] Error:', error);
+    logger.error('[Storefront Categories API] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'Failed to fetch storefront categories',
       code: 'INTERNAL_ERROR'

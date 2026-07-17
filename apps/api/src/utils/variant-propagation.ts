@@ -9,6 +9,7 @@
 import { prisma } from '../prisma';
 import { generateProductCatId,generateTenantVariantId } from '../lib/id-generator';
 import { customAlphabet } from 'nanoid';
+import { logger } from '../logger';
 
 // Generate variant ID function
 // function generateVariantId(parentItemId: string): string {
@@ -185,7 +186,7 @@ export async function propagateVariants(
     result.created = variantData.length;
 
   } catch (error: any) {
-    console.error('[Variant Propagation] Error:', error);
+    logger.error('[Variant Propagation] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     result.errors.push({ error: error.message });
   }
 

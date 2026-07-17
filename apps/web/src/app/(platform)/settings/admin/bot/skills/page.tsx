@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Modal, Input, Select, Textarea } from '@/components/ui';
 import { botPlatformAdminService, type BotSkill } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_VARIANT: Record<string, any> = {
   active: 'success',
@@ -37,7 +38,7 @@ export default function BotSkillsPage() {
       const data = await botPlatformAdminService.listSkills();
       setSkills(data);
     } catch (err) {
-      console.error('[Bot Skills] Load error:', err);
+      clientLogger.error('[Bot Skills] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export default function BotSkillsPage() {
       setShowModal(false);
       await loadSkills();
     } catch (err) {
-      console.error('[Bot Skills] Save error:', err);
+      clientLogger.error('[Bot Skills] Save error:', { detail: err });
     } finally {
       setSaving(false);
     }
@@ -112,7 +113,7 @@ export default function BotSkillsPage() {
       await botPlatformAdminService.deleteSkill(id);
       await loadSkills();
     } catch (err) {
-      console.error('[Bot Skills] Delete error:', err);
+      clientLogger.error('[Bot Skills] Delete error:', { detail: err });
     }
   }
 

@@ -12,6 +12,7 @@ import { prisma } from '../prisma';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { generateCustomerId, generateCustomerKey } from '../lib/id-generator';
+import { logger } from '../logger';
 
 export interface CustomerAuthResult {
   success: boolean;
@@ -134,7 +135,7 @@ export class CustomerAuthService {
         isNewCustomer: true,
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Register error:', error);
+      logger.error('[CustomerAuth] Register error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to create account. Please try again.',
@@ -217,7 +218,7 @@ export class CustomerAuthService {
         customer: this.formatCustomer(customer),
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Login error:', error);
+      logger.error('[CustomerAuth] Login error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to log in. Please try again.',
@@ -259,7 +260,7 @@ export class CustomerAuthService {
         customer: this.formatCustomer(updatedCustomer),
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Update profile error:', error);
+      logger.error('[CustomerAuth] Update profile error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to update profile. Please try again.',
@@ -317,7 +318,7 @@ export class CustomerAuthService {
         success: true,
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Change password error:', error);
+      logger.error('[CustomerAuth] Change password error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to change password. Please try again.',
@@ -400,7 +401,7 @@ export class CustomerAuthService {
         isNewCustomer,
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] OAuth login error:', error);
+      logger.error('[CustomerAuth] OAuth login error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to log in with social account.',
@@ -439,7 +440,7 @@ export class CustomerAuthService {
 
       return { success: true };
     } catch (error: any) {
-      console.error('[CustomerAuth] Verify email error:', error);
+      logger.error('[CustomerAuth] Verify email error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to verify email.',
@@ -478,7 +479,7 @@ export class CustomerAuthService {
 
       return { success: true };
     } catch (error: any) {
-      console.error('[CustomerAuth] Request password reset error:', error);
+      logger.error('[CustomerAuth] Request password reset error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to request password reset.',
@@ -524,7 +525,7 @@ export class CustomerAuthService {
         customer: this.formatCustomer(updatedCustomer),
       };
     } catch (error: any) {
-      console.error('[CustomerAuth] Reset password error:', error);
+      logger.error('[CustomerAuth] Reset password error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: 'Failed to reset password.',
@@ -545,7 +546,7 @@ export class CustomerAuthService {
       });
       return { success: true };
     } catch (error: any) {
-      console.error('[CustomerAuth] Logout error:', error);
+      logger.error('[CustomerAuth] Logout error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: true };
     }
   }
@@ -594,7 +595,7 @@ export class CustomerAuthService {
       }
       return result.count;
     } catch (error: any) {
-      console.error('[CustomerAuth] Reconcile guest orders error:', error);
+      logger.error('[CustomerAuth] Reconcile guest orders error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return 0;
     }
   }

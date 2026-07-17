@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireInventoryAccess } from '../middleware/permissions';
 import FeaturedProductsSingletonService from '../services/FeaturedProductsSingletonService';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 const featuredProductsService = FeaturedProductsSingletonService.getInstance();
@@ -107,7 +108,7 @@ router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInv
       count: inStockFeaturedProducts.length
     });
   } catch (error) {
-    console.error('Error fetching featured products:', error);
+    logger.error('Error fetching featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch featured products' });
   }
 });
@@ -151,7 +152,7 @@ router.get('/tenants/:tenantId/products/featuring/status', authenticateToken, re
       canFeature: current < limit
     });
   } catch (error) {
-    console.error('Error fetching featuring status:', error);
+    logger.error('Error fetching featuring status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch featuring status' });
   }
 });
@@ -244,7 +245,7 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
       }
     });
   } catch (error) {
-    console.error('Error featuring product:', error);
+    logger.error('Error featuring product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to feature product' });
   }
 });
@@ -271,7 +272,7 @@ router.delete('/tenants/:tenantId/products/:productId/feature', authenticateToke
       message: 'Product unfeatured successfully'
     });
   } catch (error) {
-    console.error('Error unfeaturing product:', error);
+    logger.error('Error unfeaturing product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to unfeature product' });
   }
 });
@@ -347,7 +348,7 @@ router.post('/tenants/:tenantId/products/feature/bulk', authenticateToken, requi
       updated: result.count
     });
   } catch (error) {
-    console.error('Error bulk featuring products:', error);
+    logger.error('Error bulk featuring products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to bulk feature products' });
   }
 });
@@ -422,7 +423,7 @@ router.patch('/tenants/:tenantId/products/:productId/feature/active', authentica
       }
     });
   } catch (error) {
-    console.error('Error updating featured active status:', error);
+    logger.error('Error updating featured active status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update featured active status' });
   }
 });
@@ -478,7 +479,7 @@ router.patch('/tenants/:tenantId/products/:productId/feature/expiration', authen
       }
     });
   } catch (error) {
-    console.error('Error updating featured expiration:', error);
+    logger.error('Error updating featured expiration:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update featured expiration' });
   }
 });
@@ -515,7 +516,7 @@ router.patch('/tenants/:tenantId/products/:productId/feature/priority', authenti
       product
     });
   } catch (error) {
-    console.error('Error updating featured priority:', error);
+    logger.error('Error updating featured priority:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update featured priority' });
   }
 });
@@ -662,7 +663,7 @@ router.get('/admin/products/featured', authenticateToken, async (req, res) => {
       offset: parseInt(offset as string)
     });
   } catch (error) {
-    console.error('Error fetching admin featured products:', error);
+    logger.error('Error fetching admin featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch featured products' });
   }
 });
@@ -747,7 +748,7 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       expiringSoon
     });
   } catch (error) {
-    console.error('Error fetching featuring stats:', error);
+    logger.error('Error fetching featuring stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch featuring stats' });
   }
 });
@@ -807,7 +808,7 @@ router.get('/tenants/:tenantId/products/featured/inactive', authenticateToken, r
       count: transformedProducts.length
     });
   } catch (error) {
-    console.error('Error fetching inactive featured products:', error);
+    logger.error('Error fetching inactive featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch inactive featured products' });
   }
 });
@@ -875,7 +876,7 @@ router.get('/tenants/:tenantId/products/featured/out-of-stock', authenticateToke
       count: transformedProducts.length
     });
   } catch (error) {
-    console.error('Error fetching out-of-stock featured products:', error);
+    logger.error('Error fetching out-of-stock featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch out-of-stock featured products' });
   }
 });
@@ -909,7 +910,7 @@ router.delete('/admin/products/featured/:id', authenticateToken, async (req, res
       deletedProductId: id
     });
   } catch (error) {
-    console.error('Error unfeaturing product:', error);
+    logger.error('Error unfeaturing product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to unfeature product' });
   }
 });

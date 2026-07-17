@@ -11,6 +11,7 @@ import { tenantInfoService } from '@/services/TenantInfoService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { Spinner } from '@/components/ui';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TenantUser {
   id: string;
@@ -84,7 +85,7 @@ export default function TenantUsersPage() {
       setUsers(Array.isArray(usersData) ? usersData : []);
       setInvitations(Array.isArray(invitesData) ? invitesData : []);
     } catch (err) {
-      console.error('Failed to load data:', err);
+      clientLogger.error('Failed to load data:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -138,7 +139,7 @@ export default function TenantUsersPage() {
       await tenantInfoService.deleteUser(tenantId, userId);
       await loadData();
     } catch (error: any) {
-      console.error('Failed to remove user:', error);
+      clientLogger.error('Failed to remove user:', { detail: error });
       alert(error?.message || 'Failed to remove user');
     }
   };

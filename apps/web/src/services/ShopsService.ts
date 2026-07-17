@@ -10,6 +10,7 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { Shop, ShopIdentifiers, ShopResolution, ShopUrls } from '../types/shop';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // INTERFACES
@@ -222,7 +223,7 @@ class ShopsService extends PublicApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[ShopsService] Failed to get shop directory:', error);
+      clientLogger.error('[ShopsService] Failed to get shop directory:', { detail: error });
       throw error;
     }
   }
@@ -281,10 +282,10 @@ class ShopsService extends PublicApiSingleton {
               shops = parsedData;
               // console.log('[ShopsService] Parsed response.data string to array, length:', shops.length);
             } else {
-              console.warn('[ShopsService] Parsed data is not an array:', parsedData);
+              clientLogger.warn('[ShopsService] Parsed data is not an array:', { detail: parsedData });
             }
           } catch (parseError) {
-            console.error('[ShopsService] Failed to parse response.data string:', parseError);
+            clientLogger.error('[ShopsService] Failed to parse response.data string:', { detail: parseError });
           }
         } else if (Array.isArray(responseData)) {
           shops = responseData;
@@ -298,17 +299,17 @@ class ShopsService extends PublicApiSingleton {
           shops = responseData.shops;
 //          console.log('[ShopsService] Using response.data.shops array, length:', shops.length);
         } else {
-          console.warn('[ShopsService] response.data is neither array nor string:', typeof responseData);
+          clientLogger.warn('[ShopsService] response.data is neither array nor string:', { detail: typeof responseData });
           console.log('[ShopsService] Available data properties:', responseData ? Object.keys(responseData) : 'no data');
         }
       } else {
-        console.warn('[ShopsService] Unexpected response structure:', response);
+        clientLogger.warn('[ShopsService] Unexpected response structure:', { detail: response });
         shops = [];
       }
 
       return shops;
     } catch (error) {
-      console.error('Failed to get trending shops', error);
+      clientLogger.error('Failed to get trending shops', { detail: error });
       throw error;
     }
   }
@@ -332,7 +333,7 @@ class ShopsService extends PublicApiSingleton {
         categories: response.data || []
       };
     } catch (error) {
-      console.error('Failed to get shop categories', error);
+      clientLogger.error('Failed to get shop categories', { detail: error });
       throw error;
     }
   }
@@ -366,7 +367,7 @@ class ShopsService extends PublicApiSingleton {
 
       return response.data || [];
     } catch (error) {
-      console.error('Error fetching shop categories:', error);
+      clientLogger.error('Error fetching shop categories:', { detail: error });
       return [];
     }
   }
@@ -395,7 +396,7 @@ class ShopsService extends PublicApiSingleton {
       const autoId = (response.data as any)?.autoId || '';
       return autoId;
     } catch (error) {
-      console.error('[ShopsService] Failed to get tenant auto ID:', error);
+      clientLogger.error('[ShopsService] Failed to get tenant auto ID:', { detail: error });
       throw error;
     }
   }
@@ -419,7 +420,7 @@ class ShopsService extends PublicApiSingleton {
 
       return identifiers;
     } catch (error) {
-      console.error('Failed to get shop identifiers', error);
+      clientLogger.error('Failed to get shop identifiers', { detail: error });
       throw error;
     }
   }
@@ -527,7 +528,7 @@ class ShopsService extends PublicApiSingleton {
       
       return resolution;
     } catch (error) {
-      console.error('[ShopsService] Failed to resolve shop:', error);
+      clientLogger.error('[ShopsService] Failed to resolve shop:', { detail: error });
       throw error;
     }
   }
@@ -575,7 +576,7 @@ class ShopsService extends PublicApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[ShopsService] Failed to get shop products:', error);
+      clientLogger.error('[ShopsService] Failed to get shop products:', { detail: error });
       throw error;
     }
   }
@@ -614,7 +615,7 @@ class ShopsService extends PublicApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[ShopsService] Failed to get shop reviews:', error);
+      clientLogger.error('[ShopsService] Failed to get shop reviews:', { detail: error });
       throw error;
     }
   }
@@ -638,7 +639,7 @@ class ShopsService extends PublicApiSingleton {
 
       return response.success || false;
     } catch (error) {
-      console.error('[ShopsService] Failed to mark review helpful:', error);
+      clientLogger.error('[ShopsService] Failed to mark review helpful:', { detail: error });
       throw error;
     }
   }
@@ -661,7 +662,7 @@ class ShopsService extends PublicApiSingleton {
 
       return response.success || false;
     } catch (error) {
-      console.error('[ShopsService] Failed to follow shop:', error);
+      clientLogger.error('[ShopsService] Failed to follow shop:', { detail: error });
       throw error;
     }
   }
@@ -711,13 +712,13 @@ class ShopsService extends PublicApiSingleton {
     try {
        const response = await this.makeDefaultRequest('/api/shops/health',{},"shop-healthcheck");
       if (!response.success){
-        console.error('Health check failed', response.error);
+        clientLogger.error('Health check failed', { detail: response.error });
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('Health check failed', error);
+      clientLogger.error('Health check failed', { detail: error });
       return false;
     }
   }

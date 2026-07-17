@@ -1,3 +1,5 @@
+import { logger } from '../logger';
+
 /**
  * Universal Singleton Base Class - API Server Version
  * 
@@ -204,7 +206,7 @@ abstract class UniversalSingleton {
    */
   protected logError(message: string, error?: any): void {
     if (this.options.enableLogging) {
-      console.error(`[${this.singletonKey}] ERROR: ${message}`, error || '');
+      logger.error(`[${this.singletonKey}] ERROR: ${message}`, undefined, { error: { name: 'Error', message: String(error || '') } });
     }
   }
 

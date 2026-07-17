@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 /**
  * Rate limiting for image search API
@@ -106,7 +107,7 @@ export async function checkImageSearchLimit(
 
     next();
   } catch (error: any) {
-    console.error('[Image Search Limit] Error:', error);
+    logger.error('[Image Search Limit] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't block on rate limit errors
     next();
   }

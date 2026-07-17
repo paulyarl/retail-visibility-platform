@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/Switch';
 import { useProductOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductOptionsSettings {
   product_variant_enabled: boolean;
@@ -145,7 +146,7 @@ export default function ProductOptionsSettingsClient({ tenantId }: ProductOption
         });
       }
     } catch (err) {
-      console.error('Failed to load product options settings:', err);
+      clientLogger.error('Failed to load product options settings:', { detail: err });
     } finally {
       setLoading(false);
     }

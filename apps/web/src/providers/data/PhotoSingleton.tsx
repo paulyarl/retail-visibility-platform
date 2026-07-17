@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import PhotoSingleton, { Photo, PhotoUploadResult, PhotoDeleteResult } from '@/lib/singletons/PhotoSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // CONTEXT
@@ -138,7 +139,7 @@ export function useItemPhotos(itemId: string | undefined) {
       setPhotos(fetchedPhotos);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch photos');
-      console.error('[useItemPhotos] Error:', err);
+      clientLogger.error('[useItemPhotos] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -212,7 +213,7 @@ export function useVariantPhotos(variantId: string | undefined) {
       setPhotos(fetchedPhotos);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch variant photos');
-      console.error('[useVariantPhotos] Error:', err);
+      clientLogger.error('[useVariantPhotos] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

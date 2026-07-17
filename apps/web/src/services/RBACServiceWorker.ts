@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * RBAC Service Worker for Platform Caching
  * Provides advanced caching coordination across browser tabs and platform
@@ -82,7 +84,7 @@ class RBACServiceWorker {
       this.isInitialized = true;
       console.log('[RBACServiceWorker] Initialized successfully');
     } catch (error) {
-      console.error('[RBACServiceWorker] Failed to initialize:', error);
+      clientLogger.error('[RBACServiceWorker] Failed to initialize:', { detail: error });
     }
   }
 
@@ -187,7 +189,7 @@ class RBACServiceWorker {
       // So we notify the main thread to preload
       this.broadcastPreloadRequest();
     } catch (error) {
-      console.error('[RBACServiceWorker] Failed to preload data:', error);
+      clientLogger.error('[RBACServiceWorker] Failed to preload data:', { detail: error });
     }
   }
 
@@ -231,7 +233,7 @@ class RBACServiceWorker {
 
       console.log(`[RBACServiceWorker] Loaded ${this.cache.size} entries from storage`);
     } catch (error) {
-      console.error('[RBACServiceWorker] Failed to load cache from storage:', error);
+      clientLogger.error('[RBACServiceWorker] Failed to load cache from storage:', { detail: error });
     }
   }
 
@@ -254,7 +256,7 @@ class RBACServiceWorker {
 
       window.localStorage.setItem('rbac-service-worker-cache', JSON.stringify(data));
     } catch (error) {
-      console.error('[RBACServiceWorker] Failed to save cache to storage:', error);
+      clientLogger.error('[RBACServiceWorker] Failed to save cache to storage:', { detail: error });
     }
   }
 

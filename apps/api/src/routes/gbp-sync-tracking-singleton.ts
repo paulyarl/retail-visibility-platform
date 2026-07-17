@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import GBPSyncTrackingSingletonService from '../services/GBPSyncTrackingSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ router.get('/tracking', async (req, res) => {
       message: 'Sync tracking records retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Get tracking error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Get tracking error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve sync tracking records'
@@ -97,7 +98,7 @@ router.get('/status-summary', async (req, res) => {
       message: 'Sync status summary retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Status summary error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Status summary error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve sync status summary'
@@ -161,7 +162,7 @@ router.post('/track-operation', async (req, res) => {
       message: 'Sync operation tracking started successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Track operation error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Track operation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to track sync operation',
@@ -210,7 +211,7 @@ router.post('/complete-operation', async (req, res) => {
       message: 'Sync operation completed successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Complete operation error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Complete operation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to complete sync operation',
@@ -269,7 +270,7 @@ router.post('/update-tracking', async (req, res) => {
       message: 'Sync tracking updated successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Update tracking error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Update tracking error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update sync tracking',
@@ -313,7 +314,7 @@ router.get('/stats', async (req, res) => {
       message: 'Sync statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Get stats error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sync statistics'
@@ -346,7 +347,7 @@ router.get('/health', async (req, res) => {
       message: 'GBP sync tracking service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Health check error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -380,7 +381,7 @@ router.delete('/tracking', async (req, res) => {
       message: `Tracking data cleared${tenantId ? ` for tenant ${tenantId}` : ' for all tenants'}`
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Clear tracking error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Clear tracking error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear tracking data'
@@ -442,7 +443,7 @@ router.get('/categories', async (req, res) => {
       message: 'Supported sync categories retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP SYNC TRACKING SINGLETON] Categories error:', error);
+    logger.error('[GBP SYNC TRACKING SINGLETON] Categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported categories'

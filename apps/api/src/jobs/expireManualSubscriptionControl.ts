@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 /**
  * Background job to expire manual subscription control
@@ -66,6 +67,6 @@ export async function expireManualSubscriptionControl(): Promise<void> {
     }
 
   } catch (error) {
-    console.error('[ManualSubscriptionControl] Error checking expired manual control:', error);
+    logger.error('[ManualSubscriptionControl] Error checking expired manual control:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }

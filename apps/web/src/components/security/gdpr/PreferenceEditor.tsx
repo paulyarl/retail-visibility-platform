@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
 import { Check } from 'lucide-react';
 import { format } from 'date-fns';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PreferenceEditorProps {
   preference: UserPreference;
@@ -32,7 +33,7 @@ export function PreferenceEditor({ preference, onChange }: PreferenceEditorProps
       setSaving(true);
       await onChange(preference.key, value);
     } catch (error) {
-      console.error('Failed to save preference:', error);
+      clientLogger.error('Failed to save preference:', { detail: error });
       setValue(preference.value);
     } finally {
       setSaving(false);

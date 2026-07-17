@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { requireOrgMember, requireOrgAdminForRequest } from '../middleware/permissions';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     res.json(requests);
   } catch (error) {
-    console.error('[Organization Requests] GET error:', error);
+    logger.error('[Organization Requests] GET error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch organization requests' });
   }
 });
@@ -88,7 +89,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     res.json(organizationRequest);
   } catch (error) {
-    console.error('[Organization Request] GET error:', error);
+    logger.error('[Organization Request] GET error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch organization request' });
   }
 });
@@ -134,7 +135,7 @@ router.post('/', authenticateToken, requireOrgMember, async (req, res) => {
 
     res.status(201).json(organizationRequest);
   } catch (error) {
-    console.error('[Organization Requests] POST error:', error);
+    logger.error('[Organization Requests] POST error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to create organization request' });
   }
 });
@@ -204,7 +205,7 @@ router.patch('/:id', authenticateToken, requireOrgAdminForRequest, async (req, r
 
     res.json(organizationRequest);
   } catch (error) {
-    console.error('[Organization Request] PATCH error:', error);
+    logger.error('[Organization Request] PATCH error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update organization request' });
   }
 });
@@ -220,7 +221,7 @@ router.delete('/:id', authenticateToken, requireOrgAdminForRequest, async (req, 
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[Organization Request] DELETE error:', error);
+    logger.error('[Organization Request] DELETE error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to delete organization request' });
   }
 });

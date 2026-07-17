@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { abandonedCartService } from '../services/AbandonedCartService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.get('/', async (req, res) => {
       data: cart
     });
   } catch (error) {
-    console.error('[Get Cart Error]', error);
+    logger.error('[Get Cart Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -132,7 +133,7 @@ router.post('/items', async (req, res) => {
       message: 'Item added to cart successfully'
     });
   } catch (error) {
-    console.error('[Add Cart Item Error]', error);
+    logger.error('[Add Cart Item Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -192,7 +193,7 @@ router.delete('/items/:itemId', async (req, res) => {
       message: 'Item removed from cart successfully'
     });
   } catch (error) {
-    console.error('[Remove Cart Item Error]', error);
+    logger.error('[Remove Cart Item Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -240,7 +241,7 @@ router.delete('/', async (req, res) => {
       message: 'Cart cleared successfully'
     });
   } catch (error) {
-    console.error('[Clear Cart Error]', error);
+    logger.error('[Clear Cart Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -277,7 +278,7 @@ router.post('/track', async (req, res) => {
 
     res.json({ success: true, message: 'Cart tracked' });
   } catch (error) {
-    console.error('[Track Cart Error]', error);
+    logger.error('[Track Cart Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { tenantLimitsService } from '@/services/TenantLimitsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantLimitStatus {
   current: number;
@@ -98,7 +99,7 @@ export function useTierInfo() {
       const tiersData = await tenantLimitsService.getTiers();
       setTiers(tiersData);
     } catch (err) {
-      console.error('[useTierInfo] Error:', err);
+      clientLogger.error('[useTierInfo] Error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);

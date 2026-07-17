@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 import DirectoryListingsTable from '@/components/admin/directory/DirectoryListingsTable';
 import FeatureListingModal from '@/components/admin/directory/FeatureListingModal';
+import { clientLogger } from '@/lib/client-logger';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export default function AdminDirectoryListingsPage() {
       setSelectedTenantId('');
       setSelectedTenantName('');
     } catch (err) {
-      console.error('Failed to feature listing:', err);
+      clientLogger.error('Failed to feature listing:', { detail: err });
     }
   };
 
@@ -44,7 +45,7 @@ export default function AdminDirectoryListingsPage() {
     try {
       await unfeatureListing(tenantId);
     } catch (err) {
-      console.error('Failed to unfeature listing:', err);
+      clientLogger.error('Failed to unfeature listing:', { detail: err });
     }
   };
 

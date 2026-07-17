@@ -13,6 +13,7 @@ import { CartSummary } from '@/lib/cart/cartManager';
 import { Button } from '@mantine/core';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Gateway {
   id: string;
@@ -68,7 +69,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
             }));
           }
         } catch (err) {
-          console.warn(`Failed to fetch gateways for tenant ${tenantId}:`, err);
+          clientLogger.warn(`Failed to fetch gateways for tenant ${tenantId}:`, { detail: err });
           gatewayData[tenantId] = [];
         }
         
@@ -83,7 +84,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
             };
           }
         } catch (err) {
-          console.warn(`Failed to fetch profile for tenant ${tenantId}:`, err);
+          clientLogger.warn(`Failed to fetch profile for tenant ${tenantId}:`, { detail: err });
         }
       }
       
@@ -141,7 +142,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
     // console.log(`Checkout cart: ${JSON.stringify(cart)}`)
 
     if (!gatewayType) {
-      console.error('[MultiCartCheckout] No gateway selected');
+      clientLogger.error('[MultiCartCheckout] No gateway selected');
       return;
     }
 
@@ -161,7 +162,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
 
       router.push(`/checkout?${params.toString()}`);
     } catch (error: any) {
-      console.error('[MultiCartCheckout] Checkout failed:', error);
+      clientLogger.error('[MultiCartCheckout] Checkout failed:', { detail: error });
       setCheckoutStatus(prev => ({ ...prev, [statusKey]: 'error' }));
       setErrors(prev => ({ ...prev, [statusKey]: error.message || 'Checkout failed' }));
     }

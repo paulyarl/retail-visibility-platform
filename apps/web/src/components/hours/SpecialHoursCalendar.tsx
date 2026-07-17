@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "./TimeInput";
 import { tenantManagementService } from "@/services/TenantManagementService";
+import { clientLogger } from '@/lib/client-logger';
 
 type Override = { date: string; open?: string; close?: string; note?: string; isClosed?: boolean };
 
@@ -48,7 +49,7 @@ export default function SpecialHoursCalendar({ tenantId }: { tenantId: string })
           setOverrides(Array.isArray(data?.overrides) ? data.overrides : []);
         }
       } catch (error) {
-        console.error('Failed to load special hours:', error);
+        clientLogger.error('Failed to load special hours:', { detail: error });
       }
     };
     load();
@@ -118,7 +119,7 @@ export default function SpecialHoursCalendar({ tenantId }: { tenantId: string })
       setMsg("✓ Saved");
       setTimeout(() => setMsg(null), 2000);
     } catch (error) {
-      console.error('Failed to save special hours:', error);
+      clientLogger.error('Failed to save special hours:', { detail: error });
       setSaving(false);
       setMsg("✗ Failed");
       setTimeout(() => setMsg(null), 2000);

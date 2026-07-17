@@ -14,6 +14,7 @@ import { requireWritableSubscription } from '../middleware/subscription';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -70,7 +71,7 @@ router.put('/:tenantId/wholesale-matching-options', authenticateToken, requireTe
         wholesale_matching_enabled: parsed.data.wholesale_matching_enabled ?? true,
       },
     }).catch((err) => {
-      console.error('[PUT wholesale-matching-options] Failed to upsert settings:', err);
+      logger.error('[PUT wholesale-matching-options] Failed to upsert settings:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
       return null;
     });
 

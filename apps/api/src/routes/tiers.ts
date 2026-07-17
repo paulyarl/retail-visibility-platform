@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.get('/validate', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Tier Validation Error]', error);
+    logger.error('[Tier Validation Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -167,7 +168,7 @@ router.get('/:tenant_id', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Get Tier Info Error]', error);
+    logger.error('[Get Tier Info Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -201,7 +202,7 @@ router.get('/', async (req, res) => {
       data: tierData
     });
   } catch (error) {
-    console.error('[Get Tiers Error]', error);
+    logger.error('[Get Tiers Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

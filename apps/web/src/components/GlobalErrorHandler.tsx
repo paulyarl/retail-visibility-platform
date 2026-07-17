@@ -18,7 +18,7 @@ export default function GlobalErrorHandler() {
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       const error = event.error || new Error(event.message || 'Unknown error');
-      clientLogger.error(`Uncaught: ${error.message}`, {
+      clientLogger.error(error, {
         filename: event.filename,
         lineno: event.lineno,
         colno: event.colno,
@@ -28,7 +28,7 @@ export default function GlobalErrorHandler() {
     const handleRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const error = reason instanceof Error ? reason : new Error(String(reason));
-      clientLogger.error(`Unhandled rejection: ${error.message}`, {
+      clientLogger.error(error, {
         reason: String(reason),
       });
     };

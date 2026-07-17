@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { optionalAuth } from '../middleware/auth';
 import { basePrisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ router.get('/alerts', optionalAuth, async (req, res) => {
       unread: alerts.filter(a => !a.read).length,
     });
   } catch (error) {
-    console.error('[GET /api/user/security-alerts] Error:', error);
+    logger.error('[GET /api/user/security-alerts] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch security alerts' });
   }
 });
@@ -118,7 +119,7 @@ router.put('/alerts/:alertId/read', optionalAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Alert marked as read' });
   } catch (error) {
-    console.error('[PUT /api/user/security-alerts/:alertId/read] Error:', error);
+    logger.error('[PUT /api/user/security-alerts/:alertId/read] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to mark alert as read' });
   }
 });
@@ -148,7 +149,7 @@ router.post('/alerts/mark-all-read', optionalAuth, async (req, res) => {
       markedCount: result 
     });
   } catch (error) {
-    console.error('[POST /api/user/security-alerts/mark-all-read] Error:', error);
+    logger.error('[POST /api/user/security-alerts/mark-all-read] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to mark alerts as read' });
   }
 });
@@ -180,7 +181,7 @@ router.delete('/alerts/:alertId', optionalAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Alert dismissed' });
   } catch (error) {
-    console.error('[DELETE /api/user/security-alerts/:alertId] Error:', error);
+    logger.error('[DELETE /api/user/security-alerts/:alertId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to dismiss alert' });
   }
 });
@@ -213,7 +214,7 @@ router.get('/alerts/preferences', optionalAuth, async (req, res) => {
 
     res.json({ data: preferences });
   } catch (error) {
-    console.error('[GET /api/user/security-alerts/preferences] Error:', error);
+    logger.error('[GET /api/user/security-alerts/preferences] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch alert preferences' });
   }
 });
@@ -241,7 +242,7 @@ router.put('/alerts/preferences', optionalAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Preferences updated', data: preferences });
   } catch (error) {
-    console.error('[PUT /api/user/security-alerts/preferences] Error:', error);
+    logger.error('[PUT /api/user/security-alerts/preferences] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update alert preferences' });
   }
 });
@@ -303,7 +304,7 @@ router.post('/alerts/test', optionalAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Test alert created' });
   } catch (error) {
-    console.error('[POST /api/user/security-alerts/test] Error:', error);
+    logger.error('[POST /api/user/security-alerts/test] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to create test alert' });
   }
 });

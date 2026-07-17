@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { authenticatedReviewService, Review } from '@/services/AuthenticatedReviewService';
 import { reviewsService } from '@/services/ReviewsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ReviewStats {
   totalReviews: number;
@@ -249,7 +250,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       setReviews(filteredReviews);
 
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      clientLogger.error('Error fetching reviews:', { detail: error });
       const errorMessage = error instanceof Error ? error.message : 'Failed to load reviews';
       setError(errorMessage);
 
@@ -297,7 +298,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
         averageRating: approvedResult?.summary?.rating_avg || 0
       });
     } catch (error) {
-      console.error('Error fetching review stats:', error);
+      clientLogger.error('Error fetching review stats:', { detail: error });
     }
   };
 
@@ -323,7 +324,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       });
       fetchStats();
     } catch (error) {
-      console.error('Error approving review:', error);
+      clientLogger.error('Error approving review:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -355,7 +356,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       });
       fetchStats();
     } catch (error) {
-      console.error('Error rejecting review:', error);
+      clientLogger.error('Error rejecting review:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -388,7 +389,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       setSelectedReviews(new Set());
       fetchStats();
     } catch (error) {
-      console.error('Error bulk approving reviews:', error);
+      clientLogger.error('Error bulk approving reviews:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -420,7 +421,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       setSelectedReviews(new Set());
       fetchStats();
     } catch (error) {
-      console.error('Error bulk rejecting reviews:', error);
+      clientLogger.error('Error bulk rejecting reviews:', { detail: error });
     } finally {
       setProcessingIds(prev => {
         const newSet = new Set(prev);
@@ -484,7 +485,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       setResponseText('');
 
     } catch (error) {
-      console.error('Error submitting response:', error);
+      clientLogger.error('Error submitting response:', { detail: error });
     } finally {
       setSubmittingResponse(false);
     }
@@ -535,7 +536,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
       }
 
     } catch (error) {
-      console.error('Error loading more reviews:', error);
+      clientLogger.error('Error loading more reviews:', { detail: error });
     } finally {
       setLoadingMore(false);
     }

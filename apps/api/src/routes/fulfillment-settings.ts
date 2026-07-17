@@ -5,6 +5,7 @@ import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -83,7 +84,7 @@ router.get('/:tenantId/fulfillment-settings', authenticateToken, async (req, res
       },
     });
   } catch (error) {
-    console.error('Error fetching fulfillment settings:', error);
+    logger.error('Error fetching fulfillment settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -152,7 +153,7 @@ router.get('/public/tenant/:tenantId/fulfillment-settings', async (req, res) => 
       },
     });
   } catch (error) {
-    console.error('Error fetching public fulfillment settings:', error);
+    logger.error('Error fetching public fulfillment settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -231,7 +232,7 @@ router.put('/:tenantId/fulfillment-settings', authenticateToken, requireTenantAd
       },
     });
   } catch (error) {
-    console.error('Error updating fulfillment settings:', error);
+    logger.error('Error updating fulfillment settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

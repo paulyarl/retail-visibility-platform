@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, UserPlus, Loader2, AlertTriangle } from 'lucide-react';
 import { adminUsersService, AdminUser } from '@/services/AdminUsersService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Tenant {
   id: string;
@@ -48,7 +49,7 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
         setFormData(prev => ({ ...prev, tenantId: tenantList[0].id }));
       }
     } catch (err) {
-      console.error('Failed to load tenants:', err);
+      clientLogger.error('Failed to load tenants:', { detail: err });
     } finally {
       setTenantsLoading(false);
     }

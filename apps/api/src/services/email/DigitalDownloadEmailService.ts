@@ -6,6 +6,7 @@
 import { prisma } from '../../prisma';
 import { emailService } from '../email-service';
 import { getOrderNotificationService } from '../OrderNotificationService';
+import { logger } from '../../logger';
 
 interface DownloadEmailData {
   customerEmail: string;
@@ -70,13 +71,13 @@ export class DigitalDownloadEmailService {
             });
           }
         } catch (logError) {
-          console.error('[DigitalDownloadEmail] Failed to log notification:', logError);
+          logger.error('[DigitalDownloadEmail] Failed to log notification:', undefined, { error: { name: (logError as any)?.name || 'Error', message: (logError as any)?.message || String(logError), stack: (logError as any)?.stack } });
         }
       } else {
-        console.error('[DigitalDownloadEmail] Failed to send email:', result.error);
+        logger.error('[DigitalDownloadEmail] Failed to send email:', undefined, { error: { name: 'Error', message: result.error } });
       }
     } catch (error) {
-      console.error('[DigitalDownloadEmail] Error sending email:', error);
+      logger.error('[DigitalDownloadEmail] Error sending email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
 
     if (process.env.NODE_ENV === 'development') {
@@ -317,10 +318,10 @@ Thanks for your business!
       if (result.success) {
         console.log('[DigitalDownloadEmail] Expiration reminder sent to:', data.customerEmail);
       } else {
-        console.error('[DigitalDownloadEmail] Failed to send expiration reminder:', result.error);
+        logger.error('[DigitalDownloadEmail] Failed to send expiration reminder:', undefined, { error: { name: 'Error', message: result.error } });
       }
     } catch (error) {
-      console.error('[DigitalDownloadEmail] Error sending expiration reminder:', error);
+      logger.error('[DigitalDownloadEmail] Error sending expiration reminder:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
 
     if (process.env.NODE_ENV === 'development') {

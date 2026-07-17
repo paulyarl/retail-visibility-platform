@@ -6,6 +6,7 @@
  */
 
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 async function syncReviewRatings() {
   const pool = getDirectPool();
@@ -98,14 +99,14 @@ async function syncReviewRatings() {
         console.log(`  ✓ Updated summary: ${stats.rating_count} reviews, ${Number(stats.rating_avg).toFixed(1)} avg rating`);
         
       } catch (error) {
-        console.error(`  ✗ Error syncing tenant ${tenantId}:`, error);
+        logger.error(`  ✗ Error syncing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
     
     console.log('Review ratings sync completed!');
     
   } catch (error) {
-    console.error('Fatal error during sync:', error);
+    logger.error('Fatal error during sync:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     process.exit(1);
   } finally {
     await pool.end();
@@ -120,7 +121,7 @@ if (require.main === module) {
       process.exit(0);
     })
     .catch((error) => {
-      console.error('Script failed:', error);
+      logger.error('Script failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       process.exit(1);
     });
 }

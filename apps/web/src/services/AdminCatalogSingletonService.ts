@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GlobalCatalogProduct {
   id: string;
@@ -124,7 +125,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to get products:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to get products:', { detail: result.error });
       return null;
     }
 
@@ -151,7 +152,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to get product detail:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to get product detail:', { detail: result.error });
       return null;
     }
 
@@ -169,7 +170,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to get product by UPC:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to get product by UPC:', { detail: result.error });
       return null;
     }
 
@@ -206,7 +207,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to search products:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to search products:', { detail: result.error });
       return null;
     }
 
@@ -233,7 +234,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to get stats:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to get stats:', { detail: result.error });
       return null;
     }
 
@@ -251,7 +252,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to get brands:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to get brands:', { detail: result.error });
       return null;
     }
 
@@ -269,7 +270,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to get categories:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to get categories:', { detail: result.error });
       return null;
     }
 
@@ -290,7 +291,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to update product:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to update product:', { detail: result.error });
       return null;
     }
 
@@ -316,7 +317,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to merge products:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to merge products:', { detail: result.error });
       return null;
     }
 
@@ -344,7 +345,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to bulk assign category:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to bulk assign category:', { detail: result.error });
       return null;
     }
 
@@ -376,7 +377,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to approve product:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to approve product:', { detail: result.error });
       return false;
     }
 
@@ -398,7 +399,7 @@ class AdminCatalogSingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminCatalog] Failed to reject product:', result.error);
+      clientLogger.error('[AdminCatalog] Failed to reject product:', { detail: result.error });
       return false;
     }
 

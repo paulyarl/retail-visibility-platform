@@ -9,6 +9,7 @@ import { CacheManager } from './cacheManager';
 import { resolveCacheOptions, AutoUserCacheOptions } from './userIdentification';
 import { AppContext, CacheIsolation } from './contextCacheManager';
 import { StorageType } from './universalStorageManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // ==================== ENHANCED INTERFACES ====================
 
@@ -711,7 +712,7 @@ export class ContextAwareCacheManager {
         userId: userId
       };
     } catch (error) {
-      console.warn('[ContextAwareCacheManager] Encryption failed, returning original data:', error);
+      clientLogger.warn('[ContextAwareCacheManager] Encryption failed, returning original data:', { detail: error });
       // Fallback to original data if encryption fails
       return data;
     }
@@ -728,7 +729,7 @@ export class ContextAwareCacheManager {
       const decodedString = decodeURIComponent(decryptedString);
       return JSON.parse(decodedString);
     } catch (error) {
-      console.warn('[ContextAwareCacheManager] Decryption failed:', error);
+      clientLogger.warn('[ContextAwareCacheManager] Decryption failed:', { detail: error });
       return data as any;
     }
   }

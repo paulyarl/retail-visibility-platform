@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PlatformStats {
   totalTenants: number;
@@ -61,7 +62,7 @@ class PlatformPublicService extends PublicApiSingleton {
         this.PLATFORM_STATS_TTL
       );
       if (!response.success) {
-        console.error('[PlatformPublicService] Failed to get platform stats:', response.error);
+        clientLogger.error('[PlatformPublicService] Failed to get platform stats:', { detail: response.error });
         return {
           totalTenants: 0,
           totalProducts: 0,
@@ -85,7 +86,7 @@ class PlatformPublicService extends PublicApiSingleton {
         version: '1.0.0'
       };
     } catch (error) {
-      console.error('[PlatformPublicService] Failed to get platform stats:', error);
+      clientLogger.error('[PlatformPublicService] Failed to get platform stats:', { detail: error });
       return {
         totalTenants: 0,
         totalProducts: 0,
@@ -112,7 +113,7 @@ class PlatformPublicService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[PlatformPublicService] Failed to get features showcase config:', response.error);
+        clientLogger.error('[PlatformPublicService] Failed to get features showcase config:', { detail: response.error });
         return {
           mode: 'grid',
           enabled: true,
@@ -128,7 +129,7 @@ class PlatformPublicService extends PublicApiSingleton {
         refreshInterval: 300000 // 5 minutes
       };
     } catch (error) {
-      console.error('[PlatformPublicService] Failed to get features showcase config:', error);
+      clientLogger.error('[PlatformPublicService] Failed to get features showcase config:', { detail: error });
       return {
         mode: 'grid',
         enabled: true,

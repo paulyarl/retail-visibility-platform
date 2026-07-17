@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useFulfillmentCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import Link from 'next/link';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FulfillmentSettings {
   pickup_enabled: boolean;
@@ -91,7 +92,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
         setSettings(response);
       }
     } catch (error) {
-      console.error('Error fetching fulfillment settings:', error);
+      clientLogger.error('Error fetching fulfillment settings:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to load settings' });
     } finally {
       setLoading(false);
@@ -111,7 +112,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
         setTimeout(() => setMessage(null), 3000);
       }
     } catch (error) {
-      console.error('Error saving fulfillment settings:', error);
+      clientLogger.error('Error saving fulfillment settings:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to save settings' });
     } finally {
       setSaving(false);

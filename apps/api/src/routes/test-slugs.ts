@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import tenantSingletonService from '../services/TenantSingletonService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.get('/slug-comparison/:tenantId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Slug Comparison Error]', error);
+    logger.error('[Slug Comparison Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

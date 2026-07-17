@@ -5,68 +5,38 @@ import { z } from 'zod';
 import { resolveDirectoryEntryOptions } from '../services/resolvers/DirectoryEntryOptionsResolver';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { getTierFeatures } from '../services/TierService';
-import { generateStorefrontOptionsSettingsId } from '../lib/id-generator';
+import { generateDirectoryEntrySettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
-// Validation schema for directory entry options
+// Validation schema for directory entry options — only directory-entry-relevant fields
 const directoryEntryOptionsSchema = z.object({
   directory_entry_opt_enabled: z.boolean().optional(),
   directory_entry_layout: z.enum(['classic', 'editorial', 'immersive', 'premium']).optional(),
-  // Shared toggles that directory entry may use
   hours_display: z.boolean().optional(),
   map_display: z.boolean().optional(),
   location_display: z.boolean().optional(),
-  hours_animated: z.boolean().optional(),
-  hours_status: z.boolean().optional(),
   storefront_social_media: z.boolean().optional(),
   storefront_contact: z.boolean().optional(),
   interactive_maps: z.boolean().optional(),
-  qr_codes_512: z.boolean().optional(),
-  qr_codes_1024: z.boolean().optional(),
-  qr_codes_2048: z.boolean().optional(),
-  qr_product: z.boolean().optional(),
-  qr_store: z.boolean().optional(),
-  qr_logo: z.boolean().optional(),
-  qr_directory: z.boolean().optional(),
-  image_gallery_5: z.boolean().optional(),
-  image_gallery_10: z.boolean().optional(),
-  image_gallery_15: z.boolean().optional(),
   enhanced_seo: z.boolean().optional(),
-  storefront_actions: z.boolean().optional(),
   external_link_enabled: z.boolean().optional(),
-  default_qr_resolution: z.string().optional(),
-  default_gallery_limit: z.number().int().min(5).max(15).optional(),
   gallery_display_mode: z.enum(['carousel', 'magazine']).optional(),
 });
 
-// Default settings for directory entry
+// Default settings for directory entry — only directory-entry-relevant fields
 export const DEFAULT_DIRECTORY_ENTRY_SETTINGS = {
   directory_entry_opt_enabled: true,
   directory_entry_layout: 'classic',
   hours_display: true,
   map_display: true,
   location_display: true,
-  hours_animated: true,
-  hours_status: true,
   storefront_social_media: true,
   storefront_contact: true,
   interactive_maps: true,
-  qr_codes_512: false,
-  qr_codes_1024: true,
-  qr_codes_2048: false,
-  qr_product: true,
-  qr_store: true,
-  qr_logo: false,
-  qr_directory: false,
-  image_gallery_5: true,
-  image_gallery_10: false,
-  image_gallery_15: false,
   enhanced_seo: false,
-  storefront_actions: false,
   external_link_enabled: false,
-  default_qr_resolution: '1024',
-  default_gallery_limit: 5,
   gallery_display_mode: 'carousel',
 };
 
@@ -75,9 +45,36 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
   try {
     const { tenantId } = req.params;
 
-    const settings = await prisma.tenant_storefront_options_settings.findUnique({
-      where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } },
+    // Query dedicated directory entry settings table
+    let settings = await prisma.tenant_directory_entry_settings.findUnique({
+      where: { tenant_id: tenantId },
     });
+
+    // Fallback to old table for backward compatibility during transition
+    if (!settings) {
+      const oldSettings = await prisma.tenant_storefront_options_settings.findUnique({
+        where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } },
+      });
+      if (oldSettings) {
+        settings = {
+          id: oldSettings.id,
+          tenant_id: oldSettings.tenant_id,
+          directory_entry_opt_enabled: oldSettings.storefront_opt_enabled ?? true,
+          directory_entry_layout: oldSettings.directory_entry_layout || 'classic',
+          hours_display: oldSettings.hours_display ?? true,
+          map_display: oldSettings.map_display ?? true,
+          location_display: oldSettings.location_display ?? true,
+          storefront_social_media: oldSettings.storefront_social_media ?? true,
+          storefront_contact: oldSettings.storefront_contact ?? true,
+          interactive_maps: oldSettings.interactive_maps ?? true,
+          enhanced_seo: oldSettings.enhanced_seo ?? false,
+          external_link_enabled: oldSettings.external_link_enabled ?? false,
+          gallery_display_mode: (oldSettings as any).gallery_display_mode || 'carousel',
+          created_at: oldSettings.created_at,
+          updated_at: oldSettings.updated_at,
+        } as any;
+      }
+    }
 
     // Resolve tier-gated layout options
     const tenant = await prisma.tenants.findUnique({
@@ -112,36 +109,21 @@ router.get('/:tenantId/directory-entry-options', authenticateToken, async (req, 
     res.json({
       success: true,
       settings: {
-        directory_entry_opt_enabled: settings.storefront_opt_enabled ?? true,
+        directory_entry_opt_enabled: settings.directory_entry_opt_enabled ?? true,
         directory_entry_layout: effectiveLayout,
         hours_display: settings.hours_display,
         map_display: settings.map_display,
         location_display: settings.location_display,
-        hours_animated: settings.hours_animated,
-        hours_status: settings.hours_status,
         storefront_social_media: settings.storefront_social_media,
         storefront_contact: settings.storefront_contact,
         interactive_maps: settings.interactive_maps,
-        qr_codes_512: settings.qr_codes_512,
-        qr_codes_1024: settings.qr_codes_1024,
-        qr_codes_2048: settings.qr_codes_2048,
-        qr_product: settings.qr_product,
-        qr_store: settings.qr_store,
-        qr_logo: settings.qr_logo,
-        qr_directory: settings.qr_directory,
-        image_gallery_5: settings.image_gallery_5,
-        image_gallery_10: settings.image_gallery_10,
-        image_gallery_15: settings.image_gallery_15,
         enhanced_seo: settings.enhanced_seo,
-        storefront_actions: settings.storefront_actions,
         external_link_enabled: settings.external_link_enabled ?? false,
-        default_qr_resolution: settings.default_qr_resolution,
-        default_gallery_limit: settings.default_gallery_limit,
         gallery_display_mode: settings.gallery_display_mode || 'carousel',
       },
     });
   } catch (error) {
-    console.error('Error fetching directory entry options settings:', error);
+    logger.error('Error fetching directory entry options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -180,7 +162,7 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
 
       const tierState = await resolveDirectoryEntryOptions(
         tierFeatures,
-        { storefront_opt_enabled: true, directory_entry_layout: data.directory_entry_layout } as any
+        { directory_entry_opt_enabled: true, directory_entry_layout: data.directory_entry_layout }
       );
       if (!tierState.enabled || !tierState.allowed_layouts.includes(data.directory_entry_layout)) {
         return res.status(403).json({
@@ -191,66 +173,40 @@ router.put('/:tenantId/directory-entry-options', authenticateToken, async (req, 
       }
     }
 
-    // Check if settings exist
-    const existing = await prisma.tenant_storefront_options_settings.findUnique({
-      where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } },
+    // Upsert into dedicated directory entry settings table
+    const settings = await prisma.tenant_directory_entry_settings.upsert({
+      where: { tenant_id: tenantId },
+      update: {
+        ...data,
+        updated_at: new Date(),
+      },
+      create: {
+        id: generateDirectoryEntrySettingsId(tenantId),
+        tenant_id: tenantId,
+        ...data,
+      },
     });
-
-    let settings;
-    if (existing) {
-      settings = await prisma.tenant_storefront_options_settings.update({
-        where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } },
-        data: {
-          ...data,
-          updated_at: new Date(),
-        },
-      });
-    } else {
-      settings = await prisma.tenant_storefront_options_settings.create({
-        data: {
-          id: generateStorefrontOptionsSettingsId(tenantId),
-          tenant_id: tenantId,
-          page_type: 'directory_entry',
-          ...data,
-        },
-      });
-    }
 
     invalidateEffectiveCapabilities(tenantId);
 
     res.json({
       success: true,
       settings: {
-        directory_entry_opt_enabled: settings.storefront_opt_enabled ?? true,
+        directory_entry_opt_enabled: settings.directory_entry_opt_enabled ?? true,
         directory_entry_layout: settings.directory_entry_layout || 'classic',
         hours_display: settings.hours_display,
         map_display: settings.map_display,
         location_display: settings.location_display,
-        hours_animated: settings.hours_animated,
-        hours_status: settings.hours_status,
         storefront_social_media: settings.storefront_social_media,
         storefront_contact: settings.storefront_contact,
         interactive_maps: settings.interactive_maps,
-        qr_codes_512: settings.qr_codes_512,
-        qr_codes_1024: settings.qr_codes_1024,
-        qr_codes_2048: settings.qr_codes_2048,
-        qr_product: settings.qr_product,
-        qr_store: settings.qr_store,
-        qr_logo: settings.qr_logo,
-        qr_directory: settings.qr_directory,
-        image_gallery_5: settings.image_gallery_5,
-        image_gallery_10: settings.image_gallery_10,
-        image_gallery_15: settings.image_gallery_15,
         enhanced_seo: settings.enhanced_seo,
-        storefront_actions: settings.storefront_actions,
         external_link_enabled: settings.external_link_enabled ?? false,
-        default_qr_resolution: settings.default_qr_resolution,
-        default_gallery_limit: settings.default_gallery_limit,
         gallery_display_mode: settings.gallery_display_mode || 'carousel',
       },
     });
   } catch (error) {
-    console.error('Error updating directory entry options settings:', error);
+    logger.error('Error updating directory entry options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

@@ -5,6 +5,7 @@ import { Button, ConfirmDialog } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { Item } from '@/services/itemsDataService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TrashBinClientProps {
   tenantId: string;
@@ -58,7 +59,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
       setItems(itemsData.items || []);
       setCapacity(capacityData);
     } catch (err) {
-      console.error('[TrashBin] Load error:', err);
+      clientLogger.error('[TrashBin] Load error:', { detail: err });
       setError('Failed to load trash bin');
     } finally {
       setLoading(false);
@@ -83,7 +84,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           await itemsSingletonService.restoreItem(item.id);
           await loadTrash();
         } catch (err) {
-          console.error('[TrashBin] Restore error:', err);
+          clientLogger.error('[TrashBin] Restore error:', { detail: err });
           setError('Failed to restore item');
         }
       },
@@ -102,7 +103,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           await itemsSingletonService.purgeItem(item.id);
           await loadTrash();
         } catch (err) {
-          console.error('[TrashBin] Purge error:', err);
+          clientLogger.error('[TrashBin] Purge error:', { detail: err });
           setError('Failed to permanently delete item');
         }
       },
@@ -123,7 +124,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
           await itemsSingletonService.emptyTrash(tenantId, items.map(item => item.id));
           await loadTrash();
         } catch (err) {
-          console.error('[TrashBin] Empty trash error:', err);
+          clientLogger.error('[TrashBin] Empty trash error:', { detail: err });
           setError('Failed to empty trash');
         }
       },

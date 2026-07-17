@@ -464,6 +464,7 @@ export function ProductPurchasePanel({
             size={128}
             showDownload={false}
             className={isQuickCommerce ? 'border-0 shadow-none p-0' : undefined}
+            isPublic
           />
         </div>
       )}

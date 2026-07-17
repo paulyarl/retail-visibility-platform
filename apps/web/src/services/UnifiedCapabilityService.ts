@@ -27,6 +27,9 @@ import {
   StorefrontQrState,
   StorefrontGalleryState,
   StorefrontHoursState,
+  StorefrontLayoutState,
+  StorefrontLayoutType,
+  StorefrontMapsState,
   StorefrontOptionFlags,
   toStorefrontOptionFlags,
   DirectoryEntryOptionsState,
@@ -62,10 +65,10 @@ import {
   StorefrontOptQRContentType,
   StorefrontOptQRDotStyleType,
   StorefrontOptQRCornerStyleType,
+  StorefrontOptQRCornerDotStyleType,
   StorefrontOptGalleryType,
   StorefrontOptGalleryDisplayMode,
   StorefrontOptAdvancedType,
-  StorefrontOptLayoutType,
   FaqManagementType,
   FaqPreviewType,
   FaqDisplayType,
@@ -87,7 +90,10 @@ import {
   WholesaleMatchingState,
   PlatformServicesState,
   PlatformServiceType,
+  FunnelState,
+  FunnelStepType,
 } from './CapabilityResolutionService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // BACKEND RESPONSE TYPES (snake_case)
@@ -119,7 +125,7 @@ interface BackendConstraintStatus {
   active_violations: string[];
 }
 
-interface BackendEffectiveCapabilities {
+export interface BackendEffectiveCapabilities {
   tenant_id: string;
   tier: { key: string; name: string; description: string };
   subscription_context: BackendSubscriptionContext;
@@ -137,6 +143,8 @@ interface BackendEffectiveCapabilities {
     storefront_qr: BackendEffectiveStorefrontQr;
     storefront_gallery: BackendEffectiveStorefrontGallery;
     storefront_hours: BackendEffectiveStorefrontHours;
+    storefront_layouts: BackendEffectiveStorefrontLayouts;
+    storefront_maps: BackendEffectiveStorefrontMaps;
     faq: BackendEffectiveFaq;
     directory_entry: BackendEffectiveDirectoryEntry;
     crm: BackendEffectiveCrm;
@@ -146,6 +154,7 @@ interface BackendEffectiveCapabilities {
     directory_promotion: BackendEffectiveDirectoryPromotion;
     wholesale_matching: BackendEffectiveWholesaleMatching;
     platform_services: BackendEffectivePlatformServices;
+    funnel: BackendEffectiveFunnel;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -322,8 +331,6 @@ interface BackendEffectiveQuickstart {
 interface BackendEffectiveStorefrontOptions {
   enabled: boolean;
   is_flexible: boolean;
-  hours_enabled: boolean;
-  allowed_hours_types: StorefrontOptHoursType[];
   category_enabled: boolean;
   allowed_category_types: StorefrontOptCategoryType[];
   recommend_enabled: boolean;
@@ -331,28 +338,8 @@ interface BackendEffectiveStorefrontOptions {
   recently_viewed_enabled: boolean;
   info_enabled: boolean;
   allowed_info_types: StorefrontOptInfoType[];
-  qr_enabled: boolean;
-  allowed_qr_resolutions: StorefrontOptQRResolutionType[];
-  allowed_qr_content_types: StorefrontOptQRContentType[];
-  qr_styled_enabled: boolean;
-  allowed_qr_dot_styles: string[];
-  allowed_qr_corner_styles: string[];
-  qr_custom_colors: boolean;
-  qr_gradients: boolean;
-  gallery_enabled: boolean;
-  allowed_gallery_types: StorefrontOptGalleryType[];
-  gallery_magazine_enabled: boolean;
-  can_use_magazine_gallery: boolean;
   advanced_enabled: boolean;
   allowed_advanced_types: StorefrontOptAdvancedType[];
-  layout_enabled: boolean;
-  allowed_layouts: StorefrontOptLayoutType[];
-  effective_layout: StorefrontOptLayoutType;
-  can_show_hours_display: boolean;
-  can_use_animated_hours: boolean;
-  can_show_hours_status: boolean;
-  can_show_map_display: boolean;
-  can_show_location_display: boolean;
   can_use_category_store: boolean;
   can_use_category_product: boolean;
   can_use_recommend_store: boolean;
@@ -360,13 +347,30 @@ interface BackendEffectiveStorefrontOptions {
   can_use_recently_viewed: boolean;
   can_use_social_media: boolean;
   can_use_contact: boolean;
-  can_use_interactive_maps: boolean;
-  can_use_qr_codes: boolean;
   can_use_enhanced_seo: boolean;
   can_use_storefront_actions: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontLayouts {
+  enabled: boolean;
+  is_flexible: boolean;
+  layout_enabled: boolean;
+  allowed_layouts: StorefrontLayoutType[];
+  effective_layout: StorefrontLayoutType;
   can_use_layout_classic: boolean;
   can_use_layout_editorial: boolean;
   can_use_layout_immersive: boolean;
+  merchant_preferences: Record<string, any>;
+}
+
+interface BackendEffectiveStorefrontMaps {
+  enabled: boolean;
+  is_flexible: boolean;
+  maps_enabled: boolean;
+  can_show_map_display: boolean;
+  can_show_location_display: boolean;
+  can_use_interactive_maps: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -380,6 +384,7 @@ interface BackendEffectiveStorefrontQr {
   qr_styled_enabled: boolean;
   allowed_qr_dot_styles: string[];
   allowed_qr_corner_styles: string[];
+  allowed_qr_corner_dot_styles: string[];
   qr_custom_colors: boolean;
   qr_gradients: boolean;
   can_use_qr_codes: boolean;
@@ -430,6 +435,12 @@ interface BackendEffectiveFaq {
   merchant_preferences: { faq_enabled?: boolean | null } | null;
 }
 
+interface BackendEffectiveDirectoryEntryMerchantPrefs {
+  directory_entry_opt_enabled: boolean;
+  directory_entry_layout: string;
+  external_link_enabled?: boolean;
+}
+
 interface BackendEffectiveDirectoryEntry {
   enabled: boolean;
   is_flexible: boolean;
@@ -456,7 +467,7 @@ interface BackendEffectiveDirectoryEntry {
   can_show_seo: boolean;
   can_show_external_link: boolean;
   external_link_enabled: boolean;
-  merchant_preferences: Record<string, any>;
+  merchant_preferences: BackendEffectiveDirectoryEntryMerchantPrefs;
 }
 
 interface BackendEffectiveCrm {
@@ -751,8 +762,6 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
   return {
     enabled: b.enabled,
     isFlexible: b.is_flexible,
-    hoursEnabled: b.hours_enabled,
-    allowedHoursTypes: b.allowed_hours_types,
     categoryEnabled: b.category_enabled,
     allowedCategoryTypes: b.allowed_category_types,
     recommendEnabled: b.recommend_enabled,
@@ -760,29 +769,8 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     recentlyViewedEnabled: b.recently_viewed_enabled,
     infoEnabled: b.info_enabled,
     allowedInfoTypes: b.allowed_info_types,
-    qrEnabled: b.qr_enabled,
-    allowedQRResolutions: b.allowed_qr_resolutions,
-    allowedQRContentTypes: b.allowed_qr_content_types,
-    qrStyledEnabled: b.qr_styled_enabled ?? false,
-    allowedQRDotStyles: (b.allowed_qr_dot_styles ?? []) as StorefrontOptQRDotStyleType[],
-    allowedQRCornerStyles: (b.allowed_qr_corner_styles ?? []) as StorefrontOptQRCornerStyleType[],
-    qrCustomColors: b.qr_custom_colors ?? false,
-    qrGradients: b.qr_gradients ?? false,
-    galleryEnabled: b.gallery_enabled,
-    allowedGalleryTypes: b.allowed_gallery_types,
-    galleryMagazineEnabled: b.gallery_magazine_enabled ?? false,
-    canUseMagazineGallery: b.can_use_magazine_gallery ?? false,
-    galleryDisplayMode: ((b.merchant_preferences as any)?.gallery_display_mode as 'carousel' | 'magazine') ?? 'carousel',
     advancedEnabled: b.advanced_enabled,
     allowedAdvancedTypes: b.allowed_advanced_types,
-    layoutEnabled: b.layout_enabled,
-    allowedLayouts: b.allowed_layouts,
-    effectiveLayout: b.effective_layout,
-    canShowHoursDisplay: b.can_show_hours_display,
-    canUseAnimatedHours: b.can_use_animated_hours,
-    canShowHoursStatus: b.can_show_hours_status,
-    canShowMapDisplay: b.can_show_map_display,
-    canShowLocationDisplay: b.can_show_location_display,
     canUseCategoryStore: b.can_use_category_store,
     canUseCategoryProduct: b.can_use_category_product,
     canUseRecommendStore: b.can_use_recommend_store,
@@ -790,13 +778,36 @@ function mapStorefrontOptions(b: BackendEffectiveStorefrontOptions): StorefrontO
     canUseRecentlyViewed: b.can_use_recently_viewed,
     canUseSocialMedia: b.can_use_social_media,
     canUseContact: b.can_use_contact,
-    canUseInteractiveMaps: b.can_use_interactive_maps,
-    canUseQRCodes: b.can_use_qr_codes,
     canUseEnhancedSEO: b.can_use_enhanced_seo,
     canUseStorefrontActions: b.can_use_storefront_actions,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontLayouts(b: BackendEffectiveStorefrontLayouts): StorefrontLayoutState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    layoutEnabled: b.layout_enabled,
+    allowedLayouts: b.allowed_layouts ?? [],
+    effectiveLayout: b.effective_layout ?? 'classic',
     canUseLayoutClassic: b.can_use_layout_classic,
     canUseLayoutEditorial: b.can_use_layout_editorial,
     canUseLayoutImmersive: b.can_use_layout_immersive,
+    merchantPreferences: b.merchant_preferences as any,
+    features: {},
+  };
+}
+
+function mapStorefrontMaps(b: BackendEffectiveStorefrontMaps): StorefrontMapsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    mapsEnabled: b.maps_enabled,
+    canShowMapDisplay: b.can_show_map_display,
+    canShowLocationDisplay: b.can_show_location_display,
+    canUseInteractiveMaps: b.can_use_interactive_maps,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };
@@ -813,6 +824,7 @@ function mapStorefrontQr(b: BackendEffectiveStorefrontQr): StorefrontQrState {
     qrStyledEnabled: b.qr_styled_enabled,
     allowedQRDotStyles: (b.allowed_qr_dot_styles ?? []) as StorefrontOptQRDotStyleType[],
     allowedQRCornerStyles: (b.allowed_qr_corner_styles ?? []) as StorefrontOptQRCornerStyleType[],
+    allowedQRCornerDotStyles: (b.allowed_qr_corner_dot_styles ?? []) as StorefrontOptQRCornerDotStyleType[],
     qrCustomColors: b.qr_custom_colors,
     qrGradients: b.qr_gradients,
     canUseQRCodes: b.can_use_qr_codes,
@@ -880,7 +892,11 @@ function mapDirectoryEntry(b: BackendEffectiveDirectoryEntry): DirectoryEntryOpt
     canShowSeo: b.can_show_seo,
     canShowExternalLink: b.can_show_external_link,
     externalLinkEnabled: b.external_link_enabled,
-    merchantPreferences: b.merchant_preferences as any,
+    merchantPreferences: {
+      directory_entry_opt_enabled: b.merchant_preferences.directory_entry_opt_enabled,
+      directory_entry_layout: (b.merchant_preferences.directory_entry_layout as DirectoryEntryLayoutKey) || 'classic',
+      external_link_enabled: b.merchant_preferences.external_link_enabled,
+    },
     features: {},
   };
 }
@@ -1053,6 +1069,30 @@ function mapPlatformServices(b: BackendEffectivePlatformServices): PlatformServi
   };
 }
 
+interface BackendEffectiveFunnel {
+  enabled: boolean;
+  builder_enabled: boolean;
+  allowed_steps: string[];
+  can_use_order_bump: boolean;
+  can_use_upsell: boolean;
+  can_use_downsell: boolean;
+  can_use_oto: boolean;
+  is_flexible: boolean;
+}
+
+function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
+  return {
+    enabled: b.enabled,
+    builderEnabled: b.builder_enabled,
+    allowedSteps: (b.allowed_steps || []) as FunnelStepType[],
+    canUseOrderBump: b.can_use_order_bump,
+    canUseUpsell: b.can_use_upsell,
+    canUseDownsell: b.can_use_downsell,
+    canUseOto: b.can_use_oto,
+    isFlexible: b.is_flexible,
+  };
+}
+
 function mapWholesaleMatching(b: BackendEffectiveWholesaleMatching): WholesaleMatchingState {
   return {
     enabled: b.enabled,
@@ -1066,7 +1106,7 @@ function mapWholesaleMatching(b: BackendEffectiveWholesaleMatching): WholesaleMa
   };
 }
 
-function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
+export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
   return {
     tierKey: b.tier.key,
     tierName: b.tier.name,
@@ -1098,6 +1138,8 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     storefrontQr: mapStorefrontQr(b.effective.storefront_qr),
     storefrontGallery: mapStorefrontGallery(b.effective.storefront_gallery),
     storefrontHours: mapStorefrontHours(b.effective.storefront_hours),
+    storefrontLayouts: mapStorefrontLayouts(b.effective.storefront_layouts),
+    storefrontMaps: mapStorefrontMaps(b.effective.storefront_maps),
     directoryEntryOptions: mapDirectoryEntry(b.effective.directory_entry),
     faqOptions: mapFaq(b.effective.faq),
     crmOptions: mapCrm(b.effective.crm),
@@ -1106,6 +1148,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
     wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
     platformServices: mapPlatformServices(b.effective.platform_services),
+    funnel: mapFunnel(b.effective.funnel),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1118,7 +1161,7 @@ function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
 // SERVICE
 // ====================
 
-type SsrAuth = { auth0Email?: string; auth0Id?: string };
+export type SsrAuth = { auth0Email?: string; auth0Id?: string };
 
 class UnifiedCapabilityService extends TenantApiSingleton {
   private static instance: UnifiedCapabilityService;
@@ -1151,15 +1194,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
   /** Invalidate cached capabilities for a single tenant (call after merchant gate changes) */
   async invalidateTenantCapabilities(tenantId: string): Promise<void> {
     this.capCache.delete(`${tenantId}-auth`);
-    this.capCache.delete(`${tenantId}-public`);
     await this.invalidateCache(`unified-caps-${tenantId}-auth`);
-    await this.invalidateCache(`unified-caps-${tenantId}-public`);
   }
 
-  private async fetchEffective(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<BackendEffectiveCapabilities | null> {
-    const isPublic = options?.isPublic ?? false;
-    const ssrAuth = options?.ssrAuth;
-    const cachekey = `unified-caps-${tenantId}${isPublic ? '-public' : '-auth'}`;
+  private async fetchEffective(tenantId: string, ssrAuth?: SsrAuth): Promise<BackendEffectiveCapabilities | null> {
+    const cachekey = `unified-caps-${tenantId}-auth`;
 
     // Deduplicate concurrent in-flight requests for the same tenant+scope
     if (this.inFlight.has(cachekey)) {
@@ -1168,41 +1207,26 @@ class UnifiedCapabilityService extends TenantApiSingleton {
 
     const promise = (async (): Promise<BackendEffectiveCapabilities | null> => {
       try {
-        if (isPublic) {
-          const endpoint = `/api/public/tenants/${tenantId}/effective-capabilities`;
-          const result = await this.makePublicRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
-            endpoint,
-            {},
-            cachekey,
-            this.CACHE_TTL
-          );
-          if (!result.success) {
-            console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
-            return null;
+        const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
+        const result = await this.makeDefaultRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
+          endpoint,
+          {},
+          cachekey,
+          this.CACHE_TTL,
+          {
+            context: AppContext.TENANT,
+            isolation: CacheIsolation.TENANT,
+            requestType: RequestType.AUTHENTICATED,
+            ssrAuth
           }
-          return result.data?.data || null;
-        } else {
-          const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
-          const result = await this.makeDefaultRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
-            endpoint,
-            {},
-            cachekey,
-            this.CACHE_TTL,
-            {
-              context: AppContext.TENANT,
-              isolation: CacheIsolation.TENANT,
-              requestType: RequestType.AUTHENTICATED,
-              ssrAuth
-            }
-          );
-          if (!result.success) {
-            console.error('[UnifiedCapabilityService] Failed to fetch capabilities:', result.error);
-            return null;
-          }
-          return result.data?.data || null;
+        );
+        if (!result.success) {
+          clientLogger.error('[UnifiedCapabilityService] Failed to fetch capabilities:', { detail: result.error });
+          return null;
         }
+        return result.data?.data || null;
       } catch (error) {
-        console.error('[UnifiedCapabilityService] Error fetching capabilities:', error);
+        clientLogger.error('[UnifiedCapabilityService] Error fetching capabilities:', { detail: error });
         return null;
       } finally {
         this.inFlight.delete(cachekey);
@@ -1213,14 +1237,14 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return promise;
   }
 
-  async getAllCapabilities(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<AllCapabilitiesState> {
-    const cacheKey = `${tenantId}${options?.isPublic ? '-public' : '-auth'}`;
+  async getAllCapabilities(tenantId: string, ssrAuth?: SsrAuth): Promise<AllCapabilitiesState> {
+    const cacheKey = `${tenantId}-auth`;
     const cached = this.capCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
       return cached.data;
     }
 
-    const raw = await this.fetchEffective(tenantId, options);
+    const raw = await this.fetchEffective(tenantId, ssrAuth);
     if (!raw) {
       throw new Error(`[UnifiedCapabilityService] Unable to resolve capabilities for tenant: ${tenantId}`);
     }
@@ -1230,144 +1254,219 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return mapped;
   }
 
-  async getCommerceState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<CommerceState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getCommerceState(tenantId: string, ssrAuth?: SsrAuth): Promise<CommerceState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.commerce;
   }
 
-  async getPaymentGatewayState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PaymentGatewayState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getPaymentGatewayState(tenantId: string, ssrAuth?: SsrAuth): Promise<PaymentGatewayState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.paymentGateway;
   }
 
-  async getStorefrontState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getStorefrontState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.storefront;
   }
 
-  async getBarcodeScanState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<BarcodeScanState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getBarcodeScanState(tenantId: string, ssrAuth?: SsrAuth): Promise<BarcodeScanState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.barcodeScan;
   }
 
-  async getFulfillmentState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FulfillmentState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getFulfillmentState(tenantId: string, ssrAuth?: SsrAuth): Promise<FulfillmentState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.fulfillment;
   }
 
-  async getProductOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ProductOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getProductOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<ProductOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.productOptions;
   }
 
-  async getProductTypeState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ProductTypeState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getProductTypeState(tenantId: string, ssrAuth?: SsrAuth): Promise<ProductTypeState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.productType;
   }
 
   /** Alias for backward compatibility with old PublicProductOptionsService */
-  async getProductOptionFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ProductOptionsState> {
-    return this.getProductOptionsState(tenantId, options);
+  async getProductOptionFlags(tenantId: string, ssrAuth?: SsrAuth): Promise<ProductOptionsState> {
+    return this.getProductOptionsState(tenantId, ssrAuth);
   }
 
-  async getFeaturedOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FeaturedOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getFeaturedOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<FeaturedOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.featuredOptions;
   }
 
-  async getIntegrationOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<IntegrationOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getIntegrationOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<IntegrationOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.integrationOptions;
   }
 
-  async getQuickstartOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<QuickstartOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getQuickstartOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<QuickstartOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.quickstartOptions;
   }
 
-  async getStorefrontOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getStorefrontOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.storefrontOptions;
   }
 
-  async getStorefrontQrState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontQrState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getStorefrontQrState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontQrState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.storefrontQr;
   }
 
-  async getStorefrontGalleryState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontGalleryState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getStorefrontGalleryState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontGalleryState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.storefrontGallery;
   }
 
-  async getStorefrontHoursState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontHoursState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getStorefrontHoursState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontHoursState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.storefrontHours;
   }
 
-  async getDirectoryEntryOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryEntryOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getStorefrontLayoutsState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontLayoutState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.storefrontLayouts;
+  }
+
+  async getStorefrontMapsState(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontMapsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.storefrontMaps;
+  }
+
+  async getDirectoryEntryOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<DirectoryEntryOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.directoryEntryOptions;
   }
 
-  /** Compatibility alias for old PublicStorefrontOptionsService */
-  async getStorefrontOptionFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<StorefrontOptionFlags> {
-    const state = await this.getStorefrontOptionsState(tenantId, options);
-    return toStorefrontOptionFlags(state);
+  /** Compatibility alias for old PublicStorefrontOptionsService.
+   *  Overlays QR/Gallery/Hours from dedicated domain states onto the legacy flags. */
+  async getStorefrontOptionFlags(tenantId: string, ssrAuth?: SsrAuth): Promise<StorefrontOptionFlags> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    const flags = toStorefrontOptionFlags(all.storefrontOptions);
+
+    // Overlay QR from dedicated storefront_qr domain
+    if (all.storefrontQr) {
+      flags.showQRCodes = all.storefrontQr.canUseQRCodes;
+      flags.showQRStyled = all.storefrontQr.qrStyledEnabled;
+      flags.qrResolutions = all.storefrontQr.allowedQRResolutions as unknown as string[];
+      flags.allowedQRDotStyles = all.storefrontQr.allowedQRDotStyles as unknown as string[];
+      flags.allowedQRCornerStyles = all.storefrontQr.allowedQRCornerStyles as unknown as string[];
+      flags.allowedQRCornerDotStyles = all.storefrontQr.allowedQRCornerDotStyles as unknown as string[];
+      flags.qrCustomColors = all.storefrontQr.qrCustomColors;
+      flags.qrGradients = all.storefrontQr.qrGradients;
+      const qrPrefs = all.storefrontQr.merchantPreferences as any;
+      flags.showQRProduct = qrPrefs?.qr_product ?? false;
+      flags.showQRStore = qrPrefs?.qr_store ?? false;
+      flags.showQRLogo = qrPrefs?.qr_logo ?? false;
+      flags.showQRDirectory = qrPrefs?.qr_directory ?? false;
+      flags.qrResolution = qrPrefs?.default_qr_resolution ?? '512';
+      flags.qrDotType = qrPrefs?.qr_dot_type;
+      flags.qrCornerType = qrPrefs?.qr_corner_type;
+      flags.qrCornerDotType = qrPrefs?.qr_corner_dot_type;
+      flags.qrCornerDotColor = qrPrefs?.qr_corner_dot_color;
+      flags.qrLogoShape = qrPrefs?.qr_logo_shape;
+      flags.qrDotColor = qrPrefs?.qr_dot_color;
+      flags.qrCornerColor = qrPrefs?.qr_corner_color;
+      flags.qrBgColor = qrPrefs?.qr_bg_color;
+      flags.qrGradientEnabled = qrPrefs?.qr_gradient_enabled;
+      flags.qrGradientStart = qrPrefs?.qr_gradient_start;
+      flags.qrGradientEnd = qrPrefs?.qr_gradient_end;
+    }
+
+    // Overlay Gallery from dedicated storefront_gallery domain
+    if (all.storefrontGallery) {
+      flags.galleryDisplayMode = all.storefrontGallery.galleryDisplayMode;
+      flags.canUseMagazineGallery = all.storefrontGallery.canUseMagazineGallery;
+      if (all.storefrontGallery.defaultGalleryLimit) {
+        flags.galleryLimit = all.storefrontGallery.defaultGalleryLimit;
+      }
+    }
+
+    // Overlay Hours from dedicated storefront_hours domain
+    if (all.storefrontHours) {
+      flags.showHoursDisplay = all.storefrontHours.canShowHoursDisplay;
+      flags.showAnimatedHours = all.storefrontHours.canUseAnimatedHours;
+      flags.showHoursStatus = all.storefrontHours.canShowHoursStatus;
+    }
+
+    // Overlay Layouts from dedicated storefront_layouts domain
+    if (all.storefrontLayouts) {
+      flags.storefrontLayout = all.storefrontLayouts.effectiveLayout;
+    }
+
+    // Overlay Maps from dedicated storefront_maps domain
+    if (all.storefrontMaps) {
+      flags.showMapDisplay = all.storefrontMaps.canShowMapDisplay;
+      flags.showLocationDisplay = all.storefrontMaps.canShowLocationDisplay;
+      flags.showInteractiveMaps = all.storefrontMaps.canUseInteractiveMaps;
+    }
+
+    return flags;
   }
 
-  async getFaqOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<FaqOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getFaqOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<FaqOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.faqOptions;
   }
 
   /** Compatibility alias for old PublicFaqService */
-  async getFaqOptionsFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PublicFaqOptionsFlags> {
-    const state = await this.getFaqOptionsState(tenantId, options);
+  async getFaqOptionsFlags(tenantId: string, ssrAuth?: SsrAuth): Promise<PublicFaqOptionsFlags> {
+    const state = await this.getFaqOptionsState(tenantId, ssrAuth);
     return toPublicFaqOptionsFlags(state);
   }
 
-  async getCrmOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<CrmOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getCrmOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<CrmOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.crmOptions;
   }
 
   /** Compatibility alias for old PublicCrmService */
-  async getCrmOptionsFlags(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PublicCrmOptionsFlags> {
-    const state = await this.getCrmOptionsState(tenantId, options);
+  async getCrmOptionsFlags(tenantId: string, ssrAuth?: SsrAuth): Promise<PublicCrmOptionsFlags> {
+    const state = await this.getCrmOptionsState(tenantId, ssrAuth);
     return toPublicCrmOptionsFlags(state);
   }
 
-  async getChatbotOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<ChatbotOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getChatbotOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<ChatbotOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.chatbotOptions;
   }
 
-  async getSocialCommerceOptionsState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<SocialCommerceOptionsState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getSocialCommerceOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<SocialCommerceOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.socialCommerceOptions;
   }
 
-  async getDirectoryPromotionState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<DirectoryPromotionState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getDirectoryPromotionState(tenantId: string, ssrAuth?: SsrAuth): Promise<DirectoryPromotionState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.directoryPromotion;
   }
 
-  async getPlatformServicesState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<PlatformServicesState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getPlatformServicesState(tenantId: string, ssrAuth?: SsrAuth): Promise<PlatformServicesState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.platformServices;
   }
 
-  async getWholesaleMatchingState(tenantId: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<WholesaleMatchingState> {
-    const all = await this.getAllCapabilities(tenantId, options);
+  async getFunnelState(tenantId: string, ssrAuth?: SsrAuth): Promise<FunnelState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.funnel;
+  }
+
+  async getWholesaleMatchingState(tenantId: string, ssrAuth?: SsrAuth): Promise<WholesaleMatchingState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.wholesaleMatching;
   }
 
-  async checkFeatureByCapability(tenantId: string, featureKey: string, options?: { isPublic?: boolean; ssrAuth?: SsrAuth }): Promise<boolean | null> {
+  async checkFeatureByCapability(tenantId: string, featureKey: string, ssrAuth?: SsrAuth): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
 
-    const all = await this.getAllCapabilities(tenantId, options);
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
     const capGroup = (all as any)[capType] as { features: Record<string, boolean> } | undefined;
     if (!capGroup) return false;
 

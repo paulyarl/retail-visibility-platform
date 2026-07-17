@@ -26,6 +26,7 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -51,12 +52,12 @@ export default function OrderDetailPage() {
             const bookings = await customerOrderService.getOrderServiceBookings(result.orderId);
             setServiceBookings(bookings);
           } catch (e) {
-            console.error('Failed to load service bookings:', e);
+            clientLogger.error('Failed to load service bookings:', { detail: e });
           }
         }
       }
     } catch (error) {
-      console.error('Failed to load order:', error);
+      clientLogger.error('Failed to load order:', { detail: error });
     } finally {
       setIsLoading(false);
     }

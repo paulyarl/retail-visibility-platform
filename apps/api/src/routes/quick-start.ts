@@ -19,6 +19,7 @@ import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityRes
 import { generateProductCatId, generateQsCatId, generateQuickStart } from '../lib/id-generator';
 import ProductTypeService from '../services/ProductTypeService';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.get('/scenarios', async (req, res) => {
     ];
     res.json({ scenarios });
   } catch (error: any) {
-    console.error('[Quick Start] Error fetching scenarios:', error);
+    logger.error('[Quick Start] Error fetching scenarios:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch scenarios', message: error.message });
   }
 });
@@ -294,7 +295,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
         });
       }
     } catch (capError: any) {
-      console.error('[Quick Start] Product type capability check failed:', capError);
+      logger.error('[Quick Start] Product type capability check failed:', undefined, { error: { name: (capError as any)?.name || 'Error', message: (capError as any)?.message || String(capError), stack: (capError as any)?.stack } });
       // Continue with generation — fail open
     }
 
@@ -338,7 +339,7 @@ router.post('/tenants/:tenantId/quick-start', authenticateToken, requireWritable
         : 'Products created successfully!',
     });
   } catch (error: any) {
-    console.error('[Quick Start] Error:', error);
+    logger.error('[Quick Start] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     if (error.message.includes('not found')) {
       return res.status(404).json({ error: 'Tenant not found', message: error.message });
@@ -497,7 +498,7 @@ router.get('/tenants/:tenantId/quick-start/eligibility', authenticateToken, asyn
         : `You have ${productCount} products (limit: ${productLimit}). Quick Start is not available.`,
     });
   } catch (error: any) {
-    console.error('[Quick Start] Error checking eligibility:', error);
+    logger.error('[Quick Start] Error checking eligibility:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to check eligibility', message: error.message });
   }
 });
@@ -1007,7 +1008,7 @@ router.post('/tenants/:tenantId/categories/quick-start', authenticateToken, requ
       ...(responseMessage && { message: responseMessage }),
     });
   } catch (error: any) {
-    console.error('[Category Quick Start] Error:', error);
+    logger.error('[Category Quick Start] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to generate categories',
       message: error.message,

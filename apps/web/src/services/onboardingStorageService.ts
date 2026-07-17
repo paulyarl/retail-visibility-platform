@@ -1,4 +1,5 @@
 import { BusinessProfile } from '@/lib/validation/businessProfile';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OnboardingProgress {
   currentStep: number;
@@ -91,7 +92,7 @@ export class OnboardingStorageService {
 
       return base64Result;
     } catch (error) {
-      console.error('[OnboardingStorageService] Encryption failed:', error);
+      clientLogger.error('[OnboardingStorageService] Encryption failed:', { detail: error });
       throw new Error('Failed to encrypt onboarding data');
     }
   }
@@ -133,7 +134,7 @@ export class OnboardingStorageService {
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch (error) {
-      console.error('[OnboardingStorageService] Decryption failed:', error);
+      clientLogger.error('[OnboardingStorageService] Decryption failed:', { detail: error });
       throw new Error(`Failed to decrypt onboarding data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -165,7 +166,7 @@ export class OnboardingStorageService {
         businessData: data.businessData || {},
       };
     } catch (error) {
-      console.error('[OnboardingStorageService] Failed to load progress:', error);
+      clientLogger.error('[OnboardingStorageService] Failed to load progress:', { detail: error });
       // If decryption fails, try to clear corrupted data
       this.clear(tenantId);
       return null;
@@ -185,7 +186,7 @@ export class OnboardingStorageService {
 
       localStorage.setItem(this.getKey(tenantId), encryptedData);
     } catch (error) {
-      console.error('[OnboardingStorageService] Failed to save progress:', error);
+      clientLogger.error('[OnboardingStorageService] Failed to save progress:', { detail: error });
       // If encryption fails, don't save (better to lose progress than corrupt data)
     }
   }
@@ -199,7 +200,7 @@ export class OnboardingStorageService {
     try {
       localStorage.removeItem(this.getKey(tenantId));
     } catch (error) {
-      console.error('[OnboardingStorageService] Failed to clear progress:', error);
+      clientLogger.error('[OnboardingStorageService] Failed to clear progress:', { detail: error });
     }
   }
 
@@ -228,7 +229,7 @@ export class OnboardingStorageService {
       console.log('[OnboardingStorageService] Updating business data with:', updates);
       await this.save(tenantId, updatedProgress);
     } catch (error) {
-      console.error('[OnboardingStorageService] Failed to update business data:', error);
+      clientLogger.error('[OnboardingStorageService] Failed to update business data:', { detail: error });
     }
   }
 }

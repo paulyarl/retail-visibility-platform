@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Device information utilities for enhanced session tracking
  */
@@ -54,7 +56,7 @@ export function getDeviceName(): string {
     return 'Unknown Device';
 
   } catch (error) {
-    console.warn('Failed to get device name:', error);
+    clientLogger.warn('Failed to get device name:', { detail: error });
     return 'Unknown Device';
   }
 }
@@ -82,7 +84,7 @@ export function getDeviceInfoHeader(): string {
     const deviceInfo = getDeviceInfo();
     return JSON.stringify(deviceInfo);
   } catch (error) {
-    console.warn('Failed to generate device info header:', error);
+    clientLogger.warn('Failed to generate device info header:', { detail: error });
     return JSON.stringify({ name: 'Unknown Device' });
   }
 }

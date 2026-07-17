@@ -14,11 +14,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import {
-  useCommerceCapability,
-  usePaymentGatewayCapability,
-  useStorefrontCapability,
-  useProductOptionsCapability,
-} from '@/hooks/tenant-access/useCapabilityAccess';
+  usePublicCommerceCapability,
+  usePublicPaymentGatewayCapability,
+  usePublicStorefrontCapability,
+  usePublicProductOptionsCapability,
+} from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { storefrontService } from '@/services/StorefrontService';
@@ -193,8 +193,12 @@ export function useProductDetailState({
     contextGatewayType ?? (product as any).defaultGatewayType;
 
   // ---- Capability flags (commerce / payment / storefront) ----
-  const commerceCap = useCommerceCapability(product.tenantId);
-  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  // Skip client-side hooks when server-provided flags are available (public pages)
+  const skipClientCaps = !!initialOptFlags;
+  // console.log(`initialOptFlags > useProductDetailState: ${JSON.stringify(initialOptFlags)}`);
+  // console.log(`skipClientCaps > useProductDetailState: ${JSON.stringify(skipClientCaps)}`);
+  const commerceCap = usePublicCommerceCapability(product.tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(product.tenantId);
   const commerceEnabled = commerceCap.data?.enabled ?? true;
   const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
   const commerceDisabled = !!(
@@ -204,7 +208,7 @@ export function useProductDetailState({
   const effectiveCanPurchase =
     effectiveCanPurchaseLegacy && commerceEnabled && gatewayCapEnabled;
 
-  const storefrontCap = useStorefrontCapability(product.tenantId);
+  const storefrontCap = usePublicStorefrontCapability(product.tenantId);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore =
     storefrontCap.data?.type === 'retail' ||
@@ -226,7 +230,7 @@ export function useProductDetailState({
 
   // ---- Product option flags (decoupled from storefront) ----
   // Use server-provided flags on public pages to avoid calling private APIs
-  const productOptionsCap = useProductOptionsCapability(
+  const productOptionsCap = usePublicProductOptionsCapability(
     serverProductOptFlags ? null : product.tenantId
   );
   const productOptState = serverProductOptFlags ?? productOptionsCap.data;

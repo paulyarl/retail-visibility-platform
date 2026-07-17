@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getContrastColor } from '@/lib/color-utils';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -61,7 +62,7 @@ export default function TenantTicketDetailPage() {
         const related = (activityList ?? []).filter((a: any) => a.ticket_id === ticketId);
         setActivities(related);
       } catch (err) {
-        console.error('[Tenant Ticket Detail] Load error:', err);
+        clientLogger.error('[Tenant Ticket Detail] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -81,7 +82,7 @@ export default function TenantTicketDetailPage() {
       setReply('');
       setIsInternal(false);
     } catch (err) {
-      console.error('[Tenant Ticket Detail] Reply error:', err);
+      clientLogger.error('[Tenant Ticket Detail] Reply error:', { detail: err });
     } finally {
       setSubmitting(false);
     }
@@ -93,7 +94,7 @@ export default function TenantTicketDetailPage() {
       const related = (activityList ?? []).filter((a: any) => a.ticket_id === ticketId);
       setActivities(related);
     } catch (err) {
-      console.error('[Tenant Ticket Detail] Activity refresh error:', err);
+      clientLogger.error('[Tenant Ticket Detail] Activity refresh error:', { detail: err });
     }
   }
 
@@ -112,7 +113,7 @@ export default function TenantTicketDetailPage() {
       setTicket(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Ticket Detail] Status change error:', err);
+      clientLogger.error('[Tenant Ticket Detail] Status change error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -127,7 +128,7 @@ export default function TenantTicketDetailPage() {
       setTicket(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Ticket Detail] Priority change error:', err);
+      clientLogger.error('[Tenant Ticket Detail] Priority change error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -142,7 +143,7 @@ export default function TenantTicketDetailPage() {
       setTicket(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Ticket Detail] Assign change error:', err);
+      clientLogger.error('[Tenant Ticket Detail] Assign change error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -157,7 +158,7 @@ export default function TenantTicketDetailPage() {
       setTicket(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Ticket Detail] Category change error:', err);
+      clientLogger.error('[Tenant Ticket Detail] Category change error:', { detail: err });
     } finally {
       setUpdating(false);
     }

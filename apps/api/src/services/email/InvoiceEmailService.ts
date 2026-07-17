@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 interface PlatformBranding {
   platformName: string;
@@ -127,10 +128,10 @@ export class InvoiceEmailService {
       if (result.success) {
         console.log(`[InvoiceEmailService] Invoice email sent successfully to ${data.customerEmail}`);
       } else {
-        console.error(`[InvoiceEmailService] Failed to send invoice email:`, result.error);
+        logger.error(`[InvoiceEmailService] Failed to send invoice email:`, undefined, { error: { name: 'Error', message: result.error } });
       }
     } catch (error) {
-      console.error('[InvoiceEmailService] Error sending invoice email:', error);
+      logger.error('[InvoiceEmailService] Error sending invoice email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

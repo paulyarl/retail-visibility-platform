@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { platformDashboardService } from '@/services/PlatformDashboardSingletonService';
 import { publicPlatformDashboardService } from '@/services/PublicPlatformDashboardService';
 import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from '@/services/interfaces/PlatformDashboardInterfaces';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface UsePlatformCompleteProps {
   isAuthenticated: boolean;
@@ -64,7 +65,7 @@ export function usePlatformComplete({ isAuthenticated, loadSecondary = true }: U
         }
         return data;
       } catch (error) {
-        console.warn('[usePlatformComplete] Stats fetch failed:', error);
+        clientLogger.warn('[usePlatformComplete] Stats fetch failed:', { detail: error });
         throw error;
       }
     },
@@ -87,7 +88,7 @@ export function usePlatformComplete({ isAuthenticated, loadSecondary = true }: U
         if (!data) return []; // Return empty instead of throwing
         return data;
       } catch (error) {
-        console.warn('[usePlatformComplete] TopTenants fetch failed, returning empty:', error);
+        clientLogger.warn('[usePlatformComplete] TopTenants fetch failed, returning empty:', { detail: error });
         return []; // Return empty on error to prevent cascading
       }
     },
@@ -108,7 +109,7 @@ export function usePlatformComplete({ isAuthenticated, loadSecondary = true }: U
         if (!data) return []; // Return empty instead of throwing
         return data;
       } catch (error) {
-        console.warn('[usePlatformComplete] Activity fetch failed, returning empty:', error);
+        clientLogger.warn('[usePlatformComplete] Activity fetch failed, returning empty:', { detail: error });
         return []; // Return empty on error to prevent cascading
       }
     },
@@ -301,7 +302,7 @@ export function useClearPlatformCache(): {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to clear cache';
       setError(errorMessage);
-      console.error('[useClearPlatformCache] Error:', err);
+      clientLogger.error('[useClearPlatformCache] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

@@ -22,7 +22,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): State {
     // Ignore DOM manipulation errors in development
     if (error.message.includes('Node.removeChild') || error.message.includes('removeChild')) {
-      console.warn('Ignoring React DOM manipulation error (development only):', error.message);
+      clientLogger.warn('Ignoring React DOM manipulation error (development only):', { detail: error.message });
       return { hasError: false };
     }
     return { hasError: true, error };
@@ -31,11 +31,11 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: any) {
     // Only log serious errors, ignore DOM manipulation warnings
     if (!error.message.includes('Node.removeChild') && !error.message.includes('removeChild')) {
-      clientLogger.error(`ErrorBoundary: ${error.message}`, {
+      clientLogger.error(error, {
         componentStack: errorInfo?.componentStack || 'No component stack available',
       });
     } else {
-      console.warn('ErrorBoundary ignored React DOM manipulation error (development only):', error.message);
+      clientLogger.warn('ErrorBoundary ignored React DOM manipulation error (development only):', { detail: error.message });
     }
   }
 

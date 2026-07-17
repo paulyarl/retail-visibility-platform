@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -150,7 +151,7 @@ router.get('/analytics', async (req: Request, res: Response) => {
       analytics
     });
   } catch (error: any) {
-    console.error('[Admin Enrichment] Error loading analytics:', error);
+    logger.error('[Admin Enrichment] Error loading analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to load enrichment analytics'
@@ -277,7 +278,7 @@ router.get('/search', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Admin Enrichment] Error searching products:', error);
+    logger.error('[Admin Enrichment] Error searching products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to search products'
@@ -334,7 +335,7 @@ router.get('/:barcode', async (req: Request, res: Response) => {
       product: transformedProduct
     });
   } catch (error: any) {
-    console.error('[Admin Enrichment] Error loading product details:', error);
+    logger.error('[Admin Enrichment] Error loading product details:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to load product details'

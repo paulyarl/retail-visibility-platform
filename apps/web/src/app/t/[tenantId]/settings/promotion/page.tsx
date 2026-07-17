@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Star, TrendingUp, Eye, MousePointer, Calendar, DollarSign, Check, X, CreditCard, RefreshCw, History, Lock } from 'lucide-react';
 import { DirectoryPromotionService, PromotionPlan, PromotionPurchase } from '@/services/DirectoryPromotionService';
 import { useDirectoryPromotionCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { clientLogger } from '@/lib/client-logger';
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: ['Gold marker on map', 'Promoted badge', 'Higher visibility', 'Basic analytics'],
@@ -36,7 +37,7 @@ export default function PromotionSettingsPage({ tenantId: propTenantId }: { tena
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: promoCapability, loading: capLoading } = useDirectoryPromotionCapability(tenantId, { forTenant: true });
+  const { data: promoCapability, loading: capLoading } = useDirectoryPromotionCapability(tenantId);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -55,7 +56,7 @@ export default function PromotionSettingsPage({ tenantId: propTenantId }: { tena
         setSelectedPlanKey((firstPremium || plansData[0]).planKey);
       }
     } catch (err) {
-      console.error('Error fetching promotion data:', err);
+      clientLogger.error('Error fetching promotion data:', { detail: err });
       setError('Failed to load promotion data. Please try again.');
     } finally {
       setLoading(false);

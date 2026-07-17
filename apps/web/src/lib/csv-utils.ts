@@ -3,6 +3,7 @@
  */
 
 import { generateSKU, generateTenantKey } from './sku-generator';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CSVItem {
   itemStatus: string | undefined;
@@ -213,7 +214,7 @@ export function parseCSV(csvText: string): CSVItem[] {
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]);
     if (values.length !== headers.length) {
-      console.warn(`Line ${i + 1} has ${values.length} values but expected ${headers.length}`);
+      clientLogger.warn(`Line ${i + 1} has ${values.length} values but expected ${headers.length}`);
       continue;
     }
 
@@ -247,7 +248,7 @@ export function parseCSV(csvText: string): CSVItem[] {
 
       items.push(validatedItem);
     } catch (error) {
-      console.error(`Error parsing line ${i + 1}:`, error);
+      clientLogger.error(`Error parsing line ${i + 1}:`, { detail: error });
       throw new Error(`Line ${i + 1}: ${error instanceof Error ? error.message : 'Invalid data'}`);
     }
   }

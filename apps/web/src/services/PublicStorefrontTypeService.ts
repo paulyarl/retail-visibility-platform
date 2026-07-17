@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type StorefrontTypeValue = 'online' | 'retail' | 'service' | 'social' | 'flexible' | 'none';
 
@@ -57,7 +58,7 @@ class PublicStorefrontTypeService extends PublicApiSingleton {
    */
   async getStorefrontTypeSettings(tenantId: string): Promise<StorefrontTypeResponse | null> {
     if (!tenantId) {
-      console.error('[PublicStorefrontType] getStorefrontTypeSettings: tenantId is required');
+      clientLogger.error('[PublicStorefrontType] getStorefrontTypeSettings: tenantId is required');
       return null;
     }
 
@@ -70,7 +71,7 @@ class PublicStorefrontTypeService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[PublicStorefrontType] Failed to get settings:', result.error);
+        clientLogger.error('[PublicStorefrontType] Failed to get settings:', { detail: result.error });
         return null;
       }
 
@@ -81,7 +82,7 @@ class PublicStorefrontTypeService extends PublicApiSingleton {
         tierState: result.data.tierState,
       };
     } catch (error) {
-      console.error('[PublicStorefrontType] Failed to get settings:', error);
+      clientLogger.error('[PublicStorefrontType] Failed to get settings:', { detail: error });
       return null;
     }
   }
@@ -98,7 +99,7 @@ class PublicStorefrontTypeService extends PublicApiSingleton {
         selected_storefront_type: s.selected_storefront_type || 'online',
       } : null;
     } catch (error) {
-      console.error('[getStorefrontTypeSettings] Failed to get storefront type settings:', error);
+      clientLogger.error('[getStorefrontTypeSettings] Failed to get storefront type settings:', { detail: error });
       return null;
     }
   }

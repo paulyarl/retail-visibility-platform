@@ -7,6 +7,7 @@ import { z } from 'zod';
 import StorefrontOptionsService from '../services/StorefrontOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateStorefrontOptionsSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -14,12 +15,6 @@ const router = Router();
 const storefrontOptionsSettingsSchema = z.object({
   storefront_opt_enabled: z.boolean().optional(),
   // Section Display
-  hours_display: z.boolean().optional(),
-  map_display: z.boolean().optional(),
-  location_display: z.boolean().optional(),
-  // Store Hours group
-  hours_animated: z.boolean().optional(),
-  hours_status: z.boolean().optional(),
   // Category Display group
   category_store: z.boolean().optional(),
   category_product: z.boolean().optional(),
@@ -31,48 +26,14 @@ const storefrontOptionsSettingsSchema = z.object({
   // Store Information group
   storefront_social_media: z.boolean().optional(),
   storefront_contact: z.boolean().optional(),
-  interactive_maps: z.boolean().optional(),
-  // QR Code Display group
-  qr_codes_512: z.boolean().optional(),
-  qr_codes_1024: z.boolean().optional(),
-  qr_codes_2048: z.boolean().optional(),
-  qr_product: z.boolean().optional(),
-  qr_store: z.boolean().optional(),
-  qr_logo: z.boolean().optional(),
-  qr_directory: z.boolean().optional(),
-  // QR Code Style group
-  qr_dot_type: z.string().optional(),
-  qr_corner_type: z.string().optional(),
-  qr_dot_color: z.string().optional(),
-  qr_corner_color: z.string().optional(),
-  qr_bg_color: z.string().optional(),
-  qr_gradient_enabled: z.boolean().optional(),
-  qr_gradient_start: z.string().optional(),
-  qr_gradient_end: z.string().optional(),
-  // Gallery Display group
-  image_gallery_5: z.boolean().optional(),
-  image_gallery_10: z.boolean().optional(),
-  image_gallery_15: z.boolean().optional(),
-  // Gallery Display Mode
-  gallery_display_mode: z.enum(['carousel', 'magazine']).optional(),
   // Advanced group
   enhanced_seo: z.boolean().optional(),
   storefront_actions: z.boolean().optional(),
-  // Layout selection
-  storefront_layout: z.enum(['classic', 'editorial', 'immersive']).optional(),
-  // Defaults
-  default_qr_resolution: z.string().optional(),
-  default_gallery_limit: z.number().int().min(5).max(15).optional(),
 });
 
-// Default settings
+// Default settings (core only — QR, Gallery, Hours have dedicated settings routes)
 export const DEFAULT_SETTINGS = {
   storefront_opt_enabled: true,
-  hours_display: true,
-  hours_animated: true,
-  hours_status: true,
-  map_display: true,
-  location_display: true,
   category_store: true,
   category_product: true,
   recommend_store: true,
@@ -80,32 +41,8 @@ export const DEFAULT_SETTINGS = {
   recently_viewed: true,
   storefront_social_media: true,
   storefront_contact: true,
-  interactive_maps: true,
-  qr_codes_512: false,
-  qr_codes_1024: true,
-  qr_codes_2048: false,
-  qr_product: true,
-  qr_store: true,
-  qr_logo: false,
-  qr_directory: false,
-  qr_dot_type: 'rounded',
-  qr_corner_type: 'extra-rounded',
-  qr_dot_color: '#1a56db',
-  qr_corner_color: '#1a56db',
-  qr_bg_color: '#ffffff',
-  qr_gradient_enabled: false,
-  qr_gradient_start: '#1a56db',
-  qr_gradient_end: '#7c3aed',
-  image_gallery_5: true,
-  image_gallery_10: false,
-  image_gallery_15: false,
-  gallery_display_mode: 'carousel',
   enhanced_seo: false,
   storefront_actions: false,
-  storefront_layout: 'classic',
-  directory_entry_layout: 'classic',
-  default_qr_resolution: '1024',
-  default_gallery_limit: 5,
 };
 
 // Get storefront options settings for a tenant
@@ -122,8 +59,6 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
         success: true,
         settings: {
           storefront_opt_enabled: false,
-          hours_animated: false,
-          hours_status: false,
           category_store: false,
           category_product: false,
           recommend_store: false,
@@ -131,31 +66,8 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
           recently_viewed: false,
           storefront_social_media: false,
           storefront_contact: false,
-          interactive_maps: false,
-          qr_codes_512: false,
-          qr_codes_1024: false,
-          qr_codes_2048: false,
-          qr_product: false,
-          qr_store: false,
-          qr_logo: false,
-          qr_directory: false,
-          qr_dot_type: 'rounded',
-          qr_corner_type: 'extra-rounded',
-          qr_dot_color: '#1a56db',
-          qr_corner_color: '#1a56db',
-          qr_bg_color: '#ffffff',
-          qr_gradient_enabled: false,
-          qr_gradient_start: '#1a56db',
-          qr_gradient_end: '#7c3aed',
-          image_gallery_5: false,
-          image_gallery_10: false,
-          image_gallery_15: false,
-          gallery_display_mode: 'carousel',
           enhanced_seo: false,
           storefront_actions: false,
-          storefront_layout: 'classic',
-          default_qr_resolution: '1024',
-          default_gallery_limit: 5,
         },
         tierState,
       });
@@ -172,9 +84,6 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
       storefront_opt_enabled: !!rawSettings.storefront_opt_enabled && tierState.enabled,
     };
 
-    // Hours group
-    tierFilteredSettings.hours_animated = tierState.allowedHoursTypes.includes('hours_animated') ? !!rawSettings.hours_animated : false;
-    tierFilteredSettings.hours_status = tierState.allowedHoursTypes.includes('hours_status') ? !!rawSettings.hours_status : false;
     // Category group
     tierFilteredSettings.category_store = tierState.allowedCategoryTypes.includes('category_store') ? !!rawSettings.category_store : false;
     tierFilteredSettings.category_product = tierState.allowedCategoryTypes.includes('category_product') ? !!rawSettings.category_product : false;
@@ -186,54 +95,9 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
     // Info group
     tierFilteredSettings.storefront_social_media = tierState.allowedInfoTypes.includes('storefront_social_media') ? !!rawSettings.storefront_social_media : false;
     tierFilteredSettings.storefront_contact = tierState.allowedInfoTypes.includes('storefront_contact') ? !!rawSettings.storefront_contact : false;
-    tierFilteredSettings.interactive_maps = tierState.allowedInfoTypes.includes('interactive_maps') ? !!rawSettings.interactive_maps : false;
-    // QR group
-    tierFilteredSettings.qr_codes_512 = tierState.allowedQRResolutions.includes('qr_codes_512') ? !!rawSettings.qr_codes_512 : false;
-    tierFilteredSettings.qr_codes_1024 = tierState.allowedQRResolutions.includes('qr_codes_1024') ? !!rawSettings.qr_codes_1024 : false;
-    tierFilteredSettings.qr_codes_2048 = tierState.allowedQRResolutions.includes('qr_codes_2048') ? !!rawSettings.qr_codes_2048 : false;
-    tierFilteredSettings.qr_product = tierState.allowedQRContentTypes.includes('qr_product') ? !!rawSettings.qr_product : false;
-    tierFilteredSettings.qr_store = tierState.allowedQRContentTypes.includes('qr_store') ? !!rawSettings.qr_store : false;
-    tierFilteredSettings.qr_logo = tierState.allowedQRContentTypes.includes('qr_logo') ? !!rawSettings.qr_logo : false;
-    tierFilteredSettings.qr_directory = tierState.allowedQRContentTypes.includes('qr_directory') ? !!rawSettings.qr_directory : false;
-    // QR Style group (pass through merchant prefs, but reset to defaults if tier doesn't allow styled QR)
-    if (tierState.qrStyledEnabled) {
-      tierFilteredSettings.qr_dot_type = rawSettings.qr_dot_type || 'rounded';
-      tierFilteredSettings.qr_corner_type = rawSettings.qr_corner_type || 'extra-rounded';
-      tierFilteredSettings.qr_dot_color = rawSettings.qr_dot_color || '#1a56db';
-      tierFilteredSettings.qr_corner_color = rawSettings.qr_corner_color || '#1a56db';
-      tierFilteredSettings.qr_bg_color = rawSettings.qr_bg_color || '#ffffff';
-      tierFilteredSettings.qr_gradient_enabled = tierState.qrGradients ? !!rawSettings.qr_gradient_enabled : false;
-      tierFilteredSettings.qr_gradient_start = rawSettings.qr_gradient_start || '#1a56db';
-      tierFilteredSettings.qr_gradient_end = rawSettings.qr_gradient_end || '#7c3aed';
-    } else {
-      tierFilteredSettings.qr_dot_type = 'rounded';
-      tierFilteredSettings.qr_corner_type = 'extra-rounded';
-      tierFilteredSettings.qr_dot_color = '#1a56db';
-      tierFilteredSettings.qr_corner_color = '#1a56db';
-      tierFilteredSettings.qr_bg_color = '#ffffff';
-      tierFilteredSettings.qr_gradient_enabled = false;
-      tierFilteredSettings.qr_gradient_start = '#1a56db';
-      tierFilteredSettings.qr_gradient_end = '#7c3aed';
-    }
-    // Gallery group
-    tierFilteredSettings.image_gallery_5 = tierState.allowedGalleryTypes.includes('image_gallery_5') ? !!rawSettings.image_gallery_5 : false;
-    tierFilteredSettings.image_gallery_10 = tierState.allowedGalleryTypes.includes('image_gallery_10') ? !!rawSettings.image_gallery_10 : false;
-    tierFilteredSettings.image_gallery_15 = tierState.allowedGalleryTypes.includes('image_gallery_15') ? !!rawSettings.image_gallery_15 : false;
-    // Gallery display mode (tier-gated: magazine requires galleryMagazineEnabled)
-    tierFilteredSettings.gallery_display_mode = (tierState.galleryMagazineEnabled && rawSettings.gallery_display_mode === 'magazine') ? 'magazine' : 'carousel';
     // Advanced group
     tierFilteredSettings.enhanced_seo = tierState.allowedAdvancedTypes.includes('enhanced_seo') ? !!rawSettings.enhanced_seo : false;
     tierFilteredSettings.storefront_actions = tierState.allowedAdvancedTypes.includes('storefront_actions') ? !!rawSettings.storefront_actions : false;
-    // Layout
-    const allowedLayouts = tierState.allowedLayouts;
-    const effectiveLayout: 'classic' | 'editorial' | 'immersive' =
-      allowedLayouts.includes(rawSettings.storefront_layout as 'classic' | 'editorial' | 'immersive')
-        ? rawSettings.storefront_layout as 'classic' | 'editorial' | 'immersive'
-        : (allowedLayouts[0] || 'classic');
-    tierFilteredSettings.storefront_layout = effectiveLayout;
-    // Defaults (not tier-gated)
-    tierFilteredSettings.default_qr_resolution = rawSettings.default_qr_resolution ?? '1024';
-    tierFilteredSettings.default_gallery_limit = rawSettings.default_gallery_limit ?? 5;
 
     res.json({
       success: true,
@@ -241,7 +105,7 @@ router.get('/:tenantId/storefront-options', authenticateToken, async (req, res) 
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching storefront options settings:', error);
+    logger.error('Error fetching storefront options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -270,43 +134,6 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
     }
 
     const data = validationResult.data;
-
-    // Enforce tier gate for layout selection
-    if (data.storefront_layout) {
-      const tierState = await StorefrontOptionsService.getInstance().resolveStorefrontOptionsState(tenantId);
-      if (!tierState.enabled || !tierState.allowedLayouts.includes(data.storefront_layout)) {
-        return res.status(403).json({
-          success: false,
-          error: 'tier_restricted',
-          message: `Layout '${data.storefront_layout}' is not available on your current plan`,
-        });
-      }
-    }
-
-    // Enforce tier gate for gallery display mode
-    if (data.gallery_display_mode === 'magazine') {
-      const tierState = await StorefrontOptionsService.getInstance().resolveStorefrontOptionsState(tenantId);
-      if (!tierState.enabled || !tierState.galleryMagazineEnabled) {
-        return res.status(403).json({
-          success: false,
-          error: 'tier_restricted',
-          message: 'Magazine gallery display mode is not available on your current plan',
-        });
-      }
-    }
-
-    // Enforce radio logic for gallery: only one of image_gallery_5/10/15 can be true
-    if (data.image_gallery_5 || data.image_gallery_10 || data.image_gallery_15) {
-      const galleryKeys = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'] as const;
-      const trueKeys = galleryKeys.filter(k => data[k] === true);
-      if (trueKeys.length > 1) {
-        // Keep only the highest-value true key
-        const winner = trueKeys[trueKeys.length - 1];
-        for (const k of galleryKeys) {
-          if (k !== winner) data[k] = false;
-        }
-      }
-    }
 
     // Check if settings exist
     const existing = await prisma.tenant_storefront_options_settings.findUnique({
@@ -341,8 +168,6 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
       success: true,
       settings: {
         storefront_opt_enabled: settings.storefront_opt_enabled,
-        hours_animated: settings.hours_animated,
-        hours_status: settings.hours_status,
         category_store: settings.category_store,
         category_product: settings.category_product,
         recommend_store: settings.recommend_store,
@@ -350,27 +175,12 @@ router.put('/:tenantId/storefront-options', authenticateToken, requireTenantAdmi
         recently_viewed: settings.recently_viewed,
         storefront_social_media: settings.storefront_social_media,
         storefront_contact: settings.storefront_contact,
-        interactive_maps: settings.interactive_maps,
-        qr_codes_512: settings.qr_codes_512,
-        qr_codes_1024: settings.qr_codes_1024,
-        qr_codes_2048: settings.qr_codes_2048,
-        qr_product: settings.qr_product,
-        qr_store: settings.qr_store,
-        qr_logo: settings.qr_logo,
-        qr_directory: settings.qr_directory,
-        image_gallery_5: settings.image_gallery_5,
-        image_gallery_10: settings.image_gallery_10,
-        image_gallery_15: settings.image_gallery_15,
-        gallery_display_mode: settings.gallery_display_mode || 'carousel',
         enhanced_seo: settings.enhanced_seo,
         storefront_actions: settings.storefront_actions,
-        storefront_layout: settings.storefront_layout || 'classic',
-        default_qr_resolution: settings.default_qr_resolution,
-        default_gallery_limit: settings.default_gallery_limit,
       },
     });
   } catch (error) {
-    console.error('Error updating storefront options settings:', error);
+    logger.error('Error updating storefront options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

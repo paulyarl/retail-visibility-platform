@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Tenant category interface
@@ -91,7 +92,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to get tenant category:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to get tenant category:', { detail: result.error });
       throw result.error;
     }
 
@@ -116,7 +117,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to update tenant category:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to update tenant category:', { detail: result.error });
       throw result.error;
     }
 
@@ -143,7 +144,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to delete tenant category:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to delete tenant category:', { detail: result.error });
       throw result.error;
     }
 
@@ -171,7 +172,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to create tenant category:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to create tenant category:', { detail: result.error });
       throw result.error;
     }
 
@@ -197,7 +198,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to get tenant categories:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to get tenant categories:', { detail: result.error });
       return [];
     }
 
@@ -222,7 +223,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to reorder tenant categories:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to reorder tenant categories:', { detail: result.error });
       throw result.error;
     }
 
@@ -249,7 +250,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to bulk import tenant categories:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to bulk import tenant categories:', { detail: result.error });
       throw result.error;
     }
 
@@ -280,7 +281,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to get tenant category analytics:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to get tenant category analytics:', { detail: result.error });
       return null;
     }
 
@@ -302,7 +303,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to archive tenant category:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to archive tenant category:', { detail: result.error });
       throw result.error;
     }
 
@@ -328,7 +329,7 @@ export class TenantCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantCategoryService] Failed to restore tenant category:', result.error);
+      clientLogger.error('[TenantCategoryService] Failed to restore tenant category:', { detail: result.error });
       throw result.error;
     }
 

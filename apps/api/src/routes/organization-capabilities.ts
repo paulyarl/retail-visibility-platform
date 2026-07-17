@@ -238,7 +238,7 @@ router.get('/:orgId/effective-capabilities', authenticateToken, async (req: Requ
       },
     });
   } catch (error: any) {
-    console.error('[GET /api/organizations/:orgId/effective-capabilities] Error:', error);
+    logger.error('[GET /api/organizations/:orgId/effective-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -358,7 +358,7 @@ router.get('/:orgId/capability-rollup', authenticateToken, async (req: Request, 
       },
     });
   } catch (error: any) {
-    console.error('[GET /api/organizations/:orgId/capability-rollup] Error:', error);
+    logger.error('[GET /api/organizations/:orgId/capability-rollup] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -388,7 +388,7 @@ router.get('/:orgId/product-type-rollup', authenticateToken, async (req: Request
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.json({ success: true, data: rollup });
   } catch (error: any) {
-    console.error('[GET /api/organizations/:orgId/product-type-rollup] Error:', error);
+    logger.error('[GET /api/organizations/:orgId/product-type-rollup] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -418,7 +418,7 @@ router.get('/:orgId/product-mix', authenticateToken, async (req: Request, res: R
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.json({ success: true, data: mix });
   } catch (error: any) {
-    console.error('[GET /api/organizations/:orgId/product-mix] Error:', error);
+    logger.error('[GET /api/organizations/:orgId/product-mix] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -517,7 +517,7 @@ router.get('/:orgId/bot-status', authenticateToken, async (req: Request, res: Re
       },
     });
   } catch (error: any) {
-    console.error('[GET /api/organizations/:orgId/bot-status] Error:', error);
+    logger.error('[GET /api/organizations/:orgId/bot-status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -577,7 +577,7 @@ router.post('/:orgId/bot/chat/start', authenticateToken, requireOrgMember, async
       orgContext: { orgName: ctx.orgName, totalLocations: ctx.totalLocations },
     });
   } catch (error: any) {
-    console.error('[POST /api/organizations/:orgId/bot/chat/start] Error:', error);
+    logger.error('[POST /api/organizations/:orgId/bot/chat/start] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to start org bot chat' });
   }
 });
@@ -728,7 +728,7 @@ router.post('/:orgId/bot/chat/message', authenticateToken, requireOrgMember, asy
       messageId: botMsg.id,
     });
   } catch (error: any) {
-    console.error('[POST /api/organizations/:orgId/bot/chat/message] Error:', error);
+    logger.error('[POST /api/organizations/:orgId/bot/chat/message] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to send message' });
   }
 });

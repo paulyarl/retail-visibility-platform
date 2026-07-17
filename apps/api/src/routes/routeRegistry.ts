@@ -202,6 +202,8 @@ import debugCookiesRoutes from '../routes/debug-cookies';
 import faqRoutes from '../routes/faq';
 import faqPublicRoutes from '../routes/faq-public';
 import tierConfigRoutes from '../routes/tier-config';
+import funnelRoutes from '../routes/funnel';
+import funnelCheckoutRoutes from '../routes/funnel-checkout';
 
 // Inline handler route files (extracted from index.ts)
 import inlineAuthRbacRoutes from '../routes/inline-auth-rbac';
@@ -281,6 +283,7 @@ import directorySupportRoutes from '../routes/directory-support';
 // Middleware (extended with checkTenantAccess, authenticateCustomer, auditLogger)
 import { authenticateToken, requireAdmin, checkTenantAccess, authenticateCustomer } from '../middleware/auth';
 import { auditLogger } from '../middleware/audit-logger';
+import { logger } from '../logger';
 
 // ─── Registry Types ────────────────────────────────────────────────────────
 
@@ -1211,6 +1214,20 @@ export const routeRegistry: RouteEntry[] = [
     authLevel: 'public',
     comment: 'Badge analytics at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events',
   },
+  {
+    path: '/api',
+    router: funnelRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Funnel tenant CRUD at /api/tenants/:tenantId/funnels',
+  },
+  {
+    path: '/api',
+    router: funnelCheckoutRoutes,
+    domain: 'misc',
+    authLevel: 'public',
+    comment: 'Funnel checkout routes at /api/public/funnels/:tenantId/*',
+  },
 
   // ── Permissions ──────────────────────────────────────────────────────
   {
@@ -1911,7 +1928,7 @@ export function mountFromRegistry(app: Express): void {
       }
       console.log(`✅ [Registry] ${entry.domain}: ${entry.path} - ${entry.comment || ''}`);
     } catch (error) {
-      console.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, error);
+      logger.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -1925,7 +1942,7 @@ export function mountFromRegistry(app: Express): void {
       }
       console.log(`✅ [Registry] ${entry.domain}: ${entry.path} - ${entry.comment || ''}`);
     } catch (error) {
-      console.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, error);
+      logger.error(`❌ [Registry] Failed to mount ${entry.path} (${entry.domain}):`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

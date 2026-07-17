@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * User Identification Utility
  * 
@@ -105,7 +107,7 @@ export function getUserIdentification(): UserIdentification {
       identificationCacheExpiry = now + CACHE_TTL_MS;
     }
   } catch (error) {
-    console.error('[UserIdentification] Error getting user data:', error);
+    clientLogger.error('[UserIdentification] Error getting user data:', { detail: error });
     // Fallback to anonymous with new session (use cached if available)
     if (cachedSessionId) {
       sessionId = cachedSessionId;
@@ -168,7 +170,7 @@ export function clearUserIdentification(): void {
     
     // console.log('[UserIdentification] Cleared session ID');
   } catch (error) {
-    console.error('[UserIdentification] Error clearing identification:', error);
+    clientLogger.error('[UserIdentification] Error clearing identification:', { detail: error });
   }
 }
 

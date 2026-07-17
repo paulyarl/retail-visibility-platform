@@ -8,6 +8,7 @@
 
 import { CustomerApiSingleton } from '@/providers/base/CustomerApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type GatewayType = 'stripe' | 'paypal' | 'square' | 'clover';
 export type PaymentMethodType = 'card' | 'paypal' | 'wallet' | 'bank_account';
@@ -105,7 +106,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] List error:', error);
+      clientLogger.error('[CustomerPaymentMethods] List error:', { detail: error });
       return { success: false, error: 'Failed to list payment methods' };
     }
   }
@@ -137,7 +138,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Get error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Get error:', { detail: error });
       return { success: false, error: 'Failed to get payment method' };
     }
   }
@@ -169,7 +170,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Get default error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Get default error:', { detail: error });
       return { success: false, error: 'Failed to get default payment method' };
     }
   }
@@ -204,7 +205,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Add error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Add error:', { detail: error });
       return { success: false, error: 'Failed to add payment method' };
     }
   }
@@ -233,7 +234,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Set default error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Set default error:', { detail: error });
       return { success: false, error: 'Failed to set default payment method' };
     }
   }
@@ -262,7 +263,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Remove error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Remove error:', { detail: error });
       return { success: false, error: 'Failed to remove payment method' };
     }
   }
@@ -308,7 +309,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] SetupIntent error:', error);
+      clientLogger.error('[CustomerPaymentMethods] SetupIntent error:', { detail: error });
       return { success: false, error: 'Failed to create setup intent' };
     }
   }
@@ -360,7 +361,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Checkout info error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Checkout info error:', { detail: error });
       return { success: false, error: 'Failed to get checkout payment info' };
     }
   }
@@ -392,7 +393,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] Expiring check error:', error);
+      clientLogger.error('[CustomerPaymentMethods] Expiring check error:', { detail: error });
       return { success: false, error: 'Failed to check expiring payment methods' };
     }
   }
@@ -438,7 +439,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] PayPal billing agreement error:', error);
+      clientLogger.error('[CustomerPaymentMethods] PayPal billing agreement error:', { detail: error });
       return { success: false, error: 'Failed to create PayPal billing agreement' };
     }
   }
@@ -476,7 +477,7 @@ class CustomerPaymentMethodsService extends CustomerApiSingleton {
 
       return { success: false, error: getErrorMessage(result.error) };
     } catch (error: any) {
-      console.error('[CustomerPaymentMethods] PayPal save error:', error);
+      clientLogger.error('[CustomerPaymentMethods] PayPal save error:', { detail: error });
       return { success: false, error: 'Failed to save PayPal payment method' };
     }
   }

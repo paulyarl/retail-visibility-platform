@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { getEffectivePlatform } from '../utils/effectiveFlags';
 import { generateFeedPushJobId, generateQuickStart } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -94,7 +95,7 @@ router.get('/setup-status/:tenantId', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Feed Jobs] Error checking setup status:', error);
+    logger.error('[Feed Jobs] Error checking setup status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check setup status',
@@ -266,7 +267,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    console.error('Error creating feed job:', error);
+    logger.error('Error creating feed job:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create feed job',
@@ -317,7 +318,7 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching feed jobs:', error);
+    logger.error('Error fetching feed jobs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feed jobs',
@@ -349,7 +350,7 @@ router.get('/:id', async (req, res) => {
       data: job,
     });
   } catch (error) {
-    console.error('Error fetching feed job:', error);
+    logger.error('Error fetching feed job:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feed job',
@@ -423,7 +424,7 @@ router.patch('/:id/status', async (req, res) => {
       });
     }
 
-    console.error('Error updating feed job status:', error);
+    logger.error('Error updating feed job status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update feed job status',
@@ -457,7 +458,7 @@ router.get('/queue/ready', async (req, res) => {
       count: jobs.length,
     });
   } catch (error) {
-    console.error('Error fetching ready jobs:', error);
+    logger.error('Error fetching ready jobs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch ready jobs',
@@ -505,7 +506,7 @@ router.get('/stats/summary', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching job stats:', error);
+    logger.error('Error fetching job stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch job statistics',
@@ -530,7 +531,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Feed job deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting feed job:', error);
+    logger.error('Error deleting feed job:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete feed job',

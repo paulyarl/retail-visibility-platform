@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../logger';
 
 /**
  * Convert camelCase to snake_case
@@ -76,7 +77,7 @@ export const emergencyTransformMiddleware = (
     }
     
   } catch (error) {
-    console.error('[EMERGENCY-TRANSFORM] Transform error:', error);
+    logger.error('[EMERGENCY-TRANSFORM] Transform error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Continue anyway - don't break the request
   }
   
@@ -172,7 +173,7 @@ export const enhancedEmergencyTransformMiddleware = (
     }
     
   } catch (error) {
-    console.error('[ENHANCED-TRANSFORM] Transform error:', error);
+    logger.error('[ENHANCED-TRANSFORM] Transform error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
   
   next();

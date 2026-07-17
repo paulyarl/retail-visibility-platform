@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryService } from '../../../../services/CategoryService';
+import { logger } from '../../../../logger';
 
 /**
  * GET /api/inventory/categories
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    logger.error('Error fetching categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     return NextResponse.json({
       success: false,

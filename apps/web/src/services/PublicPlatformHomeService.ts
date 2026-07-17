@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PublicTenant {
   id: string;
@@ -71,13 +72,13 @@ class PublicPlatformHomeService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[PublicPlatformHomeService] Failed to get public platform home data:', response.error);
+        clientLogger.error('[PublicPlatformHomeService] Failed to get public platform home data:', { detail: response.error });
         return null;
       }
 
       return response.data || null;
     } catch (error) {
-      console.error('[PublicPlatformHomeService] Error getting public platform home data:', error);
+      clientLogger.error('[PublicPlatformHomeService] Error getting public platform home data:', { detail: error });
       return null;
     }
   }
@@ -95,13 +96,13 @@ class PublicPlatformHomeService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[PublicPlatformHomeService] Failed to get public featured tenants:', response.error);
+        clientLogger.error('[PublicPlatformHomeService] Failed to get public featured tenants:', { detail: response.error });
         return null;
       }
 
       return response.data || null;
     } catch (error) {
-      console.error('[PublicPlatformHomeService] Error getting public featured tenants:', error);
+      clientLogger.error('[PublicPlatformHomeService] Error getting public featured tenants:', { detail: error });
       return null;
     }
   }

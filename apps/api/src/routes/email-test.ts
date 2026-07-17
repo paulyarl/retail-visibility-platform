@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { emailService } from '../services/email-service';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 // For now, use a simple auth check - you can replace with proper platform user check later
 const requirePlatformUser = (req: any, res: any, next: any) => {
   // Simple check - in production you'd verify JWT and platform role
@@ -25,7 +26,7 @@ router.get('/config', requirePlatformUser, async (req: Request, res: Response) =
       fromName: unifiedConfig.emailFromName,
     });
   } catch (error: any) {
-    console.error('[Email Test] Config check failed:', error);
+    logger.error('[Email Test] Config check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check email configuration',
@@ -67,7 +68,7 @@ router.post('/test', requirePlatformUser, async (req: Request, res: Response) =>
       error: result.error,
     });
   } catch (error: any) {
-    console.error('[Email Test] Test email failed:', error);
+    logger.error('[Email Test] Test email failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to send test email',
@@ -127,7 +128,7 @@ router.post('/test-invitation', requirePlatformUser, async (req: Request, res: R
       },
     });
   } catch (error: any) {
-    console.error('[Email Test] Test invitation failed:', error);
+    logger.error('[Email Test] Test invitation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to send test invitation',

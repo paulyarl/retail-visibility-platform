@@ -304,7 +304,7 @@ export class VariantAwarePropagationService extends BaseService {
 
       return products;
     } catch (error) {
-      logger.error('Failed to get products for propagation:', { region: 'unknown' });
+      logger.error('Failed to get products for propagation:', undefined, { error: { name: 'Error', message: String({ region: 'unknown' }) } });
       throw new Error(`Failed to get products for propagation: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -359,7 +359,7 @@ export class VariantAwarePropagationService extends BaseService {
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      logger.error('Propagation failed:', { region: 'unknown' });
+      logger.error('Propagation failed:', undefined, { error: { name: 'Error', message: String({ region: 'unknown' }) } });
       
       return {
         success: false,

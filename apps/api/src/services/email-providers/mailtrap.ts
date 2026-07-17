@@ -1,4 +1,5 @@
 import { EmailProvider, SendEmailParams, EmailResult } from '../email-service';
+import { logger } from '../../logger';
 
 export class MailtrapEmailProvider implements EmailProvider {
   private apiToken: string;
@@ -55,7 +56,7 @@ export class MailtrapEmailProvider implements EmailProvider {
         provider: 'mailtrap',
       };
     } catch (error: any) {
-      console.error('[Mailtrap] Email send failed:', error);
+      logger.error('[Mailtrap] Email send failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       return {
         success: false,
@@ -68,12 +69,12 @@ export class MailtrapEmailProvider implements EmailProvider {
   async validateConfig(): Promise<boolean> {
     try {
       if (!this.apiToken) {
-        console.error('[Mailtrap] API token not configured');
+        logger.error('[Mailtrap] API token not configured', undefined);
         return false;
       }
 
       if (!this.fromEmail) {
-        console.error('[Mailtrap] From email not configured');
+        logger.error('[Mailtrap] From email not configured', undefined);
         return false;
       }
 
@@ -86,14 +87,14 @@ export class MailtrapEmailProvider implements EmailProvider {
       });
 
       if (!response.ok) {
-        console.error('[Mailtrap] API token validation failed:', response.status);
+        logger.error('[Mailtrap] API token validation failed:', undefined, { error: { name: 'Error', message: String(response.status) } });
         return false;
       }
 
       console.log('[Mailtrap] Configuration validated successfully');
       return true;
     } catch (error) {
-      console.error('[Mailtrap] Configuration validation error:', error);
+      logger.error('[Mailtrap] Configuration validation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

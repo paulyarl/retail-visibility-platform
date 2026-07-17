@@ -26,6 +26,7 @@ import {
   LinkIcon,
   ShoppingBag
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SyncField {
   name: string;
@@ -118,7 +119,7 @@ export default function GBPSyncStatusPage() {
 
         setSyncCategories([]);
       } catch (error) {
-        console.error('Failed to fetch sync status:', error);
+        clientLogger.error('Failed to fetch sync status:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -194,7 +195,7 @@ export default function GBPSyncStatusPage() {
       setGbpLocations(data.data?.locations || []);
       setShowLocationSelector(true);
     } catch (error) {
-      console.error('Failed to fetch GBP locations:', error);
+      clientLogger.error('Failed to fetch GBP locations:', { detail: error });
     } finally {
       setLoadingLocations(false);
     }
@@ -215,7 +216,7 @@ export default function GBPSyncStatusPage() {
       // Refresh the page data
       window.location.reload();
     } catch (error) {
-      console.error('Failed to link location:', error);
+      clientLogger.error('Failed to link location:', { detail: error });
     } finally {
       setLinkingLocation(false);
     }
@@ -235,7 +236,7 @@ export default function GBPSyncStatusPage() {
         setTimeout(() => fetchComparison(), 1500);
       }
     } catch (error) {
-      console.error('Failed to sync to Google:', error);
+      clientLogger.error('Failed to sync to Google:', { detail: error });
       setSyncResult({
         success: false,
         message: 'Failed to sync to Google. Please try again.',
@@ -252,7 +253,7 @@ export default function GBPSyncStatusPage() {
       const data = await platformHomeService.getGoogleBusinessComparison(tenantId);
       setComparison(data.data);
     } catch (error) {
-      console.error('Failed to fetch comparison:', error);
+      clientLogger.error('Failed to fetch comparison:', { detail: error });
     } finally {
       setLoadingComparison(false);
     }
@@ -277,7 +278,7 @@ export default function GBPSyncStatusPage() {
         setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
         setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
       } catch (error) {
-        console.error('Failed to fetch GMC status:', error);
+        clientLogger.error('Failed to fetch GMC status:', { detail: error });
       }
     }
     if (tenantId && !loading) {
@@ -305,7 +306,7 @@ export default function GBPSyncStatusPage() {
         setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
       }
     } catch (error) {
-      console.error('Failed to save GMC settings:', error);
+      clientLogger.error('Failed to save GMC settings:', { detail: error });
       setGmcSettingsResult({ success: false, message: 'Failed to save settings. Please try again.' });
     } finally {
       setSavingGmcSettings(false);
@@ -327,7 +328,7 @@ export default function GBPSyncStatusPage() {
         setGmcStatus(statusData.data);
       }
     } catch (error) {
-      console.error('Failed to sync products to GMC:', error);
+      clientLogger.error('Failed to sync products to GMC:', { detail: error });
       setGmcSyncResult({
         success: false,
         message: 'Failed to sync products. Please try again.',
@@ -1169,7 +1170,7 @@ export default function GBPSyncStatusPage() {
                   const report = await gmcValidationService.getValidationReport(tenantId);
                   setValidationReport(report);
                 } catch (err) {
-                  console.error('Failed to load validation report:', err);
+                  clientLogger.error('Failed to load validation report:', { detail: err });
                 } finally {
                   setLoadingValidation(false);
                 }

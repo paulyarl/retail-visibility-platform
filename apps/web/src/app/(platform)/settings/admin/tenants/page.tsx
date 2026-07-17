@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner } from 
 import { Button, TextInput, Pagination, Group, Stack, Container } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 type Tenant = {
   id: string;
@@ -81,7 +82,7 @@ export default function AdminTenantsPage() {
       setTenants(data || []);
     } catch (err) {
       setError("Failed to load tenants");
-      console.error('Admin tenants page error:', err);
+      clientLogger.error('Admin tenants page error:', { detail: err });
     } finally {
       setLoading(false);
     }

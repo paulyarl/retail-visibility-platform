@@ -1,4 +1,5 @@
 import { inventoryScanService, type ScanSession } from '@/services/InventoryScanService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Service for handling scan session operations
@@ -13,7 +14,7 @@ export class ScanSessionService {
       const sessions = await inventoryScanService.checkActiveSessions(tenantId);
       return sessions && sessions.length > 0 ? sessions[0] : null;
     } catch (error) {
-      console.error('[ScanSessionService] Failed to check sessions:', error);
+      clientLogger.error('[ScanSessionService] Failed to check sessions:', { detail: error });
       return null;
     }
   }
@@ -25,7 +26,7 @@ export class ScanSessionService {
     try {
       return await inventoryScanService.createScanSession(tenantId);
     } catch (error) {
-      console.error('[ScanSessionService] Failed to create session:', error);
+      clientLogger.error('[ScanSessionService] Failed to create session:', { detail: error });
       throw error;
     }
   }
@@ -37,7 +38,7 @@ export class ScanSessionService {
     try {
       await inventoryScanService.endScanSession(sessionId);
     } catch (error) {
-      console.error('[ScanSessionService] Failed to end session:', error);
+      clientLogger.error('[ScanSessionService] Failed to end session:', { detail: error });
       throw error;
     }
   }

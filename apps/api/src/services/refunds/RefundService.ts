@@ -1,5 +1,6 @@
 import { prisma } from '../../prisma';
 import { customAlphabet } from 'nanoid';
+import { logger } from '../../logger';
 
 const generateRefundId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 16);
 
@@ -140,7 +141,7 @@ export class RefundService {
         error: gatewayResult.error,
       };
     } catch (error) {
-      console.error('[RefundService] Error processing refund:', error);
+      logger.error('[RefundService] Error processing refund:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         status: 'failed',
@@ -223,7 +224,7 @@ export class RefundService {
       const refundData = await refundResponse.json() as PayPalRefundResponse;
 
       if (!refundResponse.ok) {
-        console.error('[RefundService] PayPal refund failed:', refundData);
+        logger.error('[RefundService] PayPal refund failed:', undefined, { error: { name: (refundData as any)?.name || 'Error', message: (refundData as any)?.message || String(refundData), stack: (refundData as any)?.stack } });
         
         // In development mode, simulate successful refund for invalid capture IDs
         // This handles sandbox transactions that have expired or were never captured
@@ -296,7 +297,7 @@ export class RefundService {
         message: 'Refund processed successfully',
       };
     } catch (error) {
-      console.error('[RefundService] PayPal refund error:', error);
+      logger.error('[RefundService] PayPal refund error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Update refund status to failed
       await prisma.refunds.update({
@@ -359,7 +360,7 @@ export class RefundService {
         message: 'Refund processed successfully',
       };
     } catch (error: any) {
-      console.error('[RefundService] Stripe refund error:', error);
+      logger.error('[RefundService] Stripe refund error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Update refund status to failed
       await prisma.refunds.update({

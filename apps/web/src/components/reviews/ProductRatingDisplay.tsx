@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import ReviewForm from '@/components/reviews/ReviewForm';
 import { productReviewsService } from '@/services/ProductReviewsSingletonService';
 import { MessageSquare, Star, User } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductRatingDisplayProps {
   productId: string;
@@ -132,7 +133,7 @@ export default function ProductRatingDisplay({
         }
       }
     } catch (err) {
-      console.error('Error fetching product reviews:', err);
+      clientLogger.error('Error fetching product reviews:', { detail: err });
       setError('Failed to load reviews');
     } finally {
       setLoading(false);
@@ -185,7 +186,7 @@ export default function ProductRatingDisplay({
         throw new Error('Failed to submit review');
       }
     } catch (err) {
-      console.error('Error submitting review:', err);
+      clientLogger.error('Error submitting review:', { detail: err });
       setError('Failed to submit review. Please try again.');
     } finally {
       setSubmitting(false);

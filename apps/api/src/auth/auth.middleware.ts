@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { JWTPayload, makeBothConventionsAvailable } from '../middleware/auth';
 import { isPlatformAdmin } from '../utils/platform-admin';
 import { user_role } from '@prisma/client';
+import { logger } from '../logger';
 
 /**
  * Middleware to authenticate via Auth0 session
@@ -70,7 +71,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     req.user = makeBothConventionsAvailable(payload);
     next();
   } catch (error) {
-    console.error('[authenticateToken] Auth0 authentication failed:', error);
+    logger.error('[authenticateToken] Auth0 authentication failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(401).json({ error: 'authentication_failed', message: 'Authentication failed' });
   }
 };

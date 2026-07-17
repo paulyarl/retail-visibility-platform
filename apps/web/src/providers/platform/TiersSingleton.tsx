@@ -8,6 +8,7 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Tier Types (matching server-side)
 export interface Tier {
@@ -158,7 +159,7 @@ class TiersSingleton extends TenantApiSingleton {
       if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tier', result.error);
+      clientLogger.error('Error fetching tier', { detail: result.error });
       return null;
     }
     
@@ -179,7 +180,7 @@ class TiersSingleton extends TenantApiSingleton {
       if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tier by slug', result.error);
+      clientLogger.error('Error fetching tier by slug', { detail: result.error });
       return null;
     }
     
@@ -200,7 +201,7 @@ class TiersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error creating tier', result.error);
+      clientLogger.error('Error creating tier', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to create tier');
     }
 
@@ -224,7 +225,7 @@ class TiersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error updating tier', result.error);
+      clientLogger.error('Error updating tier', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to update tier');
     }
 
@@ -247,7 +248,7 @@ class TiersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error deleting tier', result.error);
+      clientLogger.error('Error deleting tier', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to delete tier');
     }
 
@@ -279,13 +280,13 @@ class TiersSingleton extends TenantApiSingleton {
       );
       
       if (!result.success) {
-        console.error('Error listing tiers', result.error);
+        clientLogger.error('Error listing tiers', { detail: result.error });
         return [];
       }
 
       return result.data?.tiers || [];
     } catch (error) {
-      console.error('Error listing tiers', error);
+      clientLogger.error('Error listing tiers', { detail: error });
       throw error;
     }
   }
@@ -305,7 +306,7 @@ class TiersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error fetching tier stats', result.error);
+      clientLogger.error('Error fetching tier stats', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch tier stats');
     }
 
@@ -325,7 +326,7 @@ class TiersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error checking upgrade eligibility', result.error);
+      clientLogger.error('Error checking upgrade eligibility', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to check upgrade eligibility');
     }
 
@@ -352,7 +353,7 @@ class TiersSingleton extends TenantApiSingleton {
       if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tier limits', result.error);
+      clientLogger.error('Error fetching tier limits', { detail: result.error });
       return null;
     }
 
@@ -370,7 +371,7 @@ class TiersSingleton extends TenantApiSingleton {
     );
     
     if (!result.success) {
-      console.error('Error checking tier feature', result.error);
+      clientLogger.error('Error checking tier feature', { detail: result.error });
       return false;
     }
 
@@ -396,7 +397,7 @@ class TiersSingleton extends TenantApiSingleton {
 
       return upgradeOptions;
     } catch (error) {
-      console.error('Error getting upgrade path', error);
+      clientLogger.error('Error getting upgrade path', { detail: error });
       return [];
     }
   }
@@ -434,7 +435,7 @@ class TiersSingleton extends TenantApiSingleton {
         savings
       };
     } catch (error) {
-      console.error('Error calculating upgrade cost', error);
+      clientLogger.error('Error calculating upgrade cost', { detail: error });
       throw error;
     }
   }

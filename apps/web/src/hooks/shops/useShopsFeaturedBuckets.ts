@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FeaturedProductsSingleton } from '../../providers/data/FeaturedProductsSingleton';
 import { storefrontService } from '../../services/StorefrontService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Featured product interface
 interface FeaturedProduct {
@@ -52,7 +53,7 @@ export function useShopsFeaturedBuckets() {
       // TODO: Get tenantId from context or URL parameter
       const tenantId = null; // No fallback - require explicit tenant
       if (!tenantId) {
-        console.error('[useShopsFeaturedBuckets] No tenantId provided');
+        clientLogger.error('[useShopsFeaturedBuckets] No tenantId provided');
         return;
       }
       const featuredProductsResult = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 100);
@@ -263,7 +264,7 @@ export function useShopsFeaturedBuckets() {
       setBuckets(buckets);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch featured buckets');
-      console.error('[useShopsFeaturedBuckets] Error:', err);
+      clientLogger.error('[useShopsFeaturedBuckets] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -344,14 +345,14 @@ export type { FeaturedProduct, FeaturedBucket };
 // Backward compatibility exports (deprecated)
 export const ProductCache = {
   getInstance: () => ({
-    clearCache: () => console.warn('ProductCache.clearCache is deprecated'),
+    clearCache: () => clientLogger.warn('ProductCache.clearCache is deprecated'),
     getCacheStats: () => ({ size: 0, hitRate: 0, pendingRequests: 0 })
   })
 };
 
 export const ProductAPISingleton = {
   getInstance: () => ({
-    fetchProduct: () => console.warn('ProductAPISingleton.fetchProduct is deprecated'),
-    makePublicApiRequest: () => console.warn('ProductAPISingleton.makePublicApiRequest is deprecated')
+    fetchProduct: () => clientLogger.warn('ProductAPISingleton.fetchProduct is deprecated'),
+    makePublicApiRequest: () => clientLogger.warn('ProductAPISingleton.makePublicApiRequest is deprecated')
   })
 };

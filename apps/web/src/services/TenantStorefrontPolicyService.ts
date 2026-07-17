@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StorefrontPolicies {
   return_policy: string | null;
@@ -48,7 +49,7 @@ class TenantStorefrontPolicyService extends TenantApiSingleton {
    */
   async getPolicies(tenantId: string): Promise<StorefrontPolicies | null> {
     if (!tenantId) {
-      console.error('[TenantStorefrontPolicy] getPolicies: tenantId is required');
+      clientLogger.error('[TenantStorefrontPolicy] getPolicies: tenantId is required');
       return null;
     }
 
@@ -66,7 +67,7 @@ class TenantStorefrontPolicyService extends TenantApiSingleton {
 
       return result.data.policies;
     } catch (error) {
-      console.error('[TenantStorefrontPolicy] Failed to get policies:', error);
+      clientLogger.error('[TenantStorefrontPolicy] Failed to get policies:', { detail: error });
       return null;
     }
   }
@@ -76,7 +77,7 @@ class TenantStorefrontPolicyService extends TenantApiSingleton {
    */
   async updatePolicies(tenantId: string, data: Partial<StorefrontPolicies>): Promise<StorefrontPolicies | null> {
     if (!tenantId) {
-      console.error('[TenantStorefrontPolicy] updatePolicies: tenantId is required');
+      clientLogger.error('[TenantStorefrontPolicy] updatePolicies: tenantId is required');
       return null;
     }
 
@@ -100,7 +101,7 @@ class TenantStorefrontPolicyService extends TenantApiSingleton {
 
       return result.data.policies;
     } catch (error) {
-      console.error('[TenantStorefrontPolicy] Failed to update policies:', error);
+      clientLogger.error('[TenantStorefrontPolicy] Failed to update policies:', { detail: error });
       return null;
     }
   }

@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
 import { generateVariantId, generateTenantVariantId,generateVariantSkuFromParent } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ router.get('/items/:itemId/variants', authenticateToken, async (req: Request, re
 
     res.json({ variants });
   } catch (error: any) {
-    console.error('[GET /items/:itemId/variants] Error:', error);
+    logger.error('[GET /items/:itemId/variants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch variants', message: error.message });
   }
 });
@@ -127,7 +128,7 @@ router.post('/items/:itemId/variants', authenticateToken, async (req: Request, r
 
     res.status(201).json({ variant });
   } catch (error: any) {
-    console.error('[POST /items/:itemId/variants] Error:', error);
+    logger.error('[POST /items/:itemId/variants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to create variant', message: error.message });
   }
 });
@@ -265,7 +266,7 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
       variants: createdVariants // Return the created variants with IDs and SKUs
     });
   } catch (error: any) {
-    console.error('[POST /items/:itemId/variants/bulk] Error:', error);
+    logger.error('[POST /items/:itemId/variants/bulk] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to create variants', message: error.message });
   }
 });
@@ -337,7 +338,7 @@ router.put('/bulk/operations', authenticateToken, async (req: Request, res: Resp
       message: `Bulk variant operations completed: ${result.success_count} successful, ${result.error_count} failed`
     });
   } catch (error: any) {
-    console.error('[PUT /variants/bulk/operations] Error:', error);
+    logger.error('[PUT /variants/bulk/operations] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Bulk operations failed', message: error.message });
   }
 });
@@ -387,7 +388,7 @@ router.put('/bulk', authenticateToken, async (req: Request, res: Response) => {
       message: `Bulk variant update completed: ${result.success_count} variants updated`
     });
   } catch (error: any) {
-    console.error('[PUT /variants/bulk] Error:', error);
+    logger.error('[PUT /variants/bulk] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update variants', message: error.message });
   }
 });
@@ -446,7 +447,7 @@ router.put('/variants/:variantId', authenticateToken, async (req: Request, res: 
 
     res.json({ variant: updated });
   } catch (error: any) {
-    console.error('[PUT /variants/:variantId] Error:', error);
+    logger.error('[PUT /variants/:variantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update variant', message: error.message });
   }
 });
@@ -489,7 +490,7 @@ router.delete('/variants/:variantId', authenticateToken, async (req: Request, re
 
     res.json({ message: 'Variant deleted successfully' });
   } catch (error: any) {
-    console.error('[DELETE /variants/:variantId] Error:', error);
+    logger.error('[DELETE /variants/:variantId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to delete variant', message: error.message });
   }
 });
@@ -528,7 +529,7 @@ router.delete('/items/:itemId/variants', authenticateToken, async (req: Request,
       count: deleted.count 
     });
   } catch (error: any) {
-    console.error('[DELETE /items/:itemId/variants] Error:', error);
+    logger.error('[DELETE /items/:itemId/variants] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to delete variants', message: error.message });
   }
 });

@@ -17,6 +17,7 @@ import CrmActivityService from '../../../services/CrmActivityService';
 import CrmAlertService from '../../../services/CrmAlertService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
+import { logger } from '../../../logger';
 
 const router = Router({ mergeParams: true });
 
@@ -32,8 +33,8 @@ function getUserId(req: Request): string | null {
   return req.user?.userId || req.user?.user_id || req.user?.id || null;
 }
 
-function getUserEmail(req: Request): string {
-  return req.user?.email || 'Platform User';
+function getUserDisplayName(req: Request): string {
+  return [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform User';
 }
 
 function getTenantIds(req: Request): string[] {
@@ -116,7 +117,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[CRM Personal] Error fetching dashboard:', error);
+    logger.error('[CRM Personal] Error fetching dashboard:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch personal CRM dashboard' });
   }
 });
@@ -155,7 +156,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: enriched });
   } catch (error) {
-    console.error('[CRM Personal] Error listing tickets:', error);
+    logger.error('[CRM Personal] Error listing tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tickets' });
   }
 });
@@ -165,7 +166,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(401).json({ error: 'authentication_required' });
-    const actorName = getUserEmail(req);
+    const actorName = getUserDisplayName(req);
 
     const ticket = await ticketService.create({
       tenant_id: PLATFORM_TENANT_ID,
@@ -192,7 +193,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: ticket });
   } catch (error) {
-    console.error('[CRM Personal] Error creating platform ticket:', error);
+    logger.error('[CRM Personal] Error creating platform ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create platform ticket' });
   }
 });
@@ -219,7 +220,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     const messages = await messageService.listByTicket(req.params.ticketId, true);
     res.json({ success: true, data: messages });
   } catch (error) {
-    console.error('[CRM Personal] Error listing ticket messages:', error);
+    logger.error('[CRM Personal] Error listing ticket messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list messages' });
   }
 });
@@ -229,7 +230,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(401).json({ error: 'authentication_required' });
-    const actorName = getUserEmail(req);
+    const actorName = getUserDisplayName(req);
 
     const ticket = await ticketService.getById(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
@@ -256,7 +257,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
 
     res.json({ success: true, data: message });
   } catch (error) {
-    console.error('[CRM Personal] Error creating ticket message:', error);
+    logger.error('[CRM Personal] Error creating ticket message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create message' });
   }
 });
@@ -293,7 +294,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: enriched });
   } catch (error) {
-    console.error('[CRM Personal] Error listing tasks:', error);
+    logger.error('[CRM Personal] Error listing tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tasks' });
   }
 });
@@ -340,7 +341,7 @@ router.get('/alerts', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: enriched });
   } catch (error) {
-    console.error('[CRM Personal] Error listing alerts:', error);
+    logger.error('[CRM Personal] Error listing alerts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list alerts' });
   }
 });
@@ -361,7 +362,7 @@ router.put('/alerts/:alertId/read', async (req: Request, res: Response) => {
     await alertService.markRead(req.params.alertId);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Personal] Error marking alert read:', error);
+    logger.error('[CRM Personal] Error marking alert read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark alert as read' });
   }
 });
@@ -384,7 +385,7 @@ router.put('/alerts/read-all', async (req: Request, res: Response) => {
     });
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Personal] Error marking all alerts read:', error);
+    logger.error('[CRM Personal] Error marking all alerts read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark all alerts as read' });
   }
 });
@@ -405,7 +406,7 @@ router.put('/alerts/:alertId/dismiss', async (req: Request, res: Response) => {
     await alertService.dismiss(req.params.alertId);
     res.json({ success: true });
   } catch (error) {
-    console.error('[CRM Personal] Error dismissing alert:', error);
+    logger.error('[CRM Personal] Error dismissing alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to dismiss alert' });
   }
 });
@@ -448,7 +449,7 @@ router.get('/activities', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: enriched });
   } catch (error) {
-    console.error('[CRM Personal] Error listing activities:', error);
+    logger.error('[CRM Personal] Error listing activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list activities' });
   }
 });

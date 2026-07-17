@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../../utils/db-pool';
 import { GBPCategorySyncService } from '../../services/GBPCategorySyncService';
+import { logger } from '../../logger';
 
 const router = Router();
 const gbpCategorySyncService = new GBPCategorySyncService();
@@ -28,7 +29,7 @@ router.get('/list', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] List error:', error);
+    logger.error('[GBP Categories Sync] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch GBP categories from Google',
@@ -72,7 +73,7 @@ router.get('/search', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] Search error:', error);
+    logger.error('[GBP Categories Sync] Search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to search GBP categories',
@@ -127,7 +128,7 @@ router.post('/sync', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] Sync error:', error);
+    logger.error('[GBP Categories Sync] Sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to sync GBP categories',
@@ -152,7 +153,7 @@ router.post('/seed', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] Seed error:', error);
+    logger.error('[GBP Categories Sync] Seed error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to seed GBP categories',
@@ -190,7 +191,7 @@ router.get('/mappings', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] Mappings error:', error);
+    logger.error('[GBP Categories Sync] Mappings error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch category mappings',
@@ -251,7 +252,7 @@ router.patch('/map/:platformCategoryId', async (req: Request, res: Response) => 
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] Map error:', error);
+    logger.error('[GBP Categories Sync] Map error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to map category',
@@ -344,7 +345,7 @@ router.post('/auto-map', async (req: Request, res: Response) => {
         );
         applied++;
       } catch (err) {
-        console.error(`Failed to map ${mapping.platformCategoryId}:`, err);
+        logger.error(`Failed to map ${mapping.platformCategoryId}:`, undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
       }
     }
 
@@ -358,7 +359,7 @@ router.post('/auto-map', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GBP Categories Sync] Auto-map error:', error);
+    logger.error('[GBP Categories Sync] Auto-map error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to auto-map categories',

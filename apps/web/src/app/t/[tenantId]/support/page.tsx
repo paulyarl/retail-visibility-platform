@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmTicket, CrmTask, CrmActivity, CrmInquiry, CrmAlert } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -88,7 +89,7 @@ export default function TenantSupportPage() {
           setUnreadAlertCount(stats?.unread_alert_count ?? 0);
         }
       } catch (err) {
-        console.error('[Tenant Support] Load error:', err);
+        clientLogger.error('[Tenant Support] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -114,7 +115,7 @@ export default function TenantSupportPage() {
       const stats = await crmTenantCrmService.getStats();
       setTickets(stats.open_tickets);
     } catch (err) {
-      console.error('[Tenant Support] Create ticket error:', err);
+      clientLogger.error('[Tenant Support] Create ticket error:', { detail: err });
     } finally {
       setSubmitting(false);
     }
@@ -140,6 +141,7 @@ export default function TenantSupportPage() {
       ]}
       navCounts={{
         tickets: tickets.length,
+        tasks: tasks.length,
         inquiries: inquiries.length,
         alerts: unreadAlertCount + unreadActivityCount,
       }}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Building2, UserCheck, Loader2, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TenantAssignment {
   tenantId: string;
@@ -92,7 +93,7 @@ export default function ManageUserTenantsModal({
       }));
       setTenantAssignments(transformedAssignments);
     } catch (err) {
-      console.error('Failed to load user tenants:', err);
+      clientLogger.error('Failed to load user tenants:', { detail: err });
     } finally {
       setLoadingTenants(false);
     }
@@ -103,7 +104,7 @@ export default function ManageUserTenantsModal({
       const tenants = await adminSecurityMonitoringService.getAvailableTenants();
       setAvailableTenants(tenants);
     } catch (error) {
-      console.error('Failed to load available tenants:', error);
+      clientLogger.error('Failed to load available tenants:', { detail: error });
     }
   };
 

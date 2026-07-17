@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantBrandingSettings {
   shopName: string;
@@ -66,7 +67,7 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
       // makeDefaultRequest returns data directly
       return result.data || null;
     } catch (error) {
-      console.error('[TenantBrandingSettingsSingleton] Failed to get branding settings:', error);
+      clientLogger.error('[TenantBrandingSettingsSingleton] Failed to get branding settings:', { detail: error });
       return null;
     }
   }
@@ -89,7 +90,7 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
       // makeDefaultRequest returns data directly
       return result.data || null;
     } catch (error) {
-      console.error('[TenantBrandingSettingsSingleton] Failed to update branding settings:', error);
+      clientLogger.error('[TenantBrandingSettingsSingleton] Failed to update branding settings:', { detail: error });
       return null;
     }
   }

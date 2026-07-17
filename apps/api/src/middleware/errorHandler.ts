@@ -109,7 +109,7 @@ export const globalErrorHandler = (
     return _next(err);
   }
 
-  const ctx = (req as any).ctx as RequestCtx | undefined;
+  const ctx = undefined as RequestCtx | undefined;
 
   // Determine status code and code
   const statusCode = err instanceof HttpError
@@ -148,7 +148,7 @@ export const globalErrorHandler = (
   };
 
   if (statusCode >= 500) {
-    logger.error(`[${statusCode}] ${req.method} ${req.path} — ${message}`, ctx, logMeta);
+    logger.error(`[${statusCode}] ${req.method} ${req.path} — ${message}`, undefined, { error: { name: 'Error', message: String(ctx) + ' ' + String(logMeta) } });
   } else if (statusCode >= 400) {
     logger.warn(`[${statusCode}] ${req.method} ${req.path} — ${message}`, ctx, logMeta);
   }
@@ -159,7 +159,7 @@ export const globalErrorHandler = (
 // ─── 404 handler (for unmatched routes) ───────────────────────────────────
 
 export const notFoundHandler = (req: Request, res: Response) => {
-  const ctx = (req as any).ctx as RequestCtx | undefined;
+  const ctx = undefined as RequestCtx | undefined;
   logger.warn(`[404] ${req.method} ${req.path} — route not found`, ctx, {
     method: req.method,
     path: req.path,

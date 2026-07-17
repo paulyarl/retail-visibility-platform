@@ -40,6 +40,7 @@ import { TickerMessage, TickerConfig, tickerConfigService } from '@/services/Tic
 import { DateTimePicker } from '@mantine/dates';
 import PlatformTicker from '@/components/notifications/PlatformTicker';
 import { useQueryClient } from '@tanstack/react-query';
+import { clientLogger } from '@/lib/client-logger';
 
 interface EnhancedTickerSettingsProps {
   onSave?: (config: TickerConfig) => void;
@@ -100,7 +101,7 @@ export default function EnhancedTickerSettings({
         console.log('[EnhancedTickerSettings] Page load - API response failed or no data:', result);
       }
     } catch (error) {
-      console.error('[EnhancedTickerSettings] Failed to load ticker config:', error);
+      clientLogger.error('[EnhancedTickerSettings] Failed to load ticker config:', { detail: error });
     }
   };
 
@@ -181,7 +182,7 @@ export default function EnhancedTickerSettings({
     console.log('[EnhancedTickerSettings] Updates targetTiers length:', updates.targetTiers?.length); */
 
     if (!messageId) {
-      console.error('[EnhancedTickerSettings] Cannot update message: missing ID');
+      clientLogger.error('[EnhancedTickerSettings] Cannot update message: missing ID');
       notifications.show({
         title: 'Error',
         message: 'Cannot update message: missing message ID.',
@@ -212,7 +213,7 @@ export default function EnhancedTickerSettings({
         color: 'green',
       });
     } else {
-      console.error('[EnhancedTickerSettings] Failed to update message:', result.error);
+      clientLogger.error('[EnhancedTickerSettings] Failed to update message:', { detail: result.error });
       notifications.show({
         title: 'Error',
         message: result.userMessage || 'Failed to update message.',
@@ -223,7 +224,7 @@ export default function EnhancedTickerSettings({
 
   const handleActivateMessage = async (messageId: string) => {
     if (!messageId) {
-      console.error('[EnhancedTickerSettings] Cannot activate message: missing ID');
+      clientLogger.error('[EnhancedTickerSettings] Cannot activate message: missing ID');
       notifications.show({
         title: 'Error',
         message: 'Cannot activate message: missing message ID.',
@@ -247,7 +248,7 @@ export default function EnhancedTickerSettings({
         color: 'green',
       });
     } else {
-      console.error('[EnhancedTickerSettings] Failed to activate message:', result.error);
+      clientLogger.error('[EnhancedTickerSettings] Failed to activate message:', { detail: result.error });
       notifications.show({
         title: 'Error',
         message: result.userMessage || 'Failed to activate message.',
@@ -258,7 +259,7 @@ export default function EnhancedTickerSettings({
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!messageId) {
-      console.error('[EnhancedTickerSettings] Cannot delete message: missing ID');
+      clientLogger.error('[EnhancedTickerSettings] Cannot delete message: missing ID');
       notifications.show({
         title: 'Error',
         message: 'Cannot delete message: missing message ID.',
@@ -280,7 +281,7 @@ export default function EnhancedTickerSettings({
         color: 'green',
       });
     } else {
-      console.error('[EnhancedTickerSettings] Failed to delete message:', result.error);
+      clientLogger.error('[EnhancedTickerSettings] Failed to delete message:', { detail: result.error });
       notifications.show({
         title: 'Error',
         message: result.userMessage || 'Failed to delete message.',
@@ -537,7 +538,7 @@ export default function EnhancedTickerSettings({
           onSubmit={messageModal.mode === 'create' ? handleAddMessage : (msg) => {
             const messageId = messageModal.message?.id;
             if (!messageId) {
-              console.error('[EnhancedTickerSettings] Cannot update message: missing ID', messageModal.message);
+              clientLogger.error('[EnhancedTickerSettings] Cannot update message: missing ID', { detail: messageModal.message });
               notifications.show({
                 title: 'Error',
                 message: 'Cannot update message: missing message ID.',

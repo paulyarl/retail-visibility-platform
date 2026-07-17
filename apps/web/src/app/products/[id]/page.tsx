@@ -17,7 +17,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { StorefrontOptionFlags, type ProductOptionFlags, type FeaturedOptionsState, type FeaturedType } from '@/services/CapabilityResolutionService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import LastViewed from '@/components/directory/LastViewed';
@@ -40,6 +40,7 @@ import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageSta
 import { resolveProductLayout, type ProductLayoutKey } from './layouts/types';
 import ProductShowcaseLayout from './ProductShowcaseLayout';
 import ProductQuickCommerceLayout from './ProductQuickCommerceLayout';
+import { clientLogger } from '@/lib/client-logger';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -137,7 +138,7 @@ async function getProduct(id: string): Promise<ProductData | null> {
     const product = await productDataService.fetchProduct(id);
     return product;
   } catch (error) {
-    console.error('[ProductPage] Error fetching product:', error);
+    clientLogger.error('[ProductPage] Error fetching product:', { detail: error });
     return null;
   }
 }
@@ -147,7 +148,7 @@ async function getShopData(tenantId: string) {
     // For now, return null since we don't have shop data in the API response
     return null;
   } catch (error) {
-    console.error('Error fetching shop data:', error);
+    clientLogger.error('Error fetching shop data:', { detail: error });
     return null;
   }
 }
@@ -158,7 +159,7 @@ async function getTenantProfile(tenantId: string) {
     // console.log(`[ProductPage] Tenant profile for ${tenantId}:`, profile);
     return profile || null;
   } catch (error) {
-    console.error('Error fetching tenant profile:', error);
+    clientLogger.error('Error fetching tenant profile:', { detail: error });
     return null;
   }
 }
@@ -172,7 +173,7 @@ async function getFeaturedProductsByType(tenantId: string): Promise<{ counts: Re
     }
     return { counts, groupedProducts: featuredData || {} };
   } catch (error) {
-    console.error('Error fetching featured products by type:', error);
+    clientLogger.error('Error fetching featured products by type:', { detail: error });
     return { counts: {}, groupedProducts: {} };
   }
 }
@@ -231,7 +232,7 @@ async function getStorefrontCategories(tenantId: string) {
     const data = await directoryService.getStorefrontCategories(tenantId);
     return data;
   } catch (error) {
-    console.error('Error fetching storefront categories:', error);
+    clientLogger.error('Error fetching storefront categories:', { detail: error });
     return { categories: [], uncategorizedCount: 0 };
   }
 }
@@ -248,12 +249,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
-  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId, { isPublic: true });
+  const optFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
   const showEnhancedSEO = optFlags?.showEnhancedSEO ?? false;
 
   let storefrontType: string | undefined;
   try {
-    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
+    const storefrontState = await publicUnifiedCapabilityService.getStorefrontState(product.tenantId);
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
     // Non-critical — default to undefined
@@ -353,7 +354,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const { counts: rawBucketCounts, groupedProducts: rawGroupedProducts } = await getFeaturedProductsByType(product.tenantId);
 
   // Fetch featured options state and apply merchant gate filtering at page root
-  const featuredState = await unifiedCapabilityService.getFeaturedOptionsState(product.tenantId, { isPublic: true });
+  const featuredState = await publicUnifiedCapabilityService.getFeaturedOptionsState(product.tenantId);
   const bucketCounts = filterBucketCountsByMerchantPreferences(rawBucketCounts, featuredState);
   const merchantFilteredFeaturedTypes = filterTypesByMerchantPreferences(product.featuredTypes || [], featuredState);
   const merchantFilteredGroupedProducts = filterGroupedProductsByMerchantPreferences(rawGroupedProducts, featuredState);
@@ -362,32 +363,32 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
-  const optFlags = await unifiedCapabilityService.getStorefrontOptionFlags(product.tenantId, { isPublic: true });
-  const productOptFlags = await unifiedCapabilityService.getProductOptionFlags(product.tenantId, { isPublic: true });
-  const faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(product.tenantId, { isPublic: true });
-  const crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(product.tenantId, { isPublic: true });
+  const optFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(product.tenantId);
+  const productOptFlags = await publicUnifiedCapabilityService.getProductOptionFlags(product.tenantId);
+  const faqOptionsFlags = await publicUnifiedCapabilityService.getFaqOptionsFlags(product.tenantId);
+  const crmOptionsFlags = await publicUnifiedCapabilityService.getCrmOptionsFlags(product.tenantId);
   const platformSettings = await platformSettingsService.getPlatformSettings();
 
   // Fetch storefront type for social behavior overlay
   let storefrontType: string | undefined;
   try {
-    const storefrontState = await unifiedCapabilityService.getStorefrontState(product.tenantId, { isPublic: true });
+    const storefrontState = await publicUnifiedCapabilityService.getStorefrontState(product.tenantId);
     storefrontType = storefrontState.effectiveType;
   } catch (e) {
-    console.error('Failed to fetch storefront type:', e);
+    clientLogger.error('Failed to fetch storefront type:', { detail: e });
   }
 
   // Fetch social commerce flags for share buttons + social proof gating
   let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
   try {
-    const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId, { isPublic: true });
+    const socialCommerceState = await publicUnifiedCapabilityService.getSocialCommerceOptionsState(product.tenantId);
     socialCommerceFlags = {
       enabled: socialCommerceState.enabled,
       canUseShareButtons: socialCommerceState.canUseShareButtons,
       canUseSocialProof: socialCommerceState.canUseSocialProof,
     };
   } catch (e) {
-    console.error('Failed to fetch social commerce options:', e);
+    clientLogger.error('Failed to fetch social commerce options:', { detail: e });
   }
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
@@ -563,7 +564,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // Resolve product page layout from storefront preference + preview param
   const { layout_preview } = await searchParams;
   const productLayout: ProductLayoutKey = resolveProductLayout(
-    optFlags?.storefrontLayout,
+    productOptFlags?.effectiveLayout,
     layout_preview,
   );
 
@@ -652,7 +653,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   id: product.tenantId,
                   name: product.tenant?.name,
                   slug: product.tenant?.slug || '',
-                  subscriptionTier: product.tenant?.subscriptionTier,
+                  subscriptionTier: tenant?.subscriptionTier || product.tenant?.subscriptionTier,
                   hasActivePaymentGateway: false,
                   defaultGatewayType: undefined,
                   trialEndsAt: tenantProfile?.trialEndsAt,
@@ -676,7 +677,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 storeStatus={null}
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                 videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} /> : undefined}
-                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
@@ -690,6 +691,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <TenantPaymentProvider tenantId={product.tenantId}>
               <ProductQuickCommerceLayout
+                disableQRCode
                 product={{
                   ...productWithEnrichment,
                   featuredTypes: merchantFilteredFeaturedTypes,
@@ -701,7 +703,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   id: product.tenantId,
                   name: product.tenant?.name,
                   slug: product.tenant?.slug || '',
-                  subscriptionTier: product.tenant?.subscriptionTier,
+                  subscriptionTier: tenant?.subscriptionTier || product.tenant?.subscriptionTier,
                   hasActivePaymentGateway: false,
                   defaultGatewayType: undefined,
                   trialEndsAt: tenantProfile?.trialEndsAt,
@@ -725,7 +727,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 storeStatus={null}
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                 videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} compact /> : undefined}
-                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
@@ -760,6 +762,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     label="Scan to Share"
                     capabilityFlags={optFlags}
                     pageType="product"
+                    isPublic
                   />
                 )}
               </div>
@@ -786,6 +789,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     label="Scan to Share"
                     capabilityFlags={optFlags}
                     pageType="product"
+                    isPublic
                   />
                 )}
               </div>
@@ -809,7 +813,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                       id: product.tenantId,
                       name: product.tenant?.name,
                       slug: product.tenant?.slug || '',
-                      subscriptionTier: product.tenant?.subscriptionTier,
+                      subscriptionTier: tenant?.subscriptionTier || product.tenant?.subscriptionTier,
                       hasActivePaymentGateway: false, // Will be determined by service
                       defaultGatewayType: undefined,
                       trialEndsAt: tenantProfile?.trialEndsAt,
@@ -833,7 +837,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     } as any}
                     storeStatus={null}
                     gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-                    fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} /> : undefined}
+                    fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
                     currentUrl={currentUrl}
                     initialOptFlags={optFlags}
                   />

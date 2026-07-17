@@ -16,7 +16,7 @@ export abstract class BaseService {
    */
   protected handleError(error: unknown, context?: RequestCtx): Error {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    this.logger.error('Service error: ' + errorMessage, context, { error });
+    this.logger.error('Service error: ' + errorMessage, undefined, { error: { name: 'Error', message: String(context) + ' ' + String({ error }) } });
     return new Error(errorMessage);
   }
 

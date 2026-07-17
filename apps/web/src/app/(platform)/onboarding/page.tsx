@@ -10,6 +10,7 @@ import { userManagementService } from '@/services/UserManagementService';
 import { onboardingStateService } from '@/services/OnboardingStateService';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
+import { clientLogger } from '@/lib/client-logger';
 
 const ONBOARDING_STEPS = [
   { id: 'welcome', title: 'Welcome to Visible Shelf!', description: 'Let\'s get your account set up' },
@@ -130,7 +131,7 @@ function OnboardingContent() {
         }
         setCurrentStep(ONBOARDING_STEPS.length - 1); // Show complete step
       } else {
-        console.error('Onboarding failed:', result.error);
+        clientLogger.error('Onboarding failed:', { detail: result.error });
         // Check if it's an authentication error
         if (result.error?.includes('401') || result.error?.includes('Unauthorized') || result.error?.includes('Authentication required')) {
           setError('Authentication failed. Please ensure cookies are enabled and any ad/privacy blockers are disabled for this site, then try again.');
@@ -139,7 +140,7 @@ function OnboardingContent() {
         }
       }
     } catch (error: any) {
-      console.error('Onboarding failed:', error);
+      clientLogger.error('Onboarding failed:', { detail: error });
       // Check for 401 status
       if (error?.status === 401 || error?.message?.includes('401')) {
         setError('Authentication failed. Please ensure cookies are enabled and any ad/privacy blockers are disabled for this site, then try again.');
@@ -219,7 +220,7 @@ function OnboardingContent() {
                   height={60}
                   className="max-h-8 w-auto object-contain mx-auto mb-6"
                   onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    console.error('[SignupWizard] Logo failed to load:', settings.logoUrl);
+                    clientLogger.error('[SignupWizard] Logo failed to load:', { detail: settings.logoUrl });
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     const fallback = target.nextElementSibling as HTMLElement;

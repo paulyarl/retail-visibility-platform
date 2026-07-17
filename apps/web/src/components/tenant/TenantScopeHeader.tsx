@@ -11,6 +11,7 @@ import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import DemoBadge from '@/components/shared/DemoBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TenantScopeHeaderProps {
   tenantId: string;
@@ -58,7 +59,7 @@ export default function TenantScopeHeader({
         setTenantData(info);
         setBusinessProfile(profile);
       } catch (error) {
-        console.error('[TenantScopeHeader] Error loading tenant data:', error);
+        clientLogger.error('[TenantScopeHeader] Error loading tenant data:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -101,7 +102,7 @@ export default function TenantScopeHeader({
         
         setAvailableTenants(list);
       } catch (error) {
-        console.error('[TenantScopeHeader] Error loading available tenants:', error);
+        clientLogger.error('[TenantScopeHeader] Error loading available tenants:', { detail: error });
       }
     };
 
@@ -162,7 +163,7 @@ export default function TenantScopeHeader({
         }
       });
     } catch (error) {
-      console.error('[TenantScopeHeader] Error switching tenant:', error);
+      clientLogger.error('[TenantScopeHeader] Error switching tenant:', { detail: error });
       setSwitching(false);
     }
   };

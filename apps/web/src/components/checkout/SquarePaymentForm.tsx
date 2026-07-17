@@ -14,6 +14,7 @@ declare global {
 }
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { validateMinimumPaymentAmount } from '@/utils/paymentValidation';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SquarePaymentFormProps {
   amount: number;
@@ -329,7 +330,7 @@ function SquarePaymentFormContent({
           const { payment } = data || {};
           
           if (!payment || !payment.id) {
-            console.error('[Square] Invalid payment object:', { payment, response });
+            clientLogger.error('[Square] Invalid payment object:', { payment, response });
             throw new Error('Invalid payment response from server');
           }
           
@@ -342,7 +343,7 @@ function SquarePaymentFormContent({
             expiryYear: payment.cardDetails?.expYear,
           });
         } catch (paymentError) {
-          console.error('Backend payment error:', paymentError);
+          clientLogger.error('Backend payment error:', { detail: paymentError });
           setError(paymentError instanceof Error ? paymentError.message : 'Payment processing failed');
           setIsProcessing(false);
         }
@@ -350,12 +351,12 @@ function SquarePaymentFormContent({
         // Handle tokenization errors gracefully
         const errors = result.errors || [];
         const errorMessage = errors.map((e: any) => e.message).join(', ');
-        console.error('Square tokenization errors:', errors);
+        clientLogger.error('Square tokenization errors:', { detail: errors });
         setError(errorMessage || 'Card validation failed');
         setIsProcessing(false);
       }
     } catch (err) {
-      console.error('Square payment error:', err);
+      clientLogger.error('Square payment error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Payment processing failed');
       setIsProcessing(false);
     }
@@ -498,7 +499,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
         // Check for error response
         if (!orderResponse.success) {
           const errorMsg = orderResponse.message || orderResponse.error || 'Failed to create order';
-          console.error('[SquarePaymentForm] Order creation failed:', orderResponse);
+          clientLogger.error('[SquarePaymentForm] Order creation failed:', { detail: orderResponse });
           throw new Error(errorMsg);
         }
 
@@ -507,7 +508,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
         const payment = responseData.payment;
         
         if (!order?.id) {
-          console.error('[SquarePaymentForm] Invalid order response:', orderResponse);
+          clientLogger.error('[SquarePaymentForm] Invalid order response:', { detail: orderResponse });
           throw new Error('Order creation returned invalid data');
         }
         
@@ -546,7 +547,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
       console.log('Square.js loaded successfully');
     };
     script.onerror = (error) => {
-      console.error('Failed to load Square.js script:', error);
+      clientLogger.error('Failed to load Square.js script:', { detail: error });
       setError('Failed to load Square payment form. Please refresh the page.');
     };
     document.body.appendChild(script);

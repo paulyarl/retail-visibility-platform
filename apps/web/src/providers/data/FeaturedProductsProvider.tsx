@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { featuredProductsSingleton, FeaturedProduct, FeaturedType } from './FeaturedProductsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // CONTEXT TYPES
@@ -68,7 +69,7 @@ export function FeaturedProductsProvider({
       setProducts(allProducts);
       
     } catch (err) {
-      console.error('[FeaturedProductsProvider] Failed to load featured products:', err);
+      clientLogger.error('[FeaturedProductsProvider] Failed to load featured products:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setBuckets(null);
       setProducts([]);
@@ -86,7 +87,7 @@ export function FeaturedProductsProvider({
       await featuredProductsSingleton.refreshFeaturedProducts(tenantId, limit);
       await loadFeaturedProducts();
     } catch (err) {
-      console.error('[FeaturedProductsProvider] Failed to refresh featured products:', err);
+      clientLogger.error('[FeaturedProductsProvider] Failed to refresh featured products:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
@@ -200,7 +201,7 @@ export function useFeaturedProductsStats() {
         const bucketStats = await getStats();
         setStats(bucketStats);
       } catch (err) {
-        console.error('Failed to load featured products stats:', err);
+        clientLogger.error('Failed to load featured products stats:', { detail: err });
       }
     };
     

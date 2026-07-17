@@ -3,6 +3,7 @@ import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { FeaturedProductsService, isValidFeaturedType } from '../services/FeaturedProductsService';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.get('/tenants/:tenantId/featured-products', authenticateToken, checkTenan
       },
     });
   } catch (error: any) {
-    console.error('[GET featured-products] Error:', error);
+    logger.error('[GET featured-products] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_featured_products', message: error.message });
   }
 });
@@ -56,7 +57,7 @@ router.get('/tenants/:tenantId/featured-products/stats', authenticateToken, chec
 
     res.json(stats);
   } catch (error: any) {
-    console.error('[GET featured-products/stats] Error:', error);
+    logger.error('[GET featured-products/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_featured_products_stats', message: error.message });
   }
 });
@@ -75,7 +76,7 @@ router.get('/tenants/:tenantId/featured-products/storefront', async (req, res) =
 
     res.json(groupedFeaturedProducts);
   } catch (error: any) {
-    console.error('[GET featured-products/storefront] Error:', error);
+    logger.error('[GET featured-products/storefront] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_storefront_featured_products', message: error.message });
   }
 });
@@ -124,7 +125,7 @@ router.get('/items/:itemId/featured-types', authenticateToken, async (req, res) 
       featuredTypesArray: featuredTypes.map(ft => ft.featured_type),
     });
   } catch (error: any) {
-    console.error('[GET items/:itemId/featured-types] Error:', error);
+    logger.error('[GET items/:itemId/featured-types] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_featured_types', message: error.message });
   }
 });
@@ -188,7 +189,7 @@ router.post('/items/:itemId/featured-types', authenticateToken, async (req, res)
       featuredProduct,
     });
   } catch (error: any) {
-    console.error('[POST items/:itemId/featured-types] Error:', error);
+    logger.error('[POST items/:itemId/featured-types] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_add_featured_type', message: error.message });
   }
 });
@@ -257,7 +258,7 @@ router.put('/items/:itemId/featured-types/:featuredType', authenticateToken, asy
       featuredProduct: updatedFeaturedProduct,
     });
   } catch (error: any) {
-    console.error('[PUT items/:itemId/featured-types/:featuredType] Error:', error);
+    logger.error('[PUT items/:itemId/featured-types/:featuredType] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_featured_type', message: error.message });
   }
 });
@@ -286,7 +287,7 @@ router.post('/migrate', authenticateToken, async (req, res) => {
       ...result
     });
   } catch (error: any) {
-    console.error('[POST /featured-products/migrate] Error:', error);
+    logger.error('[POST /featured-products/migrate] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_migrate_featured_products', message: error.message });
   }
 });
@@ -312,7 +313,7 @@ router.get('/management', authenticateToken, async (req, res) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('[GET /featured-products/management] Error:', error);
+    logger.error('[GET /featured-products/management] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_management_featured_products', message: error.message });
   }
 });
@@ -362,7 +363,7 @@ router.get('/debug', authenticateToken, async (req, res) => {
       }))
     });
   } catch (error: any) {
-    console.error('[GET /featured-products/debug] Error:', error);
+    logger.error('[GET /featured-products/debug] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_debug_featured_products', message: error.message });
   }
 });
@@ -434,7 +435,7 @@ router.patch('/items/:itemId/featured-types/:featuredType', authenticateToken, a
       featuredProduct: updatedFeaturedProduct,
     });
   } catch (error: any) {
-    console.error('[PATCH items/:itemId/featured-types/:featuredType] Error:', error);
+    logger.error('[PATCH items/:itemId/featured-types/:featuredType] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_featured_type', message: error.message });
   }
 });
@@ -490,7 +491,7 @@ router.delete('/items/:itemId/featured-types/:featuredType', authenticateToken, 
       message: 'featured_type_removed',
     });
   } catch (error: any) {
-    console.error('[DELETE items/:itemId/featured-types/:featuredType] Error:', error);
+    logger.error('[DELETE items/:itemId/featured-types/:featuredType] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_remove_featured_type', message: error.message });
   }
 });
@@ -529,7 +530,7 @@ router.post('/tenants/:tenantId/featured-products/bulk', authenticateToken, chec
       count: featuredProducts.length,
     });
   } catch (error: any) {
-    console.error('[POST featured-products/bulk] Error:', error);
+    logger.error('[POST featured-products/bulk] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_bulk_add_featured_types', message: error.message });
   }
 });

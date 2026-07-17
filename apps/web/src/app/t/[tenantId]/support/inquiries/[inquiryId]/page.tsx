@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFaqOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmInquiry, InquiryStatus, InquiryPriority } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -77,7 +78,7 @@ export default function TenantInquiryDetailPage() {
         );
         setActivities(related);
       } catch (err) {
-        console.error('[Tenant Inquiry Detail] Load error:', err);
+        clientLogger.error('[Tenant Inquiry Detail] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -94,7 +95,7 @@ export default function TenantInquiryDetailPage() {
       );
       setActivities(related);
     } catch (err) {
-      console.error('[Tenant Inquiry Detail] Activity refresh error:', err);
+      clientLogger.error('[Tenant Inquiry Detail] Activity refresh error:', { detail: err });
     }
   }
 
@@ -113,7 +114,7 @@ export default function TenantInquiryDetailPage() {
       setInquiry(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Inquiry Detail] Status change error:', err);
+      clientLogger.error('[Tenant Inquiry Detail] Status change error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -128,7 +129,7 @@ export default function TenantInquiryDetailPage() {
       setInquiry(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Inquiry Detail] Priority change error:', err);
+      clientLogger.error('[Tenant Inquiry Detail] Priority change error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -143,7 +144,7 @@ export default function TenantInquiryDetailPage() {
       setInquiry(updated);
       await refreshActivities();
     } catch (err) {
-      console.error('[Tenant Inquiry Detail] Assign change error:', err);
+      clientLogger.error('[Tenant Inquiry Detail] Assign change error:', { detail: err });
     } finally {
       setUpdating(false);
     }

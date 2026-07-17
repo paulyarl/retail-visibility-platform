@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import GBPAdvancedSyncSingletonService from '../services/GBPAdvancedSyncSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -50,7 +51,7 @@ router.post('/sync-media', async (req, res) => {
       message: 'GBP media items synced successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Sync media error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Sync media error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to sync GBP media items',
@@ -94,7 +95,7 @@ router.post('/fetch-reviews', async (req, res) => {
       message: 'GBP reviews fetched successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Fetch reviews error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Fetch reviews error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch GBP reviews',
@@ -138,7 +139,7 @@ router.post('/create-post', async (req, res) => {
       message: 'GBP post created successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Create post error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Create post error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create GBP post',
@@ -182,7 +183,7 @@ router.get('/stats', async (req, res) => {
       message: 'GBP Advanced sync statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Get stats error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sync statistics'
@@ -215,7 +216,7 @@ router.get('/health', async (req, res) => {
       message: 'GBP Advanced Sync service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Health check error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -247,7 +248,7 @@ router.delete('/cache', async (req, res) => {
       message: 'GBP Advanced Sync service cache cleared successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Clear cache error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -317,7 +318,7 @@ router.post('/test', async (req, res) => {
       message: `GBP Advanced Sync test (${operation}) completed successfully`
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Test error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test GBP Advanced Sync operation',
@@ -376,7 +377,7 @@ router.get('/features', async (req, res) => {
       message: 'Supported GBP Advanced Sync features retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP ADVANCED SYNC SINGLETON] Features error:', error);
+    logger.error('[GBP ADVANCED SYNC SINGLETON] Features error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported features'

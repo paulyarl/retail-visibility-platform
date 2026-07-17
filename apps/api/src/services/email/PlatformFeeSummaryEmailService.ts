@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface FeeSummaryData {
   merchantEmail: string;
@@ -122,12 +123,12 @@ class PlatformFeeSummaryEmailService {
       if (result.success) {
         console.log(`[PlatformFeeSummary] Monthly summary sent to ${summary.merchantEmail}`);
       } else {
-        console.error(`[PlatformFeeSummary] Failed to send summary:`, result.error);
+        logger.error(`[PlatformFeeSummary] Failed to send summary:`, undefined, { error: { name: 'Error', message: result.error } });
       }
 
       return { success: result.success, error: result.error };
     } catch (error: any) {
-      console.error('[PlatformFeeSummary] Error sending monthly summary:', error);
+      logger.error('[PlatformFeeSummary] Error sending monthly summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { success: false, error: error.message };
     }
   }
@@ -174,7 +175,7 @@ class PlatformFeeSummaryEmailService {
       console.log(`[PlatformFeeSummary] Complete. Sent: ${result.sent}, Failed: ${result.failed}`);
       return result;
     } catch (error: any) {
-      console.error('[PlatformFeeSummary] Error in batch send:', error);
+      logger.error('[PlatformFeeSummary] Error in batch send:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(error.message);
       return result;
     }

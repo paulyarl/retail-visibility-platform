@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { basePrisma } from '../../prisma';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -69,7 +70,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(settings);
   } catch (error) {
-    console.error('[GET /api/admin/platform-settings] Error:', error);
+    logger.error('[GET /api/admin/platform-settings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch platform settings' });
   }
 });
@@ -144,7 +145,7 @@ router.put('/', async (req: Request, res: Response) => {
 
     res.json(updatedSettings);
   } catch (error) {
-    console.error('[PUT /api/admin/platform-settings] Error:', error);
+    logger.error('[PUT /api/admin/platform-settings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update platform settings' });
   }
 });
@@ -195,7 +196,7 @@ router.get('/payment', async (req: Request, res: Response) => {
       platformFeePercentage: platformConfig?.default_platform_fee_percent ?? 3.0,
     });
   } catch (error) {
-    console.error('[GET /api/admin/platform-settings/payment] Error:', error);
+    logger.error('[GET /api/admin/platform-settings/payment] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch payment settings' });
   }
 });
@@ -245,7 +246,7 @@ router.put('/payment', async (req: Request, res: Response) => {
       updatedBy: req.user?.email || 'admin',
     });
   } catch (error) {
-    console.error('[PUT /api/admin/platform-settings/payment] Error:', error);
+    logger.error('[PUT /api/admin/platform-settings/payment] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update payment settings' });
   }
 });

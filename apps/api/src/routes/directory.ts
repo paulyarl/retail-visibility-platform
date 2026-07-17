@@ -9,6 +9,7 @@ import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { directoryController } from '../controllers/directory/DirectoryController';
 import { asyncErrorWrapper } from '../middleware/errorHandler';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -294,7 +295,7 @@ router.get('/search', async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[GET /api/directory/search] Error:', error);
+    logger.error('[GET /api/directory/search] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_search_directory' });
   }
 });
@@ -333,7 +334,7 @@ router.get('/categories', async (req, res) => {
 
     return res.json({ categories });
   } catch (error: any) {
-    console.error('[GET /api/directory/categories] Error:', error);
+    logger.error('[GET /api/directory/categories] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_categories' });
   }
 });
@@ -370,7 +371,7 @@ router.get('/locations', async (req, res) => {
       })),
     });
   } catch (error: any) {
-    console.error('[GET /api/directory/locations] Error:', error);
+    logger.error('[GET /api/directory/locations] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_locations' });
   }
 });
@@ -399,7 +400,7 @@ router.get('/tenant/:identifier', async (req, res) => {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       //console.log(`[Directory] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
-      console.error(`[Directory] Error resolving identifier: ${identifier}`, error);
+      logger.error(`[Directory] Error resolving identifier: ${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         error: 'Tenant not found',
         message: `No tenant found for identifier: ${identifier}`
@@ -442,7 +443,7 @@ router.get('/tenant/:identifier', async (req, res) => {
       identifierType: resolvedTenant.type
     });
   } catch (error: any) {
-    console.error('[GET /api/directory/tenant/:identifier] Error:', error);
+    logger.error('[GET /api/directory/tenant/:identifier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_directory_slug' });
   }
 });

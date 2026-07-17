@@ -10,6 +10,7 @@ import { prisma } from '../prisma';
 import { UniversalSingleton, type SingletonCacheOptions } from '../lib/UniversalSingleton';
 import TenantSingletonService  from './TenantSingletonService';
 import GBPCategorySyncSingletonService, { type GBPCategory } from './GBPCategorySyncSingletonService';
+import { logger } from '../logger';
 
 export interface ShopData {
   id: string;
@@ -253,7 +254,7 @@ class ShopManagementService extends UniversalSingleton {
       await this.setCache(cacheKey, shopData);
       return shopData;
     } catch (error) {
-      console.error('Error getting shop data:', error);
+      logger.error('Error getting shop data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -287,7 +288,7 @@ class ShopManagementService extends UniversalSingleton {
         tierName: tier.tier.name
       };
     } catch (error) {
-      console.error('Error checking tenant shop limit:', error);
+      logger.error('Error checking tenant shop limit:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Default to allowing creation if we can't check limits
       return {
         canCreate: true,
@@ -335,7 +336,7 @@ class ShopManagementService extends UniversalSingleton {
       const categories = await this.gbpCategoryService.getAvailableCategories();
       return categories;
     } catch (error) {
-      console.error('Error getting available GBP categories:', error);
+      logger.error('Error getting available GBP categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -359,7 +360,7 @@ class ShopManagementService extends UniversalSingleton {
       
       return shop;
     } catch (error) {
-      console.error('Error setting shop category:', error);
+      logger.error('Error setting shop category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -438,7 +439,7 @@ class ShopManagementService extends UniversalSingleton {
       // Return updated shop data
       return await this.getShop(tenantId) as ShopData;
     } catch (error) {
-      console.error('Error upserting shop:', error);
+      logger.error('Error upserting shop:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -479,7 +480,7 @@ class ShopManagementService extends UniversalSingleton {
 
       return await this.getShop(tenantId) as ShopData;
     } catch (error) {
-      console.error('Error publishing shop:', error);
+      logger.error('Error publishing shop:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -520,7 +521,7 @@ class ShopManagementService extends UniversalSingleton {
 
       return await this.getShop(tenantId) as ShopData;
     } catch (error) {
-      console.error('Error unpublishing shop:', error);
+      logger.error('Error unpublishing shop:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -535,7 +536,7 @@ class ShopManagementService extends UniversalSingleton {
       const shop = await this.getShop(tenantId);
       return shop ? [shop] : [];
     } catch (error) {
-      console.error('Error getting tenant shops:', error);
+      logger.error('Error getting tenant shops:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -572,7 +573,7 @@ class ShopManagementService extends UniversalSingleton {
         });
       }
     } catch (error) {
-      console.error('Error deleting shop:', error);
+      logger.error('Error deleting shop:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -591,7 +592,7 @@ class ShopManagementService extends UniversalSingleton {
       
       // Example: await prisma.directory_listings_list.upsert({...});
     } catch (error) {
-      console.error('Error creating directory listing:', error);
+      logger.error('Error creating directory listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -605,7 +606,7 @@ class ShopManagementService extends UniversalSingleton {
       
       // Example: await prisma.directory_listings_list.deleteMany({where: {tenant_id: tenantId}});
     } catch (error) {
-      console.error('Error removing directory listing:', error);
+      logger.error('Error removing directory listing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -640,7 +641,7 @@ class ShopManagementService extends UniversalSingleton {
         reviews: 0 // Would come from reviews table
       };
     } catch (error) {
-      console.error('Error getting shop analytics:', error);
+      logger.error('Error getting shop analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

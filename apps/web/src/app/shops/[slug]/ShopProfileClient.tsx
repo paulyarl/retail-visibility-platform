@@ -62,6 +62,7 @@ import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 interface DirectoryConsolidated {
@@ -537,7 +538,7 @@ export default function ShopProfileClient({
         
         setCategories(cats);
       } catch (error) {
-        console.error('Failed to fetch categories:', error);
+        clientLogger.error('Failed to fetch categories:', { detail: error });
       }
     };
     
@@ -581,7 +582,7 @@ export default function ShopProfileClient({
           setFeaturedCounts(counts);
         }
       } catch (error) {
-        console.error('Failed to load featured products:', error);
+        clientLogger.error('Failed to load featured products:', { detail: error });
       }
     };
     

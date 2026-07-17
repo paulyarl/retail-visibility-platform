@@ -12,7 +12,7 @@ interface BotDashboardPageProps {
 }
 
 export default function BotDashboardPage({ tenantId }: BotDashboardPageProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
 
   return (
     <div className="space-y-6">

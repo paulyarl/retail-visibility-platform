@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface UserInfo {
   id: string;
@@ -64,7 +65,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to get user:', result.error);
+      clientLogger.error('[UserManagementService] Failed to get user:', { detail: result.error });
       return null;
     }
 
@@ -83,7 +84,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to get user preferences:', result.error);
+      clientLogger.error('[UserManagementService] Failed to get user preferences:', { detail: result.error });
       return null;
     }
 
@@ -108,7 +109,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to update user preferences:', result.error);
+      clientLogger.error('[UserManagementService] Failed to update user preferences:', { detail: result.error });
       throw result.error;
     }
 
@@ -168,7 +169,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to update user profile:', result.error);
+      clientLogger.error('[UserManagementService] Failed to update user profile:', { detail: result.error });
       throw result.error;
     }
 
@@ -205,7 +206,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to update profile:', result.error);
+      clientLogger.error('[UserManagementService] Failed to update profile:', { detail: result.error });
       throw result.error;
     }
 
@@ -233,7 +234,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to change password:', result.error);
+      clientLogger.error('[UserManagementService] Failed to change password:', { detail: result.error });
       throw result.error;
     }
   }
@@ -250,7 +251,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to enable 2FA:', result.error);
+      clientLogger.error('[UserManagementService] Failed to enable 2FA:', { detail: result.error });
       throw result.error;
     }
 
@@ -271,7 +272,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to verify 2FA:', result.error);
+      clientLogger.error('[UserManagementService] Failed to verify 2FA:', { detail: result.error });
       throw result.error;
     }
 
@@ -292,7 +293,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to disable 2FA:', result.error);
+      clientLogger.error('[UserManagementService] Failed to disable 2FA:', { detail: result.error });
       throw result.error;
     }
   }
@@ -309,7 +310,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to get user activity:', result.error);
+      clientLogger.error('[UserManagementService] Failed to get user activity:', { detail: result.error });
       return [];
     }
 
@@ -330,7 +331,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to delete account:', result.error);
+      clientLogger.error('[UserManagementService] Failed to delete account:', { detail: result.error });
       throw result.error;
     }
 
@@ -361,7 +362,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[UserManagementService] Failed to complete onboarding:', result.error);
+      clientLogger.error('[UserManagementService] Failed to complete onboarding:', { detail: result.error });
       const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to complete onboarding';
       return { success: false, error: errorMsg };
     }

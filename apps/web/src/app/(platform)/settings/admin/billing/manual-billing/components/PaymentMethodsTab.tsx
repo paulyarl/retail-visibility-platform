@@ -40,6 +40,7 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { manualBillingService, type ManualPaymentMethod } from '@/services/ManualBillingService';
 import { useBillingData } from '../../hooks/useBillingData';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function PaymentMethodsTab() {
   const { tenants, loading: tenantsLoading } = useBillingData();
@@ -97,7 +98,7 @@ export default function PaymentMethodsTab() {
       setPaymentMethods(paymentMethods);
       setTotalPages(Math.ceil(paymentMethods.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching payment methods:', error);
+      clientLogger.error('Error fetching payment methods:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to fetch payment methods',
@@ -135,7 +136,7 @@ export default function PaymentMethodsTab() {
         });
       }
     } catch (error) {
-      console.error('Error adding payment method:', error);
+      clientLogger.error('Error adding payment method:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to add payment method',
@@ -201,7 +202,7 @@ export default function PaymentMethodsTab() {
         });
       }
     } catch (error) {
-      console.error('Error editing payment method:', error);
+      clientLogger.error('Error editing payment method:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to edit payment method',
@@ -232,7 +233,7 @@ export default function PaymentMethodsTab() {
         });
       }
     } catch (error) {
-      console.error('Error deleting payment method:', error);
+      clientLogger.error('Error deleting payment method:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to delete payment method',

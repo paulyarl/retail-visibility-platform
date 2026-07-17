@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import DigitalAssetSingletonService from '../services/DigitalAssetSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -62,7 +63,7 @@ router.post('/upload', async (req, res) => {
       message: 'File uploaded successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Upload error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to upload file',
@@ -113,7 +114,7 @@ router.get('/asset/:assetId', async (req, res) => {
       message: 'Asset retrieved successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Get asset error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Get asset error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve asset'
@@ -148,7 +149,7 @@ router.post('/signed-url', async (req, res) => {
       message: 'Signed URL generated successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Signed URL error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Signed URL error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to generate signed URL'
@@ -197,7 +198,7 @@ router.post('/external-link', async (req, res) => {
       message: 'External link created successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] External link error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] External link error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create external link'
@@ -246,7 +247,7 @@ router.post('/license-key', async (req, res) => {
       message: 'License key created successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] License key error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] License key error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create license key'
@@ -295,7 +296,7 @@ router.delete('/asset/:assetId', async (req, res) => {
       message: 'Asset deleted successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Delete asset error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Delete asset error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete asset'
@@ -330,7 +331,7 @@ router.get('/stats', async (req, res) => {
       message: 'Asset statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Get stats error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch asset statistics'
@@ -376,7 +377,7 @@ router.get('/tenant-assets', async (req, res) => {
       message: 'Tenant assets retrieved successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Get tenant assets error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Get tenant assets error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tenant assets'
@@ -401,7 +402,7 @@ router.get('/health', async (req, res) => {
       message: 'Digital asset service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Health check error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -435,7 +436,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Cache cleared successfully'
     });
   } catch (error) {
-    console.error('[DIGITAL ASSET SINGLETON] Clear cache error:', error);
+    logger.error('[DIGITAL ASSET SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'

@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import CrmOptionsService from '../services/CrmOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -154,7 +155,7 @@ router.get('/:tenantId/crm-options', authenticateToken, async (req, res) => {
 
     res.json({ success: true, settings: tierFilteredSettings, tierState });
   } catch (error) {
-    console.error('Error fetching CRM options settings:', error);
+    logger.error('Error fetching CRM options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch CRM options settings' });
   }
 });
@@ -288,7 +289,7 @@ router.put('/:tenantId/crm-options', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error updating CRM options settings:', error);
+    logger.error('Error updating CRM options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update CRM options settings' });
   }
 });
@@ -325,7 +326,7 @@ router.get('/public/tenant/:tenantId/crm-options', async (req, res) => {
 
     res.json({ success: true, settings: publicSettings, tierState });
   } catch (error) {
-    console.error('Error fetching public CRM options settings:', error);
+    logger.error('Error fetching public CRM options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch CRM options settings' });
   }
 });
@@ -338,7 +339,7 @@ router.get('/:tenantId/crm-options/capability', authenticateToken, async (req, r
     const state = await crmService.resolveCrmOptionsState(tenantId);
     res.json({ success: true, capability: state });
   } catch (error) {
-    console.error('Error resolving CRM options capability:', error);
+    logger.error('Error resolving CRM options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to resolve CRM options capability' });
   }
 });

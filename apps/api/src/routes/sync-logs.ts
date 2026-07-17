@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -79,8 +80,8 @@ router.get('/api/admin/sync-logs', authenticateToken, requireAdmin, async (req: 
       },
     });
   } catch (e: any) {
-    console.error('[sync-logs] Error:', e);
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    logger.error('[sync-logs] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 
@@ -160,8 +161,8 @@ router.get('/api/admin/sync-stats', authenticateToken, requireAdmin, async (req:
       },
     });
   } catch (e: any) {
-    console.error('[sync-stats] Error:', e);
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    logger.error('[sync-stats] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 

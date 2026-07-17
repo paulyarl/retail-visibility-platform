@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface User {
   id: string;
@@ -44,7 +45,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantUserService] Failed to get tenant users:', result.error);
+      clientLogger.error('[TenantUserService] Failed to get tenant users:', { detail: result.error });
       return null;
     }
 
@@ -73,7 +74,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantUserService] Failed to add tenant user:', result.error);
+      clientLogger.error('[TenantUserService] Failed to add tenant user:', { detail: result.error });
       throw result.error;
     }
 
@@ -101,7 +102,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantUserService] Failed to update tenant user role:', result.error);
+      clientLogger.error('[TenantUserService] Failed to update tenant user role:', { detail: result.error });
       throw result.error;
     }
 
@@ -126,7 +127,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantUserService] Failed to remove tenant user:', result.error);
+      clientLogger.error('[TenantUserService] Failed to remove tenant user:', { detail: result.error });
       throw result.error;
     }
 

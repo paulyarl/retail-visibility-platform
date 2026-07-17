@@ -7,6 +7,7 @@ import { z } from 'zod';
 import StorefrontQrService from '../services/StorefrontQrService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateStorefrontQrSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -26,9 +27,13 @@ const storefrontQrSettingsSchema = z.object({
   // QR Code Style group
   qr_dot_type: z.string().optional(),
   qr_corner_type: z.string().optional(),
+  qr_corner_dot_type: z.string().optional(),
+  qr_corner_dot_color: z.string().optional(),
+  qr_logo_shape: z.string().optional(),
   qr_dot_color: z.string().optional(),
   qr_corner_color: z.string().optional(),
   qr_bg_color: z.string().optional(),
+  qr_custom_colors_enabled: z.boolean().optional(),
   qr_gradient_enabled: z.boolean().optional(),
   qr_gradient_start: z.string().optional(),
   qr_gradient_end: z.string().optional(),
@@ -50,9 +55,13 @@ export const DEFAULT_QR_SETTINGS = {
   qr_directory: false,
   qr_dot_type: 'rounded',
   qr_corner_type: 'extra-rounded',
+  qr_corner_dot_type: 'dot',
+  qr_corner_dot_color: '#ffffff',
+  qr_logo_shape: 'square',
   qr_dot_color: '#1a56db',
   qr_corner_color: '#1a56db',
   qr_bg_color: '#ffffff',
+  qr_custom_colors_enabled: false,
   qr_gradient_enabled: false,
   qr_gradient_start: '#1a56db',
   qr_gradient_end: '#7c3aed',
@@ -84,6 +93,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
           qr_logo: false,
           qr_directory: false,
           qr_gradient_enabled: false,
+          qr_custom_colors_enabled: false,
         },
         tierState,
       });
@@ -116,18 +126,26 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
     if (tierState.qrStyledEnabled) {
       tierFilteredSettings.qr_dot_type = rawSettings.qr_dot_type || 'rounded';
       tierFilteredSettings.qr_corner_type = rawSettings.qr_corner_type || 'extra-rounded';
+      tierFilteredSettings.qr_corner_dot_type = rawSettings.qr_corner_dot_type || 'dot';
+      tierFilteredSettings.qr_corner_dot_color = rawSettings.qr_corner_dot_color || '#ffffff';
+      tierFilteredSettings.qr_logo_shape = rawSettings.qr_logo_shape || 'square';
       tierFilteredSettings.qr_dot_color = rawSettings.qr_dot_color || '#1a56db';
       tierFilteredSettings.qr_corner_color = rawSettings.qr_corner_color || '#1a56db';
       tierFilteredSettings.qr_bg_color = rawSettings.qr_bg_color || '#ffffff';
+      tierFilteredSettings.qr_custom_colors_enabled = tierState.qrCustomColors ? !!rawSettings.qr_custom_colors_enabled : false;
       tierFilteredSettings.qr_gradient_enabled = tierState.qrGradients ? !!rawSettings.qr_gradient_enabled : false;
       tierFilteredSettings.qr_gradient_start = rawSettings.qr_gradient_start || '#1a56db';
       tierFilteredSettings.qr_gradient_end = rawSettings.qr_gradient_end || '#7c3aed';
     } else {
       tierFilteredSettings.qr_dot_type = 'rounded';
       tierFilteredSettings.qr_corner_type = 'extra-rounded';
+      tierFilteredSettings.qr_corner_dot_type = 'dot';
+      tierFilteredSettings.qr_corner_dot_color = '#ffffff';
+      tierFilteredSettings.qr_logo_shape = 'square';
       tierFilteredSettings.qr_dot_color = '#1a56db';
       tierFilteredSettings.qr_corner_color = '#1a56db';
       tierFilteredSettings.qr_bg_color = '#ffffff';
+      tierFilteredSettings.qr_custom_colors_enabled = false;
       tierFilteredSettings.qr_gradient_enabled = false;
       tierFilteredSettings.qr_gradient_start = '#1a56db';
       tierFilteredSettings.qr_gradient_end = '#7c3aed';
@@ -142,7 +160,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching storefront QR settings:', error);
+    logger.error('Error fetching storefront QR settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -210,9 +228,13 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
         qr_directory: settings.qr_directory,
         qr_dot_type: settings.qr_dot_type,
         qr_corner_type: settings.qr_corner_type,
+        qr_corner_dot_type: settings.qr_corner_dot_type,
+        qr_corner_dot_color: settings.qr_corner_dot_color,
+        qr_logo_shape: settings.qr_logo_shape,
         qr_dot_color: settings.qr_dot_color,
         qr_corner_color: settings.qr_corner_color,
         qr_bg_color: settings.qr_bg_color,
+        qr_custom_colors_enabled: settings.qr_custom_colors_enabled,
         qr_gradient_enabled: settings.qr_gradient_enabled,
         qr_gradient_start: settings.qr_gradient_start,
         qr_gradient_end: settings.qr_gradient_end,
@@ -220,7 +242,7 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
       },
     });
   } catch (error) {
-    console.error('Error updating storefront QR settings:', error);
+    logger.error('Error updating storefront QR settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

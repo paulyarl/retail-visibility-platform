@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { clear } from '../lib/cache-service';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.post('/invalidate', authenticateToken, async (req, res) => {
         results.push({ pattern, status: 'success' });
         console.log(`[Cache Invalidation] Cleared pattern: ${pattern}`);
       } catch (error) {
-        console.error(`[Cache Invalidation] Failed to clear pattern ${pattern}:`, error);
+        logger.error(`[Cache Invalidation] Failed to clear pattern ${pattern}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.push({ pattern, status: 'error', error: error instanceof Error ? error.message : String(error) });
       }
     }
@@ -45,7 +46,7 @@ router.post('/invalidate', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Cache Invalidation] Error:', error);
+    logger.error('[Cache Invalidation] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Cache invalidation failed' });
   }
 });
@@ -86,7 +87,7 @@ router.post('/invalidate/tenants', authenticateToken, async (req, res) => {
         results.push({ pattern, status: 'success' });
         console.log(`[Cache Invalidation] Cleared pattern: ${pattern}`);
       } catch (error) {
-        console.error(`[Cache Invalidation] Failed to clear pattern ${pattern}:`, error);
+        logger.error(`[Cache Invalidation] Failed to clear pattern ${pattern}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.push({ pattern, status: 'error', error: error instanceof Error ? error.message : String(error) });
       }
     }
@@ -106,7 +107,7 @@ router.post('/invalidate/tenants', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Cache Invalidation] Tenant cache error:', error);
+    logger.error('[Cache Invalidation] Tenant cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Tenant cache invalidation failed' });
   }
 });

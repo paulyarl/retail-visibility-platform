@@ -40,6 +40,7 @@ import {
   IconBuildingStore
 } from '@tabler/icons-react';
 import { locationAvailabilityService, LocationAvailability, MultiLocationAvailability } from '@/services/LocationAvailabilityService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface LocationAvailabilitySectionProps {
   productSlug: string;
@@ -127,7 +128,7 @@ export function LocationAvailabilitySection({
 
         setAvailability(result);
       } catch (err) {
-        console.error('Error fetching availability:', err);
+        clientLogger.error('Error fetching availability:', { detail: err });
         setError('Unable to load availability information');
       } finally {
         setLoading(false);

@@ -25,7 +25,7 @@ import {
   StorefrontOptQRContentType,
   StorefrontOptGalleryType,
   StorefrontOptAdvancedType,
-  StorefrontOptLayoutType,
+  StorefrontLayoutType,
   FaqManagementType,
   FaqPreviewType,
   FaqDisplayType,
@@ -160,7 +160,6 @@ const STOREFRONT_OPT_RECOMMEND_LABELS: Record<StorefrontOptRecommendType, string
 const STOREFRONT_OPT_INFO_LABELS: Record<StorefrontOptInfoType, string> = {
   storefront_social_media: 'Social Media',
   storefront_contact: 'Contact Info',
-  interactive_maps: 'Maps',
 };
 
 const STOREFRONT_OPT_QR_RESOLUTION_LABELS: Record<StorefrontOptQRResolutionType, string> = {
@@ -187,7 +186,7 @@ const STOREFRONT_OPT_ADVANCED_LABELS: Record<StorefrontOptAdvancedType, string> 
   storefront_actions: 'CTA Buttons',
 };
 
-const STOREFRONT_OPT_LAYOUT_LABELS: Record<StorefrontOptLayoutType, string> = {
+const STOREFRONT_OPT_LAYOUT_LABELS: Record<StorefrontLayoutType, string> = {
   classic: 'Classic Layout',
   editorial: 'Editorial Layout',
   immersive: 'Immersive Layout',
@@ -257,6 +256,8 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   storefront_qr: { label: 'QR Codes', icon: '📱', settingsPath: '/settings/storefront-qr' },
   storefront_gallery: { label: 'Image Gallery', icon: '🖼️', settingsPath: '/settings/storefront-gallery' },
   storefront_hours: { label: 'Business Hours', icon: '🕐', settingsPath: '/settings/storefront-hours' },
+  storefront_layouts: { label: 'Storefront Layout', icon: '📐', settingsPath: '/settings/storefront-layouts' },
+  storefront_maps: { label: 'Storefront Maps', icon: '🗺️', settingsPath: '/settings/storefront-maps' },
   faq_options: { label: 'FAQ Options', icon: '❓', settingsPath: '/faq/options' },
   crm_options: { label: 'CRM', icon: '🤝', settingsPath: '/settings/crm-options' },
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
@@ -264,6 +265,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
+  funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -596,17 +598,11 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     const addSo = (label: string, tierAllowed: boolean, effective: boolean) => {
       if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
     };
-    so.allowedHoursTypes.forEach(t => addSo(STOREFRONT_OPT_HOURS_LABELS[t], true, t === 'hours_animated' ? so.canUseAnimatedHours : t === 'hours_status' ? so.canShowHoursStatus : false));
     so.allowedCategoryTypes.forEach(t => addSo(STOREFRONT_OPT_CATEGORY_LABELS[t], true, t === 'category_store' ? so.canUseCategoryStore : t === 'category_product' ? so.canUseCategoryProduct : false));
     so.allowedRecommendTypes.forEach(t => addSo(STOREFRONT_OPT_RECOMMEND_LABELS[t], true, t === 'recommend_store' ? so.canUseRecommendStore : t === 'recommend_products' ? so.canUseRecommendProducts : false));
     addSo('Recently Viewed', so.recentlyViewedEnabled, so.canUseRecentlyViewed);
-    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : t === 'interactive_maps' ? so.canUseInteractiveMaps : false));
-    so.allowedQRResolutions.forEach(t => addSo(STOREFRONT_OPT_QR_RESOLUTION_LABELS[t], true, so.canUseQRCodes));
-    so.allowedQRContentTypes.forEach(t => addSo(STOREFRONT_OPT_QR_CONTENT_LABELS[t], true, so.canUseQRCodes));
-    so.allowedGalleryTypes.forEach(t => addSo(STOREFRONT_OPT_GALLERY_LABELS[t], true, true));
+    so.allowedInfoTypes.forEach(t => addSo(STOREFRONT_OPT_INFO_LABELS[t], true, t === 'storefront_social_media' ? so.canUseSocialMedia : t === 'storefront_contact' ? so.canUseContact : false));
     so.allowedAdvancedTypes.forEach(t => addSo(STOREFRONT_OPT_ADVANCED_LABELS[t], true, t === 'enhanced_seo' ? so.canUseEnhancedSEO : t === 'storefront_actions' ? so.canUseStorefrontActions : false));
-    // Layouts
-    so.allowedLayouts.forEach(t => addSo(STOREFRONT_OPT_LAYOUT_LABELS[t], true, t === 'classic' ? so.canUseLayoutClassic : t === 'editorial' ? so.canUseLayoutEditorial : so.canUseLayoutImmersive));
     summaries.push({
       key: 'storefront_options',
       label: CAPABILITY_DISPLAY.storefront_options.label,
@@ -701,6 +697,52 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'storefront_hours',
       settingsPath: CAPABILITY_DISPLAY.storefront_hours.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Layouts — list layout types
+  const sl = caps.storefrontLayouts;
+  if (sl && sl.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSl = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    sl.allowedLayouts.forEach(t => addSl(STOREFRONT_OPT_LAYOUT_LABELS[t], true, t === 'classic' ? sl.canUseLayoutClassic : t === 'editorial' ? sl.canUseLayoutEditorial : sl.canUseLayoutImmersive));
+    summaries.push({
+      key: 'storefront_layouts',
+      label: CAPABILITY_DISPLAY.storefront_layouts.label,
+      icon: CAPABILITY_DISPLAY.storefront_layouts.icon,
+      enabled: sl.enabled,
+      merchantGated: merchantGates?.['storefront_layouts'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_layouts',
+      settingsPath: CAPABILITY_DISPLAY.storefront_layouts.settingsPath ?? null,
+    });
+  }
+
+  // Storefront Maps — list map features
+  const sm = caps.storefrontMaps;
+  if (sm && sm.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const addSm = (label: string, tierAllowed: boolean, effective: boolean) => {
+      if (tierAllowed && label) { specifics.push(label); statuses.push({ label, status: effective ? 'enabled' : 'merchant-gated' }); }
+    };
+    addSm('Interactive Maps', sm.canUseInteractiveMaps, sm.canUseInteractiveMaps);
+    addSm('Map Display', sm.canShowMapDisplay, sm.canShowMapDisplay);
+    addSm('Location Display', sm.canShowLocationDisplay, sm.canShowLocationDisplay);
+    summaries.push({
+      key: 'storefront_maps',
+      label: CAPABILITY_DISPLAY.storefront_maps.label,
+      icon: CAPABILITY_DISPLAY.storefront_maps.icon,
+      enabled: sm.enabled,
+      merchantGated: merchantGates?.['storefront_maps'] ?? false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'storefront_maps',
+      settingsPath: CAPABILITY_DISPLAY.storefront_maps.settingsPath ?? null,
     });
   }
 
@@ -955,6 +997,28 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'platform_services',
       settingsPath: CAPABILITY_DISPLAY.platform_services.settingsPath ?? null,
+    });
+  }
+
+  // Funnel Options
+  const fn = caps.funnel;
+  if (fn && fn.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (fn.canUseOrderBump) { specifics.push('Order Bump'); statuses.push({ label: 'Order Bump', status: 'enabled' }); }
+    if (fn.canUseUpsell) { specifics.push('Upsell'); statuses.push({ label: 'Upsell', status: 'enabled' }); }
+    if (fn.canUseDownsell) { specifics.push('Downsell'); statuses.push({ label: 'Downsell', status: 'enabled' }); }
+    if (fn.canUseOto) { specifics.push('One-Time Offer'); statuses.push({ label: 'One-Time Offer', status: 'enabled' }); }
+    summaries.push({
+      key: 'funnel_options',
+      label: CAPABILITY_DISPLAY.funnel_options.label,
+      icon: CAPABILITY_DISPLAY.funnel_options.icon,
+      enabled: fn.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'funnel_options',
+      settingsPath: CAPABILITY_DISPLAY.funnel_options.settingsPath ?? null,
     });
   }
 

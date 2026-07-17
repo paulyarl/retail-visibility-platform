@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // TypeScript interfaces for hours status
 export interface StoreStatus {
@@ -78,7 +79,7 @@ class HoursStatusService extends PublicApiSingleton {
         );
 
         if (!response.success || !response.data) {
-          console.error('[HoursStatusService] Failed to get store status:', response.error);
+          clientLogger.error('[HoursStatusService] Failed to get store status:', { detail: response.error });
           return null;
         }
 
@@ -92,7 +93,7 @@ class HoursStatusService extends PublicApiSingleton {
 
         return statusData;
       } catch (error) {
-        console.error('[HoursStatusService] Error fetching store status:', error);
+        clientLogger.error('[HoursStatusService] Error fetching store status:', { detail: error });
         return null;
       } finally {
         // Clean up in-flight promise once settled
@@ -118,7 +119,7 @@ class HoursStatusService extends PublicApiSingleton {
           results.set(tenantId, status);
         }
       } catch (error) {
-        console.error(`[HoursStatusService] Failed to fetch hours status for ${tenantId}:`, error);
+        clientLogger.error(`[HoursStatusService] Failed to fetch hours status for ${tenantId}:`, { detail: error });
         // Continue with other requests even if one fails
       }
     });

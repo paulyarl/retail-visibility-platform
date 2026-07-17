@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface InlineStockEditorProps {
   itemId: string;
@@ -63,7 +64,7 @@ export default function InlineStockEditor({
         console.log(`[InlineStockEditor] Update complete, editor closed`);
       }, 100);
     } catch (error) {
-      console.error('[InlineStockEditor] Failed to update stock:', error);
+      clientLogger.error('[InlineStockEditor] Failed to update stock:', { detail: error });
       alert(`Failed to update stock: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setStockValue(currentStock.toString());
     } finally {

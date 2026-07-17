@@ -5,6 +5,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { logger } from '../../logger';
 
 export interface DigitalAsset {
   id: string;
@@ -83,7 +84,7 @@ export class DigitalAssetService {
       });
 
     if (error) {
-      console.error('[DigitalAsset] Upload error:', error);
+      logger.error('[DigitalAsset] Upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error(`Failed to upload file: ${error.message}`);
     }
 
@@ -155,7 +156,7 @@ export class DigitalAssetService {
       .createSignedUrl(filePath, expiresIn);
 
     if (error) {
-      console.error('[DigitalAsset] Signed URL error:', error);
+      logger.error('[DigitalAsset] Signed URL error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error(`Failed to generate signed URL: ${error.message}`);
     }
 
@@ -176,14 +177,14 @@ export class DigitalAssetService {
         .list(filePath.split('/').slice(0, -1).join('/'));
 
       if (error) {
-        console.error('[DigitalAsset] Validation error:', error);
+        logger.error('[DigitalAsset] Validation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return false;
       }
 
       const fileName = filePath.split('/').pop();
       return data?.some(file => file.name === fileName) || false;
     } catch (error) {
-      console.error('[DigitalAsset] Validation error:', error);
+      logger.error('[DigitalAsset] Validation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -197,7 +198,7 @@ export class DigitalAssetService {
       .remove([filePath]);
 
     if (error) {
-      console.error('[DigitalAsset] Delete error:', error);
+      logger.error('[DigitalAsset] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error(`Failed to delete asset: ${error.message}`);
     }
   }
@@ -216,7 +217,7 @@ export class DigitalAssetService {
         .list(filePath.split('/').slice(0, -1).join('/'));
 
       if (error) {
-        console.error('[DigitalAsset] Metadata error:', error);
+        logger.error('[DigitalAsset] Metadata error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return null;
       }
 
@@ -231,7 +232,7 @@ export class DigitalAssetService {
         lastModified: file.updated_at || file.created_at || new Date().toISOString(),
       };
     } catch (error) {
-      console.error('[DigitalAsset] Metadata error:', error);
+      logger.error('[DigitalAsset] Metadata error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -258,7 +259,7 @@ export class DigitalAssetService {
 
       return !error;
     } catch (error) {
-      console.error('[DigitalAsset] Bucket access check failed:', error);
+      logger.error('[DigitalAsset] Bucket access check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

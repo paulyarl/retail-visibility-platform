@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PublicBrandingSettings {
   platformName: string;
@@ -65,13 +66,13 @@ class PublicBrandingService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[PublicBrandingService] Failed to get public branding:', response.error);
+        clientLogger.error('[PublicBrandingService] Failed to get public branding:', { detail: response.error });
         return null;
       }
 
       return response.data || null;
     } catch (error) {
-      console.error('[PublicBrandingService] Error getting public branding:', error);
+      clientLogger.error('[PublicBrandingService] Error getting public branding:', { detail: error });
       return null;
     }
   }

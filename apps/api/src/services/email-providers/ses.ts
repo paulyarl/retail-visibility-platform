@@ -1,4 +1,5 @@
 import { EmailProvider, SendEmailParams, EmailResult } from '../email-service';
+import { logger } from '../../logger';
 
 export class SESEmailProvider implements EmailProvider {
   private region: string;
@@ -54,7 +55,7 @@ export class SESEmailProvider implements EmailProvider {
         provider: 'aws-ses',
       };
     } catch (error: any) {
-      console.error('[AWS SES] Email send failed:', error);
+      logger.error('[AWS SES] Email send failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       return {
         success: false,
@@ -67,12 +68,12 @@ export class SESEmailProvider implements EmailProvider {
   async validateConfig(): Promise<boolean> {
     try {
       if (!this.accessKeyId || !this.secretAccessKey) {
-        console.error('[AWS SES] Credentials not configured');
+        logger.error('[AWS SES] Credentials not configured', undefined);
         return false;
       }
 
       if (!this.fromEmail) {
-        console.error('[AWS SES] From email not configured');
+        logger.error('[AWS SES] From email not configured', undefined);
         return false;
       }
 
@@ -83,7 +84,7 @@ export class SESEmailProvider implements EmailProvider {
       console.log('[AWS SES] Configuration validated successfully');
       return true;
     } catch (error) {
-      console.error('[AWS SES] Configuration validation error:', error);
+      logger.error('[AWS SES] Configuration validation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

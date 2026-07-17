@@ -9,6 +9,7 @@ import { CustomerInfoForm } from '@/components/checkout/CustomerInfoForm';
 import FulfillmentMethodForm, { FulfillmentMethod } from '@/components/checkout/FulfillmentMethodForm';
 import { ShippingAddressFormWithSaved } from '@/components/checkout/ShippingAddressFormWithSaved';
 import { GuestSavePaymentMethodPrompt } from '@/components/checkout/GuestSavePaymentMethodPrompt';
+import { OrderBump } from '@/components/checkout/OrderBump';
 import PayPalPaymentForm from '@/components/checkout/PayPalPaymentForm';
 import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import StripePaymentForm from '@/components/checkout/StripePaymentForm';
@@ -19,7 +20,7 @@ import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart, validateFulfillmentMethod } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethodsService';
 import { customerAuthService } from '@/services/CustomerAuthService';
 import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
@@ -67,8 +68,8 @@ function CheckoutPageContent() {
   const { isAuthenticated } = useCustomerAuth();
 
   // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(tenantId);
-  const paymentCap = usePaymentGatewayCapability(tenantId);
+  const commerceCap = usePublicCommerceCapability(tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(tenantId);
 
   // Tier 3 Commitment - Deposit state
   const [tenantTier, setTenantTier] = useState<string | null>(null);
@@ -746,6 +747,16 @@ function CheckoutPageContent() {
                     />
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Order Bump Offer (review step) */}
+              {currentStep === 'review' && tenantId && cartItems.length > 0 && (
+                <OrderBump
+                  tenantId={tenantId}
+                  triggerProductId={cartItems[0]?.product_id}
+                  cartValueCents={subtotal}
+                  customerId={customerId || undefined}
+                />
               )}
 
               {/* Step 2: Fulfillment Method */}

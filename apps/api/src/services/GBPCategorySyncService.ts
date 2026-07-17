@@ -8,6 +8,7 @@ import { google } from 'googleapis';
 import { prisma } from '../prisma';
 import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oauth';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 interface GBPCategory {
   categoryId: string;
@@ -36,7 +37,7 @@ export class GBPCategorySyncService {
       await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_category_products');
       console.log('[GBPCategorySync] Refreshed directory_category_products MV after GBP category changes');
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to refresh MV:', error);
+      logger.error('[GBPCategorySync] Failed to refresh MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Don't throw error - this is non-critical
     }
   }
@@ -52,7 +53,7 @@ export class GBPCategorySyncService {
       });
 
       if (!tokenRecord) {
-        console.error('[GBPCategorySync] No Google OAuth token found for GBP categories');
+        logger.error('[GBPCategorySync] No Google OAuth token found for GBP categories', undefined);
         return null;
       }
 
@@ -64,7 +65,7 @@ export class GBPCategorySyncService {
         const newTokens = await refreshAccessToken(refreshToken);
 
         if (!newTokens) {
-          console.error('[GBPCategorySync] Failed to refresh token for GBP categories');
+          logger.error('[GBPCategorySync] Failed to refresh token for GBP categories', undefined);
           return null;
         }
 
@@ -83,7 +84,7 @@ export class GBPCategorySyncService {
 
       return decryptToken(tokenRecord.access_token_encrypted);
     } catch (error) {
-      console.error('[GBPCategorySync] Error getting valid access token:', error);
+      logger.error('[GBPCategorySync] Error getting valid access token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -146,7 +147,7 @@ export class GBPCategorySyncService {
             const newAccessToken = await this.refreshAccessToken(integration.refresh_token);
             return newAccessToken;
           } catch (refreshError) {
-            console.error('[GBPCategorySync] Token refresh failed:', refreshError);
+            logger.error('[GBPCategorySync] Token refresh failed:', undefined, { error: { name: (refreshError as any)?.name || 'Error', message: (refreshError as any)?.message || String(refreshError), stack: (refreshError as any)?.stack } });
             return null;
           }
         }
@@ -158,7 +159,7 @@ export class GBPCategorySyncService {
       console.log('[GBPCategorySync] Returning valid access token');
       return accessToken;
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to get access token:', error);
+      logger.error('[GBPCategorySync] Failed to get access token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -187,7 +188,7 @@ export class GBPCategorySyncService {
 
       return newAccessToken;
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to refresh access token:', error);
+      logger.error('[GBPCategorySync] Failed to refresh access token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -216,7 +217,7 @@ export class GBPCategorySyncService {
 
       console.log('[GBPCategorySync] Updated stored tokens in oauth_integrations');
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to update stored tokens:', error);
+      logger.error('[GBPCategorySync] Failed to update stored tokens:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Don't throw - token refresh succeeded, just couldn't save
     }
   }
@@ -307,7 +308,7 @@ export class GBPCategorySyncService {
         version: this.generateVersion()
       };
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to fetch categories from API:', error);
+      logger.error('[GBPCategorySync] Failed to fetch categories from API:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Fallback to hardcoded categories
       console.log('[GBPCategorySync] Falling back to hardcoded categories');
@@ -340,7 +341,7 @@ export class GBPCategorySyncService {
         changes
       };
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to check for updates:', error);
+      logger.error('[GBPCategorySync] Failed to check for updates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -393,7 +394,7 @@ export class GBPCategorySyncService {
             break;
         }
       } catch (error) {
-        console.error(`[GBPCategorySync] Failed to apply change for ${change.categoryId}:`, error);
+        logger.error(`[GBPCategorySync] Failed to apply change for ${change.categoryId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         failed++;
       }
     }
@@ -488,7 +489,7 @@ export class GBPCategorySyncService {
       return result;
 
     } catch (error) {
-      console.error('[GBPCategorySync] Failed to seed GBP categories:', error);
+      logger.error('[GBPCategorySync] Failed to seed GBP categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
       // Fallback: try individual operations with error handling
       console.log('[GBPCategorySync] Attempting fallback individual seeding...');
@@ -513,7 +514,7 @@ export class GBPCategorySyncService {
           });
           seeded++;
         } catch (error) {
-          console.error(`[GBPCategorySync] Failed to seed ${category.id}:`, error);
+          logger.error(`[GBPCategorySync] Failed to seed ${category.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         }
       }
 

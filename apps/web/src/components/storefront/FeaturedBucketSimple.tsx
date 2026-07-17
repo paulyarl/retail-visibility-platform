@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ProductCard, ProductData } from '@/components/products/ProductCardLayouts';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeaturedBucketSimpleProps {
   title: string;
@@ -73,7 +74,7 @@ export default function FeaturedBucketSimple({
   
   // Log if we filtered out any products
   if (validProducts.length !== products.length) {
-    console.warn(`[FeaturedBucketSimple] ${bucketType} - Filtered out ${products.length - validProducts.length} products with missing data`);
+    clientLogger.warn(`[FeaturedBucketSimple] ${bucketType} - Filtered out ${products.length - validProducts.length} products with missing data`);
   }
   
   // Don't render if no valid products

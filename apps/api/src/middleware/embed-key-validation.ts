@@ -21,6 +21,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 /**
  * Extract the origin domain from request headers.
@@ -128,7 +129,7 @@ export async function resolveEmbedKey(req: Request, res: Response, next: NextFun
 
     next();
   } catch (error) {
-    console.error('[EmbedKeyValidation] Error:', error);
+    logger.error('[EmbedKeyValidation] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to validate embed key' });
   }
 }

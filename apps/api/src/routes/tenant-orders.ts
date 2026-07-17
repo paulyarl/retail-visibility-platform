@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { RefundService } from '../services/refunds/RefundService';
 import { generateOrderItemHistoryId } from '../lib/id-generator';
 import { generateTrackingUrl } from '../utils/tracking-url-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -267,7 +268,7 @@ router.get('/tenants/:tenantId/orders', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching tenant orders:', error);
+    logger.error('Error fetching tenant orders:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -439,7 +440,7 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
       data: orderDetail
     });
   } catch (error) {
-    console.error('Error fetching order detail:', error);
+    logger.error('Error fetching order detail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -522,7 +523,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
               console.log('[Tenant Orders] Recorded deposit revenue:', depositPayment.platform_fee_cents, 'cents');
             }
           } catch (revenueError) {
-            console.error('[Tenant Orders] Failed to record deposit revenue:', revenueError);
+            logger.error('[Tenant Orders] Failed to record deposit revenue:', undefined, { error: { name: (revenueError as any)?.name || 'Error', message: (revenueError as any)?.message || String(revenueError), stack: (revenueError as any)?.stack } });
           }
         }
       } else if (fulfillmentStatus === 'cancelled') {
@@ -563,10 +564,10 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
               if (refundResult.success) {
                 console.log('[Tenant Orders] Refund processed successfully:', refundResult.refundId);
               } else {
-                console.error('[Tenant Orders] Refund failed:', refundResult.error);
+                logger.error('[Tenant Orders] Refund failed:', undefined, { error: { name: 'Error', message: refundResult.error } });
               }
             }).catch(error => {
-              console.error('[Tenant Orders] Refund processing error:', error);
+              logger.error('[Tenant Orders] Refund processing error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
             });
           } else {
             console.warn('[Tenant Orders] No payment record found for paid order:', orderId);
@@ -615,7 +616,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
         const { hybridFulfillmentCoordinator } = await import('../services/HybridFulfillmentCoordinator');
         await hybridFulfillmentCoordinator.checkHybridFulfillmentComplete(orderId);
       } catch (hybridError) {
-        console.error('[Tenant Orders] Hybrid fulfillment check failed:', hybridError);
+        logger.error('[Tenant Orders] Hybrid fulfillment check failed:', undefined, { error: { name: (hybridError as any)?.name || 'Error', message: (hybridError as any)?.message || String(hybridError), stack: (hybridError as any)?.stack } });
       }
     }
 
@@ -627,7 +628,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
         await stockService.restoreStockForOrder(orderId);
         console.log(`[Tenant Orders] Stock restored for cancelled order: ${orderId}`);
       } catch (stockError) {
-        console.error(`[Tenant Orders] Failed to restore stock for cancelled order ${orderId}:`, stockError);
+        logger.error(`[Tenant Orders] Failed to restore stock for cancelled order ${orderId}:`, undefined, { error: { name: (stockError as any)?.name || 'Error', message: (stockError as any)?.message || String(stockError), stack: (stockError as any)?.stack } });
         // Don't fail the cancellation if stock restoration fails
       }
 
@@ -649,7 +650,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
           console.log(`[Tenant Orders] Revoked ${revokedCount.count} digital access grants for cancelled order: ${orderId}`);
         }
       } catch (digitalError) {
-        console.error(`[Tenant Orders] Failed to revoke digital access for cancelled order ${orderId}:`, digitalError);
+        logger.error(`[Tenant Orders] Failed to revoke digital access for cancelled order ${orderId}:`, undefined, { error: { name: (digitalError as any)?.name || 'Error', message: (digitalError as any)?.message || String(digitalError), stack: (digitalError as any)?.stack } });
       }
     }
 
@@ -749,7 +750,7 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
       }
     });
   } catch (error) {
-    console.error('Error updating order fulfillment:', error);
+    logger.error('Error updating order fulfillment:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -809,7 +810,7 @@ router.put('/tenants/:tenantId/orders/:orderId/archive', authenticateToken, asyn
       }
     });
   } catch (error) {
-    console.error('Error archiving order:', error);
+    logger.error('Error archiving order:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -837,7 +838,7 @@ router.get('/tenants/:tenantId/orders/:orderId/service-bookings', authenticateTo
 
     res.json({ success: true, data: bookings });
   } catch (error) {
-    console.error('Error fetching service bookings:', error);
+    logger.error('Error fetching service bookings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch service bookings' });
   }
 });
@@ -894,13 +895,13 @@ router.put('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId', aut
           }
         }
       } catch (notifError) {
-        console.error('[Tenant Orders] Failed to send service notification:', notifError);
+        logger.error('[Tenant Orders] Failed to send service notification:', undefined, { error: { name: (notifError as any)?.name || 'Error', message: (notifError as any)?.message || String(notifError), stack: (notifError as any)?.stack } });
       }
     }
 
     res.json({ success: true, data: updated });
   } catch (error) {
-    console.error('Error updating service booking:', error);
+    logger.error('Error updating service booking:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update service booking' });
   }
 });
@@ -928,7 +929,7 @@ router.post('/tenants/:tenantId/orders/:orderId/service-bookings/:bookingId/assi
 
     res.json({ success: true, data: updated });
   } catch (error) {
-    console.error('Error assigning provider:', error);
+    logger.error('Error assigning provider:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to assign provider' });
   }
 });

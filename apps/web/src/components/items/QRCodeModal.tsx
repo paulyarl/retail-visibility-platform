@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export function QRCodeModal(props: QRCodeModalProps) {
           }
         }
       } catch (error) {
-        console.error('[QRCodeModal] Error fetching tier:', error);
+        clientLogger.error('[QRCodeModal] Error fetching tier:', { detail: error });
       } finally {
         setTierLoading(false);
       }

@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/sync-single', async (req, res) => {
       message: result.success ? 'Product synced to GMC successfully' : (result.error || 'Sync failed')
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Sync single error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Sync single error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to sync product to GMC',
@@ -114,7 +115,7 @@ router.post('/sync-batch', async (req, res) => {
       message: result.success ? 'Batch sync completed successfully' : `Batch sync completed with ${result.failed} failures`
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Sync batch error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Sync batch error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to sync batch products to GMC',
@@ -170,7 +171,7 @@ router.post('/update-inventory', async (req, res) => {
       message: result.success ? 'Product inventory updated successfully' : (result.error || 'Update failed')
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Update inventory error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Update inventory error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update product inventory',
@@ -216,7 +217,7 @@ router.get('/stats', async (req, res) => {
       message: 'GMC sync statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Get stats error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sync statistics'
@@ -255,7 +256,7 @@ router.get('/health', async (req, res) => {
       message: 'GMC Product Sync service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Health check error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -285,7 +286,7 @@ router.delete('/cache', async (req, res) => {
       message: 'GMC Product Sync service cache cleared successfully'
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Clear cache error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -369,7 +370,7 @@ router.get('/fields', async (req, res) => {
       message: 'Supported GMC product fields retrieved successfully'
     });
   } catch (error) {
-    console.error('[GMC PRODUCT SYNC SINGLETON] Fields error:', error);
+    logger.error('[GMC PRODUCT SYNC SINGLETON] Fields error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported fields'

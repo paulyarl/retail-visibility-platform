@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const STARTUP_DELAY_MS = 60 * 1000; // 1 minute
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -59,7 +60,7 @@ async function runFlagExpiryCleanup(): Promise<void> {
 
     console.log(`[FlagExpiryCleanup] Completed: ${orphanedDeleted} orphaned + ${staleResult.count} stale removed`);
   } catch (error) {
-    console.error('[FlagExpiryCleanup] Failed:', error);
+    logger.error('[FlagExpiryCleanup] Failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import TierService from '../services/TierService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -130,7 +131,7 @@ publicTenantRouter.get('/tier', async (req: express.Request<{ tenantId: string }
       effectiveExpiresSource: effectiveExpiration?.source,
     });
   } catch (error) {
-    console.error('[GET /api/public/tenants/:tenantId/tier] Error:', error);
+    logger.error('[GET /api/public/tenants/:tenantId/tier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch tier information' });
   }
 });
@@ -238,7 +239,7 @@ router.get('/tenants/:id/tier', authenticateToken, checkTenantAccess, async (req
       organizationTierData: orgTierData,
     });
   } catch (error) {
-    console.error('[GET /tenants/:id/tier] Error:', error);
+    logger.error('[GET /tenants/:id/tier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch tier information' });
   }
 });
@@ -286,7 +287,7 @@ router.get('/tenants/:id/usage', authenticateToken, checkTenantAccess, async (re
       quotaRemaining: tenant.monthly_sku_quota ? tenant.monthly_sku_quota - (tenant.skus_added_this_month || 0) : null,
     });
   } catch (error) {
-    console.error('[GET /tenants/:id/usage] Error:', error);
+    logger.error('[GET /tenants/:id/usage] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch usage information' });
   }
 });
@@ -508,7 +509,7 @@ router.get('/tenants/:id/complete', authenticateToken, checkTenantAccess, async 
 
     res.json(response);
   } catch (error) {
-    console.error('[GET /tenants/:id/complete] Error:', error);
+    logger.error('[GET /tenants/:id/complete] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch complete tenant data' });
   }
 });

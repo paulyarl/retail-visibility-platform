@@ -955,7 +955,7 @@ export default function StorefrontEditorialLayout({
       )}
 
       {/* ================================================================= */}
-      {/* STORE INFORMATION (3-col, bg-neutral-50)                           */}
+      {/* STORE INFORMATION (2-col grid + hours row, bg-neutral-50)          */}
       {/* ================================================================= */}
       {!isProductsOnly && !storefrontStatus.shouldShowPanel && (showsLocation || showsHours || showsContact) && isRetailStore && (
         <section
@@ -964,7 +964,8 @@ export default function StorefrontEditorialLayout({
           aria-label="Store information"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Top row: Visit Us + Get in Touch (2-col) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Card 1: Visit Us (address + map) */}
               {showsLocation && showsContact && contactInfo.address && (
                 <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-700 overflow-hidden">
@@ -1024,27 +1025,7 @@ export default function StorefrontEditorialLayout({
                 </div>
               )}
 
-              {/* Card 2: Hours (BusinessHoursCollapsible) */}
-              {showsHours && (
-                <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
-                      Hours
-                    </h3>
-                  </div>
-                  <BusinessHoursCollapsible
-                    businessHours={businessHours}
-                    isRetailStore={isRetailStore}
-                  />
-                </div>
-              )}
-
-              {/* Card 3: Get in Touch (contact + fulfillment) */}
+              {/* Card 2: Get in Touch (contact + fulfillment) */}
               {showsContact && (
                 <div className="bg-white dark:bg-neutral-800 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
                   <div className="flex items-center gap-2 mb-4">
@@ -1100,6 +1081,26 @@ export default function StorefrontEditorialLayout({
                 </div>
               )}
             </div>
+
+            {/* Hours row: full-width below the grid for breathing room */}
+            {showsHours && (
+              <div className="mt-6 bg-white dark:bg-neutral-800 rounded-2xl shadow-sm border border-neutral-100 dark:border-neutral-700 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                    Hours
+                  </h3>
+                </div>
+                <BusinessHoursCollapsible
+                  businessHours={businessHours}
+                  isRetailStore={isRetailStore}
+                />
+              </div>
+            )}
           </div>
         </section>
       )}

@@ -25,8 +25,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/Dialog';
-import { Plus, Pencil, Trash2, Package, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Copy, Gift, QrCode } from 'lucide-react';
 import BundleEditModal from './BundleEditModal';
+import ComplimentaryAccessForm from './ComplimentaryAccessForm';
+import PrivateFeatureGrantDialog from './PrivateFeatureGrantDialog';
 
 function formatPrice(cents: number, cycle: string) {
   const dollars = (cents / 100).toFixed(2);
@@ -51,6 +53,8 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
   const [editingBundle, setEditingBundle] = useState<BsaasBundleEntry | null>(null);
   const [cloningFrom, setCloningFrom] = useState<BsaasBundleEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BsaasBundleEntry | null>(null);
+  const [showGrantDialog, setShowGrantDialog] = useState(false);
+  const [showGrantQRDialog, setShowGrantQRDialog] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -171,6 +175,14 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" onClick={() => setShowGrantQRDialog(true)} className="gap-2">
+          <QrCode className="w-4 h-4" />
+          Create Grant QR
+        </Button>
+        <Button variant="outline" onClick={() => setShowGrantDialog(true)} className="gap-2">
+          <Gift className="w-4 h-4" />
+          Grant Access
+        </Button>
         <Button onClick={handleAdd} className="gap-2">
           <Plus className="w-4 h-4" />
           Add Bundle
@@ -296,6 +308,20 @@ export default function BundlesTab({ onError, onSuccess }: Props) {
         availableFeatures={availableFeatures}
         onSave={handleSave}
         saving={saving}
+      />
+
+      {/* Complimentary Access Dialog */}
+      <ComplimentaryAccessForm
+        open={showGrantDialog}
+        onOpenChange={setShowGrantDialog}
+        bundles={bundles}
+      />
+
+      {/* Private Feature Grant QR Dialog */}
+      <PrivateFeatureGrantDialog
+        open={showGrantQRDialog}
+        onClose={() => setShowGrantQRDialog(false)}
+        bundles={bundles}
       />
 
       {/* Delete Confirmation */}

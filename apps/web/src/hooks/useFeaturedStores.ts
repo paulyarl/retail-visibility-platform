@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@/providers/StoreProviderSingleton';
 import cacheManager from '@/utils/cacheManager';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Store {
   id: string;
@@ -219,7 +220,7 @@ export const useFeaturedStores = (
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch featured stores');
-      console.error('[useFeaturedStores] Error:', err);
+      clientLogger.error('[useFeaturedStores] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -248,7 +249,7 @@ export const useFeaturedStores = (
       await cacheManager.clear();
       console.log('[useFeaturedStores] Cache cleared');
     } catch (error) {
-      console.warn('[useFeaturedStores] Failed to clear cache:', error);
+      clientLogger.warn('[useFeaturedStores] Failed to clear cache:', { detail: error });
     }
   }, []);
 

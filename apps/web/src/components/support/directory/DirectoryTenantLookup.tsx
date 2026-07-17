@@ -211,7 +211,7 @@ export default function DirectoryTenantLookup() {
                   <div key={note.id} className="border-l-4 border-blue-500 pl-4 py-2">
                     <p className="text-sm text-gray-900 dark:text-white">{note.note}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {note.createdByUser.firstName} {note.createdByUser.lastName} •{' '}
+                      {note.createdByUser ? `${note.createdByUser.firstName || ''} ${note.createdByUser.lastName || ''}` : 'Unknown'} •{' '}
                       {new Date(note.createdAt).toLocaleString()}
                     </p>
                   </div>

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/revenue/overview', async (req, res) => {
 
     res.json(metrics);
   } catch (error) {
-    console.error('Error fetching revenue metrics:', error);
+    logger.error('Error fetching revenue metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch revenue metrics' });
   }
 });
@@ -50,7 +51,7 @@ router.get('/revenue/trends', async (req, res) => {
 
     res.json(trends);
   } catch (error) {
-    console.error('Error fetching revenue trends:', error);
+    logger.error('Error fetching revenue trends:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch revenue trends' });
   }
 });
@@ -68,7 +69,7 @@ router.get('/revenue/tier-distribution', async (req, res) => {
 
     res.json(distribution);
   } catch (error) {
-    console.error('Error fetching tier distribution:', error);
+    logger.error('Error fetching tier distribution:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch tier distribution' });
   }
 });
@@ -86,7 +87,7 @@ router.get('/revenue/cohort-analysis', async (req, res) => {
 
     res.json(cohortData);
   } catch (error) {
-    console.error('Error fetching cohort analysis:', error);
+    logger.error('Error fetching cohort analysis:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch cohort analysis' });
   }
 });
@@ -184,7 +185,7 @@ router.get('/invoices', async (req, res) => {
       totalPages: Math.ceil(filteredInvoices.length / Number(limit))
     });
   } catch (error) {
-    console.error('Error fetching invoices:', error);
+    logger.error('Error fetching invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch invoices' });
   }
 });
@@ -206,7 +207,7 @@ router.get('/invoices/stats', async (req, res) => {
 
     res.json(stats);
   } catch (error) {
-    console.error('Error fetching invoice stats:', error);
+    logger.error('Error fetching invoice stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch invoice stats' });
   }
 });
@@ -231,7 +232,7 @@ router.post('/invoices/generate', async (req, res) => {
 
     res.json({ success: true, invoice: generatedInvoice });
   } catch (error) {
-    console.error('Error generating invoice:', error);
+    logger.error('Error generating invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to generate invoice' });
   }
 });
@@ -322,7 +323,7 @@ router.get('/payments/analytics', async (req, res) => {
       failureAnalysis
     });
   } catch (error) {
-    console.error('Error fetching payment analytics:', error);
+    logger.error('Error fetching payment analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch payment analytics' });
   }
 });
@@ -413,7 +414,7 @@ router.get('/reports', async (req, res) => {
       totalPages: Math.ceil(filteredReports.length / Number(limit))
     });
   } catch (error) {
-    console.error('Error fetching reports:', error);
+    logger.error('Error fetching reports:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch reports' });
   }
 });
@@ -440,7 +441,7 @@ router.post('/reports/generate', async (req, res) => {
 
     res.json({ success: true, report });
   } catch (error) {
-    console.error('Error generating report:', error);
+    logger.error('Error generating report:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to generate report' });
   }
 });
@@ -455,7 +456,7 @@ router.get('/reports/:reportId/download', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="report-${reportId}.pdf"`);
     res.send('Mock PDF content for report download');
   } catch (error) {
-    console.error('Error downloading report:', error);
+    logger.error('Error downloading report:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to download report' });
   }
 });

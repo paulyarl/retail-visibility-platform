@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Security Alert Data Interfaces
 export interface SecurityAlertEvent {
@@ -77,7 +78,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
         this.EVENTS_TTL
       );
     } catch (error) {
-      console.error('[SecurityAlertTrackingService] Failed to send alert events:', error);
+      clientLogger.error('[SecurityAlertTrackingService] Failed to send alert events:', { detail: error });
       throw error;
     }
   }
@@ -98,7 +99,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
         this.EVENTS_TTL
       );
     } catch (error) {
-      console.error('[SecurityAlertTrackingService] Failed to send telemetry:', error);
+      clientLogger.error('[SecurityAlertTrackingService] Failed to send telemetry:', { detail: error });
       throw error;
     }
   }
@@ -134,7 +135,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
         eventsBySeverity: {}
       };
     } catch (error) {
-      console.error('[SecurityAlertTrackingService] Failed to get security metrics:', error);
+      clientLogger.error('[SecurityAlertTrackingService] Failed to get security metrics:', { detail: error });
       return {
         totalEvents: 0,
         successfulBatches: 0,
@@ -161,7 +162,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
 
       return response.data || [];
     } catch (error) {
-      console.error('[SecurityAlertTrackingService] Failed to get alerts by type:', error);
+      clientLogger.error('[SecurityAlertTrackingService] Failed to get alerts by type:', { detail: error });
       return [];
     }
   }
@@ -181,7 +182,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
 
       return response.data || [];
     } catch (error) {
-      console.error('[SecurityAlertTrackingService] Failed to get alerts by severity:', error);
+      clientLogger.error('[SecurityAlertTrackingService] Failed to get alerts by severity:', { detail: error });
       return [];
     }
   }

@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface TikTokFeedItem {
   sku_id: string;
@@ -92,7 +93,7 @@ export async function generateTikTokProductFeed(tenant_id: string, websiteUrl?: 
       return feedItem;
     });
   } catch (error) {
-    console.error('[TikTok Feed Generator] Error:', error);
+    logger.error('[TikTok Feed Generator] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }

@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Input, Select
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTenantSummary } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const TIERS: Record<string, { label: string; color: string }> = {
   discovery: { label: 'Discovery', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300' },
@@ -47,7 +48,7 @@ export default function CrmTenantsPage() {
         setTenants(result.data);
         setTotal(result.total);
       } catch (err) {
-        console.error('[CRM Tenants] Load error:', err);
+        clientLogger.error('[CRM Tenants] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }

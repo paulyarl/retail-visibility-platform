@@ -5,6 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../logger';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -99,7 +100,7 @@ router.get('/products/:productSlug', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('[CrossTenant] Error fetching products:', error);
+    logger.error('[CrossTenant] Error fetching products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch cross-tenant products' 
@@ -147,7 +148,7 @@ router.get('/analytics/brands', async (req: Request, res: Response) => {
       data: brands
     });
   } catch (error) {
-    console.error('[CrossTenant] Error fetching brand analytics:', error);
+    logger.error('[CrossTenant] Error fetching brand analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch brand analytics' 
@@ -193,7 +194,7 @@ router.get('/analytics/categories', async (req: Request, res: Response) => {
       data: categories
     });
   } catch (error) {
-    console.error('[CrossTenant] Error fetching category analytics:', error);
+    logger.error('[CrossTenant] Error fetching category analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch category analytics' 
@@ -256,7 +257,7 @@ router.get('/analytics/products', async (req: Request, res: Response) => {
       data: products
     });
   } catch (error) {
-    console.error('[CrossTenant] Error fetching product analytics:', error);
+    logger.error('[CrossTenant] Error fetching product analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch product analytics' 
@@ -305,7 +306,7 @@ router.get('/trending', async (req: Request, res: Response) => {
       data: trending
     });
   } catch (error) {
-    console.error('[CrossTenant] Error fetching trending products:', error);
+    logger.error('[CrossTenant] Error fetching trending products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch trending products' 
@@ -362,7 +363,7 @@ router.get('/search', async (req: Request, res: Response) => {
       data: products
     });
   } catch (error) {
-    console.error('[CrossTenant] Error searching products:', error);
+    logger.error('[CrossTenant] Error searching products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to search products' 

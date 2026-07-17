@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/comp
 import { botPlatformAdminService, type BotDashboardStats } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
 import BotAiControls from '@/components/bot/BotAiControls';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function BotDashboardPage() {
   const [stats, setStats] = useState<BotDashboardStats | null>(null);
@@ -18,7 +19,7 @@ export default function BotDashboardPage() {
         const data = await botPlatformAdminService.getDashboardStats();
         setStats(data);
       } catch (err) {
-        console.error('[Bot Dashboard] Load error:', err);
+        clientLogger.error('[Bot Dashboard] Load error:', { detail: err });
         setError('Failed to load dashboard stats');
       } finally {
         setLoading(false);

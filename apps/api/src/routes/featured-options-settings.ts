@@ -6,6 +6,7 @@ import { z } from 'zod';
 import FeaturedOptionsService, { FeaturedType } from '../services/FeaturedOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateFeaturedOptionsSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -113,7 +114,7 @@ router.get('/:tenantId/featured-options', authenticateToken, async (req, res) =>
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching featured options settings:', error);
+    logger.error('Error fetching featured options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -235,7 +236,7 @@ router.put('/:tenantId/featured-options', authenticateToken, requireTenantAdmin,
       },
     });
   } catch (error) {
-    console.error('Error updating featured options settings:', error);
+    logger.error('Error updating featured options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -303,7 +304,7 @@ router.get('/public/tenant/:tenantId/featured-options', async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching public featured options settings:', error);
+    logger.error('Error fetching public featured options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -324,7 +325,7 @@ router.get('/:tenantId/featured-options/capability', authenticateToken, async (r
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving featured options capability:', error);
+    logger.error('Error resolving featured options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import DigitalProductConfig, { DigitalProductData } from '@/components/items/DigitalProductConfig';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { itemsService } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductTypeStepProps {
   data: {
@@ -329,7 +330,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
       const result = await uploadImage(file, ImageUploadPresets.product);
 
       if (result.error) {
-        console.error('[ProductTypeStep] Image compression error:', result.error);
+        clientLogger.error('[ProductTypeStep] Image compression error:', { detail: result.error });
         return;
       }
 
@@ -346,7 +347,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
         onChange({ ...data, variants: updatedVariants });
       }
     } catch (error) {
-      console.error('[ProductTypeStep] Variant image upload error:', error);
+      clientLogger.error('[ProductTypeStep] Variant image upload error:', { detail: error });
     } finally {
       setUploadingVariantId(null);
     }
@@ -359,7 +360,7 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
       try {
         await itemsService.deleteTempPhoto(variant.image_path);
       } catch (error) {
-        console.error('[ProductTypeStep] Failed to delete variant image:', error);
+        clientLogger.error('[ProductTypeStep] Failed to delete variant image:', { detail: error });
       }
     }
 

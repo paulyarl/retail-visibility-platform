@@ -1,6 +1,7 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TickerMessage {
   id: string;
@@ -83,7 +84,7 @@ class TickerConfigService extends AdminApiSingleton {
     } catch (error) {
       // Handle authentication errors specifically
       if (error instanceof Error && error.message === 'No authentication token available') {
-        console.warn('[TickerConfigService] User not authenticated, skipping ticker config load');
+        clientLogger.warn('[TickerConfigService] User not authenticated, skipping ticker config load');
         return this.createResponse(false, undefined, {
           code: 'AUTH_REQUIRED',
           message: 'Authentication required',

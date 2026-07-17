@@ -6,6 +6,7 @@
 
 const { SquareClient } = require('square') as any;
 import crypto from 'crypto';
+import { logger } from '../../logger';
 
 export interface SquareOAuthConfig {
   applicationId: string;
@@ -88,7 +89,7 @@ export class SquareOAuthService {
         scopes: result.scopes,
       };
     } catch (error) {
-      console.error('[SquareOAuth] Token exchange failed:', error);
+      logger.error('[SquareOAuth] Token exchange failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error('Failed to exchange authorization code for token');
     }
   }
@@ -116,7 +117,7 @@ export class SquareOAuthService {
         scopes: result.scopes,
       };
     } catch (error) {
-      console.error('[SquareOAuth] Token refresh failed:', error);
+      logger.error('[SquareOAuth] Token refresh failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error('Failed to refresh access token');
     }
   }
@@ -132,7 +133,7 @@ export class SquareOAuthService {
         accessToken,
       });
     } catch (error) {
-      console.error('[SquareOAuth] Token revocation failed:', error);
+      logger.error('[SquareOAuth] Token revocation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error('Failed to revoke access token');
     }
   }

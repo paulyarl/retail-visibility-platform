@@ -8,6 +8,7 @@ import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { toast } from '@/hooks/use-toast';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmContactDetail, CrmTicket, CrmTask, CrmInquiry } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
@@ -45,7 +46,7 @@ export default function ContactDetailPage() {
         const data = await crmTenantCrmService.getContactDetail(contactId);
         setContact(data);
       } catch (err) {
-        console.error('[Contact Detail] Load error:', err);
+        clientLogger.error('[Contact Detail] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -70,7 +71,7 @@ export default function ContactDetailPage() {
       setContact(data);
       toast({ title: 'Ticket Created', description: `Ticket created for ${contact?.first_name}`, variant: 'success' });
     } catch (err) {
-      console.error('[Contact Detail] Create ticket error:', err);
+      clientLogger.error('[Contact Detail] Create ticket error:', { detail: err });
       toast({ title: 'Error', description: 'Failed to create ticket', variant: 'destructive' });
     } finally {
       setSubmitting(false);

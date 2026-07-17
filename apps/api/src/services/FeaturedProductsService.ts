@@ -1,6 +1,7 @@
 import { prisma } from '../prisma';
 import { triggerRevalidate } from '../utils/revalidate';
 import { isValidBadgeKey, isPlatformControlledKey, getBadgeByKey } from './BadgeRegistryService';
+import { logger } from '../logger';
 
 // Dynamic featured type validation
 const VALID_FEATURED_TYPES = [
@@ -143,7 +144,7 @@ async function generateTrendingProducts(tenantId: string, limit: number): Promis
       product_type: item.product_type || 'physical'
     }));
   } catch (error) {
-    console.error('Error generating trending products from MV:', error);
+    logger.error('Error generating trending products from MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -231,7 +232,7 @@ async function generateRecommendedProducts(tenantId: string, limit: number): Pro
       product_type: item.product_type || 'physical'
     }));
   } catch (error) {
-    console.error('Error generating recommended products from MV:', error);
+    logger.error('Error generating recommended products from MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -319,7 +320,7 @@ async function generateBestsellerProducts(tenantId: string, limit: number): Prom
       product_type: item.product_type || 'physical'
     }));
   } catch (error) {
-    console.error('Error generating bestseller products from MV:', error);
+    logger.error('Error generating bestseller products from MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -414,7 +415,7 @@ async function generateRandomDiscoveryProducts(tenantId: string, limit: number):
       product_type: item.product_type || 'physical'
     }));
   } catch (error) {
-    console.error('Error generating random discovery products from MV:', error);
+    logger.error('Error generating random discovery products from MV:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return [];
   }
 }
@@ -549,7 +550,7 @@ export class FeaturedProductsService {
 
       return transformedProducts;
     } catch (error) {
-      console.error('Error in getFeaturedProductsForTenant:', error);
+      logger.error('Error in getFeaturedProductsForTenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -620,7 +621,7 @@ export class FeaturedProductsService {
 
       return featuredProduct as FeaturedProduct;
     } catch (error) {
-      console.error('Error in addFeaturedType:', error);
+      logger.error('Error in addFeaturedType:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -679,7 +680,7 @@ export class FeaturedProductsService {
       
       return result.count > 0;
     } catch (error) {
-      console.error('[FeaturedProductsService] Error in removeFeaturedType:', error);
+      logger.error('[FeaturedProductsService] Error in removeFeaturedType:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -719,7 +720,7 @@ export class FeaturedProductsService {
 
       return updatedRecord as FeaturedProduct;
     } catch (error) {
-      console.error('Error in updateFeaturedType:', error);
+      logger.error('Error in updateFeaturedType:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -851,7 +852,7 @@ export class FeaturedProductsService {
 
       return grouped;
     } catch (error) {
-      console.error('Error in getAllFeaturedProductsForManagement:', error);
+      logger.error('Error in getAllFeaturedProductsForManagement:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Return empty groups if there's an error
       return {
         store_selection: [],
@@ -1022,7 +1023,7 @@ export class FeaturedProductsService {
 
         console.log(`[getStorefrontFeaturedProducts] Platform types: ${Array.from(systemTypesAvailable).join(', ') || 'all on-the-fly'}`);
       } catch (error) {
-        console.error('[getStorefrontFeaturedProducts] Error generating platform-controlled selections:', error);
+        logger.error('[getStorefrontFeaturedProducts] Error generating platform-controlled selections:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         // Continue with merchant-controlled products if algorithmic generation fails
       }
 
@@ -1038,7 +1039,7 @@ export class FeaturedProductsService {
 
       return grouped;
     } catch (error) {
-      console.error('Error in getStorefrontFeaturedProducts:', error);
+      logger.error('Error in getStorefrontFeaturedProducts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Return empty groups if there's an error
       return {
         store_selection: [],
@@ -1116,14 +1117,14 @@ export class FeaturedProductsService {
 
           migrated++;
         } catch (error) {
-          console.error(`Error migrating item ${item.id}:`, error);
+          logger.error(`Error migrating item ${item.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           errors++;
         }
       }
 
       return { migrated, skipped, errors };
     } catch (error) {
-      console.error('Error in migrateLegacyFeaturedProducts:', error);
+      logger.error('Error in migrateLegacyFeaturedProducts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return { migrated: 0, skipped: 0, errors: 1 };
     }
   }
@@ -1172,7 +1173,7 @@ export class FeaturedProductsService {
 
       return createdItems as FeaturedProduct[];
     } catch (error) {
-      console.error('Error in bulkAddFeaturedTypes:', error);
+      logger.error('Error in bulkAddFeaturedTypes:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -1285,7 +1286,7 @@ export class FeaturedProductsService {
 
       return updatedTenant;
     } catch (error) {
-      console.error('Error approving tenant featured access:', error);
+      logger.error('Error approving tenant featured access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1330,7 +1331,7 @@ export class FeaturedProductsService {
 
       return updatedTenant;
     } catch (error) {
-      console.error('Error rejecting tenant featured access:', error);
+      logger.error('Error rejecting tenant featured access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1371,7 +1372,7 @@ export class FeaturedProductsService {
 
       return featuredProducts;
     } catch (error) {
-      console.error('[FeaturedProductsService] Error getting all featured products:', error);
+      logger.error('[FeaturedProductsService] Error getting all featured products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1396,7 +1397,7 @@ export class FeaturedProductsService {
 
       return updatedProduct;
     } catch (error) {
-      console.error('Error approving featured product:', error);
+      logger.error('Error approving featured product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1422,7 +1423,7 @@ export class FeaturedProductsService {
 
       return updatedProduct;
     } catch (error) {
-      console.error('Error rejecting featured product:', error);
+      logger.error('Error rejecting featured product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1478,7 +1479,7 @@ export class FeaturedProductsService {
 
       return tenants;
     } catch (error) {
-      console.error('[FeaturedProductsService] Error getting all tenants with featured access status:', error);
+      logger.error('[FeaturedProductsService] Error getting all tenants with featured access status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1524,7 +1525,7 @@ export class FeaturedProductsService {
 
       return pendingTenants;
     } catch (error) {
-      console.error('Error getting tenants pending featured access:', error);
+      logger.error('Error getting tenants pending featured access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -1543,7 +1544,7 @@ export class FeaturedProductsService {
 
       return (tenant as any)?.featured_access_approved || false;
     } catch (error) {
-      console.error('Error checking tenant featured access:', error);
+      logger.error('Error checking tenant featured access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -1569,7 +1570,7 @@ export class FeaturedProductsService {
       // Example: await cacheService.invalidatePatterns(cachePatterns);
       
     } catch (error) {
-      console.error('Error invalidating cache:', error);
+      logger.error('Error invalidating cache:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Don't throw error for cache invalidation failures
     }
   }
@@ -1655,7 +1656,7 @@ export class FeaturedProductsService {
 
       console.log(`[syncPlatformTypes] Tenant ${tenantId}: synced=${synced}, deactivated=${deactivated}`);
     } catch (error) {
-      console.error('[syncPlatformTypes] Error:', error);
+      logger.error('[syncPlatformTypes] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
 
     return { synced, deactivated };

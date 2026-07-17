@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
+import { logger } from '../logger';
 
 interface PolicyRules {
   scope: string;
@@ -33,7 +34,7 @@ async function getEffectivePolicy(tenantId?: string): Promise<PolicyRules | null
 
     return result[0] || null;
   } catch (error) {
-    console.error('[Policy] Error fetching effective policy:', error);
+    logger.error('[Policy] Error fetching effective policy:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -137,7 +138,7 @@ export async function enforcePolicyCompliance(
     // Policy check passed, continue
     next();
   } catch (error) {
-    console.error('[Policy Enforcement] Error:', error);
+    logger.error('[Policy Enforcement] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Fail-open: allow operation if policy check fails
     next();
   }
@@ -203,7 +204,7 @@ export async function getComplianceReport(tenantId: string) {
       violations,
     };
   } catch (error) {
-    console.error('[Compliance Report] Error:', error);
+    logger.error('[Compliance Report] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }

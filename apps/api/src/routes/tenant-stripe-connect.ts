@@ -15,6 +15,7 @@ import { requireAuth, checkTenantAccess } from '../middleware/auth';
 import { prisma } from '../prisma';
 import Stripe from 'stripe';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.get('/:tenantId/stripe-connect/status', requireAuth, checkTenantAccess, a
       platform_fee_percent: connection.platform_fee_override_percent,
     });
   } catch (error: any) {
-    console.error('[TenantStripeConnect] Status check error:', error);
+    logger.error('[TenantStripeConnect] Status check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'status_check_failed',
@@ -174,7 +175,7 @@ router.post('/:tenantId/stripe-connect/onboard', requireAuth, checkTenantAccess,
       expires_at: expiresAt.toISOString(),
     });
   } catch (error: any) {
-    console.error('[TenantStripeConnect] Onboarding error:', error);
+    logger.error('[TenantStripeConnect] Onboarding error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'onboarding_failed',
@@ -246,7 +247,7 @@ router.post('/:tenantId/stripe-connect/refresh', requireAuth, checkTenantAccess,
       },
     });
   } catch (error: any) {
-    console.error('[TenantStripeConnect] Refresh error:', error);
+    logger.error('[TenantStripeConnect] Refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'refresh_failed',
@@ -296,7 +297,7 @@ router.post('/:tenantId/stripe-connect/dashboard', requireAuth, checkTenantAcces
       dashboard_url: loginLink.url,
     });
   } catch (error: any) {
-    console.error('[TenantStripeConnect] Dashboard link error:', error);
+    logger.error('[TenantStripeConnect] Dashboard link error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'dashboard_link_failed',
@@ -347,7 +348,7 @@ router.delete('/:tenantId/stripe-connect', requireAuth, checkTenantAccess, async
       message: 'Stripe Connect disconnected',
     });
   } catch (error: any) {
-    console.error('[TenantStripeConnect] Disconnect error:', error);
+    logger.error('[TenantStripeConnect] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'disconnect_failed',

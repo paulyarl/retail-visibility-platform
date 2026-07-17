@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface FulfillmentSettings {
   pickup_enabled: boolean;
@@ -102,7 +103,7 @@ class PublicFulfillmentService extends PublicApiSingleton {
    */
   async getFulfillmentSettings(tenantId: string): Promise<FulfillmentSettings | null> {
     if (!tenantId) {
-      console.error('[PublicFulfillment] getFulfillmentSettings: tenantId is required');
+      clientLogger.error('[PublicFulfillment] getFulfillmentSettings: tenantId is required');
       return null;
     }
 
@@ -115,13 +116,13 @@ class PublicFulfillmentService extends PublicApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[PublicFulfillment] Failed to get fulfillment settings:', result.error);
+        clientLogger.error('[PublicFulfillment] Failed to get fulfillment settings:', { detail: result.error });
         return null;
       }
 
       return result.data?.settings || null;
     } catch (error) {
-      console.error('[PublicFulfillment] Failed to get fulfillment settings:', error);
+      clientLogger.error('[PublicFulfillment] Failed to get fulfillment settings:', { detail: error });
       return null;
     }
   }
@@ -145,7 +146,7 @@ class PublicFulfillmentService extends PublicApiSingleton {
           return false;
       }
     } catch (error) {
-      console.error('[PublicFulfillment] Failed to check fulfillment method availability:', error);
+      clientLogger.error('[PublicFulfillment] Failed to check fulfillment method availability:', { detail: error });
       return false;
     }
   }
@@ -166,7 +167,7 @@ class PublicFulfillmentService extends PublicApiSingleton {
 
       return methods;
     } catch (error) {
-      console.error('[PublicFulfillment] Failed to get available fulfillment methods:', error);
+      clientLogger.error('[PublicFulfillment] Failed to get available fulfillment methods:', { detail: error });
       return [];
     }
   }

@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { clientLogger } from '@/lib/client-logger';
 
 // Helper component to display category name by ID
 function CategoryNameDisplay({ categoryId, tenantId, categoryPath }: { categoryId: string; tenantId?: string; categoryPath?: string }) {
@@ -78,7 +79,7 @@ function CategoryNameDisplay({ categoryId, tenantId, categoryPath }: { categoryI
             return;
           }
         } catch (error) {
-          console.error('[OrganizationStep CategoryNameDisplay] Error loading tenant category:', error);
+          clientLogger.error('[OrganizationStep CategoryNameDisplay] Error loading tenant category:', { detail: error });
         }
       } else {
         // For Google categories (numeric IDs), fetch from Google taxonomy
@@ -94,7 +95,7 @@ function CategoryNameDisplay({ categoryId, tenantId, categoryPath }: { categoryI
             return;
           }
         } catch (error) {
-          console.error('[OrganizationStep CategoryNameDisplay] Error fetching Google taxonomy:', error);
+          clientLogger.error('[OrganizationStep CategoryNameDisplay] Error fetching Google taxonomy:', { detail: error });
         }
       }
 

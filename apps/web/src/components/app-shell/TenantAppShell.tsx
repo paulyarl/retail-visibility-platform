@@ -13,6 +13,7 @@ import SidebarLayout from "@/components/navigation/SidebarLayout";
 import TenantSwitcher from "@/components/app-shell/TenantSwitcher";
 import ShellWithTicker from "@/components/layout/ShellWithTicker";
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 type NavItem = { 
@@ -68,7 +69,7 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
           });
         }
       } catch (error) {
-        console.error('Failed to fetch tenant info:', error);
+        clientLogger.error('Failed to fetch tenant info:', { detail: error });
       } finally {
         setLoading(false);
       }

@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import BarcodeEnrichmentSingletonService from '../services/BarcodeEnrichmentSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -63,7 +64,7 @@ router.post('/enrich', async (req, res) => {
       message: 'Barcode enriched successfully'
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Enrich error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Enrich error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to enrich barcode',
@@ -134,7 +135,7 @@ router.post('/batch', async (req, res) => {
       message: 'Batch barcode enrichment completed successfully'
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Batch error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Batch error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to enrich barcodes in batch',
@@ -170,7 +171,7 @@ router.get('/stats', async (req, res) => {
       message: 'Enrichment statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Get stats error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch enrichment statistics'
@@ -195,7 +196,7 @@ router.get('/health', async (req, res) => {
       message: 'Barcode enrichment service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Health check error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -229,7 +230,7 @@ router.delete('/cache', async (req, res) => {
       message: `Cache cleared${barcode ? ` for barcode ${barcode}` : ' for all barcodes'}`
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Clear cache error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -290,7 +291,7 @@ router.get('/providers', async (req, res) => {
       message: 'Supported providers retrieved successfully'
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Providers error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Providers error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported providers'
@@ -327,7 +328,7 @@ router.post('/test', async (req, res) => {
       message: 'Test barcode enrichment completed successfully'
     });
   } catch (error) {
-    console.error('[BARCODE ENRICHMENT SINGLETON] Test error:', error);
+    logger.error('[BARCODE ENRICHMENT SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test barcode enrichment',

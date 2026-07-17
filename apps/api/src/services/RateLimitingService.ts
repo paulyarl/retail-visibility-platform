@@ -7,6 +7,7 @@
 
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 // Rate Limiting Types
 export interface RateLimitRule {
@@ -185,7 +186,7 @@ class RateLimitingService extends UniversalSingleton {
       
       this.throttledLog(`Loaded ${rules.length} rate limit rules from database`, 'rules-loaded');
     } catch (error) {
-      console.error('[RateLimitingService] Error loading rate limit rules:', error);
+      logger.error('[RateLimitingService] Error loading rate limit rules:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Fallback to environment variables only if environment forces rate limiting on
       if (process.env.RATE_LIMITING_ENABLED === 'true') {
@@ -291,7 +292,7 @@ class RateLimitingService extends UniversalSingleton {
       return false;
       
     } catch (error) {
-      console.error('[RateLimitingService] Error checking rate limiting status:', error);
+      logger.error('[RateLimitingService] Error checking rate limiting status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // On error, check environment variable first, then default to OFF
       if (process.env.RATE_LIMITING_ENABLED === 'true') {
@@ -424,7 +425,7 @@ class RateLimitingService extends UniversalSingleton {
       // This would record the blocked request in the database
       console.log(`Blocked request from ${ip} for route ${routeType}`);
     } catch (error) {
-      console.error('Error recording blocked request:', error);
+      logger.error('Error recording blocked request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -603,7 +604,7 @@ class RateLimitingService extends UniversalSingleton {
         }
       }
     } catch (error) {
-      console.error('Error cleaning up expired blocks:', error);
+      logger.error('Error cleaning up expired blocks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -629,7 +630,7 @@ class RateLimitingService extends UniversalSingleton {
       await this.setCache(cacheKey, metrics);
       return metrics;
     } catch (error) {
-      console.error('Error calculating rate limiting metrics:', error);
+      logger.error('Error calculating rate limiting metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       
       // Return default metrics
       return {
@@ -804,7 +805,7 @@ export async function createRateLimitingMiddleware(routeType: string = 'standard
             }
           });
         } catch (warningError) {
-          console.error('Failed to store rate limit warning:', warningError);
+          logger.error('Failed to store rate limit warning:', undefined, { error: { name: (warningError as any)?.name || 'Error', message: (warningError as any)?.message || String(warningError), stack: (warningError as any)?.stack } });
         }
 
         return res.status(429).json({
@@ -830,7 +831,7 @@ export async function createRateLimitingMiddleware(routeType: string = 'standard
 
       next();
     } catch (error) {
-      console.error('[RateLimitingService] Middleware error:', error);
+      logger.error('[RateLimitingService] Middleware error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       next(); // Allow request on error
     }
   };

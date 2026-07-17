@@ -1,4 +1,5 @@
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ProductReviewSummary {
   rating_avg: number;
@@ -69,7 +70,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
       return data || null;
     } catch (error) {
-      console.error('[ProductReviewsSingleton] Failed to get product review summary:', error);
+      clientLogger.error('[ProductReviewsSingleton] Failed to get product review summary:', { detail: error });
       return null;
     }
   }
@@ -104,7 +105,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
       return result?.data?.reviews || [];
     } catch (error) {
-      console.error('[ProductReviewsSingleton] Failed to get product reviews:', error);
+      clientLogger.error('[ProductReviewsSingleton] Failed to get product reviews:', { detail: error });
       return [];
     }
   }
@@ -138,7 +139,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
       return result?.data || null;
     } catch (error) {
-      console.error('[ProductReviewsSingleton] Failed to get user product review:', error);
+      clientLogger.error('[ProductReviewsSingleton] Failed to get user product review:', { detail: error });
       return null;
     }
   }
@@ -169,7 +170,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
       return result?.data || null;
     } catch (error) {
-      console.error('[ProductReviewsSingleton] Failed to create/update product review:', error);
+      clientLogger.error('[ProductReviewsSingleton] Failed to create/update product review:', { detail: error });
       return null;
     }
   }
@@ -194,7 +195,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
       return true;
     } catch (error) {
-      console.error('[ProductReviewsSingleton] Failed to mark review as helpful:', error);
+      clientLogger.error('[ProductReviewsSingleton] Failed to mark review as helpful:', { detail: error });
       return false;
     }
   }

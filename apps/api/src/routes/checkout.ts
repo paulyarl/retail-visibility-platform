@@ -20,6 +20,7 @@ import {
 } from '../utils/deposit-calculator';
 import { taxService } from '../services/TaxService';
 import { socialPixelService } from '../services/SocialPixelService';
+import { logger } from '../logger';
 import {
   getTenantCommerceCapabilities,
   getCheckoutMode,
@@ -457,7 +458,7 @@ router.post('/orders', async (req: Request, res: Response) => {
 
       // console.log('[Checkout] Stock availability confirmed');
     } catch (stockCheckError) {
-      console.error('[Checkout] Error checking stock availability:', stockCheckError);
+      logger.error('[Checkout] Error checking stock availability:', undefined, { error: { name: (stockCheckError as any)?.name || 'Error', message: (stockCheckError as any)?.message || String(stockCheckError), stack: (stockCheckError as any)?.stack } });
       // Don't fail checkout if stock check fails, but log the error
       console.warn('[Checkout] Proceeding with order despite stock check failure');
     }
@@ -930,7 +931,7 @@ router.post('/orders', async (req: Request, res: Response) => {
       url: pageUrl,
     }).catch(() => {});
   } catch (error) {
-    console.error('Checkout order creation error:', error);
+    logger.error('Checkout order creation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_creation_failed',
@@ -968,7 +969,7 @@ router.get('/orders/:id', async (req: Request, res: Response) => {
       order,
     });
   } catch (error) {
-    console.error('Checkout order retrieval error:', error);
+    logger.error('Checkout order retrieval error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'order_retrieval_failed',

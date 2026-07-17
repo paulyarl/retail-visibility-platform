@@ -9,6 +9,7 @@ import { adminUsersService, type AdminUser } from '@/services/AdminUsersService'
 import { getContrastColor } from '@/lib/color-utils';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
   { value: 'open', label: 'Open' },
@@ -69,7 +70,7 @@ export default function CrmTicketDetailPage() {
         ));
       }
     } catch (err) {
-      console.error('[CRM Ticket Detail] Load error:', err);
+      clientLogger.error('[CRM Ticket Detail] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export default function CrmTicketDetailPage() {
       const updated = await crmAdminService.updateTicket(ticketId, data);
       setTicket(updated);
     } catch (err) {
-      console.error('[Ticket Detail] Update error:', err);
+      clientLogger.error('[Ticket Detail] Update error:', { detail: err });
     } finally {
       setUpdating(false);
     }
@@ -106,7 +107,7 @@ export default function CrmTicketDetailPage() {
       setMessages(prev => [...prev, message]);
       setReplyContent('');
     } catch (err) {
-      console.error('[Ticket Detail] Reply error:', err);
+      clientLogger.error('[Ticket Detail] Reply error:', { detail: err });
     } finally {
       setSending(false);
     }
@@ -120,7 +121,7 @@ export default function CrmTicketDetailPage() {
       setMessages(prev => [...prev, message]);
       setNoteContent('');
     } catch (err) {
-      console.error('[Ticket Detail] Note error:', err);
+      clientLogger.error('[Ticket Detail] Note error:', { detail: err });
     } finally {
       setSending(false);
     }

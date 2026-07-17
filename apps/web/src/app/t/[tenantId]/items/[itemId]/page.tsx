@@ -19,6 +19,7 @@ import { Item as ItemType } from '@/services/itemsDataService';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import ProductCategoryContext from '@/components/products/ProductCategoryContext';
 import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ItemDetailPageProps {
   params: Promise<{
@@ -117,7 +118,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       // Return the updated item
       return result.item || updatedItem;
     } catch (err) {
-      console.error('Error updating item:', err);
+      clientLogger.error('Error updating item:', { detail: err });
       throw err;
     }
   };
@@ -331,7 +332,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             break;
         }
       } catch (photoError) {
-        console.warn('Failed to load photos via singleton:', photoError);
+        clientLogger.warn('Failed to load photos via singleton:', { detail: photoError });
         // Fallback to image_gallery from API
         if (itemGallery && Array.isArray(itemGallery) && itemGallery.length > 0) {
 
@@ -362,7 +363,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       });
       setCategories(fetchedCategories);
     } catch (error) {
-      console.warn('Failed to load categories via singleton, using empty array:', error);
+      clientLogger.warn('Failed to load categories via singleton, using empty array:', { detail: error });
       setCategories([]);
     }
   };
@@ -1195,7 +1196,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                               visibility: 'public'
                             });
                           } catch (err) {
-                            console.error('Failed to update item:', err);
+                            clientLogger.error('Failed to update item:', { detail: err });
                           }
                         }}
                         className="w-full"

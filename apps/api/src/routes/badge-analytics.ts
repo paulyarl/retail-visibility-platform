@@ -15,6 +15,7 @@
 
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 import {
   trackBadgeEvent,
   trackBadgeEvents,
@@ -41,7 +42,7 @@ router.get('/tenants/:tenantId/badge-analytics', authenticateToken, async (req, 
     const dashboard = await getBadgeAnalyticsDashboard(tenantId, period, daysBack);
     res.json(dashboard);
   } catch (error) {
-    console.error('[badge-analytics] Failed to get dashboard:', error);
+    logger.error('[badge-analytics] Failed to get dashboard:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch badge analytics' });
   }
 });
@@ -64,7 +65,7 @@ router.get('/tenants/:tenantId/badge-analytics/timeseries', authenticateToken, a
     const timeseries = await getBadgeTimeSeries(tenantId, badgeKey, period, daysBack);
     res.json({ badgeKey, period, data: timeseries });
   } catch (error) {
-    console.error('[badge-analytics] Failed to get timeseries:', error);
+    logger.error('[badge-analytics] Failed to get timeseries:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch time series' });
   }
 });
@@ -83,7 +84,7 @@ router.get('/tenants/:tenantId/badge-analytics/roi', authenticateToken, async (r
     const roi = await getBadgeROIReport(tenantId, period, daysBack);
     res.json({ badges: roi });
   } catch (error) {
-    console.error('[badge-analytics] Failed to get ROI report:', error);
+    logger.error('[badge-analytics] Failed to get ROI report:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch ROI report' });
   }
 });
@@ -104,7 +105,7 @@ router.post('/tenants/:tenantId/badge-analytics/aggregate', authenticateToken, a
       errors: result.errors,
     });
   } catch (error) {
-    console.error('[badge-analytics] Failed to aggregate:', error);
+    logger.error('[badge-analytics] Failed to aggregate:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to aggregate badge analytics' });
   }
 });
@@ -139,7 +140,7 @@ router.post('/public/badge-events', async (req, res) => {
 
     res.status(201).json({ success: true });
   } catch (error) {
-    console.error('[badge-events] Failed to track event:', error);
+    logger.error('[badge-events] Failed to track event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to track badge event' });
   }
 });
@@ -168,7 +169,7 @@ router.post('/public/badge-events/batch', async (req, res) => {
     await trackBadgeEvents(sanitized);
     res.status(201).json({ success: true, tracked: sanitized.length });
   } catch (error) {
-    console.error('[badge-events] Failed to batch track events:', error);
+    logger.error('[badge-events] Failed to batch track events:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to track badge events' });
   }
 });

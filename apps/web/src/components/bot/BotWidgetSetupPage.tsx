@@ -13,7 +13,7 @@ interface BotWidgetSetupPageProps {
 }
 
 export default function BotWidgetSetupPage({ tenantId }: BotWidgetSetupPageProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [copied, setCopied] = useState(false);
   const [copiedExternal, setCopiedExternal] = useState(false);
 

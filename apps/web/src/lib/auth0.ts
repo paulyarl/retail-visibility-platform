@@ -9,6 +9,7 @@
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
 import { NextResponse } from 'next/server';
 import AuthSyncService from '../services/AuthSyncService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Cookie names for storing user info for API authentication
 const EMAIL_COOKIE_NAME = 'auth0_email';
@@ -29,7 +30,7 @@ export const auth0 = new Auth0Client({
     console.log('[Auth0] Session.user keys:', session?.user ? Object.keys(session.user) : 'null');
     
     if (error) {
-      console.error('[Auth0] Callback error:', error);
+      clientLogger.error('[Auth0] Callback error:', { detail: error });
       // Redirect to home with error
       return NextResponse.redirect(new URL('/?auth_error=true', ctx.appBaseUrl || '/'));
     }
@@ -86,11 +87,11 @@ export const auth0 = new Auth0Client({
           return response;
         } else {
           // Log sync failure but don't block login
-          console.warn('[Auth0] User sync failed, but continuing with login');
+          clientLogger.warn('[Auth0] User sync failed, but continuing with login');
         }
       } catch (syncError) {
         // Log but don't fail - user can still use the app
-        console.error('[Auth0] Failed to sync user to database:', syncError);
+        clientLogger.error('[Auth0] Failed to sync user to database:', { detail: syncError });
       }
     }
 

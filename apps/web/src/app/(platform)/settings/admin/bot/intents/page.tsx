@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, Badge, Spinner, Button, Modal, Input, Select, Textarea } from '@/components/ui';
 import { botPlatformAdminService, type BotIntent } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function BotIntentsPage() {
   const [intents, setIntents] = useState<BotIntent[]>([]);
@@ -27,7 +28,7 @@ export default function BotIntentsPage() {
       const data = await botPlatformAdminService.listIntents();
       setIntents(data);
     } catch (err) {
-      console.error('[Bot Intents] Load error:', err);
+      clientLogger.error('[Bot Intents] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export default function BotIntentsPage() {
       setShowModal(false);
       await loadIntents();
     } catch (err) {
-      console.error('[Bot Intents] Save error:', err);
+      clientLogger.error('[Bot Intents] Save error:', { detail: err });
     } finally {
       setSaving(false);
     }
@@ -90,7 +91,7 @@ export default function BotIntentsPage() {
       await botPlatformAdminService.deleteIntent(id);
       await loadIntents();
     } catch (err) {
-      console.error('[Bot Intents] Delete error:', err);
+      clientLogger.error('[Bot Intents] Delete error:', { detail: err });
     }
   }
 

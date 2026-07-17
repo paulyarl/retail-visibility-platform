@@ -1,8 +1,9 @@
 import React from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { ShopCard } from '@/components/shops/ShopCard';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Bucket Section Component - Reusable container for shops discovery buckets
@@ -158,8 +159,8 @@ export function ProductBucket({
 }: ProductBucketProps) {
   const displayProducts = products.slice(0, maxItems);
   const tenantId = displayProducts[0]?.tenantId || displayProducts[0]?.tenant_id || null;
-  const commerceCap = useCommerceCapability(tenantId);
-  const paymentCap = usePaymentGatewayCapability(tenantId);
+  const commerceCap = usePublicCommerceCapability(tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(tenantId);
   const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
 
   return (
@@ -432,7 +433,7 @@ export function ProductBucket({
                         alt={product.tenant_name || product.tenantName || 'Store'}
                         className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600"
                         onError={(e) => {
-                          console.error('Logo failed to load:', product.tenantLogoUrl || product.tenant_logo_url);
+                          clientLogger.error('Logo failed to load:', { detail: product.tenantLogoUrl || product.tenant_logo_url });
                           e.currentTarget.style.display = 'none';
                         }}
                       />

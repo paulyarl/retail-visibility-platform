@@ -167,13 +167,13 @@ function ClassicProductSection({
                 {/* Desktop Category Sidebar */}
                 <div className="hidden lg:block lg:w-64 flex-shrink-0">
                   {showsCategoryProduct && <ProductCategorySidebar tenantId={tenantId} categories={categories} totalProducts={totalItems || 0} />}
-                  {showsQRCodes && <TenantQRCode url={currentUrl} tenantId={tenantId} label="Scan to Share" downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={200} showDownload={true} className="mt-4" pageType="storefront" capabilityFlags={storefrontOptionFlags} />}
+                  {showsQRCodes && <TenantQRCode url={currentUrl} tenantId={tenantId} label="Scan to Share" downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={200} showDownload={true} className="mt-4" pageType="storefront" capabilityFlags={storefrontOptionFlags} isPublic />}
                 </div>
 
                 {/* Mobile Category Dropdown */}
                 <div className="lg:hidden">
                   {showsCategoryProduct && <CategoryMobileDropdown tenantId={tenantId} categories={categories} totalProducts={totalItems || 0} />}
-                  {showsQRCodes && <TenantQRCode url={currentUrl} tenantId={tenantId} label="Scan to Share" downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={200} showDownload={true} className="mt-4" pageType="storefront" capabilityFlags={storefrontOptionFlags} />}
+                  {showsQRCodes && <TenantQRCode url={currentUrl} tenantId={tenantId} label="Scan to Share" downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')} size={200} showDownload={true} className="mt-4" pageType="storefront" capabilityFlags={storefrontOptionFlags} isPublic />}
                 </div>
 
                 {/* Main Content Area */}

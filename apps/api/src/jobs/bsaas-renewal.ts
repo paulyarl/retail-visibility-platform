@@ -17,6 +17,7 @@ import { prisma } from '../prisma';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 /**
  * Calculate the renewal charge amount based on coupon metadata.
@@ -189,7 +190,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         }
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error processing bundle ${bundleKey}:`, error);
+      logger.error(`[BSaaS Renewal] Error processing bundle ${bundleKey}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Bundle ${bundleKey}: ${error.message}`);
     }
   }
@@ -270,7 +271,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         await enterGracePeriod(purchase, chargeResult.error || 'Payment declined', result, featureName, renewalCharge.chargedAmount, billingCycle);
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error processing purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error processing purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Purchase ${purchase.id}: ${error.message}`);
     }
   }
@@ -371,7 +372,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         }
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error converting bundle trial ${bundleKey}:`, error);
+      logger.error(`[BSaaS Renewal] Error converting bundle trial ${bundleKey}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Bundle trial ${bundleKey}: ${error.message}`);
     }
   }
@@ -444,7 +445,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         await enterGracePeriod(purchase, chargeResult.error || 'Payment declined during trial conversion', result, featureName, renewalCharge.chargedAmount, billingCycle);
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error converting trial ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error converting trial ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Trial ${purchase.id}: ${error.message}`);
     }
   }
@@ -566,7 +567,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         }).catch(err => console.error('[BSaaS Renewal] Failed to send grace warning:', err));
       }
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error retrying past_due purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error retrying past_due purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Retry ${purchase.id}: ${error.message}`);
     }
   }
@@ -592,11 +593,15 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
         },
       });
 
+      if (purchase.feature_key === 'funnel_builder') {
+        await autoPauseFunnels(purchase.tenant_id, 'Funnel builder purchase expired');
+      }
+
       invalidateEffectiveCapabilities(purchase.tenant_id);
       result.expired++;
       console.log(`[BSaaS Renewal] Expired cancelled purchase ${purchase.id} for tenant ${purchase.tenant_id}`);
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error expiring purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error expiring purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Expire ${purchase.id}: ${error.message}`);
     }
   }
@@ -617,7 +622,7 @@ export async function processBsaasRenewals(): Promise<BsaasRenewalResult> {
     try {
       await enterGracePeriod(purchase, 'Renewal window missed — purchase expired', result);
     } catch (error: any) {
-      console.error(`[BSaaS Renewal] Error entering grace period for overdue purchase ${purchase.id}:`, error);
+      logger.error(`[BSaaS Renewal] Error entering grace period for overdue purchase ${purchase.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       result.errors.push(`Grace ${purchase.id}: ${error.message}`);
     }
   }
@@ -673,7 +678,8 @@ async function enterGracePeriod(
 }
 
 /**
- * Suspend a purchase and invalidate capabilities
+ * Suspend a purchase and invalidate capabilities.
+ * If the suspended feature is funnel_builder, auto-pause all active funnels.
  */
 async function suspendPurchase(
   purchaseId: string,
@@ -689,8 +695,33 @@ async function suspendPurchase(
     },
   });
 
+  if (featureKey === 'funnel_builder') {
+    await autoPauseFunnels(tenantId, reason);
+  }
+
   invalidateEffectiveCapabilities(tenantId);
   console.log(`[BSaaS Renewal] Suspended purchase ${purchaseId} (feature: ${featureKey}, tenant: ${tenantId}): ${reason}`);
+}
+
+/**
+ * Pause all active funnels for a tenant (used when funnel_builder expires/suspends).
+ * Funnels are paused, not deleted, so they can be re-activated on re-purchase.
+ */
+async function autoPauseFunnels(tenantId: string, reason: string): Promise<void> {
+  try {
+    const result = await prisma.tenant_sales_funnels.updateMany({
+      where: { tenant_id: tenantId, is_active: true },
+      data: { is_active: false, updated_at: new Date() },
+    });
+    if (result.count > 0) {
+      console.log(`[BSaaS Renewal] Auto-paused ${result.count} funnels for tenant ${tenantId}: ${reason}`);
+    }
+  } catch (error: any) {
+    logger.error('[BSaaS Renewal] Failed to auto-pause funnels', undefined, {
+      tenantId,
+      error: error?.message || String(error),
+    });
+  }
 }
 
 /**

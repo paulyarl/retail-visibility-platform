@@ -1,0 +1,1229 @@
+{
+  "stats": {
+    "filesScanned": 839,
+    "filesChanged": 71,
+    "consoleErrorFound": 158,
+    "consoleErrorConverted": 158,
+    "importsAdded": 70,
+    "skipped": 0,
+    "errors": 0
+  },
+  "report": [
+    {
+      "file": "app\\api\\admin\\feature-overrides\\feature\\route.ts",
+      "changes": [
+        {
+          "line": 78,
+          "before": "console.error('Error creating feature override:', error);",
+          "after": "logger.error('Error creating feature override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\featured-products\\route.ts",
+      "changes": [
+        {
+          "line": 96,
+          "before": "console.error('Error creating featured products override:', error);",
+          "after": "logger.error('Error creating featured products override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\limits\\route.ts",
+      "changes": [
+        {
+          "line": 96,
+          "before": "console.error('Error creating limits override:', error);",
+          "after": "logger.error('Error creating limits override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\pricing\\route.ts",
+      "changes": [
+        {
+          "line": 108,
+          "before": "console.error('Error creating pricing override:', error);",
+          "after": "logger.error('Error creating pricing override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\route.ts",
+      "changes": [
+        {
+          "line": 190,
+          "before": "console.error('Error creating feature override:', error);",
+          "after": "logger.error('Error creating feature override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 93,
+          "before": "console.error('Error fetching feature overrides:', error);",
+          "after": "logger.error('Error fetching feature overrides:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\tenant-limits\\route.ts",
+      "changes": [
+        {
+          "line": 85,
+          "before": "console.error('Error creating tenant limits override:', error);",
+          "after": "logger.error('Error creating tenant limits override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\[id]\\route.ts",
+      "changes": [
+        {
+          "line": 36,
+          "before": "console.error('Error deleting feature override:', error);",
+          "after": "logger.error('Error deleting feature override:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\admin\\feature-overrides\\[id]\\status\\route.ts",
+      "changes": [
+        {
+          "line": 62,
+          "before": "console.error('Error updating feature override status:', error);",
+          "after": "logger.error('Error updating feature override status:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\downloads\\[tenantId]\\[slug]\\download\\route.ts",
+      "changes": [
+        {
+          "line": 116,
+          "before": "console.error('Error processing download:', error);",
+          "after": "logger.error('Error processing download:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\downloads\\[tenantId]\\[slug]\\route.ts",
+      "changes": [
+        {
+          "line": 105,
+          "before": "console.error('Error fetching download page:', error);",
+          "after": "logger.error('Error fetching download page:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\downloads\\[tenantId]\\[slug]\\validate\\route.ts",
+      "changes": [
+        {
+          "line": 29,
+          "before": "console.error('Error validating access:', error);",
+          "after": "logger.error('Error validating access:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\inventory\\categories\\route.ts",
+      "changes": [
+        {
+          "line": 39,
+          "before": "console.error('Error fetching categories:', error);",
+          "after": "logger.error('Error fetching categories:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\inventory\\products\\route.ts",
+      "changes": [
+        {
+          "line": 62,
+          "before": "console.error('Error fetching products:', error);",
+          "after": "logger.error('Error fetching products:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\inventory\\tenant-limits\\route.ts",
+      "changes": [
+        {
+          "line": 56,
+          "before": "console.error('Error fetching tenant limits:', error);",
+          "after": "logger.error('Error fetching tenant limits:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\tenants\\[tenantId]\\digital-assets\\route.ts",
+      "changes": [
+        {
+          "line": 123,
+          "before": "console.error('Error creating digital asset:', error);",
+          "after": "logger.error('Error creating digital asset:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\tenants\\[tenantId]\\digital-assets\\[assetId]\\route.ts",
+      "changes": [
+        {
+          "line": 206,
+          "before": "console.error('Error deleting digital asset:', error);",
+          "after": "logger.error('Error deleting digital asset:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 141,
+          "before": "console.error('Error updating digital asset:', error);",
+          "after": "logger.error('Error updating digital asset:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 47,
+          "before": "console.error('Error fetching digital asset:', error);",
+          "after": "logger.error('Error fetching digital asset:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\tenants\\[tenantId]\\download-pages\\item\\[itemId]\\route.ts",
+      "changes": [
+        {
+          "line": 54,
+          "before": "console.error('Error fetching download page by item:', error);",
+          "after": "logger.error('Error fetching download page by item:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\tenants\\[tenantId]\\download-pages\\route.ts",
+      "changes": [
+        {
+          "line": 259,
+          "before": "console.error('Error creating download page:', error);",
+          "after": "logger.error('Error creating download page:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 86,
+          "before": "console.error('Error fetching download pages:', error);",
+          "after": "logger.error('Error fetching download pages:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "app\\api\\tenants\\[tenantId]\\download-pages\\[pageId]\\route.ts",
+      "changes": [
+        {
+          "line": 248,
+          "before": "console.error('Error deleting download page:', error);",
+          "after": "logger.error('Error deleting download page:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 197,
+          "before": "console.error('Error updating download page:', error);",
+          "after": "logger.error('Error updating download page:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 54,
+          "before": "console.error('Error fetching download page:', error);",
+          "after": "logger.error('Error fetching download page:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "auth\\auth.middleware.ts",
+      "changes": [
+        {
+          "line": 73,
+          "before": "console.error('[authenticateToken] Auth0 authentication failed:', error);",
+          "after": "logger.error('[authenticateToken] Auth0 authentication failed:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": true
+    },
+    {
+      "file": "auth\\auth.routes.ts",
+      "changes": [
+        {
+          "line": 170,
+          "before": "console.error('[Login Critical] Unexpected error:', error);",
+          "after": "logger.error('[Login Critical] Unexpected error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 163,
+          "before": "console.error('[Login Error]', error.message);",
+          "after": "logger.error('[Login Error]', error.message, (req as any).ctx);"
+        },
+        {
+          "line": 129,
+          "before": "console.error('[Login Critical] Database connection failed:', error.message);",
+          "after": "logger.error('[Login Critical] Database connection failed:', error.message, (req as any).ctx);"
+        }
+      ],
+      "isRoute": true
+    },
+    {
+      "file": "check-all-gateways.ts",
+      "changes": [
+        {
+          "line": 47,
+          "before": "console.error('Error:', error);",
+          "after": "logger.error('Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "check-payment-gateways.ts",
+      "changes": [
+        {
+          "line": 31,
+          "before": "console.error('Error:', error);",
+          "after": "logger.error('Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "fix-payment-gateways.ts",
+      "changes": [
+        {
+          "line": 84,
+          "before": "console.error('❌ Error:', error);",
+          "after": "logger.error('❌ Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "photos.ts",
+      "changes": [
+        {
+          "line": 658,
+          "before": "console.error(\"photo delete error\", e);",
+          "after": "logger.error(\"photo delete error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 620,
+          "before": "console.error(\"Failed to delete from storage:\", storageError);",
+          "after": "logger.error(\"Failed to delete from storage:\", (req as any).ctx, { error: { name: storageError?.name || 'Error', message: storageError?.message || String(storageError), stack: storageError?.stack } });"
+        },
+        {
+          "line": 590,
+          "before": "console.error(\"reorder error\", e);",
+          "after": "logger.error(\"reorder error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 538,
+          "before": "console.error(\"photo update error\", e);",
+          "after": "logger.error(\"photo update error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 503,
+          "before": "console.error(`[Photo Update] Position swap failed:`, swapError);",
+          "after": "logger.error(`[Photo Update] Position swap failed:`, (req as any).ctx, { error: { name: swapError?.name || 'Error', message: swapError?.message || String(swapError), stack: swapError?.stack } });"
+        },
+        {
+          "line": 444,
+          "before": "console.error(\"migrate legacy photo error\", e);",
+          "after": "logger.error(\"migrate legacy photo error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 392,
+          "before": "console.error(\"photo upload error\", e);",
+          "after": "logger.error(\"photo upload error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 243,
+          "before": "console.error(\"temp photo delete error\", e);",
+          "after": "logger.error(\"temp photo delete error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 237,
+          "before": "console.error(\"temp photo delete error\", deleteError);",
+          "after": "logger.error(\"temp photo delete error\", (req as any).ctx, { error: { name: deleteError?.name || 'Error', message: deleteError?.message || String(deleteError), stack: deleteError?.stack } });"
+        },
+        {
+          "line": 204,
+          "before": "console.error(\"temp photo upload error\", e);",
+          "after": "logger.error(\"temp photo upload error\", (req as any).ctx, { error: { name: e?.name || 'Error', message: e?.message || String(e), stack: e?.stack } });"
+        },
+        {
+          "line": 106,
+          "before": "console.error('[migrateTempPhotos] Error migrating photo:', error);",
+          "after": "logger.error('[migrateTempPhotos] Error migrating photo:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 87,
+          "before": "console.error('[migrateTempPhotos] Failed to upload to permanent location:', uploadError);",
+          "after": "logger.error('[migrateTempPhotos] Failed to upload to permanent location:', (req as any).ctx, { error: { name: uploadError?.name || 'Error', message: uploadError?.message || String(uploadError), stack: uploadError?.stack } });"
+        },
+        {
+          "line": 73,
+          "before": "console.error('[migrateTempPhotos] Failed to download temp file:', downloadError);",
+          "after": "logger.error('[migrateTempPhotos] Failed to download temp file:', (req as any).ctx, { error: { name: downloadError?.name || 'Error', message: downloadError?.message || String(downloadError), stack: downloadError?.stack } });"
+        }
+      ],
+      "isRoute": true
+    },
+    {
+      "file": "prisma.ts",
+      "changes": [
+        {
+          "line": 164,
+          "before": "console.error('[Database Recovery] Reconnection failed:', reconnectError);",
+          "after": "logger.error('[Database Recovery] Reconnection failed:', undefined, { error: { name: reconnectError?.name || 'Error', message: reconnectError?.message || String(reconnectError), stack: reconnectError?.stack } });"
+        },
+        {
+          "line": 137,
+          "before": "console.error('[Database Health] Connection check failed:', error);",
+          "after": "logger.error('[Database Health] Connection check failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 74,
+          "before": "console.error(`[Prisma Retry] All ${maxRetries} attempts failed. Giving up.`);",
+          "after": "logger.error(`[Prisma Retry] All ${maxRetries} attempts failed. Giving up.`, undefined);"
+        },
+        {
+          "line": 67,
+          "before": "console.error(`[Prisma Retry] Retrying in ${delayMs}ms with exponential backoff...`);",
+          "after": "logger.error(`[Prisma Retry] Retrying in ${delayMs}ms with exponential backoff...`, undefined);"
+        },
+        {
+          "line": 66,
+          "before": "console.error(`[Prisma Retry] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);",
+          "after": "logger.error(`[Prisma Retry] Attempt ${attempt}/${maxRetries} failed: ${error.message}`, undefined);"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "remove-square-gateway.ts",
+      "changes": [
+        {
+          "line": 62,
+          "before": "console.error('❌ Error:', error);",
+          "after": "logger.error('❌ Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-all-categories.ts",
+      "changes": [
+        {
+          "line": 87,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 73,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-category-mismatch.ts",
+      "changes": [
+        {
+          "line": 116,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 102,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-category-names.ts",
+      "changes": [
+        {
+          "line": 80,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 66,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-category-tables.ts",
+      "changes": [
+        {
+          "line": 125,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 111,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-dcp-columns.ts",
+      "changes": [
+        {
+          "line": 70,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 56,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-directory-category-columns.ts",
+      "changes": [
+        {
+          "line": 85,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 71,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-directory-listing.ts",
+      "changes": [
+        {
+          "line": 182,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 168,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-directory-listings.ts",
+      "changes": [
+        {
+          "line": 117,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 103,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-directory-tables.ts",
+      "changes": [
+        {
+          "line": 77,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 63,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-directory-views.ts",
+      "changes": [
+        {
+          "line": 84,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 70,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-entity-id-format.ts",
+      "changes": [
+        {
+          "line": 100,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 86,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-inventory-counts.ts",
+      "changes": [
+        {
+          "line": 120,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 106,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-item-status.ts",
+      "changes": [
+        {
+          "line": 114,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 100,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-mat-views.ts",
+      "changes": [
+        {
+          "line": 134,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 120,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-product-counts.ts",
+      "changes": [
+        {
+          "line": 92,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 78,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-published-stores.ts",
+      "changes": [
+        {
+          "line": 92,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 78,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-search-columns.ts",
+      "changes": [
+        {
+          "line": 62,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 48,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-search-query.ts",
+      "changes": [
+        {
+          "line": 135,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 121,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-secondary-categories.ts",
+      "changes": [
+        {
+          "line": 86,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 72,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-store-types.ts",
+      "changes": [
+        {
+          "line": 127,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 113,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-tenant-tables.ts",
+      "changes": [
+        {
+          "line": 72,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 58,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-tenant-uuid.ts",
+      "changes": [
+        {
+          "line": 76,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 62,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-view-columns.ts",
+      "changes": [
+        {
+          "line": 102,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 88,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-view-definition.ts",
+      "changes": [
+        {
+          "line": 94,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 80,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\debug-view-source.ts",
+      "changes": [
+        {
+          "line": 102,
+          "before": "console.error('❌ Debug failed:', error);",
+          "after": "logger.error('❌ Debug failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 88,
+          "before": "console.error('Fatal error during debug:', error);",
+          "after": "logger.error('Fatal error during debug:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\direct-view-query.ts",
+      "changes": [
+        {
+          "line": 111,
+          "before": "console.error('❌ Direct query failed:', error);",
+          "after": "logger.error('❌ Direct query failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 97,
+          "before": "console.error('Fatal error during direct query:', error);",
+          "after": "logger.error('Fatal error during direct query:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\generate-openapi.ts",
+      "changes": [
+        {
+          "line": 237,
+          "before": "console.error('❌ Failed to generate OpenAPI spec:', error);",
+          "after": "logger.error('❌ Failed to generate OpenAPI spec:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 224,
+          "before": "console.error('❌ route-map.json not found. Run generate-route-map.ts first.');",
+          "after": "logger.error('❌ route-map.json not found. Run generate-route-map.ts first.', undefined);"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\generate-route-map.ts",
+      "changes": [
+        {
+          "line": 184,
+          "before": "console.error('❌ Failed to generate route map:', error);",
+          "after": "logger.error('❌ Failed to generate route map:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\lint-catchall-order.ts",
+      "changes": [
+        {
+          "line": 238,
+          "before": "console.error('');",
+          "after": "logger.error('', undefined);"
+        },
+        {
+          "line": 237,
+          "before": "console.error(`  Static sibling at line ${v.staticLine}: ${v.staticRoute}`);",
+          "after": "logger.error(`  Static sibling at line ${v.staticLine}: ${v.staticRoute}`, undefined);"
+        },
+        {
+          "line": 236,
+          "before": "console.error(`  Param route at line ${v.paramLine}: ${v.paramRoute}`);",
+          "after": "logger.error(`  Param route at line ${v.paramLine}: ${v.paramRoute}`, undefined);"
+        },
+        {
+          "line": 235,
+          "before": "console.error(`  File: ${v.file}`);",
+          "after": "logger.error(`  File: ${v.file}`, undefined);"
+        },
+        {
+          "line": 233,
+          "before": "console.error(`❌ Found ${paramViolations.length} dynamic param shadowing violation(s):\\n`);",
+          "after": "logger.error(`❌ Found ${paramViolations.length} dynamic param shadowing violation(s):\\n`, undefined);"
+        },
+        {
+          "line": 229,
+          "before": "console.error('');",
+          "after": "logger.error('', undefined);"
+        },
+        {
+          "line": 228,
+          "before": "console.error(`  Static route at line ${v.staticLine}: ${v.staticRoute}`);",
+          "after": "logger.error(`  Static route at line ${v.staticLine}: ${v.staticRoute}`, undefined);"
+        },
+        {
+          "line": 227,
+          "before": "console.error(`  Catch-all at line ${v.line}: ${v.catchAll}`);",
+          "after": "logger.error(`  Catch-all at line ${v.line}: ${v.catchAll}`, undefined);"
+        },
+        {
+          "line": 226,
+          "before": "console.error(`  File: ${v.file}`);",
+          "after": "logger.error(`  File: ${v.file}`, undefined);"
+        },
+        {
+          "line": 224,
+          "before": "console.error(`❌ Found ${catchAllViolations.length} catch-all ordering violation(s):\\n`);",
+          "after": "logger.error(`❌ Found ${catchAllViolations.length} catch-all ordering violation(s):\\n`, undefined);"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\refresh-mat-views.ts",
+      "changes": [
+        {
+          "line": 96,
+          "before": "console.error('❌ Refresh failed:', error);",
+          "after": "logger.error('❌ Refresh failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 82,
+          "before": "console.error('Fatal error during refresh:', error);",
+          "after": "logger.error('Fatal error during refresh:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\refresh-materialized-views.ts",
+      "changes": [
+        {
+          "line": 67,
+          "before": "console.error('❌ Refresh failed:', error);",
+          "after": "logger.error('❌ Refresh failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 53,
+          "before": "console.error('Fatal error during refresh:', error);",
+          "after": "logger.error('Fatal error during refresh:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\refresh-smart-sale-mv.ts",
+      "changes": [
+        {
+          "line": 81,
+          "before": "console.error('Fatal error:', error);",
+          "after": "logger.error('Fatal error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 71,
+          "before": "console.error('❌ Smart Sale MV refresh failed:', error);",
+          "after": "logger.error('❌ Smart Sale MV refresh failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\seed-platform-flags.ts",
+      "changes": [
+        {
+          "line": 160,
+          "before": "console.error('❌ Seed failed:', error);",
+          "after": "logger.error('❌ Seed failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 151,
+          "before": "console.error(`❌ Failed to seed ${flagData.flag}:`, error);",
+          "after": "logger.error(`❌ Failed to seed ${flagData.flag}:`, undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "scripts\\sync-review-ratings.ts",
+      "changes": [
+        {
+          "line": 123,
+          "before": "console.error('Script failed:', error);",
+          "after": "logger.error('Script failed:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 108,
+          "before": "console.error('Fatal error during sync:', error);",
+          "after": "logger.error('Fatal error during sync:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 101,
+          "before": "console.error(`  ✗ Error syncing tenant ${tenantId}:`, error);",
+          "after": "logger.error(`  ✗ Error syncing tenant ${tenantId}:`, undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "security\\CacheEncryption.ts",
+      "changes": [
+        {
+          "line": 119,
+          "before": "console.error('[Cache Encryption] Integrity check failed:', error instanceof Error ? error.message : 'Unknown error');",
+          "after": "logger.error('[Cache Encryption] Integrity check failed:', error instanceof Error ? error.message : 'Unknown error', undefined);"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "square\\square-integration.service.ts",
+      "changes": [
+        {
+          "line": 194,
+          "before": "console.error('[SquareIntegration] Test connection error:', error);",
+          "after": "logger.error('[SquareIntegration] Test connection error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 171,
+          "before": "console.error('[SquareIntegration] Get sync logs error:', error);",
+          "after": "logger.error('[SquareIntegration] Get sync logs error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 152,
+          "before": "console.error('[SquareIntegration] Refresh token error:', error);",
+          "after": "logger.error('[SquareIntegration] Refresh token error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 130,
+          "before": "console.error('[SquareIntegration] Get status error:', error);",
+          "after": "logger.error('[SquareIntegration] Get status error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 96,
+          "before": "console.error('[SquareIntegration] Disconnect tenant error:', error);",
+          "after": "logger.error('[SquareIntegration] Disconnect tenant error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 62,
+          "before": "console.error('[SquareIntegration] Connect tenant error:', error);",
+          "after": "logger.error('[SquareIntegration] Connect tenant error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "square\\square.routes.ts",
+      "changes": [
+        {
+          "line": 448,
+          "before": "console.error('[Square Integration] Get sync status error:', error);",
+          "after": "logger.error('[Square Integration] Get sync status error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 397,
+          "before": "console.error('[Square Integration] Inventory sync error:', error);",
+          "after": "logger.error('[Square Integration] Inventory sync error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 348,
+          "before": "console.error('[Square Integration] Product sync error:', error);",
+          "after": "logger.error('[Square Integration] Product sync error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 299,
+          "before": "console.error('[Square Integration] Sync error:', error);",
+          "after": "logger.error('[Square Integration] Sync error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 246,
+          "before": "console.error('[Square Integration] Get logs error:', error);",
+          "after": "logger.error('[Square Integration] Get logs error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 214,
+          "before": "console.error('[Square Integration] Sync error:', error);",
+          "after": "logger.error('[Square Integration] Sync error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 175,
+          "before": "console.error('[Square Integration] Disconnect error:', error);",
+          "after": "logger.error('[Square Integration] Disconnect error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 145,
+          "before": "console.error('[Square Integration] Get status error:', error);",
+          "after": "logger.error('[Square Integration] Get status error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 89,
+          "before": "console.error('[Square OAuth] Token exchange error:', error);",
+          "after": "logger.error('[Square OAuth] Token exchange error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": true
+    },
+    {
+      "file": "utils\\auth0Identity.ts",
+      "changes": [
+        {
+          "line": 233,
+          "before": "console.error('[Auth0Identity] Error attaching tracking identity:', error);",
+          "after": "logger.error('[Auth0Identity] Error attaching tracking identity:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 214,
+          "before": "console.error('[Auth0Identity] Error getting DB user ID:', error);",
+          "after": "logger.error('[Auth0Identity] Error getting DB user ID:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "utils\\business-hours-utils.ts",
+      "changes": [
+        {
+          "line": 95,
+          "before": "console.error('[updateBusinessProfileHours] Error:', error);",
+          "after": "logger.error('[updateBusinessProfileHours] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 64,
+          "before": "console.error('[buildCombinedHoursObject] Error:', error);",
+          "after": "logger.error('[buildCombinedHoursObject] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "utils\\category-counts.ts",
+      "changes": [
+        {
+          "line": 164,
+          "before": "console.error('[Total Product Count] Error:', error);",
+          "after": "logger.error('[Total Product Count] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 136,
+          "before": "console.error('[Uncategorized Count] Error:', error);",
+          "after": "logger.error('[Uncategorized Count] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 106,
+          "before": "console.error('[Category Counts] Error reading from materialized view:', error);",
+          "after": "logger.error('[Category Counts] Error reading from materialized view:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "utils\\directory-category-counts.ts",
+      "changes": [
+        {
+          "line": 190,
+          "before": "console.error('[Directory Stats] Error:', error);",
+          "after": "logger.error('[Directory Stats] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 143,
+          "before": "console.error('[Category Summary] Error:', error);",
+          "after": "logger.error('[Category Summary] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 109,
+          "before": "console.error('[Platform Directory Category Counts] Error:', error);",
+          "after": "logger.error('[Platform Directory Category Counts] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 62,
+          "before": "console.error('[Directory Category Counts] Error:', error);",
+          "after": "logger.error('[Directory Category Counts] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "utils\\global-catalog-sync.ts",
+      "changes": [
+        {
+          "line": 182,
+          "before": "console.error(`[Global Catalog Sync] Failed for SKU ${item.sku}:`, error);",
+          "after": "logger.error(`[Global Catalog Sync] Failed for SKU ${item.sku}:`, undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        },
+        {
+          "line": 155,
+          "before": "console.error('[Global Catalog Sync] Error creating global entry:', error);",
+          "after": "logger.error('[Global Catalog Sync] Error creating global entry:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    },
+    {
+      "file": "utils\\tenant-organization-validation.ts",
+      "changes": [
+        {
+          "line": 104,
+          "before": "console.error('[isTenantInGoodStanding] Error:', error);",
+          "after": "logger.error('[isTenantInGoodStanding] Error:', (req as any).ctx, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": true
+    },
+    {
+      "file": "utils\\variant-propagation.ts",
+      "changes": [
+        {
+          "line": 188,
+          "before": "console.error('[Variant Propagation] Error:', error);",
+          "after": "logger.error('[Variant Propagation] Error:', undefined, { error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack } });"
+        }
+      ],
+      "isRoute": false
+    }
+  ]
+}

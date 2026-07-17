@@ -180,12 +180,13 @@ describe('StorefrontOptionsResolver', () => {
     expect(result.enabled).toBe(false);
   });
 
-  it('shows hours display when tier and merchant allow it', () => {
+  it('enables category when tier supports it', () => {
     const result = resolveStorefrontOptions(
-      { storefront_opt_enabled: true, storefront_opt_hours_display: true },
-      { hours_display: true }
+      { storefront_opt_enabled: true, storefront_opt_category_on: true },
+      { category_store: true }
     );
-    expect(result.can_show_hours_display).toBe(true);
+    expect(result.category_enabled).toBe(true);
+    expect(result.allowed_category_types).toContain('category_store');
   });
 });
 

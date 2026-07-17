@@ -5,6 +5,7 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { Store } from 'lucide-react';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // STORE INTERFACES
@@ -139,12 +140,12 @@ class StoreSingleton extends PublicApiSingleton {
           this.stores.set(store.id, store);
         });
       } else {
-        console.warn('[StoreSingleton] storesData is not an array:', storesData);
+        clientLogger.warn('[StoreSingleton] storesData is not an array:', { detail: storesData });
       }
       
       return storesData;
     } catch (error) {
-      console.error('[StoreSingleton] Error fetching stores:', error);
+      clientLogger.error('[StoreSingleton] Error fetching stores:', { detail: error });
       return [];
     }
   }
@@ -165,7 +166,7 @@ class StoreSingleton extends PublicApiSingleton {
       
       return store;
     } catch (error) {
-      console.error('[StoreSingleton] Error fetching stores:', error);
+      clientLogger.error('[StoreSingleton] Error fetching stores:', { detail: error });
       throw error;
     }
   }
@@ -190,7 +191,7 @@ class StoreSingleton extends PublicApiSingleton {
 
       return categories;
     } catch (error) {
-      console.error('[StoreSingleton] Error fetching stores:', error);
+      clientLogger.error('[StoreSingleton] Error fetching stores:', { detail: error });
       throw error;
     }
   }
@@ -413,7 +414,7 @@ export function useFeaturedStores(location?: { lat: number; lng: number } | unde
       
       // Ensure fetchedStores is an array before calling map
       if (!Array.isArray(fetchedStores)) {
-        console.warn('[StoreSingleton] fetchedStores is not an array:', fetchedStores);
+        clientLogger.warn('[StoreSingleton] fetchedStores is not an array:', { detail: fetchedStores });
         setStores([]);
         return;
       }

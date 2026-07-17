@@ -13,6 +13,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // TYPES
@@ -137,7 +138,7 @@ class ItemUpdateService extends TenantApiSingleton {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update item';
-      console.error('[ItemUpdateService] Error updating item:', error);
+      clientLogger.error('[ItemUpdateService] Error updating item:', { detail: error });
       return {
         success: false,
         error: errorMessage,
@@ -179,7 +180,7 @@ class ItemUpdateService extends TenantApiSingleton {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create item';
-      console.error('[ItemUpdateService] Error creating item:', error);
+      clientLogger.error('[ItemUpdateService] Error creating item:', { detail: error });
       return {
         success: false,
         error: errorMessage,
@@ -215,7 +216,7 @@ class ItemUpdateService extends TenantApiSingleton {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete item';
-      console.error('[ItemUpdateService] Error deleting item:', error);
+      clientLogger.error('[ItemUpdateService] Error deleting item:', { detail: error });
       return {
         success: false,
         error: errorMessage,
@@ -250,7 +251,7 @@ class ItemUpdateService extends TenantApiSingleton {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to restore item';
-      console.error('[ItemUpdateService] Error restoring item:', error);
+      clientLogger.error('[ItemUpdateService] Error restoring item:', { detail: error });
       return {
         success: false,
         error: errorMessage,
@@ -278,7 +279,7 @@ class ItemUpdateService extends TenantApiSingleton {
 
     //  console.log('[ItemUpdateService] Related caches invalidated for item:', itemId);
     } catch (error) {
-      console.error('[ItemUpdateService] Error invalidating caches:', error);
+      clientLogger.error('[ItemUpdateService] Error invalidating caches:', { detail: error });
     }
   }
 
@@ -292,7 +293,7 @@ class ItemUpdateService extends TenantApiSingleton {
       await this.clearCache();
       // console.log('[ItemUpdateService] ProductSingleton cache invalidated');
     } catch (error) {
-      console.error('[ItemUpdateService] Error invalidating product cache:', error);
+      clientLogger.error('[ItemUpdateService] Error invalidating product cache:', { detail: error });
     }
   }
 
@@ -308,7 +309,7 @@ class ItemUpdateService extends TenantApiSingleton {
       await photoSingleton.invalidateItemCache(itemId);
       // console.log('[ItemUpdateService] PhotoSingleton cache invalidated for item:', itemId);
     } catch (error) {
-      console.error('[ItemUpdateService] Error invalidating photo cache:', error);
+      clientLogger.error('[ItemUpdateService] Error invalidating photo cache:', { detail: error });
     }
   }
 

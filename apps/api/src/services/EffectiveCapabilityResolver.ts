@@ -29,6 +29,8 @@ import {
   resolveStorefrontQr,
   resolveStorefrontGallery,
   resolveStorefrontHours,
+  resolveStorefrontLayouts,
+  resolveStorefrontMaps,
   resolveDirectoryEntryOptions,
   resolveFaqOptions,
   resolveCrmOptions,
@@ -38,6 +40,7 @@ import {
   resolveDirectoryPromotion,
   resolveWholesaleMatching,
   resolvePlatformServices,
+  resolveFunnelOptions,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -231,6 +234,19 @@ export async function resolveEffectiveCapabilities(
       merchantBundle.storefrontHours,
       rawCaps.capabilities.storefront_options?.features || {}
     ),
+    resolveStorefrontLayouts(
+      rawCaps.capabilities.storefront_layouts?.features || {},
+      merchantBundle.storefrontLayouts,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
+    resolveStorefrontMaps(
+      rawCaps.capabilities.storefront_maps?.features || {},
+      merchantBundle.storefrontMaps,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
+    resolveFunnelOptions(
+      rawCaps.capabilities.funnel_options?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -267,6 +283,9 @@ export async function resolveEffectiveCapabilities(
       wholesale_matching: effective[20],
       platform_services: effective[21],
       storefront_hours: effective[22],
+      storefront_layouts: effective[23],
+      storefront_maps: effective[24],
+      funnel: effective[25],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -339,6 +358,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
+    result.effective.funnel.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -367,6 +387,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
+    result.effective.funnel.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance
@@ -697,6 +718,19 @@ export async function resolveEffectiveCapabilitiesFromMV(
       merchantBundle.storefrontHours,
       rawCaps.capabilities.storefront_options?.features || {}
     ),
+    resolveStorefrontLayouts(
+      rawCaps.capabilities.storefront_layouts?.features || {},
+      merchantBundle.storefrontLayouts,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
+    resolveStorefrontMaps(
+      rawCaps.capabilities.storefront_maps?.features || {},
+      merchantBundle.storefrontMaps,
+      rawCaps.capabilities.storefront_options?.features || {}
+    ),
+    resolveFunnelOptions(
+      rawCaps.capabilities.funnel_options?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -733,6 +767,9 @@ export async function resolveEffectiveCapabilitiesFromMV(
       wholesale_matching: effective[20],
       platform_services: effective[21],
       storefront_hours: effective[22],
+      storefront_layouts: effective[23],
+      storefront_maps: effective[24],
+      funnel: effective[25],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -799,6 +836,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
+    result.effective.funnel.enabled = false;
   }
 
   if (isLimited) {
@@ -809,6 +847,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.directory_promotion.enabled = false;
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
+    result.effective.funnel.enabled = false;
   }
 
   // Org-level subscription status check
@@ -1122,6 +1161,8 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     storefrontQr,
     storefrontGallery,
     storefrontHours,
+    storefrontLayouts,
+    storefrontMaps,
     directoryEntry,
     faqOptions,
     crmOptions,
@@ -1143,7 +1184,9 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_storefront_qr_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_gallery_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_storefront_hours_settings.findUnique({ where: { tenant_id: tenantId } })),
-    safeQuery(() => prisma.tenant_storefront_options_settings.findUnique({ where: { tenant_id_page_type: { tenant_id: tenantId, page_type: 'directory_entry' } } })),
+    safeQuery(() => prisma.tenant_storefront_layouts_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_storefront_maps_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_directory_entry_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_faq_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_crm_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_chatbot_options_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1166,6 +1209,8 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     storefrontQr: storefrontQr as any,
     storefrontGallery: storefrontGallery as any,
     storefrontHours: storefrontHours as any,
+    storefrontLayouts: storefrontLayouts as any,
+    storefrontMaps: storefrontMaps as any,
     directoryEntry: directoryEntry as any,
     faqOptions: faqOptions as any,
     crmOptions: crmOptions as any,
@@ -1238,6 +1283,16 @@ function buildMerchantSoftGates(bundle: MerchantSettingsBundle): Record<string, 
       hours_display: bundle.storefrontHours.hours_display ?? true,
       hours_animated: bundle.storefrontHours.hours_animated ?? true,
       hours_status: bundle.storefrontHours.hours_status ?? true,
+    };
+  }
+  if (bundle.storefrontLayouts) {
+    gates.storefront_layouts = {
+      layouts_enabled: bundle.storefrontLayouts.layouts_enabled ?? true,
+    };
+  }
+  if (bundle.storefrontMaps) {
+    gates.storefront_maps = {
+      maps_enabled: bundle.storefrontMaps.maps_enabled ?? true,
     };
   }
   if (bundle.wholesaleMatching) {

@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { InventoryTransferService } from '../services/InventoryTransferService';
+import { logger } from '../logger';
 // import { authenticateToken } from '../middleware/auth';
 
 console.log('🔥 [DEBUG] Tenant inventory transfer routes file loading...');
@@ -55,7 +56,7 @@ router.get('/transfers', async (req: Request, res: Response) => {
       query: req.query
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Get transfers error:', error);
+    logger.error('[Tenant Inventory] Get transfers error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_transfers',
@@ -98,7 +99,7 @@ router.get('/transfers/:transferId', async (req: Request, res: Response) => {
       data: transfer
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Get transfer details error:', error);
+    logger.error('[Tenant Inventory] Get transfer details error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_transfer_details',
@@ -183,7 +184,7 @@ const locationIdStr = Array.isArray(locationId) ? locationId[0] : locationId;
       data: result
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Get location inventory error:', error);
+    logger.error('[Tenant Inventory] Get location inventory error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_location_inventory',
@@ -227,7 +228,7 @@ router.get('/locations/:locationId/inventory/:sku', async (req: Request, res: Re
       data: pool
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Get inventory pool error:', error);
+    logger.error('[Tenant Inventory] Get inventory pool error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_inventory_pool',
@@ -273,7 +274,7 @@ router.get('/alerts/low-stock', async (req: Request, res: Response) => {
       data: result
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Get low stock alerts error:', error);
+    logger.error('[Tenant Inventory] Get low stock alerts error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_low_stock_alerts',
@@ -352,7 +353,7 @@ router.post('/sync-inventory', async (req: Request, res: Response) => {
             });
           }
         } catch (error) {
-          console.error(`Failed to sync item ${item.sku}:`, error);
+          logger.error(`Failed to sync item ${item.sku}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           syncResults.push({
             sku: item.sku,
             name: item.name,
@@ -382,7 +383,7 @@ router.post('/sync-inventory', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Sync inventory error:', error);
+    logger.error('[Tenant Inventory] Sync inventory error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_sync_inventory',
@@ -420,7 +421,7 @@ router.get('/analytics/inventory', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Tenant Inventory] Get analytics error:', error);
+    logger.error('[Tenant Inventory] Get analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_analytics',

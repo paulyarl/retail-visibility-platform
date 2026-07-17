@@ -10,6 +10,7 @@
 
 import { Router, Request, Response } from 'express';
 import { BsaasAnalyticsService } from '../../services/BsaasAnalyticsService';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get('/', async (req: Request, res: Response) => {
     const analytics = await BsaasAnalyticsService.getAnalytics();
     res.json({ success: true, data: analytics });
   } catch (error) {
-    console.error('[BSaaS Analytics] Error:', error);
+    logger.error('[BSaaS Analytics] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch analytics' });
   }
 });

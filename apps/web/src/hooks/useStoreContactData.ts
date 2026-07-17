@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StoreContactData {
   listing: {
@@ -75,7 +76,7 @@ export function useStoreContactData(params: { slug?: string; tenantId?: string }
           error: null,
         });
       } catch (error) {
-        console.error('[useStoreContactData] Failed to fetch contact data:', error);
+        clientLogger.error('[useStoreContactData] Failed to fetch contact data:', { detail: error });
         setData({
           listing: null,
           isLoading: false,
@@ -113,7 +114,7 @@ export async function getStoreContactDataStatic(params: { slug?: string; tenantI
       error: null,
     };
   } catch (error) {
-    console.error('[getStoreContactDataStatic] Failed to fetch contact data:', error);
+    clientLogger.error('[getStoreContactDataStatic] Failed to fetch contact data:', { detail: error });
     return {
       listing: null,
       isLoading: false,

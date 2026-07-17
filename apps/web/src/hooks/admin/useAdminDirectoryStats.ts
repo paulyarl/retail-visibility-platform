@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStats {
   total: number;
@@ -31,7 +32,7 @@ export function useAdminDirectoryStats(): AdminDirectoryStatsHook {
       const stats = await platformHomeService.getAdminDirectoryStats();
       setStats(stats);
     } catch (err) {
-      console.error('Failed to fetch directory stats:', err);
+      clientLogger.error('Failed to fetch directory stats:', { detail: err });
       setError('Failed to fetch directory stats');
     } finally {
       setLoading(false);

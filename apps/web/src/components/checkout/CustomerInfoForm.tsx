@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import customerAddressesService, { CustomerAddress } from '@/services/CustomerAddressesService';
 import { LogIn, User, MapPin, Check, LogOut } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 type CustomerInfoFormData = {
   email: string;
@@ -96,7 +97,7 @@ export function CustomerInfoForm({ initialData, onSubmit }: CustomerInfoFormProp
         }
       }
     } catch (error) {
-      console.error('[CustomerInfoForm] Failed to load addresses:', error);
+      clientLogger.error('[CustomerInfoForm] Failed to load addresses:', { detail: error });
     } finally {
       setIsLoadingAddresses(false);
     }

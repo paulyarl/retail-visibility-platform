@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -86,7 +87,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async getRatingSummary(tenantId: string): Promise<ReviewSummary | null> {
     if (!tenantId) {
-      console.error('[ReviewsSingleton] getRatingSummary: tenantId is required');
+      clientLogger.error('[ReviewsSingleton] getRatingSummary: tenantId is required');
       return null;
     }
 
@@ -98,7 +99,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success){
-        console.error('[ReviewsSingleton] Failed to get rating summary:', result.error);
+        clientLogger.error('[ReviewsSingleton] Failed to get rating summary:', { detail: result.error });
         return null;
       }
       
@@ -121,7 +122,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
       
       return null;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to get rating summary:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to get rating summary:', { detail: error });
       return null;
     }
   }
@@ -132,7 +133,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async getReviews(tenantId: string, limit: number = 10): Promise<Review[]> {
     if (!tenantId) {
-      console.error('[ReviewsSingleton] getReviews: tenantId is required');
+      clientLogger.error('[ReviewsSingleton] getReviews: tenantId is required');
       return [];
     }
 
@@ -144,14 +145,14 @@ class ReviewsSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success){
-        console.error('[ReviewsSingleton] Failed to get reviews:', result.error);
+        clientLogger.error('[ReviewsSingleton] Failed to get reviews:', { detail: result.error });
         return [];
 
       }     
       
       return result.data?.data?.reviews || [];
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to get reviews:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to get reviews:', { detail: error });
       return [];
     }
   }
@@ -162,7 +163,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async getUserReview(tenantId: string): Promise<Review | null> {
     if (!tenantId) {
-      console.error('[ReviewsSingleton] getUserReview: tenantId is required');
+      clientLogger.error('[ReviewsSingleton] getUserReview: tenantId is required');
       return null;
     }
 
@@ -180,7 +181,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
         console.log('[ReviewsSingleton] User not authenticated, skipping user review fetch');
         return null;
       }
-      console.error('[ReviewsSingleton] Failed to get user review:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to get user review:', { detail: error });
       return null;
     }
   }
@@ -192,7 +193,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async submitHelpfulVote(reviewId: string, isHelpful: boolean): Promise<boolean> {
     if (!reviewId) {
-      console.error('[ReviewsSingleton] submitHelpfulVote: reviewId is required');
+      clientLogger.error('[ReviewsSingleton] submitHelpfulVote: reviewId is required');
       return false;
     }
 
@@ -208,7 +209,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
       
       return true;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to submit helpful vote:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to submit helpful vote:', { detail: error });
       return false;
     }
   }
@@ -228,7 +229,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
     userEmail?: string;
   }): Promise<Review | null> {
     if (!tenantId) {
-      console.error('[ReviewsSingleton] submitReview: tenantId is required');
+      clientLogger.error('[ReviewsSingleton] submitReview: tenantId is required');
       return null;
     }
 
@@ -263,7 +264,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
         console.log('[ReviewsSingleton] User not authenticated, cannot submit review');
         return null;
       }
-      console.error('[ReviewsSingleton] Failed to submit review:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to submit review:', { detail: error });
       return null;
     }
   }
@@ -279,7 +280,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
     reviewType?: 'store' | 'product' | 'all';
   }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
     if (!tenantId) {
-      console.error('[ReviewsSingleton] getApprovedReviews: tenantId is required');
+      clientLogger.error('[ReviewsSingleton] getApprovedReviews: tenantId is required');
       return null;
     }
 
@@ -315,13 +316,13 @@ class ReviewsSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[ReviewsSingleton] Failed to get approved reviews:', result.error);
+        clientLogger.error('[ReviewsSingleton] Failed to get approved reviews:', { detail: result.error });
         return null;
       }
 
       return result.data?.data || null;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to get approved reviews:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to get approved reviews:', { detail: error });
       return null;
     }
   }
@@ -333,7 +334,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async approveReview(tenantId: string, reviewId: string): Promise<boolean> {
     if (!tenantId || !reviewId) {
-      console.error('[ReviewsSingleton] approveReview: tenantId and reviewId are required');
+      clientLogger.error('[ReviewsSingleton] approveReview: tenantId and reviewId are required');
       return false;
     }
 
@@ -353,7 +354,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to approve review:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to approve review:', { detail: error });
       return false;
     }
   }
@@ -365,7 +366,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async rejectReview(tenantId: string, reviewId: string): Promise<boolean> {
     if (!tenantId || !reviewId) {
-      console.error('[ReviewsSingleton] rejectReview: tenantId and reviewId are required');
+      clientLogger.error('[ReviewsSingleton] rejectReview: tenantId and reviewId are required');
       return false;
     }
 
@@ -385,7 +386,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to reject review:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to reject review:', { detail: error });
       return false;
     }
   }
@@ -400,7 +401,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
     sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
   }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
     if (!productId) {
-      console.error('[ReviewsSingleton] getProductApprovedReviews: productId is required');
+      clientLogger.error('[ReviewsSingleton] getProductApprovedReviews: productId is required');
       return null;
     }
 
@@ -423,13 +424,13 @@ class ReviewsSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[ReviewsSingleton] Failed to get product approved reviews:', result.error);
+        clientLogger.error('[ReviewsSingleton] Failed to get product approved reviews:', { detail: result.error });
         return null;
       }
 
       return result.data?.data || null;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to get product approved reviews:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to get product approved reviews:', { detail: error });
       return null;
     }
   }
@@ -444,7 +445,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
     offset?: number;
   }): Promise<{ reviews: Review[]; pagination: any } | null> {
     if (!productId) {
-      console.error('[ReviewsSingleton] getProductPendingReviews: productId is required');
+      clientLogger.error('[ReviewsSingleton] getProductPendingReviews: productId is required');
       return null;
     }
 
@@ -465,13 +466,13 @@ class ReviewsSingletonService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[ReviewsSingleton] Failed to get product pending reviews:', result.error);
+        clientLogger.error('[ReviewsSingleton] Failed to get product pending reviews:', { detail: result.error });
         return null;
       }
 
       return result.data?.data || null;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to get product pending reviews:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to get product pending reviews:', { detail: error });
       return null;
     }
   }
@@ -482,7 +483,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async approveProductReview(productId: string, reviewId: string): Promise<boolean> {
     if (!productId || !reviewId) {
-      console.error('[ReviewsSingleton] approveProductReview: productId and reviewId are required');
+      clientLogger.error('[ReviewsSingleton] approveProductReview: productId and reviewId are required');
       return false;
     }
 
@@ -498,7 +499,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to approve product review:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to approve product review:', { detail: error });
       return false;
     }
   }
@@ -509,7 +510,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
    */
   async rejectProductReview(productId: string, reviewId: string, reason?: string): Promise<boolean> {
     if (!productId || !reviewId) {
-      console.error('[ReviewsSingleton] rejectProductReview: productId and reviewId are required');
+      clientLogger.error('[ReviewsSingleton] rejectProductReview: productId and reviewId are required');
       return false;
     }
 
@@ -529,7 +530,7 @@ class ReviewsSingletonService extends TenantApiSingleton {
 
       return result?.success || false;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to reject product review:', error);
+      clientLogger.error('[ReviewsSingleton] Failed to reject product review:', { detail: error });
       return false;
     }
   }

@@ -8,6 +8,7 @@ import { Button } from '@mantine/core';
 import { Input, Badge, ToastContainer } from '@/components/ui';
 import { adminTenantLimitsService, type LimitsData, type FeaturedProductsLimit, type TierSystemTier } from '@/services/AdminTenantLimitsSingletonService';
 import { useToast } from '@/components/ui/use-toast';
+import { clientLogger } from '@/lib/client-logger';
 
 // Skip prerendering since this page uses Mantine components
 export const dynamic = 'force-dynamic';
@@ -78,7 +79,7 @@ export default function AdminLimitsPage() {
       
       // console.log(`[FetchLimits] Data fetch completed successfully`);
     } catch (err) {
-      console.error(`[FetchLimits] Failed to fetch limits:`, err);
+      clientLogger.error(`[FetchLimits] Failed to fetch limits:`, { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load limits data');
     } finally {
       setLoading(false);
@@ -387,7 +388,7 @@ export default function AdminLimitsPage() {
         showError('Failed to update tier. Please try again.');
       }
     } catch (err) {
-      console.error(`[FocusedSave] Exception occurred:`, err);
+      clientLogger.error(`[FocusedSave] Exception occurred:`, { detail: err });
       setError('Failed to update tier');
       setFocusedEdit(null);
       setEditValue('');

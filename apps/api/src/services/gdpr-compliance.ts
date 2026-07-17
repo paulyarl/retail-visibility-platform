@@ -171,7 +171,7 @@ export class GDPRComplianceService {
       return exportData;
 
     } catch (error) {
-      logger.error(`GDPR data export failed for user: ${userId}`, context, { error: error as any });
+      logger.error(`GDPR data export failed for user: ${userId}`, undefined, { error: { name: 'Error', message: String(context) } });
       throw error;
     }
   }
@@ -235,7 +235,7 @@ export class GDPRComplianceService {
       logger.info(`GDPR data deletion completed for user: ${userId}`, context);
 
     } catch (error) {
-      logger.error(`GDPR data deletion failed for user: ${userId}`, context, { error: error as any });
+      logger.error(`GDPR data deletion failed for user: ${userId}`, undefined, { error: { name: 'Error', message: String(context) } });
       throw error;
     }
   }

@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/RadioGroup';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Download, FileJson, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { ExportHistoryTable } from './ExportHistoryTable';
+import { clientLogger } from '@/lib/client-logger';
 
 export function DataExportWidget() {
   const { exports, requestExport, downloadExport } = useGDPR();
@@ -26,7 +27,7 @@ export function DataExportWidget() {
       setRequesting(true);
       await requestExport({ format, includeMetadata });
     } catch (error) {
-      console.error('Failed to request export:', error);
+      clientLogger.error('Failed to request export:', { detail: error });
     } finally {
       setRequesting(false);
     }
@@ -36,7 +37,7 @@ export function DataExportWidget() {
     try {
       await downloadExport(exportId);
     } catch (error) {
-      console.error('Failed to download export:', error);
+      clientLogger.error('Failed to download export:', { detail: error });
     }
   };
 

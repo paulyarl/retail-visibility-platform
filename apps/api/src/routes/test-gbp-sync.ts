@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { GBPCategorySyncService } from '../services/GBPCategorySyncService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.post('/sync-gbp-categories', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Sync test failed:', error);
+    logger.error('❌ Sync test failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
 
     // Try fallback: just fetch categories without updating DB
     try {
@@ -107,7 +108,7 @@ router.get('/gbp-oauth', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ OAuth test failed:', error);
+    logger.error('❌ OAuth test failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       message: 'OAuth token test failed',

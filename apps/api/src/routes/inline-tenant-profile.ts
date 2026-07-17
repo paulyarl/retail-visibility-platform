@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, basePrisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ const tenantProfileSchema = z.object({
 router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
   const parsed = tenantProfileSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    console.error('[POST /tenant/profile] Validation failed:', parsed.error.flatten());
+    logger.error('[POST /tenant/profile] Validation failed:', undefined, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
     return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   }
 
@@ -90,8 +91,8 @@ router.post("/api/tenant/profile", authenticateToken, async (req, res) => {
       return res.json({ success: true, profile: created });
     }
   } catch (error: any) {
-    console.error('[POST /tenant/profile] Error:', error);
-    res.status(500).json({ error: "failed_to_update_profile", details: error?.message });
+    logger.error('[POST /tenant/profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: "failed_to_update_profile", details: (error as any)?.message });
   }
 });
 
@@ -111,7 +112,7 @@ router.get("/api/tenant/profile", authenticateToken, async (req, res) => {
 
     res.json(profile);
   } catch (error) {
-    console.error('[GET /tenant/profile] Error:', error);
+    logger.error('[GET /tenant/profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_profile" });
   }
 });
@@ -147,8 +148,8 @@ router.put("/api/tenant/gbp-category", authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: 'GBP categories updated' });
   } catch (error: any) {
-    console.error('[PUT /tenant/gbp-category] Error:', error);
-    res.status(500).json({ error: "failed_to_update_gbp_categories", details: error?.message });
+    logger.error('[PUT /tenant/gbp-category] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: "failed_to_update_gbp_categories", details: (error as any)?.message });
   }
 });
 
@@ -176,7 +177,7 @@ router.get("/public/tenant/:tenant_id", async (req, res) => {
 
     res.json(tenant);
   } catch (error) {
-    console.error('[GET /public/tenant/:tenant_id] Error:', error);
+    logger.error('[GET /public/tenant/:tenant_id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_tenant" });
   }
 });
@@ -206,7 +207,7 @@ router.get("/tenant/:tenant_id/swis/preview", async (req, res) => {
 
     res.json({ items, total: items.length });
   } catch (error) {
-    console.error('[GET /tenant/:tenant_id/swis/preview] Error:', error);
+    logger.error('[GET /tenant/:tenant_id/swis/preview] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_swis_preview" });
   }
 });
@@ -227,7 +228,7 @@ router.get("/public/tenant/:tenant_id/profile", async (req, res) => {
 
     res.json(profile);
   } catch (error) {
-    console.error('[GET /public/tenant/:tenant_id/profile] Error:', error);
+    logger.error('[GET /public/tenant/:tenant_id/profile] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_profile" });
   }
 });
@@ -276,7 +277,7 @@ router.get("/public/tenant/:tenant_id/items", async (req, res) => {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
     });
   } catch (error) {
-    console.error('[GET /public/tenant/:tenant_id/items] Error:', error);
+    logger.error('[GET /public/tenant/:tenant_id/items] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_items" });
   }
 });
@@ -292,7 +293,7 @@ router.get("/public/tenant/:tenant_id/categories", async (req, res) => {
 
     res.json({ categories });
   } catch (error) {
-    console.error('[GET /public/tenant/:tenant_id/categories] Error:', error);
+    logger.error('[GET /public/tenant/:tenant_id/categories] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_categories" });
   }
 });
@@ -319,7 +320,7 @@ router.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
 
     res.json({ gateways });
   } catch (error) {
-    console.error('[GET /public/tenant/:tenant_id/payment-gateways] Error:', error);
+    logger.error('[GET /public/tenant/:tenant_id/payment-gateways] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_payment_gateways" });
   }
 });
@@ -346,7 +347,7 @@ router.get("/public/tenant/:tenant_id/oauth-status/:gateway_type", async (req, r
       expires_at: integration?.expires_at || null,
     });
   } catch (error) {
-    console.error('[GET /public/tenant/:tenant_id/oauth-status/:gateway_type] Error:', error);
+    logger.error('[GET /public/tenant/:tenant_id/oauth-status/:gateway_type] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_oauth_status" });
   }
 });
@@ -367,7 +368,7 @@ router.get("/api/categories/tenant/:tenant_id", async (req, res) => {
 
     res.json({ categories: result.rows });
   } catch (error) {
-    console.error('[GET /api/categories/tenant/:tenant_id] Error:', error);
+    logger.error('[GET /api/categories/tenant/:tenant_id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_categories" });
   }
 });
@@ -390,7 +391,7 @@ router.get("/api/categories/product-level/:tenant_id", async (req, res) => {
 
     res.json({ categories: result.rows });
   } catch (error) {
-    console.error('[GET /api/categories/product-level/:tenant_id] Error:', error);
+    logger.error('[GET /api/categories/product-level/:tenant_id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_product_categories" });
   }
 });
@@ -466,7 +467,7 @@ router.get("/api/diagnostic/category-counts/:tenant_id", async (req, res) => {
 
     res.json({ success: true, data: diagnostic });
   } catch (e: any) {
-    console.error("[Diagnostic] Error:", e);
+    logger.error("[Diagnostic] Error:", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "diagnostic_failed", message: e.message });
   }
 });
@@ -518,7 +519,7 @@ router.get("/api/categories/store-level/:tenant_id", async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(jsonString);
   } catch (e: any) {
-    console.error("[GET /api/categories/store-level/:tenant_id] Error:", e);
+    logger.error("[GET /api/categories/store-level/:tenant_id] Error:", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_get_store_categories" });
   }
 });
@@ -542,7 +543,7 @@ router.post("/public/debug-query", async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (e: any) {
-    console.error('[POST /public/debug-query] Error:', e);
+    logger.error('[POST /public/debug-query] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_execute_query", details: e.message });
   }
 });
@@ -559,7 +560,7 @@ router.post("/public/refresh-materialized-views", async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (e: any) {
-    console.error('[POST /public/refresh-materialized-views] Error:', e);
+    logger.error('[POST /public/refresh-materialized-views] Error:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_refresh_views", details: e.message });
   }
 });
@@ -579,7 +580,7 @@ router.get("/public/google-taxonomy/:categoryId", async (req, res) => {
 
     res.json(category);
   } catch (e: any) {
-    console.error("[GET /public/google-taxonomy/:categoryId] Error:", e);
+    logger.error("[GET /public/google-taxonomy/:categoryId] Error:", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_get_category" });
   }
 });
@@ -597,7 +598,7 @@ router.get("/api/tenants/:tenant_id/categories", authenticateToken, async (req, 
 
     res.json({ categories, uncategorizedCount, totalCount });
   } catch (e: any) {
-    console.error("[GET /api/tenants/:tenant_id/categories] Error:", e);
+    logger.error("[GET /api/tenants/:tenant_id/categories] Error:", undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     return res.status(500).json({ error: "failed_to_get_categories" });
   }
 });

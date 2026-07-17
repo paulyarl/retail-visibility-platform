@@ -11,6 +11,7 @@ import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { prisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -41,13 +42,13 @@ router.post('/', async (req: Request, res: Response) => {
     const webhookSecret = getWebhookSecret();
 
     if (!webhookSecret) {
-      console.error('[StripeWebhook] No webhook secret configured');
+      logger.error('[StripeWebhook] No webhook secret configured', undefined);
       return res.status(400).send('Webhook secret not configured');
     }
 
     const stripe = getStripeClient();
     if (!stripe) {
-      console.error('[StripeWebhook] Stripe not configured');
+      logger.error('[StripeWebhook] Stripe not configured', undefined);
       return res.status(400).send('Stripe not configured');
     }
 
@@ -56,7 +57,7 @@ router.post('/', async (req: Request, res: Response) => {
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err: any) {
-      console.error('[StripeWebhook] Signature verification failed:', err.message);
+      logger.error('[StripeWebhook] Signature verification failed:', undefined, { error: { name: 'Error', message: String(err.message) } });
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
@@ -106,7 +107,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.json({ received: true });
   } catch (error: any) {
-    console.error('[StripeWebhook] Error processing webhook:', error);
+    logger.error('[StripeWebhook] Error processing webhook:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).send('Webhook processing failed');
   }
 });
@@ -191,12 +192,12 @@ async function handleAccountUpdated(account: Stripe.Account) {
         });
       }
     } catch (emailError) {
-      console.error('[StripeWebhook] Failed to send admin notification:', emailError);
+      logger.error('[StripeWebhook] Failed to send admin notification:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
     }
 
     console.log(`[StripeWebhook] Updated account status for tenant: ${tenantId}`);
   } catch (error) {
-    console.error('[StripeWebhook] Error handling account.updated:', error);
+    logger.error('[StripeWebhook] Error handling account.updated:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -227,7 +228,7 @@ async function handleAccountDeauthorized(account: Stripe.Account) {
 
     console.log(`[StripeWebhook] Account deauthorized for tenant: ${connection.tenant_id}`);
   } catch (error) {
-    console.error('[StripeWebhook] Error handling account.application.deauthorized:', error);
+    logger.error('[StripeWebhook] Error handling account.application.deauthorized:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -278,7 +279,7 @@ async function handleChargeSucceeded(charge: Stripe.Charge) {
 
     console.log(`[StripeWebhook] Recorded revenue for charge: ${charge.id}`);
   } catch (error) {
-    console.error('[StripeWebhook] Error handling charge.succeeded:', error);
+    logger.error('[StripeWebhook] Error handling charge.succeeded:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -307,7 +308,7 @@ async function handleTransferCreated(transfer: Stripe.Transfer) {
 
     console.log(`[StripeWebhook] Transfer created: ${transfer.id}`);
   } catch (error) {
-    console.error('[StripeWebhook] Error handling transfer.created:', error);
+    logger.error('[StripeWebhook] Error handling transfer.created:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -349,7 +350,7 @@ async function handlePayoutCreated(payout: Stripe.Payout) {
       console.log(`[StripeWebhook] No merchant found for Stripe account ${stripeAccountId}`);
     }
   } catch (error) {
-    console.error('[StripeWebhook] Error handling payout.created:', error);
+    logger.error('[StripeWebhook] Error handling payout.created:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -400,7 +401,7 @@ async function handlePayoutFailed(payout: Stripe.Payout) {
       console.log(`[StripeWebhook] No merchant found for Stripe account ${stripeAccountId}`);
     }
   } catch (error) {
-    console.error('[StripeWebhook] Error handling payout.failed:', error);
+    logger.error('[StripeWebhook] Error handling payout.failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -433,10 +434,10 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     if (result.success) {
       console.log(`[StripeWebhook] Reversed platform fee: ${result.reversedFeeCents} cents for charge ${charge.id}`);
     } else {
-      console.error(`[StripeWebhook] Failed to reverse fee: ${result.error}`);
+      logger.error(`[StripeWebhook] Failed to reverse fee: ${result.error}`, undefined);
     }
   } catch (error) {
-    console.error('[StripeWebhook] Error handling charge.refunded:', error);
+    logger.error('[StripeWebhook] Error handling charge.refunded:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -470,7 +471,7 @@ async function handleDisputeCreated(dispute: Stripe.Dispute) {
       });
     }
   } catch (error) {
-    console.error('[StripeWebhook] Error handling charge.dispute.created:', error);
+    logger.error('[StripeWebhook] Error handling charge.dispute.created:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -500,7 +501,7 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
       console.log(`[StripeWebhook] Reversed platform fee due to lost dispute: ${result.reversedFeeCents} cents`);
     }
   } catch (error) {
-    console.error('[StripeWebhook] Error handling charge.dispute.closed:', error);
+    logger.error('[StripeWebhook] Error handling charge.dispute.closed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }

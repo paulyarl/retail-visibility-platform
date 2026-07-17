@@ -38,6 +38,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 //   DropdownMenuTrigger,
 // } from '@/components/ui/Dialog';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { clientLogger } from '@/lib/client-logger';
 // Simple copy function since copyToClipboard not available
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text);
@@ -99,7 +100,7 @@ export default function ProductList({
       setCopiedUrl(`${type} URL copied to clipboard!`);
       setTimeout(() => setCopiedUrl(null), 2000);
     } catch (error) {
-      console.error('Failed to copy URL:', error);
+      clientLogger.error('Failed to copy URL:', { detail: error });
     }
   };
 

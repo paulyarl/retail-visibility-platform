@@ -22,6 +22,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { usePublicBranding } from '@/hooks/usePublicBranding';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import LastViewed from '@/components/directory/LastViewed';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FilterState {
   category: string;
@@ -251,7 +252,7 @@ export default function FeaturedProductsPage() {
         Object.entries(locationCounts as any).map(([name, count]) => ({ name, count: count as number }))
       );
     } catch (error) {
-      console.error('Failed to fetch featured products:', error);
+      clientLogger.error('Failed to fetch featured products:', { detail: error });
     } finally {
       setLoading(false);
     }

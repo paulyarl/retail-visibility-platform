@@ -8,6 +8,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import TiersSingleton from '../providers/platform/TiersSingleton';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TierFeatureObject {
   id: string;
@@ -343,7 +344,7 @@ export class TierSystemService extends AdminApiSingleton {
    */
   async getTenantTierGains(tierKey: string): Promise<TierGains | null> {
     if (!tierKey) {
-      console.warn('[TierSystemService] Tier key is required');
+      clientLogger.warn('[TierSystemService] Tier key is required');
       return null;
     }
 
@@ -362,7 +363,7 @@ export class TierSystemService extends AdminApiSingleton {
       );
 
       if (!response.success || !response.data) {
-        console.warn(`[TierSystemService] Failed to fetch tiers from admin API, falling back to static data`);
+        clientLogger.warn(`[TierSystemService] Failed to fetch tiers from admin API, falling back to static data`);
         return this.getStaticTierGains(tierKey);
       }
 
@@ -378,7 +379,7 @@ export class TierSystemService extends AdminApiSingleton {
       const tier = allTiers.find(t => t.id === tierKey);
       
       if (!tier) {
-        console.warn(`[TierSystemService] No data found for tier: ${tierKey}, falling back to static data`);
+        clientLogger.warn(`[TierSystemService] No data found for tier: ${tierKey}, falling back to static data`);
         console.log(`[TierSystemService] Available tier IDs:`, allTiers.map(t => t.id));
         return this.getStaticTierGains(tierKey);
       }
@@ -457,7 +458,7 @@ export class TierSystemService extends AdminApiSingleton {
       return result;
 
     } catch (error) {
-      console.error(`[TierSystemService] Failed to get tier gains for ${tierKey}:`, error);
+      clientLogger.error(`[TierSystemService] Failed to get tier gains for ${tierKey}:`, { detail: error });
       console.log(`[TierSystemService] Falling back to static data for tier: ${tierKey}`);
       // Fallback to static data if API fails
       return this.getStaticTierGains(tierKey);

@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import ProductCacheSingletonService from '../services/ProductCacheSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.post('/get-products', async (req, res) => {
       message: 'Products retrieved successfully'
     });
   } catch (error) {
-    console.error('[PRODUCT CACHE SINGLETON] Get products error:', error);
+    logger.error('[PRODUCT CACHE SINGLETON] Get products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve products',
@@ -95,7 +96,7 @@ router.get('/stats', async (req, res) => {
       message: 'Cache statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[PRODUCT CACHE SINGLETON] Get stats error:', error);
+    logger.error('[PRODUCT CACHE SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch cache statistics'
@@ -134,7 +135,7 @@ router.get('/top-products', async (req, res) => {
       message: 'Top products retrieved successfully'
     });
   } catch (error) {
-    console.error('[PRODUCT CACHE SINGLETON] Get top products error:', error);
+    logger.error('[PRODUCT CACHE SINGLETON] Get top products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch top products'
@@ -172,7 +173,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Cache cleared successfully'
     });
   } catch (error) {
-    console.error('[PRODUCT CACHE SINGLETON] Clear cache error:', error);
+    logger.error('[PRODUCT CACHE SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -211,7 +212,7 @@ router.post('/cleanup', async (req, res) => {
       message: 'Cache cleanup completed successfully'
     });
   } catch (error) {
-    console.error('[PRODUCT CACHE SINGLETON] Cleanup error:', error);
+    logger.error('[PRODUCT CACHE SINGLETON] Cleanup error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to cleanup cache'
@@ -261,7 +262,7 @@ router.get('/health', async (req, res) => {
       message: 'Product cache health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[PRODUCT CACHE SINGLETON] Health check error:', error);
+    logger.error('[PRODUCT CACHE SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'

@@ -10,6 +10,7 @@
 import { Router, Request, Response } from 'express';
 import { depositForfeitureService } from '../services/DepositForfeitureService';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.post('/process', requireAuth, requireAdmin, async (req: Request, res: Res
       ...result,
     });
   } catch (error) {
-    console.error('[DepositForfeitureAPI] Error processing forfeitures:', error);
+    logger.error('[DepositForfeitureAPI] Error processing forfeitures:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'forfeiture_processing_failed',
@@ -55,7 +56,7 @@ router.get('/order/:orderId/status', async (req: Request, res: Response) => {
       ...status,
     });
   } catch (error) {
-    console.error('[DepositForfeitureAPI] Error getting deadline status:', error);
+    logger.error('[DepositForfeitureAPI] Error getting deadline status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'status_check_failed',
@@ -95,7 +96,7 @@ router.get('/tenant/:tenantId/stats', requireAuth, async (req: Request, res: Res
       ...stats,
     });
   } catch (error) {
-    console.error('[DepositForfeitureAPI] Error getting forfeiture stats:', error);
+    logger.error('[DepositForfeitureAPI] Error getting forfeiture stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'stats_retrieval_failed',
@@ -128,7 +129,7 @@ router.post('/order/:orderId/process', requireAuth, requireAdmin, async (req: Re
       ...result,
     });
   } catch (error) {
-    console.error('[DepositForfeitureAPI] Error processing forfeiture:', error);
+    logger.error('[DepositForfeitureAPI] Error processing forfeiture:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'forfeiture_processing_failed',

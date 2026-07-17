@@ -664,6 +664,59 @@ When adding new merchant preference fields to a capability domain (e.g., adding 
 
 **Verification**: Run `pnpm checkapi` after updating the settings route. The API TypeScript project validates against the Prisma schema — if a field doesn't exist on the Prisma model, `tsc` will catch it. If the field exists in the DB but not in the Zod schema, the PUT handler will silently strip it.
 
+### R33: Merchant Preferences Must Never Gate Tier-Level Fields
+
+This is a **hard architectural boundary**. As capability types become more complex, this rule prevents a class of bugs where tier gates appear `false` because the merchant hasn't selected an option yet.
+
+**The boundary**: Tier-level fields in the resolver output represent **what the tier allows**. Merchant preferences represent **what the merchant selected**. These are separate concerns and must never be conflated.
+
+**Tier-level fields** (MUST be derived from `features` + `fallbackFeatures` only, never `merchantPrefs`):
+- `enabled` — master tier gate (R2 defines this as tier AND merchant master switch; the master switch is the ONLY merchant pref that gates `enabled`)
+- `is_flexible` — tier flexibility
+- `allowed_*_types` — tier-allowed feature arrays
+- `*_styled_enabled`, `*_classic_enabled` — tier-level mode gates (e.g., `qr_styled_enabled`, `qr_classic_enabled`)
+- `*_custom_colors`, `*_gradients` — tier-level feature gates
+- `allowed_*_dot_styles`, `allowed_*_corner_styles` — tier-allowed style arrays
+
+**Merchant-gated fields** (derived from tier AND merchant prefs):
+- `can_use_*` — effective flags (tier allows AND merchant enabled)
+- `effective_*` — effective arrays (tier-allowed filtered by merchant prefs)
+- `merchant_preferences` — the preserved merchant prefs object
+
+**Bug pattern** (what NOT to do):
+```ts
+// ❌ Tier-level field gated by merchant pref — hides tier capability
+qr_styled_enabled: mainOn && showQRStyled && prefs.qr_styled_enabled,
+qr_custom_colors: mainOn && qrCustomColors && prefs.qr_styled_enabled,
+qr_classic_enabled: mainOn && prefs.qr_classic_enabled && (flexible || ...),
+
+// Result: When merchant hasn't selected styled QR, qr_styled_enabled = false
+// Frontend sees tier doesn't allow styled QR → hides the option → merchant can never select it
+```
+
+**Correct pattern**:
+```ts
+// ✅ Tier-level fields derive from features only
+qr_styled_enabled: mainOn && showQRStyled,
+qr_custom_colors: mainOn && qrCustomColors,
+qr_classic_enabled: mainOn && (flexible || !!features.storefront_qr_classic || ...),
+
+// ✅ Merchant selection lives in merchant_preferences
+merchant_preferences: {
+  qr_styled_enabled: merchantPrefs?.qr_styled_enabled !== false,
+  qr_classic_enabled: merchantPrefs?.qr_classic_enabled !== false,
+  ...
+}
+```
+
+**Why this matters**: When a tier-level field is gated by merchant prefs, the frontend cannot distinguish "tier doesn't allow this" from "merchant hasn't selected this yet". The option disappears entirely, creating a dead-end where the merchant can never discover or select it. This is especially dangerous for radio-selection UIs (Classic vs Styled, Storefront Type, Product Type) where the merchant must see all tier-allowed options to make a choice.
+
+**Audit rule**: For every field in the resolver's return object that is NOT `can_use_*`, `effective_*`, or `merchant_preferences`, verify it does NOT reference `prefs.*`. The only exception is the master `enabled` gate which may include the merchant master switch (R2).
+
+**Real-world example**: `StorefrontQrResolver.ts` had `qr_styled_enabled`, `qr_custom_colors`, `qr_gradients`, and `qr_classic_enabled` all gated by `prefs.qr_styled_enabled` or `prefs.qr_classic_enabled`. This caused the styled QR option to be invisible to merchants whose `qr_styled_enabled` pref defaulted to `false`, even when the tier allowed styled QR. The fix removed all `prefs.*` gating from these tier-level fields.
+
+**Companion skill**: `decoupled-domain-self-containment.md` — covers the frontend side of this boundary: components must read from dedicated domain state, not the legacy `StorefrontOptionFlags` overlay. Includes a deviation audit of Hours, Maps, Gallery, and Layout domains.
+
 ## File Reference
 
 ### Backend

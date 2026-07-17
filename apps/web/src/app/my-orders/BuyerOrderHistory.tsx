@@ -12,6 +12,7 @@ import { customerOrderService } from '@/services/CustomerOrderService';
 import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
 import DigitalDownloadsCard from '@/components/downloads/DigitalDownloadsCard';
 import ProductTypeBadge from '@/components/products/ProductTypeBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 type OrderStatusFilter = 'all' | 'draft' | 'active' | 'completed' | 'cancelled';
 
@@ -159,7 +160,7 @@ export default function BuyerOrderHistory() {
       if (emailToSearch) localStorage.setItem('buyer_email', emailToSearch);
       if (phoneToSearch) localStorage.setItem('buyer_phone', phoneToSearch);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      clientLogger.error('Error fetching orders:', { detail: error });
       setError('Failed to load orders. Please try again.');
       setOrders([]);
     } finally {
@@ -203,7 +204,7 @@ export default function BuyerOrderHistory() {
         throw new Error('Failed to confirm fulfillment');
       }
     } catch (error) {
-      console.error('Error confirming fulfillment:', error);
+      clientLogger.error('Error confirming fulfillment:', { detail: error });
       alert('Failed to confirm fulfillment. Please try again.');
     } finally {
       setConfirmingPickup(false);
@@ -239,7 +240,7 @@ export default function BuyerOrderHistory() {
         throw new Error('Failed to cancel order');
       }
     } catch (error) {
-      console.error('Error cancelling order:', error);
+      clientLogger.error('Error cancelling order:', { detail: error });
       alert('Failed to cancel order. Please try again.');
     } finally {
       setCancellingOrder(false);
@@ -260,7 +261,7 @@ export default function BuyerOrderHistory() {
         alert('Failed to cancel draft order.');
       }
     } catch (error) {
-      console.error('Error cancelling draft:', error);
+      clientLogger.error('Error cancelling draft:', { detail: error });
       alert('Failed to cancel draft order.');
     } finally {
       setCancellingOrder(false);
@@ -308,7 +309,7 @@ export default function BuyerOrderHistory() {
       
       setDigitalDownloads(data?.downloads || []);
     } catch (error) {
-      console.error('Error fetching digital downloads:', error);
+      clientLogger.error('Error fetching digital downloads:', { detail: error });
       setDigitalDownloads([]);
     } finally {
       setLoadingDownloads(false);

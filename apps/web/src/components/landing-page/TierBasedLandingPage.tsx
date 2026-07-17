@@ -27,7 +27,7 @@ function useResponsiveLayout() {
 import QRCode from 'qrcode';
 import { TenantQRCode } from '@/components/public/TenantQRCode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
-import { useCommerceCapability, usePaymentGatewayCapability, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability, usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
@@ -51,6 +51,7 @@ import {TenantInfo} from '@/services/PublicTenantInfoService';
 
 import { StorefrontStatusPanel, useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
 import { tenantPublicService, PublicTenantInfo, LocationStatusInfo } from '@/services/TenantPublicService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Landing page features interface
 interface LandingPageFeatures {
@@ -327,17 +328,17 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
                 const profileData = profile?.profileData || profile;
                 setTenantLogo(profileData.logo_url || null);
               } else {
-                console.error('Failed to fetch tenant profile');
+                clientLogger.error('Failed to fetch tenant profile');
               }
             } catch (profileError) {
-              console.error('Error fetching tenant profile:', profileError);
+              clientLogger.error('Error fetching tenant profile:', { detail: profileError });
             }
           }
         } else {
-          console.error('Failed to fetch tier information');
+          clientLogger.error('Failed to fetch tier information');
         }
       } catch (error) {
-        console.error('[QR Code] Error fetching tenant info:', error);
+        clientLogger.error('[QR Code] Error fetching tenant info:', { detail: error });
       } finally {
         setIsFetchingTierAndLogo(false);
 //        console.log('[QR Code] Tier and logo fetch complete');
@@ -668,7 +669,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         try {
           finalCanvas = await overlayLogoOnQR(exportCanvas, tenantLogo!);
         } catch (logoError) {
-          console.warn('Failed to overlay logo, using plain QR code:', logoError);
+          clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
           // Fall back to plain QR code if logo overlay fails
         }
       }
@@ -680,7 +681,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       // Log quality level for debugging
       // console.log(`[ProductQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
     } catch (error) {
-      console.error('Failed to generate QR code:', error);
+      clientLogger.error('Failed to generate QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }
@@ -747,7 +748,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       try {
         finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
       } catch (logoError) {
-        console.warn('Failed to overlay logo, using plain QR code:', logoError);
+        clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
       }
     }
 
@@ -767,7 +768,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Failed to download QR code:', error);
+      clientLogger.error('Failed to download QR code:', { detail: error });
     } finally {
       setIsGenerating(false);
     }
@@ -1131,15 +1132,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const effectiveGatewayType = contextGatewayType ?? (product as any).defaultGatewayType;
 
   // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(product.tenantId);
-  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  const commerceCap = usePublicCommerceCapability(product.tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(product.tenantId);
   const commerceEnabled = commerceCap.data?.enabled ?? true;
   const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
   const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));
   const effectiveCanPurchase = effectiveCanPurchaseLegacy && commerceEnabled && gatewayCapEnabled;
 
   // Storefront capability-driven content control
-  const storefrontCap = useStorefrontCapability(product.tenantId);
+  const storefrontCap = usePublicStorefrontCapability(product.tenantId);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';
@@ -1259,7 +1260,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           setFeatures(mappedFeatures);
         }
       } catch (error) {
-        console.error('[TierBasedLandingPage] Failed to load features:', error);
+        clientLogger.error('[TierBasedLandingPage] Failed to load features:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -1898,6 +1899,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             label="Scan to Share"
             pageType="product"
             capabilityFlags={optFlags}
+            isPublic
           />
         )}
 

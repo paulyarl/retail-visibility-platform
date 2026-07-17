@@ -10,6 +10,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface MapLocation {
   businessName: string;
@@ -77,7 +78,7 @@ class MapService extends PublicApiSingleton {
       );
 
       if (!response.success || !response.data) {
-        console.warn('[MapService] Failed to get tenant profile:', response.error);
+        clientLogger.warn('[MapService] Failed to get tenant profile:', { detail: response.error });
         return null;
       }
 
@@ -108,7 +109,7 @@ class MapService extends PublicApiSingleton {
         privacyMode: (profile.map_privacy_mode as 'precise' | 'neighborhood') || 'precise',
       };
     } catch (error) {
-      console.error('[MapService] Failed to get tenant map location:', error);
+      clientLogger.error('[MapService] Failed to get tenant map location:', { detail: error });
       return null;
     }
   }
@@ -144,7 +145,7 @@ class MapService extends PublicApiSingleton {
       await this.clearCache(`tenant-profile-${tenantId}`);
       console.log(`[MapService] Invalidated map cache for tenant: ${tenantId}`);
     } catch (error) {
-      console.warn(`[MapService] Failed to invalidate map cache for tenant ${tenantId}:`, error);
+      clientLogger.warn(`[MapService] Failed to invalidate map cache for tenant ${tenantId}:`, { detail: error });
     }
   }
 

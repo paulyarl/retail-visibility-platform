@@ -5,6 +5,7 @@
 
 import { CachedTenantService } from './cached-tenant-service';
 import { LocalStorageCache } from './local-storage-cache';
+import { clientLogger } from '@/lib/client-logger';
 
 // Extend window interface for test functions
 declare global {
@@ -44,7 +45,7 @@ window.testLocalStorageCache = {
 
       console.log('🎉 Basic cache test complete!');
     } catch (error) {
-      console.error('❌ Basic cache test failed:', error);
+      clientLogger.error('❌ Basic cache test failed:', { detail: error });
     }
   },
 
@@ -75,7 +76,7 @@ window.testLocalStorageCache = {
       console.log('✅ Cache stats for tenant:', cacheStats);
 
     } catch (error) {
-      console.error('❌ Tenant service test failed:', error);
+      clientLogger.error('❌ Tenant service test failed:', { detail: error });
     }
 
     console.log('🎉 Tenant service test complete!');
@@ -104,7 +105,7 @@ window.testLocalStorageCache = {
 
       console.log('🎉 Cache invalidation test complete!');
     } catch (error) {
-      console.error('❌ Cache invalidation test failed:', error);
+      clientLogger.error('❌ Cache invalidation test failed:', { detail: error });
     }
   },
 
@@ -124,7 +125,7 @@ window.testLocalStorageCache = {
 
       console.log('🎊 All tests completed!');
     } catch (error) {
-      console.error('❌ Test suite failed:', error);
+      clientLogger.error('❌ Test suite failed:', { detail: error });
     }
   }
 };

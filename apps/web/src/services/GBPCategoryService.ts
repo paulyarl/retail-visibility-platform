@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SelectedCategory {
   id: string;
@@ -88,7 +89,7 @@ class GBPCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GBPCategoryService] Failed to fetch mappings:', result.error);
+      clientLogger.error('[GBPCategoryService] Failed to fetch mappings:', { detail: result.error });
       return [];
     }
 
@@ -112,7 +113,7 @@ class GBPCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GBPCategoryService] Failed to update GBP categories:', result.error);
+      clientLogger.error('[GBPCategoryService] Failed to update GBP categories:', { detail: result.error });
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save GBP categories');
     }
 
@@ -136,7 +137,7 @@ class GBPCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GBPCategoryService] Failed to get tenant GBP profile:', result.error);
+      clientLogger.error('[GBPCategoryService] Failed to get tenant GBP profile:', { detail: result.error });
       return null;
     }
 
@@ -157,7 +158,7 @@ class GBPCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GBPCategoryService] Failed to fetch popular GBP categories:', result.error);
+      clientLogger.error('[GBPCategoryService] Failed to fetch popular GBP categories:', { detail: result.error });
       return [];
     }
 
@@ -178,7 +179,7 @@ class GBPCategoryService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[GBPCategoryService] Failed to search GBP categories:', result.error);
+      clientLogger.error('[GBPCategoryService] Failed to search GBP categories:', { detail: result.error });
       return [];
     }
 

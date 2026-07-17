@@ -6,6 +6,7 @@
  */
 
 import { FlexibleApiSingletonV2, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingletonV2';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantSlugResponse {
   slug: string;
@@ -89,7 +90,7 @@ class TenantDirectorySingletonServiceV2 extends FlexibleApiSingletonV2 {
    */
   async getTenantDirectoryListing(tenantId: string): Promise<TenantDirectoryListing | null> {
     if (!tenantId) {
-      console.error('[TenantDirectorySingletonV2] getTenantDirectoryListing: tenantId is required');
+      clientLogger.error('[TenantDirectorySingletonV2] getTenantDirectoryListing: tenantId is required');
       return null;
     }
 
@@ -109,13 +110,13 @@ class TenantDirectorySingletonServiceV2 extends FlexibleApiSingletonV2 {
       );
       
       if (!result.success){
-        console.error('[TenantDirectorySingletonV2] Failed to get tenant directory listing:', result.error);
+        clientLogger.error('[TenantDirectorySingletonV2] Failed to get tenant directory listing:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantDirectorySingletonV2] Failed to get tenant directory listing:', error);
+      clientLogger.error('[TenantDirectorySingletonV2] Failed to get tenant directory listing:', { detail: error });
       return null;
     }
   }
@@ -158,13 +159,13 @@ class TenantDirectorySingletonServiceV2 extends FlexibleApiSingletonV2 {
       );
       
       if (!result.success){
-        console.error('[TenantDirectorySingletonV2] Failed to search tenant directory:', result.error);
+        clientLogger.error('[TenantDirectorySingletonV2] Failed to search tenant directory:', { detail: result.error });
         return [];
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('[TenantDirectorySingletonV2] Failed to search tenant directory:', error);
+      clientLogger.error('[TenantDirectorySingletonV2] Failed to search tenant directory:', { detail: error });
       return [];
     }
   }
@@ -190,13 +191,13 @@ class TenantDirectorySingletonServiceV2 extends FlexibleApiSingletonV2 {
       );
       
       if (!result.success){
-        console.error('[TenantDirectorySingletonV2] Failed to get featured tenants:', result.error);
+        clientLogger.error('[TenantDirectorySingletonV2] Failed to get featured tenants:', { detail: result.error });
         return [];
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('[TenantDirectorySingletonV2] Failed to get featured tenants:', error);
+      clientLogger.error('[TenantDirectorySingletonV2] Failed to get featured tenants:', { detail: error });
       return [];
     }
   }

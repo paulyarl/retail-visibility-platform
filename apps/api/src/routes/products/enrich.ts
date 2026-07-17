@@ -15,6 +15,7 @@ import {
   calculateEnrichmentValue
 } from '../../utils/productMatcher';
 import { generatePhotoId } from '../../lib/id-generator';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.post('/find-matches', async (req: Request, res: Response) => {
       totalMatches: matchesWithValue.length
     });
   } catch (error) {
-    console.error('[Products] Find matches error:', error);
+    logger.error('[Products] Find matches error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to find matching products',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -284,7 +285,7 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
       fullyEnriched
     });
   } catch (error) {
-    console.error('[Products] Enrich error:', error);
+    logger.error('[Products] Enrich error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to enrich product',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -338,7 +339,7 @@ router.get('/needs-enrichment', async (req: Request, res: Response) => {
       total: productsWithMissing.length
     });
   } catch (error) {
-    console.error('[Products] Get needs enrichment error:', error);
+    logger.error('[Products] Get needs enrichment error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to get products needing enrichment',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -383,7 +384,7 @@ router.get('/:productId/enrichment-status', async (req: Request, res: Response) 
       photoCount: product.photo_assets.length
     });
   } catch (error) {
-    console.error('[Products] Get enrichment status error:', error);
+    logger.error('[Products] Get enrichment status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to get enrichment status',
       details: error instanceof Error ? error.message : 'Unknown error'

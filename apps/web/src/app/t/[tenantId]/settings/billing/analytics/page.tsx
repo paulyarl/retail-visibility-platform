@@ -16,6 +16,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { tenantBillingService } from '@/services/TenantBillingService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BillingAnalytics {
   period: '3m' | '6m' | '12m';
@@ -93,7 +94,7 @@ export default function BillingAnalyticsPage({ params }: { params: Promise<{ ten
       const data = await tenantBillingService.getPlatformFeeSummary(tenantId);
       setPlatformFees(data);
     } catch (err: any) {
-      console.error('Failed to load platform fees:', err);
+      clientLogger.error('Failed to load platform fees:', { detail: err });
     }
   };
 

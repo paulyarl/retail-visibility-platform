@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { GBPCategorySyncService } from '../services/GBPCategorySync';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.get('/categories', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[GBP Categories] Search error:', error);
+    logger.error('[GBP Categories] Search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to search categories',
       items: []
@@ -135,7 +136,7 @@ router.get('/categories/popular', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[GBP Categories] Popular error:', error);
+    logger.error('[GBP Categories] Popular error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to get popular categories',
       items: []
@@ -192,7 +193,7 @@ router.post('/sync-to-directory', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[GBP Sync] Error:', error);
+    logger.error('[GBP Sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to sync GBP categories to directory',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -269,7 +270,7 @@ router.get('/mappings', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[GBP Mappings] Error:', error);
+    logger.error('[GBP Mappings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ 
       error: 'Failed to get category mappings',
       details: error instanceof Error ? error.message : 'Unknown error'

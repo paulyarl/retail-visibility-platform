@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import ShopService from '../services/ShopService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Shop Categories] Error:', error);
+    logger.error('[Shop Categories] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch shop categories'
@@ -64,7 +65,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Cache is managed automatically with TTL expiration. Manual clearing not available.'
     });
   } catch (error) {
-    console.error('[Shop Categories] Error handling cache request:', error);
+    logger.error('[Shop Categories] Error handling cache request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to handle cache request'
@@ -89,7 +90,7 @@ router.get('/stats', async (req, res) => {
       cacheTTL: 30 * 60 * 1000 // 30 minutes
     });
   } catch (error) {
-    console.error('[Shop Categories] Error getting stats:', error);
+    logger.error('[Shop Categories] Error getting stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get shop categories stats'

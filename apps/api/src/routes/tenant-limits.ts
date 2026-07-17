@@ -10,6 +10,7 @@ import { authenticateToken } from '../middleware/auth';
 import { isPlatformAdmin } from '../utils/platform-admin';
 import { getTenantLimitConfig, getRemainingTenantSlots, getPlatformSupportLimit, getFeaturedProductsLimits, TENANT_LIMITS, FEATURED_PRODUCTS_LIMITS } from '../config/tenant-limits';
 import { user_tenant_role } from '@prisma/client';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ router.get('/status', authenticateToken, async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[GET /api/tenant-limits/status] Error:', error);
+    logger.error('[GET /api/tenant-limits/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_limit_status' });
   }
 });
@@ -172,7 +173,7 @@ router.get('/tiers', async (req, res) => {
 
     return res.json({ tiers });
   } catch (error) {
-    console.error('[GET /api/tenant-limits/tiers] Error:', error);
+    logger.error('[GET /api/tenant-limits/tiers] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_tiers' });
   }
 });
@@ -360,7 +361,7 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[GET /api/tenant-limits/featured-products] Error:', error);
+    logger.error('[GET /api/tenant-limits/featured-products] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_featured_limits' });
   }
 });
@@ -426,7 +427,7 @@ router.get('/featured-products/all', authenticateToken, async (req, res) => {
       tiers: Object.keys(limits),
     });
   } catch (error) {
-    console.error('[GET /api/tenant-limits/featured-products/all] Error:', error);
+    logger.error('[GET /api/tenant-limits/featured-products/all] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_featured_products_limits' });
   }
 });
@@ -496,7 +497,7 @@ router.put('/featured-products', authenticateToken, async (req, res) => {
       message: 'Featured products limits updated successfully'
     });
   } catch (error) {
-    console.error('[PUT /api/tenant-limits/featured-products] Error:', error);
+    logger.error('[PUT /api/tenant-limits/featured-products] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_update_featured_products_limits' });
   }
 });
@@ -538,7 +539,7 @@ router.get('/user-seats', authenticateToken, async (req, res) => {
 
     return res.json({ limits, tiers: Object.keys(limits) });
   } catch (error) {
-    console.error('[GET /api/tenant-limits/user-seats] Error:', error);
+    logger.error('[GET /api/tenant-limits/user-seats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_user_seat_limits' });
   }
 });
@@ -577,7 +578,7 @@ router.put('/user-seats', authenticateToken, async (req, res) => {
       message: 'User seat limit updated successfully',
     });
   } catch (error) {
-    console.error('[PUT /api/tenant-limits/user-seats] Error:', error);
+    logger.error('[PUT /api/tenant-limits/user-seats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_update_user_seat_limits' });
   }
 });

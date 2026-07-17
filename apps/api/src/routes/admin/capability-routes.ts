@@ -6,6 +6,7 @@
 
 import { Router } from 'express';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.get('/capabilities', async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error fetching capabilities:', error);
+    logger.error('Error fetching capabilities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch capabilities' });
   }
 });
@@ -157,7 +158,7 @@ router.get('/tiers/:tierKey/capabilities', async (req, res) => {
 
     res.json(Object.values(grouped));
   } catch (error) {
-    console.error('Error fetching tier capabilities:', error);
+    logger.error('Error fetching tier capabilities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch tier capabilities' });
   }
 });
@@ -185,7 +186,7 @@ router.put('/tiers/:tierKey/capabilities', async (req, res) => {
       updatedCapabilities: capabilities
     });
   } catch (error) {
-    console.error('Error updating tier capabilities:', error);
+    logger.error('Error updating tier capabilities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to update tier capabilities' });
   }
 });
@@ -270,7 +271,7 @@ router.get('/features', async (req, res) => {
     
     res.json(features);
   } catch (error) {
-    console.error('Error fetching features:', error);
+    logger.error('Error fetching features:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to fetch features' });
   }
 });

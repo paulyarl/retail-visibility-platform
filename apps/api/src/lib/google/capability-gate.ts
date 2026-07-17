@@ -10,7 +10,7 @@
  *   - Product type gate (GMC only): tenants with only `digital` product types are excluded
  *     since Google Merchant Center is for physical/hybrid/service products.
  *   - Integration gate: `google_merchant_center`/`gmc_sync` for GMC, `gbp` for GBP.
- *   - Hours display gate (GBP hours only): `storefront_options.hoursEnabled` must be true.
+ *   - Hours display gate (GBP hours only): `storefront_hours.hours_enabled` must be true.
  */
 
 import { resolveEffectiveCapabilities } from '../../services/EffectiveCapabilityResolver';
@@ -105,7 +105,7 @@ export async function isGBPSyncAllowed(tenantId: string): Promise<boolean> {
  * Check if a tenant is allowed to sync business hours to Google Business Profile.
  * Layered gate:
  *   1. storefront_types must be enabled with a physical-presence type (retail or service).
- *   2. storefront_options.hoursEnabled must be true (merchant hours display gate).
+ *   2. storefront_hours.hours_enabled must be true (merchant hours display gate).
  *   3. GBP integration must be allowed (`gbp` in effective_google_types).
  */
 export async function isGBPHoursSyncAllowed(tenantId: string): Promise<boolean> {
@@ -117,8 +117,8 @@ export async function isGBPHoursSyncAllowed(tenantId: string): Promise<boolean> 
     const sfType = getEffectiveStorefrontType(caps);
     if (!isStorefrontTypeGoogleEligible(sfType)) return false;
 
-    // Layer 2: storefront_options hours display gate
-    if (!(caps.effective.storefront_options as any)?.hours_enabled) return false;
+    // Layer 2: storefront_hours hours display gate
+    if (!(caps.effective.storefront_hours as any)?.hours_enabled) return false;
 
     // Layer 3: GBP integration gate
     if (!caps.effective.integrations) return false;

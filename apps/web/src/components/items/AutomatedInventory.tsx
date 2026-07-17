@@ -37,6 +37,7 @@ import {
   Target,
   Activity
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AutomatedInventoryProps {
   tenantId: string;
@@ -320,7 +321,7 @@ export default function AutomatedInventory({
       console.log('Running automation rules...');
       
     } catch (error) {
-      console.error('Error running automation:', error);
+      clientLogger.error('Error running automation:', { detail: error });
     } finally {
       setIsProcessing(false);
     }

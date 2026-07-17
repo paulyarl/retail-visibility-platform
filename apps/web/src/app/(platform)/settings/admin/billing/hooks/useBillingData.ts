@@ -3,6 +3,7 @@ import { adminOperationsService } from '@/services/AdminOperationsService';
 import { manualBillingService } from '@/services/ManualBillingService';
 import { tenantTierService } from '@/services/TenantTierService';
 import { Tenant, DbTier } from '../types';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UseBillingDataResult {
   tenants: Tenant[];
@@ -75,7 +76,7 @@ export function useBillingData(refetchTrigger = 0): UseBillingDataResult {
         }));
         setTiers(transformedTiers);
       } catch (e) {
-        console.error('[useBillingData] Error loading tiers:', e);
+        clientLogger.error('[useBillingData] Error loading tiers:', { detail: e });
       } finally {
         setTiersLoading(false);
       }

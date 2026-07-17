@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStats {
   totalListings: number;
@@ -327,7 +328,7 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectoryService] Failed to get featured stats:', response.error);
+      clientLogger.error('[DirectoryService] Failed to get featured stats:', { detail: response.error });
       // Return appropriate default based on type
       const defaults: Record<string, any> = {
         trending: { count: 0, avgScore: 0, topProduct: 'N/A' },
@@ -353,7 +354,7 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectoryService] Failed to get premium featured products:', response.error);
+      clientLogger.error('[DirectoryService] Failed to get premium featured products:', { detail: response.error });
       return { products: [] };
     }
 

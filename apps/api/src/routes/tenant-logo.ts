@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get('/:tenantId/logo', async (req, res) => {
       data: []
     });
   } catch (error) {
-    console.error('[Tenant Logo API] Error:', error);
+    logger.error('[Tenant Logo API] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tenant logo',

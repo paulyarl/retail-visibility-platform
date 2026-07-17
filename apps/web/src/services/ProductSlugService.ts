@@ -6,6 +6,7 @@
 
 import { FlexibleApiSingleton, RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ProductSlugData {
   brand: string;
@@ -114,7 +115,7 @@ class ProductSlugService extends FlexibleApiSingleton {
 
       return result.data || { isUnique: false };
     } catch (error) {
-      console.error('[ProductSlugService] Error validating slug:', error);
+      clientLogger.error('[ProductSlugService] Error validating slug:', { detail: error });
       return { isUnique: false };
     }
   }
@@ -152,7 +153,7 @@ class ProductSlugService extends FlexibleApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[ProductSlugService] Error registering slug:', error);
+      clientLogger.error('[ProductSlugService] Error registering slug:', { detail: error });
       return null;
     }
   }
@@ -171,7 +172,7 @@ class ProductSlugService extends FlexibleApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[ProductSlugService] Error fetching slug registry:', error);
+      clientLogger.error('[ProductSlugService] Error fetching slug registry:', { detail: error });
       return null;
     }
   }
@@ -190,7 +191,7 @@ class ProductSlugService extends FlexibleApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[ProductSlugService] Error fetching product by UPC:', error);
+      clientLogger.error('[ProductSlugService] Error fetching product by UPC:', { detail: error });
       return null;
     }
   }

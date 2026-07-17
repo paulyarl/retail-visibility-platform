@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface SearchQuery {
   query: string;
@@ -135,7 +136,7 @@ class AdvancedSearchService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedSearchService] Search failed:', response.error);
+        clientLogger.error('[AdvancedSearchService] Search failed:', { detail: response.error });
         return this.getDefaultSearchResult();
       }
 
@@ -173,7 +174,7 @@ class AdvancedSearchService extends PublicApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[AdvancedSearchService] Search error:', error);
+      clientLogger.error('[AdvancedSearchService] Search error:', { detail: error });
       return this.getDefaultSearchResult();
     }
   }
@@ -202,13 +203,13 @@ class AdvancedSearchService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedSearchService] Autocomplete failed:', response.error);
+        clientLogger.error('[AdvancedSearchService] Autocomplete failed:', { detail: response.error });
         return this.getDefaultSuggestions(query);
       }
 
       return response.data?.suggestions || this.getDefaultSuggestions(query);
     } catch (error) {
-      console.error('[AdvancedSearchService] Autocomplete error:', error);
+      clientLogger.error('[AdvancedSearchService] Autocomplete error:', { detail: error });
       return this.getDefaultSuggestions(query);
     }
   }
@@ -230,14 +231,14 @@ class AdvancedSearchService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedSearchService] Trending searches failed:', response.error);
+        clientLogger.error('[AdvancedSearchService] Trending searches failed:', { detail: response.error });
         return this.popularQueries.slice(0, limit);
       }
 
       this.popularQueries = response.data?.trending || [];
       return response.data?.trending || this.popularQueries.slice(0, limit);
     } catch (error) {
-      console.error('[AdvancedSearchService] Trending searches error:', error);
+      clientLogger.error('[AdvancedSearchService] Trending searches error:', { detail: error });
       return this.popularQueries.slice(0, limit);
     }
   }
@@ -259,13 +260,13 @@ class AdvancedSearchService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedSearchService] Related searches failed:', response.error);
+        clientLogger.error('[AdvancedSearchService] Related searches failed:', { detail: response.error });
         return [];
       }
 
       return response.data?.related || [];
     } catch (error) {
-      console.error('[AdvancedSearchService] Related searches error:', error);
+      clientLogger.error('[AdvancedSearchService] Related searches error:', { detail: error });
       return [];
     }
   }
@@ -287,13 +288,13 @@ class AdvancedSearchService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedSearchService] Category suggestions failed:', response.error);
+        clientLogger.error('[AdvancedSearchService] Category suggestions failed:', { detail: response.error });
         return [];
       }
 
       return response.data?.suggestions || [];
     } catch (error) {
-      console.error('[AdvancedSearchService] Category suggestions error:', error);
+      clientLogger.error('[AdvancedSearchService] Category suggestions error:', { detail: error });
       return [];
     }
   }
@@ -323,7 +324,7 @@ class AdvancedSearchService extends PublicApiSingleton {
         0 // No caching for click tracking
       );
     } catch (error) {
-      console.error('[AdvancedSearchService] Failed to track search click:', error);
+      clientLogger.error('[AdvancedSearchService] Failed to track search click:', { detail: error });
     }
   }
 
@@ -352,7 +353,7 @@ class AdvancedSearchService extends PublicApiSingleton {
         0 // No caching for conversion tracking
       );
     } catch (error) {
-      console.error('[AdvancedSearchService] Failed to track search conversion:', error);
+      clientLogger.error('[AdvancedSearchService] Failed to track search conversion:', { detail: error });
     }
   }
 
@@ -383,13 +384,13 @@ class AdvancedSearchService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error('[AdvancedSearchService] Search analytics failed:', response.error);
+        clientLogger.error('[AdvancedSearchService] Search analytics failed:', { detail: response.error });
         return this.getDefaultAnalytics();
       }
 
       return response.data?.analytics || this.getDefaultAnalytics();
     } catch (error) {
-      console.error('[AdvancedSearchService] Search analytics error:', error);
+      clientLogger.error('[AdvancedSearchService] Search analytics error:', { detail: error });
       return this.getDefaultAnalytics();
     }
   }
@@ -462,7 +463,7 @@ class AdvancedSearchService extends PublicApiSingleton {
           this.searchHistory = JSON.parse(saved);
         }
       } catch (error) {
-        console.error('[AdvancedSearchService] Failed to load search history:', error);
+        clientLogger.error('[AdvancedSearchService] Failed to load search history:', { detail: error });
       }
     }
   }
@@ -475,7 +476,7 @@ class AdvancedSearchService extends PublicApiSingleton {
       const trending = await this.getTrendingSearches(20);
       this.popularQueries = trending;
     } catch (error) {
-      console.error('[AdvancedSearchService] Failed to load popular queries:', error);
+      clientLogger.error('[AdvancedSearchService] Failed to load popular queries:', { detail: error });
     }
   }
 
@@ -561,7 +562,7 @@ class AdvancedSearchService extends PublicApiSingleton {
         0 // No caching for analytics tracking
       );
     } catch (error) {
-      console.error('[AdvancedSearchService] Failed to track search analytics:', error);
+      clientLogger.error('[AdvancedSearchService] Failed to track search analytics:', { detail: error });
     }
   }
 

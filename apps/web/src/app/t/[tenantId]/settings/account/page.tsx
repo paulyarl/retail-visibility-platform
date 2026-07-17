@@ -9,6 +9,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown, Navigation, ArrowRight } from 'lucide-react';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
+import { clientLogger } from '@/lib/client-logger';
 
 
 export default function TenantAccountPage() {
@@ -38,7 +39,7 @@ export default function TenantAccountPage() {
         setNavigationPreference(preference);
       }
     } catch (error) {
-      console.error('Failed to save navigation preference:', error);
+      clientLogger.error('Failed to save navigation preference:', { detail: error });
     } finally {
       setSavingPreference(false);
     }

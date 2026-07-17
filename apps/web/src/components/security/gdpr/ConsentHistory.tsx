@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { CheckCircle, XCircle, RefreshCw, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import * as gdprService from '@/services/gdpr';
+import { clientLogger } from '@/lib/client-logger';
 
 export function ConsentHistory() {
   const [history, setHistory] = useState<ConsentHistoryEntry[]>([]);
@@ -23,7 +24,7 @@ export function ConsentHistory() {
         const data = await gdprService.getConsentHistory();
         setHistory(data);
       } catch (error) {
-        console.error('Failed to fetch consent history:', error);
+        clientLogger.error('Failed to fetch consent history:', { detail: error });
       } finally {
         setLoading(false);
       }

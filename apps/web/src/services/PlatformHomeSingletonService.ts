@@ -12,6 +12,7 @@ import { BusinessProfile, normalizePhoneInput } from '../lib/validation/business
 import TenantApiSingleton from '@/providers/base/TenantApiSingleton';
 import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { unifiedCapabilityService } from './UnifiedCapabilityService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Tenant {
   id: string;
@@ -504,7 +505,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get tenants:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenants:', { detail: result.error });
       return null;
     }
 
@@ -528,7 +529,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get organizations:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get organizations:', { detail: result.error });
       return null;
     }
 
@@ -551,7 +552,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get pending upgrade request:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get pending upgrade request:', { detail: result.error });
       return null;
     }
 
@@ -574,7 +575,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get tenant details:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenant details:', { detail: result.error });
       return null;
     }
 
@@ -597,7 +598,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get tenant profile:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenant profile:', { detail: result.error });
       return null;
     }
 
@@ -624,7 +625,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // console.log('[PlatformHomeSingleton] updateTenantProfile result:', result);
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tenant profile:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tenant profile:', { detail: result.error });
       throw result.error;
     }
 
@@ -700,7 +701,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         },
       );
     } catch (error) {
-      console.warn(`[PlatformHomeSingletonService] API cache invalidation error:`, error);
+      clientLogger.warn(`[PlatformHomeSingletonService] API cache invalidation error:`, { detail: error });
       // Don't throw - client cache invalidation is still valuable
     }
   }
@@ -761,7 +762,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to create tenant:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create tenant:', { detail: result.error });
       throw result.error;
     }
     
@@ -790,7 +791,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tenant:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tenant:', { detail: result.error });
       throw result.error;
     }
     
@@ -815,7 +816,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to delete tenant:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to delete tenant:', { detail: result.error });
       throw result.error;
     }
 
@@ -837,7 +838,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get admin tier tenants:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin tier tenants:', { detail: result.error });
       return null;
 
     }
@@ -868,7 +869,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tenant tier:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tenant tier:', { detail: result.error });
       throw result.error;
     }
     
@@ -896,7 +897,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update product priority:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update product priority:', { detail: result.error });
       throw result.error;
     }
 
@@ -916,7 +917,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get platform categories:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get platform categories:', { detail: result.error });
       return null;
     }
 
@@ -937,7 +938,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to create platform category:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create platform category:', { detail: result.error });
       throw result.error;
     }
 
@@ -965,7 +966,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update platform category:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update platform category:', { detail: result.error });
       throw result.error;
     }
 
@@ -990,7 +991,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to delete platform category:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to delete platform category:', { detail: result.error });
       throw result.error;
     }
 
@@ -1012,7 +1013,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to reorder platform categories:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to reorder platform categories:', { detail: result.error });
       throw result.error;
     }
 
@@ -1034,7 +1035,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to bulk import platform categories:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to bulk import platform categories:', { detail: result.error });
       throw result.error;
     }
 
@@ -1067,7 +1068,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to create platform category from Google:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create platform category from Google:', { detail: error });
       throw error;
     }
   }
@@ -1091,7 +1092,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get tier system tiers:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tier system tiers:', { detail: result.error });
       return [];
     }
 
@@ -1174,7 +1175,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tier status:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tier status:', { detail: result.error });
       throw result.error;
     }
 
@@ -1258,7 +1259,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tier:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tier:', { detail: result.error });
       throw result.error;
     }
    
@@ -1294,7 +1295,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tier sort order:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tier sort order:', { detail: result.error });
       throw result.error;
     }
 
@@ -1331,7 +1332,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to create tier:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -1361,7 +1362,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to delete tier:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to delete tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -1385,7 +1386,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get admin directory stats:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin directory stats:', { detail: result.error });
       return null;
     }
 
@@ -1437,7 +1438,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get admin directory listings:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin directory listings:', { detail: result.error });
       return null;
     }
 
@@ -1469,7 +1470,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       await this.invalidateCachePattern('platform-admin-directory-listings*');
       await this.invalidateCachePattern('platform-admin-directory-stats*');
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to feature directory listing:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to feature directory listing:', { detail: error });
       throw error;
     }
   }
@@ -1493,7 +1494,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       await this.invalidateCachePattern('platform-admin-directory-listings*');
       await this.invalidateCachePattern('platform-admin-directory-stats*');
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to unfeature directory listing:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to unfeature directory listing:', { detail: error });
       throw error;
     }
   }
@@ -1514,7 +1515,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get admin enrichment analytics:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin enrichment analytics:', { detail: result.error });
       return null;
     }
 
@@ -1544,7 +1545,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result.data;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to search admin enrichment products:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to search admin enrichment products:', { detail: error });
       throw error;
     }
   }
@@ -1567,7 +1568,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get admin enrichment product:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin enrichment product:', { detail: error });
       throw error;
     }
   }
@@ -1588,7 +1589,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get admin subdomain stats:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get admin subdomain stats:', { detail: result.error });
       return null;
     }
 
@@ -1610,7 +1611,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get tenant logo:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenant logo:', { detail: error });
       throw error;
     }
   }
@@ -1643,7 +1644,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to upload tenant logo:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to upload tenant logo:', { detail: error });
       throw error;
     }
   }
@@ -1675,7 +1676,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to upload tenant banner:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to upload tenant banner:', { detail: error });
       throw error;
     }
   }
@@ -1703,7 +1704,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tenant name:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tenant name:', { detail: result.error });
       throw result.error;
     }
 
@@ -1745,7 +1746,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to update tenant profile branding:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tenant profile branding:', { detail: error });
       throw error;
     }
   }
@@ -1766,7 +1767,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get tenant fulfillment settings:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenant fulfillment settings:', { detail: result.error });
       return null;
     }
 
@@ -1791,7 +1792,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update tenant fulfillment settings:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update tenant fulfillment settings:', { detail: result.error });
       throw result.error;
     }
 
@@ -2112,7 +2113,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get dashboard consolidated data:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get dashboard consolidated data:', { detail: error });
       throw error;
     }
   }
@@ -2135,7 +2136,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google feed jobs setup status:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google feed jobs setup status:', { detail: error });
       throw error;
     }
   }
@@ -2158,7 +2159,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result?.data || null;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google GBP status:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google GBP status:', { detail: error });
       return null;
     }
   }
@@ -2182,7 +2183,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google OAuth merchants:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google OAuth merchants:', { detail: error });
       throw error;
     }
   }
@@ -2207,7 +2208,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to link Google merchant:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to link Google merchant:', { detail: error });
       throw error;
     }
   }
@@ -2232,7 +2233,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to disconnect Google OAuth:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to disconnect Google OAuth:', { detail: error });
       throw error;
     }
   }
@@ -2257,7 +2258,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to disconnect Google GBP:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to disconnect Google GBP:', { detail: error });
       throw error;
     }
   }
@@ -2280,7 +2281,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business media:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business media:', { detail: error });
       throw error;
     }
   }
@@ -2303,7 +2304,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business posts:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business posts:', { detail: error });
       throw error;
     }
   }
@@ -2326,7 +2327,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business reviews:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business reviews:', { detail: error });
       throw error;
     }
   }
@@ -2349,7 +2350,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business attributes:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business attributes:', { detail: error });
       throw error;
     }
   }
@@ -2374,7 +2375,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to upload Google Business media:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to upload Google Business media:', { detail: error });
       throw error;
     }
   }
@@ -2399,7 +2400,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to create Google Business post:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create Google Business post:', { detail: error });
       throw error;
     }
   }
@@ -2424,7 +2425,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to reply to Google Business review:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to reply to Google Business review:', { detail: error });
       throw error;
     }
   }
@@ -2449,7 +2450,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to save Google Business attributes:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to save Google Business attributes:', { detail: error });
       throw error;
     }
   }
@@ -2472,7 +2473,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business linked location:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business linked location:', { detail: error });
       throw error;
     }
   }
@@ -2495,7 +2496,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business locations:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business locations:', { detail: error });
       throw error;
     }
   }
@@ -2520,7 +2521,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to link Google Business location:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to link Google Business location:', { detail: error });
       throw error;
     }
   }
@@ -2545,7 +2546,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to sync Google Business:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to sync Google Business:', { detail: error });
       throw error;
     }
   }
@@ -2568,7 +2569,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business sync tracking:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business sync tracking:', { detail: error });
       throw error;
     }
   }
@@ -2591,7 +2592,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Business comparison:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Business comparison:', { detail: error });
       throw error;
     }
   }
@@ -2614,7 +2615,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get Google Merchant sync status:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Google Merchant sync status:', { detail: error });
       throw error;
     }
   }
@@ -2639,7 +2640,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to update Google Merchant settings:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update Google Merchant settings:', { detail: error });
       throw error;
     }
   }
@@ -2664,7 +2665,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to sync Google Merchant:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to sync Google Merchant:', { detail: error });
       throw error;
     }
   }
@@ -2695,7 +2696,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get GMC product sync status:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get GMC product sync status:', { detail: error });
       throw error;
     }
   }
@@ -2716,7 +2717,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get Square status:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Square status:', { detail: result.error });
       return null;
     }
 
@@ -2739,7 +2740,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get Square OAuth authorize:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Square OAuth authorize:', { detail: result.error });
       throw result.error;
     }
 
@@ -2764,7 +2765,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to disconnect Square:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to disconnect Square:', { detail: result.error });
       throw result.error;
     }
 
@@ -2789,7 +2790,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to start Square sync:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to start Square sync:', { detail: result.error });
       throw result.error;
     }
 
@@ -2893,7 +2894,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return transformedResult;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get complete tenant data:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get complete tenant data:', { detail: error });
       throw error;
     }
   }
@@ -2916,7 +2917,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
       return result;
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to get complete categories data:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get complete categories data:', { detail: error });
       throw error;
     }
   }
@@ -2937,7 +2938,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get tenant tier:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get tenant tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -2956,7 +2957,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get Sentry config:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get Sentry config:', { detail: result.error });
       return null;
     }
 
@@ -2980,7 +2981,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to get upgrade requests:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to get upgrade requests:', { detail: result.error });
       return null;
     }
 
@@ -3007,7 +3008,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to create upgrade request:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create upgrade request:', { detail: result.error });
       throw result.error;
     }
 
@@ -3038,7 +3039,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       // Invalidate tenant complete cache for this tenant
       await this.invalidateTenantCaches(tenantId);
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to assign tenant to organization:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to assign tenant to organization:', { detail: error });
       throw error;
     }
   }
@@ -3062,7 +3063,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       await this.invalidateTenantCaches(tenantId);
 
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to remove tenant from organization:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to remove tenant from organization:', { detail: error });
       throw error;
     }
   }
@@ -3087,7 +3088,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to create organization request:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to create organization request:', { detail: result.error });
       throw result.error;
     }
 
@@ -3115,7 +3116,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       // Invalidate pending request cache - use enhanced pattern matching
       await this.invalidateCachePattern(`platform-pending-request-*`);
     } catch (error) {
-      console.error('[PlatformHomeSingleton] Failed to delete pending request:', error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to delete pending request:', { detail: error });
       throw error;
     }
   }
@@ -3138,7 +3139,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformHomeSingleton] Failed to update pending request:', result.error);
+      clientLogger.error('[PlatformHomeSingleton] Failed to update pending request:', { detail: result.error });
       throw result.error;
     }
 

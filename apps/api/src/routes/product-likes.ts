@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.get('/:productId/likes', async (req: Request, res: Response) => {
       userLiked,
     });
   } catch (error: any) {
-    console.error('[GET /api/products/:productId/likes] Error:', error);
+    logger.error('[GET /api/products/:productId/likes] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get likes' });
   }
 });
@@ -131,7 +132,7 @@ router.post('/:productId/like', async (req: Request, res: Response) => {
       action: 'liked',
     });
   } catch (error: any) {
-    console.error('[POST /api/products/:productId/like] Error:', error);
+    logger.error('[POST /api/products/:productId/like] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to like product' });
   }
 });
@@ -198,7 +199,7 @@ router.delete('/:productId/like', async (req: Request, res: Response) => {
       action: 'unliked',
     });
   } catch (error: any) {
-    console.error('[DELETE /api/products/:productId/like] Error:', error);
+    logger.error('[DELETE /api/products/:productId/like] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to unlike product' });
   }
 });

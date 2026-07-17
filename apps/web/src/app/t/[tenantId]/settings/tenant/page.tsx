@@ -12,6 +12,7 @@ import AccessDenied from '@/components/AccessDenied';
 import { Spinner } from '@/components/ui';
 import { onboardingDataService } from '@/services/onboardingDataService';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 
@@ -48,7 +49,7 @@ export default function TenantBusinessProfilePage() {
         localData = savedProgress?.businessData || {};
       } catch (storageError) {
         // If localStorage is corrupted or decryption fails, log and continue with empty data
-        console.warn('[TenantSettings] Failed to load local onboarding data, using API data only:', storageError);
+        clientLogger.warn('[TenantSettings] Failed to load local onboarding data, using API data only:', { detail: storageError });
         // The OnboardingStorageService.load() method already clears corrupted data, so we don't need to do it here
       }
 
@@ -62,7 +63,7 @@ export default function TenantBusinessProfilePage() {
 //      console.log('[TenantSettings] Onboarding data loaded:', normalized);
       return normalized;
     } catch (err) {
-      console.error('[TenantSettings] Failed to load onboarding data:', err);
+      clientLogger.error('[TenantSettings] Failed to load onboarding data:', { detail: err });
       return {};
     }
   };
@@ -116,7 +117,7 @@ export default function TenantBusinessProfilePage() {
         await mergeProfileData(null);
       }
     } catch (error) {
-      console.error('Failed to load profile:', error);
+      clientLogger.error('Failed to load profile:', { detail: error });
       // Still try to load onboarding data even if API fails
       await mergeProfileData(null);
     } finally {
@@ -132,7 +133,7 @@ export default function TenantBusinessProfilePage() {
         setTenantName(data.name || '');
       }
     } catch (error) {
-      console.error('Failed to load tenant name:', error);
+      clientLogger.error('Failed to load tenant name:', { detail: error });
     }
   };
 
@@ -151,10 +152,10 @@ export default function TenantBusinessProfilePage() {
         // Reload the profile data to ensure we have the latest from server
         loadProfile();
       } else {
-        console.error('Failed to update profile: No response data');
+        clientLogger.error('Failed to update profile: No response data');
       }
     } catch (error) {
-      console.error('Failed to update profile:', error);
+      clientLogger.error('Failed to update profile:', { detail: error });
       setProfile(updatedProfile);
       setMergedProfile(updatedProfile);
     }

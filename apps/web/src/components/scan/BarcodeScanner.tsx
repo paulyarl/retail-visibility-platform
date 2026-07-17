@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
@@ -88,7 +89,7 @@ export default function BarcodeScanner({
         // For now, just show camera feed
         setIsScanning(true);
       } catch (error: any) {
-        console.error('[BarcodeScanner] Camera error:', error);
+        clientLogger.error('[BarcodeScanner] Camera error:', { detail: error });
         onError?.('Failed to access camera: ' + error.message);
       }
     };

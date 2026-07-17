@@ -10,6 +10,7 @@ import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import { StorefrontHeader } from '@/components/storefront/sections/StorefrontHeader';
 import { ServiceSection } from '@/components/storefront/sections/ServiceSection';
 import PublicBotWidget from '@/components/bot/PublicBotWidget';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -53,7 +54,7 @@ async function getTenantServices(tenantId: string) {
       resolvedTenantId: idResolvedBySlug,
     };
   } catch (error) {
-    console.error('Error fetching tenant services:', error);
+    clientLogger.error('Error fetching tenant services:', { detail: error });
     return null;
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicStorefrontCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import ProductBusinessInfoCollapsible from './ProductBusinessInfoCollapsible';
 
@@ -12,8 +12,7 @@ interface ProductBusinessInfoWrapperProps {
 }
 
 export default function ProductBusinessInfoWrapper({ product, tenant, initialOptFlags }: ProductBusinessInfoWrapperProps) {
-  // Storefront capability-driven content control
-  const storefrontCap = useStorefrontCapability(product.tenantId);
+  const storefrontCap = usePublicStorefrontCapability(product.tenantId);
   const isStorefrontEnabled = storefrontCap.data?.enabled ?? true;
   const isRetailStore = storefrontCap.data?.type === 'retail' || storefrontCap.data?.type === 'flexible';
   const isOnlineStore = storefrontCap.data?.type === 'online' || storefrontCap.data?.type === 'flexible';

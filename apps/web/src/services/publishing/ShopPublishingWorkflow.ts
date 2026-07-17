@@ -445,6 +445,7 @@ export const publishingWorkflow = ShopPublishingWorkflowService.getInstance();
 
 // React hook for publishing workflow
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function usePublishingWorkflow(shopId: string) {
   const [progress, setProgress] = useState<PublishingProgress | null>(null);
@@ -457,7 +458,7 @@ export function usePublishingWorkflow(shopId: string) {
         const workflowProgress = await publishingWorkflow.getPublishingProgress(shopId);
         setProgress(workflowProgress);
       } catch (error) {
-        console.error('Error loading publishing progress:', error);
+        clientLogger.error('Error loading publishing progress:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -472,7 +473,7 @@ export function usePublishingWorkflow(shopId: string) {
       await publishingWorkflow.startPublishingWorkflow(shopId);
       // Progress will be updated via the simulation
     } catch (error) {
-      console.error('Error starting publishing workflow:', error);
+      clientLogger.error('Error starting publishing workflow:', { detail: error });
     } finally {
       setLoading(false);
     }

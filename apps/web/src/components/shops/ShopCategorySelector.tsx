@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import RealShopService, { type GBPCategory } from "@/services/RealShopService";
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopCategorySelectorProps {
   tenantId: string;
@@ -31,7 +32,7 @@ export default function ShopCategorySelector({
         
         setCategories(availableCategories);
       } catch (error) {
-        console.error('Error loading categories:', error);
+        clientLogger.error('Error loading categories:', { detail: error });
         setError('Failed to load categories');
       } finally {
         setLoading(false);

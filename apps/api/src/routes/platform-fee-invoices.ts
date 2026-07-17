@@ -10,6 +10,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { platformFeeInvoiceService } from '../services/PlatformFeeInvoiceService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.get('/', async (req: Request, res: Response) => {
       total,
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error listing invoices:', error);
+    logger.error('[FeeInvoices] Error listing invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_failed',
@@ -86,7 +87,7 @@ router.get('/summary', async (req: Request, res: Response) => {
       summary,
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error getting summary:', error);
+    logger.error('[FeeInvoices] Error getting summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'summary_failed',
@@ -122,7 +123,7 @@ router.post('/generate', async (req: Request, res: Response) => {
       invoices: results,
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error generating invoices:', error);
+    logger.error('[FeeInvoices] Error generating invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'generation_failed',
@@ -168,7 +169,7 @@ router.get('/:invoiceId', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error getting invoice:', error);
+    logger.error('[FeeInvoices] Error getting invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',
@@ -201,7 +202,7 @@ router.post('/:invoiceId/pay', async (req: Request, res: Response) => {
       invoice,
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error marking invoice paid:', error);
+    logger.error('[FeeInvoices] Error marking invoice paid:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'payment_failed',
@@ -238,7 +239,7 @@ router.post('/:invoiceId/waive', async (req: Request, res: Response) => {
       invoice,
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error waiving invoice:', error);
+    logger.error('[FeeInvoices] Error waiving invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'waiver_failed',
@@ -273,7 +274,7 @@ router.get('/tenant/:tenantId', async (req: Request, res: Response) => {
       total,
     });
   } catch (error) {
-    console.error('[FeeInvoices] Error getting tenant invoices:', error);
+    logger.error('[FeeInvoices] Error getting tenant invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_failed',

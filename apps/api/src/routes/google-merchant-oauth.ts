@@ -11,6 +11,7 @@ import { listMerchantAccounts } from '../lib/google/gmc';
 import { generateQuickStart } from '../lib/id-generator';
 import { isGMCSyncAllowed } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -87,7 +88,7 @@ router.get('/google/oauth/status', async (req, res) => {
     });
   } catch (error) {
     const errorTime = Date.now() - startTime;
-    console.error(`[Google Merchant OAuth] Error checking status after ${errorTime}ms:`, error);
+    logger.error(`[Google Merchant OAuth] Error checking status after ${errorTime}ms:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'status_check_failed',
@@ -136,7 +137,7 @@ router.get('/google/oauth/authorize', async (req, res) => {
       data: { url: authUrl }
     });
   } catch (error) {
-    console.error('[Google Merchant OAuth] Error initiating OAuth:', error);
+    logger.error('[Google Merchant OAuth] Error initiating OAuth:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'oauth_init_failed',
@@ -155,7 +156,7 @@ router.get('/google/oauth/callback', async (req, res) => {
 
     // Handle OAuth errors
     if (oauthError) {
-      console.error('[Google Merchant OAuth] OAuth error:', oauthError);
+      logger.error('[Google Merchant OAuth] OAuth error:', undefined, { error: { name: (oauthError as any)?.name || 'Error', message: (oauthError as any)?.message || String(oauthError), stack: (oauthError as any)?.stack } });
       return res.redirect(`${WEB_URL}/settings/integrations/google?error=${oauthError}`);
     }
 
@@ -251,7 +252,7 @@ router.get('/google/oauth/callback', async (req, res) => {
     // Redirect back to integrations page with success
     res.redirect(`${WEB_URL}/t/${tenantId}/settings/integrations/google?success=connected`);
   } catch (error) {
-    console.error('[Google Merchant OAuth] Callback error:', error);
+    logger.error('[Google Merchant OAuth] Callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.redirect(`${WEB_URL}/settings/integrations/google?error=callback_failed`);
   }
 });
@@ -284,7 +285,7 @@ router.post('/google/oauth/disconnect', async (req, res) => {
       message: 'Successfully disconnected from Google Merchant Center'
     });
   } catch (error) {
-    console.error('[Google Merchant OAuth] Disconnect error:', error);
+    logger.error('[Google Merchant OAuth] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'disconnect_failed',
@@ -340,7 +341,7 @@ router.get('/google/oauth/merchants', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Google Merchant OAuth] Error listing merchants:', error);
+    logger.error('[Google Merchant OAuth] Error listing merchants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_merchants_failed',
@@ -445,7 +446,7 @@ router.post('/google/oauth/link-merchant', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Google Merchant OAuth] Error linking merchant:', error);
+    logger.error('[Google Merchant OAuth] Error linking merchant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'link_merchant_failed',
@@ -482,7 +483,7 @@ router.get('/google/merchant/sync-status', async (req, res) => {
       data: status
     });
   } catch (error) {
-    console.error('[GMC Sync Status] Error:', error);
+    logger.error('[GMC Sync Status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'get_status_failed',
@@ -589,7 +590,7 @@ router.patch('/google/merchant/settings', async (req, res) => {
       data: status,
     });
   } catch (error) {
-    console.error('[GMC Settings] Error:', error);
+    logger.error('[GMC Settings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'update_settings_failed',
@@ -661,7 +662,7 @@ router.post('/google/merchant/sync', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GMC Sync] Error:', error);
+    logger.error('[GMC Sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_failed',
@@ -708,7 +709,7 @@ router.post('/google/merchant/sync/:itemId', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GMC Sync Product] Error:', error);
+    logger.error('[GMC Sync Product] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_failed',
@@ -753,7 +754,7 @@ router.patch('/google/merchant/inventory/:itemId', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GMC Update Inventory] Error:', error);
+    logger.error('[GMC Update Inventory] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'update_failed',
@@ -798,7 +799,7 @@ router.patch('/google/merchant/price/:itemId', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GMC Update Price] Error:', error);
+    logger.error('[GMC Update Price] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'update_failed',
@@ -835,7 +836,7 @@ router.delete('/google/merchant/product/:itemId', async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('[GMC Delete Product] Error:', error);
+    logger.error('[GMC Delete Product] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'delete_failed',
@@ -905,7 +906,7 @@ router.get('/google/merchant/validation-report', async (req, res) => {
       data: report,
     });
   } catch (error) {
-    console.error('[GMC Validation Report] Error:', error);
+    logger.error('[GMC Validation Report] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'validation_report_failed',
@@ -996,7 +997,7 @@ router.get('/google/merchant/product-sync-status', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[GMC Product Sync Status] Error:', error);
+    logger.error('[GMC Product Sync Status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'product_sync_status_failed',

@@ -2,6 +2,7 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { getErrorMessage, RequestType } from '../providers/base/FlexibleApiSingleton';
 import { tenantPublicService } from './TenantPublicService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TierFeature {
   id: string;
@@ -105,7 +106,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to get admin tiers:', result.error);
+      clientLogger.error('[TenantTierService] Failed to get admin tiers:', { detail: result.error });
       return null;
     }
 
@@ -134,7 +135,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to get admin tier tenants:', result.error);
+      clientLogger.error('[TenantTierService] Failed to get admin tier tenants:', { detail: result.error });
       return null;
     }
 
@@ -175,7 +176,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to update tenant tier:', result.error);
+      clientLogger.error('[TenantTierService] Failed to update tenant tier:', { detail: result.error });
       const errorMessage = getErrorMessage(result.error) || 'Failed to update tenant tier';
       throw new Error(errorMessage);
     }
@@ -265,7 +266,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to get tier system tiers:', result.error);
+      clientLogger.error('[TenantTierService] Failed to get tier system tiers:', { detail: result.error });
       return [];
     }
 
@@ -311,7 +312,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to update tier status:', result.error);
+      clientLogger.error('[TenantTierService] Failed to update tier status:', { detail: result.error });
       throw result.error;
     }
 
@@ -339,7 +340,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to update tier:', result.error);
+      clientLogger.error('[TenantTierService] Failed to update tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -368,7 +369,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to update tier sort order:', result.error);
+      clientLogger.error('[TenantTierService] Failed to update tier sort order:', { detail: result.error });
       throw result.error;
     }
 
@@ -387,7 +388,7 @@ export class TenantTierService extends AdminApiSingleton {
     trialEndsAt: string;
   } | null> {
     if (!tenantId || !targetTier) {
-      console.error('[TenantTierService] startTrial: tenantId and targetTier are required');
+      clientLogger.error('[TenantTierService] startTrial: tenantId and targetTier are required');
       return null;
     }
 
@@ -410,7 +411,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to start trial:', result.error);
+      clientLogger.error('[TenantTierService] Failed to start trial:', { detail: result.error });
       return null;
     }
 
@@ -441,7 +442,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to create tier:', result.error);
+      clientLogger.error('[TenantTierService] Failed to create tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -469,7 +470,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to delete tier:', result.error);
+      clientLogger.error('[TenantTierService] Failed to delete tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -495,7 +496,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to get tier system tiers list:', result.error);
+      clientLogger.error('[TenantTierService] Failed to get tier system tiers list:', { detail: result.error });
       return [];
     }
 
@@ -520,7 +521,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to get tier system features list:', result.error);
+      clientLogger.error('[TenantTierService] Failed to get tier system features list:', { detail: result.error });
       return [];
     }
 
@@ -568,7 +569,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to patch tier:', result.error);
+      clientLogger.error('[TenantTierService] Failed to patch tier:', { detail: result.error });
       throw result.error;
     }
 
@@ -598,7 +599,7 @@ export class TenantTierService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantTierService] Failed to get tenant tier:', result.error);
+      clientLogger.error('[TenantTierService] Failed to get tenant tier:', { detail: result.error });
       throw result.error;
     }
 

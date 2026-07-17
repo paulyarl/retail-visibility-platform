@@ -14,6 +14,7 @@ import { OrderManagementService } from '../services/OrderManagementService';
 import { authenticateToken } from '../middleware/auth';
 import { canPerformSupportActions } from '../utils/platform-admin';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -91,7 +92,7 @@ router.get('/location/:tenantId/orders', authenticateToken, async (req: Request,
       hasMore: (options.offset || 0) + (options.limit || 50) < result.total,
     });
   } catch (error: any) {
-    console.error('[Order Management] Get location orders error:', error);
+    logger.error('[Order Management] Get location orders error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_orders',
@@ -138,7 +139,7 @@ router.get('/location/:tenantId/stats', authenticateToken, async (req: Request, 
       stats,
     });
   } catch (error: any) {
-    console.error('[Order Management] Get location stats error:', error);
+    logger.error('[Order Management] Get location stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_stats',
@@ -185,7 +186,7 @@ router.get('/location/:tenantId/attention', authenticateToken, async (req: Reque
       ...attentionOrders,
     });
   } catch (error: any) {
-    console.error('[Order Management] Get attention orders error:', error);
+    logger.error('[Order Management] Get attention orders error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_attention_orders',
@@ -240,7 +241,7 @@ router.get('/organization/:organizationId/stats', authenticateToken, async (req:
       stats,
     });
   } catch (error: any) {
-    console.error('[Order Management] Get organization stats error:', error);
+    logger.error('[Order Management] Get organization stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_organization_stats',
@@ -325,7 +326,7 @@ router.put('/orders/:orderId/status', authenticateToken, async (req: Request, re
       order: updatedOrder,
     });
   } catch (error: any) {
-    console.error('[Order Management] Update order status error:', error);
+    logger.error('[Order Management] Update order status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_update_status',
@@ -470,7 +471,7 @@ router.get('/orders/:orderId', authenticateToken, async (req: Request, res: Resp
       order: formattedOrder,
     });
   } catch (error: any) {
-    console.error('[Order Management] Get order error:', error);
+    logger.error('[Order Management] Get order error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_order',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { categoriesService } from '@/services/CategoriesSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryCategory {
   name: string;
@@ -38,7 +39,7 @@ export function useDirectoryCategories(): DirectoryCategoriesHook {
 
         setCategories(mappedCategories);
       } catch (err) {
-        console.error('Error fetching categories:', err);
+        clientLogger.error('Error fetching categories:', { detail: err });
         setError(err instanceof Error ? err.message : 'Failed to load categories');
       } finally {
         setLoading(false);

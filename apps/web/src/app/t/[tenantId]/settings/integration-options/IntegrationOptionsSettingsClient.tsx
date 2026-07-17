@@ -10,6 +10,7 @@ import { useIntegrationOptionsCapability, useAllCapabilities } from '@/hooks/ten
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 import type { IntegrationType, IntegrationGroup } from '@/services/CapabilityResolutionService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface IntegrationOptionsSettings {
   integration_enabled: boolean;
@@ -206,7 +207,7 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
         });
       }
     } catch (err) {
-      console.error('Failed to load integration options settings:', err);
+      clientLogger.error('Failed to load integration options settings:', { detail: err });
     } finally {
       setLoading(false);
     }

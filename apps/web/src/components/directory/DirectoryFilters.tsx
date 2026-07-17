@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, SlidersHorizontal, X, MapPin, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DirectoryFiltersProps {
   categories: Array<{ name: string; slug: string; count: number }>;
@@ -58,7 +59,7 @@ export default function DirectoryFilters({ categories, storeTypes = [], location
         setShowFilters(false);
       },
       (error) => {
-        console.error('Error getting location:', error);
+        clientLogger.error('Error getting location:', { detail: error });
         alert('Unable to get your location. Please enable location services.');
         setGettingLocation(false);
       }

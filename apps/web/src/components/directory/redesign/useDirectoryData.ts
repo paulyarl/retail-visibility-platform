@@ -31,6 +31,7 @@ import type {
   DirectoryPaginationInfo,
   DirectoryCounts,
 } from './types';
+import { clientLogger } from '@/lib/client-logger';
 
 // ---------------------------------------------------------------------------
 // Cache config for categories & store types (localStorage with TTL)
@@ -314,7 +315,7 @@ export function useDirectoryData(): DirectoryData {
         }
         setStoreTypes(types || []);
       } catch (err) {
-        console.error('Error fetching filters:', err);
+        clientLogger.error('Error fetching filters:', { detail: err });
       }
     };
 

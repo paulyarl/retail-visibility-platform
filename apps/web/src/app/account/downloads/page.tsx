@@ -9,6 +9,7 @@ import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderSer
 import { Package, Download, ExternalLink, Calendar, AlertTriangle, CheckCircle, XCircle, File, Link as LinkIcon, Key, Shield, Clock } from 'lucide-react';
 import DownloadProgress, { DownloadProgressCompact } from '@/components/downloads/DownloadProgress';
 import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DigitalDownload {
   orderId: string;
@@ -85,7 +86,7 @@ export default function DigitalDownloadsPage() {
       
       setDownloads(digitalDownloads);
     } catch (err: any) {
-      console.error('Failed to load digital downloads:', err);
+      clientLogger.error('Failed to load digital downloads:', { detail: err });
       setError('Failed to load your digital downloads. Please try again.');
     } finally {
       setLoading(false);
@@ -305,7 +306,7 @@ export default function DigitalDownloadsPage() {
                             loadDownloads();
                           }}
                           onDownloadError={(asset, error) => {
-                            console.error('Download failed:', error);
+                            clientLogger.error('Download failed:', { detail: error });
                           }}
                         />
                       )}

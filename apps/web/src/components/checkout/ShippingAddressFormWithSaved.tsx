@@ -22,6 +22,7 @@ import {
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import customerAddressesService, { CustomerAddress } from '@/services/CustomerAddressesService';
 import { MapPin, Plus, Check, Edit, Trash2 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 type ShippingAddressFormData = {
   addressLine1: string;
@@ -115,7 +116,7 @@ export function ShippingAddressFormWithSaved({
         setAddresses(result.addresses);
       }
     } catch (error) {
-      console.error('[ShippingAddressForm] Failed to load addresses:', error);
+      clientLogger.error('[ShippingAddressForm] Failed to load addresses:', { detail: error });
     } finally {
       setIsLoadingAddresses(false);
     }
@@ -194,7 +195,7 @@ export function ShippingAddressFormWithSaved({
         }
       }
     } catch (error) {
-      console.error('[ShippingAddressForm] Failed to delete address:', error);
+      clientLogger.error('[ShippingAddressForm] Failed to delete address:', { detail: error });
     }
   };
 

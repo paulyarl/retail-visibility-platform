@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantUsage {
   tenantId: string;
@@ -124,7 +125,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get usage:', error);
+      clientLogger.error('[TenantUsageService] Failed to get usage:', { detail: error });
       throw new Error('Failed to fetch tenant usage data');
     }
   }
@@ -146,7 +147,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get usage summary:', error);
+      clientLogger.error('[TenantUsageService] Failed to get usage summary:', { detail: error });
       throw new Error('Failed to fetch usage summary');
     }
   }
@@ -170,7 +171,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data?.endpoints || [];
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get API usage breakdown:', error);
+      clientLogger.error('[TenantUsageService] Failed to get API usage breakdown:', { detail: error });
       return [];
     }
   }
@@ -188,7 +189,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get storage usage breakdown:', error);
+      clientLogger.error('[TenantUsageService] Failed to get storage usage breakdown:', { detail: error });
       return null;
     }
   }
@@ -212,7 +213,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get bandwidth usage breakdown:', error);
+      clientLogger.error('[TenantUsageService] Failed to get bandwidth usage breakdown:', { detail: error });
       return null;
     }
   }
@@ -236,7 +237,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get user activity metrics:', error);
+      clientLogger.error('[TenantUsageService] Failed to get user activity metrics:', { detail: error });
       return null;
     }
   }
@@ -260,7 +261,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get order metrics:', error);
+      clientLogger.error('[TenantUsageService] Failed to get order metrics:', { detail: error });
       return null;
     }
   }
@@ -284,7 +285,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get revenue metrics:', error);
+      clientLogger.error('[TenantUsageService] Failed to get revenue metrics:', { detail: error });
       return null;
     }
   }
@@ -316,7 +317,7 @@ class TenantUsageService extends TenantApiSingleton {
         type: format === 'csv' ? 'text/csv' : 'application/json' 
       });
     } catch (error) {
-      console.error('[TenantUsageService] Failed to export usage data:', error);
+      clientLogger.error('[TenantUsageService] Failed to export usage data:', { detail: error });
       throw new Error('Failed to export usage data');
     }
   }
@@ -335,7 +336,7 @@ class TenantUsageService extends TenantApiSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[TenantUsageService] Failed to get real-time metrics:', error);
+      clientLogger.error('[TenantUsageService] Failed to get real-time metrics:', { detail: error });
       return null;
     }
   }

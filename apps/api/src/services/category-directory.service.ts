@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 export interface CategoryWithStores {
   id: string;
@@ -101,7 +102,7 @@ export class CategoryDirectoryService {
 
       return uniqueCategories;
     } catch (error) {
-      console.error('[CategoryService] Error fetching categories:', error);
+      logger.error('[CategoryService] Error fetching categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Return empty array on error - graceful degradation
       return [];
     }
@@ -201,7 +202,7 @@ export class CategoryDirectoryService {
 
       return storesWithCounts;
     } catch (error) {
-      console.error('[CategoryService] Error fetching stores by category:', error);
+      logger.error('[CategoryService] Error fetching stores by category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -252,7 +253,7 @@ export class CategoryDirectoryService {
       console.log(`[CategoryService] Built path with ${path.length} levels`);
       return path;
     } catch (error) {
-      console.error('[CategoryService] Error building category path:', error);
+      logger.error('[CategoryService] Error building category path:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }

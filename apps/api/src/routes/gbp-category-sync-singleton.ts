@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import GBPCategorySyncSingletonService from '../services/GBPCategorySyncSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -50,7 +51,7 @@ router.post('/sync', async (req, res) => {
       message: `GBP category sync completed${tenantId ? ` for tenant ${tenantId}` : ' for all tenants'}`
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Sync error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to sync GBP categories',
@@ -94,7 +95,7 @@ router.get('/stats', async (req, res) => {
       message: 'GBP category sync statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Get stats error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sync statistics'
@@ -128,7 +129,7 @@ router.get('/categories', async (req, res) => {
       message: 'GBP categories retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Get categories error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Get categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve GBP categories'
@@ -171,7 +172,7 @@ router.post('/refresh', async (req, res) => {
       message: `GBP category force refresh completed${tenantId ? ` for tenant ${tenantId}` : ' for all tenants'}`
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Refresh error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to force refresh GBP categories',
@@ -205,7 +206,7 @@ router.get('/health', async (req, res) => {
       message: 'GBP category sync service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Health check error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -237,7 +238,7 @@ router.delete('/cache', async (req, res) => {
       message: 'GBP category sync cache cleared successfully'
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Clear cache error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -282,7 +283,7 @@ router.post('/test', async (req, res) => {
       message: 'GBP category sync test completed successfully'
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Test error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test GBP category sync',
@@ -318,7 +319,7 @@ router.get('/status', async (req, res) => {
       message: 'GBP category sync status retrieved successfully'
     });
   } catch (error) {
-    console.error('[GBP CATEGORY SYNC SINGLETON] Status error:', error);
+    logger.error('[GBP CATEGORY SYNC SINGLETON] Status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve sync status'

@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { z } from 'zod';
 import { authenticateToken, requireTenantOwner } from '../middleware/auth';
 import { generateQuickStart } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.get('/', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching upgrade requests:', error);
+    logger.error('Error fetching upgrade requests:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_requests' });
   }
 });
@@ -83,7 +84,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(request);
   } catch (error) {
-    console.error('Error fetching upgrade request:', error);
+    logger.error('Error fetching upgrade request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_request' });
   }
 });
@@ -116,7 +117,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     res.status(201).json(request);
   } catch (error) {
-    console.error('Error creating upgrade request:', error);
+    logger.error('Error creating upgrade request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_request' });
   }
 });
@@ -162,14 +163,14 @@ router.patch('/:id', async (req, res) => {
         });
         console.log(`[Upgrade Request] Updated tenant ${request.tenant_id} to tier ${request.requested_tier}`);
       } catch (tenantError) {
-        console.error('[Upgrade Request] Failed to update tenant tier:', tenantError);
+        logger.error('[Upgrade Request] Failed to update tenant tier:', undefined, { error: { name: (tenantError as any)?.name || 'Error', message: (tenantError as any)?.message || String(tenantError), stack: (tenantError as any)?.stack } });
         // Don't fail the request update, but log the error
       }
     }
 
     res.json(request);
   } catch (error) {
-    console.error('Error updating upgrade request:', error);
+    logger.error('Error updating upgrade request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_request' });
   }
 });
@@ -183,7 +184,7 @@ router.delete('/:id', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting upgrade request:', error);
+    logger.error('Error deleting upgrade request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_request' });
   }
 });

@@ -21,6 +21,7 @@ import { IconAlertTriangle, IconPackage, IconMapPin } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications';
 import { inventoryTransferService } from '@/services/InventoryTransferService';
 import type { LocationInventory } from '@/services/InventoryTransferService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface NewTransferModalProps {
   opened: boolean;
@@ -103,7 +104,7 @@ export default function NewTransferModal({ opened, onClose, onSuccess, tenantId 
       setLocations(availableLocations);
 
     } catch (error) {
-      console.error('Failed to load transfer data:', error);
+      clientLogger.error('Failed to load transfer data:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load inventory data',
@@ -176,7 +177,7 @@ export default function NewTransferModal({ opened, onClose, onSuccess, tenantId 
       onSuccess(); // Refresh parent data
 
     } catch (error: any) {
-      console.error('Failed to create transfer:', error);
+      clientLogger.error('Failed to create transfer:', { detail: error });
       notifications.show({
         title: 'Error',
         message: error.message || 'Failed to create transfer',

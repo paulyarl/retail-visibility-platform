@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { publicDownloadService } from '@/services/downloads/PublicDownloadService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrderDetails {
   orderId: string;
@@ -127,7 +128,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
         setOrder(data);
       }
     } catch (error) {
-      console.error('Failed to fetch order details:', error);
+      clientLogger.error('Failed to fetch order details:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -142,7 +143,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
       const data = await customerOrderService.getOrderDownloads(order.orderId);
       setDigitalDownloads(data?.downloads || []);
     } catch (error) {
-      console.error('Error fetching digital downloads:', error);
+      clientLogger.error('Error fetching digital downloads:', { detail: error });
     } finally {
       setLoadingDownloads(false);
     }
@@ -151,7 +152,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
   const handleDownload = async (accessToken: string) => {
     try {
       if (!order) {
-        console.error('Order not available for download');
+        clientLogger.error('Order not available for download');
         return;
       }
       
@@ -172,12 +173,12 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
           );
         }
       } else {
-        console.error('No downloads available for this order');
+        clientLogger.error('No downloads available for this order');
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Download failed';
       setDownloadError(msg);
-      console.error('Failed to get order downloads:', error);
+      clientLogger.error('Failed to get order downloads:', { detail: error });
     } finally {
       setDownloading(false);
     }

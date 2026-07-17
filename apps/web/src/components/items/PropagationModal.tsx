@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, Alert, Button } from '@/components/ui';
 import { propagationService, type PropagationRequest, type PropagationResult, type OrganizationTenant } from '@/services/PropagationService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PropagationModalProps {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export default function PropagationModal({
         const otherTenants = organizationTenants.filter(tenant => tenant.id !== currentTenantId);
         setTenants(otherTenants);
       } catch (error) {
-        console.error('[PropagationModal] loadTenants error:', error);
+        clientLogger.error('[PropagationModal] loadTenants error:', { detail: error });
         if (cancelled) return;
         setError(error instanceof Error ? error.message : 'Failed to load locations');
       } finally {

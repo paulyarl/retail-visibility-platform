@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Globe, MapPin, TrendingUp, Users, Eye } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GeographicAnalyticsProps {
   filters: {
@@ -140,7 +141,7 @@ export default function GeographicAnalytics({ filters }: GeographicAnalyticsProp
       await new Promise(resolve => setTimeout(resolve, 600));
       setGeographicData(mockGeographicData);
     } catch (error) {
-      console.error('Error fetching geographic data:', error);
+      clientLogger.error('Error fetching geographic data:', { detail: error });
     } finally {
       setLoading(false);
     }

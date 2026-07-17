@@ -9,6 +9,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 /**
  * Map trial tiers to their base tiers for feature/limit proxying
@@ -368,7 +369,7 @@ export async function checkTenantFeatureAccess(
       source: tierAccess ? 'tier' : 'none',
     };
   } catch (error) {
-    console.error('[checkTenantFeatureAccess] Error:', error);
+    logger.error('[checkTenantFeatureAccess] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return { hasAccess: false, source: 'none' };
   }
 }

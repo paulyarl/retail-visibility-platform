@@ -12,6 +12,7 @@ import { CacheManager } from './cacheManager';
 import { gzip, ungzip } from 'pako';
 
 import cacheManager from './cacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export enum CacheIsolation {
   GLOBAL = 'global',
@@ -386,7 +387,7 @@ class ContextCacheManager {
         };
       }
     } catch (error) {
-      console.error('[ContextCacheManager] Compression failed:', error);
+      clientLogger.error('[ContextCacheManager] Compression failed:', { detail: error });
       // Fallback to uncompressed data
       return data;
     }
@@ -421,7 +422,7 @@ class ContextCacheManager {
 
       return data;
     } catch (error) {
-      console.error('[ContextCacheManager] Decompression failed:', error);
+      clientLogger.error('[ContextCacheManager] Decompression failed:', { detail: error });
       return data;
     }
   }
@@ -450,7 +451,7 @@ class ContextCacheManager {
     const manager = this.contexts.get(context);
     
     if (!manager) {
-      console.warn(`[ContextCacheManager] No cache manager for context: ${context}`);
+      clientLogger.warn(`[ContextCacheManager] No cache manager for context: ${context}`);
       return null;
     }
 
@@ -461,7 +462,7 @@ class ContextCacheManager {
       }
       return null;
     } catch (error) {
-      console.error(`[ContextCacheManager] Get failed for ${context}:`, error);
+      clientLogger.error(`[ContextCacheManager] Get failed for ${context}:`, { detail: error });
       return null;
     }
   }
@@ -480,7 +481,7 @@ class ContextCacheManager {
     const config = CONTEXT_CONFIGS[context];
     
     if (!manager) {
-      console.warn(`[ContextCacheManager] No cache manager for context: ${context}`);
+      clientLogger.warn(`[ContextCacheManager] No cache manager for context: ${context}`);
       return;
     }
 
@@ -501,7 +502,7 @@ class ContextCacheManager {
         //   compressed: config.compression
         // });
     } catch (error) {
-      console.error(`[ContextCacheManager] Set failed for ${context}:`, error);
+      clientLogger.error(`[ContextCacheManager] Set failed for ${context}:`, { detail: error });
     }
   }
 
@@ -515,7 +516,7 @@ class ContextCacheManager {
       await manager.remove(cacheKey);
       // console.log(`[ContextCacheManager] Removed from ${context} cache:`, { key: cacheKey });
     } catch (error) {
-      console.error(`[ContextCacheManager] Remove failed for ${context}:`, error);
+      clientLogger.error(`[ContextCacheManager] Remove failed for ${context}:`, { detail: error });
     }
   }
 
@@ -682,7 +683,7 @@ class ContextCacheManager {
         console.log(`  ✅ Data integrity: ${integrity ? 'PASS' : 'FAIL'}`);
         
       } catch (error) {
-        console.error(`  ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+        clientLogger.error(`  ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
       }
       
       console.log('---');

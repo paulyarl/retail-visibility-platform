@@ -884,23 +884,24 @@ model crm_support_tickets {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_tasks {
-  id             String           @id
-  tenant_id      String           @db.VarChar(255)
-  contact_id     String?
-  title          String           @db.VarChar(255)
-  description    String?
-  status         String?          @default("pending") @db.VarChar(20)
-  priority       String?          @default("medium") @db.VarChar(20)
-  due_date       DateTime?        @db.Timestamptz(6)
-  assigned_to    String?          @db.VarChar(255)
-  created_by     String           @db.VarChar(255)
-  completed_at   DateTime?        @db.Timestamptz(6)
-  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
-  sort_order     Int?             @default(0)
-  crm_activities crm_activities[]
-  crm_contacts   crm_contacts?    @relation(fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_crm_tasks_contact")
-  tenants        tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_tasks_tenant")
+  id                String              @id
+  tenant_id         String              @db.VarChar(255)
+  contact_id        String?
+  title             String              @db.VarChar(255)
+  description       String?
+  status            String?             @default("pending") @db.VarChar(20)
+  priority          String?             @default("medium") @db.VarChar(20)
+  due_date          DateTime?           @db.Timestamptz(6)
+  assigned_to       String?             @db.VarChar(255)
+  created_by        String              @db.VarChar(255)
+  completed_at      DateTime?           @db.Timestamptz(6)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  sort_order        Int?                @default(0)
+  crm_activities    crm_activities[]
+  crm_task_messages crm_task_messages[]
+  crm_contacts      crm_contacts?       @relation(fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_crm_tasks_contact")
+  tenants           tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_tasks_tenant")
 
   @@index([assigned_to, status], map: "idx_crm_tasks_assigned_status")
   @@index([contact_id], map: "idx_crm_tasks_contact_id")
@@ -923,6 +924,21 @@ model crm_ticket_messages {
   crm_support_tickets crm_support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_messages_ticket")
 
   @@index([ticket_id, created_at], map: "idx_crm_messages_ticket_created")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_task_messages {
+  id          String    @id @db.VarChar(255)
+  task_id     String    @db.VarChar(255)
+  author_id   String    @db.VarChar(255)
+  author_type String    @default("platform") @db.VarChar(20)
+  author_name String    @db.VarChar(255)
+  content     String
+  is_internal Boolean   @default(false)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  crm_tasks   crm_tasks @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_task_messages_task")
+
+  @@index([task_id, created_at], map: "idx_crm_task_messages_task_created")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -2202,6 +2218,8 @@ model inventory_items {
   product_variants                                                                product_variants[]
   shopping_cart_items                                                             shopping_cart_items[]
   store_reviews                                                                   store_reviews[]
+  tenant_funnel_steps                                                             tenant_funnel_steps[]
+  tenant_sales_funnels                                                            tenant_sales_funnels[]
 
   @@unique([tenant_id, sku])
   @@index([tenant_id, featured_type, is_featured], map: "idx_inventory_items_featured_type")
@@ -4656,30 +4674,34 @@ model tenant_storefront_options_settings {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_storefront_qr_settings {
-  id                    String    @id @default(dbgenerated("(gen_random_uuid())::text"))
-  tenant_id             String    @unique
-  qr_enabled            Boolean?  @default(true)
-  qr_classic_enabled    Boolean?  @default(true)
-  qr_styled_enabled     Boolean?  @default(false)
-  qr_dot_type           String?   @default("rounded") @db.VarChar(30)
-  qr_corner_type        String?   @default("extra-rounded") @db.VarChar(30)
-  qr_dot_color          String?   @default("#1a56db") @db.VarChar(20)
-  qr_corner_color       String?   @default("#1a56db") @db.VarChar(20)
-  qr_bg_color           String?   @default("#ffffff") @db.VarChar(20)
-  qr_gradient_enabled   Boolean?  @default(false)
-  qr_gradient_start     String?   @default("#1a56db") @db.VarChar(20)
-  qr_gradient_end       String?   @default("#7c3aed") @db.VarChar(20)
-  qr_codes_512          Boolean?  @default(false)
-  qr_codes_1024         Boolean?  @default(true)
-  qr_codes_2048         Boolean?  @default(false)
-  default_qr_resolution String?   @default("1024") @db.VarChar(10)
-  qr_product            Boolean?  @default(true)
-  qr_store              Boolean?  @default(true)
-  qr_logo               Boolean?  @default(false)
-  qr_directory          Boolean?  @default(false)
-  created_at            DateTime? @default(now()) @db.Timestamp(6)
-  updated_at            DateTime? @default(now()) @db.Timestamp(6)
-  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_qr_tenant")
+  id                       String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id                String    @unique
+  qr_enabled               Boolean?  @default(true)
+  qr_classic_enabled       Boolean?  @default(true)
+  qr_styled_enabled        Boolean?  @default(false)
+  qr_dot_type              String?   @default("rounded") @db.VarChar(30)
+  qr_corner_type           String?   @default("extra-rounded") @db.VarChar(30)
+  qr_dot_color             String?   @default("#1a56db") @db.VarChar(20)
+  qr_corner_color          String?   @default("#1a56db") @db.VarChar(20)
+  qr_bg_color              String?   @default("#ffffff") @db.VarChar(20)
+  qr_gradient_enabled      Boolean?  @default(false)
+  qr_gradient_start        String?   @default("#1a56db") @db.VarChar(20)
+  qr_gradient_end          String?   @default("#7c3aed") @db.VarChar(20)
+  qr_codes_512             Boolean?  @default(false)
+  qr_codes_1024            Boolean?  @default(true)
+  qr_codes_2048            Boolean?  @default(false)
+  default_qr_resolution    String?   @default("1024") @db.VarChar(10)
+  qr_product               Boolean?  @default(true)
+  qr_store                 Boolean?  @default(true)
+  qr_logo                  Boolean?  @default(false)
+  qr_directory             Boolean?  @default(false)
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  qr_custom_colors_enabled Boolean?  @default(false)
+  qr_corner_dot_type       String?   @default("dot") @db.VarChar(30)
+  qr_corner_dot_color      String?   @default("#ffffff") @db.VarChar(20)
+  qr_logo_shape            String?   @default("square") @db.VarChar(20)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_qr_tenant")
 
   @@index([tenant_id], map: "idx_storefront_qr_tenant")
 }
@@ -4956,6 +4978,7 @@ model tenants {
   tenant_chatbot_options_settings                                                        tenant_chatbot_options_settings?
   tenant_commerce_settings                                                               tenant_commerce_settings?
   tenant_crm_options_settings                                                            tenant_crm_options_settings?
+  tenant_directory_entry_settings                                                        tenant_directory_entry_settings?
   tenant_faq_options_settings                                                            tenant_faq_options_settings?
   tenant_feature_overrides_list                                                          tenant_feature_overrides_list[]
   tenant_feature_purchases                                                               tenant_feature_purchases[]
@@ -4968,11 +4991,14 @@ model tenants {
   tenant_product_options_settings                                                        tenant_product_options_settings?
   tenant_product_types_settings                                                          tenant_product_types_settings?
   tenant_quickstart_options_settings                                                     tenant_quickstart_options_settings?
+  tenant_sales_funnels                                                                   tenant_sales_funnels[]
   tenant_shipping_carriers                                                               tenant_shipping_carriers[]
   tenant_social_commerce_options_settings                                                tenant_social_commerce_options_settings?
   tenant_social_pixels                                                                   tenant_social_pixels?
   tenant_storefront_gallery_settings                                                     tenant_storefront_gallery_settings?
   tenant_storefront_hours_settings                                                       tenant_storefront_hours_settings?
+  tenant_storefront_layouts_settings                                                     tenant_storefront_layouts_settings?
+  tenant_storefront_maps_settings                                                        tenant_storefront_maps_settings?
   tenant_storefront_options_settings                                                     tenant_storefront_options_settings[]
   tenant_storefront_policies                                                             tenant_storefront_policies?
   tenant_storefront_qr_settings                                                          tenant_storefront_qr_settings?
@@ -5615,6 +5641,130 @@ model bsaas_grant_token_claims {
   @@unique([grant_token_id, tenant_id])
   @@index([grant_token_id], map: "idx_bsaas_grant_token_claims_grant_token_id")
   @@index([tenant_id], map: "idx_bsaas_grant_token_claims_tenant_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_directory_entry_settings {
+  id                          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id                   String    @unique
+  directory_entry_opt_enabled Boolean?  @default(true)
+  directory_entry_layout      String?   @default("classic") @db.VarChar(20)
+  hours_display               Boolean?  @default(true)
+  map_display                 Boolean?  @default(true)
+  location_display            Boolean?  @default(true)
+  storefront_social_media     Boolean?  @default(true)
+  storefront_contact          Boolean?  @default(true)
+  interactive_maps            Boolean?  @default(true)
+  enhanced_seo                Boolean?  @default(false)
+  external_link_enabled       Boolean?  @default(false)
+  gallery_display_mode        String?   @default("carousel") @db.VarChar(20)
+  created_at                  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                  DateTime? @default(now()) @db.Timestamp(6)
+  tenants                     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_directory_entry_tenant")
+
+  @@index([tenant_id], map: "idx_directory_entry_settings_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_storefront_layouts_settings {
+  id                String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id         String    @unique
+  layouts_enabled   Boolean?  @default(true)
+  storefront_layout String?   @default("classic") @db.VarChar(50)
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  updated_at        DateTime? @default(now()) @db.Timestamp(6)
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_layouts_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_layouts_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_storefront_maps_settings {
+  id               String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  tenant_id        String    @unique
+  maps_enabled     Boolean?  @default(true)
+  interactive_maps Boolean?  @default(true)
+  map_display      Boolean?  @default(true)
+  location_display Boolean?  @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  tenants          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_maps_tenant")
+
+  @@index([tenant_id], map: "idx_storefront_maps_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_sales_funnels {
+  id                   String                @id
+  tenant_id            String
+  name                 String
+  entry_item_id        String?
+  trigger_type         String                @default("product")
+  min_cart_value_cents Int?
+  is_active            Boolean               @default(true)
+  is_default           Boolean               @default(false)
+  metadata             Json?                 @default("{}")
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime              @default(now()) @db.Timestamptz(6)
+  funnel_events        funnel_events[]
+  tenant_funnel_steps  tenant_funnel_steps[]
+  inventory_items      inventory_items?      @relation(fields: [entry_item_id], references: [id], onUpdate: NoAction, map: "fk_tenant_sales_funnels_entry_item")
+  tenants              tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_sales_funnels_tenant")
+
+  @@index([tenant_id, is_active], map: "idx_tenant_sales_funnels_tenant_active")
+  @@index([tenant_id], map: "idx_tenant_sales_funnels_tenant")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_funnel_steps {
+  id                   String                @id
+  tenant_id            String
+  funnel_id            String
+  step_type            String
+  offer_item_id        String
+  display_title        String?
+  display_description  String?
+  price_cents          Int?
+  discount_cents       Int                   @default(0)
+  sort_order           Int                   @default(0)
+  accept_to_step_id    String?
+  skip_to_step_id      String?
+  is_active            Boolean               @default(true)
+  metadata             Json?                 @default("{}")
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime              @default(now()) @db.Timestamptz(6)
+  funnel_events        funnel_events[]
+  accept_to_step       tenant_funnel_steps?  @relation("FunnelStepBranchingAccept", fields: [accept_to_step_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_accept_to")
+  other_steps_accept   tenant_funnel_steps[] @relation("FunnelStepBranchingAccept")
+  tenant_sales_funnels tenant_sales_funnels  @relation(fields: [funnel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_funnel_steps_funnel")
+  inventory_items      inventory_items       @relation(fields: [offer_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_funnel_steps_offer_item")
+  skip_to_step         tenant_funnel_steps?  @relation("FunnelStepBranchingSkip", fields: [skip_to_step_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_skip_to")
+  other_steps_skip     tenant_funnel_steps[] @relation("FunnelStepBranchingSkip")
+
+  @@index([funnel_id], map: "idx_tenant_funnel_steps_funnel")
+  @@index([funnel_id, is_active, sort_order], map: "idx_tenant_funnel_steps_funnel_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model funnel_events {
+  id                   String               @id
+  tenant_id            String
+  funnel_id            String
+  step_id              String?
+  event_type           String
+  order_id             String?
+  session_id           String?
+  customer_id          String?
+  revenue_cents        Int                  @default(0)
+  metadata             Json?                @default("{}")
+  created_at           DateTime             @default(now()) @db.Timestamptz(6)
+  tenant_sales_funnels tenant_sales_funnels @relation(fields: [funnel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_funnel_events_funnel")
+  step                 tenant_funnel_steps? @relation(fields: [step_id], references: [id], onUpdate: NoAction, map: "fk_funnel_events_step")
+
+  @@index([funnel_id], map: "idx_funnel_events_funnel")
+  @@index([step_id], map: "idx_funnel_events_step")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_funnel_events_tenant_created")
+  @@index([tenant_id, event_type, created_at(sort: Desc)], map: "idx_funnel_events_tenant_event_type")
 }
 
 enum action {

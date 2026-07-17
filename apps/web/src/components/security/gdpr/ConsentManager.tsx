@@ -14,6 +14,7 @@ import { ConsentCard } from './ConsentCard';
 import { ConsentHistory } from './ConsentHistory';
 import { BulkConsentActions } from './BulkConsentActions';
 import { Shield, History, Settings } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function ConsentManager() {
   const { consents, updateConsent, loading } = useGDPR();
@@ -59,7 +60,7 @@ export function ConsentManager() {
         }
       });
     } else {
-      console.warn('[ConsentManager] consents is not an array:', consents);
+      clientLogger.warn('[ConsentManager] consents is not an array:', { detail: consents });
     }
 
     return Object.values(groups).filter(group => group.consents.length > 0);
@@ -74,7 +75,7 @@ export function ConsentManager() {
     try {
       await updateConsent({ type: consent.type, consented });
     } catch (error) {
-      console.error('Failed to update consent:', error);
+      clientLogger.error('Failed to update consent:', { detail: error });
     }
   };
 

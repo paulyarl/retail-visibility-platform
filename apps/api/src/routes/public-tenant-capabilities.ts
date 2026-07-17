@@ -16,6 +16,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { deriveInternalStatus } from '../utils/subscription-status';
+import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
 
@@ -295,6 +296,7 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         qr_styled_enabled: false,
         allowed_qr_dot_styles: [],
         allowed_qr_corner_styles: [],
+        allowed_qr_corner_dot_styles: [],
         qr_custom_colors: false,
         qr_gradients: false,
         can_use_qr_codes: false,
@@ -322,6 +324,26 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_show_hours_display: false,
         can_use_animated_hours: false,
         can_show_hours_status: false,
+        merchant_preferences: {},
+      },
+      storefront_layouts: {
+        enabled: false,
+        is_flexible: false,
+        layout_enabled: false,
+        allowed_layouts: [],
+        effective_layout: 'classic' as const,
+        can_use_layout_classic: false,
+        can_use_layout_editorial: false,
+        can_use_layout_immersive: false,
+        merchant_preferences: {},
+      },
+      storefront_maps: {
+        enabled: false,
+        is_flexible: false,
+        maps_enabled: false,
+        can_show_map_display: false,
+        can_show_location_display: false,
+        can_use_interactive_maps: false,
         merchant_preferences: {},
       },
       directory_entry: {
@@ -465,6 +487,16 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_social_media_kit: false,
         is_flexible: false,
       },
+      funnel: {
+        enabled: false,
+        builder_enabled: false,
+        allowed_steps: [],
+        can_use_order_bump: false,
+        can_use_upsell: false,
+        can_use_downsell: false,
+        can_use_oto: false,
+        is_flexible: false,
+      },
     },
     constraint_violations: [],
     constraint_status: {},
@@ -507,7 +539,7 @@ router.get('/resolve/:identifier', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[GET /api/public/tenants/resolve/:identifier] Error:', error);
+    logger.error('[GET /api/public/tenants/resolve/:identifier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'failed_to_resolve_tenant' });
   }
 });
@@ -650,7 +682,7 @@ router.get('/:tenantId/capabilities', async (req: Request, res: Response) => {
       uncategorized_features: uncategorizedFeatures,
     });
   } catch (error) {
-    console.error('[GET /api/public/tenants/:tenantId/capabilities] Error:', error);
+    logger.error('[GET /api/public/tenants/:tenantId/capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_get_tenant_capabilities' });
   }
 });
@@ -704,7 +736,7 @@ router.get('/:tenantId/effective-capabilities', async (req: Request, res: Respon
       data: result,
     });
   } catch (error) {
-    console.error('[GET /api/public/tenants/:tenantId/effective-capabilities] Error:', error);
+    logger.error('[GET /api/public/tenants/:tenantId/effective-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

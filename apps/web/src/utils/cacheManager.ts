@@ -7,6 +7,7 @@
 
 import { CacheEncryption } from '../lib/cache/cache-encryption';
 import { resolveCacheOptions, AutoUserCacheOptions } from './userIdentification';
+import { clientLogger } from '@/lib/client-logger';
 
 // Context types for cache organization
 export type CacheContext = 'public' | 'user' | 'tenant' | 'admin' | 'system' | 'shop' | 'product' | 'store' | 'directory' | 'global';
@@ -159,7 +160,7 @@ class CacheManager {
       const request = indexedDB.open(dbName, version);
 
       request.onerror = () => {
-        console.warn('[CacheManager] IndexedDB open failed, falling back to memory only');
+        clientLogger.warn('[CacheManager] IndexedDB open failed, falling back to memory only');
         this.indexedDBSupported = false;
       };
 
@@ -168,7 +169,7 @@ class CacheManager {
         
         // Double-check that our store exists
         if (!this.db.objectStoreNames.contains(this.storeName)) {
-          console.warn(`[CacheManager] Store '${this.storeName}' missing after initialization, attempting to recreate`);
+          clientLogger.warn(`[CacheManager] Store '${this.storeName}' missing after initialization, attempting to recreate`);
           // Close current connection and reopen with higher version
           this.db.close();
           this.initIndexedDBWithVersion(version + 1);
@@ -183,7 +184,7 @@ class CacheManager {
         }
       };
     } catch (error) {
-      console.warn('[CacheManager] IndexedDB initialization failed, falling back to memory only:', error);
+      clientLogger.warn('[CacheManager] IndexedDB initialization failed, falling back to memory only:', { detail: error });
       this.indexedDBSupported = false;
     }
   }
@@ -195,7 +196,7 @@ class CacheManager {
       const request = indexedDB.open(this.dbName, version);
 
       request.onerror = () => {
-        console.warn('[CacheManager] IndexedDB version upgrade failed');
+        clientLogger.warn('[CacheManager] IndexedDB version upgrade failed');
         this.indexedDBSupported = false;
       };
 
@@ -212,7 +213,7 @@ class CacheManager {
         }
       };
     } catch (error) {
-      console.warn('[CacheManager] IndexedDB version upgrade failed:', error);
+      clientLogger.warn('[CacheManager] IndexedDB version upgrade failed:', { detail: error });
       this.indexedDBSupported = false;
     }
   }
@@ -239,7 +240,7 @@ class CacheManager {
       });
       return await CacheEncryption.encrypt(jsonString, userId || this.defaultUserId);
     } catch (error) {
-      console.warn('[CacheManager] Encryption failed, storing plain data:', error);
+      clientLogger.warn('[CacheManager] Encryption failed, storing plain data:', { detail: error });
       return data;
     }
   }
@@ -256,7 +257,7 @@ class CacheManager {
       const decryptedString = await CacheEncryption.decrypt(data, userId || this.defaultUserId);
       return JSON.parse(decryptedString);
     } catch (error) {
-      console.warn('[CacheManager] Decryption failed, returning as-is:', error);
+      clientLogger.warn('[CacheManager] Decryption failed, returning as-is:', { detail: error });
       return data as T;
     }
   }
@@ -271,7 +272,7 @@ class CacheManager {
     try {
       // Check if the store exists before trying to access it
       if (!this.db.objectStoreNames.contains(this.storeName)) {
-        console.warn(`[CacheManager] Store '${this.storeName}' not found in database, falling back to memory`);
+        clientLogger.warn(`[CacheManager] Store '${this.storeName}' not found in database, falling back to memory`);
         return null;
       }
 
@@ -291,7 +292,7 @@ class CacheManager {
         };
       });
     } catch (error) {
-      console.warn('[CacheManager] IndexedDB get failed:', error);
+      clientLogger.warn('[CacheManager] IndexedDB get failed:', { detail: error });
       return null;
     }
   }
@@ -302,7 +303,7 @@ class CacheManager {
     try {
       // Check if the store exists before trying to access it
       if (!this.db.objectStoreNames.contains(this.storeName)) {
-        console.warn(`[CacheManager] Store '${this.storeName}' not found in database, skipping IndexedDB write`);
+        clientLogger.warn(`[CacheManager] Store '${this.storeName}' not found in database, skipping IndexedDB write`);
         return;
       }
 
@@ -318,7 +319,7 @@ class CacheManager {
       // Cleanup old entries
       await this.cleanupIndexedDB();
     } catch (error) {
-      console.warn('[CacheManager] IndexedDB set failed:', error);
+      clientLogger.warn('[CacheManager] IndexedDB set failed:', { detail: error });
     }
   }
 
@@ -339,7 +340,7 @@ class CacheManager {
         return null;
       }
     } catch (error) {
-      console.warn('[CacheManager] localStorage get failed:', error);
+      clientLogger.warn('[CacheManager] localStorage get failed:', { detail: error });
       return null;
     }
   }
@@ -353,17 +354,17 @@ class CacheManager {
     } catch (error) {
       // Handle quota exceeded specifically
       if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-        console.warn('[CacheManager] localStorage quota exceeded, attempting cleanup...');
+        clientLogger.warn('[CacheManager] localStorage quota exceeded, attempting cleanup...');
         this.cleanupLocalStorage();
         // Try again after cleanup
         try {
           const storageKey = this.getStorageKey(key);
           localStorage.setItem(storageKey, JSON.stringify(entry));
         } catch (retryError) {
-          console.warn('[CacheManager] localStorage set failed even after cleanup:', retryError);
+          clientLogger.warn('[CacheManager] localStorage set failed even after cleanup:', { detail: retryError });
         }
       } else {
-        console.warn('[CacheManager] localStorage set failed:', error);
+        clientLogger.warn('[CacheManager] localStorage set failed:', { detail: error });
       }
     }
   }
@@ -405,7 +406,7 @@ class CacheManager {
 
       console.log(`[CacheManager] Cleaned up ${toRemove} old localStorage cache entries`);
     } catch (error) {
-      console.warn('[CacheManager] localStorage cleanup failed:', error);
+      clientLogger.warn('[CacheManager] localStorage cleanup failed:', { detail: error });
     }
   }
 
@@ -416,7 +417,7 @@ class CacheManager {
       const storageKey = this.getStorageKey(key);
       localStorage.removeItem(storageKey);
     } catch (error) {
-      console.warn('[CacheManager] localStorage remove failed:', error);
+      clientLogger.warn('[CacheManager] localStorage remove failed:', { detail: error });
     }
   }
 
@@ -449,7 +450,7 @@ class CacheManager {
         }
       };
     } catch (error) {
-      console.warn('[CacheManager] IndexedDB cleanup failed:', error);
+      clientLogger.warn('[CacheManager] IndexedDB cleanup failed:', { detail: error });
     }
   }
 
@@ -536,7 +537,7 @@ class CacheManager {
           return; // Success, don't fallback to localStorage
         }
       } catch (error) {
-        console.warn('[CacheManager] IndexedDB set failed, falling back to localStorage:', error);
+        clientLogger.warn('[CacheManager] IndexedDB set failed, falling back to localStorage:', { detail: error });
       }
     }
     
@@ -614,7 +615,7 @@ class CacheManager {
         });
         // console.log('[CacheManager] Removed from IndexedDB:', key);
       } catch (error) {
-        console.warn('[CacheManager] IndexedDB remove failed:', error);
+        clientLogger.warn('[CacheManager] IndexedDB remove failed:', { detail: error });
       }
     }
 
@@ -752,7 +753,7 @@ class CacheManager {
       removedCount = keysToDelete.length;
       
     } catch (error) {
-      console.error('[CacheManager] ❌ IndexedDB pattern remove failed:', error);
+      clientLogger.error('[CacheManager] ❌ IndexedDB pattern remove failed:', { detail: error });
       throw error;
     }
     
@@ -807,7 +808,7 @@ class CacheManager {
       }
       
     } catch (error) {
-      console.error('[CacheManager] ❌ localStorage pattern remove failed:', error);
+      clientLogger.error('[CacheManager] ❌ localStorage pattern remove failed:', { detail: error });
       throw error;
     }
     
@@ -832,7 +833,7 @@ class CacheManager {
         });
         // console.log('[CacheManager] Cleared IndexedDB');
       } catch (error) {
-        console.warn('[CacheManager] IndexedDB clear failed:', error);
+        clientLogger.warn('[CacheManager] IndexedDB clear failed:', { detail: error });
       }
     }
 
@@ -848,7 +849,7 @@ class CacheManager {
         });
         // console.log('[CacheManager] Cleared localStorage');
       } catch (error) {
-        console.warn('[CacheManager] localStorage clear failed:', error);
+        clientLogger.warn('[CacheManager] localStorage clear failed:', { detail: error });
       }
     }
 

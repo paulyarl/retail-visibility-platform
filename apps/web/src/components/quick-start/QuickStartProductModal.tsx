@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { BusinessTypeSelector, BUSINESS_TYPES, getBusinessType, getDefaultCount } from './BusinessTypeSelector';
+import { clientLogger } from '@/lib/client-logger';
 
 export type QuickStartTextProvider = 'openai' | 'google' | 'anthropic' | 'mistral';
 export type QuickStartProductType = 'physical' | 'digital' | 'hybrid' | 'service';
@@ -81,7 +82,7 @@ export function QuickStartProductModal({
       setImageModel('openai');
       setProductType('physical');
     } catch (error) {
-      console.error('[QuickStartProductModal] Error:', error);
+      clientLogger.error('[QuickStartProductModal] Error:', { detail: error });
     } finally {
       setIsLoading(false);
     }

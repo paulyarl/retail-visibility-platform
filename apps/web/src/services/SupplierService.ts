@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Supplier {
   id: string;
@@ -149,7 +150,7 @@ class SupplierServiceClass extends AdminApiSingleton {
       this.cacheTTL
     );
     if (!result.success) {
-      console.error('[SupplierService] Failed to list suppliers:', result.error);
+      clientLogger.error('[SupplierService] Failed to list suppliers:', { detail: result.error });
       return [];
     }
     return result.data?.suppliers || [];

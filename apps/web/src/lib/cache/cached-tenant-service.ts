@@ -7,6 +7,7 @@ import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService, type TenantUsage } from '@/services/TenantManagementService';
 import { LocalStorageCache } from './local-storage-cache';
 import type { TenantInfo, TenantTier } from '@/services/PublicTenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CachedTenantData {
   tenant: TenantInfo | null;
@@ -63,7 +64,7 @@ export class CachedTenantService {
 
       return cachedData;
     } catch (error) {
-      console.error('[CachedTenantService] Failed to fetch consolidated tenant data:', error);
+      clientLogger.error('[CachedTenantService] Failed to fetch consolidated tenant data:', { detail: error });
       throw error;
     }
   }

@@ -4,6 +4,7 @@ import TimeInput from "./TimeInput";
 import { tenantManagementService } from "@/services/TenantManagementService";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { platformHomeService } from "@/services/PlatformHomeSingletonService";
+import { clientLogger } from '@/lib/client-logger';
 
 type Period = { day: string; open: string; close: string };
 type SpecialHour = { date: string; isClosed: boolean; open?: string; close?: string; note?: string };
@@ -177,7 +178,7 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
               }
             }
           } catch (syncError) {
-            console.warn('[HoursEditor] Failed to sync profile hours:', syncError);
+            clientLogger.warn('[HoursEditor] Failed to sync profile hours:', { detail: syncError });
           }
         }
         
@@ -188,7 +189,7 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
         if (!mountedRef.current) return;
         setSpecialHours(Array.isArray(specialData?.overrides) ? specialData.overrides : []);
       } catch (error) {
-        console.error('Failed to load business hours:', error);
+        clientLogger.error('Failed to load business hours:', { detail: error });
       }
     };
     load();
@@ -233,7 +234,7 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
         await platformHomeService.saveOnboardingProfile(tenantId, { hours: profileHours });
         console.log('[HoursEditor] Successfully synced business hours back to profile');
       } catch (profileSyncError) {
-        console.warn('[HoursEditor] Failed to sync hours back to profile:', profileSyncError);
+        clientLogger.warn('[HoursEditor] Failed to sync hours back to profile:', { detail: profileSyncError });
         // Don't fail the entire save if profile sync fails
       }
       
@@ -241,7 +242,7 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
       setMsg("✓ Saved");
       setTimeout(() => setMsg(null), 2000);
     } catch (error) {
-      console.error('Failed to save business hours:', error);
+      clientLogger.error('Failed to save business hours:', { detail: error });
       setSaving(false);
       setMsg("✗ Failed");
       setTimeout(() => setMsg(null), 2000);

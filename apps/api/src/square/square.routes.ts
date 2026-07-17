@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 // Lazy import Square services to avoid startup failures
 let squareSyncService: any = null;
@@ -86,7 +87,7 @@ router.post('/oauth/exchange', authenticateToken, async (req: Request, res: Resp
       });
     }
 
-    console.error('[Square OAuth] Token exchange error:', error);
+    logger.error('[Square OAuth] Token exchange error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     if (error instanceof Error) {
       return res.status(500).json({
@@ -142,7 +143,7 @@ router.get('/integrations/:tenantId', authenticateToken, async (req: Request, re
       },
     });
   } catch (error) {
-    console.error('[Square Integration] Get status error:', error);
+    logger.error('[Square Integration] Get status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'internal_error',
@@ -172,7 +173,7 @@ router.post('/integrations/:tenantId/disconnect', authenticateToken, async (req:
       message: 'Square integration disconnected successfully',
     });
   } catch (error) {
-    console.error('[Square Integration] Disconnect error:', error);
+    logger.error('[Square Integration] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     if (error instanceof Error) {
       if (error.message.includes('not found')) {
@@ -211,7 +212,7 @@ router.post('/integrations/:tenantId/sync', authenticateToken, async (req: Reque
       message: 'Sync functionality will be available in Phase 3',
     });
   } catch (error) {
-    console.error('[Square Integration] Sync error:', error);
+    logger.error('[Square Integration] Sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'internal_error',
@@ -243,7 +244,7 @@ router.get('/integrations/:tenantId/logs', authenticateToken, async (req: Reques
       count: logs.length,
     });
   } catch (error) {
-    console.error('[Square Integration] Get logs error:', error);
+    logger.error('[Square Integration] Get logs error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'internal_error',
@@ -296,7 +297,7 @@ router.post('/integrations/:tenantId/sync', authenticateToken, async (req: Reque
       },
     });
   } catch (error: any) {
-    console.error('[Square Integration] Sync error:', error);
+    logger.error('[Square Integration] Sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'sync_failed',
@@ -345,7 +346,7 @@ router.post('/integrations/:tenantId/sync/products', authenticateToken, async (r
       },
     });
   } catch (error: any) {
-    console.error('[Square Integration] Product sync error:', error);
+    logger.error('[Square Integration] Product sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'sync_failed',
@@ -394,7 +395,7 @@ router.post('/integrations/:tenantId/sync/inventory', authenticateToken, async (
       },
     });
   } catch (error: any) {
-    console.error('[Square Integration] Inventory sync error:', error);
+    logger.error('[Square Integration] Inventory sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'sync_failed',
@@ -445,7 +446,7 @@ router.get('/integrations/:tenantId/sync/status', authenticateToken, async (req:
       })),
     });
   } catch (error: any) {
-    console.error('[Square Integration] Get sync status error:', error);
+    logger.error('[Square Integration] Get sync status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     res.status(500).json({
       error: 'internal_error',

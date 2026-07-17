@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export type Photo = {
   url: string;
@@ -46,7 +47,7 @@ class ProductPhotosService extends PublicApiSingleton {
       );
       
       if (!data.success) {
-        console.warn(`Failed to fetch product photos: ${data.error || 'Unknown error'}`);
+        clientLogger.warn(`Failed to fetch product photos: ${data.error || 'Unknown error'}`);
         return [];
       }
       
@@ -57,7 +58,7 @@ class ProductPhotosService extends PublicApiSingleton {
         position: p.position ?? 0,
       }));
     } catch (error) {
-      console.warn(`Failed to fetch product photos: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch product photos: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];
     }
   }
@@ -105,7 +106,7 @@ class ProductPhotosService extends PublicApiSingleton {
       
       return [];
     } catch (error) {
-      console.warn('Error fetching product photos:', error);
+      clientLogger.warn('Error fetching product photos:', { detail: error });
       return [];
     }
   }

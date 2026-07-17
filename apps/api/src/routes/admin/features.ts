@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 // Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
@@ -38,7 +39,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
     });
     res.json(features.map(transformFeature));
   } catch (error) {
-    console.error('[GET /api/admin/features] Error:', error);
+    logger.error('[GET /api/admin/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_features' });
   }
 });
@@ -59,7 +60,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
     });
     res.status(201).json(transformFeature(feature));
   } catch (error) {
-    console.error('[POST /api/admin/features] Error:', error);
+    logger.error('[POST /api/admin/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_feature' });
   }
 });
@@ -84,7 +85,7 @@ router.put('/', requirePlatformAdmin, async (req, res) => {
     const feature = await prisma.features_list.update({ where: { key: feature_key }, data });
     res.json(transformFeature(feature));
   } catch (error) {
-    console.error('[PUT /api/admin/features] Error:', error);
+    logger.error('[PUT /api/admin/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_feature' });
   }
 });
@@ -108,7 +109,7 @@ router.delete('/', requirePlatformAdmin, async (req, res) => {
     await prisma.features_list.delete({ where: { key: feature_key } });
     res.json({ success: true, deleted: true });
   } catch (error) {
-    console.error('[DELETE /api/admin/features] Error:', error);
+    logger.error('[DELETE /api/admin/features] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_feature' });
   }
 });

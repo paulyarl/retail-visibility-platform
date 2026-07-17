@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -44,13 +45,13 @@ class StoreStatusSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[StoreStatusSingleton] Failed to get store status:', result.error);
+        clientLogger.error('[StoreStatusSingleton] Failed to get store status:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[StoreStatusSingleton] Failed to get store status:', error);
+      clientLogger.error('[StoreStatusSingleton] Failed to get store status:', { detail: error });
       return null;
     }
   }

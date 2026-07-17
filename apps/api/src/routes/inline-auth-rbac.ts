@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requireRoleGroup, requirePermission } from '../middleware/role-validation';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get('/api/auth/role-groups', authenticateToken, (req, res) => {
     const { ROLE_GROUPS } = require('../config/role-groups');
     res.json(ROLE_GROUPS);
   } catch (error) {
-    console.error('[API] Failed to load role groups:', error);
+    logger.error('[API] Failed to load role groups:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to load role groups' });
   }
 });
@@ -52,7 +53,7 @@ router.get('/api/auth/user-groups', authenticateToken, (req, res) => {
       groups: userGroups
     });
   } catch (error) {
-    console.error('[API] Failed to get user groups:', error);
+    logger.error('[API] Failed to get user groups:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get user groups' });
   }
 });
@@ -63,7 +64,7 @@ router.get('/api/auth/permissions', authenticateToken, (req, res) => {
     const permissions = getAllPermissions();
     res.json(permissions);
   } catch (error) {
-    console.error('[API] Failed to load permissions:', error);
+    logger.error('[API] Failed to load permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to load permissions' });
   }
 });
@@ -88,7 +89,7 @@ router.get('/api/auth/user-permissions', authenticateToken, (req, res) => {
       permissions: userPermissions
     });
   } catch (error) {
-    console.error('[API] Failed to get user permissions:', error);
+    logger.error('[API] Failed to get user permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get user permissions' });
   }
 });
@@ -123,7 +124,7 @@ router.get('/api/auth/user-access', authenticateToken, (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[API] Failed to get user access:', error);
+    logger.error('[API] Failed to get user access:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get user access' });
   }
 });

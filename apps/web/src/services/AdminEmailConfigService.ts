@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface EmailConfig {
   category: string;
@@ -55,7 +56,7 @@ class AdminEmailConfigService extends AdminApiSingleton {
 
       return result.data || [];
     } catch (error) {
-      console.error('[AdminEmailConfigService] Failed to get email configs:', error);
+      clientLogger.error('[AdminEmailConfigService] Failed to get email configs:', { detail: error });
       return [];
     }
   }
@@ -68,7 +69,7 @@ class AdminEmailConfigService extends AdminApiSingleton {
       const configs = await this.getAllEmailConfigs();
       return configs.find(config => config.category === category) || null;
     } catch (error) {
-      console.error('[AdminEmailConfigService] Failed to get email config by category:', error);
+      clientLogger.error('[AdminEmailConfigService] Failed to get email config by category:', { detail: error });
       return null;
     }
   }
@@ -93,7 +94,7 @@ class AdminEmailConfigService extends AdminApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[AdminEmailConfigService] Failed to create email config:', error);
+      clientLogger.error('[AdminEmailConfigService] Failed to create email config:', { detail: error });
       return null;
     }
   }
@@ -118,7 +119,7 @@ class AdminEmailConfigService extends AdminApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[AdminEmailConfigService] Failed to update email config:', error);
+      clientLogger.error('[AdminEmailConfigService] Failed to update email config:', { detail: error });
       return null;
     }
   }
@@ -142,7 +143,7 @@ class AdminEmailConfigService extends AdminApiSingleton {
 
       return result.data?.success || false;
     } catch (error) {
-      console.error('[AdminEmailConfigService] Failed to delete email config:', error);
+      clientLogger.error('[AdminEmailConfigService] Failed to delete email config:', { detail: error });
       return false;
     }
   }
@@ -163,7 +164,7 @@ class AdminEmailConfigService extends AdminApiSingleton {
       
       return emailMap;
     } catch (error) {
-      console.error('[AdminEmailConfigService] Failed to get email config map:', error);
+      clientLogger.error('[AdminEmailConfigService] Failed to get email config map:', { detail: error });
       return {};
     }
   }

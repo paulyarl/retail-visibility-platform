@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Plus, X, Loader2, FolderOpen, Pencil, Check } from 'lucide-react';
 import { faqService, FaqCategory } from '@/services/FaqService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CategoryManagerProps {
   tenantId: string;
@@ -33,7 +34,7 @@ export default function CategoryManager({ tenantId, categories, onChange }: Cate
       setNewName('');
       onChange();
     } catch (err: any) {
-      console.error('Failed to create category:', err);
+      clientLogger.error('Failed to create category:', { detail: err });
     } finally {
       setCreating(false);
     }
@@ -62,7 +63,7 @@ export default function CategoryManager({ tenantId, categories, onChange }: Cate
       setEditName('');
       onChange();
     } catch (err: any) {
-      console.error('Failed to update category:', err);
+      clientLogger.error('Failed to update category:', { detail: err });
     } finally {
       setUpdatingId(null);
     }
@@ -74,7 +75,7 @@ export default function CategoryManager({ tenantId, categories, onChange }: Cate
       await faqService.deleteCategory(tenantId, id);
       onChange();
     } catch (err: any) {
-      console.error('Failed to delete category:', err);
+      clientLogger.error('Failed to delete category:', { detail: err });
     } finally {
       setDeletingId(null);
     }

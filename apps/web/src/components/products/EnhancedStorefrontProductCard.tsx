@@ -20,7 +20,7 @@ import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
 import VariantPopupModal from './VariantPopupModal';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 
 // Enhanced product interface matching the new API response
 export interface EnhancedProductData {
@@ -146,8 +146,8 @@ export default function EnhancedStorefrontProductCard({
   const hasGateway = !!effectiveGatewayType;
 
   // Capability-aware commerce and payment gateway resolution
-  const commerceCap = useCommerceCapability(product.tenantId);
-  const paymentCap = usePaymentGatewayCapability(product.tenantId);
+  const commerceCap = usePublicCommerceCapability(product.tenantId);
+  const paymentCap = usePublicPaymentGatewayCapability(product.tenantId);
   const commerceEnabled = commerceCap.data?.enabled ?? true;
   const gatewayCapEnabled = paymentCap.data?.enabled ?? true;
   const commerceDisabled = !!((commerceCap.data && !commerceCap.data.enabled) || (paymentCap.data && !paymentCap.data.enabled));

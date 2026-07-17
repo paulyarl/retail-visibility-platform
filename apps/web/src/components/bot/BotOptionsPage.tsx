@@ -79,7 +79,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 ];
 
 export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
-  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId, { forTenant: true });
+  const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
   const [settings, setSettings] = useState<ChatbotOptionsSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

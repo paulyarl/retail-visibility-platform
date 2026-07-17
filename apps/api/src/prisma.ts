@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { createFlexiblePrisma } from './lib/prisma-flexible';
+import { logger } from './logger';
 
 // Ensure a single PrismaClient in dev (nodemon hot reload safe)
 const globalForPrisma = global as unknown as { 
@@ -63,15 +64,15 @@ async function withRetry<T>(
       if (isConnectionError && attempt < maxRetries) {
         // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
         const delayMs = initialDelayMs * Math.pow(2, attempt - 1);
-        console.error(`[Prisma Retry] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
-        console.error(`[Prisma Retry] Retrying in ${delayMs}ms with exponential backoff...`);
+        logger.error(`[Prisma Retry] Attempt ${attempt}/${maxRetries} failed: ${error.message}`, undefined);
+        logger.error(`[Prisma Retry] Retrying in ${delayMs}ms with exponential backoff...`, undefined);
         await new Promise(resolve => setTimeout(resolve, delayMs));
         continue;
       }
       
       // Don't retry other errors or if max retries reached
       if (attempt === maxRetries) {
-        console.error(`[Prisma Retry] All ${maxRetries} attempts failed. Giving up.`);
+        logger.error(`[Prisma Retry] All ${maxRetries} attempts failed. Giving up.`, undefined);
       }
       throw error;
     }
@@ -134,7 +135,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch (error) {
-    console.error('[Database Health] Connection check failed:', error);
+    logger.error('[Database Health] Connection check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return false;
   }
 }
@@ -161,7 +162,7 @@ export async function validateAndRecoverConnection(): Promise<boolean> {
       console.log('[Database Recovery] Successfully reconnected to database');
       return true;
     } catch (reconnectError) {
-      console.error('[Database Recovery] Reconnection failed:', reconnectError);
+      logger.error('[Database Recovery] Reconnection failed:', undefined, { error: { name: (reconnectError as any)?.name || 'Error', message: (reconnectError as any)?.message || String(reconnectError), stack: (reconnectError as any)?.stack } });
       return false;
     }
   }

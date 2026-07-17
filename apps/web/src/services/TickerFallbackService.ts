@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Ticker Fallback Service
  * Provides local storage redundancy for critical ticker communications
@@ -61,7 +63,7 @@ class TickerFallbackService {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(fallbackData));
 //      console.log('[TickerFallbackService] Saved fallback data:', { configEnabled: config?.enabled, messageCount: messages.length });
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to save fallback data:', error);
+      clientLogger.error('[TickerFallbackService] Failed to save fallback data:', { detail: error });
     }
   }
 
@@ -87,7 +89,7 @@ class TickerFallbackService {
 
       return data;
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to get fallback data:', error);
+      clientLogger.error('[TickerFallbackService] Failed to get fallback data:', { detail: error });
       return null;
     }
   }
@@ -100,7 +102,7 @@ class TickerFallbackService {
       localStorage.setItem(this.EMERGENCY_MESSAGES_KEY, JSON.stringify(messages));
       console.log('[TickerFallbackService] Saved emergency messages:', messages.length);
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to save emergency messages:', error);
+      clientLogger.error('[TickerFallbackService] Failed to save emergency messages:', { detail: error });
     }
   }
 
@@ -112,7 +114,7 @@ class TickerFallbackService {
       const stored = localStorage.getItem(this.EMERGENCY_MESSAGES_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to get emergency messages:', error);
+      clientLogger.error('[TickerFallbackService] Failed to get emergency messages:', { detail: error });
       return [];
     }
   }
@@ -125,7 +127,7 @@ class TickerFallbackService {
       localStorage.setItem(this.CONFIG_KEY, JSON.stringify(config));
 //      console.log('[TickerFallbackService] Saved fallback config:', { enabled: config.enabled });
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to save fallback config:', error);
+      clientLogger.error('[TickerFallbackService] Failed to save fallback config:', { detail: error });
     }
   }
 
@@ -137,7 +139,7 @@ class TickerFallbackService {
       const stored = localStorage.getItem(this.CONFIG_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to get fallback config:', error);
+      clientLogger.error('[TickerFallbackService] Failed to get fallback config:', { detail: error });
       return null;
     }
   }
@@ -152,7 +154,7 @@ class TickerFallbackService {
       localStorage.removeItem(this.CONFIG_KEY);
       console.log('[TickerFallbackService] Cleared all fallback data');
     } catch (error) {
-      console.error('[TickerFallbackService] Failed to clear fallback data:', error);
+      clientLogger.error('[TickerFallbackService] Failed to clear fallback data:', { detail: error });
     }
   }
 

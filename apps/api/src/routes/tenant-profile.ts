@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import TenantProfileService from '../services/TenantProfileService';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -63,7 +64,7 @@ router.get('/:tenantId/profile', async (req, res) => {
       message: 'Tenant profile retrieved successfully'
     });
   } catch (error) {
-    console.error('Tenant profile retrieval failed:', error);
+    logger.error('Tenant profile retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tenant profile',
@@ -99,7 +100,7 @@ router.get('/:tenantId/analytics', async (req, res) => {
       message: 'Tenant analytics retrieved successfully'
     });
   } catch (error) {
-    console.error('Tenant analytics retrieval failed:', error);
+    logger.error('Tenant analytics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tenant analytics',
@@ -144,7 +145,7 @@ router.post('/:tenantId/activity', async (req, res) => {
       message: 'Tenant activity recorded successfully'
     });
   } catch (error) {
-    console.error('Tenant activity recording failed:', error);
+    logger.error('Tenant activity recording failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to record tenant activity',
@@ -180,7 +181,7 @@ router.get('/:tenantId/stats', async (req, res) => {
       message: 'Tenant statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('Tenant statistics retrieval failed:', error);
+    logger.error('Tenant statistics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tenant statistics',
@@ -217,7 +218,7 @@ router.put('/:tenantId/profile', async (req, res) => {
       message: 'Tenant profile updated successfully'
     });
   } catch (error) {
-    console.error('Tenant profile update failed:', error);
+    logger.error('Tenant profile update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update tenant profile',
@@ -253,7 +254,7 @@ router.get('/:tenantId/stats', async (req, res) => {
       message: 'Tenant profile statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('Tenant profile statistics retrieval failed:', error);
+    logger.error('Tenant profile statistics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tenant profile statistics',

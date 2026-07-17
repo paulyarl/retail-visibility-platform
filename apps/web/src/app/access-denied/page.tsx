@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Button } from '@/components/ui';
 import { userManagementService } from '@/services/UserManagementService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 function AccessDeniedContent() {
@@ -34,7 +35,7 @@ function AccessDeniedContent() {
           console.log('[Access Denied] No access token found in localStorage');
         }
       } catch (error) {
-        console.error('[Access Denied] Failed to set auth token cookie:', error);
+        clientLogger.error('[Access Denied] Failed to set auth token cookie:', { detail: error });
       }
     };
 
@@ -57,7 +58,7 @@ function AccessDeniedContent() {
           });
         }
       } catch (error) {
-        console.error('Failed to fetch user:', error);
+        clientLogger.error('Failed to fetch user:', { detail: error });
       }
     };
     fetchUser();

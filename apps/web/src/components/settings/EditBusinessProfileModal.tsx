@@ -12,6 +12,7 @@ import { metaIntegrationService, MetaStatus } from '@/services/MetaIntegrationSe
 import { tiktokIntegrationService, TikTokStatus } from '@/services/TikTokIntegrationService';
 import { useSocialCommerceOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import Link from 'next/link';
+import { clientLogger } from '@/lib/client-logger';
 
 const SOCIAL_PLATFORMS = [
   { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourpage', helperText: 'Your Facebook page URL' },
@@ -107,7 +108,7 @@ export default function EditBusinessProfileModal({
       // Return the optimized URL
       return uploadResult.data?.url || uploadResult.data?.dataUrl;
     } catch (err: any) {
-      console.error('Failed to optimize pasted logo URL:', err);
+      clientLogger.error('Failed to optimize pasted logo URL:', { detail: err });
       setError(err.message || 'Failed to fetch and optimize logo from URL');
       return null;
     } finally {
@@ -147,7 +148,7 @@ export default function EditBusinessProfileModal({
         setLogoPreview(uploadedUrl);
       }
     } catch (err: any) {
-      console.error('Logo upload error:', err);
+      clientLogger.error('Logo upload error:', { detail: err });
       setError(err.message || 'Failed to upload logo');
     } finally {
       setUploadingLogo(false);
@@ -183,7 +184,7 @@ export default function EditBusinessProfileModal({
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error('[EditBusinessProfile] Error uploading logo from URL:', err);
+      clientLogger.error('[EditBusinessProfile] Error uploading logo from URL:', { detail: err });
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploadingLogo(false);

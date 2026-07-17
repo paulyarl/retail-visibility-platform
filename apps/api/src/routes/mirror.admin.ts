@@ -17,7 +17,7 @@ router.get('/api/admin/mirror/last-run', authenticateToken, requireAdmin, async 
 
     return res.json({ success: true, data: row || null });
   } catch (e: any) {
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 

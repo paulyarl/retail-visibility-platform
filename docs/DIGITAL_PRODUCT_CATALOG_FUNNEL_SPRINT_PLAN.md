@@ -606,3 +606,19 @@ The smallest meaningful first step is:
 5. Verify via API call: create a funnel with 2 steps, retrieve it
 
 This proves the data model and service pattern before building the full checkout integration.
+
+---
+
+## 12. Future Enhancement Capture
+
+The following items are explicitly **out of scope** for Sprints 1–4 but should be captured for future sprint planning:
+
+| Enhancement | Description | Priority | Dependencies |
+|---|---|---|---|
+| **Funnel Templates** | Pre-built funnel patterns (e.g., "Digital Product Upsell Chain", "Order Bump + OTO", "High-Ticket Downsell Ladder") that merchants can clone and customize. Template library accessible from the funnel builder. | Medium | Sprint 2 complete |
+| **A/B Testing** | Multiple funnel variants per entry product with traffic splitting and conversion comparison. Requires relaxing the `UNIQUE(tenant_id, entry_item_id)` constraint or adding a variant dimension. | Low | Sprint 4 complete |
+| **Admin Funnel Management** | Dedicated admin panel for viewing all tenant funnels, platform-level funnel templates, and funnel performance benchmarks across tenants. Not needed for standard BSaaS flow — admin manages via existing BSaaS Catalog UI. | Low | Sprint 2 complete, only if platform-level insights needed |
+| **Funnel Analytics Aggregation Job** | Batch job (similar to `badge-analytics-sync.ts`) that pre-aggregates funnel conversion metrics into a summary table for dashboard performance. Currently analytics are computed on-demand. | Low | Sprint 4 complete, only if performance issues arise |
+| **Multi-Product Entry Funnels** | Allow a single funnel to be triggered by multiple entry products (many-to-one instead of one-to-one). Requires junction table `tenant_funnel_entry_items`. | Low | Validated merchant demand |
+| **Funnel Sharing / Marketplace** | Merchants publish funnel templates to a marketplace for other merchants to clone. Community-driven funnel patterns. | Low | Funnel Templates + validated demand |
+| **Conditional Step Logic** | Steps that appear/skip based on customer attributes (e.g., first-time buyer vs returning, cart value threshold). Currently branching is accept/skip only. | Medium | Sprint 3 complete |

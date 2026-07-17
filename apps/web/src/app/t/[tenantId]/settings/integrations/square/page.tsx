@@ -8,6 +8,7 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { ArrowLeft, Zap, ExternalLink, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@mantine/core';
 import router from 'next/router';
+import { clientLogger } from '@/lib/client-logger';
 
 // Types
 interface SquareStatus {
@@ -58,7 +59,7 @@ export default function SquareIntegrationPage() {
       const data = await platformHomeService.getSquareStatus(tenantId);
       setStatus(data);
     } catch (err) {
-      console.error('Failed to fetch status:', err);
+      clientLogger.error('Failed to fetch status:', { detail: err });
     }
   }, [tenantId]);
 

@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface SlugPattern {
   pattern: string;
@@ -94,7 +95,7 @@ class TenantSlugService extends TenantApiSingleton {
 
       // Handle case where response is not in expected format
       if (!response || typeof response !== 'object') {
-        console.error('[TenantSlugService] Invalid API response format:', response);
+        clientLogger.error('[TenantSlugService] Invalid API response format:', { detail: response });
         throw new Error('Invalid API response format');
       }
 
@@ -120,7 +121,7 @@ class TenantSlugService extends TenantApiSingleton {
 
       throw new Error('Unexpected response format');
     } catch (error) {
-      console.error('[TenantSlugService] Failed to get slug patterns:', error);
+      clientLogger.error('[TenantSlugService] Failed to get slug patterns:', { detail: error });
       throw error;
     }
   }
@@ -146,7 +147,7 @@ class TenantSlugService extends TenantApiSingleton {
 
       // Handle case where response is not in expected format
       if (!response || typeof response !== 'object') {
-        console.error('[TenantSlugService] Invalid API response format:', response);
+        clientLogger.error('[TenantSlugService] Invalid API response format:', { detail: response });
         throw new Error('Invalid API response format');
       }
 
@@ -172,7 +173,7 @@ class TenantSlugService extends TenantApiSingleton {
 
       throw new Error('Unexpected response format');
     } catch (error) {
-      console.error('[TenantSlugService] Failed to get slug patterns:', error);
+      clientLogger.error('[TenantSlugService] Failed to get slug patterns:', { detail: error });
       throw error;
     }
   }
@@ -190,7 +191,7 @@ class TenantSlugService extends TenantApiSingleton {
       const pattern = patterns.find(p => p.slug === slug);
       return pattern ? pattern.isAvailable : false;
     } catch (error) {
-      console.error('[TenantSlugService] Failed to check slug availability:', error);
+      clientLogger.error('[TenantSlugService] Failed to check slug availability:', { detail: error });
       return false;
     }
   }

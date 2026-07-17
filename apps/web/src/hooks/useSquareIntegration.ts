@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SquareStatus } from '@/components/square';
 import { squareIntegrationService } from '@/services/SquareIntegrationSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SquareIntegrationData {
   enabled: boolean;
@@ -69,7 +70,7 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
         setError(responseData?.userMessage || 'Failed to load Square status');
       }
     } catch (err: any) {
-      console.error('Failed to fetch Square status:', err);
+      clientLogger.error('Failed to fetch Square status:', { detail: err });
       setError(err.message);
     } finally {
       setLoading(false);
@@ -93,7 +94,7 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
         window.location.href = responseData.authorizationUrl;
       }
     } catch (err: any) {
-      console.error('Failed to connect Square:', err);
+      clientLogger.error('Failed to connect Square:', { detail: err });
       setError(err.message);
       throw err;
     }
@@ -122,7 +123,7 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
       // Refresh status
       await refresh();
     } catch (err: any) {
-      console.error('Failed to disconnect:', err);
+      clientLogger.error('Failed to disconnect:', { detail: err });
       setError(err.message);
       throw err;
     }
@@ -143,7 +144,7 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
       // Refresh status
       await refresh();
     } catch (err: any) {
-      console.error('Failed to sync:', err);
+      clientLogger.error('Failed to sync:', { detail: err });
       setError(err.message);
       throw err;
     }

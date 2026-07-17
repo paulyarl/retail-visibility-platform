@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ScanSession {
   id: string;
@@ -79,7 +80,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to get scan session:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to get scan session:', { detail: result.error });
       return null;
     }
 
@@ -104,7 +105,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to create scan session:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to create scan session:', { detail: result.error });
       throw result.error;
     }
 
@@ -127,7 +128,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to lookup barcode:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to lookup barcode:', { detail: result.error });
       return null;
     }
 
@@ -149,7 +150,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to delete scan result:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to delete scan result:', { detail: result.error });
       throw result.error;
     }
 
@@ -172,7 +173,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to commit scan session:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to commit scan session:', { detail: result.error });
       throw result.error;
     }
 
@@ -195,7 +196,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to delete scan session:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to delete scan session:', { detail: result.error });
       throw result.error;
     }
 
@@ -218,7 +219,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to end scan session:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to end scan session:', { detail: result.error });
       throw result.error;
     }
 
@@ -249,7 +250,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to add scan result:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to add scan result:', { detail: result.error });
       throw result.error;
     }
 
@@ -275,7 +276,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to get scan results:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to get scan results:', { detail: result.error });
       return null;
     }
 
@@ -298,7 +299,7 @@ export class InventoryScanService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[InventoryScanService] Failed to check active sessions:', result.error);
+      clientLogger.error('[InventoryScanService] Failed to check active sessions:', { detail: result.error });
       return null;
     }
 

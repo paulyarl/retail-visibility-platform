@@ -32,6 +32,7 @@ import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { useAllCapabilities } from "@/hooks/tenant-access/useCapabilityAccess";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 // Lazy load secondary components (non-critical for initial render)
 const QuickActions = lazy(() => import("./QuickActions"));
@@ -126,7 +127,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
           });
         }
       } catch (error) {
-        console.error('Failed to fetch business profile:', error);
+        clientLogger.error('Failed to fetch business profile:', { detail: error });
       } finally {
         setBusinessProfileLoading(false);
       }

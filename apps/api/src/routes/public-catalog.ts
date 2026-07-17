@@ -14,6 +14,7 @@ import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { DEFAULT_SETTINGS } from './storefront-options-settings';
 import ProductOptionsService from '../services/ProductOptionsService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -96,7 +97,7 @@ router.get('/products/featured', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Featured products error:', error);
+    logger.error('[PUBLIC API] Featured products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch featured products'
@@ -154,7 +155,7 @@ router.get('/products/:id', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Single product error:', error);
+    logger.error('[PUBLIC API] Single product error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product'
@@ -206,7 +207,7 @@ router.get('/products/search/global', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Global product search error:', error);
+    logger.error('[PUBLIC API] Global product search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to search products'
@@ -246,7 +247,7 @@ router.get('/products', async (req, res) => {
       message: 'General product listing retrieved successfully'
     });
   } catch (error) {
-    console.error('[PUBLIC API] General products error:', error);
+    logger.error('[PUBLIC API] General products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch general products'
@@ -286,7 +287,7 @@ router.get('/stores', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Stores error:', error);
+    logger.error('[PUBLIC API] Stores error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch stores'
@@ -333,7 +334,7 @@ router.get('/stores/search', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Store search error:', error);
+    logger.error('[PUBLIC API] Store search error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to search stores'
@@ -377,7 +378,7 @@ router.get('/stores/:identifier', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Store by identifier error:', error);
+    logger.error('[PUBLIC API] Store by identifier error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
     res.status(statusCode).json({
       success: false,
@@ -496,7 +497,7 @@ router.get('/stores/:identifier/profile', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Store profile error:', error);
+    logger.error('[PUBLIC API] Store profile error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -574,7 +575,7 @@ router.get('/shops', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Shops error:', error);
+    logger.error('[PUBLIC API] Shops error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch shops'
@@ -614,7 +615,7 @@ router.get('/shops/trending', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC SHOPS API] Error fetching trending shops:', error);
+    logger.error('[PUBLIC SHOPS API] Error fetching trending shops:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch trending shops';
     res.status(500).json({
       success: false,
@@ -651,7 +652,7 @@ router.post('/test/batch-resolve', async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('[Batch Test] Error:', error);
+    logger.error('[Batch Test] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Batch test failed',
@@ -688,7 +689,7 @@ router.get('/tenant/:identifier', async (req, res) => {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
-      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      logger.error(`[Public API] Error resolving identifier: ${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         success: false,
         error: 'Tenant not found',
@@ -888,7 +889,7 @@ router.get('/tenant/:identifier', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Public API] Error fetching tenant by identifier:', error);
+    logger.error('[Public API] Error fetching tenant by identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tenant',
@@ -921,7 +922,7 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
-      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      logger.error(`[Public API] Error resolving identifier: ${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         success: false,
         error: 'Tenant not found',
@@ -958,7 +959,7 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
       // }
       
     } catch (error) {
-      console.error(`[Public API] Error retrieving profile for tenant: ${resolvedTenant.id}`, error);
+      logger.error(`[Public API] Error retrieving profile for tenant: ${resolvedTenant.id}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         success: false,
         error: 'Tenant profile not found',
@@ -991,7 +992,7 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Public API] Error fetching tenant profile by identifier:', error);
+    logger.error('[Public API] Error fetching tenant profile by identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tenant profile',
@@ -1024,7 +1025,7 @@ router.get('/tenant/:identifier/payment-gateways', async (req, res) => {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       // console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
-      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      logger.error(`[Public API] Error resolving identifier: ${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         success: false,
         error: 'Tenant not found',
@@ -1061,7 +1062,7 @@ router.get('/tenant/:identifier/payment-gateways', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Public API] Error fetching payment gateways by identifier:', error);
+    logger.error('[Public API] Error fetching payment gateways by identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch payment gateways',
@@ -1129,7 +1130,7 @@ router.get('/tenant/:identifier/business-profile', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Public API] Error fetching business profile by identifier:', error);
+    logger.error('[Public API] Error fetching business profile by identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch business profile',
@@ -1174,7 +1175,7 @@ router.get('/shops/trending', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC SHOPS API] Error fetching trending shops:', error);
+    logger.error('[PUBLIC SHOPS API] Error fetching trending shops:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch trending shops';
     res.status(500).json({
       success: false,
@@ -1218,7 +1219,7 @@ router.get('/shops/categories', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching trending categories:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching trending categories:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trending categories',
@@ -1259,7 +1260,7 @@ router.get('/shops/locations', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC SHOPS API] Error fetching locations:', error);
+    logger.error('[PUBLIC SHOPS API] Error fetching locations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch locations';
     res.status(500).json({
       success: false,
@@ -1326,7 +1327,7 @@ router.get('/shops/nearby', async (req, res) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching nearby shops:', errorMessage);
+    logger.error('[PUBLIC SHOPS API] Error fetching nearby shops:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch nearby shops',
@@ -1360,7 +1361,7 @@ router.get('/shops/id/:tenantId', async (req, res) => {
       shop
     });
   } catch (error) {
-    console.error('[PUBLIC API] Shop by tenant ID error:', error);
+    logger.error('[PUBLIC API] Shop by tenant ID error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch shop'
@@ -1399,7 +1400,7 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
     // Validate bucketType
     const validBucketTypes = ['random', 'trending', 'new', 'sale', 'seasonal', 'staff', 'selection'];
     if (!validBucketTypes.includes(bucketType as string)) {
-      console.error(`[PUBLIC API] Invalid bucketType: ${bucketType}`);
+      logger.error(`[PUBLIC API] Invalid bucketType: ${bucketType}`, undefined);
       return res.status(400).json({
         success: false,
         error: `Invalid bucketType: ${bucketType}. Valid types: ${validBucketTypes.join(', ')}`
@@ -1474,7 +1475,7 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`[SHOPS API] Discovery error for bucket ${req.params.bucketType}:`, error);
+    logger.error(`[SHOPS API] Discovery error for bucket ${req.params.bucketType}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1540,7 +1541,7 @@ router.get('/shops/trending', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Trending shops error:', error);
+    logger.error('[SHOPS API] Trending shops error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -1577,7 +1578,7 @@ router.get('/shops/:identifier', async (req, res) => {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       console.log('[Public API] Successfully resolved identifier:', identifier, '->', resolvedTenant?.id);
     } catch (error) {
-      console.error('[Public API] Error resolving identifier:', identifier, error);
+      logger.error('[Public API] Error resolving identifier:', undefined, { error: { name: 'Error', message: String(identifier) +  + String({ error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } }) } });
       return res.status(404).json({
         success: false,
         error: `Identifier not found: ${identifier}`,
@@ -1623,7 +1624,7 @@ router.get('/shops/:identifier', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Public API] Error fetching shop by identifier:', error);
+    logger.error('[Public API] Error fetching shop by identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch shop',
@@ -1677,7 +1678,7 @@ router.get('/shops/:slug', async (req, res) => {
       shop
     });
   } catch (error) {
-    console.error('[PUBLIC API] Shop by slug error:', error);
+    logger.error('[PUBLIC API] Shop by slug error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch shop'
@@ -1763,7 +1764,7 @@ router.get('/shops/:scope/trending', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`[SHOPS API] Scope-first trending shops error for scope ${req.params.scope}:`, error);
+    logger.error(`[SHOPS API] Scope-first trending shops error for scope ${req.params.scope}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1872,7 +1873,7 @@ router.get('/shops/:scope/:bucketType', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`[SHOPS API] Scope-first discovery error for ${req.params.scope}/${req.params.bucketType}:`, error);
+    logger.error(`[SHOPS API] Scope-first discovery error for ${req.params.scope}/${req.params.bucketType}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -1914,7 +1915,7 @@ router.get('/shops/featured/random', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Random products error:', error);
+    logger.error('[SHOPS API] Random products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch random products'
@@ -1958,7 +1959,7 @@ router.get('/shops/featured/trending', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Trending products error:', error);
+    logger.error('[SHOPS API] Trending products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch trending products'
@@ -1994,7 +1995,7 @@ router.get('/shops/featured/new', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] New products error:', error);
+    logger.error('[SHOPS API] New products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch new products'
@@ -2030,7 +2031,7 @@ router.get('/shops/featured/sale', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Sale products error:', error);
+    logger.error('[SHOPS API] Sale products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sale products'
@@ -2066,7 +2067,7 @@ router.get('/shops/featured/seasonal', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Seasonal products error:', error);
+    logger.error('[SHOPS API] Seasonal products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch seasonal products'
@@ -2102,7 +2103,7 @@ router.get('/shops/featured/staff', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Staff pick products error:', error);
+    logger.error('[SHOPS API] Staff pick products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch staff pick products'
@@ -2138,7 +2139,7 @@ router.get('/shops/featured/selection', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Store selection products error:', error);
+    logger.error('[SHOPS API] Store selection products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch store selection products'
@@ -2182,7 +2183,7 @@ router.get('/shops/recently-viewed', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[SHOPS API] Recently viewed shops error:', error);
+    logger.error('[SHOPS API] Recently viewed shops error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recently viewed shops'
@@ -2218,7 +2219,7 @@ router.get('/categories', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Categories error:', error);
+    logger.error('[PUBLIC API] Categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch categories'
@@ -2249,7 +2250,7 @@ router.get('/categories/tree', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Category tree error:', error);
+    logger.error('[PUBLIC API] Category tree error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch category tree'
@@ -2290,7 +2291,7 @@ router.get('/categories/:slug', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Category by slug error:', error);
+    logger.error('[PUBLIC API] Category by slug error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch category'
@@ -2340,7 +2341,7 @@ router.get('/categories/:id/products', async (req, res) => {
       pagination: productsResponse.pagination
     });
   } catch (error) {
-    console.error('[PUBLIC API] Category products error:', error);
+    logger.error('[PUBLIC API] Category products error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch category products'
@@ -2579,7 +2580,7 @@ router.get('/catalog', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[PUBLIC API] Catalog error:', error);
+    logger.error('[PUBLIC API] Catalog error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch catalog products'
@@ -2624,7 +2625,7 @@ router.get('/catalog/categories', async (req, res) => {
     res.json({ categories });
     
   } catch (error) {
-    console.error('[PUBLIC API] Catalog categories error:', error);
+    logger.error('[PUBLIC API] Catalog categories error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch catalog categories'
@@ -2677,7 +2678,7 @@ router.get('/catalog/tenants', async (req, res) => {
     res.json({ tenants });
     
   } catch (error) {
-    console.error('[PUBLIC API] Catalog tenants error:', error);
+    logger.error('[PUBLIC API] Catalog tenants error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch catalog tenants'
@@ -2822,7 +2823,7 @@ router.get('/tenant/:tenantId/items', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[PUBLIC API] Tenant items error:', error);
+    logger.error('[PUBLIC API] Tenant items error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tenant items'
@@ -2920,7 +2921,7 @@ router.get('/items/:itemId', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[PUBLIC API] Item fetch error:', error);
+    logger.error('[PUBLIC API] Item fetch error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch item'
@@ -2952,7 +2953,7 @@ router.get('/tenant/:identifier/fulfillment-settings', async (req, res) => {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
       console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
-      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      logger.error(`[Public API] Error resolving identifier: ${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         success: false,
         error: 'Tenant not found',
@@ -3012,7 +3013,7 @@ router.get('/tenant/:identifier/fulfillment-settings', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Public API] Error fetching fulfillment settings by identifier:', error);
+    logger.error('[Public API] Error fetching fulfillment settings by identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch fulfillment settings',
@@ -3058,7 +3059,7 @@ router.get('/platform/stats', async (_req, res) => {
 
     res.json(publicStats);
   } catch (error) {
-    console.error('[Public Platform Stats] Error fetching public stats:', error);
+    logger.error('[Public Platform Stats] Error fetching public stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Return safe defaults on error
     res.json({
       totalTenants: 0,
@@ -3113,7 +3114,7 @@ router.get('/platform/dashboard', async (_req, res) => {
 
     res.json(publicDashboardData);
   } catch (error) {
-    console.error('[Public Platform Dashboard] Error fetching public dashboard:', error);
+    logger.error('[Public Platform Dashboard] Error fetching public dashboard:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Return safe defaults on error
     res.json({
       stats: {
@@ -3214,7 +3215,7 @@ router.get('/platform/branding', async (_req, res) => {
 
     res.json(publicBranding);
   } catch (error) {
-    console.error('[Public Platform Branding] Error fetching public branding:', error);
+    logger.error('[Public Platform Branding] Error fetching public branding:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Return safe defaults on error
     res.json({
       platformName: 'Visible Shelf',
@@ -3283,7 +3284,7 @@ router.get('/resolver/:type/:identifier', async (req, res) => {
       resolved = await Promise.race([identifierPromise, timeoutPromise]);
       console.log(`[Public API] Successfully resolved identifier: ${type}/${identifier} → ${resolved?.id}`);
     } catch (error) {
-      console.error(`[Public API] Error resolving identifier: ${type}/${identifier}`, error);
+      logger.error(`[Public API] Error resolving identifier: ${type}/${identifier}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(404).json({
         success: false,
         error: 'Identifier not found',
@@ -3312,7 +3313,7 @@ router.get('/resolver/:type/:identifier', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Public API] Error in resolver endpoint:', error);
+    logger.error('[Public API] Error in resolver endpoint:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Resolution failed',
@@ -3379,20 +3380,38 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
       select: { id: true },
     });
 
-    const tierFeatures = capabilityType
-      ? await prisma.tier_features_list.findMany({
-          where: {
-            tier_id: effectiveTierId,
-            feature_key: { startsWith: 'storefront_opt_' },
-            is_enabled: true,
-          },
-          select: { feature_key: true },
-        })
-      : [];
+    // Also fetch storefront_maps capability features
+    const mapsCapType = await prisma.capability_type_list.findUnique({
+      where: { key: 'storefront_maps' },
+      select: { id: true },
+    });
+
+    const [tierFeatures, mapsTierFeatures] = await Promise.all([
+      capabilityType
+        ? prisma.tier_features_list.findMany({
+            where: {
+              tier_id: effectiveTierId,
+              feature_key: { startsWith: 'storefront_opt_' },
+              is_enabled: true,
+            },
+            select: { feature_key: true },
+          })
+        : Promise.resolve([]),
+      mapsCapType
+        ? prisma.tier_features_list.findMany({
+            where: {
+              tier_id: effectiveTierId,
+              capability_type_id: mapsCapType.id,
+              is_enabled: true,
+            },
+            select: { feature_key: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
     // Build feature map from tier features
     const features: Record<string, boolean> = {};
-    for (const tf of tierFeatures) {
+    for (const tf of [...tierFeatures, ...mapsTierFeatures]) {
       features[tf.feature_key] = true;
     }
 
@@ -3443,8 +3462,19 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
 
     // Section Display (standalone, no group gate)
     const hoursDisplayTierAllowed = flexible || !!features.storefront_opt_hours_display;
-    const mapDisplayTierAllowed = flexible || !!features.storefront_opt_map_display;
-    const locationDisplayTierAllowed = flexible || !!features.storefront_opt_location_display;
+    // Maps — new storefront_maps_* keys with fallback to old storefront_opt_* keys
+    const mapsDisabled = !!features.storefront_maps_disabled || !!features.storefront_opt_disabled;
+    const mapsEnabled = !mapsDisabled && (!!features.storefront_maps_enabled || !!features.storefront_opt_enabled);
+    const mapsFlexible = !!features.storefront_maps_flexible || !!features.storefront_opt_flexible;
+    const mapDisplayTierAllowed = mapsFlexible
+      || !!features.storefront_maps_display
+      || !!features.storefront_opt_map_display;
+    const locationDisplayTierAllowed = mapsFlexible
+      || !!features.storefront_maps_location
+      || !!features.storefront_opt_location_display;
+    const interactiveMapsTierAllowed = mapsFlexible
+      || !!features.storefront_maps_interactive
+      || !!features.storefront_opt_interactive_maps;
 
     // Recently viewed
     const recentlyViewedTierAllowed = flexible || !!features.storefront_opt_recently_viewed;
@@ -3456,11 +3486,10 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
     const infoUntouched = !infoGroupEnabled && !infoGroupDisabled;
     const allowedInfoTypes: string[] = [];
     if (flexible || infoEnabled) {
-      allowedInfoTypes.push('storefront_social_media', 'storefront_contact', 'interactive_maps');
+      allowedInfoTypes.push('storefront_social_media', 'storefront_contact');
     } else if (infoUntouched) {
       if (features.storefront_opt_storefront_social_media) allowedInfoTypes.push('storefront_social_media');
       if (features.storefront_opt_storefront_contact) allowedInfoTypes.push('storefront_contact');
-      if (features.storefront_opt_interactive_maps) allowedInfoTypes.push('interactive_maps');
     }
 
     // QR group
@@ -3535,9 +3564,16 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
     const effectiveRecommendTypes = optEnabled
       ? allowedRecommendTypes.filter(t => (prefs as any)[t] !== false)
       : [];
-    const effectiveHoursDisplay = optEnabled && hoursDisplayTierAllowed && prefs.hours_display !== false;
-    const effectiveMapDisplay = optEnabled && mapDisplayTierAllowed && prefs.map_display !== false;
-    const effectiveLocationDisplay = optEnabled && locationDisplayTierAllowed && prefs.location_display !== false;
+    const effectiveHoursDisplay = optEnabled && hoursDisplayTierAllowed && (prefs as any).hours_display !== false;
+    // Maps effective flags — from new storefront_maps domain
+    const mapsSettings = await prisma.tenant_storefront_maps_settings.findUnique({
+      where: { tenant_id: tenantId },
+    });
+    const mapsPrefs = mapsSettings || {};
+    const mapsMainOn = mapsEnabled;
+    const effectiveMapDisplay = mapsMainOn && mapDisplayTierAllowed && (mapsPrefs as any).map_display !== false;
+    const effectiveLocationDisplay = mapsMainOn && locationDisplayTierAllowed && (mapsPrefs as any).location_display !== false;
+    const effectiveInteractiveMaps = mapsMainOn && interactiveMapsTierAllowed && (mapsPrefs as any).interactive_maps !== false;
     const effectiveRecentlyViewed = optEnabled && recentlyViewedTierAllowed && prefs.recently_viewed !== false;
     const effectiveInfoTypes = optEnabled
       ? allowedInfoTypes.filter(t => (prefs as any)[t] !== false)
@@ -3586,7 +3622,7 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
         showRecentlyViewed: mainOn && effectiveRecentlyViewed,
         showSocialMedia: mainOn && effectiveInfoTypes.includes('storefront_social_media'),
         showContact: mainOn && effectiveInfoTypes.includes('storefront_contact'),
-        showInteractiveMaps: mainOn && effectiveInfoTypes.includes('interactive_maps'),
+        showInteractiveMaps: mainOn && effectiveInteractiveMaps,
         showQRCodes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
         showQRProduct: mainOn && effectiveQRContentTypes.includes('qr_product'),
         showQRStore: mainOn && effectiveQRContentTypes.includes('qr_store'),
@@ -3597,14 +3633,14 @@ router.get('/tenant/:tenantId/storefront-options', async (req, res) => {
         galleryLimit,
         showEnhancedSEO: mainOn && effectiveAdvancedTypes.includes('enhanced_seo'),
         showStorefrontActions: mainOn && effectiveAdvancedTypes.includes('storefront_actions'),
-        storefrontLayout: allowedLayouts.includes(prefs.storefront_layout || 'classic')
-          ? (prefs.storefront_layout || 'classic')
+        storefrontLayout: allowedLayouts.includes('classic')
+          ? 'classic'
           : (allowedLayouts[0] || 'classic'),
       },
       tierKey: effectiveTierKey,
     });
   } catch (error) {
-    console.error('Error fetching public storefront options:', error);
+    logger.error('Error fetching public storefront options:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -3701,7 +3737,7 @@ router.get('/tenant/:tenantId/product-options', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching public product options:', error);
+    logger.error('Error fetching public product options:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -3730,7 +3766,7 @@ router.get('/platform-fee', async (_req, res) => {
       platformFeePercentage: percentage,
     });
   } catch (error) {
-    console.error('[Public API] Error fetching platform fee:', error);
+    logger.error('[Public API] Error fetching platform fee:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch platform fee',
@@ -3860,14 +3896,14 @@ router.post('/inquiries', async (req, res) => {
         },
       });
     } catch (actErr) {
-      console.error('[Public Inquiry] Activity log error (non-critical):', actErr);
+      logger.error('[Public Inquiry] Activity log error (non-critical):', undefined, { error: { name: (actErr as any)?.name || 'Error', message: (actErr as any)?.message || String(actErr), stack: (actErr as any)?.stack } });
     }
 
     console.log(`[Public Inquiry] Created inquiry ${inquiry.id} for tenant ${tenant_id} from ${finalSenderEmail || 'anonymous'} (customer_id: ${customerId || 'none'})`);
 
     res.status(201).json({ success: true, data: inquiry });
   } catch (error) {
-    console.error('[Public Inquiry] Error creating inquiry:', error);
+    logger.error('[Public Inquiry] Error creating inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit inquiry' });
   }
 });
@@ -3997,14 +4033,14 @@ router.post('/help-desk', async (req, res) => {
         },
       });
     } catch (actErr) {
-      console.error('[Help Desk] Activity log error (non-critical):', actErr);
+      logger.error('[Help Desk] Activity log error (non-critical):', undefined, { error: { name: (actErr as any)?.name || 'Error', message: (actErr as any)?.message || String(actErr), stack: (actErr as any)?.stack } });
     }
 
     console.log(`[Help Desk] Created inquiry ${inquiry.id} for platform admin from ${finalSenderEmail || 'anonymous'}`);
 
     res.status(201).json({ success: true, data: inquiry });
   } catch (error) {
-    console.error('[Help Desk] Error creating inquiry:', error);
+    logger.error('[Help Desk] Error creating inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to submit help desk inquiry' });
   }
 });
@@ -4056,7 +4092,7 @@ router.post('/qr/:tenantId/scan', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[QR Scan] Error tracking scan:', error);
+    logger.error('[QR Scan] Error tracking scan:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to track scan' });
   }
 });
@@ -4099,7 +4135,7 @@ router.get('/admin/demo-tenants/:id/qr-analytics', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[QR Analytics] Error:', error);
+    logger.error('[QR Analytics] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch QR analytics' });
   }
 });

@@ -6,6 +6,7 @@
  */
 
 import { RequestSetupResult } from './RequestSetupUtility';
+import { clientLogger } from '@/lib/client-logger';
 
 // Response interfaces
 export interface ApiResult<T> {
@@ -62,7 +63,7 @@ export class RequestExecutionUtility {
         data: data
       } as ApiResult<T>;
     } catch (error) {
-      console.error(`[RequestExecutionUtility] Request failed:`, error);
+      clientLogger.error(`[RequestExecutionUtility] Request failed:`, { detail: error });
       
       return {
         success: false,

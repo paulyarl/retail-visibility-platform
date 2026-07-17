@@ -36,6 +36,7 @@ import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import LastViewed from '@/components/directory/LastViewed';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
+import { clientLogger } from '@/lib/client-logger';
 
 
 interface Shop {
@@ -712,7 +713,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
             category_type: 'platform', // All storefront categories are platform categories
           }));
         } catch (e) {
-          console.error('Failed to fetch categories:', e);
+          clientLogger.error('Failed to fetch categories:', { detail: e });
         }
 
         // Calculate stats
@@ -737,7 +738,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
         }
 
       } catch (error) {
-        console.error('Error loading tenant data:', error);
+        clientLogger.error('Error loading tenant data:', { detail: error });
         setTenantError('Failed to load tenant data');
       } finally {
         setTenantLoading(false);
@@ -753,7 +754,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
         const settings = await platformSettingsService.getPlatformSettings();
         setPlatformSettings(settings);
       } catch (error) {
-        console.error('Failed to load platform settings:', error);
+        clientLogger.error('Failed to load platform settings:', { detail: error });
       }
     };
 

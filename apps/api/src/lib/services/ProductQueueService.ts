@@ -13,6 +13,7 @@
 
 import { prisma } from '../../prisma';
 import { UniversalSingleton, SingletonCacheOptions, AuthContext } from '../UniversalSingleton';
+import { logger } from '../../logger';
 
 export interface QueueItem {
   id: string;
@@ -262,7 +263,7 @@ class ProductQueueService extends UniversalSingleton {
       console.log('Queue item removed:', { itemId, tenantId });
       return true;
     } catch (error) {
-      console.error('Failed to remove queue item:', error);
+      logger.error('Failed to remove queue item:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }
@@ -282,7 +283,7 @@ class ProductQueueService extends UniversalSingleton {
       
       return true;
     } catch (error) {
-      console.error('Failed to update item priority:', error);
+      logger.error('Failed to update item priority:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return false;
     }
   }

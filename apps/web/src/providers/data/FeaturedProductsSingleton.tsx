@@ -16,6 +16,7 @@ import { PublicProduct } from '@/providers/data/ProductSingleton';
 
 // Import StorefrontService for API calls
 import { storefrontService } from '@/services/StorefrontService';
+import { clientLogger } from '@/lib/client-logger';
 
 // FeaturedType union - now dynamic to support all types
 export type FeaturedType = string;
@@ -154,12 +155,12 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
           try {
             await this.cacheManager.clear();
           } catch (clearError) {
-            console.warn('[FeaturedProductsSingleton] Failed to clear all cache:', clearError);
+            clientLogger.warn('[FeaturedProductsSingleton] Failed to clear all cache:', { detail: clearError });
           }
         }
       }
     } catch (error) {
-      console.warn('[FeaturedProductsSingleton] Error in forceClearStaleCache:', error);
+      clientLogger.warn('[FeaturedProductsSingleton] Error in forceClearStaleCache:', { detail: error });
     }
   }
 
@@ -335,7 +336,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
       await this.setCache(cacheKey, defaultResult, options); // 1 minute for empty data
       return defaultResult;
     } catch (error) {
-      console.error('Error fetching featured products:', error);
+      clientLogger.error('Error fetching featured products:', { detail: error });
       
       // Cache the error result to avoid repeated failures
       await this.setCache(cacheKey, defaultResult, options); // 30 seconds for errors
@@ -366,7 +367,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
           return cachedData as FeaturedProductsData;
         }
       } catch (error) {
-        console.warn('[FeaturedProductsSingleton] Invalid cache data, continuing with fresh fetch');
+        clientLogger.warn('[FeaturedProductsSingleton] Invalid cache data, continuing with fresh fetch');
       }
     }
 
@@ -485,7 +486,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
       await set(cacheKey, defaultResult, { ttl: 60 * 1000, ...options });
       return defaultResult;
     } catch (error) {
-      console.error('Error fetching featured products:', error);
+      clientLogger.error('Error fetching featured products:', { detail: error });
       await set(cacheKey, defaultResult, { ttl: 30 * 1000, ...options });
       return defaultResult;
     }
@@ -541,7 +542,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
         hasPrice: product.priceCents > 0
       }));
     } catch (error) {
-      console.error('Error converting to universal products:', error);
+      clientLogger.error('Error converting to universal products:', { detail: error });
       return [];
     }
   }

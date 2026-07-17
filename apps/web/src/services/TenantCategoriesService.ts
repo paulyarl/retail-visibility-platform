@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Category {
   id: string;
@@ -94,7 +95,7 @@ class TenantCategoriesService extends TenantApiSingleton {
 
       return response.data?.data || null;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to get Google taxonomy:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to get Google taxonomy:', { detail: error });
       return null;
     }
   }
@@ -114,7 +115,7 @@ class TenantCategoriesService extends TenantApiSingleton {
 
       return response.data?.results || [];
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to search Google taxonomy:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to search Google taxonomy:', { detail: error });
       return [];
     }
   }
@@ -138,7 +139,7 @@ class TenantCategoriesService extends TenantApiSingleton {
 
       return response.data?.categories || [];
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to browse Google taxonomy:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to browse Google taxonomy:', { detail: error });
       return [];
     }
   }
@@ -164,7 +165,7 @@ class TenantCategoriesService extends TenantApiSingleton {
 
       return response.data?.data || [];
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to get tenant categories:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to get tenant categories:', { detail: error });
       return [];
     }
   }
@@ -184,7 +185,7 @@ class TenantCategoriesService extends TenantApiSingleton {
 
       return response.data?.data || null;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to get alignment status:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to get alignment status:', { detail: error });
       return null;
     }
   }
@@ -222,7 +223,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       );
       
       if (!response?.success) {
-        console.error('[TenantCategoriesService] Failed to create category:', response.error);
+        clientLogger.error('[TenantCategoriesService] Failed to create category:', { detail: response.error });
         throw response.error;
       }
 
@@ -236,7 +237,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       }
       return null;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to create category:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to create category:', { detail: error });
       return null;
     }
   }
@@ -260,7 +261,7 @@ class TenantCategoriesService extends TenantApiSingleton {
         `tenant-categories-${tenantId}`
       );
       if (!results?.success) {
-        console.error('[TenantCategoriesService] Failed to update category:', results.error);
+        clientLogger.error('[TenantCategoriesService] Failed to update category:', { detail: results.error });
         throw results.error;
       }
 
@@ -269,7 +270,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       
       return results.data || null;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to update category:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to update category:', { detail: error });
       return null;
     }
   }
@@ -289,7 +290,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       );
 
       if (!results?.success) {
-        console.error('[TenantCategoriesService] Failed to delete category:', results.error);
+        clientLogger.error('[TenantCategoriesService] Failed to delete category:', { detail: results.error });
         throw results.error;
       }
 
@@ -298,7 +299,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       
       return true;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to delete category:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to delete category:', { detail: error });
       return false;
     }
   }
@@ -318,7 +319,7 @@ class TenantCategoriesService extends TenantApiSingleton {
         `alignment-status-${tenantId}`
       );
       if (!results?.success) {
-        console.error('[TenantCategoriesService] Failed to align category:', results.error);
+        clientLogger.error('[TenantCategoriesService] Failed to align category:', { detail: results.error });
         throw results.error;
       }
 
@@ -327,7 +328,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       
       return true;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to align category:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to align category:', { detail: error });
       return false;
     }
   }
@@ -356,7 +357,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       await this.invalidateCache(`alignment-status-${tenantId}`);
       
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to bulk delete categories:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to bulk delete categories:', { detail: error });
     }
 
     return { success, failed };
@@ -378,7 +379,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       );
 
       if (!response?.success) {
-        console.error('[TenantCategoriesService] Failed to quick start categories:', response.error);
+        clientLogger.error('[TenantCategoriesService] Failed to quick start categories:', { detail: response.error });
         throw response.error;
       }
 
@@ -388,7 +389,7 @@ class TenantCategoriesService extends TenantApiSingleton {
       
       return response.data?.data || [];
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to quick start categories:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to quick start categories:', { detail: error });
       return [];
     }
   }
@@ -408,13 +409,13 @@ class TenantCategoriesService extends TenantApiSingleton {
         `propagation-${heroTenantId}`
       );
       if (!results.success){
-        console.error('[TenantCategoriesService] Failed to propagate categories:', results.error);
+        clientLogger.error('[TenantCategoriesService] Failed to propagate categories:', { detail: results.error });
         throw results.error;
       }
 
       return true;
     } catch (error) {
-      console.error('[TenantCategoriesService] Failed to propagate categories:', error);
+      clientLogger.error('[TenantCategoriesService] Failed to propagate categories:', { detail: error });
       return false;
     }
   }

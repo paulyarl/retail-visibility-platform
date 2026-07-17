@@ -9,6 +9,7 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { tenantPublicService, LocationStatusInfo } from '@/services/TenantPublicService';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantInfo {
   id: string;
@@ -99,7 +100,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
   async getTenantInfo(tenantId: string): Promise<TenantInfo | null> { 
     
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getTenantInfo: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getTenantInfo: tenantId is required');
       return null;
     }
 
@@ -109,7 +110,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
       return tenant || null;
     } catch (error) {
-      console.error('[PublicTenantInfoService] Failed to get tenant info:', error);
+      clientLogger.error('[PublicTenantInfoService] Failed to get tenant info:', { detail: error });
       return null;
     }
   }
@@ -121,7 +122,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
   async getBusinessProfile(tenantId: string): Promise<BusinessProfile | null> { 
     
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getBusinessProfile: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getBusinessProfile: tenantId is required');
       return null;
     }
 
@@ -135,7 +136,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.error('[PublicTenantInfoService] Failed to get business profile:', response.error);
+        clientLogger.error('[PublicTenantInfoService] Failed to get business profile:', { detail: response.error });
         return null;
       }
 
@@ -169,7 +170,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         tenant_id: profile.tenantId || profile.id || undefined,
       };
     } catch (error) {
-      console.error('[PublicTenantInfoService] Failed to get business profile:', error);
+      clientLogger.error('[PublicTenantInfoService] Failed to get business profile:', { detail: error });
       return null;
     }
   }
@@ -180,7 +181,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    */
   async getTenantTier(tenantId: string): Promise<TenantTier | null> {
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getTenantTier: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getTenantTier: tenantId is required');
       return null;
     }
 
@@ -190,7 +191,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
       return result || null;
     } catch (error) {
-      console.error('[PublicTenantInfoService] Failed to get tenant tier:', error);
+      clientLogger.error('[PublicTenantInfoService] Failed to get tenant tier:', { detail: error });
       return null;
     }
   }
@@ -209,7 +210,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    */
   async getBusinessHours(tenantId: string): Promise<BusinessHours | null> {
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getBusinessHours: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getBusinessHours: tenantId is required');
       return null;
     }
 
@@ -232,7 +233,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[PublicTenantInfoService] Failed to get business hours:', result.error);
+        clientLogger.error('[PublicTenantInfoService] Failed to get business hours:', { detail: result.error });
         return null;
       }
 
@@ -266,7 +267,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
       return null;
     } catch (error) {
-      console.error('[PublicTenantInfoService] Failed to get business hours:', error);
+      clientLogger.error('[PublicTenantInfoService] Failed to get business hours:', { detail: error });
       return null;
     }
   }
@@ -278,7 +279,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    */
   async getPaymentGatewayStatus(tenantId: string): Promise<{hasActiveGateway: boolean; defaultGatewayType?: string} | null> { 
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getPaymentGatewayStatus: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getPaymentGatewayStatus: tenantId is required');
       return null;
     }
 
@@ -318,7 +319,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
       // console.log(`[PublicTenantInfoService] getPaymentGatewayStatus NO DATA for tenant: ${tenantId}`, new Date().toISOString());
       return null;
     } catch (error) {
-      console.error(`[PublicTenantInfoService] getPaymentGatewayStatus ERROR for tenant: ${tenantId}`, error);
+      clientLogger.error(`[PublicTenantInfoService] getPaymentGatewayStatus ERROR for tenant: ${tenantId}`, { detail: error });
       return null;
     }
   }
@@ -330,7 +331,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
   async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> { 
     
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getPaymentGateways: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getPaymentGateways: tenantId is required');
       return [];
     }
 
@@ -346,7 +347,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         this.cacheTTL
       );
       if (!response.success){
-        console.error('[PublicTenantInfoService] Failed to get payment gateways:', response.error);
+        clientLogger.error('[PublicTenantInfoService] Failed to get payment gateways:', { detail: response.error });
         return [];
       }
 
@@ -357,7 +358,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
       // console.log(`[PublicTenantInfoService] getPaymentGateways NO DATA for tenant: ${tenantId}`, new Date().toISOString());
       return [];
     } catch (error) {
-      console.error(`[PublicTenantInfoService] getPaymentGateways ERROR for tenant: ${tenantId}`, error);
+      clientLogger.error(`[PublicTenantInfoService] getPaymentGateways ERROR for tenant: ${tenantId}`, { detail: error });
       return [];
     }
   }
@@ -369,7 +370,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
   async getFulfillmentSettings(tenantId: string): Promise<any> {
     
     if (!tenantId) {
-      console.error('[PublicTenantInfoService] getFulfillmentSettings: tenantId is required');
+      clientLogger.error('[PublicTenantInfoService] getFulfillmentSettings: tenantId is required');
       return null;
     }
 
@@ -385,7 +386,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         this.cacheTTL
       );
       if (!response.success){
-        console.error('[PublicTenantInfoService] Failed to get fulfillment settings:', response.error);
+        clientLogger.error('[PublicTenantInfoService] Failed to get fulfillment settings:', { detail: response.error });
         return null;
       }
 
@@ -396,7 +397,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
       console.log(`[PublicTenantInfoService] getFulfillmentSettings NO DATA for tenant: ${tenantId}`, new Date().toISOString());
       return null;
     } catch (error) {
-      console.error(`[PublicTenantInfoService] getFulfillmentSettings ERROR for tenant: ${tenantId}`, error);
+      clientLogger.error(`[PublicTenantInfoService] getFulfillmentSettings ERROR for tenant: ${tenantId}`, { detail: error });
       return null;
     }
   }
@@ -436,7 +437,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         paymentGateways
       };
     } catch (error) {
-      console.error('[PublicTenantInfoService] Failed to get complete tenant info:', error);
+      clientLogger.error('[PublicTenantInfoService] Failed to get complete tenant info:', { detail: error });
       return {
         tenant: null,
         businessProfile: null,
@@ -475,7 +476,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
       return null;
     } catch (error) {
-      console.error('[PublicTenantInfoService] Failed to get tenant logo from discovery:', error);
+      clientLogger.error('[PublicTenantInfoService] Failed to get tenant logo from discovery:', { detail: error });
       return null;
     }
   }

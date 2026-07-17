@@ -4,6 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 import { z } from 'zod';
 import FaqOptionsService from '../services/FaqOptionsService';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -150,7 +151,7 @@ router.get('/:tenantId/faq-options', authenticateToken, async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching FAQ options settings:', error);
+    logger.error('Error fetching FAQ options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -352,7 +353,7 @@ router.put('/:tenantId/faq-options', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error updating FAQ options settings:', error);
+    logger.error('Error updating FAQ options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -409,7 +410,7 @@ router.get('/public/tenant/:tenantId/faq-options', async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching public FAQ options settings:', error);
+    logger.error('Error fetching public FAQ options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -430,7 +431,7 @@ router.get('/:tenantId/faq-options/capability', authenticateToken, async (req, r
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving FAQ options capability:', error);
+    logger.error('Error resolving FAQ options capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

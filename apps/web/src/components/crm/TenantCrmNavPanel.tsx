@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/support', label: 'Dashboard', emoji: '📊' },
   { href: '/support/alerts', label: 'Alerts', emoji: '🔔' },
   { href: '/support/tickets', label: 'Tickets', emoji: '🎫' },
+  { href: '/support/tasks', label: 'Tasks', emoji: '✅' },
   { href: '/support/contacts', label: 'Contacts', emoji: '👥' },
   { href: '/support/inquiries', label: 'Inquiries', emoji: '❓' },
 ] as const;
@@ -16,6 +17,7 @@ interface TenantCrmNavPanelProps {
   tenantId: string;
   counts?: {
     tickets?: number;
+    tasks?: number;
     inquiries?: number;
     alerts?: number;
   };

@@ -8,6 +8,7 @@ import BarcodeScanner from '@/components/scan/BarcodeScanner';
 import BatchReview from '@/components/scan/BatchReview';
 import EnrichmentPreview from '@/components/scan/EnrichmentPreview';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ScanResult {
   id: string;
@@ -77,12 +78,12 @@ export default function TenantActiveScanPage() {
           setSelectedResult(results[0]);
         }
       } else {
-        console.error('[TenantScanSession] Invalid session data structure:', sessionData);
+        clientLogger.error('[TenantScanSession] Invalid session data structure:', { detail: sessionData });
         alert('Failed to load session');
         router.push(`/t/${tenantId}/scan`);
       }
     } catch (error) {
-      console.error('[TenantScanSession] Failed to load session:', error);
+      clientLogger.error('[TenantScanSession] Failed to load session:', { detail: error });
       alert('Failed to load session');
       router.push(`/t/${tenantId}/scan`);
     } finally {
@@ -127,11 +128,11 @@ export default function TenantActiveScanPage() {
         // console.log('[TenantScanSession] Setting selected result:', newResult);
         setSelectedResult(newResult);
       } else {
-        console.error('[TenantScanSession] Scan failed:', data);
+        clientLogger.error('[TenantScanSession] Scan failed:', { detail: data });
         alert(data?.error || 'Failed to scan barcode');
       }
     } catch (error) {
-      console.error('[TenantScanSession] Failed to scan barcode:', error);
+      clientLogger.error('[TenantScanSession] Failed to scan barcode:', { detail: error });
       alert('Failed to scan barcode');
     } finally {
       setScanning(false);
@@ -156,7 +157,7 @@ export default function TenantActiveScanPage() {
         scannedCount: Math.max(0, prev.scannedCount - 1)
       } : null);
     } catch (error) {
-      console.error('Failed to remove result:', error);
+      clientLogger.error('Failed to remove result:', { detail: error });
       alert('Failed to remove result');
     }
   };
@@ -197,7 +198,7 @@ export default function TenantActiveScanPage() {
     try {
       await itemsSingletonService.updateScanResult(sessionId, selectedResult.id, updatedEnrichment);
     } catch (error) {
-      console.error('Failed to update scan result enrichment:', error);
+      clientLogger.error('Failed to update scan result enrichment:', { detail: error });
       // Could show error toast here, but for now just log it
     }
   }, [selectedResult, session, sessionId]);
@@ -224,7 +225,7 @@ export default function TenantActiveScanPage() {
           try {
             await itemsSingletonService.updateScanResult(sessionId, result.id, result.enrichment);
           } catch (error) {
-            console.error(`Failed to save enrichment for result ${result.id}:`, error);
+            clientLogger.error(`Failed to save enrichment for result ${result.id}:`, { detail: error });
           }
         }
       }
@@ -243,7 +244,7 @@ export default function TenantActiveScanPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to commit session:', error);
+      clientLogger.error('Failed to commit session:', { detail: error });
       alert('Failed to commit session');
     } finally {
       setCommitting(false);
@@ -259,7 +260,7 @@ export default function TenantActiveScanPage() {
       await itemsSingletonService.cancelScanSession(sessionId);
       router.push(`/t/${tenantId}/scan`);
     } catch (error) {
-      console.error('Failed to cancel session:', error);
+      clientLogger.error('Failed to cancel session:', { detail: error });
       alert('Failed to cancel session');
     }
   };

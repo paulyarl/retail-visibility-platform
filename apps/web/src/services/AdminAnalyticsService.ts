@@ -1,5 +1,6 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AdminAnalytics {
   totalTenants: number;
@@ -89,7 +90,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get admin directory stats:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get admin directory stats:', { detail: result.error });
       return null;
     }
 
@@ -138,7 +139,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get admin directory listings:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get admin directory listings:', { detail: result.error });
       return null;
     }
 
@@ -156,7 +157,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get admin enrichment analytics:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get admin enrichment analytics:', { detail: result.error });
       return null;
     }
 
@@ -185,7 +186,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to search admin enrichment products:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to search admin enrichment products:', { detail: result.error });
       return null;
     }
 
@@ -203,7 +204,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get admin subdomain stats:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get admin subdomain stats:', { detail: result.error });
       return null;
     }
 
@@ -221,7 +222,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get platform overview:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get platform overview:', { detail: result.error });
       return null;
     }
 
@@ -243,7 +244,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get tenant usage stats:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get tenant usage stats:', { detail: result.error });
       return null;
     }
 
@@ -261,7 +262,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get feature adoption metrics:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get feature adoption metrics:', { detail: result.error });
       return null;
     }
 
@@ -279,7 +280,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get performance metrics:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get performance metrics:', { detail: result.error });
       return null;
     }
 
@@ -297,7 +298,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get user activity analytics:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get user activity analytics:', { detail: result.error });
       return null;
     }
 
@@ -315,7 +316,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminAnalyticsService] Failed to get revenue analytics:', result.error);
+      clientLogger.error('[AdminAnalyticsService] Failed to get revenue analytics:', { detail: result.error });
       return null;
     }
 
@@ -335,7 +336,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[AdminAnalyticsService] Failed to export ${type} analytics:`, result.error);
+      clientLogger.error(`[AdminAnalyticsService] Failed to export ${type} analytics:`, { detail: result.error });
       return null;
     }
 
@@ -358,7 +359,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error(`[AdminAnalyticsService] Failed to get custom report ${reportId}:`, result.error);
+      clientLogger.error(`[AdminAnalyticsService] Failed to get custom report ${reportId}:`, { detail: result.error });
       return null;
     }
 

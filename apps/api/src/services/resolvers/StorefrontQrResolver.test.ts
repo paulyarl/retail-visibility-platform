@@ -42,8 +42,9 @@ describe('resolveStorefrontQr', () => {
     const result = resolveStorefrontQr(features, null);
     expect(result.is_flexible).toBe(true);
     expect(result.qr_styled_enabled).toBe(true);
-    expect(result.allowed_qr_dot_styles).toEqual(['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded']);
-    expect(result.allowed_qr_corner_styles).toEqual(['dot', 'extra-rounded', 'rounded']);
+    expect(result.allowed_qr_dot_styles).toEqual(['rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded', 'square']);
+    expect(result.allowed_qr_corner_styles).toEqual(['dot', 'extra-rounded', 'rounded', 'square']);
+    expect(result.allowed_qr_corner_dot_styles).toEqual(['dot', 'square']);
     expect(result.qr_custom_colors).toBe(true);
     expect(result.qr_gradients).toBe(true);
   });
@@ -68,6 +69,7 @@ describe('resolveStorefrontQr', () => {
     const result = resolveStorefrontQr(features, null);
     expect(result.qr_styled_enabled).toBe(false);
     expect(result.allowed_qr_dot_styles).toEqual([]);
+    expect(result.allowed_qr_corner_dot_styles).toEqual([]);
   });
 
   it('respects individual QR resolution keys', () => {
@@ -149,6 +151,32 @@ describe('resolveStorefrontQr', () => {
     };
     const result = resolveStorefrontQr({}, null, fallbackFeatures);
     expect(result.allowed_qr_resolutions).toEqual(['qr_codes_512', 'qr_codes_2048']);
+  });
+
+  it('tier allows styled QR even when merchant pref qr_styled_enabled is false', () => {
+    const features = {
+      storefront_qr_enabled: true,
+      storefront_qr_on: true,
+      storefront_qr_styled: true,
+    };
+    const merchantPrefs = { qr_styled_enabled: false };
+    const result = resolveStorefrontQr(features, merchantPrefs);
+    expect(result.qr_styled_enabled).toBe(true);
+    expect(result.qr_classic_enabled).toBe(true);
+    expect(result.merchant_preferences.qr_styled_enabled).toBe(false);
+  });
+
+  it('tier allows classic QR even when merchant pref qr_classic_enabled is false', () => {
+    const features = {
+      storefront_qr_enabled: true,
+      storefront_qr_on: true,
+      storefront_qr_styled: true,
+    };
+    const merchantPrefs = { qr_classic_enabled: false };
+    const result = resolveStorefrontQr(features, merchantPrefs);
+    expect(result.qr_classic_enabled).toBe(true);
+    expect(result.qr_styled_enabled).toBe(true);
+    expect(result.merchant_preferences.qr_classic_enabled).toBe(false);
   });
 
   it('returns empty arrays when QR group is disabled', () => {

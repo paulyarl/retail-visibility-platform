@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { useAuth } from '@/contexts/AuthContext';
+import { clientLogger } from '@/lib/client-logger';
 
 // Define interfaces inline since AdminCacheService is removed
 interface AdminTenantsData {
@@ -117,7 +118,7 @@ export function useAdminData(): UseAdminDataReturn {
 
         return consolidatedData;
       } catch (error) {
-        console.error('[useAdminData] Failed to fetch admin data:', error);
+        clientLogger.error('[useAdminData] Failed to fetch admin data:', { detail: error });
         throw error;
       }
     },

@@ -4,6 +4,7 @@
  */
 import { Router } from 'express';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 const router = Router();
 // Auth: authenticateToken + requireAdmin applied at mount level in admin.routes.ts
@@ -75,7 +76,7 @@ router.get('/by-capability', requirePlatformStaff, async (req, res) => {
 
     res.json(Array.from(tierMap.values()));
   } catch (error) {
-    console.error('[GET /api/admin/tier-capabilities/by-capability] Error:', error);
+    logger.error('[GET /api/admin/tier-capabilities/by-capability] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tiers_by_capability' });
   }
 });
@@ -124,7 +125,7 @@ router.get('/', requirePlatformStaff, async (req, res) => {
 
     res.json(Array.from(capMap.values()));
   } catch (error) {
-    console.error('[GET /api/admin/tier-capabilities] Error:', error);
+    logger.error('[GET /api/admin/tier-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_list_tier_capabilities' });
   }
 });
@@ -207,7 +208,7 @@ router.post('/', requirePlatformAdmin, async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[POST /api/admin/tier-capabilities] Error:', error);
+    logger.error('[POST /api/admin/tier-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_create_tier_capability' });
   }
 });
@@ -277,7 +278,7 @@ router.put('/', requirePlatformAdmin, async (req, res) => {
       })),
     }]);
   } catch (error) {
-    console.error('[PUT /api/admin/tier-capabilities] Error:', error);
+    logger.error('[PUT /api/admin/tier-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_tier_capabilities' });
   }
 });
@@ -300,7 +301,7 @@ router.delete('/', requirePlatformAdmin, async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('[DELETE /api/admin/tier-capabilities] Error:', error);
+    logger.error('[DELETE /api/admin/tier-capabilities] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_delete_tier_capability' });
   }
 });

@@ -4,6 +4,7 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { useState, useEffect } from 'react';
 import TenantSKUPrefix from './TenantSKUPrefix';
 import { googleIntegrationService } from '@/services/GoogleIntegrationService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ItemsHeaderProps {
   stats: {
@@ -50,7 +51,7 @@ export default function ItemsHeader({
           syncing: false,
         });
       } catch (err) {
-        console.error('[ItemsHeader] Failed to check GMC status:', err);
+        clientLogger.error('[ItemsHeader] Failed to check GMC status:', { detail: err });
       }
     };
     checkGmcStatus();

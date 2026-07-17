@@ -9,6 +9,7 @@ import PlatformTicker from '@/components/notifications/PlatformTicker';
 import { tickerConfigService, TickerMessage } from '@/services/TickerConfigService';
 import TickerFallbackService from '@/services/TickerFallbackService';
 import { useQuery } from '@tanstack/react-query';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShellWithTickerProps {
   children: React.ReactNode;
@@ -43,7 +44,7 @@ export default function ShellWithTicker({ children, shellHeader }: ShellWithTick
         
         return result;
       } catch (error) {
-        console.warn('[ShellWithTicker] Config API failed, using fallback:', error);
+        clientLogger.warn('[ShellWithTicker] Config API failed, using fallback:', { detail: error });
         // Return fallback config
         const fallbackConfig = TickerFallbackService.getFallbackConfig();
         return { success: true, data: { data: fallbackConfig } };
@@ -75,7 +76,7 @@ export default function ShellWithTicker({ children, shellHeader }: ShellWithTick
         
         return result;
       } catch (error) {
-        console.warn('[ShellWithTicker] Messages API failed, using fallback:', error);
+        clientLogger.warn('[ShellWithTicker] Messages API failed, using fallback:', { detail: error });
         // Return fallback messages
         const fallbackData = TickerFallbackService.getCombinedFallbackData();
         return { success: true, data: { data: fallbackData.messages } };

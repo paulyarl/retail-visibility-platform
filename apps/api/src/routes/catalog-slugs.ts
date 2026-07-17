@@ -15,6 +15,7 @@ import { prisma } from '../prisma';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { parseSlugToJSON, generateProductSlug, determineSlugType } from '../lib/slug-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.get('/validate', optionalAuth, async (req: Request, res: Response) => {
       suggestedSlug
     });
   } catch (error) {
-    console.error('[CatalogSlugs] Error validating slug:', error);
+    logger.error('[CatalogSlugs] Error validating slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to validate slug' });
   }
 });
@@ -148,7 +149,7 @@ router.post('/register', authenticateToken, async (req: Request, res: Response) 
 
     res.status(201).json(registry);
   } catch (error) {
-    console.error('[CatalogSlugs] Error registering slug:', error);
+    logger.error('[CatalogSlugs] Error registering slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to register slug' });
   }
 });
@@ -184,7 +185,7 @@ router.get('/:slug/parse', optionalAuth, async (req: Request, res: Response) => 
 
     res.json(components);
   } catch (error) {
-    console.error('[CatalogSlugs] Error parsing slug:', error);
+    logger.error('[CatalogSlugs] Error parsing slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to parse slug' });
   }
 });
@@ -264,7 +265,7 @@ router.post('/compare', optionalAuth, async (req: Request, res: Response) => {
       slug2_components: parsed2,
     });
   } catch (error) {
-    console.error('[CatalogSlugs] Error comparing products:', error);
+    logger.error('[CatalogSlugs] Error comparing products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to compare products' });
   }
 });
@@ -287,7 +288,7 @@ router.get('/:slug', optionalAuth, async (req: Request, res: Response) => {
 
     res.json(registry);
   } catch (error) {
-    console.error('[CatalogSlugs] Error fetching slug registry:', error);
+    logger.error('[CatalogSlugs] Error fetching slug registry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch slug registry' });
   }
 });
@@ -326,7 +327,7 @@ router.get('/upc/:upc', optionalAuth, async (req: Request, res: Response) => {
     // Return registry entry
     res.json(registry);
   } catch (error) {
-    console.error('[CatalogSlugs] Error fetching product by UPC:', error);
+    logger.error('[CatalogSlugs] Error fetching product by UPC:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch product by UPC' });
   }
 });
@@ -355,7 +356,7 @@ router.delete('/:slug', authenticateToken, async (req: Request, res: Response) =
 
     res.json({ success: true, deleted: deleted.count });
   } catch (error) {
-    console.error('[CatalogSlugs] Error deleting slug:', error);
+    logger.error('[CatalogSlugs] Error deleting slug:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete slug' });
   }
 });

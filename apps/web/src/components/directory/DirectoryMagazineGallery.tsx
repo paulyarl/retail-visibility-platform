@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 type DirectoryPhoto = {
   id: string;
@@ -38,7 +39,7 @@ export default function DirectoryMagazineGallery({ listing, isPublished }: Direc
         const photoAssets = await directoryListingService.getDirectoryListingPhotos(listing.id);
         setPhotos(photoAssets.sort((a, b) => a.position - b.position));
       } catch (e) {
-        console.error("Failed to load directory photos:", e);
+        clientLogger.error("Failed to load directory photos:", { detail: e });
       } finally {
         setLoading(false);
       }

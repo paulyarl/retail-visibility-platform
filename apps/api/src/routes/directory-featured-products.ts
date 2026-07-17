@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { TIER_FEATURED_ACCESS_CTE, TIER_FEATURED_ACCESS_JOIN, TIER_FEATURED_ACCESS_WHERE, TENANT_PREFS_JOIN, TENANT_PREFS_WHERE } from '../utils/tier-capability-sql';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -384,7 +385,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('Featured products API error:', error);
+    logger.error('Featured products API error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json(
       { success: false, error: 'Failed to fetch featured products' }
     );

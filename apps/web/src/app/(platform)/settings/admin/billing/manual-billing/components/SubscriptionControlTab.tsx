@@ -36,6 +36,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { manualBillingService } from '@/services/ManualBillingService';
 import { useForm } from '@mantine/form';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Tenant {
   id: string;
@@ -117,7 +118,7 @@ export default function SubscriptionControlTab() {
       setTenants(transformedTenants);
       setTotalPages(Math.ceil(transformedTenants.length / itemsPerPage));
     } catch (error) {
-      console.error('Error fetching tenants:', error);
+      clientLogger.error('Error fetching tenants:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to fetch tenants',
@@ -284,7 +285,7 @@ export default function SubscriptionControlTab() {
         });
       }
     } catch (error) {
-      console.error('Error updating subscription control:', error);
+      clientLogger.error('Error updating subscription control:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to update subscription control',
@@ -319,7 +320,7 @@ export default function SubscriptionControlTab() {
         });
       }
     } catch (error) {
-      console.error('Error adding subscription control:', error);
+      clientLogger.error('Error adding subscription control:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to add subscription control',
@@ -419,7 +420,7 @@ export default function SubscriptionControlTab() {
 
       setBulkControlModalOpen(false);
     } catch (error) {
-      console.error('Error during bulk control:', error);
+      clientLogger.error('Error during bulk control:', { detail: error });
       notifications.show({
         title: 'Bulk Control Error',
         message: 'Failed to enable manual control for legacy tenants',

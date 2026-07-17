@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import TaxonomySyncSingletonService from '../services/TaxonomySyncSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get('/check-updates', async (req, res) => {
       message: 'Taxonomy update check completed successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Check updates error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Check updates error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to check for taxonomy updates',
@@ -74,7 +75,7 @@ router.post('/full-sync', async (req, res) => {
       message: 'Full taxonomy sync completed successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Full sync error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Full sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to perform full taxonomy sync',
@@ -108,7 +109,7 @@ router.post('/incremental-sync', async (req, res) => {
       message: 'Incremental taxonomy sync completed successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Incremental sync error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Incremental sync error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to perform incremental taxonomy sync',
@@ -143,7 +144,7 @@ router.get('/current-taxonomy', async (req, res) => {
       message: 'Current taxonomy retrieved successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Get current taxonomy error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Get current taxonomy error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve current taxonomy'
@@ -176,7 +177,7 @@ router.get('/stats', async (req, res) => {
       message: 'Taxonomy sync statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Get stats error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sync statistics'
@@ -209,7 +210,7 @@ router.get('/health', async (req, res) => {
       message: 'Taxonomy sync service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Health check error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -241,7 +242,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Taxonomy sync cache cleared successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Clear cache error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -278,7 +279,7 @@ router.get('/operations', async (req, res) => {
       message: 'Sync operation history retrieved successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Get operations error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Get operations error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve operation history'
@@ -334,7 +335,7 @@ router.post('/test', async (req, res) => {
       message: `Taxonomy sync test (${type}) completed successfully`
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Test error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test taxonomy synchronization',
@@ -385,7 +386,7 @@ router.get('/operations-info', async (req, res) => {
       message: 'Supported sync operations retrieved successfully'
     });
   } catch (error) {
-    console.error('[TAXONOMY SYNC SINGLETON] Operations info error:', error);
+    logger.error('[TAXONOMY SYNC SINGLETON] Operations info error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported operations'

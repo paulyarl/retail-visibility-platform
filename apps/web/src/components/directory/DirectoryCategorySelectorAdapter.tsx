@@ -4,6 +4,7 @@ import { useMemo, useCallback } from 'react';
 import CategorySelectorMulti, { CategoryOption } from '@/components/shared/CategorySelectorMulti';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DirectoryCategorySelectorAdapterProps {
   primary: string;
@@ -73,7 +74,7 @@ export default function DirectoryCategorySelectorAdapter({
       }
       return [];
     } catch (error) {
-      console.error('Directory category search error:', error);
+      clientLogger.error('Directory category search error:', { detail: error });
       return [];
     }
   }, []);

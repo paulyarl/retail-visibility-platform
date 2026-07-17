@@ -21,6 +21,7 @@ import { generalRateLimit } from '../../middleware/rate-limit';
 import { DigitalDownloadPageService } from '../../services/DigitalDownloadPageService';
 import { prisma } from '../../prisma';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 // Tenant authentication middleware
 const authenticateTenant = async (req: Request, res: Response, next: NextFunction) => {
@@ -43,7 +44,7 @@ const authenticateTenant = async (req: Request, res: Response, next: NextFunctio
     (req as any).tenant = tenant;
     next();
   } catch (error) {
-    console.error('Tenant authentication error:', error);
+    logger.error('Tenant authentication error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Authentication failed' });
   }
 };
@@ -139,7 +140,7 @@ router.get('/:tenantId/digital-download-pages', authenticateTenant, generalRateL
       data: result
     });
   } catch (error: any) {
-    console.error('Error fetching download pages:', error);
+    logger.error('Error fetching download pages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch download pages',
@@ -183,7 +184,7 @@ router.get('/:tenantId/digital-download-pages/digital-items', authenticateTenant
       data: items
     });
   } catch (error: any) {
-    console.error('Error fetching digital items:', error);
+    logger.error('Error fetching digital items:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch digital items',
@@ -266,7 +267,7 @@ router.post('/:tenantId/digital-download-pages', authenticateTenant, generalRate
       message: 'Download page created successfully'
     });
   } catch (error: any) {
-    console.error('Error creating download page:', error);
+    logger.error('Error creating download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create download page',
@@ -301,7 +302,7 @@ router.get('/:tenantId/digital-download-pages/:id', authenticateTenant, generalR
 
     res.json({ success: true, data: result });
   } catch (error: any) {
-    console.error('Error fetching download page:', error);
+    logger.error('Error fetching download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch download page',
@@ -350,7 +351,7 @@ router.put('/:tenantId/digital-download-pages/:id', authenticateTenant, generalR
 
     res.json({ success: true, data: result, message: 'Download page updated successfully' });
   } catch (error: any) {
-    console.error('Error updating download page:', error);
+    logger.error('Error updating download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update download page',
@@ -386,7 +387,7 @@ router.delete('/:tenantId/digital-download-pages/:id', authenticateTenant, gener
 
     res.json({ success: true, message: 'Download page deleted successfully' });
   } catch (error: any) {
-    console.error('Error deleting download page:', error);
+    logger.error('Error deleting download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete download page',
@@ -433,7 +434,7 @@ router.post('/:tenantId/digital-download-pages/:id/preview-token', authenticateT
       message: 'Preview token generated successfully'
     });
   } catch (error: any) {
-    console.error('Error generating preview token:', error);
+    logger.error('Error generating preview token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to generate preview token',
@@ -470,7 +471,7 @@ router.get('/:tenantId/digital-download-pages/:id/assets', authenticateTenant, g
 
     res.json({ success: true, data: assets });
   } catch (error: any) {
-    console.error('Error fetching page assets:', error);
+    logger.error('Error fetching page assets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch page assets',
@@ -513,7 +514,7 @@ router.put('/:tenantId/digital-download-pages/:id/assets/reorder', authenticateT
 
     res.json({ success: true, message: 'Assets reordered successfully' });
   } catch (error: any) {
-    console.error('Error reordering page assets:', error);
+    logger.error('Error reordering page assets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to reorder page assets',
@@ -551,7 +552,7 @@ router.post('/:tenantId/digital-download-pages/:id/assets', authenticateTenant, 
       data: asset
     });
   } catch (error: any) {
-    console.error('Error adding page asset:', error);
+    logger.error('Error adding page asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to add page asset',
@@ -581,7 +582,7 @@ router.put('/:tenantId/digital-download-pages/:id/assets/:assetId', authenticate
       data: asset
     });
   } catch (error: any) {
-    console.error('Error updating page asset:', error);
+    logger.error('Error updating page asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update page asset',
@@ -610,7 +611,7 @@ router.delete('/:tenantId/digital-download-pages/:id/assets/:assetId', authentic
       message: 'Asset deleted successfully'
     });
   } catch (error: any) {
-    console.error('Error deleting page asset:', error);
+    logger.error('Error deleting page asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete page asset',

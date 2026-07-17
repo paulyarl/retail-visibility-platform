@@ -15,6 +15,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // TYPES
@@ -134,7 +135,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantSettingsSingleton] Error fetching tenant info:', result.error);
+      clientLogger.error('[TenantSettingsSingleton] Error fetching tenant info:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant info');
     }
 
@@ -153,7 +154,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantSettingsSingleton] Error fetching tenant profile:', result.error);
+      clientLogger.error('[TenantSettingsSingleton] Error fetching tenant profile:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant profile');
     }
 
@@ -172,7 +173,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantSettingsSingleton] Error fetching tenant tier:', result.error);
+      clientLogger.error('[TenantSettingsSingleton] Error fetching tenant tier:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant tier');
     }
 
@@ -190,7 +191,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantSettingsSingleton] Error fetching featured products limits:', result.error);
+      clientLogger.error('[TenantSettingsSingleton] Error fetching featured products limits:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch featured products limits');
     }
 
@@ -218,7 +219,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
       //console.log('[TenantSettingsSingleton] Fetched all settings:', this.tenantId);
       return { info, profile, tier, featuredLimits };
     } catch (error) {
-      console.error('[TenantSettingsSingleton] Error fetching all settings:', error);
+      clientLogger.error('[TenantSettingsSingleton] Error fetching all settings:', { detail: error });
       throw error;
     }
   }
@@ -241,7 +242,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantSettingsSingleton] Error updating tenant profile:', result.error);
+      clientLogger.error('[TenantSettingsSingleton] Error updating tenant profile:', { detail: result.error });
       throw new Error(getErrorMessage(result.error) || 'Failed to update tenant profile');
     }
 

@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // Enhanced interfaces based on mv_global_discovery schema
 export interface ProductVariant {
@@ -202,7 +203,7 @@ class EnhancedProductService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.error('[EnhancedProductService] Failed to fetch product:', response.error);
+        clientLogger.error('[EnhancedProductService] Failed to fetch product:', { detail: response.error });
         return null;
       }
 
@@ -210,7 +211,7 @@ class EnhancedProductService extends PublicApiSingleton {
       const productData = response.data?.data || response.data;
       return this.transformProductData(productData);
     } catch (error) {
-      console.warn(`Failed to fetch product with variants: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch product with variants: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
   }
@@ -228,13 +229,13 @@ class EnhancedProductService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.warn('[EnhancedProductService] Failed to fetch variants:', response.error);
+        clientLogger.warn('[EnhancedProductService] Failed to fetch variants:', { detail: response.error });
         return [];
       }
       
       return response.data.variants || [];
     } catch (error) {
-      console.warn(`Failed to fetch product variants: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch product variants: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];
     }
   }
@@ -252,13 +253,13 @@ class EnhancedProductService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.warn('[EnhancedProductService] Failed to fetch category recommendations:', response.error);
+        clientLogger.warn('[EnhancedProductService] Failed to fetch category recommendations:', { detail: response.error });
         return [];
       }
       
       return response.data.products.map((product: any) => this.transformProductData(product));
     } catch (error) {
-      console.warn(`Failed to fetch category recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch category recommendations: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];
     }
   }
@@ -283,13 +284,13 @@ class EnhancedProductService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.warn('[EnhancedProductService] Failed to fetch trending products:', response.error);
+        clientLogger.warn('[EnhancedProductService] Failed to fetch trending products:', { detail: response.error });
         return [];
       }
       
       return response.data.products || [];
     } catch (error) {
-      console.warn(`Failed to fetch trending products: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch trending products: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];
     }
   }
@@ -307,13 +308,13 @@ class EnhancedProductService extends PublicApiSingleton {
       );
       
       if (!response.success) {
-        console.warn('[EnhancedProductService] Failed to fetch category hierarchy:', response.error);
+        clientLogger.warn('[EnhancedProductService] Failed to fetch category hierarchy:', { detail: response.error });
         return [];
       }
       
       return response.data.categories || [];
     } catch (error) {
-      console.warn(`Failed to fetch category hierarchy: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientLogger.warn(`Failed to fetch category hierarchy: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];
     }
   }

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { CustomerService } from '../services/CustomerService';
+import { logger } from '../logger';
 
 const router = Router();
 const customerService = CustomerService.getInstance();
@@ -37,7 +38,7 @@ router.post('/', async (req: Request, res: Response) => {
       data: customer
     });
   } catch (error: any) {
-    console.error('[Customer] Create customer error:', error);
+    logger.error('[Customer] Create customer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_create_customer',
@@ -65,7 +66,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       data: customer
     });
   } catch (error: any) {
-    console.error('[Customer] Get customer error:', error);
+    logger.error('[Customer] Get customer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_customer',
@@ -93,7 +94,7 @@ router.get('/email/:email', async (req: Request, res: Response) => {
       data: customer
     });
   } catch (error: any) {
-    console.error('[Customer] Get customer by email error:', error);
+    logger.error('[Customer] Get customer by email error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_customer',
@@ -122,7 +123,7 @@ router.get('/tenant/:tenantId', async (req: Request, res: Response) => {
       data: result
     });
   } catch (error: any) {
-    console.error('[Customer] Get tenant customers error:', error);
+    logger.error('[Customer] Get tenant customers error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_get_tenant_customers',
@@ -152,7 +153,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       data: customer
     });
   } catch (error: any) {
-    console.error('[Customer] Update customer error:', error);
+    logger.error('[Customer] Update customer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_update_customer',
@@ -181,7 +182,7 @@ router.post('/from-order', async (req: Request, res: Response) => {
       message: 'Customer updated from order data'
     });
   } catch (error: any) {
-    console.error('[Customer] Update customer from order error:', error);
+    logger.error('[Customer] Update customer from order error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_update_customer_from_order',
@@ -218,7 +219,7 @@ router.post('/relationship', async (req: Request, res: Response) => {
       data: relationship
     });
   } catch (error: any) {
-    console.error('[Customer] Create relationship error:', error);
+    logger.error('[Customer] Create relationship error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_create_relationship',

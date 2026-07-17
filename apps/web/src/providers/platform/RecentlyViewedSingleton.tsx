@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '../base/PublicApiSingleton';
 import { recentlyViewedService } from '@/services/RecentlyViewedService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Recently Viewed Data Interfaces
 export interface RecentlyViewedItem {
@@ -129,7 +130,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
 
       return recentlyViewedItem;
     } catch (error) {
-      console.error('Error adding recently viewed item:', error);
+      clientLogger.error('Error adding recently viewed item:', { detail: error });
       throw error;
     }
   }
@@ -144,7 +145,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
       // End view using service
       await recentlyViewedService.endView();
     } catch (error) {
-      console.error('Error updating view duration:', error);
+      clientLogger.error('Error updating view duration:', { detail: error });
     } finally {
       this.currentItemId = null;
       this.currentViewStart = null;
@@ -181,7 +182,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
       await this.setCache(cacheKey, items);
       return items;
     } catch (error) {
-      console.error('Error fetching recently viewed items:', error);
+      clientLogger.error('Error fetching recently viewed items:', { detail: error });
       return [];
     }
   }
@@ -225,7 +226,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
       // Clear cache
       await this.clearCache(`recently-viewed-${userId || 'anonymous'}`);
     } catch (error) {
-      console.error('Failed to remove recently viewed item:', error);
+      clientLogger.error('Failed to remove recently viewed item:', { detail: error });
       throw error;
     }
   }
@@ -244,7 +245,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
       // Clear cache
       await this.clearCache(`recently-viewed-${userId || 'anonymous'}`);
     } catch (error) {
-      console.error('Failed to clear recently viewed items:', error);
+      clientLogger.error('Failed to clear recently viewed items:', { detail: error });
       throw error;
     }
   }
@@ -279,7 +280,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
         viewTrends: []
       };
     } catch (error) {
-      console.error('Failed to fetch recently viewed stats:', error);
+      clientLogger.error('Failed to fetch recently viewed stats:', { detail: error });
       // Return default stats on error
       return {
         totalViews: 0,
@@ -319,7 +320,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
       
       return trends.data || [];
     } catch (error) {
-      console.error('Failed to fetch recently viewed trends:', error);
+      clientLogger.error('Failed to fetch recently viewed trends:', { detail: error });
       return [];
     }
   }
@@ -376,13 +377,13 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
         cacheKey
       );
       if (!recommendations.success){
-        console.error('Error fetching personalized recommendations:', recommendations.error);
+        clientLogger.error('Error fetching personalized recommendations:', { detail: recommendations.error });
         return [];
       }
       
       return recommendations.data || [];
     } catch (error) {
-      console.error('Error fetching personalized recommendations:', error);
+      clientLogger.error('Error fetching personalized recommendations:', { detail: error });
       return [];
     }
   }
@@ -407,7 +408,7 @@ class RecentlyViewedSingleton extends PublicApiSingleton {
       
       return similarItems.data || [];
     } catch (error) {
-      console.error('Error fetching similar items:', error);
+      clientLogger.error('Error fetching similar items:', { detail: error });
       return [];
     }
   }

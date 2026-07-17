@@ -10,6 +10,7 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // Import ProductVariant from the components to ensure consistency
 export type { ProductVariant } from '@/components/items/ProductVariants';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface VariantCreateData {
   variant_name: string;
@@ -91,7 +92,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: 'Variants fetched successfully',
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error fetching variants:', error);
+      clientLogger.error('[VariantsSingleton] Error fetching variants:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch variants',
@@ -126,7 +127,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: 'Variant created successfully',
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error creating variant:', error);
+      clientLogger.error('[VariantsSingleton] Error creating variant:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create variant',
@@ -161,7 +162,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: 'Variant updated successfully',
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error updating variant:', error);
+      clientLogger.error('[VariantsSingleton] Error updating variant:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update variant',
@@ -189,7 +190,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: 'Variant deleted successfully',
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error deleting variant:', error);
+      clientLogger.error('[VariantsSingleton] Error deleting variant:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to delete variant',
@@ -224,7 +225,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: `${variants.length} variants created successfully`,
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error creating bulk variants:', error);
+      clientLogger.error('[VariantsSingleton] Error creating bulk variants:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create bulk variants',
@@ -259,7 +260,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: `${updates.length} variants updated successfully`,
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error updating bulk variants:', error);
+      clientLogger.error('[VariantsSingleton] Error updating bulk variants:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update bulk variants',
@@ -315,7 +316,7 @@ class VariantsSingleton extends TenantApiSingleton {
       // console.log('[VariantsSingleton] Returning result:', JSON.stringify(result));
       return result;
     } catch (error) {
-      console.error('[VariantsSingleton] Error performing bulk variant operations:', error);
+      clientLogger.error('[VariantsSingleton] Error performing bulk variant operations:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to perform bulk variant operations',
@@ -341,7 +342,7 @@ class VariantsSingleton extends TenantApiSingleton {
         message: 'Variant stats fetched successfully',
       };
     } catch (error) {
-      console.error('[VariantsSingleton] Error fetching variant stats:', error);
+      clientLogger.error('[VariantsSingleton] Error fetching variant stats:', { detail: error });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch variant stats',

@@ -5,6 +5,7 @@ import { ArrowLeft, Tag } from 'lucide-react';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CategoryPageProps {
   params: Promise<{
@@ -75,7 +76,7 @@ async function getCategoryListings(category: string, page: number = 1) {
   try {
     return await recommendationsService.searchByCategory(category, page, limit);
   } catch (error) {
-    console.error('Error fetching category listings:', error);
+    clientLogger.error('Error fetching category listings:', { detail: error });
     return null;
   }
 }

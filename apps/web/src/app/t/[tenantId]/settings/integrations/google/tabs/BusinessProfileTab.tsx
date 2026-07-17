@@ -16,6 +16,7 @@ import {
   Tag,
   Info,
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BusinessProfileTabProps {
   tenantId: string;
@@ -51,7 +52,7 @@ export default function BusinessProfileTab({
         setLinkedLocation(locData?.data?.location || null);
         setSyncSummary(summaryData?.data || null);
       } catch (err) {
-        console.error('Failed to fetch GBP data:', err);
+        clientLogger.error('Failed to fetch GBP data:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -72,7 +73,7 @@ export default function BusinessProfileTab({
       setLinkedLocation(locData?.data?.location || null);
       setSyncSummary(summaryData?.data || null);
     } catch (err) {
-      console.error('Failed to sync business info:', err);
+      clientLogger.error('Failed to sync business info:', { detail: err });
       setSyncResult({ success: false, message: 'Failed to sync business info' });
     } finally {
       setSyncing(false);

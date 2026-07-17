@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import TierSingletonService from '../services/TierSingletonService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -36,7 +37,7 @@ router.get('/stats', async (req, res) => {
       message: 'Tier statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('Tier statistics retrieval failed:', error);
+    logger.error('Tier statistics retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tier statistics',
@@ -71,7 +72,7 @@ router.get('/:id', async (req, res) => {
       message: 'Tier retrieved successfully'
     });
   } catch (error) {
-    console.error('Tier retrieval failed:', error);
+    logger.error('Tier retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tier',
@@ -106,7 +107,7 @@ router.get('/slug/:slug', async (req, res) => {
       message: 'Tier retrieved successfully'
     });
   } catch (error) {
-    console.error('Tier retrieval by slug failed:', error);
+    logger.error('Tier retrieval by slug failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tier',
@@ -142,7 +143,7 @@ router.post('/', async (req, res) => {
       message: 'Tier created successfully'
     });
   } catch (error) {
-    console.error('Tier creation failed:', error);
+    logger.error('Tier creation failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to create tier',
@@ -179,7 +180,7 @@ router.put('/:id', async (req, res) => {
       message: 'Tier updated successfully'
     });
   } catch (error) {
-    console.error('Tier update failed:', error);
+    logger.error('Tier update failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to update tier',
@@ -215,7 +216,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Tier deleted successfully'
     });
   } catch (error) {
-    console.error('Tier deletion failed:', error);
+    logger.error('Tier deletion failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to delete tier',
@@ -249,7 +250,7 @@ router.get('/', async (req, res) => {
       message: 'Tiers retrieved successfully'
     });
   } catch (error) {
-    console.error('Tier listing failed:', error);
+    logger.error('Tier listing failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to list tiers',
@@ -285,7 +286,7 @@ router.get('/:tierId/can-upgrade/:tenantId', async (req, res) => {
       message: 'Upgrade eligibility check completed'
     });
   } catch (error) {
-    console.error('Upgrade eligibility check failed:', error);
+    logger.error('Upgrade eligibility check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to check upgrade eligibility',
@@ -321,7 +322,7 @@ router.get('/:tierId/limits', async (req, res) => {
       message: 'Tier limits retrieved successfully'
     });
   } catch (error) {
-    console.error('Tier limits retrieval failed:', error);
+    logger.error('Tier limits retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve tier limits',
@@ -365,7 +366,7 @@ router.get('/:tierId/has-feature/:feature', async (req, res) => {
       message: 'Feature check completed'
     });
   } catch (error) {
-    console.error('Feature check failed:', error);
+    logger.error('Feature check failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to check feature',

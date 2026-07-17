@@ -5,6 +5,7 @@
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { generateCrmAlertId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 export class CrmAlertService extends BaseService {
   private static instance: CrmAlertService;
@@ -132,7 +133,7 @@ export class CrmAlertService extends BaseService {
         },
       });
     } catch (error) {
-      console.error('[CrmAlertService] Failed to create order alert:', error);
+      logger.error('[CrmAlertService] Failed to create order alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -195,7 +196,7 @@ export class CrmAlertService extends BaseService {
         },
       });
     } catch (error) {
-      console.error('[CrmAlertService] Failed to create abandoned cart alert:', error);
+      logger.error('[CrmAlertService] Failed to create abandoned cart alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -258,7 +259,7 @@ export class CrmAlertService extends BaseService {
         },
       });
     } catch (error) {
-      console.error('[CrmAlertService] Failed to create featured placement alert:', error);
+      logger.error('[CrmAlertService] Failed to create featured placement alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -317,7 +318,7 @@ export class CrmAlertService extends BaseService {
         },
       });
     } catch (error) {
-      console.error('[CrmAlertService] Failed to create App Store alert:', error);
+      logger.error('[CrmAlertService] Failed to create App Store alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 }

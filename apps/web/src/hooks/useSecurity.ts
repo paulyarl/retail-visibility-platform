@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LoginSession, SecurityAlert } from '@/types/security';
 import * as securityService from '@/services/security';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useSecurity() {
   const [sessions, setSessions] = useState<LoginSession[]>([]);
@@ -35,7 +36,7 @@ export function useSecurity() {
       const alerts = Array.isArray(response) ? response : (response as any)?.data || [];
       setAlerts(alerts);
     } catch (err) {
-      console.error('Failed to fetch alerts:', err);
+      clientLogger.error('Failed to fetch alerts:', { detail: err });
     }
   }, []);
 
@@ -62,7 +63,7 @@ export function useSecurity() {
       await securityService.markAlertAsRead(alertId);
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, read: true } : a));
     } catch (err) {
-      console.error('Failed to mark alert as read:', err);
+      clientLogger.error('Failed to mark alert as read:', { detail: err });
     }
   }, []);
 
@@ -71,7 +72,7 @@ export function useSecurity() {
       await securityService.dismissAlert(alertId);
       setAlerts(prev => prev.filter(a => a.id !== alertId));
     } catch (err) {
-      console.error('Failed to dismiss alert:', err);
+      clientLogger.error('Failed to dismiss alert:', { detail: err });
     }
   }, []);
 

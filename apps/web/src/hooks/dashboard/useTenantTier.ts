@@ -14,6 +14,7 @@ import {
   TierFeature
 } from '@/lib/tiers/tier-resolver';
 import { canBypassTierRestrictions, canBypassRoleRestrictions, forceAdminBypass } from '@/lib/auth/platform-admin';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantUsage {
   products: number;
@@ -114,7 +115,7 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
         const data = await CachedTenantService.getTenantData(tenantId, true);
         return data;
       } catch (error) {
-        console.error('[useTenantTier] Failed to fetch tenant data:', error);
+        clientLogger.error('[useTenantTier] Failed to fetch tenant data:', { detail: error });
         throw error;
       }
     },

@@ -5,6 +5,7 @@ import { requireTenantAdmin } from '../middleware/permissions';
 import { z } from 'zod';
 import { invalidateEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { generateQuickstartOptionsSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -71,7 +72,7 @@ router.get('/:tenantId/quickstart-options', authenticateToken, async (req, res) 
       },
     });
   } catch (error) {
-    console.error('Error fetching quickstart options settings:', error);
+    logger.error('Error fetching quickstart options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -143,7 +144,7 @@ router.put('/:tenantId/quickstart-options', authenticateToken, requireTenantAdmi
       },
     });
   } catch (error) {
-    console.error('Error updating quickstart options settings:', error);
+    logger.error('Error updating quickstart options settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

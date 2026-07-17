@@ -336,9 +336,17 @@ A submission with only `_disabled` enabled is valid — it means "this tier expl
 
 - `086_capability_type_disabled_keys.sql` — inserts `_disabled` feature keys for all capability types that lacked them and links them via `capability_features_list`
 
+## Architectural Boundary: Tier Gates vs Merchant Preferences
+
+**Hard rule**: Tier-level fields in resolver output (`allowed_*_types`, `*_styled_enabled`, `*_classic_enabled`, `is_flexible`, feature-level booleans) must be derived from `features` + `fallbackFeatures` only — **never gated by merchant preferences**. Merchant preferences belong in `merchant_preferences` and `can_use_*` / `effective_*` fields only.
+
+When a tier-level field is gated by merchant prefs, the frontend cannot distinguish "tier doesn't allow this" from "merchant hasn't selected this yet". The option disappears, creating a dead-end where the merchant can never discover or select it. This is especially dangerous for radio-selection UIs (Classic vs Styled, Storefront Type, Product Type) where the merchant must see all tier-allowed options to make a choice.
+
+See `capability-data-flow-rules.md` R33 for the full rule, bug pattern, and audit checklist.
+
 ## Related Documents
 
 - **`add-bsaas-feature.md`** — How to add a purchasable feature to the BSaaS store
 - **`capability-deployment-flow.md`** — 8-phase deployment pipeline for capabilities
-- **`capability-data-flow-rules.md`** — Canonical data flow rules (R14-R17)
+- **`capability-data-flow-rules.md`** — Canonical data flow rules (R14-R17, R33 tier/merchant boundary)
 - **`add-capability-feature.md`** — How to add a new feature key to the capability system

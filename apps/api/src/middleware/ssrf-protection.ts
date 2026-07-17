@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../logger';
 
 /**
  * SSRF (Server-Side Request Forgery) Protection Middleware
@@ -119,7 +120,7 @@ export function ssrfProtection(req: Request, res: Response, next: NextFunction) 
           for (const match of matches) {
             const validation = validateUrlForSSRF(match);
             if (!validation.valid) {
-              console.error(`[SSRF BLOCKED] ${validation.reason} in ${context}: ${match} from ${clientIP}`);
+              logger.error(`[SSRF BLOCKED] ${validation.reason} in ${context}: ${match} from ${clientIP}`, undefined);
               return false;
             }
           }
@@ -191,7 +192,7 @@ export function ssrfProtection(req: Request, res: Response, next: NextFunction) 
 
     next();
   } catch (error) {
-    console.error('[SSRF] Error in SSRF protection:', error);
+    logger.error('[SSRF] Error in SSRF protection:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Security validation error'
@@ -262,7 +263,7 @@ export function blockIotRequests(req: Request, res: Response, next: NextFunction
       url.includes('/ipcamera') ||
       url.includes('rtsp://') ||
       url.includes('rtmp://')) {
-    console.error(`[IOT BLOCKED] IoT/IoT request blocked: ${req.method} ${req.originalUrl} from ${clientIP}`);
+    logger.error(`[IOT BLOCKED] IoT/IoT request blocked: ${req.method} ${req.originalUrl} from ${clientIP}`, undefined);
     return res.status(403).json({
       error: 'Forbidden',
       message: 'IoT/IoT access not allowed'

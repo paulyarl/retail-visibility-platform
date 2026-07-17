@@ -8,6 +8,7 @@
  */
 
 import { getPlatformFeeSummaryEmailService } from '../services/email/PlatformFeeSummaryEmailService';
+import { logger } from '../logger';
 
 export interface MonthlyFeeSummaryResult {
   sent: number;
@@ -68,7 +69,7 @@ export function startMonthlyFeeSummaryJob(): void {
       try {
         await sendMonthlyFeeSummaries();
       } catch (error) {
-        console.error('[MonthlyFeeSummaryJob] Error:', error);
+        logger.error('[MonthlyFeeSummaryJob] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
       
       // Schedule next run

@@ -9,6 +9,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { abandonedCartService } from '../services/AbandonedCartService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/:tenantId/abandoned-carts', authenticateToken, async (req: Request,
     const { carts, total } = await abandonedCartService.getAbandonedCarts(tenantId, options);
     res.json({ success: true, carts, total });
   } catch (error) {
-    console.error('Error fetching abandoned carts:', error);
+    logger.error('Error fetching abandoned carts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch abandoned carts' });
   }
 });
@@ -37,7 +38,7 @@ router.get('/:tenantId/abandoned-carts/summary', authenticateToken, async (req: 
     const summary = await abandonedCartService.getSummary(tenantId);
     res.json({ success: true, summary });
   } catch (error) {
-    console.error('Error fetching abandoned cart summary:', error);
+    logger.error('Error fetching abandoned cart summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch summary' });
   }
 });
@@ -61,7 +62,7 @@ router.post('/:tenantId/abandoned-carts/:cartId/resend', authenticateToken, asyn
       res.status(400).json({ success: false, error: 'email_failed', message: 'Failed to send recovery email (cart may be converted, already sent, or no email on file)' });
     }
   } catch (error) {
-    console.error('Error resending abandoned cart recovery email:', error);
+    logger.error('Error resending abandoned cart recovery email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to send recovery email' });
   }
 });

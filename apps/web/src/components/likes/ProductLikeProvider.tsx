@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { productLikesService } from '@/services/ProductLikesSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Simple decryption for client-side caching (matches AuthContext)
 function decrypt(text: string): string {
@@ -44,7 +45,7 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
         setSessionId(lastViewedSession);
       }
     } catch (error) {
-      console.error('[ProductLikeProvider] Error getting user data:', error);
+      clientLogger.error('[ProductLikeProvider] Error getting user data:', { detail: error });
     }
   }, []);
 
@@ -61,7 +62,7 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
       
       return { success: true, likes: data?.likesCount, userLiked: data?.userLiked };
     } catch (error) {
-      console.error('[ProductLikeProvider] Error liking product:', error);
+      clientLogger.error('[ProductLikeProvider] Error liking product:', { detail: error });
       return { success: false, likes: 0, userLiked: false };
     }
   };
@@ -82,7 +83,7 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
         userLiked: data?.userLiked || false
       };
     } catch (error) {
-      console.error('[ProductLikeProvider] Error unliking product:', error);
+      clientLogger.error('[ProductLikeProvider] Error unliking product:', { detail: error });
       return { success: false, likes: 0, userLiked: false };
     }
   };
@@ -96,7 +97,7 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
         userLiked: data?.userLiked || false
       };
     } catch (error) {
-      console.error('[ProductLikeProvider] Error getting like status:', error);
+      clientLogger.error('[ProductLikeProvider] Error getting like status:', { detail: error });
       return null;
     }
   };

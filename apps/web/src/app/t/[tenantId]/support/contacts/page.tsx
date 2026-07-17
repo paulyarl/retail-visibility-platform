@@ -8,6 +8,7 @@ import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { toast } from '@/hooks/use-toast';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
 import type { CrmContact } from '@/types/crm';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function TenantContactsPage() {
   const params = useParams();
@@ -27,7 +28,7 @@ export default function TenantContactsPage() {
         const data = await crmTenantCrmService.listContacts();
         setContacts(data ?? []);
       } catch (err) {
-        console.error('[Tenant Contacts] Load error:', err);
+        clientLogger.error('[Tenant Contacts] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -61,7 +62,7 @@ export default function TenantContactsPage() {
       setSelectedContact(null);
       toast({ title: 'Ticket Created', description: `Ticket created for ${selectedContact.first_name}`, variant: 'success' });
     } catch (err) {
-      console.error('[Tenant Contacts] Create ticket error:', err);
+      clientLogger.error('[Tenant Contacts] Create ticket error:', { detail: err });
       toast({ title: 'Error', description: 'Failed to create ticket', variant: 'destructive' });
     } finally {
       setSubmitting(false);

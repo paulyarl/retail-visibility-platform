@@ -5,6 +5,7 @@ import { useAccessControl, AccessPresets } from "@/lib/auth/useAccessControl";
 import { useOrganizationData } from "@/hooks/useApiQueries";
 import { organizationsService } from "@/services/OrganizationsSingletonService";
 import type { OrganizationData, BillingCounters } from "@/components/organization/types";
+import { clientLogger } from '@/lib/client-logger';
 
 export function useOrgDashboardData(tenantId?: string | null, urlOrgId?: string | null) {
   const {
@@ -45,7 +46,7 @@ export function useOrgDashboardData(tenantId?: string | null, urlOrgId?: string 
           }
           setAvailableOrganizations(organizations);
         } catch (error) {
-          console.error("Failed to fetch organizations:", error);
+          clientLogger.error("Failed to fetch organizations:", { detail: error });
         } finally {
           setLoadingOrganizations(false);
         }

@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../../middleware/auth';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get('/list', authenticateToken, async (req: Request, res: Response) => {
 
     res.json(tiers);
   } catch (error: any) {
-    console.error('[ADMIN TIERS LIST] Error fetching tier list:', error);
+    logger.error('[ADMIN TIERS LIST] Error fetching tier list:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'internal_error',
       message: 'Failed to fetch tier list',

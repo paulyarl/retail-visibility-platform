@@ -486,6 +486,7 @@ export const shopBrandingService = ShopBrandingServiceImpl.getInstance();
 
 // React hook for branding management
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useShopBranding(shopId: string) {
   const [branding, setBranding] = useState<ShopBranding | null>(null);
@@ -504,7 +505,7 @@ export function useShopBranding(shopId: string) {
         setBranding(shopBranding);
         setPresets(availablePresets);
       } catch (error) {
-        console.error('Error loading branding:', error);
+        clientLogger.error('Error loading branding:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -518,7 +519,7 @@ export function useShopBranding(shopId: string) {
       await shopBrandingService.updateShopBranding(shopId, newBranding);
       setBranding(newBranding);
     } catch (error) {
-      console.error('Error updating branding:', error);
+      clientLogger.error('Error updating branding:', { detail: error });
       throw error;
     }
   };
@@ -529,7 +530,7 @@ export function useShopBranding(shopId: string) {
       const updatedBranding = await shopBrandingService.getShopBranding(shopId);
       setBranding(updatedBranding);
     } catch (error) {
-      console.error('Error applying preset:', error);
+      clientLogger.error('Error applying preset:', { detail: error });
       throw error;
     }
   };
@@ -540,7 +541,7 @@ export function useShopBranding(shopId: string) {
       const defaultBranding = await shopBrandingService.getShopBranding(shopId);
       setBranding(defaultBranding);
     } catch (error) {
-      console.error('Error resetting branding:', error);
+      clientLogger.error('Error resetting branding:', { detail: error });
       throw error;
     }
   };

@@ -5,6 +5,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GoogleTaxonomyPath {
   id: string;
@@ -41,7 +42,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    */
   async getGoogleTaxonomyPath(googleCategoryId: string): Promise<GoogleTaxonomyPath | null> {
     if (!googleCategoryId) {
-      console.error('[GoogleTaxonomyPublicService] Google category ID is required');
+      clientLogger.error('[GoogleTaxonomyPublicService] Google category ID is required');
       return null;
     }
 
@@ -53,7 +54,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GoogleTaxonomyPublicService] Failed to get Google taxonomy path:', response.error);
+      clientLogger.error('[GoogleTaxonomyPublicService] Failed to get Google taxonomy path:', { detail: response.error });
       return null;
     }
 
@@ -73,7 +74,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GoogleTaxonomyPublicService] Failed to get popular Google categories:', response.error);
+      clientLogger.error('[GoogleTaxonomyPublicService] Failed to get popular Google categories:', { detail: response.error });
       return null;
     }
 
@@ -86,7 +87,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    */
   async searchGoogleTaxonomy(query: string, limit: number = 20): Promise<GoogleTaxonomyPath[] | null> {
     if (!query) {
-      console.error('[GoogleTaxonomyPublicService] Search query is required');
+      clientLogger.error('[GoogleTaxonomyPublicService] Search query is required');
       return null;
     }
 
@@ -98,7 +99,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[GoogleTaxonomyPublicService] Failed to search Google taxonomy:', response.error);
+      clientLogger.error('[GoogleTaxonomyPublicService] Failed to search Google taxonomy:', { detail: response.error });
       return null;
     }
 

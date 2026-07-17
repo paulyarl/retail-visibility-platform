@@ -10,6 +10,7 @@ import { BarcodeEnrichmentService } from '../services/BarcodeEnrichmentService';
 import { isPlatformAdmin, canViewAllTenants } from '../utils/platform-admin';
 import { generateItemId, generateSessionId, generatePhotoId, generateTenantItemId } from '../lib/id-generator';
 import { requireWritableSubscription } from '../middleware/tier-access';
+import { logger } from '../logger';
 //import { requireWritableSubscription } from '../middleware/subscription';
 
 // Initialize enrichment service
@@ -113,7 +114,7 @@ router.post('/scan/start', authenticateToken, requireWritableSubscription, /* re
 
     return res.status(201).json({ success: true, session });
   } catch (error: any) {
-    console.error('[scan/start] Error:', error);
+    logger.error('[scan/start] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -166,7 +167,7 @@ router.get('/scan/my-sessions', authenticateToken, async (req: Request, res: Res
 
     return res.json({ success: true, sessions: transformedSessions });
   } catch (error: any) {
-    console.error('[scan/my-sessions GET] Error:', error);
+    logger.error('[scan/my-sessions GET] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -300,7 +301,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
       duplicate: duplicateItem ? { item: duplicateItem, warning: 'Item already exists in inventory' } : null,
     });
   } catch (error: any) {
-    console.error('[scan/:sessionId/lookup-barcode] Error:', error);
+    logger.error('[scan/:sessionId/lookup-barcode] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -560,7 +561,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
             });
             photoAssets.push(photoAsset);
           } catch (photoError) {
-            console.error(`[commit] Failed to create photo asset for ${imageUrl}:`, photoError);
+            logger.error(`[commit] Failed to create photo asset for ${imageUrl}:`, undefined, { error: { name: (photoError as any)?.name || 'Error', message: (photoError as any)?.message || String(photoError), stack: (photoError as any)?.stack } });
             // Continue with other photos even if one fails
           }
         }
@@ -593,11 +594,11 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
             }
           } catch (imageError) {
             // Don't fail commit if image processing fails
-            console.error(`[commit] Failed to process images for ${item!.sku}:`, imageError);
+            logger.error(`[commit] Failed to process images for ${item!.sku}:`, undefined, { error: { name: (imageError as any)?.name || 'Error', message: (imageError as any)?.message || String(imageError), stack: (imageError as any)?.stack } });
           }
         }
       } catch (error) {
-        console.error(`[commit] Failed to create item for barcode ${result.barcode}:`, error);
+        logger.error(`[commit] Failed to create item for barcode ${result.barcode}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
 
@@ -629,7 +630,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
 
     return res.json({ success: true, committed: committed.length, itemIds: committed });
   } catch (error: any) {
-    console.error('[scan/:sessionId/commit] Error:', error);
+    logger.error('[scan/:sessionId/commit] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -681,7 +682,7 @@ router.put('/scan/:sessionId/results/:resultId/enrichment', authenticateToken, a
 
     return res.json({ success: true, enrichment: updatedEnrichment });
   } catch (error: any) {
-    console.error('[scan/update-enrichment] Error:', error);
+    logger.error('[scan/update-enrichment] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -734,7 +735,7 @@ router.get('/scan/:sessionId', authenticateToken, async (req: Request, res: Resp
 
     return res.json({ success: true, session: transformedSession });
   } catch (error: any) {
-    console.error('[scan/:sessionId] Error:', error);
+    logger.error('[scan/:sessionId] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -787,7 +788,7 @@ router.post('/scan/cleanup-my-sessions', authenticateToken, async (req: Request,
       message: `Cleaned up ${result.count} active sessions` 
     });
   } catch (error: any) {
-    console.error('[scan/cleanup-my-sessions POST] Error:', error);
+    logger.error('[scan/cleanup-my-sessions POST] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -831,7 +832,7 @@ router.post('/scan/cleanup-idle-sessions', async (req: Request, res: Response) =
       message: `Cleaned up ${result.count} idle sessions`
     });
   } catch (error: any) {
-    console.error('[scan/cleanup-idle-sessions POST] Error:', error);
+    logger.error('[scan/cleanup-idle-sessions POST] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -846,7 +847,7 @@ router.get('/admin/enrichment/cache-stats', authenticateToken, async (req: Reque
     const stats = barcodeEnrichmentService.getCacheStats();
     return res.json({ success: true, stats });
   } catch (error: any) {
-    console.error('[enrichment/cache-stats] Error:', error);
+    logger.error('[enrichment/cache-stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -860,7 +861,7 @@ router.get('/admin/enrichment/rate-limits', authenticateToken, async (req: Reque
     const stats = barcodeEnrichmentService.getRateLimitStats();
     return res.json({ success: true, stats });
   } catch (error: any) {
-    console.error('[enrichment/rate-limits] Error:', error);
+    logger.error('[enrichment/rate-limits] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -879,7 +880,7 @@ router.post('/admin/enrichment/clear-cache', authenticateToken, async (req: Requ
       message: barcode ? `Cache cleared for ${barcode}` : 'All cache cleared' 
     });
   } catch (error: any) {
-    console.error('[enrichment/clear-cache] Error:', error);
+    logger.error('[enrichment/clear-cache] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -983,7 +984,7 @@ router.get('/admin/enrichment/analytics', authenticateToken, async (req: Request
       },
     });
   } catch (error: any) {
-    console.error('[enrichment/analytics] Error:', error);
+    logger.error('[enrichment/analytics] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1057,7 +1058,7 @@ router.get('/admin/enrichment/search', authenticateToken, async (req: Request, r
       },
     });
   } catch (error: any) {
-    console.error('[enrichment/search] Error:', error);
+    logger.error('[enrichment/search] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1081,7 +1082,7 @@ router.get('/admin/enrichment/:barcode', authenticateToken, async (req: Request,
 
     return res.json({ success: true, product });
   } catch (error: any) {
-    console.error('[enrichment/detail] Error:', error);
+    logger.error('[enrichment/detail] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1205,7 +1206,7 @@ router.get('/scan/tenant/:tenantId/analytics', authenticateToken, async (req: Re
       },
     });
   } catch (error: any) {
-    console.error('[tenant/analytics] Error:', error);
+    logger.error('[tenant/analytics] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1263,7 +1264,7 @@ router.get('/scan/preview/:barcode', authenticateToken, async (req: Request, res
       message: 'Product not in cache. Will fetch from external APIs when scanned.',
     });
   } catch (error: any) {
-    console.error('[preview] Error:', error);
+    logger.error('[preview] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1443,7 +1444,7 @@ router.patch('/scan/:sessionId/results/:resultId/enrichment', authenticateToken,
 
     return res.json({ success: true, enrichment: updatedEnrichment });
   } catch (error: any) {
-    console.error('[scan/:sessionId/results/:resultId/enrichment PATCH] Error:', error);
+    logger.error('[scan/:sessionId/results/:resultId/enrichment PATCH] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1482,7 +1483,7 @@ router.delete('/scan/:sessionId/results/:resultId', authenticateToken, async (re
 
     return res.json({ success: true });
   } catch (error: any) {
-    console.error('[scan/:sessionId/results/:resultId DELETE] Error:', error);
+    logger.error('[scan/:sessionId/results/:resultId DELETE] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });
@@ -1519,7 +1520,7 @@ router.delete('/scan/:sessionId', authenticateToken, async (req, res) => {
 
     return res.json({ success: true });
   } catch (error: any) {
-    console.error('[scan/:sessionId DELETE] Error:', error);
+    logger.error('[scan/:sessionId DELETE] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'internal_error', message: error.message });
   }
 });

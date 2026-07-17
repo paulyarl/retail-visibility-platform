@@ -8,6 +8,7 @@
 import {  RequestType, RequestTarget } from '@/providers/base/FlexibleApiSingleton';
 import { PublicApiSingleton} from '@/providers/base/PublicApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface UserLocation {
   latitude: number;
@@ -136,7 +137,7 @@ class LocationAvailabilityService extends PublicApiSingleton {
   ): Promise<MultiLocationAvailability | null> {
     // Validate slug format before making API call
     if (!this.isValidProductSlug(productSlug)) {
-      console.warn(`[LocationAvailabilityService] Invalid product_slug format: ${productSlug}. Expected lpc_* or upc_* prefix. Use getAvailabilityBySku() for SKU lookups.`);
+      clientLogger.warn(`[LocationAvailabilityService] Invalid product_slug format: ${productSlug}. Expected lpc_* or upc_* prefix. Use getAvailabilityBySku() for SKU lookups.`);
       return null;
     }
 
@@ -176,7 +177,7 @@ class LocationAvailabilityService extends PublicApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[LocationAvailabilityService] Error fetching product availability:', error);
+      clientLogger.error('[LocationAvailabilityService] Error fetching product availability:', { detail: error });
       return null;
     }
   }
@@ -223,7 +224,7 @@ class LocationAvailabilityService extends PublicApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[LocationAvailabilityService] Error fetching SKU availability:', error);
+      clientLogger.error('[LocationAvailabilityService] Error fetching SKU availability:', { detail: error });
       return null;
     }
   }

@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 type LocationStatus = 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
 
@@ -173,7 +174,7 @@ export async function syncLocationStatusToGoogle(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[GoogleBusinessStatusSync] API error for tenant ${tenantId}:`, errorText);
+      logger.error(`[GoogleBusinessStatusSync] API error for tenant ${tenantId}:`, undefined, { error: { name: (errorText as any)?.name || 'Error', message: (errorText as any)?.message || String(errorText), stack: (errorText as any)?.stack } });
       
       return {
         success: false,
@@ -195,7 +196,7 @@ export async function syncLocationStatusToGoogle(
     };
 
   } catch (error: any) {
-    console.error(`[GoogleBusinessStatusSync] Error syncing tenant ${tenantId}:`, error);
+    logger.error(`[GoogleBusinessStatusSync] Error syncing tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return {
       success: false,
       error: error.message || 'Unknown error',
@@ -263,6 +264,6 @@ export async function logSyncResult(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[GoogleBusinessStatusSync] Error logging sync result:', error);
+    logger.error('[GoogleBusinessStatusSync] Error logging sync result:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }

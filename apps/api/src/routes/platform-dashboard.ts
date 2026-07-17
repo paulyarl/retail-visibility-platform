@@ -3,6 +3,7 @@ import { authenticateToken, authorize } from '../middleware/auth';
 import { platformDashboardSingleton } from '../services/PlatformDashboardSingletonService';
 import { SingletonMetrics } from '../lib/UniversalSingleton';
 import { user_role } from '@prisma/client';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -26,11 +27,11 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     });
 
   } catch (error: any) {
-    console.error('[PLATFORM DASHBOARD] Error:', error);
+    logger.error('[PLATFORM DASHBOARD] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_platform_dashboard',
-      message: error?.message || 'Unknown error'
+      message: (error as any)?.message || 'Unknown error'
     });
   }
 });
@@ -52,11 +53,11 @@ router.get('/stats', authenticateToken, async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('[PLATFORM STATS] Error:', error);
+    logger.error('[PLATFORM STATS] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_platform_stats',
-      message: error?.message || 'Unknown error'
+      message: (error as any)?.message || 'Unknown error'
     });
   }
 });
@@ -78,11 +79,11 @@ router.get('/tenants/top', authenticateToken, async (req: Request, res: Response
     });
 
   } catch (error: any) {
-    console.error('[PLATFORM TENANTS] Error:', error);
+    logger.error('[PLATFORM TENANTS] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_top_tenants',
-      message: error?.message || 'Unknown error'
+      message: (error as any)?.message || 'Unknown error'
     });
   }
 });
@@ -104,11 +105,11 @@ router.get('/activity', authenticateToken, async (req: Request, res: Response) =
     });
 
   } catch (error: any) {
-    console.error('[PLATFORM ACTIVITY] Error:', error);
+    logger.error('[PLATFORM ACTIVITY] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_recent_activity',
-      message: error?.message || 'Unknown error'
+      message: (error as any)?.message || 'Unknown error'
     });
   }
 });
@@ -131,11 +132,11 @@ router.delete('/cache', authenticateToken, authorize(user_role.PLATFORM_ADMIN, u
     });
 
   } catch (error: any) {
-    console.error('[PLATFORM CACHE] Error:', error);
+    logger.error('[PLATFORM CACHE] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_clear_cache',
-      message: error?.message || 'Unknown error'
+      message: (error as any)?.message || 'Unknown error'
     });
   }
 });
@@ -156,11 +157,11 @@ router.get('/metrics', authenticateToken, authorize(user_role.PLATFORM_ADMIN, us
     });
 
   } catch (error: any) {
-    console.error('[PLATFORM METRICS] Error:', error);
+    logger.error('[PLATFORM METRICS] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'failed_to_fetch_metrics',
-      message: error?.message || 'Unknown error'
+      message: (error as any)?.message || 'Unknown error'
     });
   }
 });

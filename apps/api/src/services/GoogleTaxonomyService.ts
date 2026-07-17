@@ -1,3 +1,5 @@
+import { logger } from '../logger';
+
 /**
  * Google Taxonomy Service
  * Handles fetching and processing Google Product Taxonomy data
@@ -35,7 +37,7 @@ export class GoogleTaxonomyService {
         lastModified
       };
     } catch (error) {
-      console.error('Error fetching Google taxonomy:', error);
+      logger.error('Error fetching Google taxonomy:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

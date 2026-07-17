@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { generateTenantAutoId, getCachedTenantAutoId, getTenantIdentifiers, isTenantAutoId } from '../middleware/tenantAutoId';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.get('/:tenantId', (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[TENANT AUTO ID] Error generating auto ID:', error);
+    logger.error('[TENANT AUTO ID] Error generating auto ID:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to generate tenant auto ID'
@@ -68,7 +69,7 @@ router.get('/:tenantId/cached', (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[TENANT AUTO ID] Error getting cached auto ID:', error);
+    logger.error('[TENANT AUTO ID] Error getting cached auto ID:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get cached tenant auto ID'
@@ -99,7 +100,7 @@ router.get('/:tenantId/identifiers', (req, res) => {
       data: identifiers
     });
   } catch (error) {
-    console.error('[TENANT AUTO ID] Error getting identifiers:', error);
+    logger.error('[TENANT AUTO ID] Error getting identifiers:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get tenant identifiers'
@@ -133,7 +134,7 @@ router.post('/validate', (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[TENANT AUTO ID] Error validating identifier:', error);
+    logger.error('[TENANT AUTO ID] Error validating identifier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to validate identifier'
@@ -168,7 +169,7 @@ router.get('/batch', (req, res) => {
       count: results.length
     });
   } catch (error) {
-    console.error('[TENANT AUTO ID] Error batch generating auto IDs:', error);
+    logger.error('[TENANT AUTO ID] Error batch generating auto IDs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to batch generate tenant auto IDs'

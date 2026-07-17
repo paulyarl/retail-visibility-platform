@@ -4,6 +4,7 @@
  */
 
 import { externalApiService } from '@/services/ExternalApiService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GeocodeResult {
   latitude: number;
@@ -47,7 +48,7 @@ export async function geocodeAddress(
     });
 
     if (!result) {
-      console.warn(`[Geocoding] Failed for "${fullAddress}"`);
+      clientLogger.warn(`[Geocoding] Failed for "${fullAddress}"`);
       return null;
     }
 
@@ -64,7 +65,7 @@ export async function geocodeAddress(
       placeId: reverseResult?.place_id?.toString(),
     };
   } catch (error) {
-    console.error('[Geocoding] Error:', error);
+    clientLogger.error('[Geocoding] Error:', { detail: error });
     return null;
   }
 }
@@ -126,7 +127,7 @@ export async function batchGeocodeAddresses(
         const errorMessage = typeof batchResult.error === 'string' 
           ? batchResult.error 
           : batchResult.error?.message || 'Unknown error';
-        console.warn(`[Geocoding] Failed for address ${addr.id}:`, errorMessage);
+        clientLogger.warn(`[Geocoding] Failed for address ${addr.id}:`, { detail: errorMessage });
         results[addr.id] = null;
       }
 
@@ -136,7 +137,7 @@ export async function batchGeocodeAddresses(
       }
     }
   } catch (error) {
-    console.error('[Geocoding] Batch request failed:', error);
+    clientLogger.error('[Geocoding] Batch request failed:', { detail: error });
     
     // Fallback to individual requests if batch fails
     for (let i = 0; i < addresses.length; i++) {

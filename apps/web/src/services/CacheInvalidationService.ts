@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CacheInvalidationResult {
   success: boolean;
@@ -49,7 +50,7 @@ export class CacheInvalidationService extends AdminApiSingleton {
         throw new Error('Cache invalidation failed');
       }
     } catch (error) {
-      console.warn('⚠️ API cache clear error:', error);
+      clientLogger.warn('⚠️ API cache clear error:', { detail: error });
       throw error;
     }
   }
@@ -75,7 +76,7 @@ export class CacheInvalidationService extends AdminApiSingleton {
         throw new Error('Tenant cache invalidation failed');
       }
     } catch (error) {
-      console.warn('⚠️ Tenant API cache clear error:', error);
+      clientLogger.warn('⚠️ Tenant API cache clear error:', { detail: error });
       throw error;
     }
   }
@@ -101,7 +102,7 @@ export class CacheInvalidationService extends AdminApiSingleton {
         throw new Error('Tenant cache invalidation failed');
       }
     } catch (error) {
-      console.warn('⚠️ Tenant API cache clear error:', error);
+      clientLogger.warn('⚠️ Tenant API cache clear error:', { detail: error });
       throw error;
     }
   }

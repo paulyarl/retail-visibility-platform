@@ -476,7 +476,7 @@ router.get('/exports', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    logger.error('Failed to get export history', { metadata: { error: error.message } } as any);
+    logger.error('Failed to get export history', undefined, { error: { name: 'Error', message: String({ metadata: { error: error.message } } as any) } });
     res.status(500).json({
       error: 'exports_retrieval_failed',
       message: 'Failed to retrieve export history.',
@@ -499,7 +499,7 @@ router.get('/delete/status', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    logger.error('Failed to get deletion status', { metadata: { error: error.message } } as any);
+    logger.error('Failed to get deletion status', undefined, { error: { name: 'Error', message: String({ metadata: { error: error.message } } as any) } });
     res.status(500).json({
       error: 'deletion_status_failed',
       message: 'Failed to retrieve deletion status.',

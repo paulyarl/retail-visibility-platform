@@ -15,6 +15,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 export interface ResolvedTenant {
   id: string;
@@ -148,7 +149,7 @@ export async function resolveIdentifier(
     });
     
   } catch (error) {
-    console.error(`[Identifier Resolver] Error resolving ${identifier}:`, error);
+    logger.error(`[Identifier Resolver] Error resolving ${identifier}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Resolution failed',

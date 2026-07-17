@@ -12,6 +12,7 @@
 
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
+import { logger } from '../logger';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ const routeMapPath = join(__dirname, '..', 'generated', 'route-map.json');
 const outputPath = join(__dirname, '..', '..', 'openapi.json');
 
 if (!existsSync(routeMapPath)) {
-  console.error('❌ route-map.json not found. Run generate-route-map.ts first.');
+  logger.error('❌ route-map.json not found. Run generate-route-map.ts first.', undefined);
   process.exit(1);
 }
 
@@ -234,6 +235,6 @@ try {
   console.log(`✅ OpenAPI spec generated: ${outputPath}`);
   console.log(`   ${Object.keys(spec.paths).length} paths, ${spec.tags.length} tags`);
 } catch (error) {
-  console.error('❌ Failed to generate OpenAPI spec:', error);
+  logger.error('❌ Failed to generate OpenAPI spec:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   process.exit(1);
 }

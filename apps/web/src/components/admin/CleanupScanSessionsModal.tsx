@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { scanAnalyticsService } from '@/services/ScanAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CleanupScanSessionsModalProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
       const data = await scanAnalyticsService.getScanSessionStats(selectedTenantId);
       setSessionStats(data);
     } catch (err) {
-      console.error('Failed to fetch session stats:', err);
+      clientLogger.error('Failed to fetch session stats:', { detail: err });
     }
   };
 

@@ -8,6 +8,7 @@ import TenantSettingsSingleton, {
   TenantTier, 
   FeaturedProductsLimits 
 } from '@/lib/singletons/TenantSettingsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // ====================
 // CONTEXT
@@ -138,7 +139,7 @@ export function useTenantInfo() {
       setInfo(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tenant info');
-      console.error('[useTenantInfo] Error:', err);
+      clientLogger.error('[useTenantInfo] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -171,7 +172,7 @@ export function useTenantProfile() {
       setProfile(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tenant profile');
-      console.error('[useTenantProfile] Error:', err);
+      clientLogger.error('[useTenantProfile] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -221,7 +222,7 @@ export function useFeaturedProductsLimits() {
       setLimits(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch featured products limits');
-      console.error('[useFeaturedProductsLimits] Error:', err);
+      clientLogger.error('[useFeaturedProductsLimits] Error:', { detail: err });
     } finally {
       setLoading(false);
     }

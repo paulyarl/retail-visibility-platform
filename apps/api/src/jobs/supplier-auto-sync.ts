@@ -15,6 +15,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const STARTUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
@@ -136,7 +137,7 @@ async function runScheduledSync(): Promise<void> {
           data: { last_sync: new Date() },
         });
       } catch (error) {
-        console.error(`[SupplierAutoSync] Error syncing mapping ${mapping.id}:`, error);
+        logger.error(`[SupplierAutoSync] Error syncing mapping ${mapping.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         failed++;
       }
 
@@ -149,7 +150,7 @@ async function runScheduledSync(): Promise<void> {
       `${synced} synced, ${failed} failed`
     );
   } catch (error) {
-    console.error('[SupplierAutoSync] Scheduled sync failed:', error);
+    logger.error('[SupplierAutoSync] Scheduled sync failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 

@@ -13,6 +13,7 @@ import sharp from 'sharp';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { generateItemId, generatePhotoId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 // Import the new Google GenAI for Imagen 3
 let GoogleGenAI: any = null;
@@ -151,7 +152,7 @@ export class AIImageService {
       };
       
     } catch (error: any) {
-      console.error(`[AIImage] Failed to generate image for "${productName}":`, error.message);
+      logger.error(`[AIImage] Failed to generate image for "${productName}":`, undefined, { error: { name: 'Error', message: String(error.message) } });
       
       // Try fallback provider
       if (provider === 'google' && this.openai) {
@@ -159,7 +160,7 @@ export class AIImageService {
         try {
           return await this.generateProductImage(productName, tenantId, inventoryItemId, 'openai', quality);
         } catch (fallbackError: any) {
-          console.error('[AIImage] Fallback also failed:', fallbackError.message);
+          logger.error('[AIImage] Fallback also failed:', undefined, { error: { name: 'Error', message: String(fallbackError.message) } });
         }
       }
       

@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface SeoSettings {
   seo_tags: string[];
@@ -41,13 +42,13 @@ class TenantSeoService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantSeoService] Failed to get SEO settings:', result.error);
+        clientLogger.error('[TenantSeoService] Failed to get SEO settings:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantSeoService] Failed to get SEO settings:', error);
+      clientLogger.error('[TenantSeoService] Failed to get SEO settings:', { detail: error });
       return null;
     }
   }
@@ -66,14 +67,14 @@ class TenantSeoService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantSeoService] Failed to update SEO settings:', result.error);
+        clientLogger.error('[TenantSeoService] Failed to update SEO settings:', { detail: result.error });
         return false;
       }
 
       this.invalidateCache(`tenant-seo-${tenantId}`);
       return true;
     } catch (error) {
-      console.error('[TenantSeoService] Failed to update SEO settings:', error);
+      clientLogger.error('[TenantSeoService] Failed to update SEO settings:', { detail: error });
       return false;
     }
   }

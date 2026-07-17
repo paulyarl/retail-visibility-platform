@@ -29,6 +29,7 @@ import {
 
 // Re-export for convenience
 export { AccessPresets } from './access-control';
+import { clientLogger } from '@/lib/client-logger';
  
 
 export interface UseAccessControlResult {
@@ -98,7 +99,7 @@ export function useAccessControl(
               
               // Ensure organizations is an array before calling find
               if (!Array.isArray(organizations)) {
-                console.warn('[useAccessControl] Organizations is not an array:', organizations);
+                clientLogger.warn('[useAccessControl] Organizations is not an array:', { detail: organizations });
                 throw new Error('Invalid organizations data format');
               }
               
@@ -115,7 +116,7 @@ export function useAccessControl(
                 setOrganizationData(null);
               }
             } catch (orgError) {
-              console.warn('Failed to fetch organizations:', orgError);
+              clientLogger.warn('Failed to fetch organizations:', { detail: orgError });
               setOrganizationData(null);
             }
           }
@@ -125,7 +126,7 @@ export function useAccessControl(
         setOrganizationData(null);
       }
     } catch (error) {
-      console.error('Failed to fetch tenant data:', error);
+      clientLogger.error('Failed to fetch tenant data:', { detail: error });
       setError('Failed to load tenant data');
       setTenantData(null);
       setOrganizationData(null);

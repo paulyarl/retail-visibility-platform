@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { publicBrandingService } from '@/services/PublicBrandingService';
 import { adminSettingsService } from '@/services/AdminSettingsService';
 import { useAuth } from './AuthContext';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PlatformSettings {
   platformName: string;
@@ -60,7 +61,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
             }
           }
         } catch (paymentError) {
-          console.warn('[PlatformSettingsProvider] Failed to fetch payment settings, using defaults:', paymentError);
+          clientLogger.warn('[PlatformSettingsProvider] Failed to fetch payment settings, using defaults:', { detail: paymentError });
         }
 
         const mappedSettings: PlatformSettings = {
@@ -79,11 +80,11 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
         // console.log('[PlatformSettingsProvider] Mapped settings:', mappedSettings);
         setSettings(mappedSettings);
       } else {
-        console.warn('[PlatformSettingsProvider] No public branding settings found, using defaults');
+        clientLogger.warn('[PlatformSettingsProvider] No public branding settings found, using defaults');
         setSettings(null);
       }
     } catch (error) {
-      console.error('[PlatformSettingsProvider] Failed to load public branding settings:', error);
+      clientLogger.error('[PlatformSettingsProvider] Failed to load public branding settings:', { detail: error });
       setError('Failed to load platform settings');
       setSettings(null);
     } finally {

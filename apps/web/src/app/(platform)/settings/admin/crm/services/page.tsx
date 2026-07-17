@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -37,7 +38,7 @@ export default function CrmServicesPage() {
         if (ticketsRes.status === 'fulfilled') setTickets(ticketsRes.value);
         if (tasksRes.status === 'fulfilled') setTasks(tasksRes.value);
       } catch (err) {
-        console.error('[CRM Services] Load error:', err);
+        clientLogger.error('[CRM Services] Load error:', { detail: err });
       } finally {
         setLoading(false);
       }

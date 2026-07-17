@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Organization {
   id: string;
@@ -80,7 +81,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to get organizations:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to get organizations:', { detail: result.error });
       return [];
     }
 
@@ -93,7 +94,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async getOrganizationById(id: string): Promise<Organization | null> {
     if (!id) {
-      console.error('[OrganizationsSingleton] getOrganizationById: id is required');
+      clientLogger.error('[OrganizationsSingleton] getOrganizationById: id is required');
       return null;
     }
 
@@ -104,7 +105,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to get organization by ID:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to get organization by ID:', { detail: result.error });
       return null;
     }
 
@@ -117,7 +118,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async getOrganizationBySlug(slug: string): Promise<Organization | null> {
     if (!slug) {
-      console.error('[OrganizationsSingleton] getOrganizationBySlug: slug is required');
+      clientLogger.error('[OrganizationsSingleton] getOrganizationBySlug: slug is required');
       return null;
     }
 
@@ -128,7 +129,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to get organization by slug:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to get organization by slug:', { detail: result.error });
       return null;
     }
 
@@ -141,7 +142,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async searchOrganizations(query: string, page: number = 1, limit: number = 20): Promise<Organization[]> {
     if (!query) {
-      console.error('[OrganizationsSingleton] searchOrganizations: query is required');
+      clientLogger.error('[OrganizationsSingleton] searchOrganizations: query is required');
       return [];
     }
 
@@ -152,7 +153,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to search organizations:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to search organizations:', { detail: result.error });
       return [];
     }
 
@@ -165,7 +166,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async updateHeroLocation(organizationId: string, tenantId: string): Promise<any> {
     if (!organizationId || !tenantId) {
-      console.error('[OrganizationsSingleton] updateHeroLocation: organizationId and tenantId are required');
+      clientLogger.error('[OrganizationsSingleton] updateHeroLocation: organizationId and tenantId are required');
       return null;
     }
 
@@ -179,7 +180,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to update hero location:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to update hero location:', { detail: result.error });
       return null;
     }
     
@@ -200,17 +201,17 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     organizationId?: string;
   }): Promise<any> {
     if (!requestData.scope || !requestData.strategy) {
-      console.error('[OrganizationsSingleton] mirrorCategories: scope and strategy are required');
+      clientLogger.error('[OrganizationsSingleton] mirrorCategories: scope and strategy are required');
       return null;
     }
 
     if (requestData.scope === 'tenant' && !requestData.tenantId) {
-      console.error('[OrganizationsSingleton] mirrorCategories: tenantId is required for tenant scope');
+      clientLogger.error('[OrganizationsSingleton] mirrorCategories: tenantId is required for tenant scope');
       return null;
     }
 
     if (requestData.scope === 'organization' && !requestData.organizationId) {
-      console.error('[OrganizationsSingleton] mirrorCategories: organizationId is required for organization scope');
+      clientLogger.error('[OrganizationsSingleton] mirrorCategories: organizationId is required for organization scope');
       return null;
     }
 
@@ -224,7 +225,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to mirror categories:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to mirror categories:', { detail: result.error });
       return null;
     }
 
@@ -237,7 +238,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async syncFromHero(organizationId: string): Promise<any> {
     if (!organizationId) {
-      console.error('[OrganizationsSingleton] syncFromHero: organizationId is required');
+      clientLogger.error('[OrganizationsSingleton] syncFromHero: organizationId is required');
       return null;
     }
 
@@ -251,7 +252,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to sync from hero:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to sync from hero:', { detail: result.error });
       return null;
     }
     
@@ -287,12 +288,12 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     }>;
   } | null> {
     if (!organizationId) {
-      console.error('[OrganizationsSingleton] propagateItems: organizationId is required');
+      clientLogger.error('[OrganizationsSingleton] propagateItems: organizationId is required');
       return null;
     }
 
     if (!options.sourceItemId || !options.targetTenantIds?.length) {
-      console.error('[OrganizationsSingleton] propagateItems: sourceItemId and targetTenantIds are required');
+      clientLogger.error('[OrganizationsSingleton] propagateItems: sourceItemId and targetTenantIds are required');
       return null;
     }
 
@@ -310,7 +311,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to propagate items:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to propagate items:', { detail: result.error });
       return null;
     }
 
@@ -323,7 +324,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async getOrganizationCommerceSettings(organizationId: string): Promise<any | null> {
     if (!organizationId) {
-      console.error('[OrganizationsSingleton] getOrganizationCommerceSettings: organizationId is required');
+      clientLogger.error('[OrganizationsSingleton] getOrganizationCommerceSettings: organizationId is required');
       return null;
     }
 
@@ -336,7 +337,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to get commerce settings:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to get commerce settings:', { detail: result.error });
       return null;
     }
 
@@ -348,7 +349,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
    */
   async updateOrganizationCommerceSettings(organizationId: string, settings: any): Promise<any | null> {
     if (!organizationId) {
-      console.error('[OrganizationsSingleton] updateOrganizationCommerceSettings: organizationId is required');
+      clientLogger.error('[OrganizationsSingleton] updateOrganizationCommerceSettings: organizationId is required');
       return null;
     }
 
@@ -362,7 +363,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to update commerce settings:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to update commerce settings:', { detail: result.error });
       return null;
     }
 
@@ -380,7 +381,7 @@ class OrganizationsSingletonService extends TenantApiSingleton {
       `org-available-tenants-${organizationId}`
     );
     if (!result.success) {
-      console.error('[OrganizationsSingleton] Failed to get available tenants:', result.error);
+      clientLogger.error('[OrganizationsSingleton] Failed to get available tenants:', { detail: result.error });
       return [];
     }
     return result.data || [];

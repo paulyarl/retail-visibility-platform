@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getTenantOrganizationsSingleton } from '@/lib/singletons/TenantOrganizationsSingleton';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Tenant {
   id: string;
@@ -64,7 +65,7 @@ export default function PropagateItemModal({
       const otherTenants = organization.tenants.filter((t: any) => t.id !== currentTenantId);
       setTenants(otherTenants);
     } catch (err: any) {
-      console.error('Failed to load tenants:', err);
+      clientLogger.error('Failed to load tenants:', { detail: err });
       setError('Failed to load locations');
     } finally {
       setLoading(false);
@@ -111,7 +112,7 @@ export default function PropagateItemModal({
         onSuccess?.();
       }
     } catch (err: any) {
-      console.error('Failed to propagate:', err);
+      clientLogger.error('Failed to propagate:', { detail: err });
       setError(err.message || 'Failed to propagate item');
     } finally {
       setPropagating(false);

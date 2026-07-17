@@ -16,6 +16,7 @@
 import { prisma } from '../prisma';
 import { CrmTaskService } from '../services/CrmTaskService';
 import FeaturedOptionsService from '../services/FeaturedOptionsService';
+import { logger } from '../logger';
 
 export interface FeaturedExpiryMonitorResult {
   autoUnfeatured: number;
@@ -93,7 +94,7 @@ export async function processFeaturedProductsExpiry(): Promise<FeaturedExpiryMon
         });
         result.expiredAlerts++;
       } catch (error: any) {
-        console.error(`[FeaturedExpiryMonitor] Failed to create expired CRM task for tenant ${tenantId}:`, error);
+        logger.error(`[FeaturedExpiryMonitor] Failed to create expired CRM task for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         result.errors.push(`Expired CRM task ${tenantId}: ${error.message}`);
       }
     }
@@ -153,7 +154,7 @@ export async function processFeaturedProductsExpiry(): Promise<FeaturedExpiryMon
         });
         result.expiringSoonAlerts++;
       } catch (error: any) {
-        console.error(`[FeaturedExpiryMonitor] Failed to create expiring CRM task for tenant ${tenantId}:`, error);
+        logger.error(`[FeaturedExpiryMonitor] Failed to create expiring CRM task for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         result.errors.push(`Expiring CRM task ${tenantId}: ${error.message}`);
       }
     }
@@ -193,7 +194,7 @@ export async function processFeaturedProductsExpiry(): Promise<FeaturedExpiryMon
 
     return result;
   } catch (error: any) {
-    console.error('[FeaturedExpiryMonitor] Fatal error:', error);
+    logger.error('[FeaturedExpiryMonitor] Fatal error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     result.errors.push(`Fatal error: ${error.message}`);
     return result;
   }

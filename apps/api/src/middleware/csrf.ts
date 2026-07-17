@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import crypto from 'crypto';
+import { logger } from '../logger';
 
 function getCookie(req: Request, name: string): string | undefined {
   const header = req.headers['cookie'];
@@ -45,7 +46,7 @@ export function csrfProtect(req: Request, res: Response, next: NextFunction) {
   if (!enforce) return next();
 
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
-    console.error('[CSRF] Token mismatch - Cookie:', cookieToken?.substring(0, 8), 'Header:', headerToken?.substring(0, 8));
+    logger.error('[CSRF] Token mismatch - Cookie:', undefined, { error: { name: 'Error', message: String(cookieToken?.substring(0, 8)) +  + String('Header:') + String(headerToken?.substring(0, 8)) } });
     return res.status(403).json({ error: 'csrf_missing_or_invalid' });
   }
 

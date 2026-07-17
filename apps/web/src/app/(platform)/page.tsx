@@ -21,6 +21,7 @@ import { computeStoreStatus } from "@/lib/hours-utils";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 const LandingHero = dynamic(
   () => import("@/components/landing/LandingHero").then((m) => m.LandingHero),
@@ -138,7 +139,7 @@ function Home() {
           });
         } catch (error) {
           // Silently fail - platform stats are non-critical for user experience
-          console.warn('[Platform Stats] Failed to load public stats, using defaults');
+          clientLogger.warn('[Platform Stats] Failed to load public stats, using defaults');
         }
       };
       fetchPlatformStats();
@@ -172,7 +173,7 @@ function Home() {
         setShowcaseMode(modeMap[config.mode] || 'tabs');
       } catch (error) {
         // Silently fail - showcase config is non-critical, defaults to 'hybrid'
-        console.warn('[Showcase Config] Failed to load config, using hybrid mode');
+        clientLogger.warn('[Showcase Config] Failed to load config, using hybrid mode');
         setShowcaseMode('tabs');
       }
     };
@@ -231,7 +232,7 @@ function Home() {
         }
       } catch (error) {
         // Silently fail - tenant details are non-critical for dashboard
-        console.warn('[Tenant Details] Failed to load logo/banner, continuing without them');
+        clientLogger.warn('[Tenant Details] Failed to load logo/banner, continuing without them');
       }
     };
 

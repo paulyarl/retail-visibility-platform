@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Trend Data Interfaces
 export interface TrendData {
@@ -72,7 +73,7 @@ class RateLimitTrendsService extends AdminApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[RateLimitTrendsService] Failed to get rate limit trends:', error);
+      clientLogger.error('[RateLimitTrendsService] Failed to get rate limit trends:', { detail: error });
       return {
         aggregatedData: [],
         topPaths: [],

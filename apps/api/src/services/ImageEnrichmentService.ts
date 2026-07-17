@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../prisma";
 import { StorageBuckets } from "../storage-config";
 import { generatePhotoId } from "../lib/id-generator";
+import { logger } from '../logger';
 const sharp = require("sharp");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -113,7 +114,7 @@ export class ImageEnrichmentService {
         contentType: finalContentType
       };
     } catch (error) {
-      console.error('[ImageCompression] Error compressing image:', error);
+      logger.error('[ImageCompression] Error compressing image:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Return original buffer if compression fails
       return {
         buffer: imageBuffer,
@@ -175,7 +176,7 @@ export class ImageEnrichmentService {
         });
 
       if (error) {
-        console.error('[ImageEnrichment] Upload error:', error);
+        logger.error('[ImageEnrichment] Upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return null;
       }
 
@@ -192,7 +193,7 @@ export class ImageEnrichmentService {
         contentType: compressedImage.contentType,
       };
     } catch (error: any) {
-      console.error('[ImageEnrichment] Error downloading/storing image:', error);
+      logger.error('[ImageEnrichment] Error downloading/storing image:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -234,7 +235,7 @@ export class ImageEnrichmentService {
         });
       }
     } catch (error: any) {
-      console.error('[ImageEnrichment] Error creating PhotoAsset:', error);
+      logger.error('[ImageEnrichment] Error creating PhotoAsset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -301,7 +302,7 @@ export class ImageEnrichmentService {
         
         successCount++;
       } catch (error) {
-        console.error(`[ImageEnrichment] Error processing image ${i + 1}:`, error);
+        logger.error(`[ImageEnrichment] Error processing image ${i + 1}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         // Continue with next image
       }
     }

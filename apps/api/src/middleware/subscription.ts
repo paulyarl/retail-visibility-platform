@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma";
 import { getMaintenanceState, deriveInternalStatus } from "../utils/subscription-status";
 import { resolveOrgStandingInheritance } from "../utils/org-standing-inheritance";
+import { logger } from '../logger';
 
 /**
  * Subscription status check middleware
@@ -133,7 +134,7 @@ export async function requireActiveSubscription(
     // Subscription is valid, continue
     next();
   } catch (error) {
-    console.error("[Subscription Check] Error:", error);
+    logger.error("[Subscription Check] Error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: "subscription_check_failed",
       message: "Failed to verify subscription status",
@@ -271,7 +272,7 @@ export async function checkSubscriptionLimits(
 
     next();
   } catch (error) {
-    console.error("[Subscription Limits] Error:", error);
+    logger.error("[Subscription Limits] Error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     next(); // Don't block on limit check errors
   }
 }
@@ -388,7 +389,7 @@ export async function requireWritableSubscription(
     // Active, trialing, and past_due are allowed
     next();
   } catch (error) {
-    console.error("[Writable Subscription Check] Error:", error);
+    logger.error("[Writable Subscription Check] Error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: "subscription_check_failed",
       message: "Failed to verify subscription write permissions",

@@ -4,6 +4,7 @@
  */
 
 import { cacheInvalidationService } from '../services/CacheInvalidationService';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Clear API caches via the cache invalidation service
@@ -12,7 +13,7 @@ async function clearApiCaches(): Promise<void> {
   try {
     await cacheInvalidationService.clearAllTenantCaches();
   } catch (error) {
-    console.warn('⚠️ API cache clear error:', error);
+    clientLogger.warn('⚠️ API cache clear error:', { detail: error });
   }
 }
 
@@ -38,7 +39,7 @@ export async function clearAllBrowserCaches(): Promise<void> {
       console.log(`✅ Cleared ${keys.length} localStorage items`);
     }
   } catch (error) {
-    console.warn('⚠️ Failed to clear localStorage:', error);
+    clientLogger.warn('⚠️ Failed to clear localStorage:', { detail: error });
   }
 
   // Clear sessionStorage
@@ -53,7 +54,7 @@ export async function clearAllBrowserCaches(): Promise<void> {
       console.log(`✅ Cleared ${keys.length} sessionStorage items`);
     }
   } catch (error) {
-    console.warn('⚠️ Failed to clear sessionStorage:', error);
+    clientLogger.warn('⚠️ Failed to clear sessionStorage:', { detail: error });
   }
 
   // Clear IndexedDB
@@ -68,7 +69,7 @@ export async function clearAllBrowserCaches(): Promise<void> {
       }
     }
   } catch (error) {
-    console.warn('⚠️ Failed to clear IndexedDB:', error);
+    clientLogger.warn('⚠️ Failed to clear IndexedDB:', { detail: error });
   }
 
   console.log('🎉 Cache cleanup completed!');

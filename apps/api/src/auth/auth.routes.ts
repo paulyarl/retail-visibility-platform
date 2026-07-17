@@ -5,6 +5,7 @@ import { threatDetectionService } from '../services/threat-detection';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import { trackSession, trackFailedLogin } from '../middleware/session-tracker';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -126,7 +127,7 @@ router.post('/login', async (req: Request, res: Response) => {
         error.message?.includes("Can't reach database server") ||
         error.message?.includes('Connection refused')
       ) {
-        console.error('[Login Critical] Database connection failed:', error.message);
+        logger.error('[Login Critical] Database connection failed:', undefined, { error: { name: 'Error', message: String(error.message) } });
         return res.status(503).json({
           error: 'service_unavailable',
           message: 'Authentication service is temporarily unavailable. Please try again in a moment.',
@@ -160,14 +161,14 @@ router.post('/login', async (req: Request, res: Response) => {
         });
       }
       
-      console.error('[Login Error]', error.message);
+      logger.error('[Login Error]', undefined, { error: { name: 'Error', message: String(error.message) } });
       return res.status(400).json({
         error: 'login_failed',
         message: error.message,
       });
     }
     
-    console.error('[Login Critical] Unexpected error:', error);
+    logger.error('[Login Critical] Unexpected error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'internal_error',
       message: 'An unexpected error occurred',

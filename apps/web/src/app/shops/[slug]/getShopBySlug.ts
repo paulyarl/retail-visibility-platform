@@ -1,4 +1,5 @@
 import { shopsService } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ShopData {
   id: string;
@@ -51,7 +52,7 @@ export async function getShopBySlug(identifier: string): Promise<ShopResponse | 
       }
     };
   } catch (error) {
-    console.error('Error fetching shop:', error);
+    clientLogger.error('Error fetching shop:', { detail: error });
     return null;
   }
 }

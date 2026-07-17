@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "../hours/TimeInput";
 import { getTenantHoursSingleton } from "@/lib/singletons/TenantHoursSingleton";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { clientLogger } from '@/lib/client-logger';
 
 type Period = { day: string; open: string; close: string };
 type SpecialHour = { date: string; isClosed: boolean; open?: string; close?: string; note?: string };
@@ -99,7 +100,7 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
         const overrides = shopData.hours?.overrides || [];
         setSpecialHours(Array.isArray(overrides) ? overrides : []);
       } catch (error) {
-        console.error('Failed to load shop hours:', error);
+        clientLogger.error('Failed to load shop hours:', { detail: error });
         if (mountedRef.current) {
           setMsg('Failed to load hours data');
         }
@@ -151,7 +152,7 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
       onUpdate(updatedShop);
       setMsg('Shop hours saved successfully');
     } catch (error) {
-      console.error('Failed to save shop hours:', error);
+      clientLogger.error('Failed to save shop hours:', { detail: error });
       setMsg('Failed to save hours');
     } finally {
       setSaving(false);

@@ -8,6 +8,7 @@
 import { performance } from 'perf_hooks';
 import ShopsFeaturedService from './ShopsFeaturedService';
 import { ShopsPerformanceMonitor } from './ShopsPerformanceMonitor';
+import { logger } from '../logger';
 
 interface LoadTestConfig {
   concurrentUsers: number;
@@ -390,7 +391,7 @@ export class ShopsPerformanceTester {
         }
         
       } catch (error) {
-        console.error(`Error testing cache for ${bucketType}:`, error);
+        logger.error(`Error testing cache for ${bucketType}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
       
       // Small delay between requests

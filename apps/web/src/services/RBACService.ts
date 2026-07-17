@@ -8,6 +8,7 @@
 
 import { SystemSingleton } from '../providers/base/SystemSingleton';
 import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface RBACRoleGroups {
   [key: string]: string[];
@@ -119,13 +120,13 @@ export class RBACService extends SystemSingleton {
       );
       
       if (!result.success) {
-        console.error('[RBACService] Failed to get permissions:', result.error);
+        clientLogger.error('[RBACService] Failed to get permissions:', { detail: result.error });
         return [];
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('[RBACService] Failed to get permissions:', error);
+      clientLogger.error('[RBACService] Failed to get permissions:', { detail: error });
       return [];
     }
   }
@@ -146,7 +147,7 @@ export class RBACService extends SystemSingleton {
       );
       
       if (!result.success) {
-        console.error('[RBACService] Failed to create permission:', result.error);
+        clientLogger.error('[RBACService] Failed to create permission:', { detail: result.error });
         return null;
       }
 
@@ -155,7 +156,7 @@ export class RBACService extends SystemSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[RBACService] Failed to create permission:', error);
+      clientLogger.error('[RBACService] Failed to create permission:', { detail: error });
       return null;
     }
   }
@@ -166,7 +167,7 @@ export class RBACService extends SystemSingleton {
    */
   async updatePermission(permissionId: string, permissionData: RBACUpdatePermissionRequest): Promise<RBACPermission | null> {
     if (!permissionId) {
-      console.error('[RBACService] Permission ID is required');
+      clientLogger.error('[RBACService] Permission ID is required');
       return null;
     }
 
@@ -181,7 +182,7 @@ export class RBACService extends SystemSingleton {
       );
       
       if (!result.success) {
-        console.error('[RBACService] Failed to update permission:', result.error);
+        clientLogger.error('[RBACService] Failed to update permission:', { detail: result.error });
         return null;
       }
 
@@ -190,7 +191,7 @@ export class RBACService extends SystemSingleton {
       
       return result.data || null;
     } catch (error) {
-      console.error('[RBACService] Failed to update permission:', error);
+      clientLogger.error('[RBACService] Failed to update permission:', { detail: error });
       return null;
     }
   }
@@ -207,7 +208,7 @@ export class RBACService extends SystemSingleton {
     failed: string[];
   }> {
     if (!updates || updates.length === 0) {
-      console.error('[RBACService] Updates array is required');
+      clientLogger.error('[RBACService] Updates array is required');
       return { success: 0, failed: [] };
     }
 
@@ -225,7 +226,7 @@ export class RBACService extends SystemSingleton {
       );
       
       if (!result.success) {
-        console.error('[RBACService] Failed to bulk update permissions:', result.error);
+        clientLogger.error('[RBACService] Failed to bulk update permissions:', { detail: result.error });
         return { success: 0, failed: updates.map(u => u.id) };
       }
 
@@ -234,7 +235,7 @@ export class RBACService extends SystemSingleton {
       
       return result.data || { success: 0, failed: updates.map(u => u.id) };
     } catch (error) {
-      console.error('[RBACService] Failed to bulk update permissions:', error);
+      clientLogger.error('[RBACService] Failed to bulk update permissions:', { detail: error });
       return { success: 0, failed: updates.map(u => u.id) };
     }
   }
@@ -245,7 +246,7 @@ export class RBACService extends SystemSingleton {
    */
   async deletePermission(permissionId: string): Promise<boolean> {
     if (!permissionId) {
-      console.error('[RBACService] Permission ID is required');
+      clientLogger.error('[RBACService] Permission ID is required');
       return false;
     }
 
@@ -259,7 +260,7 @@ export class RBACService extends SystemSingleton {
       );
       
       if (!result.success) {
-        console.error('[RBACService] Failed to delete permission:', result.error);
+        clientLogger.error('[RBACService] Failed to delete permission:', { detail: result.error });
         return false;
       }
 
@@ -268,7 +269,7 @@ export class RBACService extends SystemSingleton {
       
       return true;
     } catch (error) {
-      console.error('[RBACService] Failed to delete permission:', error);
+      clientLogger.error('[RBACService] Failed to delete permission:', { detail: error });
       return false;
     }
   }
@@ -301,7 +302,7 @@ export class RBACService extends SystemSingleton {
       }
 
     } catch (error) {
-      console.error('[RBACService] Failed to fetch role groups:', error);
+      clientLogger.error('[RBACService] Failed to fetch role groups:', { detail: error });
       return this.getFallbackRoleGroups();
     }
   }
@@ -332,7 +333,7 @@ export class RBACService extends SystemSingleton {
       }
 
     } catch (error) {
-      console.error('[RBACService] Failed to fetch user permissions:', error);
+      clientLogger.error('[RBACService] Failed to fetch user permissions:', { detail: error });
       return this.getFallbackUserPermissions();
     }
   }
@@ -364,7 +365,7 @@ export class RBACService extends SystemSingleton {
       }
 
     } catch (error) {
-      console.error('[RBACService] Failed to fetch user access:', error);
+      clientLogger.error('[RBACService] Failed to fetch user access:', { detail: error });
       return this.getFallbackUserAccess();
     }
   }
@@ -378,13 +379,13 @@ export class RBACService extends SystemSingleton {
       const allowedRoles = roleGroups[requiredGroup];
       
       if (!allowedRoles) {
-        console.error(`[RBACService] Role group '${requiredGroup}' not found`);
+        clientLogger.error(`[RBACService] Role group '${requiredGroup}' not found`);
         return false;
       }
       
       return allowedRoles.includes(userRole);
     } catch (error) {
-      console.error('[RBACService] Failed to validate role against group:', error);
+      clientLogger.error('[RBACService] Failed to validate role against group:', { detail: error });
       return false;
     }
   }
@@ -397,7 +398,7 @@ export class RBACService extends SystemSingleton {
       const userAccess = await this.getUserAccess();
       return userAccess.access.permissions.includes(permission);
     } catch (error) {
-      console.error('[RBACService] Failed to check permission:', error);
+      clientLogger.error('[RBACService] Failed to check permission:', { detail: error });
       return false;
     }
   }
@@ -458,7 +459,7 @@ export class RBACService extends SystemSingleton {
       
       console.log('[RBACService] All RBAC data preloaded to system cache');
     } catch (error) {
-      console.error('[RBACService] Failed to preload RBAC data:', error);
+      clientLogger.error('[RBACService] Failed to preload RBAC data:', { detail: error });
     }
   }
 

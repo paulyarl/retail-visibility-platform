@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // Photo Data Interfaces
 export interface Photo {
@@ -81,7 +82,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to fetch item photos:', response.error);
+      clientLogger.error('[PhotoService] Failed to fetch item photos:', { detail: response.error });
       return [];
     }
 
@@ -101,7 +102,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to fetch variant photos:', response.error);
+      clientLogger.error('[PhotoService] Failed to fetch variant photos:', { detail: response.error });
       return [];
     }
 
@@ -130,7 +131,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to upload item photo:', response.error);
+      clientLogger.error('[PhotoService] Failed to upload item photo:', { detail: response.error });
       return { success: false, error: 'Upload failed' };
     }
 
@@ -162,7 +163,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to upload variant photo:', response.error);
+      clientLogger.error('[PhotoService] Failed to upload variant photo:', { detail: response.error });
       return { success: false, error: 'Upload failed' };
     }
 
@@ -189,7 +190,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to delete photo:', response.error);
+      clientLogger.error('[PhotoService] Failed to delete photo:', { detail: response.error });
       return { success: false, error: 'Delete failed' };
     }
 
@@ -217,7 +218,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to reorder photos:', response.error);
+      clientLogger.error('[PhotoService] Failed to reorder photos:', { detail: response.error });
       return { success: false, error: 'Reorder failed' };
     }
 
@@ -244,7 +245,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to set primary photo:', response.error);
+      clientLogger.error('[PhotoService] Failed to set primary photo:', { detail: response.error });
       return { success: false, error: 'Set primary failed' };
     }
 
@@ -269,7 +270,7 @@ class PhotoService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[PhotoService] Failed to fetch photo:', response.error);
+      clientLogger.error('[PhotoService] Failed to fetch photo:', { detail: response.error });
       return null;
     }
 

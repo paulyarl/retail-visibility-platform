@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Select, Button } from '@/components/ui';
 import { Switch } from '@/components/ui/Switch';
 import { botPlatformAdminService, type BotPlatformSettings, type BotSyncEstimate, type BotSyncResult, type AiProviderType } from '@/services/bot/BotPlatformAdminService';
+import { clientLogger } from '@/lib/client-logger';
 
 const PROVIDER_OPTIONS = [
   { value: 'openai', label: 'OpenAI' },
@@ -83,7 +84,7 @@ export default function BotAiControls() {
       const est = await botPlatformAdminService.getSyncEstimate();
       setEstimate(est);
     } catch (err) {
-      console.error('[BotAiControls] Estimate error:', err);
+      clientLogger.error('[BotAiControls] Estimate error:', { detail: err });
     }
   }, []);
 
@@ -94,7 +95,7 @@ export default function BotAiControls() {
         setSettings(data);
         await loadEstimate();
       } catch (err) {
-        console.error('[BotAiControls] Load error:', err);
+        clientLogger.error('[BotAiControls] Load error:', { detail: err });
         setError('Failed to load AI controls');
       } finally {
         setLoading(false);
@@ -112,7 +113,7 @@ export default function BotAiControls() {
       setSettings(result);
       await loadEstimate();
     } catch (err) {
-      console.error('[BotAiControls] Update error:', err);
+      clientLogger.error('[BotAiControls] Update error:', { detail: err });
       setError('Failed to update setting');
     } finally {
       setSaving(false);
@@ -138,7 +139,7 @@ export default function BotAiControls() {
       setSyncResult(result);
       await loadEstimate();
     } catch (err) {
-      console.error('[BotAiControls] Sync error:', err);
+      clientLogger.error('[BotAiControls] Sync error:', { detail: err });
       setError('Failed to trigger sync');
     } finally {
       setSyncing(false);

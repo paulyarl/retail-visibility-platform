@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, Store, Package, Tag, Star, Eye, Users, Clock, ArrowDown, Monitor, Layout, UserCheck, Shield } from 'lucide-react';
 import { platformAnalyticsService, PopularContentData } from '@/services/analytics/PlatformAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PopularContentAnalyticsProps {
   filters: {
@@ -177,7 +178,7 @@ export default function PopularContentAnalytics({ filters }: PopularContentAnaly
         });
       }
     } catch (error) {
-      console.error('Error fetching popular content:', error);
+      clientLogger.error('Error fetching popular content:', { detail: error });
       // Set empty data on error to prevent UI crashes
       setPopularContent({
         contentItems: [],

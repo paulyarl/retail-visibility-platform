@@ -42,6 +42,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/Dialog';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function CapabilityManagement() {
   // Data state
@@ -162,7 +163,7 @@ export default function CapabilityManagement() {
       setConstraints(Array.isArray(constraintList) ? constraintList : []);
       setConstraintMetadata(metadata);
     } catch (err) {
-      console.error('Failed to load capability data:', err);
+      clientLogger.error('Failed to load capability data:', { detail: err });
       setError('Failed to load capability data');
     } finally {
       setLoading(false);
@@ -179,7 +180,7 @@ export default function CapabilityManagement() {
       const data = await adminCapabilityService.getTierCapabilities(tierKey);
       setTierCapabilities(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Failed to load tier capabilities:', err);
+      clientLogger.error('Failed to load tier capabilities:', { detail: err });
       setTierCapabilities([]);
     }
   };
@@ -276,7 +277,7 @@ export default function CapabilityManagement() {
       }
       await loadData();
     } catch (err) {
-      console.error('Failed to save tier capability:', err);
+      clientLogger.error('Failed to save tier capability:', { detail: err });
       setError('Failed to save tier capability');
     } finally {
       setSaving(false);
@@ -295,7 +296,7 @@ export default function CapabilityManagement() {
       await loadTierCapabilities(deleteTarget.tierKey);
       await loadData();
     } catch (err) {
-      console.error('Failed to delete tier capability:', err);
+      clientLogger.error('Failed to delete tier capability:', { detail: err });
       setError('Failed to delete tier capability');
     } finally {
       setDeleteDialogOpen(false);
@@ -332,7 +333,7 @@ export default function CapabilityManagement() {
       setFeatureDialogOpen(false);
       await loadData();
     } catch (err) {
-      console.error('Failed to save feature:', err);
+      clientLogger.error('Failed to save feature:', { detail: err });
       setError('Failed to save feature');
     } finally {
       setSaving(false);
@@ -350,7 +351,7 @@ export default function CapabilityManagement() {
       await adminCapabilityService.deleteFeature(deleteTarget.key);
       await loadData();
     } catch (err) {
-      console.error('Failed to delete feature:', err);
+      clientLogger.error('Failed to delete feature:', { detail: err });
       setError('Failed to delete feature');
     } finally {
       setDeleteDialogOpen(false);
@@ -417,7 +418,7 @@ export default function CapabilityManagement() {
       setCapTypeDialogOpen(false);
       await loadData();
     } catch (err) {
-      console.error('Failed to save capability type:', err);
+      clientLogger.error('Failed to save capability type:', { detail: err });
       setError('Failed to save capability type');
     } finally {
       setSaving(false);
@@ -436,7 +437,7 @@ export default function CapabilityManagement() {
       await adminCapabilityService.deleteCapabilityType(deleteTarget.key);
       await loadData();
     } catch (err) {
-      console.error('Failed to delete capability type:', err);
+      clientLogger.error('Failed to delete capability type:', { detail: err });
       setError('Failed to delete capability type');
     } finally {
       setDeleteDialogOpen(false);
@@ -473,7 +474,7 @@ export default function CapabilityManagement() {
       await loadTierCapabilities(selectedTier);
       setError(null);
     } catch (err) {
-      console.error('Failed to save tier capabilities:', err);
+      clientLogger.error('Failed to save tier capabilities:', { detail: err });
       setError('Failed to save tier capabilities');
     } finally {
       setSaving(false);
@@ -544,7 +545,7 @@ export default function CapabilityManagement() {
       setLegacyTierDialogOpen(false);
       await loadData();
     } catch (err) {
-      console.error('Failed to save legacy tier:', err);
+      clientLogger.error('Failed to save legacy tier:', { detail: err });
       setError('Failed to save legacy tier');
     } finally {
       setSaving(false);
@@ -557,7 +558,7 @@ export default function CapabilityManagement() {
       await tenantTierService.deleteTier(tierKey, 'Deactivated via admin UI');
       await loadData();
     } catch (err) {
-      console.error('Failed to delete legacy tier:', err);
+      clientLogger.error('Failed to delete legacy tier:', { detail: err });
       setError('Failed to delete legacy tier');
     }
   };
@@ -629,7 +630,7 @@ export default function CapabilityManagement() {
       setLegacyFeatureDialogOpen(false);
       await loadData();
     } catch (err) {
-      console.error('Failed to save legacy feature:', err);
+      clientLogger.error('Failed to save legacy feature:', { detail: err });
       setError('Failed to save legacy feature');
     } finally {
       setSaving(false);
@@ -659,7 +660,7 @@ export default function CapabilityManagement() {
       });
       await loadData();
     } catch (err) {
-      console.error('Failed to remove legacy feature:', err);
+      clientLogger.error('Failed to remove legacy feature:', { detail: err });
       setError('Failed to remove legacy feature');
     }
   };
@@ -800,7 +801,7 @@ export default function CapabilityManagement() {
       setConstraintDialogOpen(false);
       await loadData();
     } catch (err) {
-      console.error('Failed to save constraint:', err);
+      clientLogger.error('Failed to save constraint:', { detail: err });
       setError('Failed to save constraint');
     } finally {
       setSaving(false);
@@ -818,7 +819,7 @@ export default function CapabilityManagement() {
       await adminCapabilityService.deleteConstraint(deleteTarget.key);
       await loadData();
     } catch (err) {
-      console.error('Failed to delete constraint:', err);
+      clientLogger.error('Failed to delete constraint:', { detail: err });
       setError('Failed to delete constraint');
     } finally {
       setDeleteDialogOpen(false);
@@ -1383,7 +1384,7 @@ export default function CapabilityManagement() {
                                     });
                                     await loadData();
                                   } catch (err) {
-                                    console.error('Failed to toggle feature:', err);
+                                    clientLogger.error('Failed to toggle feature:', { detail: err });
                                     setError('Failed to toggle feature');
                                   }
                                 }}

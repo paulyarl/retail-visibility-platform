@@ -27,6 +27,7 @@ import {
   Heart,
   PawPrint
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 // const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -100,7 +101,7 @@ export default function GBPAdvancedFeaturesPage() {
           await fetchReviews();
         }
       } catch (error) {
-        console.error('Failed to fetch data:', error);
+        clientLogger.error('Failed to fetch data:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -116,7 +117,7 @@ export default function GBPAdvancedFeaturesPage() {
       const data = await platformHomeService.getGoogleBusinessMedia(tenantId);
       setMedia(data.data || []);
     } catch (error) {
-      console.error('Failed to fetch media:', error);
+      clientLogger.error('Failed to fetch media:', { detail: error });
     }
   }
 
@@ -125,7 +126,7 @@ export default function GBPAdvancedFeaturesPage() {
       const data = await platformHomeService.getGoogleBusinessPosts(tenantId);
       setPosts(data.data || []);
     } catch (error) {
-      console.error('Failed to fetch posts:', error);
+      clientLogger.error('Failed to fetch posts:', { detail: error });
     }
   }
 
@@ -138,7 +139,7 @@ export default function GBPAdvancedFeaturesPage() {
         totalReviewCount: data.data?.totalReviewCount,
       });
     } catch (error) {
-      console.error('Failed to fetch reviews:', error);
+      clientLogger.error('Failed to fetch reviews:', { detail: error });
     }
   }
 
@@ -147,7 +148,7 @@ export default function GBPAdvancedFeaturesPage() {
       const data = await platformHomeService.getGoogleBusinessAttributes(tenantId);
       setAttributes(data.data || []);
     } catch (error) {
-      console.error('Failed to fetch attributes:', error);
+      clientLogger.error('Failed to fetch attributes:', { detail: error });
     }
   }
 
@@ -159,7 +160,7 @@ export default function GBPAdvancedFeaturesPage() {
       setPhotoUrl('');
       await fetchMedia();
     } catch (error) {
-      console.error('Failed to upload photo:', error);
+      clientLogger.error('Failed to upload photo:', { detail: error });
     } finally {
       setUploadingPhoto(false);
     }
@@ -173,7 +174,7 @@ export default function GBPAdvancedFeaturesPage() {
       setNewPostSummary('');
       await fetchPosts();
     } catch (error) {
-      console.error('Failed to create post:', error);
+      clientLogger.error('Failed to create post:', { detail: error });
     } finally {
       setCreatingPost(false);
     }
@@ -188,7 +189,7 @@ export default function GBPAdvancedFeaturesPage() {
       setReplyingTo(null);
       await fetchReviews();
     } catch (error) {
-      console.error('Failed to reply to review:', error);
+      clientLogger.error('Failed to reply to review:', { detail: error });
     } finally {
       setSendingReply(false);
     }
@@ -200,7 +201,7 @@ export default function GBPAdvancedFeaturesPage() {
       await platformHomeService.saveGoogleBusinessCommonAttributes(tenantId, commonAttrs);
       await fetchAttributes();
     } catch (error) {
-      console.error('Failed to save attributes:', error);
+      clientLogger.error('Failed to save attributes:', { detail: error });
     } finally {
       setSavingAttributes(false);
     }

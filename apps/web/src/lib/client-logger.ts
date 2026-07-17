@@ -60,13 +60,22 @@ class ClientLogger {
 
   /**
    * Log an error. Sends to Sentry, console.error, and backend persistence.
+   *
+   * Accepts either an Error object (preferred — preserves real stack trace)
+   * or a string message (wrapped in Error, stack will point to this file).
    */
-  error(message: string, context?: Record<string, any>): void {
+  error(messageOrError: string | Error, context?: Record<string, any>): void {
     if (!shouldLog('error')) return;
+
+    const error =
+      messageOrError instanceof Error
+        ? messageOrError
+        : new Error(messageOrError);
+    const message = error.message;
 
     const correlationId = getCorrelationId();
 
-    Sentry.captureException(new Error(message), {
+    Sentry.captureException(error, {
       tags: {
         ...(correlationId && { correlation_id: correlationId }),
         ...(currentTenantId && { tenant_id: currentTenantId }),
@@ -88,7 +97,7 @@ class ClientLogger {
       }));
     }
 
-    reportError(message, context);
+    reportError(error, context);
   }
 
   /**

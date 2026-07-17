@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 /**
  * Builds combined business hours object for business profile storage
@@ -61,7 +62,7 @@ export async function buildCombinedHoursObject(tenantId: string): Promise<any | 
 
     return Object.keys(combinedHours).length > 0 ? combinedHours : null;
   } catch (error) {
-    console.error('[buildCombinedHoursObject] Error:', error);
+    logger.error('[buildCombinedHoursObject] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -92,6 +93,6 @@ export async function updateBusinessProfileHours(tenantId: string): Promise<void
       console.log(`[updateBusinessProfileHours] No business profile found for tenant ${tenantId}, skipping hours update`);
     }
   } catch (error) {
-    console.error('[updateBusinessProfileHours] Error:', error);
+    logger.error('[updateBusinessProfileHours] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }

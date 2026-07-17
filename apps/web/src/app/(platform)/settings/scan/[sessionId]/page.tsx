@@ -8,6 +8,7 @@ import BatchReview from '@/components/scan/BatchReview';
 import EnrichmentPreview from '@/components/scan/EnrichmentPreview';
 import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { notifications } from '@mantine/notifications';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,12 +88,12 @@ export default function ActiveScanPage() {
           setSelectedResult(transformedResults[0]);
         }
       } else {
-        console.error('[PlatformScanPage] Invalid session response:', sessionData);
+        clientLogger.error('[PlatformScanPage] Invalid session response:', { detail: sessionData });
         notifications.show({ title: 'Error', message: 'Failed to load session', color: 'red' });
         router.push('/scan');
       }
     } catch (error) {
-      console.error('Failed to load session:', error);
+      clientLogger.error('Failed to load session:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to load session', color: 'red' });
       router.push('/scan');
     } finally {
@@ -111,7 +112,7 @@ export default function ActiveScanPage() {
       
       const tenantId = session.tenantId;
       if (!tenantId) {
-        console.error('[PlatformScanPage] No tenant ID found in session');
+        clientLogger.error('[PlatformScanPage] No tenant ID found in session');
         notifications.show({ title: 'Error', message: 'Session is missing tenant information', color: 'red' });
         return;
       }
@@ -143,7 +144,7 @@ export default function ActiveScanPage() {
         notifications.show({ title: 'Error', message: data?.error || 'Failed to scan barcode', color: 'red' });
       }
     } catch (error) {
-      console.error('Failed to scan barcode:', error);
+      clientLogger.error('Failed to scan barcode:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to scan barcode', color: 'red' });
     } finally {
       setScanning(false);
@@ -186,7 +187,7 @@ export default function ActiveScanPage() {
     try {
       await itemsSingletonService.updateScanResult(sessionId, selectedResult.id, updatedEnrichment);
     } catch (error) {
-      console.error('Failed to update scan result enrichment:', error);
+      clientLogger.error('Failed to update scan result enrichment:', { detail: error });
       // Could show error toast here, but for now just log it
     }
   }, [selectedResult, session, sessionId]);
@@ -208,7 +209,7 @@ export default function ActiveScanPage() {
       // Reload session and results
       await loadSession();
     } catch (error) {
-      console.error('Failed to remove item:', error);
+      clientLogger.error('Failed to remove item:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to remove item', color: 'red' });
     }
   };
@@ -232,7 +233,7 @@ export default function ActiveScanPage() {
       notifications.show({ title: 'Success', message: `Successfully committed ${validCount} items to inventory!`, color: 'green' });
       router.push('/scan');
     } catch (error) {
-      console.error('Failed to commit session:', error);
+      clientLogger.error('Failed to commit session:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to commit session', color: 'red' });
     } finally {
       setCommitting(false);
@@ -248,7 +249,7 @@ export default function ActiveScanPage() {
       await itemsSingletonService.cancelScanSession(sessionId);
       router.push('/scan');
     } catch (error) {
-      console.error('Failed to cancel session:', error);
+      clientLogger.error('Failed to cancel session:', { detail: error });
       notifications.show({ title: 'Error', message: 'Failed to cancel session', color: 'red' });
     }
   };

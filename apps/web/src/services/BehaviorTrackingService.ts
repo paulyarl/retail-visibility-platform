@@ -7,6 +7,7 @@
 
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // Behavior Tracking Data Interfaces
 // Auth0: userId determined server-side from session
@@ -84,7 +85,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
         this.EVENTS_TTL
       );
     } catch (error) {
-      console.error('[BehaviorTrackingService] Failed to send tracking event:', error);
+      clientLogger.error('[BehaviorTrackingService] Failed to send tracking event:', { detail: error });
       throw error;
     }
   }
@@ -105,7 +106,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
         this.EVENTS_TTL
       );
     } catch (error) {
-      console.error('[BehaviorTrackingService] Failed to send batch events:', error);
+      clientLogger.error('[BehaviorTrackingService] Failed to send batch events:', { detail: error });
       throw error;
     }
   }
@@ -126,7 +127,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
         this.SESSIONS_TTL
       );
     } catch (error) {
-      console.error('[BehaviorTrackingService] Failed to send tracking session:', error);
+      clientLogger.error('[BehaviorTrackingService] Failed to send tracking session:', { detail: error });
       throw error;
     }
   }
@@ -144,7 +145,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
     );
 
     if (!response.success) {
-      console.error('[BehaviorTrackingService] Failed to get behavior analytics:', response.error);
+      clientLogger.error('[BehaviorTrackingService] Failed to get behavior analytics:', { detail: response.error });
       return {
         totalEvents: 0,
         uniqueUsers: 0,
@@ -176,7 +177,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
     );
 
     if (!response.success) {
-      console.error('[BehaviorTrackingService] Failed to get user behavior patterns:', response.error);
+      clientLogger.error('[BehaviorTrackingService] Failed to get user behavior patterns:', { detail: response.error });
       return null;
     }
 

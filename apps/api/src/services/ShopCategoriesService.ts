@@ -62,7 +62,7 @@ export default class ShopCategoriesService {
 
       return categories;
     } catch (error) {
-      console.error('[ShopCategoriesService] Error fetching categories:', error instanceof Error ? error.message : String(error));
+      logger.error('[ShopCategoriesService] Error fetching categories:', undefined, { error: { name: 'Error', message: String(error instanceof Error ? error.message : String(error)) } });
       throw error;
     }
   }

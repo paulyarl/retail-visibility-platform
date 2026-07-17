@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface FeaturedProduct {
   featured_product_id: string;
@@ -61,7 +62,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[FeaturedProductsService] Failed to get featuring stats:', result.error);
+      clientLogger.error('[FeaturedProductsService] Failed to get featuring stats:', { detail: result.error });
       return null;
     }
 
@@ -104,7 +105,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[FeaturedProductsService] Failed to get featured products:', result.error);
+      clientLogger.error('[FeaturedProductsService] Failed to get featured products:', { detail: result.error });
       return null;
     }
 
@@ -128,7 +129,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[FeaturedProductsService] Failed to unfeature product:', result.error);
+      clientLogger.error('[FeaturedProductsService] Failed to unfeature product:', { detail: result.error });
       throw result.error;
     }
 
@@ -155,7 +156,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[FeaturedProductsService] Failed to update product priority:', result.error);
+      clientLogger.error('[FeaturedProductsService] Failed to update product priority:', { detail: result.error });
       throw result.error;
     }
 
@@ -183,7 +184,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[FeaturedProductsService] Failed to feature product:', result.error);
+      clientLogger.error('[FeaturedProductsService] Failed to feature product:', { detail: result.error });
       throw result.error;
     }
 
@@ -208,7 +209,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[FeaturedProductsService] Failed to bulk update priorities:', result.error);
+      clientLogger.error('[FeaturedProductsService] Failed to bulk update priorities:', { detail: result.error });
       throw result.error;
     }
 

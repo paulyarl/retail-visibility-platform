@@ -15,6 +15,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { tenantBillingService } from '@/services/TenantBillingService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BillingStatement {
   id: string;
@@ -142,7 +143,7 @@ export default function BillingStatementsPage({ params }: { params: Promise<{ te
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading statement:', error);
+      clientLogger.error('Error downloading statement:', { detail: error });
       setError('Failed to download statement PDF');
     }
   };

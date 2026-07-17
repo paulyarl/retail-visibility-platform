@@ -7,6 +7,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Edit2, Save, X, Plus, Trash2, Pause, ChevronDown, ChevronUp, CreditCard, Star } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Tier {
   id: string;
@@ -115,7 +116,7 @@ export default function TierSystemPage() {
       
       setTiers(correctedTiers); // Handle null return
     } catch (err) {
-      console.error('Failed to load tiers:', err);
+      clientLogger.error('Failed to load tiers:', { detail: err });
       setError('Failed to load tiers');
       setTiers([]); // Ensure tiers is always an array
     } finally {
@@ -166,7 +167,7 @@ export default function TierSystemPage() {
         throw new Error('Failed to update tier');
       }
     } catch (err: any) {
-      console.error('Failed to toggle tier:', err);
+      clientLogger.error('Failed to toggle tier:', { detail: err });
       setError(err.message || 'Failed to update tier');
       
       // Show error toast
@@ -207,7 +208,7 @@ export default function TierSystemPage() {
         throw new Error('Failed to deactivate tier');
       }
     } catch (err: any) {
-      console.error('Failed to deactivate tier:', err);
+      clientLogger.error('Failed to deactivate tier:', { detail: err });
       setError(err.message || 'Failed to deactivate tier');
       
       // Show error toast
@@ -280,7 +281,7 @@ export default function TierSystemPage() {
         throw new Error('Failed to save tier');
       }
     } catch (err: any) {
-      console.error('Failed to save tier:', err);
+      clientLogger.error('Failed to save tier:', { detail: err });
       setError(err.message || 'Failed to save tier');
       
       // Show error toast
@@ -476,7 +477,7 @@ export default function TierSystemPage() {
       setSuccess('Sort order updated successfully');
       loadTiers();
     } catch (err) {
-      console.error('Failed to update sort order:', err);
+      clientLogger.error('Failed to update sort order:', { detail: err });
       setError('Failed to update sort order');
     } finally {
       setSaving(false);
@@ -576,7 +577,7 @@ export default function TierSystemPage() {
         throw new Error('Failed to update commerce feature');
       }
     } catch (err: any) {
-      console.error('Failed to toggle commerce feature:', err);
+      clientLogger.error('Failed to toggle commerce feature:', { detail: err });
       setError(err.message || 'Failed to update commerce feature');
       toast(err.message || 'Failed to update commerce feature', { variant: 'error' });
     } finally {
@@ -686,7 +687,7 @@ export default function TierSystemPage() {
         setError('Failed to create tier');
       }
     } catch (err) {
-      console.error('Failed to create tier:', err);
+      clientLogger.error('Failed to create tier:', { detail: err });
       setError('Failed to create tier');
     } finally {
       setSaving(false);

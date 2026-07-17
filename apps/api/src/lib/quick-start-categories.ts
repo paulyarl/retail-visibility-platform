@@ -7,6 +7,7 @@
 
 import { prisma } from '../prisma';
 import { generateProductCatId, generateQsCatId } from './id-generator';
+import { logger } from '../logger';
 
 export interface QuickStartCategory {
   name: string;
@@ -108,7 +109,7 @@ export async function createQuickStartCategoriesForTenant(tenantId: string): Pro
       console.log(`[Quick Start Categories] Created category: ${category.name} for tenant ${tenantId}`);
     } catch (error: any) {
       // Log error but continue with other categories
-      console.error(`[Quick Start Categories] Failed to create category ${category.name} for tenant ${tenantId}:`, error);
+      logger.error(`[Quick Start Categories] Failed to create category ${category.name} for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 }

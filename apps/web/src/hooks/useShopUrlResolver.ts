@@ -6,6 +6,7 @@
 import { useMemo, useCallback } from 'react';
 import { Shop, ShopUrls, ShopResolution } from '@/types/shop';
 import { shopsService } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ShopUrlOptions {
   preferSlug?: boolean;
@@ -59,7 +60,7 @@ export function useShopUrlResolver() {
         ...(includeAll && { all: shop.urls })
       };
     } catch (error) {
-      console.error('[SHOP URL RESOLVER] Failed to resolve shop URL:', error);
+      clientLogger.error('[SHOP URL RESOLVER] Failed to resolve shop URL:', { detail: error });
       return null;
     }
   }, [shopsService]);
@@ -74,7 +75,7 @@ export function useShopUrlResolver() {
     try {
       return await shopsService.getShopUrls(tenantId, slug);
     } catch (error) {
-      console.error('[SHOP URL RESOLVER] Failed to generate shop URLs:', error);
+      clientLogger.error('[SHOP URL RESOLVER] Failed to generate shop URLs:', { detail: error });
       throw error;
     }
   }, [shopsService]);
@@ -175,7 +176,7 @@ export function useShopUrls(tenantId: string, slug?: string) {
       const shopUrls = await generateShopUrls(tenantId, slug);
       return shopUrls;
     } catch (err) {
-      console.error('[SHOP URLS] Failed to refresh shop URLs:', err);
+      clientLogger.error('[SHOP URLS] Failed to refresh shop URLs:', { detail: err });
       throw err;
     }
   }, [generateShopUrls, tenantId, slug]);
@@ -233,7 +234,7 @@ export function useCurrentShopUrl() {
     try {
       return await resolveShopUrl(identifier, { includeAll: true });
     } catch (err) {
-      console.error('[CURRENT SHOP URL] Failed to resolve:', err);
+      clientLogger.error('[CURRENT SHOP URL] Failed to resolve:', { detail: err });
       throw err;
     }
   }, [resolveShopUrl, identifier]);

@@ -21,6 +21,7 @@ import {
   getLastViewedItems
 } from '../services/recommendationService';
 import { extractTrackingIdentity, TrackingIdentity } from '../utils/auth0Identity';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -107,7 +108,7 @@ router.post('/track-batch', async (req: Request, res: Response) => {
         });
         successCount++;
       } catch (eventError) {
-        console.error(`[TrackBatch] Failed to process event for entity ${event.entityId}:`, eventError);
+        logger.error(`[TrackBatch] Failed to process event for entity ${event.entityId}:`, undefined, { error: { name: (eventError as any)?.name || 'Error', message: (eventError as any)?.message || String(eventError), stack: (eventError as any)?.stack } });
         results.push({
           entityId: event.entityId,
           success: false,
@@ -137,7 +138,7 @@ router.post('/track-batch', async (req: Request, res: Response) => {
 
     res.json(responseData);
   } catch (error) {
-    console.error('[TrackBatch] Error:', error);
+    logger.error('[TrackBatch] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'batch_processing_failed',
@@ -205,7 +206,7 @@ router.post('/track', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error tracking behavior:', error);
+    logger.error('Error tracking behavior:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'tracking_failed',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -232,7 +233,7 @@ router.get('/stores-like-this/:storeId', async (req: Request, res: Response) => 
     res.json(result);
 
   } catch (error) {
-    console.error('Error getting stores like this:', error);
+    logger.error('Error getting stores like this:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get store recommendations'
@@ -259,7 +260,7 @@ router.get('/popular-in-category/:categorySlug', async (req: Request, res: Respo
     res.json(result);
 
   } catch (error) {
-    console.error('Error getting popular stores in category:', error);
+    logger.error('Error getting popular stores in category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get category recommendations'
@@ -293,7 +294,7 @@ router.get('/trending-nearby', async (req: Request, res: Response) => {
     res.json(result);
 
   } catch (error) {
-    console.error('Error getting trending nearby:', error);
+    logger.error('Error getting trending nearby:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get nearby recommendations'
@@ -320,7 +321,7 @@ router.get('/products-like-this/:productId', async (req: Request, res: Response)
     res.json(result);
 
   } catch (error) {
-    console.error('Error getting products like this:', error);
+    logger.error('Error getting products like this:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get product recommendations'
@@ -360,7 +361,7 @@ router.get('/stores-for-user', async (req: Request, res: Response) => {
     res.json(result);
 
   } catch (error) {
-    console.error('Error getting stores for user:', error);
+    logger.error('Error getting stores for user:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get user recommendations'
@@ -435,7 +436,7 @@ router.get('/for-product/:productId', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error getting recommendations for product:', error);
+    logger.error('Error getting recommendations for product:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get product recommendations'
@@ -474,13 +475,19 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
          dcl.category_slug,
          dcl.google_category_id,
          dcl.is_primary,
-         dcl.rating_avg,
-         dcl.rating_count,
+         COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+         COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
          dcl.product_count,
-         dcl.logo_url,
+         COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
          t.location_status as tenant_location_status
        FROM directory_category_listings dcl
        INNER JOIN tenants t ON dcl.tenant_id = t.id
+       LEFT JOIN LATERAL (
+         SELECT tenant_logo_url, store_average_rating, store_review_count
+         FROM mv_storefront_discovery
+         WHERE tenant_id = dcl.tenant_id
+         LIMIT 1
+       ) msd ON true
        WHERE dcl.tenant_id = $1 
          AND dcl.is_primary = true
        LIMIT 1`,
@@ -536,9 +543,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.category_slug,
           dcl.google_category_id,
           dcl.is_primary,
-          dcl.rating_avg,
-          dcl.rating_count,
-          dcl.logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
           dcl.is_featured,
           dll.business_hours,
           t.location_status as tenant_location_status,
@@ -569,7 +576,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             ) +
             (
               CASE
-                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
+                WHEN ABS(COALESCE(dcl.rating_avg, msd.store_average_rating, 0) - $4) < 0.5 THEN 1
                 ELSE 0
               END
             )
@@ -577,6 +584,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
         LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
         WHERE dcl.tenant_id != $5
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
@@ -648,9 +661,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.city,
           dcl.state,
           dcl.category_name,
-          dcl.logo_url,
-          dcl.rating_avg,
-          dcl.rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
           dll.business_hours,
           t.location_status as tenant_location_status,
           
@@ -680,7 +693,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             ) +
             (
               CASE
-                WHEN ABS(COALESCE(dcl.rating_avg, 0) - $4) < 0.5 THEN 1
+                WHEN ABS(COALESCE(dcl.rating_avg, msd.store_average_rating, 0) - $4) < 0.5 THEN 1
                 ELSE 0
               END
             )
@@ -688,6 +701,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
         LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
         WHERE dcl.tenant_id != $5
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
@@ -750,9 +769,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           dcl.city,
           dcl.state,
           dcl.category_name,
-          dcl.logo_url,
-          dcl.rating_avg,
-          dcl.rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
           dcl.product_count,
           dll.business_hours,
           t.location_status as tenant_location_status,
@@ -760,6 +779,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
         FROM directory_category_listings dcl
         INNER JOIN tenants t ON dcl.tenant_id = t.id
         LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
         WHERE dcl.tenant_id != $1
           AND dcl.tenant_exists = true
           AND dcl.is_active_location = true
@@ -803,9 +828,9 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
             dcl.city,
             dcl.state,
             dcl.category_name,
-            dcl.logo_url,
-            dcl.rating_avg,
-            dcl.rating_count,
+            COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+            COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+            COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
             dcl.product_count,
             dll.business_hours,
             t.location_status as tenant_location_status,
@@ -813,6 +838,12 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           FROM directory_category_listings dcl
           INNER JOIN tenants t ON dcl.tenant_id = t.id
           LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+          LEFT JOIN LATERAL (
+            SELECT tenant_logo_url, store_average_rating, store_review_count
+            FROM mv_storefront_discovery
+            WHERE tenant_id = dcl.tenant_id
+            LIMIT 1
+          ) msd ON true
           WHERE dcl.tenant_id != $1
             AND dcl.tenant_exists = true
             AND dcl.is_active_location = true
@@ -860,7 +891,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error getting recommendations for storefront:', error);
+    logger.error('Error getting recommendations for storefront:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get storefront recommendations'
@@ -941,7 +972,7 @@ router.get('/for-directory', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error getting recommendations for directory:', error);
+    logger.error('Error getting recommendations for directory:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get directory recommendations'
@@ -978,7 +1009,7 @@ router.get('/last-viewed', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error getting last viewed items:', error);
+    logger.error('Error getting last viewed items:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get last viewed items'
@@ -1134,7 +1165,7 @@ router.get('/for-product-page/:productId', async (req: Request, res: Response) =
     });
 
   } catch (error) {
-    console.error('Error getting last viewed items:', error);
+    logger.error('Error getting last viewed items:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get last viewed items'
@@ -1187,7 +1218,7 @@ router.get('/last-viewed', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error getting last viewed items:', error);
+    logger.error('Error getting last viewed items:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get last viewed items'

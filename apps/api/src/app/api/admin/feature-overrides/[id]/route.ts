@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -33,7 +34,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting feature override:', error);
+    logger.error('Error deleting feature override:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { error: 'Failed to delete feature override' },
       { status: 500 }

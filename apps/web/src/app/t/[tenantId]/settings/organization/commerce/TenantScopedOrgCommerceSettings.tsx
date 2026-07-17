@@ -11,6 +11,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useRouter } from 'next/navigation';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrganizationCommerceSettings {
   // Overall commerce availability
@@ -90,7 +91,7 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
           }
         }
       } catch (error) {
-        console.error('Failed to initialize organization commerce settings:', error);
+        clientLogger.error('Failed to initialize organization commerce settings:', { detail: error });
         setMessage({ type: 'error', text: 'Failed to load commerce settings' });
       } finally {
         setLoading(false);
@@ -108,7 +109,7 @@ export default function TenantScopedOrgCommerceSettings({ params }: TenantScoped
       await organizationsService.updateOrganizationCommerceSettings(organizationId, settings);
       setMessage({ type: 'success', text: 'Commerce settings saved successfully' });
     } catch (error) {
-      console.error('Failed to save commerce settings:', error);
+      clientLogger.error('Failed to save commerce settings:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to save settings' });
     } finally {
       setSaving(false);

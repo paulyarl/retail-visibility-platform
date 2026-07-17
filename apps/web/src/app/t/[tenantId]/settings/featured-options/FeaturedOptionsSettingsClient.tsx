@@ -15,6 +15,7 @@ import {
   PLATFORM_FEATURED_TYPES,
   getFeaturedTypeMeta,
 } from '@/utils/featuredOptions';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeaturedOptionsSettings {
   featured_enabled: boolean;
@@ -168,7 +169,7 @@ export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOpti
         });
       }
     } catch (err) {
-      console.error('Failed to load featured options settings:', err);
+      clientLogger.error('Failed to load featured options settings:', { detail: err });
     } finally {
       setLoading(false);
     }

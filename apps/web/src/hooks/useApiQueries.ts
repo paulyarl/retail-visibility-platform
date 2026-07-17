@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiQueriesService } from '@/services/ApiQueriesSingletonService';
 import { useTenantComplete } from './dashboard/useTenantComplete';
 import { useItemsComplete } from './useItemsComplete';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Category {
   id: string;
@@ -98,7 +99,7 @@ export function useOrganizationData(organizationId?: string) {
     queryKey: ['organization', organizationId, 'billing'],
     queryFn: async (): Promise<OrganizationData> => {
       if (!organizationId) {
-        console.error('[useOrganizationData] Organization ID is required');
+        clientLogger.error('[useOrganizationData] Organization ID is required');
         throw new Error('Organization ID is required');
       }
 
@@ -108,7 +109,7 @@ export function useOrganizationData(organizationId?: string) {
         console.log('[useOrganizationData] Successfully fetched organization data');
         return response;
       } catch (error) {
-        console.error('[useOrganizationData] Error fetching organization data:', error);
+        clientLogger.error('[useOrganizationData] Error fetching organization data:', { detail: error });
         throw error;
       }
     },

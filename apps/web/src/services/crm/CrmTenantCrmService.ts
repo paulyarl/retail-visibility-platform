@@ -10,8 +10,8 @@ import type {
   CrmTenantCrmStats, CrmUserReadState, CrmContact, CrmContactDetail, CreateContactInput, UpdateContactInput,
   CrmTicket, CreateTicketInput, UpdateTicketInput,
   CrmTicketMessage, CreateTicketMessageInput,
-  CrmTask, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
-  CrmAlert,
+  CrmTask, CrmTaskMessage, CreateTaskMessageInput, CrmActivity, CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
+  CrmAlert, TaskStatus,
 } from '@/types/crm';
 
 class CrmTenantCrmService extends TenantApiSingleton {
@@ -208,7 +208,7 @@ class CrmTenantCrmService extends TenantApiSingleton {
     return this.unwrap<CrmTicketMessage>(result);
   }
 
-  // --- Tasks (read-only) ---
+  // --- Tasks ---
   async listTasks(filters?: { status?: string; assignedTo?: string }): Promise<CrmTask[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
@@ -223,8 +223,49 @@ class CrmTenantCrmService extends TenantApiSingleton {
     return this.unwrap<CrmTask[]>(result);
   }
 
+  async updateTaskStatus(taskId: string, status: TaskStatus): Promise<CrmTask> {
+    const result = await this.makeDefaultRequest<CrmTask>(
+      `/api/tenant/crm/tasks/${taskId}`,
+      { method: 'PUT', body: JSON.stringify({ status }) },
+      undefined
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTask>(result);
+  }
+
+  async updateTask(taskId: string, data: { status?: TaskStatus; assigned_to?: string | null }): Promise<CrmTask> {
+    const result = await this.makeDefaultRequest<CrmTask>(
+      `/api/tenant/crm/tasks/${taskId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      undefined
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTask>(result);
+  }
+
+  // --- Task Messages ---
+  async listTaskMessages(taskId: string): Promise<CrmTaskMessage[]> {
+    const cacheKey = `crm-tenant-task-messages-${taskId}`;
+    const result = await this.makeDefaultRequest<CrmTaskMessage[]>(
+      `/api/tenant/crm/tasks/${taskId}/messages`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmTaskMessage[]>(result);
+  }
+
+  async createTaskMessage(taskId: string, data: CreateTaskMessageInput): Promise<CrmTaskMessage> {
+    const result = await this.makeDefaultRequest<CrmTaskMessage>(
+      `/api/tenant/crm/tasks/${taskId}/messages`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTaskMessage>(result);
+  }
+
   // --- Activities ---
-  async listActivities(filters?: { limit?: number }): Promise<CrmActivity[]> {
+  async listActivities(filters?: { limit?: number; ticketId?: string; taskId?: string }): Promise<CrmActivity[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)] as [string, string])
     ).toString() : '';

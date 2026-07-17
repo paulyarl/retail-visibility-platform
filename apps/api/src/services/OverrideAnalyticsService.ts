@@ -7,6 +7,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { getCacheService } from './OverrideCacheService';
+import { logger } from '../logger';
 
 export interface AnalyticsMetrics {
   overview: {
@@ -92,7 +93,7 @@ export class OverrideAnalyticsService {
       
       return analytics;
     } catch (error) {
-      console.error('[Analytics] Get analytics error:', error);
+      logger.error('[Analytics] Get analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -421,7 +422,7 @@ export class OverrideAnalyticsService {
 
       return trend;
     } catch (error) {
-      console.error('[Analytics] Get usage trends error:', error);
+      logger.error('[Analytics] Get usage trends error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -483,7 +484,7 @@ export class OverrideAnalyticsService {
         topApprovers: [] // Would implement actual approver tracking
       };
     } catch (error) {
-      console.error('[Analytics] Get approval analytics error:', error);
+      logger.error('[Analytics] Get approval analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -510,7 +511,7 @@ export class OverrideAnalyticsService {
           throw new Error(`Unsupported export format: ${format}`);
       }
     } catch (error) {
-      console.error('[Analytics] Export error:', error);
+      logger.error('[Analytics] Export error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

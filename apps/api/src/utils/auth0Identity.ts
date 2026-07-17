@@ -13,6 +13,7 @@
 
 import { Request, Response } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 export interface TrackingIdentity {
   userId: string | null;           // Auth0 user.sub if authenticated, null if anonymous
@@ -211,7 +212,7 @@ export async function getDbUserIdFromAuth0(auth0Sub: string): Promise<string | n
     
     return null;
   } catch (error) {
-    console.error('[Auth0Identity] Error getting DB user ID:', error);
+    logger.error('[Auth0Identity] Error getting DB user ID:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -230,7 +231,7 @@ export function attachTrackingIdentity(req: Request, res: Response, next: Functi
       next();
     })
     .catch(error => {
-      console.error('[Auth0Identity] Error attaching tracking identity:', error);
+      logger.error('[Auth0Identity] Error attaching tracking identity:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Continue with anonymous identity
       (req as any).trackingIdentity = {
         userId: null,

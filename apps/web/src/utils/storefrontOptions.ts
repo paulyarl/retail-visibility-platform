@@ -15,7 +15,6 @@ import {
   StorefrontOptQRContentType as QRContentTypeInternal,
   StorefrontOptGalleryType as GalleryTypeInternal,
   StorefrontOptAdvancedType as AdvancedTypeInternal,
-  StorefrontOptLayoutType as LayoutTypeInternal,
   StorefrontOptionsState,
 } from '@/services/CapabilityResolutionService';
 
@@ -28,24 +27,22 @@ export type StorefrontOptQRResolutionType = QRResolutionTypeInternal;
 export type StorefrontOptQRContentType = QRContentTypeInternal;
 export type StorefrontOptGalleryType = GalleryTypeInternal;
 export type StorefrontOptAdvancedType = AdvancedTypeInternal;
-export type StorefrontOptLayoutType = LayoutTypeInternal;
 
 // ====================
 // GROUP DEFINITIONS
 // ====================
 
-export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'gallery_mode' | 'advanced' | 'layout';
+export type StorefrontOptGroup = 'hours' | 'category' | 'recommend' | 'behavior' | 'info' | 'qr' | 'gallery' | 'gallery_mode' | 'advanced';
 
 export const HOURS_TYPES: StorefrontOptHoursType[] = ['hours_animated', 'hours_status'];
 export const CATEGORY_TYPES: StorefrontOptCategoryType[] = ['category_store', 'category_product'];
 export const RECOMMEND_TYPES: StorefrontOptRecommendType[] = ['recommend_store', 'recommend_products'];
-export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact', 'interactive_maps'];
+export const INFO_TYPES: StorefrontOptInfoType[] = ['storefront_social_media', 'storefront_contact'];
 export const QR_RESOLUTION_TYPES: StorefrontOptQRResolutionType[] = ['qr_codes_512', 'qr_codes_1024', 'qr_codes_2048'];
 export const QR_CONTENT_TYPES: StorefrontOptQRContentType[] = ['qr_product', 'qr_store', 'qr_logo', 'qr_directory'];
 export const GALLERY_TYPES: StorefrontOptGalleryType[] = ['image_gallery_5', 'image_gallery_10', 'image_gallery_15'];
 export const GALLERY_MODE_TYPES = ['carousel', 'magazine'] as const;
 export const ADVANCED_TYPES: StorefrontOptAdvancedType[] = ['enhanced_seo', 'storefront_actions'];
-export const LAYOUT_TYPES: StorefrontOptLayoutType[] = ['classic', 'editorial', 'immersive'];
 
 // ====================
 // TYPE GUARDS
@@ -83,10 +80,6 @@ export function isAdvancedType(type: string): type is StorefrontOptAdvancedType 
   return ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType);
 }
 
-export function isLayoutType(type: string): type is StorefrontOptLayoutType {
-  return LAYOUT_TYPES.includes(type as StorefrontOptLayoutType);
-}
-
 // ====================
 // DISPLAY HELPERS
 // ====================
@@ -117,7 +110,6 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   // Store Information
   storefront_social_media: { key: 'storefront_social_media', label: 'Social Media Links', description: 'Social media links on storefront', group: 'info', icon: '🔗', color: 'cyan', selectionMode: 'toggle' },
   storefront_contact: { key: 'storefront_contact', label: 'Contact Info', description: 'Contact information on storefront', group: 'info', icon: '📞', color: 'sky', selectionMode: 'toggle' },
-  interactive_maps: { key: 'interactive_maps', label: 'Interactive Maps', description: 'Embedded interactive map on storefront', group: 'info', icon: '🗺️', color: 'emerald', selectionMode: 'toggle' },
   // QR Code Display — Resolution (multi select)
   qr_codes_512: { key: 'qr_codes_512', label: 'QR 512px', description: '512px QR code resolution (standard)', group: 'qr', icon: '📱', color: 'slate', selectionMode: 'multi' },
   qr_codes_1024: { key: 'qr_codes_1024', label: 'QR 1024px', description: '1024px QR code resolution (high)', group: 'qr', icon: '📱', color: 'gray', selectionMode: 'multi' },
@@ -137,10 +129,6 @@ const STOREFRONT_OPT_TYPE_META: Record<string, StorefrontOptTypeMeta> = {
   // Advanced
   enhanced_seo: { key: 'enhanced_seo', label: 'Enhanced SEO', description: 'Advanced SEO controls and metadata', group: 'advanced', icon: '🔍', color: 'lime', selectionMode: 'toggle' },
   storefront_actions: { key: 'storefront_actions', label: 'Storefront Actions', description: 'Custom call-to-action buttons', group: 'advanced', icon: '⚡', color: 'yellow', selectionMode: 'toggle' },
-  // Layout
-  classic: { key: 'classic', label: 'Classic Layout', description: 'Traditional single-column layout', group: 'layout', icon: '📄', color: 'slate', selectionMode: 'radio' },
-  editorial: { key: 'editorial', label: 'Modern Editorial', description: 'Storytelling emphasis, hero banner layout', group: 'layout', icon: '📰', color: 'violet', selectionMode: 'radio' },
-  immersive: { key: 'immersive', label: 'Immersive Commerce', description: 'Conversion-optimized compact purchase flow', group: 'layout', icon: '🛒', color: 'emerald', selectionMode: 'radio' },
 };
 
 /**
@@ -163,7 +151,6 @@ export function getTypesByGroup(group: StorefrontOptGroup): string[] {
     case 'qr': return [...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES];
     case 'gallery': return [...GALLERY_TYPES];
     case 'advanced': return [...ADVANCED_TYPES];
-    case 'layout': return [...LAYOUT_TYPES];
     default: return [];
   }
 }
@@ -193,11 +180,10 @@ export const STOREFRONT_OPT_GROUPS: StorefrontOptGroupMeta[] = [
   { key: 'category', label: 'Category Display', description: 'Category navigation and badges', icon: '🏷️', color: 'purple' },
   { key: 'recommend', label: 'Recommendation Display', description: 'Recommended content sections', icon: '⭐', color: 'amber' },
   { key: 'behavior', label: 'User Behavior', description: 'User tracking and behavior features', icon: '👁️', color: 'teal' },
-  { key: 'info', label: 'Store Information', description: 'Contact, social, and map display', icon: 'ℹ️', color: 'cyan' },
+  { key: 'info', label: 'Store Information', description: 'Contact and social links', icon: 'ℹ️', color: 'cyan' },
   { key: 'qr', label: 'QR Code Display', description: 'QR code generation and display options', icon: '📱', color: 'indigo' },
   { key: 'gallery', label: 'Gallery Display', description: 'Image gallery limits', icon: '🖼️', color: 'orange' },
   { key: 'advanced', label: 'Advanced', description: 'Advanced storefront features', icon: '⚡', color: 'lime' },
-  { key: 'layout', label: 'Storefront Layout', description: 'Storefront page layout options', icon: '📐', color: 'violet' },
 ];
 
 export function getGroupMeta(group: StorefrontOptGroup): StorefrontOptGroupMeta | undefined {
@@ -218,20 +204,19 @@ export function filterAllowedTypes(state: StorefrontOptionsState, group?: Storef
   const allTypes = group ? getTypesByGroup(group) : [
     ...HOURS_TYPES, ...CATEGORY_TYPES, ...RECOMMEND_TYPES, 'recently_viewed',
     ...INFO_TYPES, ...QR_RESOLUTION_TYPES, ...QR_CONTENT_TYPES,
-    ...GALLERY_TYPES, ...ADVANCED_TYPES, ...LAYOUT_TYPES,
+    ...GALLERY_TYPES, ...ADVANCED_TYPES,
   ];
 
   return allTypes.filter(type => {
-    if (HOURS_TYPES.includes(type as StorefrontOptHoursType)) return state.allowedHoursTypes.includes(type as StorefrontOptHoursType);
+    if (HOURS_TYPES.includes(type as StorefrontOptHoursType)) return false;
     if (CATEGORY_TYPES.includes(type as StorefrontOptCategoryType)) return state.allowedCategoryTypes.includes(type as StorefrontOptCategoryType);
     if (RECOMMEND_TYPES.includes(type as StorefrontOptRecommendType)) return state.allowedRecommendTypes.includes(type as StorefrontOptRecommendType);
     if (type === 'recently_viewed') return state.recentlyViewedEnabled;
     if (INFO_TYPES.includes(type as StorefrontOptInfoType)) return state.allowedInfoTypes.includes(type as StorefrontOptInfoType);
-    if (QR_RESOLUTION_TYPES.includes(type as StorefrontOptQRResolutionType)) return state.allowedQRResolutions.includes(type as StorefrontOptQRResolutionType);
-    if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return state.allowedQRContentTypes.includes(type as StorefrontOptQRContentType);
-    if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return state.allowedGalleryTypes.includes(type as StorefrontOptGalleryType);
+    if (QR_RESOLUTION_TYPES.includes(type as StorefrontOptQRResolutionType)) return false;
+    if (QR_CONTENT_TYPES.includes(type as StorefrontOptQRContentType)) return false;
+    if (GALLERY_TYPES.includes(type as StorefrontOptGalleryType)) return false;
     if (ADVANCED_TYPES.includes(type as StorefrontOptAdvancedType)) return state.allowedAdvancedTypes.includes(type as StorefrontOptAdvancedType);
-    if (LAYOUT_TYPES.includes(type as StorefrontOptLayoutType)) return state.allowedLayouts.includes(type as StorefrontOptLayoutType);
     return false;
   });
 }
@@ -244,8 +229,6 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (!state.enabled) return [];
 
   const effective: string[] = [];
-  if (state.canUseAnimatedHours) effective.push('hours_animated');
-  if (state.canShowHoursStatus) effective.push('hours_status');
   if (state.canUseCategoryStore) effective.push('category_store');
   if (state.canUseCategoryProduct) effective.push('category_product');
   if (state.canUseRecommendStore) effective.push('recommend_store');
@@ -253,18 +236,8 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
   if (state.canUseRecentlyViewed) effective.push('recently_viewed');
   if (state.canUseSocialMedia) effective.push('storefront_social_media');
   if (state.canUseContact) effective.push('storefront_contact');
-  if (state.canUseInteractiveMaps) effective.push('interactive_maps');
-  if (state.canUseQRCodes) {
-    // Add QR types that are both tier-allowed and merchant-enabled
-    if (state.allowedQRResolutions.length > 0) effective.push(...state.allowedQRResolutions);
-    if (state.allowedQRContentTypes.length > 0) effective.push(...state.allowedQRContentTypes);
-  }
-  if (state.allowedGalleryTypes.length > 0) effective.push(...state.allowedGalleryTypes);
   if (state.canUseEnhancedSEO) effective.push('enhanced_seo');
   if (state.canUseStorefrontActions) effective.push('storefront_actions');
-  if (state.canUseLayoutClassic) effective.push('classic');
-  if (state.canUseLayoutEditorial) effective.push('editorial');
-  if (state.canUseLayoutImmersive) effective.push('immersive');
 
   return effective;
 }
@@ -273,22 +246,14 @@ export function getEffectiveTypes(state: StorefrontOptionsState): string[] {
  * Get the active gallery limit from state (resolves radio selection).
  */
 export function getActiveGalleryLimit(state: StorefrontOptionsState): number {
-  if (!state.enabled || !state.galleryEnabled) return 0;
-  if (state.allowedGalleryTypes.includes('image_gallery_15')) return 15;
-  if (state.allowedGalleryTypes.includes('image_gallery_10')) return 10;
-  if (state.allowedGalleryTypes.includes('image_gallery_5')) return 5;
-  return state.merchantPreferences.default_gallery_limit || 5;
+  return 0;
 }
 
 /**
  * Get the active QR resolution from state.
  */
 export function getActiveQRResolution(state: StorefrontOptionsState): string {
-  if (!state.enabled || !state.qrEnabled) return '';
-  if (state.allowedQRResolutions.includes('qr_codes_2048')) return '2048';
-  if (state.allowedQRResolutions.includes('qr_codes_1024')) return '1024';
-  if (state.allowedQRResolutions.includes('qr_codes_512')) return '512';
-  return state.merchantPreferences.default_qr_resolution || '1024';
+  return '';
 }
 
 // ====================
@@ -343,8 +308,8 @@ export interface StorefrontOptionFlags {
  */
 export function getStorefrontOptionFlags(state: StorefrontOptionsState): StorefrontOptionFlags {
   return {
-    showAnimatedHours: state.canUseAnimatedHours,
-    showHoursStatus: state.canShowHoursStatus,
+    showAnimatedHours: false,
+    showHoursStatus: false,
     showCategoryStore: state.canUseCategoryStore,
     showCategoryProduct: state.canUseCategoryProduct,
     showRecommendStore: state.canUseRecommendStore,
@@ -352,19 +317,17 @@ export function getStorefrontOptionFlags(state: StorefrontOptionsState): Storefr
     showRecentlyViewed: state.canUseRecentlyViewed,
     showSocialMedia: state.canUseSocialMedia,
     showContact: state.canUseContact,
-    showInteractiveMaps: state.canUseInteractiveMaps,
-    showQRCodes: state.canUseQRCodes,
-    showQRProduct: state.enabled && state.allowedQRContentTypes.includes('qr_product') && state.merchantPreferences.qr_product !== false,
-    showQRStore: state.enabled && state.allowedQRContentTypes.includes('qr_store') && state.merchantPreferences.qr_store !== false,
-    showQRLogo: state.enabled && state.allowedQRContentTypes.includes('qr_logo') && state.merchantPreferences.qr_logo !== false,
-    showQRDirectory: state.enabled && state.allowedQRContentTypes.includes('qr_directory') && state.merchantPreferences.qr_directory !== false,
-    qrResolution: getActiveQRResolution(state),
-    galleryLimit: getActiveGalleryLimit(state),
+    showInteractiveMaps: false,
+    showQRCodes: false,
+    showQRProduct: false,
+    showQRStore: false,
+    showQRLogo: false,
+    showQRDirectory: false,
+    qrResolution: '',
+    galleryLimit: 0,
     showEnhancedSEO: state.canUseEnhancedSEO,
     showStorefrontActions: state.canUseStorefrontActions,
-    storefrontLayout: state.canUseLayoutClassic
-      ? state.merchantPreferences.storefront_layout || 'classic'
-      : state.allowedLayouts[0] || 'classic',
+    storefrontLayout: 'classic',
   };
 }
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.get('/featured', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Featured Shops API Error]', error);
+    logger.error('[Featured Shops API Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -132,7 +133,7 @@ router.post('/featured', async (req, res) => {
       message: 'Shop added to featured list successfully'
     });
   } catch (error) {
-    console.error('[Add Featured Shop Error]', error);
+    logger.error('[Add Featured Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

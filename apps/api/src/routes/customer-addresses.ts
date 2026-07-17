@@ -13,6 +13,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { generateCustomerAddressId } from '../lib/id-generator';
 import { CustomerTokenService } from '../services/CustomerTokenService';
+import { logger } from '../logger';
 
 const router = Router();
 const customerTokenService = CustomerTokenService.getInstance();
@@ -74,7 +75,7 @@ router.get('/', requireCustomerAuth, async (req: Request, res: Response) => {
       addresses: addresses.map(formatAddress),
     });
   } catch (error: any) {
-    console.error('[CustomerAddresses] List error:', error);
+    logger.error('[CustomerAddresses] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -114,7 +115,7 @@ router.get('/:id', requireCustomerAuth, async (req: Request, res: Response) => {
       address: formatAddress(address),
     });
   } catch (error: any) {
-    console.error('[CustomerAddresses] Get error:', error);
+    logger.error('[CustomerAddresses] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -201,7 +202,7 @@ router.post('/', requireCustomerAuth, async (req: Request, res: Response) => {
       address: formatAddress(address),
     });
   } catch (error: any) {
-    console.error('[CustomerAddresses] Create error:', error);
+    logger.error('[CustomerAddresses] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -282,7 +283,7 @@ router.put('/:id', requireCustomerAuth, async (req: Request, res: Response) => {
       address: formatAddress(address),
     });
   } catch (error: any) {
-    console.error('[CustomerAddresses] Update error:', error);
+    logger.error('[CustomerAddresses] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -347,7 +348,7 @@ router.delete('/:id', requireCustomerAuth, async (req: Request, res: Response) =
       message: 'Address deleted',
     });
   } catch (error: any) {
-    console.error('[CustomerAddresses] Delete error:', error);
+    logger.error('[CustomerAddresses] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -402,7 +403,7 @@ router.put('/:id/default', requireCustomerAuth, async (req: Request, res: Respon
       address: formatAddress(address),
     });
   } catch (error: any) {
-    console.error('[CustomerAddresses] Set default error:', error);
+    logger.error('[CustomerAddresses] Set default error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',

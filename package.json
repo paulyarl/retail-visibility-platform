@@ -37,7 +37,7 @@
     "test:watch": "vitest --watch"
   },
   "license": "ISC",
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.13.1",
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.23.0",
     "@hookform/resolvers": "^5.4.0",

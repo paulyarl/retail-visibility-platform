@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { reviewsService, type ReviewSummary, type Review } from '@/services/ReviewsSingletonService';
 import { publicReviewsService } from '@/services/PublicReviewsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UseReviewsOptions {
   tenantId: string;
@@ -58,7 +59,7 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
       const summary = await service.getRatingSummary(tenantId);
       setSummary(summary);
     } catch (error) {
-      console.error('Error fetching rating summary:', error);
+      clientLogger.error('Error fetching rating summary:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
       const reviews = await service.getReviews(tenantId, 10);
       setReviews(reviews);
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      clientLogger.error('Error fetching reviews:', { detail: error });
     }
   }, [tenantId, isPublic]);
 
@@ -81,7 +82,7 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
       const userReview = await reviewsService.getUserReview(tenantId);
       setUserReview(userReview);
     } catch (error) {
-      console.error('Error fetching user review:', error);
+      clientLogger.error('Error fetching user review:', { detail: error });
     }
   }, [tenantId]);
 
@@ -100,7 +101,7 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
         }
       }
     } catch (error) {
-      console.error('Error submitting helpful vote:', error);
+      clientLogger.error('Error submitting helpful vote:', { detail: error });
     }
   }, [fetchReviews, fetchUserReview, isPublic]);
 
@@ -135,7 +136,7 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
         setShowReviewForm(false);
       }
     } catch (error) {
-      console.error('Error submitting review:', error);
+      clientLogger.error('Error submitting review:', { detail: error });
     }
   }, [tenantId, fetchRatingSummary, fetchReviews, fetchUserReview, isPublic]);
 

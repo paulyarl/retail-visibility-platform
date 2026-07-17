@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ChangeLocationStatusModalProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ export default function ChangeLocationStatusModal({
       setCurrentStatus(backendStatus);
       setSelectedStatus(backendStatus); // Reset selected status to current
     } catch (err) {
-      console.error('Error fetching current status:', err);
+      clientLogger.error('Error fetching current status:', { detail: err });
       setCurrentStatus(initialStatus); // Fallback to prop
       setSelectedStatus(initialStatus);
     } finally {
@@ -142,7 +143,7 @@ export default function ChangeLocationStatusModal({
       const data = await tenantInfoService.getTenantStatusPreview(tenantId, selectedStatus);
       setImpact(data);
     } catch (err) {
-      console.error('Failed to fetch impact preview:', err);
+      clientLogger.error('Failed to fetch impact preview:', { detail: err });
     } finally {
       setPreviewLoading(false);
     }
@@ -171,7 +172,7 @@ export default function ChangeLocationStatusModal({
         onStatusChanged();
       }
     } catch (err) {
-      console.error('Failed to update status:', err);
+      clientLogger.error('Failed to update status:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
       setLoading(false);

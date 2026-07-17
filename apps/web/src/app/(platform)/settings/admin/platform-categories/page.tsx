@@ -7,6 +7,7 @@ import { Plus, Edit2, Trash2, GripVertical, Save, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import GoogleCategorySelector from '@/components/categories/GoogleCategorySelector';
 import CategoryCoverageBadge from '@/components/categories/CategoryCoverageBadge';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PlatformCategory {
   id: string;
@@ -153,7 +154,7 @@ export default function PlatformCategoriesPage() {
       // Show all results (no limit) - admins can handle large result sets
       setGbpResults(filtered);
     } catch (error) {
-      console.error('Failed to search GBP categories:', error);
+      clientLogger.error('Failed to search GBP categories:', { detail: error });
     } finally {
       setGbpLoading(false);
     }

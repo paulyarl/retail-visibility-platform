@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AdminDirectoryListing {
   id: string;
@@ -101,7 +102,7 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
         setPagination(pagination);
       }
     } catch (err) {
-      console.error('Error fetching admin directory listings:', err);
+      clientLogger.error('Error fetching admin directory listings:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load listings');
     } finally {
       setLoading(false);
@@ -170,7 +171,7 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
       await platformHomeService.featureDirectoryListing(tenantId, until, priority);
       await fetchListings();
     } catch (err) {
-      console.error('Error featuring listing:', err);
+      clientLogger.error('Error featuring listing:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to feature listing');
       throw err;
     }
@@ -182,7 +183,7 @@ export function useAdminDirectoryListings(initialFilters?: DirectoryFilters): Ad
       await platformHomeService.unfeatureDirectoryListing(tenantId);
       await fetchListings();
     } catch (err) {
-      console.error('Error unfeaturing listing:', err);
+      clientLogger.error('Error unfeaturing listing:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to unfeature listing');
       throw err;
     }

@@ -6,6 +6,7 @@ import { Package, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface Category {
   id: string;
@@ -53,7 +54,7 @@ export default function AllCategoriesClient() {
           setCategories(transformedCategories);
         }
       } catch (err) {
-        console.error('Error fetching categories:', err);
+        clientLogger.error('Error fetching categories:', { detail: err });
         setError('Failed to load categories. Please try again.');
       } finally {
         setLoading(false);

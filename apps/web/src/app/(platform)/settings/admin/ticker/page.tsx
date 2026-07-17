@@ -6,6 +6,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import EnhancedTickerSettings from '@/components/admin/EnhancedTickerSettings';
 import { tickerConfigService } from '@/services/TickerConfigService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 export default function TickerSettingsPage() {
@@ -39,7 +40,7 @@ export default function TickerSettingsPage() {
           setAvailableTenants(tenantsResult.data);
         }
       } catch (error) {
-        console.error('Failed to load ticker data:', error);
+        clientLogger.error('Failed to load ticker data:', { detail: error });
       } finally {
         setLoading(false);
       }

@@ -53,6 +53,7 @@ import { PlatformRevenueTransaction } from '@/services/PlatformRevenueService';
 import { ManualInvoice, ServiceCharge } from '@/services/ManualBillingService';
 import { Tenant } from '../types';
 import { useBillingWorkflows } from '@/services/BillingWorkflowService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface BillingWorkflowsRealProps {
   revenueTransactions?: PlatformRevenueTransaction[];
@@ -181,7 +182,7 @@ export function BillingWorkflowsReal({
     try {
       await toggleWorkflow(ruleId);
     } catch (error) {
-      console.error('Failed to toggle workflow:', error);
+      clientLogger.error('Failed to toggle workflow:', { detail: error });
     }
   };
 
@@ -189,7 +190,7 @@ export function BillingWorkflowsReal({
     try {
       await testWorkflow(ruleId);
     } catch (error) {
-      console.error('Failed to test workflow:', error);
+      clientLogger.error('Failed to test workflow:', { detail: error });
     }
   };
 
@@ -201,7 +202,7 @@ export function BillingWorkflowsReal({
       };
       await executeWorkflow(ruleId, triggerData);
     } catch (error) {
-      console.error('Failed to execute workflow:', error);
+      clientLogger.error('Failed to execute workflow:', { detail: error });
     }
   };
 
@@ -238,7 +239,7 @@ export function BillingWorkflowsReal({
         enabled: true
       });
     } catch (error) {
-      console.error('Failed to create workflow:', error);
+      clientLogger.error('Failed to create workflow:', { detail: error });
     }
   };
 
@@ -254,7 +255,7 @@ export function BillingWorkflowsReal({
       setEditModalOpened(false);
       setModalOpened(false);
     } catch (error) {
-      console.error('Failed to update workflow:', error);
+      clientLogger.error('Failed to update workflow:', { detail: error });
     }
   };
 

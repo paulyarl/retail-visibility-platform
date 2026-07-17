@@ -13,6 +13,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface LoginRequest {
   email: string;
@@ -322,7 +323,7 @@ export class PublicAuthService extends PublicApiSingleton {
       return result.data || { isAuthenticated: false };
     } catch (error) {
       // Handle any unexpected errors
-      console.warn('[PublicAuthService] getSessionInfo error:', error);
+      clientLogger.warn('[PublicAuthService] getSessionInfo error:', { detail: error });
       return { isAuthenticated: false };
     }
   }
@@ -725,7 +726,7 @@ export class PublicAuthService extends PublicApiSingleton {
       
       return null;
     } catch (error) {
-      console.error('Error getting token:', error);
+      clientLogger.error('Error getting token:', { detail: error });
       return null;
     }
   }

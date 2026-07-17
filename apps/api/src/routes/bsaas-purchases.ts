@@ -656,12 +656,31 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
     const featureKeys = catalogEntries.map(e => e.feature_key);
     const features = await prisma.features_list.findMany({
       where: { key: { in: featureKeys }, is_active: true },
-      select: { key: true, name: true, description: true, category: true },
+      select: { id: true, key: true, name: true, description: true, category: true },
     });
     const featureMap = new Map(features.map(f => [f.key, f]));
 
+    // Fetch capability type for each feature via capability_features_list
+    const capLinks = await prisma.capability_features_list.findMany({
+      where: { feature_id: { in: features.map(f => f.id || '') }, is_active: true },
+      include: { capability_type_list: { select: { key: true } } },
+    });
+    const featureIdToCapKey = new Map<string, string>();
+    for (const link of capLinks) {
+      if (link.capability_type_list?.key) {
+        featureIdToCapKey.set(link.feature_id, link.capability_type_list.key);
+      }
+    }
+    // Also build a feature-key → capability-key map for convenience
+    const featureKeyToCapKey = new Map<string, string>();
+    for (const f of features) {
+      const capKey = featureIdToCapKey.get(f.id || '');
+      if (capKey) featureKeyToCapKey.set(f.key, capKey);
+    }
+
     const catalog = catalogEntries
       .filter(entry => featureMap.has(entry.feature_key))
+      .filter(entry => !entry.feature_key.endsWith('_enabled') && !entry.feature_key.endsWith('_disabled'))
       .map(entry => {
         const f = featureMap.get(entry.feature_key)!;
         return {
@@ -669,6 +688,7 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
           name: entry.marketing_name || f.name,
           description: entry.description || f.description || '',
           category: f.category,
+          capabilityType: featureKeyToCapKey.get(entry.feature_key) || null,
           priceCents: entry.price_cents,
           billingCycle: entry.billing_cycle as 'one_time' | 'weekly' | 'monthly' | 'annual',
           trialDays: entry.trial_days,
@@ -721,7 +741,7 @@ router.get('/feature-catalog', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: catalogWithStatus });
   } catch (error: any) {
-    console.error('[BSaaS] Error fetching feature catalog:', error);
+    logger.error('[BSaaS] Error fetching feature catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch feature catalog' });
   }
 });
@@ -830,7 +850,7 @@ router.get('/feature-purchases', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: purchases });
   } catch (error: any) {
-    console.error('[BSaaS] Error listing purchases:', error);
+    logger.error('[BSaaS] Error listing purchases:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to list purchases' });
   }
 });
@@ -1200,6 +1220,27 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       })();
     }
 
+    // 5e. If this is a funnel_builder re-purchase, re-activate paused funnels — fire-and-forget
+    if (featureKey === 'funnel_builder') {
+      (async () => {
+        try {
+          const paused = await prisma.tenant_sales_funnels.findMany({
+            where: { tenant_id: tenantId, is_active: false },
+            select: { id: true },
+          });
+          if (paused.length > 0) {
+            await prisma.tenant_sales_funnels.updateMany({
+              where: { tenant_id: tenantId, is_active: false },
+              data: { is_active: true, updated_at: new Date() },
+            });
+            logger.info('[BSaaS] Re-activated paused funnels after re-purchase', undefined, { tenantId, count: paused.length });
+          }
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to re-activate funnels after re-purchase', undefined, { error: (err as Error).message });
+        }
+      })();
+    }
+
     // 6. Audit log
     await audit({
       tenantId,
@@ -1238,7 +1279,7 @@ router.post('/feature-purchase', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error purchasing feature:', error);
+    logger.error('[BSaaS] Error purchasing feature:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase feature' });
   }
 });
@@ -1566,6 +1607,27 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       metadata: { bundleKey, bundleName: bundle.marketing_name, featureKeys },
     }).catch(err => console.error('[BSaaS] Failed to send bundle notification:', err));
 
+    // 10b. If bundle includes funnel_builder, re-activate paused funnels — fire-and-forget
+    if (featureKeys.includes('funnel_builder')) {
+      (async () => {
+        try {
+          const paused = await prisma.tenant_sales_funnels.findMany({
+            where: { tenant_id: tenantId, is_active: false },
+            select: { id: true },
+          });
+          if (paused.length > 0) {
+            await prisma.tenant_sales_funnels.updateMany({
+              where: { tenant_id: tenantId, is_active: false },
+              data: { is_active: true, updated_at: new Date() },
+            });
+            logger.info('[BSaaS] Re-activated paused funnels after bundle re-purchase', undefined, { tenantId, count: paused.length });
+          }
+        } catch (err) {
+          logger.warn('[BSaaS] Failed to re-activate funnels after bundle re-purchase', undefined, { error: (err as Error).message });
+        }
+      })();
+    }
+
     res.json({
       success: true,
       data: {
@@ -1582,7 +1644,7 @@ router.post('/bundle-purchase', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error purchasing bundle:', error);
+    logger.error('[BSaaS] Error purchasing bundle:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to purchase bundle' });
   }
 });
@@ -1652,7 +1714,7 @@ router.post('/validate-promo', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error validating promo code:', error);
+    logger.error('[BSaaS] Error validating promo code:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to validate promo code' });
   }
 });
@@ -1798,7 +1860,7 @@ router.post('/feature-purchase/:id/cancel', async (req: Request, res: Response) 
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error cancelling purchase:', error);
+    logger.error('[BSaaS] Error cancelling purchase:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to cancel purchase' });
   }
 });
@@ -1974,7 +2036,7 @@ router.post('/redeem-grant', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[BSaaS] Error redeeming grant token:', error);
+    logger.error('[BSaaS] Error redeeming grant token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to redeem grant token' });
   }
 });

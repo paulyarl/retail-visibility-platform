@@ -9,6 +9,7 @@ import { requireAuth, checkTenantAccess } from '../middleware/auth';
 import crypto from 'crypto';
 import { generatePaymentGatewayId } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -63,7 +64,7 @@ router.get('/:tenantId/payment-gateway', async (req: Request, res: Response) => 
       defaultGatewayType: activeGateway?.gateway_type || null,
     });
   } catch (error: any) {
-    console.error('[Payment Gateway] Status check error:', error);
+    logger.error('[Payment Gateway] Status check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       hasActiveGateway: false,
       defaultGatewayType: null,
@@ -187,7 +188,7 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
       commerce_features: commerceFeatures, // Feature-based checkout mode detection
     });
   } catch (error: any) {
-    console.error('[Payment Gateways] Public list error:', error);
+    logger.error('[Payment Gateways] Public list error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_failed',
@@ -258,7 +259,7 @@ router.get('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async 
       },
     });
   } catch (error: any) {
-    console.error('[Payment Gateways] List error:', error);
+    logger.error('[Payment Gateways] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_failed',
@@ -379,7 +380,7 @@ router.post('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async
       },
     });
   } catch (error: any) {
-    console.error('[Payment Gateways] Create error:', error);
+    logger.error('[Payment Gateways] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'create_failed',
@@ -432,7 +433,7 @@ router.patch('/:tenantId/payment-gateways/:gatewayId', requireAuth, checkTenantA
       },
     });
   } catch (error: any) {
-    console.error('[Payment Gateways] Update error:', error);
+    logger.error('[Payment Gateways] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'update_failed',
@@ -498,7 +499,7 @@ router.post('/:tenantId/payment-gateways/:gatewayId/set-default', requireAuth, c
       message: 'Default gateway updated',
     });
   } catch (error: any) {
-    console.error('[Payment Gateways] Set default error:', error);
+    logger.error('[Payment Gateways] Set default error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'set_default_failed',
@@ -541,7 +542,7 @@ router.delete('/:tenantId/payment-gateways/:gatewayId', requireAuth, checkTenant
       message: 'Payment gateway deleted',
     });
   } catch (error: any) {
-    console.error('[Payment Gateways] Delete error:', error);
+    logger.error('[Payment Gateways] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'delete_failed',

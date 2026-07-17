@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface PlaceholderEntry {
   key: string;
@@ -112,7 +113,7 @@ class PolicyTemplateService extends TenantApiSingleton {
       if (!result.success || !result.data) return [];
       return result.data.templates ?? [];
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to get templates:', error);
+      clientLogger.error('[PolicyTemplate] Failed to get templates:', { detail: error });
       return [];
     }
   }
@@ -134,7 +135,7 @@ class PolicyTemplateService extends TenantApiSingleton {
       if (!result.success || !result.data) return [];
       return result.data.groups ?? [];
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to get grouped templates:', error);
+      clientLogger.error('[PolicyTemplate] Failed to get grouped templates:', { detail: error });
       return [];
     }
   }
@@ -156,7 +157,7 @@ class PolicyTemplateService extends TenantApiSingleton {
       if (!result.success || !result.data) return [];
       return result.data.recommendations ?? [];
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to get recommended templates:', error);
+      clientLogger.error('[PolicyTemplate] Failed to get recommended templates:', { detail: error });
       return [];
     }
   }
@@ -202,7 +203,7 @@ class PolicyTemplateService extends TenantApiSingleton {
         policies: result.data.policies,
       };
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to apply template:', error);
+      clientLogger.error('[PolicyTemplate] Failed to apply template:', { detail: error });
       return { success: false, error: error instanceof Error ? error.message : 'Failed to apply template' };
     }
   }
@@ -224,7 +225,7 @@ class PolicyTemplateService extends TenantApiSingleton {
       if (!result.success || !result.data) return null;
       return result.data.completeness ?? null;
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to get completeness:', error);
+      clientLogger.error('[PolicyTemplate] Failed to get completeness:', { detail: error });
       return null;
     }
   }
@@ -244,7 +245,7 @@ class PolicyTemplateService extends TenantApiSingleton {
       if (!result.success || !result.data) return {};
       return result.data.defaults ?? {};
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to get auto-fill defaults:', error);
+      clientLogger.error('[PolicyTemplate] Failed to get auto-fill defaults:', { detail: error });
       return {};
     }
   }
@@ -264,7 +265,7 @@ class PolicyTemplateService extends TenantApiSingleton {
       if (!result.success || !result.data) return [];
       return result.data.outdated ?? [];
     } catch (error) {
-      console.error('[PolicyTemplate] Failed to get outdated usage:', error);
+      clientLogger.error('[PolicyTemplate] Failed to get outdated usage:', { detail: error });
       return [];
     }
   }

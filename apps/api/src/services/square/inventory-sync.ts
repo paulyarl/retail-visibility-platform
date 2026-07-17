@@ -6,6 +6,7 @@
 
 import { squareIntegrationRepository } from './square-integration.repository';
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface SquareInventoryCount {
   catalog_object_id: string;
@@ -137,7 +138,7 @@ export class InventorySync {
         source: 'square',
       };
     } catch (error) {
-      console.error(`[InventorySync] Failed to import inventory:`, error);
+      logger.error(`[InventorySync] Failed to import inventory:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -210,7 +211,7 @@ export class InventorySync {
         source: 'platform',
       };
     } catch (error) {
-      console.error(`[InventorySync] Failed to export inventory:`, error);
+      logger.error(`[InventorySync] Failed to export inventory:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -319,7 +320,7 @@ export class InventorySync {
       // For now, default to exporting to Square
       return await this.exportInventory(platformProductId);
     } catch (error) {
-      console.error(`[InventorySync] Failed to sync product inventory:`, error);
+      logger.error(`[InventorySync] Failed to sync product inventory:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -379,7 +380,7 @@ export class InventorySync {
 
       return discrepancies;
     } catch (error) {
-      console.error(`[InventorySync] Failed to get discrepancies:`, error);
+      logger.error(`[InventorySync] Failed to get discrepancies:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

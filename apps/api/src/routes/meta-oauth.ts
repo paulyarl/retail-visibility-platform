@@ -29,6 +29,7 @@ import {
 import { fullCatalogSync } from '../services/MetaCatalogSyncService';
 import { generateMetaOAuthAccountId, generateMetaOAuthTokenId } from '../lib/id-generator';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -88,7 +89,7 @@ router.get('/meta/oauth/status', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Meta OAuth] Error checking status:', error);
+    logger.error('[Meta OAuth] Error checking status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'status_check_failed',
@@ -132,7 +133,7 @@ router.get('/meta/oauth/authorize', async (req, res) => {
       data: { url: authUrl }
     });
   } catch (error) {
-    console.error('[Meta OAuth] Error initiating OAuth:', error);
+    logger.error('[Meta OAuth] Error initiating OAuth:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'oauth_init_failed',
@@ -150,7 +151,7 @@ router.get('/meta/oauth/callback', async (req, res) => {
     const { code, state, error: oauthError } = req.query;
 
     if (oauthError) {
-      console.error('[Meta OAuth] OAuth error:', String(oauthError));
+      logger.error('[Meta OAuth] OAuth error:', undefined, { error: { name: 'Error', message: String(String(oauthError)) } });
       return res.redirect(`${WEB_URL}/settings/integrations/meta?error=${oauthError}`);
     }
 
@@ -240,7 +241,7 @@ router.get('/meta/oauth/callback', async (req, res) => {
 
     res.redirect(`${WEB_URL}/t/${tenantId}/settings/integrations/meta?success=connected`);
   } catch (error) {
-    console.error('[Meta OAuth] Callback error:', error);
+    logger.error('[Meta OAuth] Callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.redirect(`${WEB_URL}/settings/integrations/meta?error=callback_failed`);
   }
 });
@@ -288,7 +289,7 @@ router.post('/meta/oauth/disconnect', async (req, res) => {
       message: 'Successfully disconnected from Meta Commerce',
     });
   } catch (error) {
-    console.error('[Meta OAuth] Disconnect error:', error);
+    logger.error('[Meta OAuth] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'disconnect_failed',
@@ -337,7 +338,7 @@ router.get('/meta/oauth/businesses', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Meta OAuth] Error listing businesses:', error);
+    logger.error('[Meta OAuth] Error listing businesses:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'list_businesses_failed',
@@ -400,7 +401,7 @@ router.post('/meta/oauth/link-catalog', async (req, res) => {
       data: { businessId, catalogId, instagramAccountId },
     });
   } catch (error) {
-    console.error('[Meta OAuth] Error linking catalog:', error);
+    logger.error('[Meta OAuth] Error linking catalog:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'link_catalog_failed',
@@ -455,7 +456,7 @@ router.post('/meta/catalog/sync', async (req, res) => {
         console.log(`[Meta OAuth] Catalog sync complete for tenant ${tenantId}: ${result.synced}/${result.total} synced`);
       })
       .catch(err => {
-        console.error(`[Meta OAuth] Catalog sync failed for tenant ${tenantId}:`, err);
+        logger.error(`[Meta OAuth] Catalog sync failed for tenant ${tenantId}:`, undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
       });
 
     res.json({
@@ -463,7 +464,7 @@ router.post('/meta/catalog/sync', async (req, res) => {
       message: 'Catalog sync started. Check sync status for results.',
     });
   } catch (error) {
-    console.error('[Meta OAuth] Error triggering catalog sync:', error);
+    logger.error('[Meta OAuth] Error triggering catalog sync:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_trigger_failed',
@@ -505,7 +506,7 @@ router.get('/meta/catalog/sync-status', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Meta OAuth] Error getting sync status:', error);
+    logger.error('[Meta OAuth] Error getting sync status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'sync_status_failed',

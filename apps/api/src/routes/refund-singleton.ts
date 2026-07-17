@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import RefundSingletonService from '../services/RefundSingletonService';
 import { authenticateToken } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.post('/process', async (req, res) => {
       message: 'Refund processed successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Process refund error:', error);
+    logger.error('[REFUND SINGLETON] Process refund error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to process refund',
@@ -100,7 +101,7 @@ router.get('/refund/:refundId', async (req, res) => {
       message: 'Refund retrieved successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Get refund error:', error);
+    logger.error('[REFUND SINGLETON] Get refund error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve refund'
@@ -141,7 +142,7 @@ router.get('/tenant/:tenantId', async (req, res) => {
       message: 'Tenant refunds retrieved successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Get tenant refunds error:', error);
+    logger.error('[REFUND SINGLETON] Get tenant refunds error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve tenant refunds'
@@ -184,7 +185,7 @@ router.get('/stats', async (req, res) => {
       message: 'Refund statistics retrieved successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Get stats error:', error);
+    logger.error('[REFUND SINGLETON] Get stats error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch refund statistics'
@@ -217,7 +218,7 @@ router.get('/health', async (req, res) => {
       message: 'Refund service health status retrieved successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Health check error:', error);
+    logger.error('[REFUND SINGLETON] Health check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to check service health'
@@ -249,7 +250,7 @@ router.delete('/cache', async (req, res) => {
       message: 'Refund service cache cleared successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Clear cache error:', error);
+    logger.error('[REFUND SINGLETON] Clear cache error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to clear cache'
@@ -302,7 +303,7 @@ router.post('/test', async (req, res) => {
       message: 'Test refund processed successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Test error:', error);
+    logger.error('[REFUND SINGLETON] Test error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       message: 'Failed to test refund processing',
@@ -353,7 +354,7 @@ router.get('/gateways', async (req, res) => {
       message: 'Supported payment gateways retrieved successfully'
     });
   } catch (error) {
-    console.error('[REFUND SINGLETON] Gateways error:', error);
+    logger.error('[REFUND SINGLETON] Gateways error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve supported gateways'

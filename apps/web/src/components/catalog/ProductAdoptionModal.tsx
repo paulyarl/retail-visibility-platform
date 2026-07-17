@@ -23,6 +23,7 @@ import { Button, Modal, TextInput, NumberInput, Textarea, Select } from '@mantin
 import { Badge } from '@/components/ui/Badge';
 import { GlobalProduct, globalCatalogService } from '@/services/GlobalCatalogService';
 import { productSlugService } from '@/services/ProductSlugService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductAdoptionModalProps {
   product: GlobalProduct;
@@ -61,7 +62,7 @@ export default function ProductAdoptionModal({
         const existing = await productSlugService.slugExists(product.product_slug);
         setUpcStatus(existing ? 'duplicate' : 'available');
       } catch (err) {
-        console.error('[ProductAdoptionModal] Error checking UPC:', err);
+        clientLogger.error('[ProductAdoptionModal] Error checking UPC:', { detail: err });
         setUpcStatus('available'); // Allow adoption if check fails
       }
     };
@@ -95,7 +96,7 @@ export default function ProductAdoptionModal({
         onAdopted(product);
       }, 1500);
     } catch (err: any) {
-      console.error('[ProductAdoptionModal] Error adopting product:', err);
+      clientLogger.error('[ProductAdoptionModal] Error adopting product:', { detail: err });
       setError(err.message || 'Failed to adopt product');
     } finally {
       setAdopting(false);

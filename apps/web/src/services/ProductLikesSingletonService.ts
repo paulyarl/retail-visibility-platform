@@ -1,4 +1,5 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface ProductLike {
   id: string;
@@ -51,13 +52,13 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         `product-like-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`
       );
       if (!response.success) {
-        console.error('[ProductLikesSingleton] Failed to like product:', response.error);
+        clientLogger.error('[ProductLikesSingleton] Failed to like product:', { detail: response.error });
         return false;
       }
 
       return response.data !== null;
     } catch (error) {
-      console.error('[ProductLikesSingleton] Failed to like product:', error);
+      clientLogger.error('[ProductLikesSingleton] Failed to like product:', { detail: error });
       return false;
     }
   }
@@ -84,13 +85,13 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         `product-unlike-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`
       );
       if (!response.success) {
-        console.error('[ProductLikesSingleton] Failed to unlike product:', response.error);
+        clientLogger.error('[ProductLikesSingleton] Failed to unlike product:', { detail: response.error });
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('[ProductLikesSingleton] Failed to unlike product:', error);
+      clientLogger.error('[ProductLikesSingleton] Failed to unlike product:', { detail: error });
       return false;
     }
   }
@@ -115,13 +116,13 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         `product-like-status-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`
       );
       if (!response.success) {
-        console.error('[ProductLikesSingleton] Failed to get product like status:', response.error);
+        clientLogger.error('[ProductLikesSingleton] Failed to get product like status:', { detail: response.error });
         return null;
       }
 
       return response.data || null;
     } catch (error) {
-      console.error('[ProductLikesSingleton] Failed to get product like status:', error);
+      clientLogger.error('[ProductLikesSingleton] Failed to get product like status:', { detail: error });
       return null;
     }
   }

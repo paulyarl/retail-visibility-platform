@@ -1,0 +1,1228 @@
+/**
+ * Recommendation API Routes
+ * MVP Recommendation System
+ * 
+ * Auth0 Integration:
+ * - User identity extracted server-side from Auth0 session
+ * - Supports both authenticated and anonymous users
+ * - userId determined by Auth0 session (not client-provided)
+ */
+
+import { Router, Request, Response } from 'express';
+import { getDirectPool } from '../utils/db-pool';
+import {
+  getStoresViewedBySameUsers,
+  getPopularStoresInCategory,
+  getTrendingNearby,
+  trackUserBehavior,
+  getProductsViewedBySameUsers,
+  getStoresInUserFavoriteCategories,
+  getSimilarStoresInCategory,
+  getLastViewedItems
+} from '../services/recommendationService';
+import { extractTrackingIdentity, TrackingIdentity } from '../utils/auth0Identity';
+
+const router = Router();
+
+/**
+ * POST /api/recommendations/track-batch
+ * Track multiple user behavior events in batch (for client-side caching)
+ * 
+ * Auth0: User identity extracted server-side, applied to all events
+ */
+router.post('/track-batch', async (req: Request, res: Response) => {
+  try {
+    const { events, batchMetadata } = req.body;
+
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({
+        error: 'invalid_events',
+        message: 'Events array is required and must not be empty'
+      });
+    }
+
+    // Extract identity from Auth0 session (server-side)
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    // Process each event in the batch with server-determined identity
+    for (const event of events) {
+      try {
+        const {
+          entityId,
+          entity_id, // Support snake_case format
+          locationLat,
+          location_lng, // Support snake_case format
+          location_lat, // Support snake_case format
+          locationLng,
+          referrer,
+          userAgent,
+          timestamp,
+          pageType,
+          page_type, // Support snake_case format
+          context,
+          priority
+        } = event;
+
+        // Support both camelCase and snake_case formats
+        // Check for entity_type/entityType in the raw event first, then default to 'store'
+        const finalEntityId = entityId || entity_id;
+        const finalEntityType = event?.entity_type || event?.entityType || 'store';
+        const finalLocationLat = locationLat || location_lat;
+        const finalLocationLng = locationLng || location_lng;
+        const finalPageType = pageType || page_type;
+
+        if (!finalEntityId) {
+          results.push({
+            entityId: finalEntityId,
+            success: false,
+            error: 'entity_id_required'
+          });
+          failureCount++;
+          continue;
+        }
+
+        await trackUserBehavior({
+          userId: identity.userId,              // Server-determined (null if anonymous)
+          sessionId: identity.sessionId,        // Server-determined
+          isAuthenticated: identity.isAuthenticated,  // Track auth status
+          entityType: finalEntityType,
+          entityId: finalEntityId,
+          locationLat: finalLocationLat,
+          locationLng: finalLocationLng,
+          referrer,
+          userAgent,
+          ipAddress: req.ip,
+          pageType: finalPageType,
+          context
+        });
+
+        results.push({
+          entityId: finalEntityId,
+          success: true,
+          priority
+        });
+        successCount++;
+      } catch (eventError) {
+        console.error(`[TrackBatch] Failed to process event for entity ${event.entityId}:`, eventError);
+        results.push({
+          entityId: event.entityId,
+          success: false,
+          error: eventError instanceof Error ? eventError.message : 'unknown_error'
+        });
+        failureCount++;
+      }
+    }
+
+    // Include analytics metadata in response for dashboard adjustments
+    const responseData = {
+      success: failureCount === 0,
+      message: `Processed ${successCount} successful, ${failureCount} failed`,
+      data: {
+        total: events.length,
+        successful: successCount,
+        failed: failureCount,
+        results,
+        identity: {
+          userId: identity.userId,
+          isAuthenticated: identity.isAuthenticated
+        },
+        batchMetadata: batchMetadata || null,
+        processingTimestamp: new Date().toISOString()
+      }
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('[TrackBatch] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'batch_processing_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/recommendations/track
+ * Track single user behavior event for recommendations
+ * 
+ * Auth0: User identity extracted server-side from session
+ */
+router.post('/track', async (req: Request, res: Response) => {
+  try {
+    // Extract identity from Auth0 session (server-side)
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
+    const {
+      entityType = 'store',
+      entityId,
+      entity_id, // Support snake_case format
+      locationLat,
+      locationLng,
+      location_lat, // Support snake_case format
+      location_lng, // Support snake_case format
+      referrer,
+      userAgent
+    } = req.body;
+
+    // Support both camelCase and snake_case formats
+    const finalEntityId = entityId || entity_id;
+    const finalEntityType = entityType || req.body?.entity_type;
+    const finalLocationLat = locationLat || location_lat;
+    const finalLocationLng = locationLng || location_lng;
+
+    if (!finalEntityId) {
+      return res.status(400).json({
+        error: 'entity_id_required',
+        message: 'Entity ID is required for tracking'
+      });
+    }
+
+    await trackUserBehavior({
+      userId: identity.userId,              // Server-determined (null if anonymous)
+      sessionId: identity.sessionId,        // Server-determined
+      isAuthenticated: identity.isAuthenticated,  // Track auth status
+      entityType: finalEntityType,
+      entityId: finalEntityId,
+      locationLat: finalLocationLat,
+      locationLng: finalLocationLng,
+      referrer,
+      userAgent,
+      ipAddress: req.ip
+    });
+
+    res.json({ 
+      success: true, 
+      tracked: true,
+      identity: {
+        userId: identity.userId,
+        isAuthenticated: identity.isAuthenticated
+      }
+    });
+
+  } catch (error) {
+    console.error('Error tracking behavior:', error);
+    res.status(500).json({
+      error: 'tracking_failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/stores-like-this/:storeId
+ * Get stores viewed by users who also viewed this store
+ */
+router.get('/stores-like-this/:storeId', async (req: Request, res: Response) => {
+  try {
+    const { storeId } = req.params;
+    const { userId } = req.query;
+    const { limit = 3 } = req.query;
+
+    const result = await getStoresViewedBySameUsers(
+      storeId,
+      userId as string,
+      Math.min(Math.max(Number(limit), 1), 10)
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error getting stores like this:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get store recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/popular-in-category/:categorySlug
+ * Get popular stores in the same category
+ */
+router.get('/popular-in-category/:categorySlug', async (req: Request, res: Response) => {
+  try {
+    const { categorySlug } = req.params;
+    const { lat, lng, limit = 3 } = req.query;
+
+    const result = await getPopularStoresInCategory(
+      categorySlug,
+      lat ? Number(lat) : undefined,
+      lng ? Number(lng) : undefined,
+      Math.min(Math.max(Number(limit), 1), 10)
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error getting popular stores in category:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get category recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/trending-nearby
+ * Get trending stores near user location
+ */
+router.get('/trending-nearby', async (req: Request, res: Response) => {
+  try {
+    const { lat, lng, radius = 25, days = 7, limit = 3 } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        error: 'location_required',
+        message: 'Latitude and longitude are required for nearby recommendations'
+      });
+    }
+
+    const result = await getTrendingNearby(
+      Number(lat),
+      Number(lng),
+      Math.min(Math.max(Number(radius), 1), 100), // 1-100 mile radius
+      Math.min(Math.max(Number(days), 1), 30), // 1-30 days
+      Math.min(Math.max(Number(limit), 1), 10) // 1-10 results
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error getting trending nearby:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get nearby recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/products-like-this/:productId
+ * Get products viewed by users who also viewed this product
+ */
+router.get('/products-like-this/:productId', async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { userId } = req.query;
+    const { limit = 3 } = req.query;
+
+    const result = await getProductsViewedBySameUsers(
+      productId,
+      userId as string,
+      Math.min(Math.max(Number(limit), 1), 10)
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error getting products like this:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get product recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/stores-for-user
+ * Get stores in user's favorite categories
+ * 
+ * Auth0: Uses server-determined userId from session
+ */
+router.get('/stores-for-user', async (req: Request, res: Response) => {
+  try {
+    // Extract identity from Auth0 session
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
+    // Use server-determined userId, fall back to query param for backwards compat
+    const userId = identity.userId || req.query.userId as string;
+    const { lat, lng, limit = 3 } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        error: 'authentication_required',
+        message: 'User must be authenticated for personalized recommendations'
+      });
+    }
+
+    const result = await getStoresInUserFavoriteCategories(
+      userId,
+      lat ? Number(lat) : undefined,
+      lng ? Number(lng) : undefined,
+      Math.min(Math.max(Number(limit), 1), 10)
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error getting stores for user:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get user recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/for-product/:productId
+ * Get all recommendations for a product page
+ */
+router.get('/for-product/:productId', async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { userId, lat, lng, tenantId, categorySlug } = req.query;
+
+    const recommendations = [];
+
+    // 1. Products like this (always included)
+    const productsLikeThis = await getProductsViewedBySameUsers(
+      productId,
+      userId as string,
+      3
+    );
+    if (productsLikeThis.recommendations.length > 0) {
+      recommendations.push({
+        type: 'products_like_this',
+        title: 'Products Like This You Viewed',
+        ...productsLikeThis
+      });
+    }
+
+    // 2. Popular in category (if category provided)
+    if (categorySlug) {
+      const popularInCategory = await getPopularStoresInCategory(
+        categorySlug as string,
+        lat ? Number(lat) : undefined,
+        lng ? Number(lng) : undefined,
+        3
+      );
+      if (popularInCategory.recommendations.length > 0) {
+        recommendations.push({
+          type: 'popular_in_category',
+          title: `Popular ${(categorySlug as string).replace('-', ' ')}`,
+          ...popularInCategory
+        });
+      }
+    }
+
+    // 3. Trending nearby (if location provided)
+    if (lat && lng) {
+      const trendingNearby = await getTrendingNearby(
+        Number(lat),
+        Number(lng),
+        25,
+        7,
+        3
+      );
+      if (trendingNearby.recommendations.length > 0) {
+        recommendations.push({
+          type: 'trending_nearby',
+          title: 'Trending Nearby',
+          ...trendingNearby
+        });
+      }
+    }
+
+    res.json({
+      recommendations,
+      productId,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('Error getting recommendations for product:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get product recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/for-storefront/:tenantId
+ * Get recommendations for storefront pages with enhanced filtering
+ * Uses same filtering logic as directory related stores (active stores, GBP scoring, category scoring)
+ */
+router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { userId, lat, lng } = req.query;
+    const limit = 6; // Show up to 6 recommendations on storefront
+
+    //console.log(`[Storefront Recommendations] Getting enhanced recommendations for tenant: ${tenantId}`);
+
+    // Import database utility
+    const { getDirectPool } = await import('../utils/db-pool');
+
+    // First, get the current store's directory listing for scoring
+    const currentListing = await getDirectPool().query(
+      `SELECT 
+         dcl.tenant_id,
+         dcl.business_name,
+         dcl.slug,
+         dcl.address,
+         dcl.city,
+         dcl.state,
+         dcl.zip_code,
+         dcl.category_id,
+         dcl.category_name,
+         dcl.category_slug,
+         dcl.google_category_id,
+         dcl.is_primary,
+         COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+         COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+         dcl.product_count,
+         COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+         t.location_status as tenant_location_status
+       FROM directory_category_listings dcl
+       INNER JOIN tenants t ON dcl.tenant_id = t.id
+       LEFT JOIN LATERAL (
+         SELECT tenant_logo_url, store_average_rating, store_review_count
+         FROM mv_storefront_discovery
+         WHERE tenant_id = dcl.tenant_id
+         LIMIT 1
+       ) msd ON true
+       WHERE dcl.tenant_id = $1 
+         AND dcl.is_primary = true
+       LIMIT 1`,
+      [tenantId]
+    );
+
+    if (currentListing.rows.length === 0) {
+      // If no directory listing, fall back to basic recommendations
+      // console.log(`[Storefront Recommendations] No directory listing found, using basic fallback`);
+      const similarStores = await getSimilarStoresInCategory(tenantId, limit);
+      
+      return res.json({
+        recommendations: similarStores.recommendations.length > 0 ? [{
+          type: 'similar_stores',
+          title: 'You Might Also Like',
+          recommendations: similarStores.recommendations
+        }] : [],
+        tenantId,
+        generatedAt: new Date()
+      });
+    }
+
+    const current = currentListing.rows[0];
+    let relatedListings = [];
+
+    // Helper function to generate reason text
+    const getReasonText = (score: number, categoryMatch: boolean, targetCity: string, storeCity: string, targetState: string, storeState: string) => {
+      if (categoryMatch && storeCity === targetCity) {
+        return `Same category in ${storeCity}`;
+      } else if (categoryMatch) {
+        return `Same category`;
+      } else if (storeCity === targetCity) {
+        return `Nearby in ${storeCity}`;
+      } else if (storeState === targetState) {
+        return `In ${storeState}`;
+      }
+      return 'Similar store';
+    };
+
+    try {
+      // Use directory_category_listings MV for recommendations but get REAL product counts
+      const relatedQuery = `
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.zip_code,
+          dcl.category_id,
+          dcl.category_name,
+          dcl.category_slug,
+          dcl.google_category_id,
+          dcl.is_primary,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          dcl.is_featured,
+          dll.business_hours,
+          t.location_status as tenant_location_status,
+          
+          -- Get ACTUAL product count from inventory_items table
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dcl.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ), 0) as actual_product_count,
+          
+          (
+            (
+              CASE
+                WHEN dcl.google_category_id = $6 THEN 3
+                WHEN dcl.category_name = $1 THEN 2
+                ELSE 0
+              END
+            ) * 2 +
+            (
+              CASE
+                WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
+                WHEN dcl.state = $3 THEN 1
+                ELSE 0
+              END
+            ) +
+            (
+              CASE
+                WHEN ABS(COALESCE(dcl.rating_avg, msd.store_average_rating, 0) - $4) < 0.5 THEN 1
+                ELSE 0
+              END
+            )
+          ) as relevance_score
+        FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
+        WHERE dcl.tenant_id != $5
+          AND dcl.tenant_exists = true
+          AND dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, actual_product_count DESC
+      `;
+
+      const related = await getDirectPool().query(relatedQuery, [
+        current.category_name,
+        current.city,
+        current.state,
+        current.rating_avg || 0,
+        tenantId,
+        current.google_category_id
+      ]);
+
+      //console.log(`[Storefront Recommendations] MV query returned ${related.rows.length} rows`);
+      //console.log(`[Storefront Recommendations] Current store - Platform Category: ${current.category_name}, City: ${current.city}, State: ${current.state}`);
+      
+      // Log all scores for debugging
+     /*  related.rows.forEach((row: any, idx: number) => {
+        if (idx < 10) { // Only log first 10 to avoid spam
+          console.log(`[Storefront Recommendations] Store ${idx + 1}: ${row.business_name} - Platform: ${row.category_name}, City: ${row.city}, State: ${row.state}, Score: ${row.relevance_score}`);
+        }
+      }); */
+      
+      // Filter and map results
+      relatedListings = related.rows
+        .filter((row: any) => (row.relevance_score || 0) > 0)
+        .slice(0, limit)
+        .map((row: any) => ({
+          id: row.tenant_id,
+          tenantId: row.tenant_id,
+          businessName: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          primaryCategory: row.category_name,
+          logoUrl: row.logo_url,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.actual_product_count || 0, // Use actual count from inventory_items
+          businessHours: row.business_hours,
+          relevanceScore: row.relevance_score || 0,
+          reason: getReasonText(
+            row.relevance_score, 
+            row.category_name === current.category_name || 
+            row.google_category_id === current.google_category_id,
+            current.city, 
+            row.city, 
+            current.state, 
+            row.state
+          )
+        }));
+
+      //console.log(`[Storefront Recommendations] Found ${relatedListings.length} stores with score > 0 (after filtering from ${related.rows.length} total)`);
+
+    } catch (mvError) {
+      console.log(`[Storefront Recommendations] MV approach failed, using fallback:`, mvError);
+      
+      // Fallback: Same query structure but using actual product counts
+      const fallbackQuery = `
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.category_name,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+          dll.business_hours,
+          t.location_status as tenant_location_status,
+          
+          -- Get ACTUAL product count from inventory_items table
+          COALESCE((
+            SELECT COUNT(*)
+            FROM inventory_items ii
+            WHERE ii.tenant_id = dcl.tenant_id
+              AND ii.item_status = 'active'
+              AND ii.visibility = 'public'
+          ), 0) as actual_product_count,
+          
+          (
+            (
+              CASE
+                WHEN dcl.category_name = $1 THEN 3
+                WHEN dcl.google_category_id = $6 THEN 2
+                ELSE 0
+              END
+            ) * 2 +
+            (
+              CASE
+                WHEN dcl.city = $2 AND dcl.state = $3 THEN 2
+                WHEN dcl.state = $3 THEN 1
+                ELSE 0
+              END
+            ) +
+            (
+              CASE
+                WHEN ABS(COALESCE(dcl.rating_avg, msd.store_average_rating, 0) - $4) < 0.5 THEN 1
+                ELSE 0
+              END
+            )
+          ) as relevance_score
+        FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
+        WHERE dcl.tenant_id != $5
+          AND dcl.tenant_exists = true
+          AND dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+        ORDER BY dcl.tenant_id, relevance_score DESC, dcl.rating_avg DESC NULLS LAST, actual_product_count DESC
+      `;
+
+      const fallbackResult = await getDirectPool().query(fallbackQuery, [
+        current.category_name,
+        current.city,
+        current.state,
+        current.rating_avg || 0,
+        tenantId,
+        current.google_category_id
+      ]);
+
+      //console.log(`[Storefront Recommendations] Fallback query returned ${fallbackResult.rows.length} rows`);
+      
+      relatedListings = fallbackResult.rows
+        .filter((row: any) => (row.relevance_score || 0) >= 1)
+        .slice(0, limit)
+        .map((row: any) => ({
+          id: row.tenant_id,
+          tenantId: row.tenant_id,
+          businessName: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          primaryCategory: row.category_name,
+          logoUrl: row.logo_url,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.actual_product_count || 0, // Use actual count from inventory_items
+          businessHours: row.business_hours,
+          relevanceScore: row.relevance_score || 0,
+          reason: getReasonText(
+            row.relevance_score, 
+            row.category_name === current.category_name || 
+            row.google_category_id === current.google_category_id,
+            current.city, 
+            row.city, 
+            current.state, 
+            row.state
+          )
+        }));
+    }
+
+    // Ensure at least 1 store is always shown (fallback logic)
+    if (relatedListings.length === 0) {
+      // console.log(`[Storefront Recommendations] No stores found with minimum score, trying fallback`);
+
+      // Fallback: Show featured stores in the same state
+      const fallbackFeaturedQuery = `
+        SELECT DISTINCT ON (dcl.tenant_id)
+          dcl.tenant_id,
+          dcl.business_name,
+          dcl.slug,
+          dcl.address,
+          dcl.city,
+          dcl.state,
+          dcl.category_name,
+          COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+          COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+          COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+          dcl.product_count,
+          dll.business_hours,
+          t.location_status as tenant_location_status,
+          0.5 as relevance_score
+        FROM directory_category_listings dcl
+        INNER JOIN tenants t ON dcl.tenant_id = t.id
+        LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+        LEFT JOIN LATERAL (
+          SELECT tenant_logo_url, store_average_rating, store_review_count
+          FROM mv_storefront_discovery
+          WHERE tenant_id = dcl.tenant_id
+          LIMIT 1
+        ) msd ON true
+        WHERE dcl.tenant_id != $1
+          AND dcl.tenant_exists = true
+          AND dcl.is_active_location = true
+          AND dcl.is_directory_visible = true
+          AND dcl.state = $2
+          AND dcl.is_featured = true
+        ORDER BY dcl.tenant_id, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+        LIMIT 3
+      `;
+
+      const fallbackResult = await getDirectPool().query(fallbackFeaturedQuery, [tenantId, current.state]);
+      if (fallbackResult.rows.length > 0) {
+        relatedListings = fallbackResult.rows.slice(0, limit).map((row: any) => ({
+          id: row.tenant_id,
+          tenantId: row.tenant_id,
+          businessName: row.business_name,
+          slug: row.slug,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          primaryCategory: row.category_name,
+          logoUrl: row.logo_url,
+          ratingAvg: row.rating_avg || 0,
+          ratingCount: row.rating_count || 0,
+          productCount: row.product_count || 0,
+          businessHours: row.business_hours,
+          relevanceScore: row.relevance_score || 0,
+          reason: 'Featured in your area'
+        }));
+        // console.log(`[Storefront Recommendations] Fallback found ${relatedListings.length} featured stores`);
+      }
+
+      // If still no stores, show any active stores in the same state
+      if (relatedListings.length === 0) {
+        const finalFallbackQuery = `
+          SELECT DISTINCT ON (dcl.tenant_id)
+            dcl.tenant_id,
+            dcl.business_name,
+            dcl.slug,
+            dcl.address,
+            dcl.city,
+            dcl.state,
+            dcl.category_name,
+            COALESCE(dcl.logo_url, msd.tenant_logo_url) as logo_url,
+            COALESCE(dcl.rating_avg, msd.store_average_rating, 0) as rating_avg,
+            COALESCE(dcl.rating_count, msd.store_review_count, 0) as rating_count,
+            dcl.product_count,
+            dll.business_hours,
+            t.location_status as tenant_location_status,
+            0.1 as relevance_score
+          FROM directory_category_listings dcl
+          INNER JOIN tenants t ON dcl.tenant_id = t.id
+          LEFT JOIN directory_listings_list dll ON dll.tenant_id = dcl.tenant_id
+          LEFT JOIN LATERAL (
+            SELECT tenant_logo_url, store_average_rating, store_review_count
+            FROM mv_storefront_discovery
+            WHERE tenant_id = dcl.tenant_id
+            LIMIT 1
+          ) msd ON true
+          WHERE dcl.tenant_id != $1
+            AND dcl.tenant_exists = true
+            AND dcl.is_active_location = true
+            AND dcl.is_directory_visible = true
+            AND dcl.state = $2
+          ORDER BY dcl.tenant_id, dcl.rating_avg DESC NULLS LAST, dcl.product_count DESC
+          LIMIT 1
+        `;
+
+        const finalResult = await getDirectPool().query(finalFallbackQuery, [tenantId, current.state]);
+        if (finalResult.rows.length > 0) {
+          relatedListings = finalResult.rows.map((row: any) => ({
+            id: row.tenant_id,
+            tenantId: row.tenant_id,
+            businessName: row.business_name,
+            slug: row.slug,
+            address: row.address,
+            city: row.city,
+            state: row.state,
+            primaryCategory: row.category_name,
+            logoUrl: row.logo_url,
+            ratingAvg: row.rating_avg || 0,
+            ratingCount: row.rating_count || 0,
+            productCount: row.product_count || 0,
+            businessHours: row.business_hours,
+            relevanceScore: row.relevance_score || 0,
+            reason: 'Nearby store'
+          }));
+          //console.log(`[Storefront Recommendations] Final fallback found ${relatedListings.length} stores`);
+        }
+      }
+    }
+
+    // Format response for storefront component
+    const recommendations = [{
+      type: 'enhanced_related',
+      title: 'You Might Also Like',
+      recommendations: relatedListings
+    }];
+
+    res.json({
+      recommendations,
+      tenantId,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('Error getting recommendations for storefront:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get storefront recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/for-directory
+ * Get recommendations for directory home page
+ * 
+ * Auth0: Uses server-determined userId for personalized recommendations
+ */
+router.get('/for-directory', async (req: Request, res: Response) => {
+  try {
+    // Extract identity from Auth0 session
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
+    const { lat, lng, categorySlug } = req.query;
+
+    const recommendations = [];
+
+    // 1. User favorite categories (if authenticated)
+    if (identity.userId) {
+      const userFavorites = await getStoresInUserFavoriteCategories(
+        identity.userId,
+        lat ? Number(lat) : undefined,
+        lng ? Number(lng) : undefined,
+        5
+      );
+      if (userFavorites.recommendations.length > 0) {
+        recommendations.push({
+          type: 'user_favorite_categories',
+          title: 'Recommended For You',
+          ...userFavorites
+        });
+      }
+    }
+
+    // 2. Popular in category (if category provided)
+    if (categorySlug) {
+      const popularInCategory = await getPopularStoresInCategory(
+        categorySlug as string,
+        lat ? Number(lat) : undefined,
+        lng ? Number(lng) : undefined,
+        5
+      );
+      if (popularInCategory.recommendations.length > 0) {
+        recommendations.push({
+          type: 'popular_in_category',
+          title: `Popular ${(categorySlug as string).replace('-', ' ')}`,
+          ...popularInCategory
+        });
+      }
+    }
+
+    // 3. Trending nearby (if location provided)
+    if (lat && lng) {
+      const trendingNearby = await getTrendingNearby(
+        Number(lat),
+        Number(lng),
+        25,
+        7,
+        5
+      );
+      if (trendingNearby.recommendations.length > 0) {
+        recommendations.push({
+          type: 'trending_nearby',
+          title: 'Trending Nearby',
+          ...trendingNearby
+        });
+      }
+    }
+
+    res.json({
+      recommendations,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('Error getting recommendations for directory:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get directory recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/last-viewed
+ * Get recently viewed items for the current user
+ * 
+ * Auth0: Uses server-determined userId (if authenticated) or sessionId (if anonymous)
+ */
+router.get('/last-viewed', async (req: Request, res: Response) => {
+  try {
+    // Extract identity from Auth0 session
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    const limit = Math.min(Number(req.query.limit) || 10, 50);
+    const entityType = (req.query.entityType as 'store' | 'product' | 'all') || 'all';
+    
+    const result = await getLastViewedItems(
+      identity.userId || undefined,
+      identity.sessionId,
+      entityType,
+      limit
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      identity: {
+        isAuthenticated: identity.isAuthenticated
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting last viewed items:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get last viewed items'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/for-product-page/:productId
+ * Get recommended products for a product detail page
+ * Uses scoring algorithm based on category, brand, price, and tenant
+ */
+router.get('/for-product-page/:productId', async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { limit = 6, userId } = req.query;
+    const limitNum = Math.min(Math.max(Number(limit), 1), 10);
+
+    //console.log(`[Product Recommendations] Getting recommendations for product: ${productId}, limit: ${limitNum}`);
+
+    // First get the current product details
+    const currentProductQuery = `
+      SELECT ii.*,
+        ii.tenant_id,
+        ii.category_path,
+        ii.directory_category_id,
+        ii.price_cents,
+        ii.brand,
+        ii.item_status,
+        ii.visibility
+      FROM inventory_items ii
+      WHERE ii.id = $1 AND ii.item_status = 'active' AND ii.visibility = 'public'
+    `;
+
+    const currentProduct = await getDirectPool().query(currentProductQuery, [productId]);
+    if (currentProduct.rows.length === 0) {
+      return res.json({
+        recommendations: [],
+        productId,
+        generatedAt: new Date()
+      });
+    }
+
+    const product = currentProduct.rows[0];
+
+    // Build recommendation scoring query
+    const recommendationsQuery = `
+      SELECT DISTINCT ON (ii.id)
+        ii.id,
+        ii.name,
+        ii.title,
+        mgd.product_category,
+        mgd.product_category_slug,
+        COALESCE(mgd.list_price_cents, ii.price_cents) as price_cents,
+        mgd.sale_price_cents,
+        ii.currency,
+        ii.image_url,
+        ii.brand,
+        ii.category_path,
+        ii.directory_category_id,
+        ii.tenant_id,
+        
+        -- Include payment gateway status from mv_storefront_discovery (most reliable source)
+        COALESCE(mgd.has_active_payment_gateway, false) as has_active_payment_gateway,
+        mgd.default_gateway_type,
+
+        -- Calculate relevance score
+        (
+          -- Same category (highest priority)
+          CASE
+            WHEN ii.category_path && $1 THEN 4
+            WHEN ii.directory_category_id = $2 THEN 3
+            ELSE 0
+          END +
+
+          -- Same brand
+          CASE
+            WHEN LOWER(ii.brand) = LOWER($3) AND ii.brand IS NOT NULL THEN 2
+            ELSE 0
+          END +
+
+          -- Same tenant (other products from same store)
+          CASE
+            WHEN ii.tenant_id = $4 THEN 1
+            ELSE 0
+          END +
+
+          -- Similar price range (±25%)
+          CASE
+            WHEN ii.price_cents BETWEEN ($5 * 0.75) AND ($5 * 1.25) THEN 1
+            ELSE 0
+          END +
+
+          -- Image boost (prioritize products with photos)
+          CASE
+            WHEN ii.image_url IS NOT NULL AND ii.image_url != '' THEN 1.5
+            ELSE 0
+          END
+        ) as relevance_score
+
+      FROM inventory_items ii
+      LEFT JOIN mv_storefront_discovery mgd ON ii.id = mgd.inventory_item_id
+      WHERE ii.id != $6  -- Exclude current product
+        AND ii.item_status = 'active'
+        AND ii.visibility = 'public'
+        AND ii.tenant_id = $4  -- CRITICAL: Only show products from same tenant
+        AND ii.price_cents > 0
+        AND ii.image_url IS NOT NULL
+        AND ii.image_url != ''  -- Hard requirement: must have photo
+      ORDER BY ii.id, relevance_score DESC, ii.updated_at DESC
+      LIMIT $7
+    `;
+
+    const params = [
+      product.category_path || [],  // $1
+      product.directory_category_id, // $2
+      product.brand, // $3
+      product.tenant_id, // $4
+      product.price_cents, // $5
+      productId, // $6
+      limitNum // $7
+    ];
+
+    const recommendationsResult = await getDirectPool().query(recommendationsQuery, params);
+
+    // Format recommendations for frontend
+    const recommendations = recommendationsResult.rows
+      .filter((row: any) => (row.relevance_score || 0) > 0)
+      .slice(0, limitNum)
+      .map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        title: row.title || row.name,
+        productCategory: row.product_category,
+        productCategorySlug: row.product_category_slug,
+        priceCents: row.price_cents || 0,
+        salePriceCents: row.sale_price_cents,
+        currency: row.currency || 'USD',
+        imageUrl: row.image_url,
+        brand: row.brand,
+        relevanceScore: row.relevance_score || 0,
+        tenantId: row.tenant_id,
+        has_active_payment_gateway: row.has_active_payment_gateway || false,
+        payment_gateway_type: row.default_gateway_type || null
+      }));
+
+    //console.log(`[Product Recommendations] Found ${recommendations.length} recommendations with score > 0`);
+
+    res.json({
+      recommendations,
+      productId,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('Error getting last viewed items:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get last viewed items'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/last-viewed
+ * Get user's last viewed items (stores, products, etc.)
+ * Supports both authenticated users (userId) and anonymous users (sessionId)
+ * Query parameters: userId or sessionId (one required), entityType, limit, daysBack
+ */
+router.get('/last-viewed', async (req: Request, res: Response) => {
+  try {
+    const { userId, sessionId, entityType = 'all', limit = 10, daysBack = 30 } = req.query;
+
+    // Must have either userId or sessionId
+    if (!userId && !sessionId) {
+      return res.status(400).json({
+        error: 'user_or_session_required',
+        message: 'Either userId or sessionId parameter is required'
+      });
+    }
+
+    // Validate entity type
+    const validEntityTypes = ['store', 'product', 'all'];
+    if (!validEntityTypes.includes(entityType as string)) {
+      return res.status(400).json({
+        error: 'invalid_entity_type',
+        message: 'Entity type must be one of: store, product, all'
+      });
+    }
+
+    const result = await getLastViewedItems(
+      userId as string,
+      sessionId as string,
+      entityType as 'store' | 'product' | 'all',
+      Math.min(Math.max(Number(limit), 1), 20), // 1-20 limit
+      Math.min(Math.max(Number(daysBack), 1), 90) // 1-90 days
+    );
+
+    res.json({
+      ...result,
+      userId: userId || null,
+      sessionId: sessionId || null,
+      entityType,
+      limit: Number(limit),
+      daysBack: Number(daysBack)
+    });
+
+  } catch (error) {
+    console.error('Error getting last viewed items:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get last viewed items'
+    });
+  }
+});
+
+export default router;

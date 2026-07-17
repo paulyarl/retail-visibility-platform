@@ -6,6 +6,7 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from './contextCacheManager';
+import { clientLogger } from '@/lib/client-logger';
 
 // Store Stats Singleton Class
 class StoreStatsSingleton extends PublicApiSingleton {
@@ -142,7 +143,7 @@ export async function fetchMultipleStoreStats(tenantIds: string[]): Promise<Reco
         const stats = await fetchStoreStats(tenantId);
         return { tenantId, stats };
       } catch (error) {
-        console.error(`Error fetching stats for ${tenantId}:`, error);
+        clientLogger.error(`Error fetching stats for ${tenantId}:`, { detail: error });
         return { 
           tenantId, 
           stats: {
@@ -223,7 +224,7 @@ export async function fetchStoreStats(tenantId: string): Promise<StoreStats> {
     
     return result;
   } catch (error) {
-    console.error('Error fetching store stats:', error);
+    clientLogger.error('Error fetching store stats:', { detail: error });
     return {
       totalProducts: 0,
       totalInStock: 0,

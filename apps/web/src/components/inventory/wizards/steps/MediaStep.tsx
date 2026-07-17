@@ -49,6 +49,7 @@ import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
 import { Progress } from '@/components/ui/Progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/Dialog';
+import { clientLogger } from '@/lib/client-logger';
 
 interface MediaStepProps {
   data: {
@@ -221,7 +222,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
         const result = await uploadImage(file, ImageUploadPresets.product);
         
         if (result.error) {
-          console.error('[MediaStep] Image compression error:', result.error);
+          clientLogger.error('[MediaStep] Image compression error:', { detail: result.error });
           continue;
         }
 
@@ -234,7 +235,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           });
           console.log('[MediaStep] Photo uploaded to Supabase:', uploadResult.url);
         } catch (uploadError) {
-          console.error('[MediaStep] Supabase upload failed:', uploadError);
+          clientLogger.error('[MediaStep] Supabase upload failed:', { detail: uploadError });
           continue; // Skip this image if upload fails
         }
 
@@ -261,7 +262,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
         }
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      clientLogger.error('Upload error:', { detail: error });
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -348,7 +349,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           await itemsService.deleteTempPhoto(imageToRemove.path);
           console.log('[MediaStep] Deleted temp photo from Supabase:', imageToRemove.path);
         } catch (error) {
-          console.error('[MediaStep] Failed to delete temp photo:', error);
+          clientLogger.error('[MediaStep] Failed to delete temp photo:', { detail: error });
           // Continue with local removal even if delete fails
         }
       }

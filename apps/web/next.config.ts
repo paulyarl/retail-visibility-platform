@@ -66,8 +66,10 @@ const nextConfig: NextConfig = {
   // If you import from a local package (e.g. packages/shared), add it here:
   transpilePackages: ["@rvp/shared", "shared"].filter(Boolean),
 
-  // Disable source maps in production to fix 404 errors
-  productionBrowserSourceMaps: false,
+  // Enable source maps in production so Sentry can de-minify stack traces.
+  // The Sentry webpack plugin uploads maps to Sentry then deletes them from the build output,
+  // so they are never served publicly.
+  productionBrowserSourceMaps: true,
 
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
@@ -222,6 +224,12 @@ const sentryWebpackPluginOptions = {
   silent: true,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
+
+  // Upload source maps to Sentry, then delete them from the build output
+  // so they are never served to users.
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
 };
 
 

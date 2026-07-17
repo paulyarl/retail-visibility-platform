@@ -8,6 +8,7 @@ import { Loader2, CreditCard, Lock } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { validateMinimumPaymentAmount } from '@/utils/paymentValidation';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PayPalPaymentFormProps {
   amount: number;
@@ -106,7 +107,7 @@ function PayPalPaymentFormContent({
       }
       return paypalOrderId;
     } catch (error) {
-      console.error('PayPal create order error:', error);
+      clientLogger.error('PayPal create order error:', { detail: error });
       setError('Failed to initialize payment. Please try again.');
       throw error;
     }
@@ -133,7 +134,7 @@ function PayPalPaymentFormContent({
         token: transactionId,
       });
     } catch (error) {
-      console.error('PayPal capture error:', error);
+      clientLogger.error('PayPal capture error:', { detail: error });
       setError('Payment processing failed. Please try again.');
     } finally {
       setIsProcessing(false);
@@ -141,7 +142,7 @@ function PayPalPaymentFormContent({
   };
 
   const onError = (error: any) => {
-    console.error('PayPal error:', error);
+    clientLogger.error('PayPal error:', { detail: error });
     setError('Payment failed. Please try again.');
   };
 
@@ -259,7 +260,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
       // Check for error response
       if (!orderResponse.success) {
         const errorMsg = orderResponse.message || orderResponse.error || 'Failed to create order';
-        console.error('[PayPalPaymentForm] Order creation failed:', orderResponse);
+        clientLogger.error('[PayPalPaymentForm] Order creation failed:', { detail: orderResponse });
         throw new Error(errorMsg);
       }
 
@@ -268,7 +269,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
       const payment = responseData.payment;
       
       if (!order?.id) {
-        console.error('[PayPalPaymentForm] Invalid order response:', orderResponse);
+        clientLogger.error('[PayPalPaymentForm] Invalid order response:', { detail: orderResponse });
         throw new Error('Order creation returned invalid data');
       }
       
@@ -284,7 +285,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
 
       setLoading(false);
     } catch (error) {
-      console.error('Order creation error:', error);
+      clientLogger.error('Order creation error:', { detail: error });
       setError(error instanceof Error ? error.message : 'Failed to initialize checkout. Please try again.');
       setLoading(false);
     }

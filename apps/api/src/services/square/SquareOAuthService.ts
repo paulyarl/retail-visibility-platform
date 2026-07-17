@@ -2,6 +2,7 @@ import { TokenEncryptionService } from '../TokenEncryptionService';
 import { prisma } from '../../prisma';
 import crypto from 'crypto';
 import { generatePaymentGatewayId } from '../../lib/id-generator';
+import { logger } from '../../logger';
 
 interface SquareTokenResponse {
   access_token: string;
@@ -224,10 +225,10 @@ export class SquareOAuthService {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Unknown error' })) as any;
-        console.error(`[Square OAuth] Token revocation failed: ${error.message || error.error}`);
+        logger.error(`[Square OAuth] Token revocation failed: ${error.message || error.error}`, undefined);
       }
     } catch (error) {
-      console.error('[Square OAuth] Token revocation error (continuing with disconnect):', error);
+      logger.error('[Square OAuth] Token revocation error (continuing with disconnect):', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
 
     await this.disconnect(tenantId);

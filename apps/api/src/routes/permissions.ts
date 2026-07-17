@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { generateAuditId, generateQuickStart } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.get('/', async (req, res) => {
       roles: Object.keys(grouped),
     });
   } catch (error) {
-    console.error('[GET /permissions] Error:', error);
+    logger.error('[GET /permissions] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_permissions' });
   }
 });
@@ -51,7 +52,7 @@ router.get('/:role', async (req, res) => {
 
     res.json(permissions);
   } catch (error) {
-    console.error('[GET /permissions/:role] Error:', error);
+    logger.error('[GET /permissions/:role] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_role_permissions' });
   }
 });
@@ -105,7 +106,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(updated);
   } catch (error) {
-    console.error('[PUT /permissions/:id] Error:', error);
+    logger.error('[PUT /permissions/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_update_permission' });
   }
 });
@@ -175,7 +176,7 @@ router.post('/bulk-update', async (req, res) => {
       permissions: results,
     });
   } catch (error) {
-    console.error('[POST /permissions/bulk-update] Error:', error);
+    logger.error('[POST /permissions/bulk-update] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_bulk_update_permissions' });
   }
 });
@@ -204,7 +205,7 @@ router.get('/audit/history', async (req, res) => {
       offset,
     });
   } catch (error) {
-    console.error('[GET /permissions/audit/history] Error:', error);
+    logger.error('[GET /permissions/audit/history] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_fetch_audit_logs' });
   }
 });
@@ -239,7 +240,7 @@ router.post('/check', async (req, res) => {
       permission,
     });
   } catch (error) {
-    console.error('[POST /permissions/check] Error:', error);
+    logger.error('[POST /permissions/check] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'failed_to_check_permission' });
   }
 });

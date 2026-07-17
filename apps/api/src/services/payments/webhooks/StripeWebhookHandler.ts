@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { prisma } from '../../../prisma';
 import { digitalFulfillmentService } from '../../digital-assets/DigitalFulfillmentService';
 import { realtimeService } from '../../RealtimeService';
+import { logger } from '../../../logger';
 
 /**
  * Stripe Webhook Event Handler
@@ -68,7 +69,7 @@ export class StripeWebhookHandler {
           console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
       }
     } catch (error) {
-      console.error(`[Stripe Webhook] Error processing event ${event.id}:`, error);
+      logger.error(`[Stripe Webhook] Error processing event ${event.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -434,7 +435,7 @@ export class StripeWebhookHandler {
       // In production, you'd fetch the balance transaction and get the fee
       return null;
     } catch (error) {
-      console.error('[Stripe Webhook] Error fetching balance transaction:', error);
+      logger.error('[Stripe Webhook] Error fetching balance transaction:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -481,10 +482,10 @@ export class StripeWebhookHandler {
           });
         }
       } else {
-        console.error(`[Stripe Webhook] Digital fulfillment had errors:`, result.errors);
+        logger.error(`[Stripe Webhook] Digital fulfillment had errors:`, undefined, { error: { name: 'Error', message: String(result.errors) } });
       }
     } catch (error) {
-      console.error('[Stripe Webhook] Error fulfilling digital products:', error);
+      logger.error('[Stripe Webhook] Error fulfilling digital products:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       // Don't throw - payment was successful, fulfillment can be retried
     }
   }

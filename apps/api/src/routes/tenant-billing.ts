@@ -9,6 +9,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth } from '../middleware/auth';
 import { jsPDF } from 'jspdf';
+import { logger } from '../logger';
 
 const router = Router({ mergeParams: true });
 
@@ -127,7 +128,7 @@ router.get('/overview', requireAuth, async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, data: overview });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting billing overview:', error);
+    logger.error('[TenantBilling] Error getting billing overview:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get billing overview' });
   }
 });
@@ -265,7 +266,7 @@ router.get('/risk', requireAuth, async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, data: risk });
   } catch (error: any) {
-    console.error('[TenantBilling] Error calculating risk assessment:', error);
+    logger.error('[TenantBilling] Error calculating risk assessment:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to calculate risk assessment' });
   }
 });
@@ -360,7 +361,7 @@ router.get('/actions', requireAuth, async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, data: actions });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting billing actions:', error);
+    logger.error('[TenantBilling] Error getting billing actions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get billing actions' });
   }
 });
@@ -459,7 +460,7 @@ router.get('/recent-activity', requireAuth, async (req: Request, res: Response) 
 
     return res.status(200).json({ success: true, data: limitedActivities });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting recent activity:', error);
+    logger.error('[TenantBilling] Error getting recent activity:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get recent activity' });
   }
 });
@@ -563,7 +564,7 @@ router.get('/payment-methods', requireAuth, async (req: Request, res: Response) 
     // No payment history either - return empty
     return res.status(200).json({ success: true, data: [] });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting payment methods:', error);
+    logger.error('[TenantBilling] Error getting payment methods:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get payment methods' });
   }
 });
@@ -597,7 +598,7 @@ router.post('/payment-methods', requireAuth, async (req: Request, res: Response)
 
     return res.status(200).json({ success: true, data: newPaymentMethod });
   } catch (error: any) {
-    console.error('[TenantBilling] Error adding payment method:', error);
+    logger.error('[TenantBilling] Error adding payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to add payment method' });
   }
 });
@@ -626,7 +627,7 @@ router.put('/payment-methods/:paymentMethodId', requireAuth, async (req: Request
 
     return res.status(200).json({ success: true });
   } catch (error: any) {
-    console.error('[TenantBilling] Error updating payment method:', error);
+    logger.error('[TenantBilling] Error updating payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to update payment method' });
   }
 });
@@ -652,7 +653,7 @@ router.delete('/payment-methods/:paymentMethodId', requireAuth, async (req: Requ
 
     return res.status(200).json({ success: true });
   } catch (error: any) {
-    console.error('[TenantBilling] Error removing payment method:', error);
+    logger.error('[TenantBilling] Error removing payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to remove payment method' });
   }
 });
@@ -781,7 +782,7 @@ router.get('/analytics', requireAuth, async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, data: analytics });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting analytics:', error);
+    logger.error('[TenantBilling] Error getting analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get analytics' });
   }
 });
@@ -838,7 +839,7 @@ router.get('/platform-fees', requireAuth, async (req: Request, res: Response) =>
 
     return res.status(200).json({ success: true, data: summary });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting platform fees:', error);
+    logger.error('[TenantBilling] Error getting platform fees:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get platform fee summary' });
   }
 });
@@ -898,7 +899,7 @@ router.post('/invoices/:invoiceId/pay', requireAuth, async (req: Request, res: R
       paymentIntent 
     });
   } catch (error: any) {
-    console.error('[TenantBilling] Error paying invoice:', error);
+    logger.error('[TenantBilling] Error paying invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to process payment' });
   }
 });
@@ -971,7 +972,7 @@ router.get('/statements', requireAuth, async (req: Request, res: Response) => {
       statements 
     });
   } catch (error: any) {
-    console.error('[TenantBilling] Error getting statements:', error);
+    logger.error('[TenantBilling] Error getting statements:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to get billing statements' });
   }
 });
@@ -1210,7 +1211,7 @@ router.get('/statements/:statementId/download', requireAuth, async (req: Request
     res.setHeader('Content-Length', pdfBuffer.length);
     res.send(pdfBuffer);
   } catch (error: any) {
-    console.error('[TenantBilling] Error downloading statement:', error);
+    logger.error('[TenantBilling] Error downloading statement:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ success: false, error: 'Failed to download statement' });
   }
 });

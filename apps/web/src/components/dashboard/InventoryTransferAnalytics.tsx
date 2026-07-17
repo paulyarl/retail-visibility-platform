@@ -39,6 +39,7 @@ import { notifications } from '@mantine/notifications';
 
 import { inventoryAnalyticsService } from '@/services/InventoryAnalyticsService';
 import type { TransferAnalytics } from '@/services/InventoryAnalyticsService';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function InventoryTransferAnalytics() {
   const params = useParams();
@@ -54,7 +55,7 @@ export default function InventoryTransferAnalytics() {
       const tenantId = tenant?.tenantId || params.tenantId as string;
       
       if (!tenantId) {
-        console.error('[InventoryTransferAnalytics] No tenant ID found in context or URL params');
+        clientLogger.error('[InventoryTransferAnalytics] No tenant ID found in context or URL params');
         notifications.show({
           title: 'Error',
           message: 'Tenant ID is required',
@@ -70,7 +71,7 @@ export default function InventoryTransferAnalytics() {
       console.log(`Analytics result:`, result);
       
       if (!(result as any)?.success || !(result as any)?.data) {
-        console.warn('No analytics data available, using fallback');
+        clientLogger.warn('No analytics data available, using fallback');
         setAnalytics({
           totalTransfers: 0,
           activeTransfers: 0,
@@ -114,7 +115,7 @@ export default function InventoryTransferAnalytics() {
 
       setAnalytics(mappedAnalytics);
     } catch (error) {
-      console.error('Failed to load analytics:', error);
+      clientLogger.error('Failed to load analytics:', { detail: error });
       notifications.show({
         title: 'Error',
         message: 'Failed to load analytics data',

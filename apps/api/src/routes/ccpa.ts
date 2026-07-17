@@ -13,11 +13,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import CcpaComplianceService from '../services/CcpaComplianceService';
+import CrmInquiryService from '../services/CrmInquiryService';
+import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { Request, Response } from 'express';
 
 const router = Router();
 const ccpaService = CcpaComplianceService.getInstance();
+const inquiryService = CrmInquiryService.getInstance();
+
+const PLATFORM_TENANT_ID = 'platform';
 
 const optOutSchema = z.object({
   email: z.string().email(),
@@ -59,6 +64,83 @@ router.post('/opt-out-sale', async (req: Request, res: Response) => {
       email,
       tenantId,
     });
+
+    // Create a CRM inquiry for platform admin (fire-and-forget, non-blocking)
+    // Mirrors the Help Desk pattern: anonymous submission → platform tenant CRM
+    (async () => {
+      try {
+        // Ensure platform system tenant exists
+        let platformTenant = await prisma.tenants.findUnique({
+          where: { id: PLATFORM_TENANT_ID },
+          select: { id: true },
+        });
+        if (!platformTenant) {
+          platformTenant = await prisma.tenants.create({
+            data: {
+              id: PLATFORM_TENANT_ID,
+              name: 'VisibleShelf Platform',
+              subscription_tier: 'enterprise',
+              subscription_status: 'active',
+              slug: 'platform-help-desk',
+              directory_visible: false,
+            },
+          });
+          logger.info('[CCPA] Auto-created platform system tenant');
+        }
+
+        const adminGuideUrl = `${req.protocol}://${req.get('host')}/settings/admin/crm/requests`;
+        const inquiryBody = [
+          `CCPA "Do Not Sell My Personal Information" request submitted by ${email}.`,
+          tenantId ? `Associated tenant: ${tenantId}` : 'No specific tenant provided.',
+          notes ? `Additional details: ${notes}` : '',
+          '',
+          '--- Admin Processing Guide ---',
+          `1. Review the CCPA request: ${req.protocol}://${req.get('host')}/settings/admin/ccpa`,
+          `2. Verify the requester identity via email reply to ${email}`,
+          '3. Process the opt-out within 15 business days (CCPA requirement)',
+          '4. Update the CCPA request status to "completed" or "denied"',
+          `5. Reply to the submitter at ${email} with confirmation`,
+          `6. Update this inquiry status to "resolved" when done: ${adminGuideUrl}`,
+        ].filter(Boolean).join('\n');
+
+        const inquiry = await inquiryService.create({
+          tenant_id: PLATFORM_TENANT_ID,
+          subject: `CCPA Opt-Out Request — ${email}`,
+          body: inquiryBody,
+          source: 'ccpa_request',
+          sender_email: email,
+          priority: 'normal',
+        });
+
+        // Log activity
+        try {
+          await prisma.crm_activities.create({
+            data: {
+              id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              tenant_id: PLATFORM_TENANT_ID,
+              actor_id: email,
+              actor_name: email,
+              activity_type: 'inquiry_created',
+              content: `CCPA opt-out inquiry: ${inquiry.id}`,
+              is_internal: false,
+            },
+          });
+        } catch {
+          // Activity log is non-critical
+        }
+
+        logger.info('[CCPA] CRM inquiry created for platform admin', undefined, {
+          inquiryId: inquiry.id,
+          ccpaRequestId: request.id,
+          email,
+        });
+      } catch (crmErr) {
+        logger.error('[CCPA] CRM inquiry creation failed (non-critical)', undefined, {
+          error: crmErr instanceof Error ? crmErr.message : String(crmErr),
+          ccpaRequestId: request.id,
+        });
+      }
+    })();
 
     return res.json({
       success: true,

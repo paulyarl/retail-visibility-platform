@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { SquareOAuthService } from '../../services/square/SquareOAuthService';
 import { requireAuth } from '../../middleware/auth';
 import { unifiedConfig } from '../../config/unifiedConfig';
+import { logger } from '../../logger';
 
 const router = Router();
 const squareOAuth = new SquareOAuthService();
@@ -35,7 +36,7 @@ router.get('/authorize', requireAuth, async (req, res) => {
     
     res.json({ authorizationUrl: authUrl });
   } catch (error: any) {
-    console.error('[Square OAuth] Authorization error:', error);
+    logger.error('[Square OAuth] Authorization error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to generate authorization URL' });
   }
 });
@@ -52,7 +53,7 @@ router.get('/callback', async (req, res) => {
 
     // Handle OAuth errors from Square
     if (error) {
-      console.error('[Square OAuth] Callback error:', error, error_description);
+      logger.error('[Square OAuth] Callback error:', undefined, { error: { name: 'Error', message: String(error) +  + String({ error: { name: (error_description as any)?.name || 'Error', message: (error_description as any)?.message || String(error_description), stack: (error_description as any)?.stack } }) } });
       const errorMessage = encodeURIComponent(error_description as string || error as string);
       return res.redirect(
         `${webBaseUrl}/settings/payment-gateways?error=square_oauth&message=${errorMessage}`
@@ -69,7 +70,7 @@ router.get('/callback', async (req, res) => {
       const stateData = squareOAuth.verifyState(state);
       tenantId = stateData.tenantId;
     } catch (error: any) {
-      console.error('[Square OAuth] State verification failed:', error);
+      logger.error('[Square OAuth] State verification failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.redirect(
         `${webBaseUrl}/settings/payment-gateways?error=square_oauth&message=Invalid+or+expired+state+parameter`
       );
@@ -81,7 +82,7 @@ router.get('/callback', async (req, res) => {
     // Redirect to success page (use web domain, not API domain)
     res.redirect(`${webBaseUrl}/t/${tenantId}/settings/payment-gateways?connected=square&success=true`);
   } catch (error: any) {
-    console.error('[Square OAuth] Callback error:', error);
+    logger.error('[Square OAuth] Callback error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     const webBaseUrl = unifiedConfig.webUrl;
     
     // Try to extract tenantId from state for error redirect
@@ -146,7 +147,7 @@ router.get('/status', requireAuth, async (req, res) => {
       lastRefreshed: tokenRecord.last_refreshed_at,
     });
   } catch (error: any) {
-    console.error('[Square OAuth] Status check error:', error);
+    logger.error('[Square OAuth] Status check error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to check OAuth status' });
   }
 });
@@ -173,7 +174,7 @@ router.delete('/disconnect', requireAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Square OAuth disconnected successfully' });
   } catch (error: any) {
-    console.error('[Square OAuth] Disconnect error:', error);
+    logger.error('[Square OAuth] Disconnect error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to disconnect Square OAuth' });
   }
 });
@@ -194,7 +195,7 @@ router.post('/refresh', requireAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Token refreshed successfully' });
   } catch (error: any) {
-    console.error('[Square OAuth] Refresh error:', error);
+    logger.error('[Square OAuth] Refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to refresh token' });
   }
 });
@@ -224,7 +225,7 @@ router.post('/register-test-token', requireAuth, async (req, res) => {
       note: 'This token will be used for Square API calls for this tenant'
     });
   } catch (error: any) {
-    console.error('[Square OAuth] Register test token error:', error);
+    logger.error('[Square OAuth] Register test token error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: error.message || 'Failed to register test token' });
   }
 });

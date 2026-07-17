@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import VariantSelector, { ProductVariant } from './VariantSelector';
 import VariantAttributeDisplay, { VariantComparisonGrid } from './VariantAttributeDisplay';
 import { AddToCartButton } from './AddToCartButton';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
 import { SalePrice } from './SalePrice';
 import { FeaturedTypeBadges } from './FeaturedTypeBadges';
 import { Badge } from '@/components/ui/Badge';
 import { getFeaturedTypeDisplay, FeaturedType } from '@/types/product-display';
 import { useVariantsSingleton } from '@/lib/singletons/VariantsSingleton';
 import { getEnhancedTenantFeaturedProductsSingleton } from '@/lib/singletons/EnhancedTenantFeaturedProductsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductWithVariantsProps {
   product: {
@@ -83,7 +84,7 @@ export default function ProductWithVariants({
           }
         }
       } catch (error) {
-        console.error('Failed to fetch variants:', error);
+        clientLogger.error('Failed to fetch variants:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -107,7 +108,7 @@ export default function ProductWithVariants({
       
       setVariantFeaturedTypes(featuredTypesMap);
     } catch (error) {
-      console.error('Failed to fetch variant featured types:', error);
+      clientLogger.error('Failed to fetch variant featured types:', { detail: error });
     }
   };
 
@@ -144,7 +145,7 @@ export default function ProductWithVariants({
           setVariantPhotos(photosByVariant);
         }
       } catch (error) {
-        console.error('Failed to fetch photos:', error);
+        clientLogger.error('Failed to fetch photos:', { detail: error });
       }
     };
 

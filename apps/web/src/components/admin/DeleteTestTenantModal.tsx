@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { adminUsersService } from '@/services/AdminUsersService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DeleteTestTenantModalProps {
   onClose: () => void;
@@ -35,7 +36,7 @@ export default function DeleteTestTenantModal({ onClose }: DeleteTestTenantModal
       const data = await platformHomeService.getTenants();
       setTenants(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Failed to fetch tenants:', err);
+      clientLogger.error('Failed to fetch tenants:', { detail: err });
     } finally {
       setLoadingTenants(false);
     }

@@ -456,6 +456,7 @@ export const featuredShopManager = FeaturedShopManagerImpl.getInstance();
 
 // React hook for featured shops management
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useFeaturedShops(type?: FeaturedType, limit?: number) {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -474,7 +475,7 @@ export function useFeaturedShops(type?: FeaturedType, limit?: number) {
         setShops(featuredShops);
         setStats(featuredStats);
       } catch (error) {
-        console.error('Error loading featured shops:', error);
+        clientLogger.error('Error loading featured shops:', { detail: error });
       } finally {
         setLoading(false);
       }
@@ -492,7 +493,7 @@ export function useFeaturedShops(type?: FeaturedType, limit?: number) {
         setShops(updatedShops);
       }
     } catch (error) {
-      console.error('Error adding to featured:', error);
+      clientLogger.error('Error adding to featured:', { detail: error });
       throw error;
     }
   };
@@ -506,7 +507,7 @@ export function useFeaturedShops(type?: FeaturedType, limit?: number) {
         setShops(updatedShops);
       }
     } catch (error) {
-      console.error('Error removing from featured:', error);
+      clientLogger.error('Error removing from featured:', { detail: error });
       throw error;
     }
   };

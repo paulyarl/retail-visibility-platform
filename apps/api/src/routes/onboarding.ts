@@ -6,6 +6,7 @@ import { USER_ROLES } from '../config/role-groups';
 import { TRIAL_CONFIG } from '../config/tenant-limits';
 import { generateTenantId, generateUserTenantId } from '../lib/id-generator';
 import slugSingletonService from '../services/SlugSingletonService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -188,7 +189,7 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
       } : null,
     });
   } catch (error) {
-    console.error('Onboarding error:', error);
+    logger.error('Onboarding error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to complete onboarding' 
@@ -272,7 +273,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Get onboarding status error:', error);
+    logger.error('Get onboarding status error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get onboarding status' 

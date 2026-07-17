@@ -7,6 +7,7 @@ import { prisma } from '../../prisma';
 import { Prisma } from '@prisma/client';
 import { BaseService } from '../BaseService';
 import { getCacheService } from '../OverrideCacheService';
+import { logger } from '../../logger';
 
 // Wrapper to adapt OverrideCacheService to expected interface
 class AnalyticsCacheAdapter {
@@ -302,7 +303,7 @@ export class AnalyticsService extends BaseService {
       await this.safeCacheSet(cacheKey, result, 300); // Cache for 5 minutes
       return result;
     } catch (error) {
-      console.error('[AnalyticsService] Error getting overview metrics:', error);
+      logger.error('[AnalyticsService] Error getting overview metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -387,7 +388,7 @@ export class AnalyticsService extends BaseService {
       await this.cache.set(cacheKey, result, 300);
       return result;
     } catch (error) {
-      console.error('[AnalyticsService] Error getting page traffic analytics:', error);
+      logger.error('[AnalyticsService] Error getting page traffic analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -443,7 +444,7 @@ export class AnalyticsService extends BaseService {
       await this.cache.set(cacheKey, result, 300);
       return result;
     } catch (error) {
-      console.error('[AnalyticsService] Error getting user behavior analytics:', error);
+      logger.error('[AnalyticsService] Error getting user behavior analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -508,7 +509,7 @@ export class AnalyticsService extends BaseService {
       await this.cache.set(cacheKey, result, 300);
       return result;
     } catch (error) {
-      console.error('[AnalyticsService] Error getting time series analytics:', error);
+      logger.error('[AnalyticsService] Error getting time series analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -580,7 +581,7 @@ export class AnalyticsService extends BaseService {
       await this.cache.set(cacheKey, result, 300);
       return result;
     } catch (error) {
-      console.error('[AnalyticsService] Error getting popular content analytics:', error);
+      logger.error('[AnalyticsService] Error getting popular content analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -660,7 +661,7 @@ export class AnalyticsService extends BaseService {
       await this.cache.set(cacheKey, result, 300);
       return result;
     } catch (error) {
-      console.error('[AnalyticsService] Error getting geographic analytics:', error);
+      logger.error('[AnalyticsService] Error getting geographic analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

@@ -12,6 +12,7 @@ import { prisma } from '../../prisma';
 import { generateInvoiceId, generateBillingMethodId, generateServiceChargeId, generateSubscriptionPaymentId } from '../../lib/id-generator';
 import { encryptCredential, decryptCredential } from '../../utils/credential-encryption';
 import { audit } from '../../audit';
+import { logger } from '../../logger';
 
 export interface ManualInvoiceData {
   tenantId: string;
@@ -138,7 +139,7 @@ export class ManualBillingService {
       };
 
     } catch (error: any) {
-      console.error('[ManualBilling] Error creating manual invoice:', error);
+      logger.error('[ManualBilling] Error creating manual invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to create manual invoice'
@@ -221,7 +222,7 @@ export class ManualBillingService {
       };
 
     } catch (error: any) {
-      console.error('[ManualBilling] Error adding manual payment method:', error);
+      logger.error('[ManualBilling] Error adding manual payment method:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to add manual payment method'
@@ -301,7 +302,7 @@ export class ManualBillingService {
       };
 
     } catch (error: any) {
-      console.error('[ManualBilling] Error marking invoice as paid:', error);
+      logger.error('[ManualBilling] Error marking invoice as paid:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return {
         success: false,
         error: error.message || 'Failed to mark invoice as paid'
@@ -356,7 +357,7 @@ export class ManualBillingService {
       }));
 
     } catch (error: any) {
-      console.error('[ManualBilling] Error getting manual payment methods:', error);
+      logger.error('[ManualBilling] Error getting manual payment methods:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return [];
     }
   }
@@ -420,7 +421,7 @@ export class ManualBillingService {
       }));
 
     } catch (error) {
-      console.error('Error getting manual invoices:', error);
+      logger.error('Error getting manual invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -501,7 +502,7 @@ export class ManualBillingService {
         })),
       };
     } catch (error) {
-      console.error('Error fetching manual invoice:', error);
+      logger.error('Error fetching manual invoice:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw new Error('Failed to fetch manual invoice');
     }
   }
@@ -574,7 +575,7 @@ export class ManualBillingService {
         }))
       }));
     } catch (error) {
-      console.error('Error getting all manual invoices:', error);
+      logger.error('Error getting all manual invoices:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -622,7 +623,7 @@ export class ManualBillingService {
         updatedAt: method.updated_at || undefined
       }));
     } catch (error) {
-      console.error('Error getting all manual payment methods:', error);
+      logger.error('Error getting all manual payment methods:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

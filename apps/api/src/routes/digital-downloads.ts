@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { digitalAccessService } from '../services/digital-assets/DigitalAccessService';
 import { digitalAssetService } from '../services/digital-assets/DigitalAssetService';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -46,7 +47,7 @@ router.get('/:accessToken', async (req: Request, res: Response) => {
     });
 
     if (!item) {
-      console.error('[DigitalDownload] Item not found:', grant.inventoryItemId);
+      logger.error('[DigitalDownload] Item not found:', undefined, { error: { name: 'Error', message: String(grant.inventoryItemId) } });
       return res.status(404).json({
         success: false,
         error: 'item_not_found',
@@ -56,7 +57,7 @@ router.get('/:accessToken', async (req: Request, res: Response) => {
 
     const assets = item.digital_assets as any[];
     if (!assets || assets.length === 0) {
-      console.error('[DigitalDownload] No assets found for item:', item.id);
+      logger.error('[DigitalDownload] No assets found for item:', undefined, { error: { name: 'Error', message: String(item.id) } });
       return res.status(404).json({
         success: false,
         error: 'no_assets',
@@ -94,7 +95,7 @@ router.get('/:accessToken', async (req: Request, res: Response) => {
         // Redirect to signed URL
         return res.redirect(signedUrl);
       } catch (error: any) {
-        console.error('[DigitalDownload] Failed to generate signed URL:', error);
+        logger.error('[DigitalDownload] Failed to generate signed URL:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         return res.status(500).json({
           success: false,
           error: 'download_failed',
@@ -110,7 +111,7 @@ router.get('/:accessToken', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('[DigitalDownload] Error:', error);
+    logger.error('[DigitalDownload] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'download_error',
@@ -187,7 +188,7 @@ router.get('/:accessToken/info', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('[DigitalDownload] Info error:', error);
+    logger.error('[DigitalDownload] Info error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'info_error',
@@ -250,7 +251,7 @@ router.get('/orders/:orderId/downloads', async (req: Request, res: Response) => 
     });
 
   } catch (error: any) {
-    console.error('[DigitalDownload] Order downloads error:', error);
+    logger.error('[DigitalDownload] Order downloads error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fetch_error',
@@ -426,7 +427,7 @@ router.get('/:tenantId/:slug', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error('[DigitalDownload] Page access error:', error);
+    logger.error('[DigitalDownload] Page access error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',

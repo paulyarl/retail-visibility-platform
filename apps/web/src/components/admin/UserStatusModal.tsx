@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Shield, Mail, Power, UserCheck, Loader2, AlertTriangle, CheckCircle, Clock, AlertCircle, Edit3, Save } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { adminUsersService } from '@/services/AdminUsersService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface UserStatusModalProps {
   isOpen: boolean;
@@ -97,7 +98,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         onSuccess?.();
       }, 1500);
     } catch (error) {
-      console.error('Failed to update email:', error);
+      clientLogger.error('Failed to update email:', { detail: error });
       setError('Failed to update email');
     } finally {
       setLoading(false);
@@ -142,7 +143,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         onSuccess?.();
       }, 1500);
     } catch (error) {
-      console.error('Failed to update name:', error);
+      clientLogger.error('Failed to update name:', { detail: error });
       setError('Failed to update name');
     } finally {
       setLoading(false);
@@ -337,7 +338,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         }, 1500);
       }
     } catch (error) {
-      console.error(`Failed to ${action.type}:`, error);
+      clientLogger.error(`Failed to ${action.type}:`, { detail: error });
       setError(`Failed to ${action.label.toLowerCase()}`);
     } finally {
       setLoading(false);

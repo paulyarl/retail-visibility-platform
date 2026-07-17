@@ -7,14 +7,14 @@
 
 import type {
   EffectiveDirectoryEntryOptions,
-  StorefrontOptionsMerchantSettings,
+  DirectoryEntryMerchantSettings,
 } from './types';
 
 export type DirectoryEntryLayoutType = 'classic' | 'editorial' | 'immersive' | 'premium';
 
 export function resolveDirectoryEntryOptions(
   features: Record<string, boolean>,
-  merchantPrefs: StorefrontOptionsMerchantSettings | null
+  merchantPrefs: DirectoryEntryMerchantSettings | null
 ): EffectiveDirectoryEntryOptions {
   // Single-key pattern: present + true = enabled; missing/false = disabled
   const disabled = !!features.directory_entry_disabled;
@@ -46,7 +46,7 @@ export function resolveDirectoryEntryOptions(
   const externalLinkTierAllowed = mainOn && (flexible || !!features.directory_entry_external_link);
 
   const prefs = {
-    directory_entry_opt_enabled: merchantPrefs?.storefront_opt_enabled !== false,
+    directory_entry_opt_enabled: merchantPrefs?.directory_entry_opt_enabled !== false,
     directory_entry_layout: merchantPrefs?.directory_entry_layout || 'classic',
     external_link_enabled: merchantPrefs?.external_link_enabled === true,
   };
@@ -58,14 +58,6 @@ export function resolveDirectoryEntryOptions(
     ? (merchantLayoutChoice as DirectoryEntryLayoutType)
     : (effectiveLayouts[0] || 'classic');
 
-  // Section effective flags — tier feature OR flexible grants availability; merchant prefs gate display
-  const hasGalleryPref = merchantPrefs && (
-    merchantPrefs.image_gallery_5 || merchantPrefs.image_gallery_10 || merchantPrefs.image_gallery_15
-  );
-  const hasQrPref = merchantPrefs && (
-    merchantPrefs.qr_product || merchantPrefs.qr_store || merchantPrefs.qr_logo || merchantPrefs.qr_directory
-  );
-
   return {
     enabled: mainOn,
     is_flexible: flexible,
@@ -76,12 +68,12 @@ export function resolveDirectoryEntryOptions(
     can_use_layout_editorial: mainOn && allowedLayouts.includes('editorial'),
     can_use_layout_immersive: mainOn && allowedLayouts.includes('immersive'),
     can_use_layout_premium: mainOn && allowedLayouts.includes('premium'),
-    // Section effective flags — tier feature OR flexible; merchant pref gates (default true if tier allows)
+    // Section effective flags — tier feature OR flexible grants availability; merchant prefs gate display
     hours_enabled: mainOn && (flexible || !!features.directory_entry_hours_on || !!features.directory_entry_hours_enabled) && (merchantPrefs?.hours_display !== false),
     map_enabled: mainOn && (flexible || !!features.directory_entry_map_on || !!features.directory_entry_map_enabled) && (merchantPrefs?.map_display !== false),
     contact_enabled: mainOn && (flexible || !!features.directory_entry_contact_on || !!features.directory_entry_contact_enabled) && (merchantPrefs?.storefront_contact !== false),
-    gallery_enabled: mainOn && (flexible || !!features.directory_entry_gallery_on || !!features.directory_entry_gallery_enabled) && (hasGalleryPref !== false),
-    qr_enabled: mainOn && (flexible || !!features.directory_entry_qr_on || !!features.directory_entry_qr_enabled) && (hasQrPref !== false),
+    gallery_enabled: mainOn && (flexible || !!features.directory_entry_gallery_on || !!features.directory_entry_gallery_enabled),
+    qr_enabled: mainOn && (flexible || !!features.directory_entry_qr_on || !!features.directory_entry_qr_enabled),
     social_enabled: mainOn && (flexible || !!features.directory_entry_social_on || !!features.directory_entry_social_enabled) && (merchantPrefs?.storefront_social_media !== false),
     seo_enabled: mainOn && (flexible || !!features.directory_entry_seo_on || !!features.directory_entry_seo_enabled) && (merchantPrefs?.enhanced_seo !== false),
     // Tier-gated availability flags (for UI disable states)

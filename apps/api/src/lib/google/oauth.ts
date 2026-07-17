@@ -6,6 +6,7 @@
  */
 
 import crypto from 'crypto';
+import { logger } from '../../logger';
 
 // Environment variables
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -69,13 +70,13 @@ export function decodeState(state: string): { tenantId: string; nonce: string; t
     // Validate timestamp (max 10 minutes old)
     const age = Date.now() - decoded.timestamp;
     if (age > 10 * 60 * 1000) {
-      console.error('[OAuth] State expired:', age);
+      logger.error('[OAuth] State expired:', undefined, { error: { name: (age as any)?.name || 'Error', message: (age as any)?.message || String(age), stack: (age as any)?.stack } });
       return null;
     }
     
     return decoded;
   } catch (error) {
-    console.error('[OAuth] Invalid state:', error);
+    logger.error('[OAuth] Invalid state:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -107,7 +108,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[OAuth] Token exchange failed:', error);
+      logger.error('[OAuth] Token exchange failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
@@ -119,7 +120,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
       token_type: string;
     } | null;
   } catch (error) {
-    console.error('[OAuth] Token exchange error:', error);
+    logger.error('[OAuth] Token exchange error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -149,7 +150,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[OAuth] Token refresh failed:', error);
+      logger.error('[OAuth] Token refresh failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
 
@@ -160,7 +161,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
       token_type: string;
     } | null;
   } catch (error) {
-    console.error('[OAuth] Token refresh error:', error);
+    logger.error('[OAuth] Token refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -182,7 +183,7 @@ export async function getUserInfo(accessToken: string): Promise<{
     });
 
     if (!response.ok) {
-      console.error('[OAuth] User info fetch failed');
+      logger.error('[OAuth] User info fetch failed', undefined);
       return null;
     }
 
@@ -193,7 +194,7 @@ export async function getUserInfo(accessToken: string): Promise<{
       picture: string;
     } | null;
   } catch (error) {
-    console.error('[OAuth] User info error:', error);
+    logger.error('[OAuth] User info error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }
@@ -249,7 +250,7 @@ export async function revokeToken(token: string): Promise<boolean> {
 
     return response.ok;
   } catch (error) {
-    console.error('[OAuth] Token revocation error:', error);
+    logger.error('[OAuth] Token revocation error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return false;
   }
 }

@@ -65,7 +65,7 @@ export class CrmTaskService extends BaseService {
     status?: string;
     priority?: string;
     due_date?: Date;
-    assigned_to?: string;
+    assigned_to?: string | null;
     contact_id?: string;
   }, actorId: string, actorName: string, actorType: string = 'platform') {
     const task = await prisma.crm_tasks.findUnique({ where: { id: taskId } });
@@ -98,9 +98,29 @@ export class CrmTaskService extends BaseService {
           actor_id: actorId,
           actor_type: actorType,
           actor_name: actorName,
-          activity_type: 'task_created',
+          activity_type: 'status_change',
           content: `Task "${task.title}" status changed from ${task.status} to ${data.status}`,
           metadata: { from: task.status, to: data.status },
+          is_internal: false,
+        },
+      });
+    }
+
+    // Auto-log assignment change as activity
+    if (data.assigned_to !== undefined && data.assigned_to !== task.assigned_to) {
+      const fromName = task.assigned_to || 'Unassigned';
+      const toName = data.assigned_to || 'Unassigned';
+      await prisma.crm_activities.create({
+        data: {
+          id: generateCrmActivityId(task.tenant_id),
+          tenant_id: task.tenant_id,
+          task_id: taskId,
+          actor_id: actorId,
+          actor_type: actorType,
+          actor_name: actorName,
+          activity_type: 'assignment_change',
+          content: `Task "${task.title}" assignment changed from ${fromName} to ${toName}`,
+          metadata: { from: task.assigned_to, to: data.assigned_to },
           is_internal: false,
         },
       });

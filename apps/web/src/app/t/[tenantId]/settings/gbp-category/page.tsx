@@ -9,6 +9,7 @@ import { gbpCategoryService } from '@/services/GBPCategoryService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { IconInfoCircle, IconCheck, IconRocket, IconTarget, IconLink, IconAlertTriangle, IconBulb } from '@tabler/icons-react';
+import { clientLogger } from '@/lib/client-logger';
 
 
 export default function GBPCategoryPage() {
@@ -30,7 +31,7 @@ export default function GBPCategoryPage() {
         const profileData = await gbpCategoryService.getTenantGBPCategoryProfile(tenantId);
         setProfile(profileData);
       } catch (error) {
-        console.error('[GBPCategoryPage] Failed to load profile:', error);
+        clientLogger.error('[GBPCategoryPage] Failed to load profile:', { detail: error });
       } finally {
         setLoading(false);
       }

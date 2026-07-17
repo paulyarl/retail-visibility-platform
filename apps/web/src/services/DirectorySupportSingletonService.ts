@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStatus {
   tenant: {
@@ -96,14 +97,14 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryStatus>(
-      `/support/directory/tenant/${tenantId}/status`,
+      `/api/support/directory/tenant/${tenantId}/status`,
       {},
       `directory-status-${tenantId}`,
       this.cacheTTL
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to get directory status:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to get directory status:', { detail: response.error });
       return null;
     }
 
@@ -120,14 +121,14 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryQualityCheck>(
-      `/support/directory/tenant/${tenantId}/quality-check`,
+      `/api/support/directory/tenant/${tenantId}/quality-check`,
       {},
       `directory-quality-check-${tenantId}`,
       this.cacheTTL
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to get directory quality check:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to get directory quality check:', { detail: response.error });
       return null;
     }
 
@@ -144,14 +145,14 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryNote[]>(
-      `/support/directory/tenant/${tenantId}/notes`,
+      `/api/support/directory/tenant/${tenantId}/notes`,
       {},
       `directory-notes-${tenantId}`,
       this.cacheTTL
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to get directory notes:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to get directory notes:', { detail: response.error });
       return null;
     }
 
@@ -168,7 +169,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     }
 
     const response = await this.makeDefaultRequest<DirectoryNote>(
-      `/support/directory/tenant/${tenantId}/notes`,
+      `/api/support/directory/tenant/${tenantId}/notes`,
       {
         method: 'POST',
         headers: {
@@ -181,7 +182,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySupportSingleton] Failed to add directory note:', response.error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to add directory note:', { detail: response.error });
       return null;
     }
 
@@ -202,7 +203,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
       }
 
       const response = await this.makeDefaultRequest<any>(
-        `/support/directory/search?q=${encodeURIComponent(query)}`,
+        `/api/support/directory/search?q=${encodeURIComponent(query)}`,
         {},
         `search-directory-${query}`,
         this.cacheTTL
@@ -210,7 +211,7 @@ class DirectorySupportSingletonService extends TenantApiSingleton {
 
       return response;
     } catch (error) {
-      console.error('[DirectorySupportSingleton] Failed to search directory:', error);
+      clientLogger.error('[DirectorySupportSingleton] Failed to search directory:', { detail: error });
       return null;
     }
   }

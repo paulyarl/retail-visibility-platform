@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useProductTypeCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
 
 interface ProductTypeSettings {
   product_types_enabled: boolean;
@@ -102,7 +103,7 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
         });
       }
     } catch (err) {
-      console.error('Failed to load product type settings:', err);
+      clientLogger.error('Failed to load product type settings:', { detail: err });
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,7 @@
 import { prisma } from '../prisma';
 import { generateCustomerPaymentMethodId } from '../lib/id-generator';
 import Stripe from 'stripe';
+import { logger } from '../logger';
 
 // ==================
 // TYPES
@@ -299,7 +300,7 @@ export class CustomerPaymentMethodsService {
           // Fall back to input values if retrieve fails
         }
       } catch (stripeError: any) {
-        console.error('[CustomerPaymentMethods] Stripe error:', stripeError.message);
+        logger.error('[CustomerPaymentMethods] Stripe error:', undefined, { error: { name: 'Error', message: String(stripeError.message) } });
         throw stripeError;
       }
     }
@@ -393,7 +394,7 @@ export class CustomerPaymentMethodsService {
           });
         }
       } catch (error: any) {
-        console.error('[CustomerPaymentMethods] Failed to update Stripe default:', error.message);
+        logger.error('[CustomerPaymentMethods] Failed to update Stripe default:', undefined, { error: { name: 'Error', message: String(error.message) } });
         // Don't fail the operation — local default is what matters
       }
     }
@@ -421,7 +422,7 @@ export class CustomerPaymentMethodsService {
       try {
         await this.stripe.paymentMethods.detach(method.payment_method_token);
       } catch (error: any) {
-        console.error('[CustomerPaymentMethods] Failed to detach Stripe payment method:', error.message);
+        logger.error('[CustomerPaymentMethods] Failed to detach Stripe payment method:', undefined, { error: { name: 'Error', message: String(error.message) } });
         // Continue — local record is what matters
       }
     }

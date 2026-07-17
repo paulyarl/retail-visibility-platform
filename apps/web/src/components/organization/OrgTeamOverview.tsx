@@ -8,6 +8,7 @@ import { Button } from "@mantine/core";
 import { Badge } from "@/components/ui/Badge";
 import { tenantInfoService } from "@/services/TenantInfoService";
 import type { OrganizationData } from "./types";
+import { clientLogger } from '@/lib/client-logger';
 
 interface OrgTeamOverviewProps {
   locations: OrganizationData["locationBreakdown"];
@@ -73,7 +74,7 @@ export default function OrgTeamOverview({ locations, tenantId }: OrgTeamOverview
           }
         }
       } catch (error) {
-        console.error("Failed to fetch team data:", error);
+        clientLogger.error("Failed to fetch team data:", { detail: error });
       } finally {
         setLoading(false);
       }

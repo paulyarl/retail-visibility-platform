@@ -6,6 +6,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { ROLE_GROUPS, PERMISSION_GROUPS, RoleGroup, PermissionGroup, isRoleInGroup, hasPermission, isValidRole } from '../config/role-groups';
+import { logger } from '../logger';
 
 /**
  * Middleware to require users to be in a specific role group
@@ -52,7 +53,7 @@ export function requireRoleGroup(groupName: RoleGroup) {
       // User has required permissions
       next();
     } catch (error) {
-      console.error('[Role Validation] Error checking permissions:', error);
+      logger.error('[Role Validation] Error checking permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'Permission check failed',
         message: 'Unable to verify user permissions'
@@ -109,7 +110,7 @@ export function requireAnyRoleGroup(groupNames: RoleGroup[]) {
 
       next();
     } catch (error) {
-      console.error('[Role Validation] Error checking permissions:', error);
+      logger.error('[Role Validation] Error checking permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'Permission check failed',
         message: 'Unable to verify user permissions'
@@ -167,7 +168,7 @@ export function requireAllRoleGroups(groupNames: RoleGroup[]) {
 
       next();
     } catch (error) {
-      console.error('[Role Validation] Error checking permissions:', error);
+      logger.error('[Role Validation] Error checking permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'Permission check failed',
         message: 'Unable to verify user permissions'
@@ -264,7 +265,7 @@ export function requirePermission(permission: PermissionGroup) {
       // User has required permission
       next();
     } catch (error) {
-      console.error('[Permission Validation] Error checking permissions:', error);
+      logger.error('[Permission Validation] Error checking permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return res.status(500).json({
         error: 'Permission check failed',
         message: 'Unable to verify user permissions'

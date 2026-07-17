@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { SecurityPagination } from './SecurityPagination';
 import { AlertTriangle, Shield, TrendingUp, Users, Eye, EyeOff, Clock, User, Globe, UserCheck, UserX, ChevronDown, ChevronUp, Cpu, Activity, MapPin, Network } from 'lucide-react';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PaginationInfo {
   page: number;
@@ -73,7 +74,7 @@ export default function SecurityAlerts() {
         hasPrev: page > 1
       });
     } catch (err) {
-      console.error('[SecurityAlerts] Error fetching alerts:', err);
+      clientLogger.error('[SecurityAlerts] Error fetching alerts:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch security alerts');
     } finally {
       setLoading(false);

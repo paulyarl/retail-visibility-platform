@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { crossTenantProductService, CrossTenantProduct } from '@/services/CrossTenantProductService';
 import Link from 'next/link';
 import Image from 'next/image';
+import { clientLogger } from '@/lib/client-logger';
 
 interface AvailableNearbyProps {
   productSlug: string;
@@ -61,7 +62,7 @@ export function AvailableNearby({ productSlug, currentTenantId, className = '' }
       
       setNearbyProducts(otherStores);
     } catch (err) {
-      console.error('Failed to fetch nearby products:', err);
+      clientLogger.error('Failed to fetch nearby products:', { detail: err });
       setError('Unable to check availability at nearby stores');
     } finally {
       setLoading(false);

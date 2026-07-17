@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(override, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating tenant limits override:', error);
+    logger.error('Error creating tenant limits override:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { error: 'Failed to create tenant limits override' },
       { status: 500 }

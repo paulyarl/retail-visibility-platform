@@ -13,6 +13,7 @@ export interface BsaasCatalogItem {
   name: string;
   description: string;
   category: string | null;
+  capabilityType: string | null;
   priceCents: number;
   billingCycle: 'one_time' | 'weekly' | 'monthly' | 'annual';
   trialDays: number;

@@ -7,6 +7,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
 import { tenantUserService, type User } from '@/services/TenantUserService';
+import { clientLogger } from '@/lib/client-logger';
 
 
 
@@ -52,7 +53,7 @@ export default function TenantUsersPage() {
 
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('[Tenant Users] Load error:', err);
+      clientLogger.error('[Tenant Users] Load error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load users');
     } finally {
       setLoading(false);
@@ -86,7 +87,7 @@ export default function TenantUsersPage() {
 
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error('[Tenant Users] Add error:', err);
+      clientLogger.error('[Tenant Users] Add error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to add user');
     } finally {
       setAdding(false);
@@ -113,7 +114,7 @@ export default function TenantUsersPage() {
 
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error('[Tenant Users] Change role error:', err);
+      clientLogger.error('[Tenant Users] Change role error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to change role');
     } finally {
       setChangingRole(false);
@@ -133,7 +134,7 @@ export default function TenantUsersPage() {
       await loadUsers();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error('[Tenant Users] Remove error:', err);
+      clientLogger.error('[Tenant Users] Remove error:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to remove user');
     }
   };

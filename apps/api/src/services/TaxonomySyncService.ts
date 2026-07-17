@@ -1,6 +1,7 @@
 import { GoogleTaxonomyService } from './GoogleTaxonomyService';
 import { prisma } from '../prisma';
 import { GOOGLE_PRODUCT_TAXONOMY } from '../lib/google/taxonomy';
+import { logger } from '../logger';
 
 function collectNodes(nodes: any[]): any[] {
   const out: any[] = [];
@@ -64,7 +65,7 @@ async function upsertInBatches(items: any[], batchSize = 200) {
         console.log(`[TaxonomySyncService] Batch ${batchNum}/${totalBatches} completed`);
       }
     } catch (error) {
-      console.error(`[TaxonomySyncService] Batch ${batchNum} failed:`, error);
+      logger.error(`[TaxonomySyncService] Batch ${batchNum} failed:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -107,11 +108,11 @@ export class TaxonomySyncService {
         changes
       };
     } catch (error: any) {
-      console.error('[TaxonomySyncService] checkForUpdates: Failed to check for taxonomy updates:', error);
+      logger.error('[TaxonomySyncService] checkForUpdates: Failed to check for taxonomy updates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       console.error('[TaxonomySyncService] checkForUpdates: Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name
+        message: (error as any)?.message,
+        stack: (error as any)?.stack,
+        name: (error as any)?.name
       });
       throw error;
     }
@@ -148,11 +149,11 @@ export class TaxonomySyncService {
         needsReview: 0
       };
     } catch (error: any) {
-      console.error('[TaxonomySyncService] applySafeUpdates: Error populating taxonomy:', error);
+      logger.error('[TaxonomySyncService] applySafeUpdates: Error populating taxonomy:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       console.error('[TaxonomySyncService] applySafeUpdates: Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name,
+        message: (error as any)?.message,
+        stack: (error as any)?.stack,
+        name: (error as any)?.name,
         code: error?.code
       });
       throw error;
@@ -287,11 +288,11 @@ export class TaxonomySyncService {
       console.log(`[TaxonomySyncService] getCurrentTaxonomy: Found ${current.length} existing taxonomy records`);
       return current;
     } catch (error: any) {
-      console.error('[TaxonomySyncService] getCurrentTaxonomy: Error querying database:', error);
+      logger.error('[TaxonomySyncService] getCurrentTaxonomy: Error querying database:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       console.error('[TaxonomySyncService] getCurrentTaxonomy: Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name,
+        message: (error as any)?.message,
+        stack: (error as any)?.stack,
+        name: (error as any)?.name,
         code: error?.code
       });
       throw error;

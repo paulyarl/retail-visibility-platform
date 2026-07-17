@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface AdminUser {
   id: string;
@@ -54,7 +55,7 @@ export class AdminUserService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminUserService] Failed to get admin users:', result.error);
+      clientLogger.error('[AdminUserService] Failed to get admin users:', { detail: result.error });
       return null;
     }
 
@@ -76,7 +77,7 @@ export class AdminUserService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminUserService] Failed to delete admin user:', result.error);
+      clientLogger.error('[AdminUserService] Failed to delete admin user:', { detail: result.error });
       throw result.error;
     }
 
@@ -103,7 +104,7 @@ export class AdminUserService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminUserService] Failed to create admin user:', result.error);
+      clientLogger.error('[AdminUserService] Failed to create admin user:', { detail: result.error });
       throw result.error;
     }
 
@@ -131,7 +132,7 @@ export class AdminUserService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminUserService] Failed to update admin user permissions:', result.error);
+      clientLogger.error('[AdminUserService] Failed to update admin user permissions:', { detail: result.error });
       throw result.error;
     }
 
@@ -156,7 +157,7 @@ export class AdminUserService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminUserService] Failed to remove user from tenant:', result.error);
+      clientLogger.error('[AdminUserService] Failed to remove user from tenant:', { detail: result.error });
       throw result.error;
     }
 
@@ -181,7 +182,7 @@ export class AdminUserService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminUserService] Failed to add user to tenant:', result.error);
+      clientLogger.error('[AdminUserService] Failed to add user to tenant:', { detail: result.error });
       throw result.error;
     }
 

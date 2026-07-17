@@ -15,6 +15,7 @@ import {
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { tiktokIntegrationService } from '@/services/TikTokIntegrationService';
 import type { TikTokStatus, TikTokSyncStatus } from '@/services/TikTokIntegrationService';
+import { clientLogger } from '@/lib/client-logger';
 
 function TikTokIntegrationContent() {
   const params = useParams();
@@ -52,7 +53,7 @@ function TikTokIntegrationContent() {
       const data = await tiktokIntegrationService.getCatalogSyncStatus(tenantId);
       setSyncStatus(data);
     } catch (err) {
-      console.error('Failed to fetch sync status:', err);
+      clientLogger.error('Failed to fetch sync status:', { detail: err });
     }
   }
 

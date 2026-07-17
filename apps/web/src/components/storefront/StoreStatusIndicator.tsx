@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { directoryService } from '@/services/DirectorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StoreStatusIndicatorProps {
   tenantId: string;
@@ -44,7 +45,7 @@ async function getBusinessHours(tenantId: string) {
       return hoursData;
     }
   } catch (error) {
-    console.error('Error fetching business hours:', error);
+    clientLogger.error('Error fetching business hours:', { detail: error });
     return null;
   }
 }

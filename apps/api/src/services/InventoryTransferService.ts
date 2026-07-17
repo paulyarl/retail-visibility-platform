@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 import { 
   generateScheduleId,
   generateNotificationId 
@@ -824,7 +825,7 @@ export class InventoryTransferService {
 
       return this.formatTransfer(transfer);
     } catch (error) {
-      console.error('[InventoryTransferService] Failed to create transfer:', error);
+      logger.error('[InventoryTransferService] Failed to create transfer:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

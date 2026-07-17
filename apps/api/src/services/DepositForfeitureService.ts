@@ -10,6 +10,7 @@
 
 import { prisma } from '../prisma';
 import { calculateForfeiture, isEligibleForForfeiture } from '../utils/deposit-calculator';
+import { logger } from '../logger';
 
 export class DepositForfeitureService {
   /**
@@ -66,7 +67,7 @@ export class DepositForfeitureService {
             result.totalRetailerCompensation += forfeiture.retailerCompensationCents;
           }
         } catch (error) {
-          console.error(`[DepositForfeitureService] Failed to process order ${order.id}:`, error);
+          logger.error(`[DepositForfeitureService] Failed to process order ${order.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           result.failed++;
         }
       }
@@ -74,7 +75,7 @@ export class DepositForfeitureService {
       console.log('[DepositForfeitureService] Forfeiture processing complete:', result);
       return result;
     } catch (error) {
-      console.error('[DepositForfeitureService] Error in forfeiture processing:', error);
+      logger.error('[DepositForfeitureService] Error in forfeiture processing:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -102,7 +103,7 @@ export class DepositForfeitureService {
     });
 
     if (!order) {
-      console.error(`[DepositForfeitureService] Order ${orderId} not found`);
+      logger.error(`[DepositForfeitureService] Order ${orderId} not found`, undefined);
       return null;
     }
 
@@ -114,7 +115,7 @@ export class DepositForfeitureService {
 
     const depositPayment = order.payments[0];
     if (!depositPayment) {
-      console.error(`[DepositForfeitureService] No deposit payment found for order ${orderId}`);
+      logger.error(`[DepositForfeitureService] No deposit payment found for order ${orderId}`, undefined);
       return null;
     }
 

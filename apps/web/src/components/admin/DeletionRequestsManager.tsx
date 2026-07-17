@@ -31,6 +31,7 @@ import { AlertTriangle, Calendar, User, XCircle, FileText, TrendingDown, Archive
 import { formatDistanceToNow, format } from 'date-fns';
 import { adminDeletionRequestsService } from '@/services/AdminDeletionRequestsService';
 import type { DeletionRequest, DeletionStats } from '@/services/AdminDeletionRequestsService';
+import { clientLogger } from '@/lib/client-logger';
 
 export function DeletionRequestsManager() {
   const [requests, setRequests] = useState<DeletionRequest[]>([]);
@@ -54,7 +55,7 @@ export function DeletionRequestsManager() {
         setError(response.error);
       }
     } catch (error) {
-      console.error('Failed to fetch deletion requests:', error);
+      clientLogger.error('Failed to fetch deletion requests:', { detail: error });
       setError('Failed to load deletion requests');
     } finally {
       setLoading(false);
@@ -66,7 +67,7 @@ export function DeletionRequestsManager() {
       const stats = await adminDeletionRequestsService.getDeletionStats();
       setStats(stats);
     } catch (error) {
-      console.error('Failed to fetch deletion stats:', error);
+      clientLogger.error('Failed to fetch deletion stats:', { detail: error });
     }
   };
 
@@ -86,7 +87,7 @@ export function DeletionRequestsManager() {
         setAdminNotes('');
       }
     } catch (error) {
-      console.error('Failed to cancel deletion request:', error);
+      clientLogger.error('Failed to cancel deletion request:', { detail: error });
     }
   };
 
@@ -98,7 +99,7 @@ export function DeletionRequestsManager() {
       setAdminNotes('');
       await fetchRequests(activeTab);
     } catch (error) {
-      console.error('Failed to update notes:', error);
+      clientLogger.error('Failed to update notes:', { detail: error });
     }
   };
 

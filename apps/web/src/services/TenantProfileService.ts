@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface GeocodeRequest {
   address: string;
@@ -73,7 +74,7 @@ class TenantProfileService extends TenantApiSingleton {
    */
   async geocodeAddress(address: string): Promise<GeocodeResult | null> {
     if (!address) {
-      console.error('[TenantProfileService] geocodeAddress: address is required');
+      clientLogger.error('[TenantProfileService] geocodeAddress: address is required');
       return null;
     }
 
@@ -88,13 +89,13 @@ class TenantProfileService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantProfileService] Failed to geocode address:', result.error);
+        clientLogger.error('[TenantProfileService] Failed to geocode address:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantProfileService] Failed to geocode address:', error);
+      clientLogger.error('[TenantProfileService] Failed to geocode address:', { detail: error });
       return null;
     }
   }
@@ -105,7 +106,7 @@ class TenantProfileService extends TenantApiSingleton {
    */
   async getTenantProfile(tenantId: string): Promise<TenantProfile | null> {
     if (!tenantId) {
-      console.error('[TenantProfileService] getTenantProfile: tenantId is required');
+      clientLogger.error('[TenantProfileService] getTenantProfile: tenantId is required');
       return null;
     }
 
@@ -117,13 +118,13 @@ class TenantProfileService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantProfileService] Failed to get tenant profile:', result.error);
+        clientLogger.error('[TenantProfileService] Failed to get tenant profile:', { detail: result.error });
         return null;
       }
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantProfileService] Failed to get tenant profile:', error);
+      clientLogger.error('[TenantProfileService] Failed to get tenant profile:', { detail: error });
       return null;
     }
   }
@@ -134,7 +135,7 @@ class TenantProfileService extends TenantApiSingleton {
    */
   async updateTenantProfile(tenantId: string, profileData: Partial<TenantProfile>): Promise<TenantProfile | null> {
     if (!tenantId) {
-      console.error('[TenantProfileService] updateTenantProfile: tenantId is required');
+      clientLogger.error('[TenantProfileService] updateTenantProfile: tenantId is required');
       return null;
     }
 
@@ -149,7 +150,7 @@ class TenantProfileService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[TenantProfileService] Failed to update tenant profile:', result.error);
+        clientLogger.error('[TenantProfileService] Failed to update tenant profile:', { detail: result.error });
         return null;
       }
 
@@ -158,7 +159,7 @@ class TenantProfileService extends TenantApiSingleton {
 
       return result.data || null;
     } catch (error) {
-      console.error('[TenantProfileService] Failed to update tenant profile:', error);
+      clientLogger.error('[TenantProfileService] Failed to update tenant profile:', { detail: error });
       return null;
     }
   }

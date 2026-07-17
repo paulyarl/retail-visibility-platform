@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { CustomerAuthService } from '../services/CustomerAuthService';
+import { logger } from '../logger';
 
 const router = Router();
 const customerAuthService = CustomerAuthService.getInstance();
@@ -96,7 +97,7 @@ router.post('/login', async (req: Request, res: Response) => {
       token, // Return token to frontend
     });
   } catch (error: any) {
-    console.error('[CustomerAuth Token] Login error:', error);
+    logger.error('[CustomerAuth Token] Login error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',
@@ -127,7 +128,7 @@ router.get('/me', requireTokenAuth, async (req: Request, res: Response) => {
       customer,
     });
   } catch (error: any) {
-    console.error('[CustomerAuth Token] Get customer error:', error);
+    logger.error('[CustomerAuth Token] Get customer error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'server_error',

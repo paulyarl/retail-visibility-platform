@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { CheckCircle, ArrowLeft } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 function OrderConfirmationContent() {
   const searchParams = useSearchParams();
@@ -53,7 +54,7 @@ function OrderConfirmationContent() {
         }));
       }
     } catch (error) {
-      console.error('Error fetching order details:', error);
+      clientLogger.error('Error fetching order details:', { detail: error });
     } finally {
       setLoading(false);
     }

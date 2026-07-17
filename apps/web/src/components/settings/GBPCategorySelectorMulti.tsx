@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { X, Plus, GripVertical, Star } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GBPCategory {
   id: string;
@@ -59,7 +60,7 @@ export default function GBPCategorySelectorMulti({
           setPopularCategories(data);
         }
       } catch (error) {
-        console.error('[GBPCategorySelector] Failed to load popular categories:', error);
+        clientLogger.error('[GBPCategorySelector] Failed to load popular categories:', { detail: error });
       } finally {
         setLoadingPopular(false);
       }
@@ -83,7 +84,7 @@ export default function GBPCategorySelectorMulti({
           setPrimaryResults(data);
         }
       } catch (error) {
-        console.error('[GBPCategorySelector] Primary search error:', error);
+        clientLogger.error('[GBPCategorySelector] Primary search error:', { detail: error });
       } finally {
         if (active) setPrimaryLoading(false);
       }
@@ -111,7 +112,7 @@ export default function GBPCategorySelectorMulti({
           setSecondaryResults(data);
         }
       } catch (error) {
-        console.error('[GBPCategorySelector] Secondary search error:', error);
+        clientLogger.error('[GBPCategorySelector] Secondary search error:', { detail: error });
       } finally {
         if (active) setSecondaryLoading(false);
       }

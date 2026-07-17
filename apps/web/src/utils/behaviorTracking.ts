@@ -14,6 +14,7 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import { openStreetMapService } from '@/services/OpenStreetMapService';
 import { externalApiService } from '@/services/ExternalApiService';
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 // In-memory cache to prevent race conditions when multiple calls happen simultaneously
 let cachedSessionId: string | null = null;
@@ -313,7 +314,7 @@ class BehaviorTrackingCache {
       // console.log(`[BehaviorTracking] Sent ${eventsToSend.length} events in batch (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
     } catch (error) {
       // For tracking failures, use warn instead of error - these are not user-facing issues
-      console.warn('[BehaviorTracking] Tracking batch failed, will retry:', error instanceof Error ? error.message : 'Unknown error');
+      clientLogger.warn('[BehaviorTracking] Tracking batch failed, will retry:', { detail: error instanceof Error ? error.message : 'Unknown error' });
       
       // Increment retry attempts
       this.retryState.attempts++;
@@ -390,7 +391,7 @@ class BehaviorTrackingCache {
         this.events = Array.isArray(parsed) ? parsed : [];
       }
     } catch (error) {
-      console.warn('[BehaviorTracking] Failed to load from storage:', error);
+      clientLogger.warn('[BehaviorTracking] Failed to load from storage:', { detail: error });
       this.events = [];
     }
   }
@@ -404,7 +405,7 @@ class BehaviorTrackingCache {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.events));
     } catch (error) {
-      console.warn('[BehaviorTracking] Failed to save to storage:', error);
+      clientLogger.warn('[BehaviorTracking] Failed to save to storage:', { detail: error });
     }
   }
 
@@ -444,7 +445,7 @@ class BehaviorTrackingCache {
         this.retryState = { ...this.retryState, ...parsed };
       }
     } catch (error) {
-      console.warn('[BehaviorTracking] Failed to load retry state:', error);
+      clientLogger.warn('[BehaviorTracking] Failed to load retry state:', { detail: error });
     }
   }
 
@@ -457,7 +458,7 @@ class BehaviorTrackingCache {
     try {
       localStorage.setItem(this.RETRY_KEY, JSON.stringify(this.retryState));
     } catch (error) {
-      console.warn('[BehaviorTracking] Failed to save retry state:', error);
+      clientLogger.warn('[BehaviorTracking] Failed to save retry state:', { detail: error });
     }
   }
 
@@ -517,7 +518,7 @@ export async function trackBehavior(trackingData: TrackingData): Promise<void> {
     await trackingSingleton.trackRecommendation(trackingData, location);
   } catch (error) {
     // Tracking failures should be silent - don't show to users
-    console.warn('Silent tracking failure:', error instanceof Error ? error.message : 'Unknown error');
+    clientLogger.warn('Silent tracking failure:', { detail: error instanceof Error ? error.message : 'Unknown error' });
     // Don't throw - tracking failures shouldn't break the page
   }
 }
@@ -626,7 +627,7 @@ async function getUserLocationServer(): Promise<{
     const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
     
     if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
-      console.warn('[BehaviorTracking] Invalid location data received from external API');
+      clientLogger.warn('[BehaviorTracking] Invalid location data received from external API');
       return null;
     }
     
@@ -637,7 +638,7 @@ async function getUserLocationServer(): Promise<{
       state: ipLocation.region || 'Unknown'
     };
   } catch (error) {
-    console.warn('[BehaviorTracking] Failed to get user location:', error);
+    clientLogger.warn('[BehaviorTracking] Failed to get user location:', { detail: error });
     return null;
   }
 }
@@ -710,7 +711,7 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
       sessionCacheExpiry = now + SESSION_CACHE_TTL_MS;
     }
   } catch (error) {
-    console.error('[Tracking] Error getting user data:', error);
+    clientLogger.error('[Tracking] Error getting user data:', { detail: error });
   }
 
   const cache = getTrackingCache();
@@ -751,7 +752,7 @@ async function getUserLocationClient(): Promise<{
           });
         });
       } catch (highAccuracyError) {
-        console.warn('[BehaviorTracking] High accuracy geolocation failed, trying low accuracy:', highAccuracyError);
+        clientLogger.warn('[BehaviorTracking] High accuracy geolocation failed, trying low accuracy:', { detail: highAccuracyError });
         
         // Second attempt: Low accuracy with shorter timeout
         position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -786,7 +787,7 @@ async function getUserLocationClient(): Promise<{
           };
         }
       } catch (proxyError) {
-        console.warn('[BehaviorTracking] OpenStreetMap service failed, using coordinates only:', proxyError);
+        clientLogger.warn('[BehaviorTracking] OpenStreetMap service failed, using coordinates only:', { detail: proxyError });
       }
       
       // Fallback to coordinates only if proxy fails
@@ -820,12 +821,12 @@ async function getUserLocationClient(): Promise<{
         };
       }
     } catch (ipError) {
-      console.warn('[BehaviorTracking] Failed to get IP location:', ipError);
+      clientLogger.warn('[BehaviorTracking] Failed to get IP location:', { detail: ipError });
     }
     
     return null;
   } catch (error) {
-    console.warn('[BehaviorTracking] Failed to get user location:', error);  
+    clientLogger.warn('[BehaviorTracking] Failed to get user location:', { detail: error });  
     return null;
   }
 }

@@ -1,3 +1,5 @@
+import { clientLogger } from '@/lib/client-logger';
+
 /**
  * Tier Capability Resolver Utility
  * 
@@ -116,14 +118,14 @@ export class TierCapabilityResolver {
 
     const capabilityType = this.capabilityTypes.find(ct => ct.capability_type_key === capabilityTypeKey);
     if (!capabilityType) {
-      console.warn(`Capability type ${capabilityTypeKey} not found for capability ${capabilityKey}`);
+      clientLogger.warn(`Capability type ${capabilityTypeKey} not found for capability ${capabilityKey}`);
       return null;
     }
 
     // Find the tier and get its actual features
     const tier = this.tiers.find(t => t.tier_key === tierKey);
     if (!tier) {
-      console.warn(`Tier ${tierKey} not found for capability ${capabilityKey}`);
+      clientLogger.warn(`Tier ${tierKey} not found for capability ${capabilityKey}`);
       return null;
     }
 
@@ -150,7 +152,7 @@ export class TierCapabilityResolver {
     );
 
     if (relevantCapabilityTypes.length === 0) {
-      console.warn('No capability types found for tier features');
+      clientLogger.warn('No capability types found for tier features');
       return null;
     }
 
@@ -178,7 +180,7 @@ export class TierCapabilityResolver {
     // Use the first capability type as fallback
     const capabilityType = this.capabilityTypes[0];
     if (!capabilityType) {
-      console.warn('No capability types available for fallback');
+      clientLogger.warn('No capability types available for fallback');
       return null;
     }
 

@@ -15,6 +15,7 @@ import { getSubscriptionStatusService } from '../services/subscription/Subscript
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { prisma } from '../prisma';
 import { unifiedConfig } from '../config/unifiedConfig';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -50,7 +51,7 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, WEBHOOK_SECRET);
   } catch (err) {
-    console.error('[Stripe Webhook] Webhook signature verification failed:', err);
+    logger.error('[Stripe Webhook] Webhook signature verification failed:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
     return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
 
@@ -100,7 +101,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.json({ received: true });
   } catch (err: any) {
-    console.error('[StripeWebhook] Error handling event:', err);
+    logger.error('[StripeWebhook] Error handling event:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } });
     res.status(500).json({ error: 'Webhook handler failed' });
   }
 });
@@ -332,7 +333,7 @@ async function handleSetupIntentSucceeded(setupIntent: Stripe.SetupIntent) {
       paymentMethodToken: setupIntent.payment_method as string,
     });
   } catch (error: any) {
-    console.error(`[StripeWebhook] Failed to auto-save payment method:`, error.message);
+    logger.error(`[StripeWebhook] Failed to auto-save payment method:`, undefined, { error: { name: 'Error', message: String(error.message) } });
   }
 }
 

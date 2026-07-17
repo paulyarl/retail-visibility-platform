@@ -6,6 +6,7 @@
  */
 
 import TenantIntegrationsService from '@/services/TenantIntegrationsService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CloverIntegration {
   connected: boolean;
@@ -124,7 +125,7 @@ class IntegrationsSingleton {
       return cloverIntegration;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`IntegrationsSingleton: Error fetching Clover integration:`, error);
+      clientLogger.error(`IntegrationsSingleton: Error fetching Clover integration:`, { detail: error });
       
       this.setState({
         loading: false,
@@ -170,7 +171,7 @@ class IntegrationsSingleton {
       console.log(`IntegrationsSingleton: Fetched Square integration for tenant ${this.tenantId}`);
       return squareIntegration;
     } catch (error) {
-      console.error(`IntegrationsSingleton: Error fetching Square integration:`, error);
+      clientLogger.error(`IntegrationsSingleton: Error fetching Square integration:`, { detail: error });
       throw error;
     }
   }

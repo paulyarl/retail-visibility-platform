@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Analytics {
   totalScanned: number;
@@ -109,7 +110,7 @@ class ScanAnalyticsService extends TenantApiSingleton {
 
       return response?.data?.analytics || null;
     } catch (error) {
-      console.error('[ScanAnalyticsService] Failed to get tenant analytics:', error);
+      clientLogger.error('[ScanAnalyticsService] Failed to get tenant analytics:', { detail: error });
       return null;
     }
   }
@@ -157,7 +158,7 @@ class ScanAnalyticsService extends TenantApiSingleton {
         }
       };
     } catch (error) {
-      console.error('[ScanAnalyticsService] Failed to preview product:', error);
+      clientLogger.error('[ScanAnalyticsService] Failed to preview product:', { detail: error });
       return {
         found: false,
         message: 'Failed to preview product'
@@ -190,7 +191,7 @@ class ScanAnalyticsService extends TenantApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[ScanAnalyticsService] Failed to get scan session stats:', error);
+      clientLogger.error('[ScanAnalyticsService] Failed to get scan session stats:', { detail: error });
       return null;
     }
   }
@@ -215,7 +216,7 @@ class ScanAnalyticsService extends TenantApiSingleton {
       }
       return response.data;
     } catch (error) {
-      console.error('[ScanAnalyticsService] Failed to cleanup scan sessions:', error);
+      clientLogger.error('[ScanAnalyticsService] Failed to cleanup scan sessions:', { detail: error });
       throw error;
     }
   }

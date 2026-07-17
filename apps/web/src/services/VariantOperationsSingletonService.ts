@@ -13,6 +13,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface BulkFeaturedTypeOperation {
   variantIds: string[];
@@ -102,7 +103,7 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[VariantOperationsSingleton] Failed to bulk update featured type:', error);
+      clientLogger.error('[VariantOperationsSingleton] Failed to bulk update featured type:', { detail: error });
       return null;
     }
   }
@@ -145,7 +146,7 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[VariantOperationsSingleton] Failed to bulk update sale price:', error);
+      clientLogger.error('[VariantOperationsSingleton] Failed to bulk update sale price:', { detail: error });
       return null;
     }
   }
@@ -187,7 +188,7 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[VariantOperationsSingleton] Failed to bulk update inventory:', error);
+      clientLogger.error('[VariantOperationsSingleton] Failed to bulk update inventory:', { detail: error });
       return null;
     }
   }
@@ -224,7 +225,7 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[VariantOperationsSingleton] Failed to bulk delete variants:', error);
+      clientLogger.error('[VariantOperationsSingleton] Failed to bulk delete variants:', { detail: error });
       return null;
     }
   }
@@ -262,7 +263,7 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[VariantOperationsSingleton] Failed to bulk update variant status:', error);
+      clientLogger.error('[VariantOperationsSingleton] Failed to bulk update variant status:', { detail: error });
       return null;
     }
   }

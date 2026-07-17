@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { shopsService } from '@/services/ShopsService';
+import { clientLogger } from '@/lib/client-logger';
 
 export function useShopService() {
   return shopsService;
@@ -63,13 +64,13 @@ export function useShopDirectory(params: {
         setHasMore(result.length >= (params.limit || 10));
  //       console.log('[useShopDirectory] Shops loaded (fallback):', result.length);
       } else {
-        console.warn('[useShopDirectory] Unexpected response structure:', result);
+        clientLogger.warn('[useShopDirectory] Unexpected response structure:', { detail: result });
         setShops([]);
         setHasMore(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch shops');
-      console.error('[useShopDirectory] Error:', err);
+      clientLogger.error('[useShopDirectory] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -120,13 +121,13 @@ export function useShopDirectory(params: {
           setHasMore(result.length >= (params.limit || 10));
  //         console.log('[useShopDirectory] Shops loaded (fallback):', result.length);
         } else {
-          console.warn('[useShopDirectory] Unexpected response structure:', result);
+          clientLogger.warn('[useShopDirectory] Unexpected response structure:', { detail: result });
           setShops([]);
           setHasMore(false);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch shops');
-        console.error('[useShopDirectory] Error:', err);
+        clientLogger.error('[useShopDirectory] Error:', { detail: err });
       } finally {
         setLoading(false);
       }
@@ -227,12 +228,12 @@ export function useShopCategories() {
         setData(response);
 //        console.log('[useShopCategories] Categories loaded (fallback):', response.length);
       } else {
-        console.warn('[useShopCategories] Unexpected response structure:', response);
+        clientLogger.warn('[useShopCategories] Unexpected response structure:', { detail: response });
         setData([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');
-      console.error('[useShopCategories] Error:', err);
+      clientLogger.error('[useShopCategories] Error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -279,12 +280,12 @@ export function useStoreTypes() {
         setData(transformedStoreTypes);
        // console.log('[useStoreTypes] Transformed store types:', transformedStoreTypes);
       } else {
-        console.warn('[useStoreTypes] No store types found');
+        clientLogger.warn('[useStoreTypes] No store types found');
         setData([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch store types');
-      console.error('[useStoreTypes] Error:', err);
+      clientLogger.error('[useStoreTypes] Error:', { detail: err });
       setData([]);
     } finally {
       setLoading(false);

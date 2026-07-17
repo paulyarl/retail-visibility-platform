@@ -10,6 +10,7 @@ import { generateAutoSKU } from './sku-generator';
 import { suggestCategories, getCategoryById } from './google/taxonomy';
 import { productCacheService } from '../services/ProductCacheService';
 import { z } from 'zod';
+import { logger } from '../logger';
 
 // Item schema validation (copied from index.ts for consistency)
 const baseItemSchema = z.object({
@@ -860,7 +861,7 @@ export async function generateQuickStartProducts(
           });
         }
       } catch (error: any) {
-        console.error(`[Quick Start] Failed to generate products for ${category.name}:`, error.message);
+        logger.error(`[Quick Start] Failed to generate products for ${category.name}:`, undefined, { error: { name: 'Error', message: String(error.message) } });
       }
     }
     
@@ -1035,7 +1036,7 @@ export async function generateQuickStartProducts(
           // Use the same validation and transformation as the regular items API
           const parsed = createItemSchema.safeParse(rawItemData);
           if (!parsed.success) {
-            console.error('[Quick Start] Validation failed for item:', rawItemData.name, parsed.error.flatten());
+            logger.error('[Quick Start] Validation failed for item:', undefined, { error: { name: 'Error', message: String(rawItemData.name) +  + String(parsed.error.flatten()) } });
             throw new Error(`Validation failed for item ${rawItemData.name}: ${JSON.stringify(parsed.error.flatten())}`);
           }
           
@@ -1088,7 +1089,7 @@ export async function generateQuickStartProducts(
               });
               console.log(`[Quick Start] ✓ Created photo_assets record for cached photo: ${created.name}`);
             } catch (photoError: any) {
-              console.error(`[Quick Start] Failed to create photo_assets for ${created.name}:`, photoError.message);
+              logger.error(`[Quick Start] Failed to create photo_assets for ${created.name}:`, undefined, { error: { name: 'Error', message: String(photoError.message) } });
             }
           }
           
@@ -1211,7 +1212,7 @@ export async function generateQuickStartProducts(
                   console.log(`[Quick Start] ✓ Image generated and attached for: ${item.name}${upgradeMsg}`);
                   imagesGenerated++;
                 } catch (updateError: any) {
-                  console.error(`[Quick Start] Failed to update item ${item.id} with image_url:`, updateError);
+                  logger.error(`[Quick Start] Failed to update item ${item.id} with image_url:`, undefined, { error: { name: (updateError as any)?.name || 'Error', message: (updateError as any)?.message || String(updateError), stack: (updateError as any)?.stack } });
                   imagesFailed++;
                 }
               } else {
@@ -1219,7 +1220,7 @@ export async function generateQuickStartProducts(
                 imagesFailed++;
               }
             } catch (error: any) {
-              console.error(`[Quick Start] Image generation error for "${item.name}":`, error.message);
+              logger.error(`[Quick Start] Image generation error for "${item.name}":`, undefined, { error: { name: 'Error', message: String(error.message) } });
               imagesFailed++;
             }
           }

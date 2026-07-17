@@ -8,6 +8,7 @@
 import { prisma } from '../prisma';
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 import { getLocationStatusInfo, LocationStatusInfo } from '../utils/location-status';
+import { logger } from '../logger';
 
 export interface ResolvedTenant {
   id: string;
@@ -65,7 +66,7 @@ export class UniversalIdentifierCache extends UniversalSingleton {
       try {
         return await existingOperation;
       } catch (error) {
-        console.error(`[Cache SYNC] Existing operation failed for key: ${key}`, error);
+        logger.error(`[Cache SYNC] Existing operation failed for key: ${key}`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         // If existing operation fails, remove it and try again
         this.operationQueue.delete(key);
         // Continue to create new operation
@@ -136,7 +137,7 @@ export class UniversalIdentifierCache extends UniversalSingleton {
  */
       return resolvedTenant;
     } catch (error) {
-      console.error(`[Cache ERROR] ${identifier}:`, error);
+      logger.error(`[Cache ERROR] ${identifier}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -262,7 +263,7 @@ export class UniversalIdentifierCache extends UniversalSingleton {
       console.log(`[Cache DB LOOKUP] Not found: ${identifier}`);
       return null;
     } catch (error) {
-      console.error(`[Cache DB ERROR] ${identifier}:`, error);
+      logger.error(`[Cache DB ERROR] ${identifier}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return null;
     }
   }
@@ -328,7 +329,7 @@ export class UniversalIdentifierCache extends UniversalSingleton {
 
       console.log(`[Cache WARM] Completed warm-up for ${tenants.length} tenants`);
     } catch (error) {
-      console.error(`[Cache WARM ERROR]:`, error);
+      logger.error(`[Cache WARM ERROR]:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -358,13 +359,13 @@ export class UniversalIdentifierCache extends UniversalSingleton {
         cacheKeys.push(`identifier:${tenant.slug}`);
       }
     } catch (error) {
-      console.error('[Cache] Error finding tenant slug for invalidation:', error);
+      logger.error('[Cache] Error finding tenant slug for invalidation:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
 
     // Invalidate all related cache entries
     const invalidationPromises = cacheKeys.map(key =>
       this.clearCache(key).catch(error => 
-        console.error(`[Cache] Error invalidating ${key}:`, error)
+        logger.error(`[Cache] Error invalidating ${key}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } })
       )
     );
 

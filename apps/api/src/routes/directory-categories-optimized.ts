@@ -13,6 +13,7 @@ import {
   getDirectoryStats
 } from '../utils/directory-category-counts';
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.get('/counts', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories-optimized/counts] Error:', error);
+    logger.error('[GET /api/directory/categories-optimized/counts] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_category_counts' });
   }
 });
@@ -69,7 +70,7 @@ router.get('/gbp-counts', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories-optimized/gbp-counts] Error:', error);
+    logger.error('[GET /api/directory/categories-optimized/gbp-counts] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_platform_directory_category_counts' });
   }
 });
@@ -101,7 +102,7 @@ router.get('/featured', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories-optimized/featured] Error:', error);
+    logger.error('[GET /api/directory/categories-optimized/featured] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_featured_categories' });
   }
 });
@@ -137,7 +138,7 @@ router.get('/:categoryId/summary', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories-optimized/:categoryId/summary] Error:', error);
+    logger.error('[GET /api/directory/categories-optimized/:categoryId/summary] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_category_summary' });
   }
 });
@@ -162,7 +163,7 @@ router.get('/stats', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories-optimized/stats] Error:', error);
+    logger.error('[GET /api/directory/categories-optimized/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_directory_stats' });
   }
 });
@@ -223,7 +224,7 @@ router.get('/counts-by-name', async (req: Request, res: Response) => {
     });
     
   } catch (error) {
-    console.error('[GET /api/directory/categories-optimized/counts-by-name] Error:', error);
+    logger.error('[GET /api/directory/categories-optimized/counts-by-name] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_category_counts_by_name' });
   }
 });

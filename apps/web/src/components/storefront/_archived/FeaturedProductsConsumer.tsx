@@ -5,6 +5,7 @@ import { useProduct } from '@/providers/ProductProvider';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
 import { storefrontService } from '@/services/StorefrontService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Featured type configuration (matches producer)
 const featuredTypeConfig = {
@@ -84,7 +85,7 @@ export default function FeaturedProductsSection({
 
         setFeaturedProducts(filteredProducts);
       } catch (err) {
-        console.error('Failed to load featured products:', err);
+        clientLogger.error('Failed to load featured products:', { detail: err });
         setFeaturedProducts([]);
       }
     };

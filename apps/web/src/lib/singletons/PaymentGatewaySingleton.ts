@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface PaymentGateway {
   id: string;
@@ -103,7 +104,7 @@ class PaymentGatewaySingleton extends PublicApiSingleton {
       return gateways;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`PaymentGatewaySingleton: Error fetching gateways:`, error);
+      clientLogger.error(`PaymentGatewaySingleton: Error fetching gateways:`, { detail: error });
       
       this.setState({
         loading: false,

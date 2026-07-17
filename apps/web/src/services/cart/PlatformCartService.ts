@@ -50,7 +50,7 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
         this.carts = new Map(Object.entries(data.carts || {}));
       }
     } catch (error) {
-      console.error('Error loading carts from storage:', error);
+      clientLogger.error('Error loading carts from storage:', { detail: error });
     }
   }
 
@@ -62,7 +62,7 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
       };
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
     } catch (error) {
-      console.error('Error saving carts to storage:', error);
+      clientLogger.error('Error saving carts to storage:', { detail: error });
     }
   }
 
@@ -82,7 +82,7 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
         `cart-add-${shopId}-${productId}`
       );
     } catch (error) {
-      console.warn('Failed to sync cart with server, using local fallback:', error);
+      clientLogger.warn('Failed to sync cart with server, using local fallback:', { detail: error });
     }
 
     // Local storage fallback
@@ -364,6 +364,7 @@ export const cartService = PlatformCartService.getInstance();
 
 // React hook for cart functionality
 import { useState, useEffect } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export function usePlatformCart(shopId?: string) {
   const [cart, setCart] = useState<ShopCart | PlatformCart | null>(null);
@@ -381,7 +382,7 @@ export function usePlatformCart(shopId?: string) {
           setCart(platformCart);
         }
       } catch (error) {
-        console.error('Error loading cart:', error);
+        clientLogger.error('Error loading cart:', { detail: error });
       } finally {
         setLoading(false);
       }

@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Language {
   code: string;
@@ -108,7 +109,7 @@ class InternationalizationService extends PublicApiSingleton {
    */
   async setLanguage(languageCode: string): Promise<void> {
     if (!this.isLanguageSupported(languageCode)) {
-      console.warn(`[InternationalizationService] Language ${languageCode} is not supported`);
+      clientLogger.warn(`[InternationalizationService] Language ${languageCode} is not supported`);
       return;
     }
 
@@ -199,7 +200,7 @@ class InternationalizationService extends PublicApiSingleton {
         currency: currency
       }).format(amount);
     } catch (error) {
-      console.warn(`[InternationalizationService] Failed to format currency for ${lang}`, error);
+      clientLogger.warn(`[InternationalizationService] Failed to format currency for ${lang}`, { detail: error });
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: currency
@@ -220,7 +221,7 @@ class InternationalizationService extends PublicApiSingleton {
     try {
       return new Intl.NumberFormat(lang, options).format(number);
     } catch (error) {
-      console.warn(`[InternationalizationService] Failed to format number for ${lang}`, error);
+      clientLogger.warn(`[InternationalizationService] Failed to format number for ${lang}`, { detail: error });
       return new Intl.NumberFormat('en-US', options).format(number);
     }
   }
@@ -239,7 +240,7 @@ class InternationalizationService extends PublicApiSingleton {
     try {
       return new Intl.DateTimeFormat(lang, options).format(dateObj);
     } catch (error) {
-      console.warn(`[InternationalizationService] Failed to format date for ${lang}`, error);
+      clientLogger.warn(`[InternationalizationService] Failed to format date for ${lang}`, { detail: error });
       return new Intl.DateTimeFormat('en-US', options).format(dateObj);
     }
   }
@@ -261,7 +262,7 @@ class InternationalizationService extends PublicApiSingleton {
       
       return rtf.format(diffDays, 'day');
     } catch (error) {
-      console.warn(`[InternationalizationService] Failed to format relative time for ${lang}`, error);
+      clientLogger.warn(`[InternationalizationService] Failed to format relative time for ${lang}`, { detail: error });
       return dateObj.toLocaleDateString();
     }
   }
@@ -294,7 +295,7 @@ class InternationalizationService extends PublicApiSingleton {
       );
 
       if (!response.success) {
-        console.error(`[InternationalizationService] Failed to load translations for ${languageCode}:`, response.error);
+        clientLogger.error(`[InternationalizationService] Failed to load translations for ${languageCode}:`, { detail: response.error });
         return this.getDefaultTranslations();
       }
 
@@ -303,7 +304,7 @@ class InternationalizationService extends PublicApiSingleton {
       
       return translations;
     } catch (error) {
-      console.error(`[InternationalizationService] Error loading translations for ${languageCode}:`, error);
+      clientLogger.error(`[InternationalizationService] Error loading translations for ${languageCode}:`, { detail: error });
       return this.getDefaultTranslations();
     }
   }

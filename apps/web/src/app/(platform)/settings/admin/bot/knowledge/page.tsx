@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Select, Modal } from '@/components/ui';
 import { botPlatformAdminService, type BotKnowledgeStatus } from '@/services/bot/BotPlatformAdminService';
 import AdminBotPageShell from '@/components/bot/AdminBotPageShell';
+import { clientLogger } from '@/lib/client-logger';
 
 export default function BotKnowledgePage() {
   const [tenants, setTenants] = useState<BotKnowledgeStatus[]>([]);
@@ -22,7 +23,7 @@ export default function BotKnowledgePage() {
       setTenants(result.data || []);
       setTotal(result.total);
     } catch (err) {
-      console.error('[Bot Knowledge] Load error:', err);
+      clientLogger.error('[Bot Knowledge] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -38,7 +39,7 @@ export default function BotKnowledgePage() {
       setRefreshModal(null);
       await load();
     } catch (err) {
-      console.error('[Bot Knowledge] Refresh error:', err);
+      clientLogger.error('[Bot Knowledge] Refresh error:', { detail: err });
     } finally {
       setRefreshing(null);
     }

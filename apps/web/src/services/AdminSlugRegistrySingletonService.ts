@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface SlugRegistryEntry {
   id: string;
@@ -107,7 +108,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to get entries:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to get entries:', { detail: result.error });
       return null;
     }
 
@@ -134,7 +135,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to get entry:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to get entry:', { detail: result.error });
       return null;
     }
 
@@ -152,7 +153,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to parse slug:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to parse slug:', { detail: result.error });
       return null;
     }
 
@@ -178,7 +179,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to compare products:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to compare products:', { detail: result.error });
       return null;
     }
 
@@ -198,7 +199,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to regenerate slug:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to regenerate slug:', { detail: result.error });
       return null;
     }
 
@@ -222,7 +223,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to update entry:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to update entry:', { detail: result.error });
       return null;
     }
 
@@ -255,7 +256,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to bulk migrate:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to bulk migrate:', { detail: result.error });
       return null;
     }
 
@@ -277,7 +278,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to get stats:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to get stats:', { detail: result.error });
       return null;
     }
 
@@ -298,7 +299,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to deactivate slug:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to deactivate slug:', { detail: result.error });
       return false;
     }
 
@@ -320,7 +321,7 @@ class AdminSlugRegistrySingletonService extends AdminApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[AdminSlugRegistry] Failed to activate slug:', result.error);
+      clientLogger.error('[AdminSlugRegistry] Failed to activate slug:', { detail: result.error });
       return false;
     }
 

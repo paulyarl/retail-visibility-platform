@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface CloverIntegrationData {
   enabled: boolean;
@@ -58,7 +59,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CloverIntegrationSingleton] Failed to get Clover status:', result.error);
+      clientLogger.error('[CloverIntegrationSingleton] Failed to get Clover status:', { detail: result.error });
       return null;
     }
 
@@ -80,7 +81,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CloverIntegrationSingleton] Failed to get Clover OAuth authorize:', result.error);
+      clientLogger.error('[CloverIntegrationSingleton] Failed to get Clover OAuth authorize:', { detail: result.error });
       return null;
     }
 
@@ -102,7 +103,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CloverIntegrationSingleton] Failed to enable Clover demo:', result.error);
+      clientLogger.error('[CloverIntegrationSingleton] Failed to enable Clover demo:', { detail: result.error });
       throw result.error;
     }
 
@@ -125,7 +126,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CloverIntegrationSingleton] Failed to disable Clover demo:', result.error);
+      clientLogger.error('[CloverIntegrationSingleton] Failed to disable Clover demo:', { detail: result.error });
       throw result.error;
     }
 
@@ -148,7 +149,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CloverIntegrationSingleton] Failed to disconnect Clover:', result.error);
+      clientLogger.error('[CloverIntegrationSingleton] Failed to disconnect Clover:', { detail: result.error });
       throw result.error;
     }
 
@@ -171,7 +172,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[CloverIntegrationSingleton] Failed to sync Clover:', result.error);
+      clientLogger.error('[CloverIntegrationSingleton] Failed to sync Clover:', { detail: result.error });
       throw result.error;
     }
 

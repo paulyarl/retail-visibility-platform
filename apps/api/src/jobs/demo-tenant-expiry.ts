@@ -6,6 +6,7 @@
  */
 
 import demoTenantService from '../services/DemoTenantService';
+import { logger } from '../logger';
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 let intervalId: NodeJS.Timeout | null = null;
@@ -27,11 +28,11 @@ async function runExpiryCheck(): Promise<void> {
           console.warn(`[Demo Expiry Job] Could not expire ${tenant.id}: ${result.reason}`);
         }
       } catch (error) {
-        console.error(`[Demo Expiry Job] Error expiring ${tenant.id}:`, error);
+        logger.error(`[Demo Expiry Job] Error expiring ${tenant.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       }
     }
   } catch (error) {
-    console.error('[Demo Expiry Job] Error running expiry check:', error);
+    logger.error('[Demo Expiry Job] Error running expiry check:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   }
 }
 
@@ -45,12 +46,12 @@ export function startDemoExpiryJob(): void {
 
   // Run immediately on startup
   runExpiryCheck().catch(err =>
-    console.error('[Demo Expiry Job] Initial run failed:', err)
+    logger.error('[Demo Expiry Job] Initial run failed:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } })
   );
 
   intervalId = setInterval(() => {
     runExpiryCheck().catch(err =>
-      console.error('[Demo Expiry Job] Scheduled run failed:', err)
+      logger.error('[Demo Expiry Job] Scheduled run failed:', undefined, { error: { name: (err as any)?.name || 'Error', message: (err as any)?.message || String(err), stack: (err as any)?.stack } })
     );
   }, CHECK_INTERVAL_MS);
 }

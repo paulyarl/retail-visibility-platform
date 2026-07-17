@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.post('/subdomain-usage', async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true });
   } catch (error: any) {
-    console.error('[Analytics] Error logging subdomain usage:', error);
+    logger.error('[Analytics] Error logging subdomain usage:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to log analytics' });
   }
 });
@@ -97,7 +98,7 @@ router.get('/subdomain-stats', async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    console.error('[Analytics] Error getting subdomain stats:', error);
+    logger.error('[Analytics] Error getting subdomain stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to get stats' });
   }
 });

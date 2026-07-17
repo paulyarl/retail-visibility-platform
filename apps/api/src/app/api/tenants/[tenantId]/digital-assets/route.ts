@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { generateDigitalAssetId } from '../../../../../lib/id-generator';
+import { logger } from '../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -120,7 +121,7 @@ export async function POST(
       data: transformAsset(asset),
     });
   } catch (error) {
-    console.error('Error creating digital asset:', error);
+    logger.error('Error creating digital asset:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to create digital asset' },
       { status: 500 }

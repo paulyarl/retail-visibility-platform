@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { recordDownload, generateOrRetrieveLicenseKey } from '../../../../../../services/downloads/DownloadAccessService';
+import { logger } from '../../../../../../logger';
 
 /**
  * POST /api/downloads/[tenantId]/[slug]/download
@@ -113,7 +114,7 @@ export async function POST(
       { status: 400 }
     );
   } catch (error) {
-    console.error('Error processing download:', error);
+    logger.error('Error processing download:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Download processing failed' },
       { status: 500 }

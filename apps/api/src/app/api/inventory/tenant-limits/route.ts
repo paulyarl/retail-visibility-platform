@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { logger } from '../../../../logger';
 
 /**
  * GET /api/inventory/tenant-limits
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error fetching tenant limits:', error);
+    logger.error('Error fetching tenant limits:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     
     return NextResponse.json({
       success: false,

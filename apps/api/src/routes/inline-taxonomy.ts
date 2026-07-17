@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth';
 import { prisma } from '../prisma';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get('/api/admin/taxonomy/status', requireAdmin, async (req, res) => {
       lastChecked: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[Taxonomy Status] Error:', error);
+    logger.error('[Taxonomy Status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to check taxonomy status' });
   }
 });
@@ -56,7 +57,7 @@ router.post('/api/admin/taxonomy/sync', requireAdmin, async (req, res) => {
       flaggedItems: itemMigration.flagged
     });
   } catch (error) {
-    console.error('[Taxonomy Sync] Error:', error);
+    logger.error('[Taxonomy Sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Taxonomy sync failed' });
   }
 });

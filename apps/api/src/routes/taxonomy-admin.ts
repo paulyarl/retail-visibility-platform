@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { GOOGLE_PRODUCT_TAXONOMY, CategoryNode } from '../lib/google/taxonomy';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[GET /admin/taxonomy] Error:', error);
+    logger.error('[GET /admin/taxonomy] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_get_taxonomy' });
   }
 });
@@ -114,7 +115,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[GET /admin/taxonomy/:id] Error:', error);
+    logger.error('[GET /admin/taxonomy/:id] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_get_taxonomy_category' });
   }
 });
@@ -151,7 +152,7 @@ async function upsertInBatches(items: any[], batchSize = 200) {
       );
       console.log(`[upsertInBatches] Batch ${Math.floor(i/batchSize) + 1} completed successfully`);
     } catch (error) {
-      console.error(`[upsertInBatches] Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
+      logger.error(`[upsertInBatches] Batch ${Math.floor(i/batchSize) + 1} failed:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -188,7 +189,7 @@ router.post('/sync', async (_req, res) => {
       flagged_items: 0,
     });
   } catch (error) {
-    console.error('[POST /admin/taxonomy/sync] Error:', error);
+    logger.error('[POST /admin/taxonomy/sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'failed_to_sync_taxonomy' });
   }
 });

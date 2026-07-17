@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import CategorySelectorMulti, { CategoryOption } from '@/components/shared/CategorySelectorMulti';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
 import { gbpCategoryService } from '@/services/GBPCategoryService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface SelectedCategory {
   id: string;
@@ -52,7 +53,7 @@ export default function GBPCategorySelectorAdapter({
           path: cat.path,
         })));
       } catch (error) {
-        console.error('[GBPCategorySelector] Failed to load GBP categories:', error);
+        clientLogger.error('[GBPCategorySelector] Failed to load GBP categories:', { detail: error });
       } finally {
         setLoadingGbp(false);
       }
@@ -142,7 +143,7 @@ export default function GBPCategorySelectorAdapter({
       
       return Array.from(resultMap.values()).slice(0, 20);
     } catch (error) {
-      console.error('[GBPCategorySelector] Search error:', error);
+      clientLogger.error('[GBPCategorySelector] Search error:', { detail: error });
     }
     
     return localResults.slice(0, 20);

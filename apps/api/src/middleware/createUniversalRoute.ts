@@ -8,6 +8,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { resolveUniversalIdentifier, createIdentifierResolver } from './universalIdentifierResolver';
 import { ResolvedTenant } from '../services/UniversalIdentifierCache';
+import { logger } from '../logger';
 
 export interface UniversalRouteOptions {
   /**
@@ -162,7 +163,7 @@ export function createUniversalRoute(options: UniversalRouteOptions): Router {
         }
 
       } catch (error) {
-        console.error(`[Universal Route] Error in ${method.toUpperCase()} ${path}:`, error);
+        logger.error(`[Universal Route] Error in ${method.toUpperCase()} ${path}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         
         if (!res.headersSent) {
           res.status(500).json({
@@ -353,7 +354,7 @@ export function createBatchTestRoute(): Router {
         timestamp: Date.now()
       });
     } catch (error) {
-      console.error('[Batch Test] Error:', error);
+      logger.error('[Batch Test] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       next(error);
     }
   });

@@ -134,11 +134,27 @@ function ChartIcon() {
   );
 }
 
+function FilterIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-6 8v6l-6 2v-8L3 4z" />
+    </svg>
+  );
+}
+
 function MapPinIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+function MapIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
     </svg>
   );
 }
@@ -157,9 +173,11 @@ const IconComponents = {
   bell: BellIcon,
   featured: FeaturedIcon,
   'map-pin': MapPinIcon,
+  map: MapIcon,
   tags: TagsIcon,
   store: StoreIcon,
   chart: ChartIcon,
+  filter: FilterIcon,
 };
 
 // Convert icon string to React component
@@ -170,6 +188,7 @@ function getIconComponent(iconName: string): React.ReactNode {
 
 // Re-export types for compatibility
 export type { SidebarTarget, BadgeVariant, NavLink } from '@/services/NavigationLinksService';
+import { clientLogger } from '@/lib/client-logger';
 
 // ─── Shared in-memory cache (one fetch per browser session) ───────────────────
 
@@ -311,7 +330,7 @@ export function useNavLinks(): UseNavLinksResult {
         hasLoadedRef.current = true;
       })
       .catch(err => {
-        console.error('[useNavLinks]', err);
+        clientLogger.error('[useNavLinks]', { detail: err });
         setError(err.message);
         setLoading(false);
       });

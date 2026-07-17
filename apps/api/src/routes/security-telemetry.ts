@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -74,7 +75,7 @@ router.post('/rate_limit_exceeded', async (req: Request, res: Response) => {
           processedEvents.push({ ...event, alertCreated: false, reason: 'duplicate' });
         }
       } catch (error) {
-        console.error('[Security Telemetry] Error processing rate limit event:', error);
+        logger.error('[Security Telemetry] Error processing rate limit event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         processedEvents.push({ ...event, alertCreated: false, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
@@ -93,7 +94,7 @@ router.post('/rate_limit_exceeded', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Security Telemetry] Error processing rate limit batch:', error);
+    logger.error('[Security Telemetry] Error processing rate limit batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to process security telemetry' });
   }
 });
@@ -145,7 +146,7 @@ router.post('/auth_failure', async (req: Request, res: Response) => {
 
         processedEvents.push({ ...event, alertCreated: true });
       } catch (error) {
-        console.error('[Security Telemetry] Error processing auth failure event:', error);
+        logger.error('[Security Telemetry] Error processing auth failure event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         processedEvents.push({ ...event, alertCreated: false, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
@@ -162,7 +163,7 @@ router.post('/auth_failure', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Security Telemetry] Error processing auth failure batch:', error);
+    logger.error('[Security Telemetry] Error processing auth failure batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to process security telemetry' });
   }
 });
@@ -214,7 +215,7 @@ router.post('/suspicious_activity', async (req: Request, res: Response) => {
 
         processedEvents.push({ ...event, alertCreated: true });
       } catch (error) {
-        console.error('[Security Telemetry] Error processing suspicious activity event:', error);
+        logger.error('[Security Telemetry] Error processing suspicious activity event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         processedEvents.push({ ...event, alertCreated: false, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
@@ -231,7 +232,7 @@ router.post('/suspicious_activity', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Security Telemetry] Error processing suspicious activity batch:', error);
+    logger.error('[Security Telemetry] Error processing suspicious activity batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to process security telemetry' });
   }
 });
@@ -283,7 +284,7 @@ router.post('/security_incident', async (req: Request, res: Response) => {
 
         processedEvents.push({ ...event, alertCreated: true });
       } catch (error) {
-        console.error('[Security Telemetry] Error processing security incident event:', error);
+        logger.error('[Security Telemetry] Error processing security incident event:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         processedEvents.push({ ...event, alertCreated: false, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
@@ -300,7 +301,7 @@ router.post('/security_incident', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Security Telemetry] Error processing security incident batch:', error);
+    logger.error('[Security Telemetry] Error processing security incident batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to process security telemetry' });
   }
 });
@@ -362,7 +363,7 @@ router.get('/metrics', authenticateToken, requireAdmin, async (req: Request, res
     });
 
   } catch (error) {
-    console.error('[Security Telemetry] Error getting metrics:', error);
+    logger.error('[Security Telemetry] Error getting metrics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to get telemetry metrics' });
   }
 });
@@ -487,7 +488,7 @@ router.post('/batch', async (req: Request, res: Response) => {
             results[eventType] = { success: false, error: 'Unknown event type' };
         }
       } catch (error) {
-        console.error(`[Security Telemetry] Error processing ${eventType} batch:`, error);
+        logger.error(`[Security Telemetry] Error processing ${eventType} batch:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results[eventType] = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
       }
     }
@@ -511,7 +512,7 @@ router.post('/batch', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[Security Telemetry] Error processing mixed batch:', error);
+    logger.error('[Security Telemetry] Error processing mixed batch:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'Failed to process security telemetry batch' });
   }
 });

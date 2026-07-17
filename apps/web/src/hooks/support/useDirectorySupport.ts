@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { directorySupportService } from '@/services/DirectorySupportSingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface DirectoryStatus {
   tenant: {
@@ -57,10 +58,26 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const status = await directorySupportService.getDirectoryStatus(tenantId);
-      return status;
+      const raw = await directorySupportService.getDirectoryStatus(tenantId) as any;
+      if (!raw) return null;
+      return {
+        ...raw,
+        tenant: {
+          ...raw.tenant,
+          subscriptionTier: raw.tenant?.subscription_tier,
+          subscriptionStatus: raw.tenant?.subscription_status,
+        },
+        settings: {
+          ...raw.settings,
+          isPublished: raw.settings?.is_published ?? false,
+          isFeatured: raw.settings?.is_featured ?? false,
+        },
+        profile: raw.profile
+          ? { ...raw.profile, businessName: raw.profile.business_name }
+          : null,
+      };
     } catch (error) {
-      console.error('Failed to get directory status:', error);
+      clientLogger.error('Failed to get directory status:', { detail: error });
       setError('Failed to get directory status');
       return null;
     } finally {
@@ -76,7 +93,7 @@ export function useDirectorySupport() {
       const qualityCheck = await directorySupportService.getDirectoryQualityCheck(tenantId);
       return qualityCheck;
     } catch (err) {
-      console.error('Error checking quality:', err);
+      clientLogger.error('Error checking quality:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to check quality');
       return null;
     } finally {
@@ -89,10 +106,16 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const notes = await directorySupportService.getDirectoryNotes(tenantId);
-      return notes || [];
+      const raw = await directorySupportService.getDirectoryNotes(tenantId) as any;
+      if (!raw) return [];
+      const notes = Array.isArray(raw) ? raw : (raw.notes || []);
+      return notes.map((n: any) => ({
+        ...n,
+        createdAt: n.created_at || n.createdAt,
+        createdBy: n.created_by || n.createdBy,
+      }));
     } catch (err) {
-      console.error('Error fetching notes:', err);
+      clientLogger.error('Error fetching notes:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to load notes');
       return [];
     } finally {
@@ -108,7 +131,7 @@ export function useDirectorySupport() {
       const result = await directorySupportService.addDirectoryNote(tenantId, note);
       return !!result;
     } catch (err) {
-      console.error('Error adding note:', err);
+      clientLogger.error('Error adding note:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to add note');
       return false;
     } finally {
@@ -121,10 +144,28 @@ export function useDirectorySupport() {
       setLoading(true);
       setError(null);
 
-      const data = await directorySupportService.searchDirectory(query);
-      return data?.tenants || [];
+      const response = await directorySupportService.searchDirectory(query);
+      const tenants = response?.data?.tenants || response?.tenants || [];
+      return tenants.map((t: any) => ({
+        ...t,
+        subscriptionTier: t.subscription_tier,
+        subscriptionStatus: t.subscription_status,
+        businessProfile: t.tenant_business_profiles_list
+          ? {
+              ...t.tenant_business_profiles_list,
+              businessName: t.tenant_business_profiles_list.business_name,
+            }
+          : undefined,
+        directorySettings: t.directory_settings_list
+          ? {
+              ...t.directory_settings_list,
+              isPublished: t.directory_settings_list.is_published,
+              isFeatured: t.directory_settings_list.is_featured,
+            }
+          : undefined,
+      }));
     } catch (err) {
-      console.error('Error searching tenants:', err);
+      clientLogger.error('Error searching tenants:', { detail: err });
       setError(err instanceof Error ? err.message : 'Failed to search');
       return [];
     } finally {

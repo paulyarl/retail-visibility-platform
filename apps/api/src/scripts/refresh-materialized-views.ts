@@ -5,6 +5,7 @@
  */
 
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 async function refreshMaterializedViews() {
   const pool = getDirectPool();
@@ -50,7 +51,7 @@ async function refreshMaterializedViews() {
     }
     
   } catch (error) {
-    console.error('Fatal error during refresh:', error);
+    logger.error('Fatal error during refresh:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
   } finally {
     await pool.end();
   }
@@ -64,7 +65,7 @@ if (require.main === module) {
       process.exit(0);
     })
     .catch((error) => {
-      console.error('❌ Refresh failed:', error);
+      logger.error('❌ Refresh failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       process.exit(1);
     });
 }

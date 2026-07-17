@@ -3,6 +3,7 @@
 
 import { platformHomeService } from '../services/PlatformHomeSingletonService';
 import { tenantInfoService } from '../services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 // Test services
 const testServices = [
@@ -40,7 +41,7 @@ export async function runCacheInvalidationTest() {
       });
       
     } catch (error) {
-      console.error(`    ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+      clientLogger.error(`    ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
       results.push({
         test: 'Service Contracts',
         service: test.name,
@@ -73,7 +74,7 @@ export async function runCacheInvalidationTest() {
       });
       
     } catch (error) {
-      console.error(`    ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+      clientLogger.error(`    ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
       results.push({
         test: 'Cache Invalidation',
         service: test.name,

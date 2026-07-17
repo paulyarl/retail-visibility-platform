@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react';
 import { useStorePublish } from '@/providers/data/StorePublishProvider';
 import { PublishedStore, DirectoryCategory, StorePublishOptions } from '@/providers/data/StorePublishSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 interface StoreDirectorySectionProps {
   title?: string;
@@ -74,7 +75,7 @@ export default function StoreDirectorySection({
 
         setDisplayStores(storeData);
       } catch (error) {
-        console.error('Failed to load store data:', error);
+        clientLogger.error('Failed to load store data:', { detail: error });
       }
     };
 

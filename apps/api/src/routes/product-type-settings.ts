@@ -8,6 +8,7 @@ import ProductTypeService, { ProductType } from '../services/ProductTypeService'
 import { invalidateEffectiveCapabilities, resolveEffectiveCapabilities } from '../services/EffectiveCapabilityResolver';
 import { validateProposedChange } from '../services/resolvers';
 import { generateProductTypeSettingsId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ router.get('/:tenantId/product-type', authenticateToken, async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching product type settings:', error);
+    logger.error('Error fetching product type settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -219,7 +220,7 @@ router.put('/:tenantId/product-type', authenticateToken, requireTenantAdmin, req
       },
     });
   } catch (error) {
-    console.error('Error updating product type settings:', error);
+    logger.error('Error updating product type settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -240,7 +241,7 @@ router.get('/:tenantId/product-type/capability', authenticateToken, async (req, 
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving product type capability:', error);
+    logger.error('Error resolving product type capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -310,7 +311,7 @@ router.get('/public/tenant/:tenantId/product-type', async (req, res) => {
       tierState,
     });
   } catch (error) {
-    console.error('Error fetching public product type settings:', error);
+    logger.error('Error fetching public product type settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -336,7 +337,7 @@ router.get('/public/tenant/:tenantId/product-type/capability', async (req, res) 
       capability: state,
     });
   } catch (error) {
-    console.error('Error resolving public product type capability:', error);
+    logger.error('Error resolving public product type capability:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

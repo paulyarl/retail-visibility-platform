@@ -7,6 +7,7 @@ import { useCartWidget } from '@/contexts/CartWidgetContext';
 import { Button } from '@mantine/core';
 import { ShoppingCart, X, Store, ArrowRight, ChevronDown, ChevronUp, Minimize2, Maximize2 } from 'lucide-react';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface TenantProfile {
   id: string;
@@ -41,7 +42,7 @@ export function FloatingCartWidget() {
             };
           }
         } catch (err) {
-          console.warn(`Failed to fetch profile for tenant ${tenantId}:`, err);
+          clientLogger.warn(`Failed to fetch profile for tenant ${tenantId}:`, { detail: err });
         }
       }
       

@@ -206,7 +206,7 @@ router.get('/variant-aware', authenticateToken, async (req: Request, res: Respon
     });
 
   } catch (error: any) {
-    logger.error('[VARIANT-AWARE PRODUCTS] Query error:', error);
+    logger.error('[VARIANT-AWARE PRODUCTS] Query error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'query_failed',
@@ -325,7 +325,7 @@ router.get('/variant-aware/:id', authenticateToken, async (req: Request, res: Re
     });
 
   } catch (error: any) {
-    logger.error('[VARIANT-AWARE PRODUCTS] Single product error:', error);
+    logger.error('[VARIANT-AWARE PRODUCTS] Single product error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'single_product_failed',
@@ -456,7 +456,7 @@ router.get('/parent/:parentId/variants', authenticateToken, async (req: Request,
     });
 
   } catch (error: any) {
-    logger.error('[VARIANT-AWARE PRODUCTS] Variants query error:', error);
+    logger.error('[VARIANT-AWARE PRODUCTS] Variants query error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'variants_query_failed',
@@ -621,7 +621,7 @@ router.get('/variant-groups', authenticateToken, async (req: Request, res: Respo
     });
 
   } catch (error: any) {
-    logger.error('[VARIANT-AWARE PRODUCTS] Variant groups error:', error);
+    logger.error('[VARIANT-AWARE PRODUCTS] Variant groups error:', undefined, { error: { name: 'Error', message: String(error) } });
     res.status(500).json({
       success: false,
       error: 'variant_groups_failed',

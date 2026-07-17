@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { featuredProductsSingleton, FeaturedProduct, FeaturedType } from '@/providers/data/FeaturedProductsSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 /**
  * Hook for getting all featured products buckets
@@ -26,7 +27,7 @@ export function useFeaturedProductsBuckets(tenantId?: string, limit: number = 20
       const bucketsData = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, limit);
       setBuckets(bucketsData);
     } catch (err) {
-      console.error('Failed to fetch featured products buckets:', err);
+      clientLogger.error('Failed to fetch featured products buckets:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setBuckets(null);
     } finally {
@@ -45,7 +46,7 @@ export function useFeaturedProductsBuckets(tenantId?: string, limit: number = 20
       await featuredProductsSingleton.refreshFeaturedProducts(tenantId, limit);
       await fetchBuckets();
     } catch (err) {
-      console.error('Failed to refresh featured products buckets:', err);
+      clientLogger.error('Failed to refresh featured products buckets:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
@@ -83,7 +84,7 @@ export function useFeaturedProductsByType(tenantId?: string, featuredType?: Feat
       const featuredProducts = await featuredProductsSingleton.getFeaturedProductsByType(tenantId, featuredType, limit);
       setProducts(featuredProducts);
     } catch (err) {
-      console.error('Failed to fetch featured products by type:', err);
+      clientLogger.error('Failed to fetch featured products by type:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setProducts([]);
     } finally {
@@ -125,7 +126,7 @@ export function useFeaturedProductsStats(tenantId?: string) {
       const bucketStats = featuredProductsSingleton.getBucketStats();
       setStats(bucketStats);
     } catch (err) {
-      console.error('Failed to fetch featured products stats:', err);
+      clientLogger.error('Failed to fetch featured products stats:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setStats({});
     } finally {
@@ -160,7 +161,7 @@ export function usePreloadFeaturedProducts(tenantId?: string, limit: number = 20
       setError(null);
       await featuredProductsSingleton.preloadTenantFeaturedProducts();
     } catch (err) {
-      console.error('Failed to preload featured products:', err);
+      clientLogger.error('Failed to preload featured products:', { detail: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);

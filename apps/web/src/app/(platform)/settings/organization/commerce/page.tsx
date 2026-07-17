@@ -9,6 +9,7 @@ import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
 import { organizationsService } from '@/services/OrganizationsSingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +80,7 @@ export default function OrganizationCommerceSettingsPage() {
           setUserRole(result.data.user.role);
         }
       } catch (error) {
-        console.error('Failed to fetch user role:', error);
+        clientLogger.error('Failed to fetch user role:', { detail: error });
       }
     };
 
@@ -154,7 +155,7 @@ export default function OrganizationCommerceSettingsPage() {
           setSettings(response);
         }
       } catch (error) {
-        console.error('Failed to fetch organization commerce settings:', error);
+        clientLogger.error('Failed to fetch organization commerce settings:', { detail: error });
         setMessage({ type: 'error', text: 'Failed to load commerce settings' });
       } finally {
         setLoading(false);
@@ -174,7 +175,7 @@ export default function OrganizationCommerceSettingsPage() {
       await organizationsService.updateOrganizationCommerceSettings(organizationId, settings);
       setMessage({ type: 'success', text: 'Commerce settings saved successfully' });
     } catch (error) {
-      console.error('Failed to save commerce settings:', error);
+      clientLogger.error('Failed to save commerce settings:', { detail: error });
       setMessage({ type: 'error', text: 'Failed to save settings' });
     } finally {
       setSaving(false);

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea } from '@/components/ui';
+import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea, Select, SearchableSelect } from '@/components/ui';
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminOperationsService, type AdminTenant, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTask, TaskStatus, TaskPriority } from '@/types/crm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { clientLogger } from '@/lib/client-logger';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -66,7 +67,7 @@ export default function CrmGlobalTasksPage() {
           return true;
         }));
       } catch (err) {
-        console.error('[CRM Global Tasks] Options load error:', err);
+        clientLogger.error('[CRM Global Tasks] Options load error:', { detail: err });
       } finally {
         setOptionsLoading(false);
       }
@@ -77,6 +78,12 @@ export default function CrmGlobalTasksPage() {
     tenants.map(t => ({ value: t.id, label: `${t.name} (${t.id})` })),
     [tenants]
   );
+
+  const tenantNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    tenants.forEach(t => map.set(t.id, t.name));
+    return map;
+  }, [tenants]);
 
   const assigneeOptions = useMemo(() =>
     staffUsers.map(u => ({ value: u.id, label: `${u.name || u.email} (${u.email})` })),
@@ -91,7 +98,7 @@ export default function CrmGlobalTasksPage() {
       });
       setTasks(result);
     } catch (err) {
-      console.error('[CRM Global Tasks] Load error:', err);
+      clientLogger.error('[CRM Global Tasks] Load error:', { detail: err });
     } finally {
       setLoading(false);
     }
@@ -118,7 +125,7 @@ export default function CrmGlobalTasksPage() {
       setNewTask(EMPTY_TASK);
       await load();
     } catch (err) {
-      console.error('[CRM Global Tasks] Create error:', err);
+      clientLogger.error('[CRM Global Tasks] Create error:', { detail: err });
     } finally {
       setCreating(false);
     }
@@ -141,7 +148,7 @@ export default function CrmGlobalTasksPage() {
       setEditTask(null);
       await load();
     } catch (err) {
-      console.error('[CRM Global Tasks] Edit error:', err);
+      clientLogger.error('[CRM Global Tasks] Edit error:', { detail: err });
     } finally {
       setEditing(false);
     }
@@ -155,7 +162,7 @@ export default function CrmGlobalTasksPage() {
       setDeleteTaskId(null);
       await load();
     } catch (err) {
-      console.error('[CRM Global Tasks] Delete error:', err);
+      clientLogger.error('[CRM Global Tasks] Delete error:', { detail: err });
     } finally {
       setDeleting(false);
     }
@@ -167,7 +174,7 @@ export default function CrmGlobalTasksPage() {
       await crmAdminService.updateTask(taskId, { status: newStatus });
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     } catch (err) {
-      console.error('[CRM Global Tasks] Status change error:', err);
+      clientLogger.error('[CRM Global Tasks] Status change error:', { detail: err });
     } finally {
       setUpdatingId(null);
     }
@@ -232,7 +239,9 @@ export default function CrmGlobalTasksPage() {
                         className="block rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium truncate flex-1">{t.title}</p>
+                          <Link href={`/settings/admin/crm/tasks/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-amber-600 hover:underline">
+                            {t.title}
+                          </Link>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => { setEditTask(t); setShowEdit(true); }}
@@ -251,8 +260,8 @@ export default function CrmGlobalTasksPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
-                          <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="text-xs text-neutral-500 hover:underline">
-                            {t.tenant_id}
+                          <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="text-xs text-neutral-500 hover:underline" title={t.tenant_id}>
+                            {tenantNameMap.get(t.tenant_id) || t.tenant_id}
                           </Link>
                           {t.priority && (
                             <Badge variant={t.priority === 'high' ? 'warning' : 'default'}>
@@ -305,22 +314,12 @@ export default function CrmGlobalTasksPage() {
                   <Spinner size="sm" /> Loading tenants...
                 </div>
               ) : (
-                <>
-                  <input
-                    type="text"
-                    required
-                    list="tenant-options"
-                    value={newTask.tenant_id}
-                    onChange={(e) => setNewTask(prev => ({ ...prev, tenant_id: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    placeholder="Search and select a tenant..."
-                  />
-                  <datalist id="tenant-options">
-                    {tenantOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </datalist>
-                </>
+                <SearchableSelect
+                  options={tenantOptions}
+                  value={newTask.tenant_id}
+                  onChange={(val) => setNewTask(prev => ({ ...prev, tenant_id: val }))}
+                  placeholder="Search and select a tenant..."
+                />
               )}
             </div>
             <div>
@@ -367,20 +366,12 @@ export default function CrmGlobalTasksPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
-              <input
-                type="text"
-                list="assignee-options"
+              <Select
                 value={newTask.assigned_to}
                 onChange={(e) => setNewTask(prev => ({ ...prev, assigned_to: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="Select staff user or type email for external assignee..."
+                options={[{ value: '', label: '— Unassigned —' }, ...assigneeOptions]}
+                disabled={optionsLoading}
               />
-              <datalist id="assignee-options">
-                {assigneeOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </datalist>
-              <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
@@ -452,20 +443,12 @@ export default function CrmGlobalTasksPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
-                <input
-                  type="text"
-                  list="assignee-options-edit"
+                <Select
                   value={editTask.assigned_to || ''}
                   onChange={(e) => setEditTask(prev => prev ? { ...prev, assigned_to: e.target.value || null } : null)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                  placeholder="Select staff user or type email for external assignee..."
+                  options={[{ value: '', label: '— Unassigned —' }, ...assigneeOptions]}
+                  disabled={optionsLoading}
                 />
-                <datalist id="assignee-options-edit">
-                  {assigneeOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </datalist>
-                <p className="text-xs text-neutral-400 mt-1">Select a platform staff user, or type an email address for an external assignee.</p>
               </div>
             </div>
             <ModalFooter>

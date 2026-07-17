@@ -11,6 +11,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireWritableSubscription } from '../middleware/tier-access';
 import { generateItemId, generateTenantItemId, generateProductCatId, generateQsCatId } from '../lib/id-generator';
 import { generateAutoSKU } from '../lib/sku-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -175,7 +176,7 @@ router.post('/product', authenticateToken, requireWritableSubscription, async (r
     });
 
   } catch (error: any) {
-    console.error('[Clone Product] Error:', error);
+    logger.error('[Clone Product] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -279,7 +280,7 @@ router.post('/category', authenticateToken, requireWritableSubscription, async (
     });
 
   } catch (error: any) {
-    console.error('[Clone Category] Error:', error);
+    logger.error('[Clone Category] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'internal_error',

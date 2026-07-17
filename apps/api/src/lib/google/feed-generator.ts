@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../prisma';
+import { logger } from '../../logger';
 
 export interface FeedItem {
   id: string;
@@ -77,7 +78,7 @@ export async function generateProductFeed(tenant_id: string): Promise<FeedItem[]
       } as FeedItem;
     });
   } catch (error) {
-    console.error('[Feed Generator] Error:', error);
+    logger.error('[Feed Generator] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }

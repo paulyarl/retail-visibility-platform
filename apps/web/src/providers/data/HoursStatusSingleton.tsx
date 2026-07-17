@@ -1,6 +1,7 @@
 import { PublicApiSingleton } from '../base/PublicApiSingleton';
 import { SingletonCacheOptions } from '../base/FlexibleApiSingleton';
 import { hoursStatusService } from '@/services/HoursStatusService';
+import { clientLogger } from '@/lib/client-logger';
 
 // TypeScript interfaces for hours status
 export interface StoreStatus {
@@ -40,7 +41,7 @@ class HoursStatusSingleton extends PublicApiSingleton {
    
   
   private handlePublicError(error: any): void {
-    console.error('Public API error:', error);
+    clientLogger.error('Public API error:', { detail: error });
   }
   
   // ====================
@@ -105,7 +106,7 @@ class HoursStatusSingleton extends PublicApiSingleton {
           results.set(tenantId, status);
         }
       } catch (error) {
-        console.error(`Failed to fetch hours status for ${tenantId}:`, error);
+        clientLogger.error(`Failed to fetch hours status for ${tenantId}:`, { detail: error });
         // Continue with other requests even if one fails
       }
     });
@@ -153,7 +154,7 @@ class HoursStatusSingleton extends PublicApiSingleton {
     try {
       await this.getMultipleStoreStatus(tenantIds);
     } catch (error) {
-      console.error('Failed to preload featured stores status:', error);
+      clientLogger.error('Failed to preload featured stores status:', { detail: error });
       // Don't throw error - preload failures shouldn't break the app
     }
   }

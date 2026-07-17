@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { generateDownloadPageId } from '../../../../../lib/id-generator';
+import { logger } from '../../../../../logger';
 
 const prisma = new PrismaClient();
 
@@ -83,7 +84,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching download pages:', error);
+    logger.error('Error fetching download pages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to fetch download pages' },
       { status: 500 }
@@ -256,7 +257,7 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error('Error creating download page:', error);
+    logger.error('Error creating download page:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return NextResponse.json(
       { success: false, error: 'Failed to create download page' },
       { status: 500 }

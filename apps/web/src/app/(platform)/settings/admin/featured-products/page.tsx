@@ -12,6 +12,7 @@ import AdminFeaturedApprovalService, { PendingTenant, PendingProduct } from '@/s
 import { notifications } from '@mantine/notifications';
 import { useToast } from '@/components/ui/use-toast';
 import { ToastContainer } from '@/components/ui';
+import { clientLogger } from '@/lib/client-logger';
 
 interface FeaturedProduct {
   featured_product_id: string;
@@ -182,7 +183,7 @@ export default function FeaturedProductsManagement() {
       const tenants = [...new Map(allProducts.map((p: any) => [p.tenants.id, p.tenants])).values()];
       setUniqueTenants(tenants);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      clientLogger.error('Error fetching data:', { detail: error });
     } finally {
       setLoading(false);
     }
@@ -193,7 +194,7 @@ export default function FeaturedProductsManagement() {
       const allProducts = await AdminFeaturedApprovalService.getAllFeaturedProducts();
       setPendingProducts(allProducts);
     } catch (error) {
-      console.error('Error fetching all featured products:', error);
+      clientLogger.error('Error fetching all featured products:', { detail: error });
       setPendingProducts([]);
     }
   };
@@ -218,7 +219,7 @@ export default function FeaturedProductsManagement() {
       setPendingTenants(allTenants);
       setPendingTotal(allTenants.length);
     } catch (error) {
-      console.error('Error fetching tenants with featured access status:', error);
+      clientLogger.error('Error fetching tenants with featured access status:', { detail: error });
     }
   };
 
@@ -350,7 +351,7 @@ export default function FeaturedProductsManagement() {
       // Show success notification
       toast('🗑️ Product has been removed from featuring!', { variant: 'info' });
     } catch (error) {
-      console.error('Error unfeaturing product:', error);
+      clientLogger.error('Error unfeaturing product:', { detail: error });
       notifications.show({
         title: 'Unfeature Failed',
         message: 'Failed to unfeature product. Please try again.',
@@ -366,7 +367,7 @@ export default function FeaturedProductsManagement() {
       await fetchData();
       setUpdatingPriority(null);
     } catch (error) {
-      console.error('Error updating priority:', error);
+      clientLogger.error('Error updating priority:', { detail: error });
       alert('Failed to update priority');
     }
   };
@@ -405,7 +406,7 @@ export default function FeaturedProductsManagement() {
         toast('✅ Product has been approved for featuring!', { variant: 'success' });
       }
     } catch (error) {
-      console.error('Error approving product:', error);
+      clientLogger.error('Error approving product:', { detail: error });
       notifications.show({
         title: 'Approval Failed',
         message: 'Failed to approve product. Please try again.',
@@ -444,7 +445,7 @@ export default function FeaturedProductsManagement() {
         // No updated product returned from service
       }
     } catch (error) {
-      console.error('Error rejecting product:', error);
+      clientLogger.error('Error rejecting product:', { detail: error });
       notifications.show({
         title: 'Rejection Failed',
         message: 'Failed to reject product. Please try again.',
@@ -485,7 +486,7 @@ export default function FeaturedProductsManagement() {
         toast('Failed to approve tenant', { variant: 'error' });
       }
     } catch (error) {
-      console.error('Error approving tenant:', error);
+      clientLogger.error('Error approving tenant:', { detail: error });
       notifications.show({
         title: 'Approval Failed',
         message: 'Failed to approve tenant. Please try again.',
@@ -511,7 +512,7 @@ export default function FeaturedProductsManagement() {
         toast(`❌ ${updatedTenant.name} has been rejected${reason ? ` (${reason})` : ''}!`, { variant: 'error' });
       }
     } catch (error) {
-      console.error('Error rejecting tenant:', error);
+      clientLogger.error('Error rejecting tenant:', { detail: error });
       notifications.show({
         title: 'Rejection Failed',
         message: 'Failed to reject tenant. Please try again.',
@@ -569,7 +570,7 @@ export default function FeaturedProductsManagement() {
         icon: <Trash2 size={16} />,
       });
     } catch (error) {
-      console.error('Error bulk unfeaturing:', error);
+      clientLogger.error('Error bulk unfeaturing:', { detail: error });
       notifications.show({
         title: 'Bulk Action Failed',
         message: 'Failed to unfeature some products. Please try again.',

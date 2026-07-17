@@ -38,6 +38,8 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'storefront_qr', label: 'QR Codes', icon: '📱', prefix: 'storefront_qr_', settingsPath: '/settings/storefront-qr' },
   { key: 'storefront_gallery', label: 'Image Gallery', icon: '🖼️', prefix: 'storefront_gallery_', settingsPath: '/settings/storefront-gallery' },
   { key: 'storefront_hours', label: 'Business Hours', icon: '🕐', prefix: 'storefront_hours_', settingsPath: '/settings/storefront-hours' },
+  { key: 'storefront_layouts', label: 'Storefront Layout', icon: '📐', prefix: 'storefront_layouts_', settingsPath: '/settings/storefront-layouts' },
+  { key: 'storefront_maps', label: 'Storefront Maps', icon: '🗺️', prefix: 'storefront_maps_', settingsPath: '/settings/storefront-maps' },
   { key: 'faq_options', label: 'FAQ Options', icon: '❓', prefix: 'faq_', settingsPath: '/faq/options' },
   { key: 'crm_options', label: 'CRM', icon: '🤝', prefix: 'crm_', settingsPath: '/settings/crm-options' },
   { key: 'directory_entry', label: 'Directory Entry', icon: '📍', prefix: 'directory_entry_', settingsPath: '/settings/directory' },
@@ -45,6 +47,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'social_commerce_options', label: 'Social Commerce', icon: '🛍️', prefix: 'social_commerce_', settingsPath: '/settings/social-commerce' },
   { key: 'wholesale_matching_options', label: 'Wholesale Matching', icon: '🔗', prefix: 'wholesale_', settingsPath: '/settings/wholesale' },
   { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
+  { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {
@@ -91,6 +94,8 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'storefront_qr': return caps.storefrontQr.enabled;
     case 'storefront_gallery': return caps.storefrontGallery.enabled;
     case 'storefront_hours': return caps.storefrontHours.enabled;
+    case 'storefront_layouts': return !!caps.storefrontLayouts?.enabled;
+    case 'storefront_maps': return !!caps.storefrontMaps?.enabled;
     case 'faq_options': return caps.faqOptions.enabled;
     case 'crm_options': return caps.crmOptions.enabled;
     case 'directory_entry': return caps.directoryEntryOptions.enabled;
@@ -98,6 +103,7 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'social_commerce_options': return caps.socialCommerceOptions.enabled;
     case 'wholesale_matching_options': return !!caps.wholesaleMatching?.enabled;
     case 'platform_services': return !!caps.platformServices?.enabled;
+    case 'funnel_options': return !!caps.funnel?.enabled;
     default: return false;
   }
 }

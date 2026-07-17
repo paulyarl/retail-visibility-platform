@@ -6,6 +6,7 @@
 
 import { prisma } from '../prisma';
 import { generateBookingId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 export interface ServiceBookingResult {
   success: boolean;
@@ -126,7 +127,7 @@ export class ServiceFulfillmentService {
             orderItemId: orderItem.id,
           });
         } catch (error: any) {
-          console.error('[ServiceFulfillment] Failed to create booking:', error);
+          logger.error('[ServiceFulfillment] Failed to create booking:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           result.errors.push({
             orderItemId: orderItem.id,
             error: error.message,
@@ -184,7 +185,7 @@ export class ServiceFulfillmentService {
             amount: order.total_cents,
           });
         } catch (notifError) {
-          console.error('[ServiceFulfillment] Failed to send service_scheduled notification:', notifError);
+          logger.error('[ServiceFulfillment] Failed to send service_scheduled notification:', undefined, { error: { name: (notifError as any)?.name || 'Error', message: (notifError as any)?.message || String(notifError), stack: (notifError as any)?.stack } });
         }
       }
 
@@ -196,7 +197,7 @@ export class ServiceFulfillmentService {
 
       return result;
     } catch (error: any) {
-      console.error('[ServiceFulfillment] Order fulfillment failed:', error);
+      logger.error('[ServiceFulfillment] Order fulfillment failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }

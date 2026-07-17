@@ -15,6 +15,7 @@ import type {
   StorefrontOptQRContentType,
   StorefrontOptQRDotStyleType,
   StorefrontOptQRCornerStyleType,
+  StorefrontOptQRCornerDotStyleType,
 } from './types';
 
 export function resolveStorefrontQr(
@@ -28,18 +29,26 @@ export function resolveStorefrontQr(
   const mainOn = enabled;
 
   // QR group — new keys with fallback to old storefront_opt_qr_* keys
+  // storefront_qr_enabled is the master enable (checked above), NOT a group-on key.
+  // Individual QR keys implicitly enable the group.
+  const hasAnyIndividualQRKey = !!(
+    features.storefront_qr_resolution_512 || features.storefront_qr_resolution_1024 || features.storefront_qr_resolution_2048
+    || features.storefront_qr_product || features.storefront_qr_store || features.storefront_qr_logo || features.storefront_qr_directory
+    || fallbackFeatures.storefront_opt_qr_codes_512 || fallbackFeatures.storefront_opt_qr_codes_1024 || fallbackFeatures.storefront_opt_qr_codes_2048
+    || fallbackFeatures.storefront_opt_qr_product || fallbackFeatures.storefront_opt_qr_store || fallbackFeatures.storefront_opt_qr_logo || fallbackFeatures.storefront_opt_qr_directory
+  );
   const qrGroupEnabled = flexible
     || !!features.storefront_qr_on || !!features.storefront_qr
-    || !!features.storefront_qr_enabled
     || !!fallbackFeatures.storefront_opt_qr_on
     || !!fallbackFeatures.storefront_opt_qr
-    || !!fallbackFeatures.storefront_opt_qr_enabled;
+    || !!fallbackFeatures.storefront_opt_qr_enabled
+    || hasAnyIndividualQRKey;
 
   // QR resolutions
   const allowedQRResolutions: StorefrontOptQRResolutionType[] = [];
   if (qrGroupEnabled) {
     if (flexible
-      || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+      || features.storefront_qr_on || features.storefront_qr
       || features.storefront_qr_resolution
       || fallbackFeatures.storefront_opt_qr_on || fallbackFeatures.storefront_opt_qr || fallbackFeatures.storefront_opt_qr_enabled
       || fallbackFeatures.storefront_opt_qr_resolution
@@ -56,7 +65,7 @@ export function resolveStorefrontQr(
   const allowedQRContentTypes: StorefrontOptQRContentType[] = [];
   if (qrGroupEnabled) {
     if (flexible
-      || features.storefront_qr_on || features.storefront_qr || features.storefront_qr_enabled
+      || features.storefront_qr_on || features.storefront_qr
       || features.storefront_qr_content
       || fallbackFeatures.storefront_opt_qr_on || fallbackFeatures.storefront_opt_qr || fallbackFeatures.storefront_opt_qr_enabled
       || fallbackFeatures.storefront_opt_qr_content
@@ -87,13 +96,14 @@ export function resolveStorefrontQr(
     || features.storefront_qr_dot_styles || features.storefront_qr_dot_styles_on
     || fallbackFeatures.storefront_opt_qr_dot_styles || fallbackFeatures.storefront_opt_qr_dot_styles_on
   )) {
-    allowedQRDotStyles.push('rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded');
+    allowedQRDotStyles.push('rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded', 'square');
   } else if (showQRStyled) {
     if (features.storefront_qr_dot_rounded || fallbackFeatures.storefront_opt_qr_dot_rounded) allowedQRDotStyles.push('rounded');
     if (features.storefront_qr_dot_dots || fallbackFeatures.storefront_opt_qr_dot_dots) allowedQRDotStyles.push('dots');
     if (features.storefront_qr_dot_classy || fallbackFeatures.storefront_opt_qr_dot_classy) allowedQRDotStyles.push('classy');
     if (features.storefront_qr_dot_classy_rounded || fallbackFeatures.storefront_opt_qr_dot_classy_rounded) allowedQRDotStyles.push('classy-rounded');
     if (features.storefront_qr_dot_extra_rounded || fallbackFeatures.storefront_opt_qr_dot_extra_rounded) allowedQRDotStyles.push('extra-rounded');
+    if (features.storefront_qr_dot_square || fallbackFeatures.storefront_opt_qr_dot_square) allowedQRDotStyles.push('square');
   }
 
   const allowedQRCornerStyles: StorefrontOptQRCornerStyleType[] = [];
@@ -101,11 +111,18 @@ export function resolveStorefrontQr(
     || features.storefront_qr_corner_styles || features.storefront_qr_corner_styles_on
     || fallbackFeatures.storefront_opt_qr_corner_styles || fallbackFeatures.storefront_opt_qr_corner_styles_on
   )) {
-    allowedQRCornerStyles.push('dot', 'extra-rounded', 'rounded');
+    allowedQRCornerStyles.push('dot', 'extra-rounded', 'rounded', 'square');
   } else if (showQRStyled) {
     if (features.storefront_qr_corner_dot || fallbackFeatures.storefront_opt_qr_corner_dot) allowedQRCornerStyles.push('dot');
     if (features.storefront_qr_corner_extra_rounded || fallbackFeatures.storefront_opt_qr_corner_extra_rounded) allowedQRCornerStyles.push('extra-rounded');
     if (features.storefront_qr_corner_rounded || fallbackFeatures.storefront_opt_qr_corner_rounded) allowedQRCornerStyles.push('rounded');
+    if (features.storefront_qr_corner_square || fallbackFeatures.storefront_opt_qr_corner_square) allowedQRCornerStyles.push('square');
+  }
+
+  // Corner dot styles (inner dots inside the 3 corner squares)
+  const allowedQRCornerDotStyles: StorefrontOptQRCornerDotStyleType[] = [];
+  if (showQRStyled) {
+    allowedQRCornerDotStyles.push('dot', 'square');
   }
 
   const qrCustomColors = showQRStyled && (flexible
@@ -128,6 +145,18 @@ export function resolveStorefrontQr(
     qr_logo: merchantPrefs?.qr_logo ?? false,
     qr_directory: merchantPrefs?.qr_directory ?? false,
     default_qr_resolution: merchantPrefs?.default_qr_resolution || '1024',
+    qr_dot_type: merchantPrefs?.qr_dot_type ?? 'rounded',
+    qr_corner_type: merchantPrefs?.qr_corner_type ?? 'extra-rounded',
+    qr_corner_dot_type: merchantPrefs?.qr_corner_dot_type ?? 'dot',
+    qr_corner_dot_color: merchantPrefs?.qr_corner_dot_color ?? '#ffffff',
+    qr_logo_shape: merchantPrefs?.qr_logo_shape ?? 'square',
+    qr_dot_color: merchantPrefs?.qr_dot_color ?? '#1a56db',
+    qr_corner_color: merchantPrefs?.qr_corner_color ?? '#1a56db',
+    qr_bg_color: merchantPrefs?.qr_bg_color ?? '#ffffff',
+    qr_custom_colors_enabled: merchantPrefs?.qr_custom_colors_enabled ?? false,
+    qr_gradient_enabled: merchantPrefs?.qr_gradient_enabled ?? false,
+    qr_gradient_start: merchantPrefs?.qr_gradient_start ?? null,
+    qr_gradient_end: merchantPrefs?.qr_gradient_end ?? null,
   };
 
   // Effective filters
@@ -142,12 +171,13 @@ export function resolveStorefrontQr(
     allowed_qr_content_types: allowedQRContentTypes,
     qr_classic_enabled: mainOn && (flexible
       || !!features.storefront_qr_classic || !!features.storefront_qr_classic_on
-      || !!features.storefront_qr_enabled
+      || !!features.storefront_qr_on || !!features.storefront_qr
       || !!fallbackFeatures.storefront_opt_qr_on || !!fallbackFeatures.storefront_opt_qr
       || !!fallbackFeatures.storefront_opt_qr_enabled),
     qr_styled_enabled: mainOn && showQRStyled,
     allowed_qr_dot_styles: allowedQRDotStyles,
     allowed_qr_corner_styles: allowedQRCornerStyles,
+    allowed_qr_corner_dot_styles: allowedQRCornerDotStyles,
     qr_custom_colors: mainOn && qrCustomColors,
     qr_gradients: mainOn && qrGradients,
     can_use_qr_codes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),

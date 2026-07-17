@@ -41,7 +41,7 @@ import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
 import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
-import { unifiedCapabilityService } from '@/services/UnifiedCapabilityService';
+import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
 import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, type StorefrontState } from '@/services/CapabilityResolutionService';
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
@@ -49,6 +49,7 @@ import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
 import DemoBanner from '@/components/storefront/DemoBanner';
 // import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
 // import ProductDataService from '@/services/ProductDataService';
+import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -336,7 +337,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       productCategories = categories;
       storeCategories = [];
     } catch (e) {
-      console.error('Failed to fetch categories:', e);
+      clientLogger.error('Failed to fetch categories:', { detail: e });
     }
 
     // Fetch products using singleton service (use resolved tenant ID)
@@ -408,7 +409,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     try {
       platformSettings = await platformSettingsService.getPlatformSettings();
     } catch (e) {
-      console.error('Failed to fetch platform settings:', e);
+      clientLogger.error('Failed to fetch platform settings:', { detail: e });
     }
 
     // Find current category name if filtering
@@ -417,75 +418,75 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch storefront option flags (capability-aware) — prioritized server-side fetch
     let storefrontOptionFlags: StorefrontOptionFlags | null = null;
     try {
-      storefrontOptionFlags = await unifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug, { isPublic: true });
+      storefrontOptionFlags = await publicUnifiedCapabilityService.getStorefrontOptionFlags(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch storefront option flags:', e);
+      clientLogger.error('Failed to fetch storefront option flags:', { detail: e });
     }
 
     // Fetch commerce state from unified capability service
     let commerceSettings: CommerceState | null = null;
     try {
-      commerceSettings = await unifiedCapabilityService.getCommerceState(idResolvedBySlug, { isPublic: true });
+      commerceSettings = await publicUnifiedCapabilityService.getCommerceState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch commerce state:', e);
+      clientLogger.error('Failed to fetch commerce state:', { detail: e });
     }
 
     // Fetch payment gateway state from unified capability service
     let paymentGatewaySettings: PaymentGatewayState | null = null;
     try {
-      paymentGatewaySettings = await unifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug, { isPublic: true });
+      paymentGatewaySettings = await publicUnifiedCapabilityService.getPaymentGatewayState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch payment gateway state:', e);
+      clientLogger.error('Failed to fetch payment gateway state:', { detail: e });
     }
 
     // Fetch storefront type state from unified capability service
     let storefrontTypeSettings: StorefrontState | null = null;
     try {
-      storefrontTypeSettings = await unifiedCapabilityService.getStorefrontState(idResolvedBySlug, { isPublic: true });
+      storefrontTypeSettings = await publicUnifiedCapabilityService.getStorefrontState(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch storefront type state:', e);
+      clientLogger.error('Failed to fetch storefront type state:', { detail: e });
     }
 
     // Fetch FAQ option flags server-side (no client waterfall)
     let faqOptionsFlags: PublicFaqOptionsFlags | null = null;
     try {
-      faqOptionsFlags = await unifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug, { isPublic: true });
+      faqOptionsFlags = await publicUnifiedCapabilityService.getFaqOptionsFlags(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch FAQ option flags:', e);
+      clientLogger.error('Failed to fetch FAQ option flags:', { detail: e });
     }
 
     // Fetch CRM option flags server-side (no client waterfall)
     let crmOptionsFlags: PublicCrmOptionsFlags | null = null;
     try {
-      crmOptionsFlags = await unifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug, { isPublic: true });
+      crmOptionsFlags = await publicUnifiedCapabilityService.getCrmOptionsFlags(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch CRM option flags:', e);
+      clientLogger.error('Failed to fetch CRM option flags:', { detail: e });
     }
 
     // Fetch product option flags server-side (no client waterfall)
     let productOptionFlags: ProductOptionFlags | null = null;
     try {
-      productOptionFlags = await unifiedCapabilityService.getProductOptionFlags(idResolvedBySlug, { isPublic: true });
+      productOptionFlags = await publicUnifiedCapabilityService.getProductOptionFlags(idResolvedBySlug);
     } catch (e) {
-      console.error('Failed to fetch product option flags:', e);
+      clientLogger.error('Failed to fetch product option flags:', { detail: e });
     }
 
     // Fetch social commerce options server-side (no client waterfall)
     let socialCommerceFlags: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null = null;
     try {
-      const socialCommerceState = await unifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug, { isPublic: true });
+      const socialCommerceState = await publicUnifiedCapabilityService.getSocialCommerceOptionsState(idResolvedBySlug);
       socialCommerceFlags = {
         enabled: socialCommerceState.enabled,
         canUseShareButtons: socialCommerceState.canUseShareButtons,
         canUseSocialProof: socialCommerceState.canUseSocialProof,
       };
     } catch (e) {
-      console.error('Failed to fetch social commerce options:', e);
+      clientLogger.error('Failed to fetch social commerce options:', { detail: e });
     }
 
     return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags };
   } catch (error) {
-    console.error('Error fetching tenant storefront:', error);
+    clientLogger.error('Error fetching tenant storefront:', { detail: error });
     return null;
   }
 }
@@ -614,13 +615,13 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     // Track category browse on storefront
     import('@/utils/behaviorTracking').then(({ trackCategoryBrowse }) => {
       trackCategoryBrowse(currentCategory.id || category, currentCategory.slug || category).catch(err =>
-        console.error('Failed to track category browse:', err)
+        clientLogger.error('Failed to track category browse:', { detail: err })
       );
     });
   } else {
     // Track general storefront view
     trackStorefrontView(id, storeCategories || [], storefrontTypeSettings?.effectiveType).catch(err =>
-      console.error('Failed to track storefront view:', err)
+      clientLogger.error('Failed to track storefront view:', { detail: err })
     );
   }
   const totalPages = Math.ceil(total / limit);
@@ -650,7 +651,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   try {
     totalAllProducts = await storefrontSingletonService.getTotalProductCount(id);
   } catch (e) {
-    console.error('Failed to fetch total product count:', e);
+    clientLogger.error('Failed to fetch total product count:', { detail: e });
     // Fallback to current total if available
     totalAllProducts = total || 0;
   }

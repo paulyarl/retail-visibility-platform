@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Modal, ModalFooter, Button, Input, Select } from '@/components/ui';
 import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 import { countries } from '@/lib/validation/businessProfile';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface TenantCreationData {
   name: string;
@@ -84,7 +85,7 @@ export default function CreateTenantModal({
       setErrors({});
       onClose();
     } catch (error) {
-      console.error('Failed to create tenant:', error);
+      clientLogger.error('Failed to create tenant:', { detail: error });
     }
   };
 

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { tenantDirectoryService, TenantDirectoryStatus } from '@/services/TenantDirectorySingletonService';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DirectoryTenantPageProps {
   params: Promise<{
@@ -12,7 +13,7 @@ async function getTenantDirectoryStatus(tenantId: string): Promise<TenantDirecto
   try {
     return await tenantDirectoryService.getTenantDirectoryStatus(tenantId);
   } catch (error) {
-    console.error('Error fetching tenant directory status:', error);
+    clientLogger.error('Error fetching tenant directory status:', { detail: error });
     return null;
   }
 }

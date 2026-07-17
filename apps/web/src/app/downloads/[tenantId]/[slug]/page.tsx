@@ -21,6 +21,7 @@ import {
   Copy,
   Check
 } from 'lucide-react';
+import { clientLogger } from '@/lib/client-logger';
 
 interface DigitalAsset {
   id: string;
@@ -114,7 +115,7 @@ export default function PublicDownloadPage() {
         });
       }
     } catch (err) {
-      console.error('Error loading download page:', err);
+      clientLogger.error('Error loading download page:', { detail: err });
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -157,7 +158,7 @@ export default function PublicDownloadPage() {
       // Refresh access validation to update download count
       loadDownloadPage();
     } catch (err) {
-      console.error('Download error:', err);
+      clientLogger.error('Download error:', { detail: err });
       setError('Download failed');
     } finally {
       setDownloadingAssetId(null);

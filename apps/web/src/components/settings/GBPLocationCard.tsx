@@ -15,6 +15,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@mantine/core';
+import { clientLogger } from '@/lib/client-logger';
 
 interface GBPLocationCardProps {
   tenantId: string;
@@ -63,7 +64,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       const linkedData = await tenantInfoService.getGBPLinkedLocation(tenantId);
       setLinkedLocation(linkedData?.data?.location || null);
     } catch (err) {
-      console.error('Failed to fetch GBP status:', err);
+      clientLogger.error('Failed to fetch GBP status:', { detail: err });
       setError('Failed to load GBP status');
     } finally {
       setLoading(false);
@@ -78,7 +79,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       setGbpLocations(data.data?.locations || []);
       setShowLocationSelector(true);
     } catch (err) {
-      console.error('Failed to fetch GBP locations:', err);
+      clientLogger.error('Failed to fetch GBP locations:', { detail: err });
       setError('Failed to fetch GBP locations');
     } finally {
       setLoadingLocations(false);
@@ -103,7 +104,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       });
       setShowLocationSelector(false);
     } catch (err) {
-      console.error('Failed to link location:', err);
+      clientLogger.error('Failed to link location:', { detail: err });
       setError('Failed to link location');
     } finally {
       setLinkingLocation(false);
@@ -118,7 +119,7 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       await tenantInfoService.unlinkGBPLocation(tenantId);
       setLinkedLocation(null);
     } catch (err) {
-      console.error('Failed to unlink location:', err);
+      clientLogger.error('Failed to unlink location:', { detail: err });
       setError('Failed to unlink location');
     } finally {
       setLinkingLocation(false);

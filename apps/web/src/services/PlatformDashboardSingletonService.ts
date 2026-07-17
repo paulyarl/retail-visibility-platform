@@ -7,6 +7,7 @@
 
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from './interfaces/PlatformDashboardInterfaces';
+import { clientLogger } from '@/lib/client-logger';
 
 class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
   private static instance: PlatformDashboardSingletonService;
@@ -36,7 +37,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformDashboardSingleton] Failed to get platform dashboard:', result.error);
+      clientLogger.error('[PlatformDashboardSingleton] Failed to get platform dashboard:', { detail: result.error });
       return null;
     }
 //    console.log(`[PlatformDashboardSingleton] Got platform dashboard:`, result.data)
@@ -58,7 +59,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformDashboardSingleton] Failed to get platform stats:', result.error);
+      clientLogger.error('[PlatformDashboardSingleton] Failed to get platform stats:', { detail: result.error });
       return null;
     }
 
@@ -77,7 +78,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformDashboardSingleton] Failed to get top tenants:', result.error);
+      clientLogger.error('[PlatformDashboardSingleton] Failed to get top tenants:', { detail: result.error });
       return null;
     }
 
@@ -96,7 +97,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[PlatformDashboardSingleton] Failed to get recent activity:', result.error);
+      clientLogger.error('[PlatformDashboardSingleton] Failed to get recent activity:', { detail: result.error });
       return null;
     }
 

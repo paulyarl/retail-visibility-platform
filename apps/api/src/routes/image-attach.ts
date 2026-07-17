@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import { generatePhotoId } from '../lib/id-generator';
+import { logger } from '../logger';
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.post('/:tenantId/items/:itemId/attach-image', authenticateToken, checkTen
       },
     });
   } catch (error: any) {
-    console.error('[Image Attach] Error:', error);
+    logger.error('[Image Attach] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       error: 'Failed to attach image',
       message: error.message,

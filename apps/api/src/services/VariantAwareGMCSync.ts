@@ -272,7 +272,7 @@ export class VariantAwareGMCSync {
       await this.storeSyncRecord(product, gmcProduct);
 
     } catch (error) {
-      logger.error(`Failed to upsert GMC product for ${product.name}:`, { region: 'unknown' });
+      logger.error(`Failed to upsert GMC product for ${product.name}:`, undefined, { error: { name: 'Error', message: String({ region: 'unknown' }) } });
       throw error;
     }
   }
@@ -291,7 +291,7 @@ export class VariantAwareGMCSync {
         merchantId: 'placeholder-merchant-id'
       };
     } catch (error) {
-      logger.error('Failed to get GMC auth info:', { region: 'unknown' });
+      logger.error('Failed to get GMC auth info:', undefined, { error: { name: 'Error', message: String({ region: 'unknown' }) } });
       return null;
     }
   }

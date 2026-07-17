@@ -7,6 +7,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface FeaturedProductsLimit {
   store_selection: number;
@@ -140,7 +141,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       
       // console.log('[AdminTenantLimits] All cached data refreshed successfully');
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to force refresh cached data:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to force refresh cached data:', { detail: error });
     }
   }
 
@@ -158,13 +159,13 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to get tier system tiers:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to get tier system tiers:', { detail: result.error });
         return null;
       }
 
       return result.data?.tiers || null;
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to get tier system tiers:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to get tier system tiers:', { detail: error });
       return null;
     }
   }
@@ -183,13 +184,13 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to get tenant limits tiers:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to get tenant limits tiers:', { detail: result.error });
         return null;
       }
 
       return result.data?.tiers || null;
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to get tenant limits tiers:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to get tenant limits tiers:', { detail: error });
       return null;
     }
   }
@@ -208,13 +209,13 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to get all featured products limits:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to get all featured products limits:', { detail: result.error });
         return null;
       }
 
       return result.data?.limits || null;
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to get all featured products limits:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to get all featured products limits:', { detail: error });
       return null;
     }
   }
@@ -251,7 +252,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to update featured products limits:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to update featured products limits:', { detail: result.error });
         return { success: false };
       }
 
@@ -265,7 +266,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
         message: (result.data as any)?.message 
       };
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to update featured products limits:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to update featured products limits:', { detail: error });
       return { success: false };
     }
   }
@@ -292,7 +293,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
       
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to update tier field:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to update tier field:', { detail: result.error });
         return { success: false };
       }
 
@@ -305,7 +306,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
         updatedTier: (result.data as any)?.tier 
       };
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to update tier field:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to update tier field:', { detail: error });
       return { success: false };
     }
   }
@@ -355,7 +356,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
         tiers: tiersData
       };
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to get limits data:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to get limits data:', { detail: error });
       return null;
     }
   }
@@ -374,13 +375,13 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to get user seat limits:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to get user seat limits:', { detail: result.error });
         return null;
       }
 
       return result.data?.limits || null;
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to get user seat limits:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to get user seat limits:', { detail: error });
       return null;
     }
   }
@@ -402,7 +403,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[AdminTenantLimits] Failed to update user seat limit:', result.error);
+        clientLogger.error('[AdminTenantLimits] Failed to update user seat limit:', { detail: result.error });
         return { success: false };
       }
 
@@ -415,7 +416,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
         message: (result.data as any)?.message
       };
     } catch (error) {
-      console.error('[AdminTenantLimits] Failed to update user seat limit:', error);
+      clientLogger.error('[AdminTenantLimits] Failed to update user seat limit:', { detail: error });
       return { success: false };
     }
   }
@@ -434,7 +435,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       
       return uniqueTypes.sort();
     } catch (error) {
-      console.error('[AdminTenantLimits] Error fetching featured types:', error);
+      clientLogger.error('[AdminTenantLimits] Error fetching featured types:', { detail: error });
       // Fallback to hardcoded types if API fails
       return ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'bestseller', 'clearance', 'trending', 'featured', 'recommended'];
     }

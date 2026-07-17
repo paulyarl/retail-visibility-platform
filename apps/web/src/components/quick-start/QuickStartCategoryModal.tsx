@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { BusinessTypeSelector, BUSINESS_TYPES, getBusinessType, getDefaultCount } from './BusinessTypeSelector';
 import { STOREFRONT_BUSINESS_PRIORITY, STOREFRONT_DEFAULT_CATEGORY_COUNT, type StorefrontType } from '@/lib/storefront-business-mapping';
+import { clientLogger } from '@/lib/client-logger';
 
 interface QuickStartCategoryModalProps {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export function QuickStartCategoryModal({
       setSelectedType(null);
       setCategoryCount(15);
     } catch (error) {
-      console.error('[QuickStartCategoryModal] Error:', error);
+      clientLogger.error('[QuickStartCategoryModal] Error:', { detail: error });
     } finally {
       setIsLoading(false);
     }

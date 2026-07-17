@@ -4,6 +4,7 @@ import { requireFlag } from '../middleware/flags'
 import { generateGbpHoursSyncLogId, generateQuickStart, generateSpecialHoursId } from '../lib/id-generator'
 import CacheService, { CacheKeys } from '../lib/cache-service';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
+import { logger } from '../logger';
 
 // Cache TTL constants
 const CACHE_TTL = {
@@ -240,7 +241,7 @@ router.post('/tenant/:tenantId/gbp/hours/mirror',
       },
     });
   } catch (error: any) {
-    console.error(`[GBP Hours Mirror] Error syncing hours for tenant ${tenantId}:`, error);
+    logger.error(`[GBP Hours Mirror] Error syncing hours for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: error.message });
   }
 })
@@ -390,7 +391,7 @@ router.get('/tenant/:tenantId/business-hours/status',
 
     res.json(result)
   } catch (error) {
-    console.error('Error computing store status:', error)
+    logger.error('Error computing store status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to compute store status'
@@ -489,7 +490,7 @@ router.get('/business-hours/status/:tenantId',
 
     res.json(result)
   } catch (error) {
-    console.error('Error computing store status:', error)
+    logger.error('Error computing store status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to compute store status'

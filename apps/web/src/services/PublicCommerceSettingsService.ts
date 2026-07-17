@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface CommerceSettings {
   deposit_enabled?: boolean;
@@ -46,7 +47,7 @@ class PublicCommerceSettingsService extends PublicApiSingleton {
    */
   async getCommerceSettings(tenantId: string): Promise<CommerceSettings | null> {
     if (!tenantId) {
-      console.error('[PublicCommerceSettings] getCommerceSettings: tenantId is required');
+      clientLogger.error('[PublicCommerceSettings] getCommerceSettings: tenantId is required');
       return null;
     }
 
@@ -59,13 +60,13 @@ class PublicCommerceSettingsService extends PublicApiSingleton {
       );
 
       if (!result.success) {
-        console.error('[PublicCommerceSettings] Failed to get settings:', result.error);
+        clientLogger.error('[PublicCommerceSettings] Failed to get settings:', { detail: result.error });
         return null;
       }
 
       return result.data?.settings || null;
     } catch (error) {
-      console.error('[PublicCommerceSettings] Failed to get settings:', error);
+      clientLogger.error('[PublicCommerceSettings] Failed to get settings:', { detail: error });
       return null;
     }
   }

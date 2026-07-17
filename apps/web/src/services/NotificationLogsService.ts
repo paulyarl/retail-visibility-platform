@@ -5,6 +5,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface NotificationLog {
   id: string;
@@ -81,7 +82,7 @@ class NotificationLogsService extends AdminApiSingleton {
       
       return result.data as NotificationLogsResponse;
     } catch (error) {
-      console.error('Error fetching notification logs:', error);
+      clientLogger.error('Error fetching notification logs:', { detail: error });
       return { logs: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }, filters: { types: [] } };
     }
   }
@@ -102,7 +103,7 @@ class NotificationLogsService extends AdminApiSingleton {
       
       return result.success ? (result.data as NotificationStats) : null;
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
+      clientLogger.error('Error fetching notification stats:', { detail: error });
       return null;
     }
   }
@@ -120,7 +121,7 @@ class NotificationLogsService extends AdminApiSingleton {
       
       return result.data as (NotificationLog & { tenant?: any });
     } catch (error) {
-      console.error('Error fetching notification log:', error);
+      clientLogger.error('Error fetching notification log:', { detail: error });
       return null;
     }
   }

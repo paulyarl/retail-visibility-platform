@@ -16,7 +16,7 @@ router.get('/api/tenant/:tenantId/categories', authenticateToken, checkTenantAcc
     });
     return res.json({ success: true, data: rows });
   } catch (e: any) {
-    return res.status(500).json({ success: false, error: e?.message || 'internal_error' });
+    return res.status(500).json({ success: false, error: (e as any)?.message || 'internal_error' });
   }
 });
 

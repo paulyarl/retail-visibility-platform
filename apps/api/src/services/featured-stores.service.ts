@@ -1,4 +1,5 @@
 import { getDirectPool } from '../utils/db-pool';
+import { logger } from '../logger';
 
 // TypeScript interfaces for featured stores
 interface FeaturedStore {
@@ -269,7 +270,7 @@ class FeaturedStoresService {
       };
       
     } catch (error) {
-      console.error('[FeaturedStoresService] Error fetching featured stores:', error);
+      logger.error('[FeaturedStoresService] Error fetching featured stores:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       throw error;
     }
   }
@@ -293,7 +294,7 @@ class FeaturedStoresService {
       return parseInt(result.rows[0]?.total_featured_stores || '0');
       
     } catch (error) {
-      console.error('[FeaturedStoresService] Error getting featured stores count:', error);
+      logger.error('[FeaturedStoresService] Error getting featured stores count:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
       return 0;
     }
   }
