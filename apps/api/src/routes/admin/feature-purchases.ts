@@ -327,8 +327,9 @@ router.get('/grants', async (req: Request, res: Response) => {
     const enriched = grants.map((g) => {
       const qrExpired = new Date(g.qr_expires_at).getTime() < Date.now();
       const claimsExhausted = g.claims_count >= g.max_claims;
-      let grantStatus: 'active' | 'expired' | 'fully_claimed' | 'inactive' = 'active';
-      if (qrExpired) grantStatus = 'expired';
+      let grantStatus: 'active' | 'expired' | 'fully_claimed' | 'inactive' | 'revoked' = 'active';
+      if (g.is_revoked) grantStatus = 'revoked';
+      else if (qrExpired) grantStatus = 'expired';
       else if (claimsExhausted) grantStatus = 'fully_claimed';
 
       if (status && grantStatus !== status) return null;
@@ -347,6 +348,10 @@ router.get('/grants', async (req: Request, res: Response) => {
         max_claims: g.max_claims,
         claims_count: g.claims_count,
         qr_expires_at: g.qr_expires_at.toISOString(),
+        is_revoked: g.is_revoked,
+        revoked_at: g.revoked_at?.toISOString() || null,
+        revoked_by: g.revoked_by || null,
+        notes: g.notes || null,
         created_at: g.created_at.toISOString(),
         updated_at: g.updated_at.toISOString(),
         status: grantStatus,
@@ -363,6 +368,128 @@ router.get('/grants', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('[FeaturePurchases] Error listing grants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list grant tokens' });
+  }
+});
+
+// PUT /api/admin/feature-purchases/grants/:id — update grant token (max_claims, notes)
+const updateGrantSchema = z.object({
+  max_claims: z.number().int().min(1).max(100).optional(),
+  notes: z.string().max(2000).optional().nullable(),
+});
+
+router.put('/grants/:id', async (req: Request, res: Response) => {
+  try {
+    const validation = updateGrantSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'validation_error', message: 'Invalid grant update data', details: validation.error.issues });
+    }
+
+    const existing = await prisma.bsaas_grant_tokens.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'not_found', message: 'Grant token not found' });
+    }
+
+    if (existing.is_revoked) {
+      return res.status(400).json({ error: 'revoked', message: 'Cannot update a revoked grant token' });
+    }
+
+    const updateData: any = { updated_at: new Date() };
+    if (validation.data.max_claims !== undefined) {
+      if (validation.data.max_claims < existing.claims_count) {
+        return res.status(400).json({ error: 'invalid_max_claims', message: `max_claims cannot be less than current claims_count (${existing.claims_count})` });
+      }
+      updateData.max_claims = validation.data.max_claims;
+    }
+    if (validation.data.notes !== undefined) updateData.notes = validation.data.notes;
+
+    const updated = await prisma.bsaas_grant_tokens.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    await audit({
+      tenantId: 'platform',
+      actor: (req as any).user?.userId || 'admin',
+      action: 'feature_purchase.grant_token_updated',
+      payload: { entity_type: 'grant_token', id: updated.id, changes: validation.data },
+    });
+
+    res.json({ success: true, data: { id: updated.id, max_claims: updated.max_claims, notes: updated.notes } });
+  } catch (error) {
+    logger.error('[FeaturePurchases] Error updating grant token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update grant token' });
+  }
+});
+
+// POST /api/admin/feature-purchases/grants/:id/revoke — revoke a grant token
+router.post('/grants/:id/revoke', async (req: Request, res: Response) => {
+  try {
+    const existing = await prisma.bsaas_grant_tokens.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'not_found', message: 'Grant token not found' });
+    }
+
+    if (existing.is_revoked) {
+      return res.status(400).json({ error: 'already_revoked', message: 'Grant token is already revoked' });
+    }
+
+    const updated = await prisma.bsaas_grant_tokens.update({
+      where: { id: req.params.id },
+      data: {
+        is_revoked: true,
+        revoked_at: new Date(),
+        revoked_by: (req as any).user?.userId || 'admin',
+        updated_at: new Date(),
+      },
+    });
+
+    await audit({
+      tenantId: 'platform',
+      actor: (req as any).user?.userId || 'admin',
+      action: 'feature_purchase.grant_token_revoked',
+      payload: { entity_type: 'grant_token', id: updated.id, feature_key: existing.feature_key },
+    });
+
+    res.json({ success: true, data: { id: updated.id, is_revoked: updated.is_revoked, revoked_at: updated.revoked_at?.toISOString() } });
+  } catch (error) {
+    logger.error('[FeaturePurchases] Error revoking grant token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to revoke grant token' });
+  }
+});
+
+// POST /api/admin/feature-purchases/grants/:id/unrevoke — un-revoke a grant token
+router.post('/grants/:id/unrevoke', async (req: Request, res: Response) => {
+  try {
+    const existing = await prisma.bsaas_grant_tokens.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'not_found', message: 'Grant token not found' });
+    }
+
+    if (!existing.is_revoked) {
+      return res.status(400).json({ error: 'not_revoked', message: 'Grant token is not revoked' });
+    }
+
+    const updated = await prisma.bsaas_grant_tokens.update({
+      where: { id: req.params.id },
+      data: {
+        is_revoked: false,
+        revoked_at: null,
+        revoked_by: null,
+        updated_at: new Date(),
+      },
+    });
+
+    await audit({
+      tenantId: 'platform',
+      actor: (req as any).user?.userId || 'admin',
+      action: 'feature_purchase.grant_token_unrevoked',
+      payload: { entity_type: 'grant_token', id: updated.id, feature_key: existing.feature_key },
+    });
+
+    res.json({ success: true, data: { id: updated.id, is_revoked: updated.is_revoked } });
+  } catch (error) {
+    logger.error('[FeaturePurchases] Error un-revoking grant token:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to un-revoke grant token' });
   }
 });
 

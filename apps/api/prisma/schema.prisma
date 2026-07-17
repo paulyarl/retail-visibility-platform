@@ -5624,6 +5624,10 @@ model bsaas_grant_tokens {
   qr_expires_at            DateTime                   @db.Timestamptz(6)
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  is_revoked               Boolean                    @default(false)
+  revoked_at               DateTime?                  @db.Timestamptz(6)
+  revoked_by               String?                    @db.VarChar(255)
+  notes                    String?
   bsaas_grant_token_claims bsaas_grant_token_claims[]
 
   @@index([feature_key], map: "idx_bsaas_grant_tokens_feature_key")

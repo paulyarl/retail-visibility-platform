@@ -15,7 +15,7 @@ import {
 } from '@/services/AdminFeaturePurchasesService';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Gift, QrCode, Ticket, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { Gift, QrCode, Ticket, ChevronDown, ChevronRight, RefreshCw, Pencil, Ban, RotateCcw } from 'lucide-react';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -36,6 +36,8 @@ function getStatusBadge(status: GrantToken['status']) {
       return <Badge variant="secondary" className="bg-red-100 text-red-800">Expired</Badge>;
     case 'fully_claimed':
       return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Fully Claimed</Badge>;
+    case 'revoked':
+      return <Badge variant="secondary" className="bg-red-100 text-red-800 border border-red-300">Revoked</Badge>;
     default:
       return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Inactive</Badge>;
   }
@@ -60,6 +62,11 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [editingGrant, setEditingGrant] = useState<GrantToken | null>(null);
+  const [editMaxClaims, setEditMaxClaims] = useState<number>(1);
+  const [editNotes, setEditNotes] = useState<string>('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -100,10 +107,66 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
     onSuccess('Grants refreshed');
   };
 
+  const handleEditClick = (grant: GrantToken, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingGrant(grant);
+    setEditMaxClaims(grant.max_claims);
+    setEditNotes(grant.notes || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingGrant) return;
+    setSavingEdit(true);
+    try {
+      await adminFeaturePurchasesService.updateGrant(editingGrant.id, {
+        max_claims: editMaxClaims,
+        notes: editNotes || null,
+      });
+      onSuccess('Grant token updated');
+      setEditingGrant(null);
+      loadData();
+    } catch (err: any) {
+      onError(err.message || 'Failed to update grant token');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleRevoke = async (grant: GrantToken, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Revoke grant token for "${grant.feature_name}"? This will prevent any future redemptions.`)) return;
+    setRevokingId(grant.id);
+    try {
+      await adminFeaturePurchasesService.revokeGrant(grant.id);
+      onSuccess('Grant token revoked');
+      loadData();
+    } catch (err: any) {
+      onError(err.message || 'Failed to revoke grant token');
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const handleUnrevoke = async (grant: GrantToken, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Un-revoke grant token for "${grant.feature_name}"? This will allow redemptions again.`)) return;
+    setRevokingId(grant.id);
+    try {
+      await adminFeaturePurchasesService.unrevokeGrant(grant.id);
+      onSuccess('Grant token un-revoked');
+      loadData();
+    } catch (err: any) {
+      onError(err.message || 'Failed to un-revoke grant token');
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
   const totalGrants = grants.length;
   const activeGrants = grants.filter((g) => g.status === 'active').length;
   const expiredGrants = grants.filter((g) => g.status === 'expired').length;
   const fullyClaimedGrants = grants.filter((g) => g.status === 'fully_claimed').length;
+  const revokedGrants = grants.filter((g) => g.status === 'revoked').length;
   const totalClaims = grants.reduce((sum, g) => sum + (g.claims_count ?? 0), 0);
   const totalComplimentary = complimentaryGrants.length;
   const activeComplimentary = complimentaryGrants.filter((g) => g.status === 'active').length;
@@ -111,7 +174,7 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
         <div className="border border-neutral-200 rounded-lg p-3">
           <p className="text-xs text-neutral-500">QR Grant Tokens</p>
           <p className="text-xl font-bold mt-1">{totalGrants}</p>
@@ -127,6 +190,10 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
         <div className="border border-neutral-200 rounded-lg p-3">
           <p className="text-xs text-neutral-500">QR Expired</p>
           <p className="text-xl font-bold mt-1 text-red-600">{expiredGrants}</p>
+        </div>
+        <div className="border border-neutral-200 rounded-lg p-3">
+          <p className="text-xs text-neutral-500">QR Revoked</p>
+          <p className="text-xl font-bold mt-1 text-red-700">{revokedGrants}</p>
         </div>
         <div className="border border-neutral-200 rounded-lg p-3">
           <p className="text-xs text-neutral-500">Total QR Claims</p>
@@ -155,6 +222,7 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
             <option value="active">Active</option>
             <option value="fully_claimed">Fully Claimed</option>
             <option value="expired">Expired</option>
+            <option value="revoked">Revoked</option>
           </select>
         </div>
         <Button variant="outline" onClick={handleRefresh} className="gap-2" size="sm">
@@ -194,15 +262,18 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Created</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Granted By</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {grants.map((grant) => {
                 const isExpanded = expandedRows.has(grant.id);
                 const hasClaims = (grant.claims?.length ?? 0) > 0;
+                const isRevoked = grant.is_revoked;
+                const canEdit = !isRevoked && grant.status !== 'expired';
                 return (
                   <React.Fragment key={grant.id}>
-                    <tr className="hover:bg-neutral-50 cursor-pointer" onClick={() => hasClaims && toggleRow(grant.id)}>
+                    <tr className={`hover:bg-neutral-50 cursor-pointer ${isRevoked ? 'opacity-60' : ''}`} onClick={() => hasClaims && toggleRow(grant.id)}>
                       <td className="px-4 py-3">
                         {hasClaims ? (
                           isExpanded ? (
@@ -243,11 +314,48 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                       </td>
                       <td className="px-4 py-3">
                         {getStatusBadge(grant.status)}
+                        {grant.notes && (
+                          <div className="text-xs text-neutral-400 mt-1 max-w-[150px] truncate" title={grant.notes}>
+                            {grant.notes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          {canEdit && (
+                            <button
+                              onClick={(e) => handleEditClick(grant, e)}
+                              className="p-1.5 rounded hover:bg-neutral-200 text-neutral-600"
+                              title="Edit grant"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {isRevoked ? (
+                            <button
+                              onClick={(e) => handleUnrevoke(grant, e)}
+                              disabled={revokingId === grant.id}
+                              className="p-1.5 rounded hover:bg-green-100 text-green-600 disabled:opacity-50"
+                              title="Un-revoke"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => handleRevoke(grant, e)}
+                              disabled={revokingId === grant.id}
+                              className="p-1.5 rounded hover:bg-red-100 text-red-600 disabled:opacity-50"
+                              title="Revoke"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                     {isExpanded && hasClaims && (
                       <tr className="bg-neutral-50/50">
-                        <td colSpan={9} className="px-8 py-3">
+                        <td colSpan={10} className="px-8 py-3">
                           <div className="space-y-1">
                             <p className="text-xs font-medium text-neutral-500 mb-2">Claim History ({grant.claims?.length ?? 0})</p>
                             {(grant.claims ?? []).map((claim) => (
@@ -344,6 +452,62 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Edit Grant Modal */}
+      {editingGrant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingGrant(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-1">Edit Grant Token</h3>
+              <p className="text-sm text-neutral-500 mb-4">
+                {editingGrant.feature_name} — <span className="font-mono text-xs">{editingGrant.feature_key}</span>
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Max Claims
+                  </label>
+                  <input
+                    type="number"
+                    min={editingGrant.claims_count}
+                    max={100}
+                    value={editMaxClaims}
+                    onChange={(e) => setEditMaxClaims(parseInt(e.target.value) || 1)}
+                    className="w-full border border-neutral-200 rounded-md px-3 py-2 text-sm"
+                  />
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Current claims: {editingGrant.claims_count}. Cannot be reduced below current claims.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Admin notes about this grant token..."
+                    className="w-full border border-neutral-200 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => setEditingGrant(null)} size="sm">
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={savingEdit} size="sm">
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

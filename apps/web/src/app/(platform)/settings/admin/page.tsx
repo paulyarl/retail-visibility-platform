@@ -949,6 +949,19 @@ export default function AdminDashboardPage() {
           stats: '5-30 categories',
           badge: 'NEW',
         },
+        {
+          title: 'QR Code Generator',
+          description: 'Design styled QR codes for any target URL — marketing, events, print materials',
+          href: '/settings/admin/qr-generator',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h.01M4 4h.01M4 8h.01M9 4h.01M9 8h.01M9 12h.01M9 16h.01M9 20h.01M4 16h.01M16 4h.01M16 8h.01M16 12h.01M16 16h.01M4 20h.01" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'Themed, downloadable PNG/SVG',
+          badge: 'NEW',
+        },
       ],
     },
     {

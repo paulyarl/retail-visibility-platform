@@ -52,6 +52,35 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  try {
+    const authResult = await requirePlatformAdmin(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { accessToken } = authResult;
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+    const requestBody = await request.json();
+
+    let endpoint: string;
+    if (action === 'update-grant') {
+      endpoint = `/api/admin/feature-purchases/grants/${requestBody.grant_id}`;
+      const { grant_id, ...updateData } = requestBody;
+      const response = await authenticatedFetch(endpoint, accessToken, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json({ error: 'Unknown PUT action' }, { status: 400 });
+  } catch (error) {
+    console.error('[Feature Purchases Proxy PUT] Error:', error);
+    return NextResponse.json({ error: 'Failed to process feature purchase update' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requirePlatformAdmin(request);
@@ -66,6 +95,10 @@ export async function POST(request: NextRequest) {
       ? '/api/admin/feature-purchases/grant-complimentary'
       : action === 'create-grant-token'
       ? '/api/admin/feature-purchases/create-grant-token'
+      : action === 'revoke-grant'
+      ? `/api/admin/feature-purchases/grants/${requestBody.grant_id}/revoke`
+      : action === 'unrevoke-grant'
+      ? `/api/admin/feature-purchases/grants/${requestBody.grant_id}/unrevoke`
       : '/api/admin/feature-purchases';
 
     const response = await authenticatedFetch(endpoint, accessToken, {

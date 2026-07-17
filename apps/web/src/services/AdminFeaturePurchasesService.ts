@@ -68,10 +68,19 @@ export interface GrantToken {
   max_claims: number;
   claims_count: number;
   qr_expires_at: string;
+  is_revoked: boolean;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
-  status: 'active' | 'expired' | 'fully_claimed' | 'inactive';
+  status: 'active' | 'expired' | 'fully_claimed' | 'inactive' | 'revoked';
   claims: GrantClaim[];
+}
+
+export interface UpdateGrantInput {
+  max_claims?: number;
+  notes?: string | null;
 }
 
 export interface ComplimentaryGrant {
@@ -182,6 +191,51 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
     const data = result.data;
     const actualData = Array.isArray(data) ? data : (data as any)?.data;
     return Array.isArray(actualData) ? actualData : [];
+  }
+
+  async updateGrant(grantId: string, input: UpdateGrantInput): Promise<{ id: string; max_claims: number; notes: string | null }> {
+    const result = await this.makeDefaultRequest<{ id: string; max_claims: number; notes: string | null }>(
+      `/api/admin/feature-purchases/grants/${grantId}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `admin-feature-purchases-grant-update-${grantId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update grant token');
+    }
+    await this.invalidateGrantsCache();
+    const data = (result.data as any)?.data || result.data;
+    return data;
+  }
+
+  async revokeGrant(grantId: string): Promise<{ id: string; is_revoked: boolean; revoked_at: string }> {
+    const result = await this.makeDefaultRequest<{ id: string; is_revoked: boolean; revoked_at: string }>(
+      `/api/admin/feature-purchases/grants/${grantId}/revoke`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `admin-feature-purchases-grant-revoke-${grantId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to revoke grant token');
+    }
+    await this.invalidateGrantsCache();
+    const data = (result.data as any)?.data || result.data;
+    return data;
+  }
+
+  async unrevokeGrant(grantId: string): Promise<{ id: string; is_revoked: boolean }> {
+    const result = await this.makeDefaultRequest<{ id: string; is_revoked: boolean }>(
+      `/api/admin/feature-purchases/grants/${grantId}/unrevoke`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `admin-feature-purchases-grant-unrevoke-${grantId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to un-revoke grant token');
+    }
+    await this.invalidateGrantsCache();
+    const data = (result.data as any)?.data || result.data;
+    return data;
   }
 
   async invalidateGrantsCache(): Promise<void> {

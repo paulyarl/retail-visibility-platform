@@ -143,7 +143,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
 
           if (logoUrl) {
             try {
-              finalCanvas = await overlayLogoOnQR(canvas, logoUrl);
+              finalCanvas = await overlayLogoOnQR(canvas, logoUrl, settings.qr_logo_shape);
             } catch {
               // fallback to plain QR
             }
@@ -177,6 +177,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
     settings.qr_gradient_start,
     settings.qr_gradient_end,
     settings.default_qr_resolution,
+    settings.qr_logo_shape,
     logoUrl,
     exportSize,
   ]);
@@ -267,7 +268,7 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
   );
 }
 
-async function overlayLogoOnQR(qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> {
+async function overlayLogoOnQR(qrCanvas: HTMLCanvasElement, logoSrc: string, logoShape: string): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -275,6 +276,8 @@ async function overlayLogoOnQR(qrCanvas: HTMLCanvasElement, logoSrc: string): Pr
       reject(new Error('Could not get canvas context'));
       return;
     }
+
+    const isCircle = logoShape === 'circle';
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -288,26 +291,40 @@ async function overlayLogoOnQR(qrCanvas: HTMLCanvasElement, logoSrc: string): Pr
       const logoY = (canvas.height - logoSize) / 2;
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
-      ctx.fill();
+      if (isCircle) {
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(logoX - 6, logoY - 6, logoSize + 12, logoSize + 12);
+      }
 
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
+      if (isCircle) {
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+      } else {
+        ctx.beginPath();
+        ctx.rect(logoX, logoY, logoSize, logoSize);
+        ctx.clip();
+      }
       ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
       ctx.restore();
 
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
-      ctx.stroke();
+      if (isCircle) {
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(logoX - 3, logoY - 3, logoSize + 6, logoSize + 6);
+      }
 
       resolve(canvas);
-    };
+      };
     img.onerror = () => reject(new Error('Failed to load logo image'));
     img.src = logoSrc;
   });

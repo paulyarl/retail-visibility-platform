@@ -73,7 +73,7 @@ export default function PromoCodeQRDialog({
     const theme = QR_THEMES[selectedTheme];
     const options = buildQROptions(
       qrData.qr_url,
-      qrData.target_icon?.icon_name ? undefined : '/icons/visibleshelf-logo.svg',
+      undefined,
       theme,
     );
 

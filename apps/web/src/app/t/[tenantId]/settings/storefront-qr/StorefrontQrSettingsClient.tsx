@@ -331,7 +331,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                 </div>
                 {!(isTierFlexible || tierQrContentTypes.includes('qr_logo')) && <Lock className="h-3 w-3 text-neutral-400" />}
               </div>
-              {settings.qr_logo && settings.qr_styled_enabled && (
+              {settings.qr_logo && (
                 <div className="space-y-2 mt-3">
                   <p className="text-sm font-medium text-neutral-700">Logo Shape</p>
                   <p className="text-xs text-neutral-500">Cutout shape for the embedded logo</p>
