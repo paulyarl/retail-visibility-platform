@@ -27,6 +27,7 @@ import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
+import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 
 export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutProps) {
   const {
@@ -37,6 +38,9 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
     paymentGatewayStatus, actualProductCount, fullAddress,
     isDemo, demoExpiresAt,
   } = props;
+
+  // Track QR code scans when visitor arrives via QR code
+  useQrScanTracking(tenantId, 'directory');
 
   const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 

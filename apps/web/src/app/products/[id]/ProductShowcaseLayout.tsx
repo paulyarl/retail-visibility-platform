@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useProductLayoutState } from './layouts/hooks/useProductLayoutState';
+import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { ProductBreadcrumb } from './layouts/shared/ProductBreadcrumb';
 import { ProductTrustBar } from './layouts/shared/ProductTrustBar';
 import { StickyPurchaseBar } from './layouts/shared/StickyPurchaseBar';
@@ -44,6 +45,9 @@ export function ProductShowcaseLayout({
   socialCommerceFlags,
 }: ProductShowcaseLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
+
+  // Track QR code scans when visitor arrives via QR code
+  useQrScanTracking(product.tenantId, 'product', { productId: product.id });
 
   if (s.loading) return <ProductLayoutSkeleton layoutVariant="showcase" />;
 

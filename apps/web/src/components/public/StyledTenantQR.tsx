@@ -43,8 +43,9 @@ export function StyledTenantQR({
       : 512);
 
   const generateStyledQR = async (targetSize: number): Promise<string> => {
+    const trackingUrl = url.includes('source=qr') ? url : `${url}${url.includes('?') ? '&' : '?'}source=qr`;
     return generateQrDataUrl({
-      data: url,
+      data: trackingUrl,
       exportSize: targetSize,
       styled: true,
       logoUrl: prefs?.qr_logo ? tenantLogo : null,

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronLeft, ShoppingCart } from 'lucide-react';
 import { useProductLayoutState } from './layouts/hooks/useProductLayoutState';
+import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { ProductBreadcrumb } from './layouts/shared/ProductBreadcrumb';
 import { ProductTrustBar } from './layouts/shared/ProductTrustBar';
 import { StickyPurchaseBar } from './layouts/shared/StickyPurchaseBar';
@@ -47,6 +48,9 @@ export default function ProductQuickCommerceLayout({
   socialCommerceFlags,
 }: ProductQuickCommerceLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
+
+  // Track QR code scans when visitor arrives via QR code
+  useQrScanTracking(product.tenantId, 'product', { productId: product.id });
 
   // Use server-provided flags directly to avoid hydration mismatches
   const showsLocation = productOptFlags?.showsLocationDisplay ?? s.showsLocation ?? true;

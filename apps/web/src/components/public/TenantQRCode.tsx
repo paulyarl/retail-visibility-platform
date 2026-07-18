@@ -336,6 +336,9 @@ export function TenantQRCode({
       return;
     }
 
+    // Append source=qr for analytics tracking (if not already present)
+    const trackingUrl = url.includes('source=qr') ? url : `${url}${url.includes('?') ? '&' : '?'}source=qr`;
+
     setIsGenerating(true);
     try {
       const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
@@ -346,7 +349,7 @@ export function TenantQRCode({
       const logoUrl = (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : null;
 
       const dataUrl = await generateQrDataUrl({
-        data: url,
+        data: trackingUrl,
         exportSize: qrSettings.exportSize,
         styled: false,
         logoUrl,
@@ -383,7 +386,7 @@ export function TenantQRCode({
     const effectiveLogoUrl = (logoUrl && targetSize >= logoMinSize) ? logoUrl : null;
 
     return generateQrDataUrl({
-      data: url,
+      data: url.includes('source=qr') ? url : `${url}${url.includes('?') ? '&' : '?'}source=qr`,
       exportSize: targetSize,
       styled: styledEnabled,
       logoUrl: effectiveLogoUrl,

@@ -289,6 +289,7 @@ const buildAdminNavItems = (): NavItem[] => [
     children: [
       { label: 'Reviews',             href: '/settings/admin/reviews' },
       { label: 'Analytics',           href: '/settings/admin/analytics' },
+      { label: 'QR Analytics',        href: '/settings/admin/qr-analytics' },
       { label: 'Scan Metrics',        href: '/settings/admin/scan-metrics' },
     ],
   },

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Save, AlertCircle, CheckCircle2, QrCode, Palette, Sparkles, Lock, Zap, ArrowRight, Globe, MapPin, Image } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, QrCode, Palette, Sparkles, Lock, Zap, ArrowRight, Globe, MapPin, Image, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontQrCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
@@ -15,6 +15,7 @@ interface StorefrontQrSettings {
   qr_enabled: boolean;
   qr_classic_enabled: boolean;
   qr_styled_enabled: boolean;
+  qr_analytics_enabled: boolean;
   qr_codes_512: boolean;
   qr_codes_1024: boolean;
   qr_codes_2048: boolean;
@@ -45,6 +46,7 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_enabled: true,
   qr_classic_enabled: true,
   qr_styled_enabled: false,
+  qr_analytics_enabled: false,
   qr_codes_512: false,
   qr_codes_1024: true,
   qr_codes_2048: false,
@@ -162,6 +164,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
   const tierQrResolutions = tierState?.allowedQRResolutions ?? [];
   const tierQrContentTypes = tierState?.allowedQRContentTypes ?? [];
   const tierStyledEnabled = tierState?.qrStyledEnabled ?? false;
+  const canUseQrAnalytics = tierState?.canUseQrAnalytics ?? false;
   const tierQrCustomColors = tierState?.qrCustomColors ?? false;
   const tierQrGradients = tierState?.qrGradients ?? false;
   const tierDotStyles = tierState?.allowedQRDotStyles ?? [];
@@ -180,6 +183,13 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
           <h1 className="text-2xl font-bold text-neutral-900">QR Code Settings</h1>
           <p className="text-sm text-neutral-500 mt-1">Configure QR code display and styling for your storefront</p>
         </div>
+        <Link
+          href={`/t/${tenantId}/settings/storefront-qr/analytics`}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        >
+          <BarChart3 className="w-4 h-4" />
+          View Analytics
+        </Link>
       </div>
 
       {/* Plan Summary */}
@@ -314,6 +324,39 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                   );
                 })}
               </div>
+            </div>
+
+            {/* QR Analytics — premium feature for tracking scan events */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700">QR Analytics</p>
+              <p className="text-xs text-neutral-500">Track QR code scan performance and conversion metrics</p>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={settings.qr_analytics_enabled}
+                    onCheckedChange={(v) => updateSetting('qr_analytics_enabled', v)}
+                    disabled={!canUseQrAnalytics}
+                  />
+                  <span className="text-sm text-neutral-700">Enable QR Scan Tracking</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!canUseQrAnalytics && <Lock className="h-3 w-3 text-neutral-400" />}
+                  {canUseQrAnalytics && settings.qr_analytics_enabled && (
+                    <Link
+                      href={`/t/${tenantId}/settings/storefront-qr/analytics`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      <BarChart3 className="h-3 w-3" />
+                      View Dashboard
+                    </Link>
+                  )}
+                </div>
+              </div>
+              {!canUseQrAnalytics && (
+                <p className="text-xs text-neutral-500">
+                  QR Analytics is a premium feature. <Link href={`/t/${tenantId}/settings/subscription`} className="text-indigo-600 hover:text-indigo-700">Upgrade your plan</Link> to access scan tracking and conversion analytics.
+                </p>
+              )}
             </div>
 
             {/* Logo on QR Code — controls whether the merchant's logo appears on the QR */}

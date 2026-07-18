@@ -18,6 +18,7 @@ import { usePublicFeaturedOptionsCapability } from '@/hooks/tenant-access/usePub
 import { useStorefrontStatus, StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import { SubscriptionStatusPanel } from '@/components/subscription/SubscriptionStatusPanel';
 import { useActiveFeatured } from '@/hooks/useActiveFeatured';
+import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 
 // Product Discovery & Navigation
 // import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
@@ -159,6 +160,9 @@ export default function StorefrontClientWrapper({
   // console.log(`initialStorefrontOptionFlags: ${JSON.stringify(initialStorefrontOptionFlags)}`);
 
   const [featuredCounts, setFeaturedCounts] = useState<Record<string, number>>({});
+
+  // Track QR code scans when visitor arrives via QR code
+  useQrScanTracking(tenantId, 'storefront');
 
   const [isFullWidth, setIsFullWidth] = useState(fullWidthLayout);
   const [featuredData, setFeaturedData] = useState<any>(null);
