@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui';
-import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { useStorefrontQrCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { generateQrDataUrl } from '@/lib/qr-engine';
 import { Download, Copy, RefreshCw } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
@@ -18,64 +18,28 @@ interface QRCodeGeneratorProps {
 export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUrl }: QRCodeGeneratorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showTierInfo, setShowTierInfo] = useState(false);
 
-  const { tier, loading: tierLoading, canAccess } = useTenantTier(tenantId);
-  const tierId = tier?.effective?.id || null;
-  const hasQRAccess = canAccess('qr_codes', 'canView');
+  const { data: qrCapability } = useStorefrontQrCapability(tenantId);
+  const isTierEnabled = qrCapability?.enabled ?? false;
+  const tierStyledEnabled = qrCapability?.qrStyledEnabled ?? false;
+  const tierQrResolutions = qrCapability?.allowedQRResolutions ?? [];
+  const tierQrContentTypes = qrCapability?.allowedQRContentTypes ?? [];
+  const canUseQrAnalytics = qrCapability?.canUseQrAnalytics ?? false;
+  const isTierFlexible = qrCapability?.isFlexible ?? false;
   
-  // Map tier to QR features (similar to old getQRFeatures logic)
-  const getQRFeatures = (tier: string | null) => {
-    switch (tier) {
-      case 'enterprise':
-      case 'organization':
-      case 'chain_enterprise': // Chain enterprise gets same features as individual enterprise
-        return {
-          enabled: true,
-          maxResolution: 2048,
-          customColors: true,
-          customLogo: true,
-          bulkDownload: true,
-          analytics: true,
-          printTemplates: true,
-          whiteLabel: true,
-          dynamicQR: true
-        };
-      case 'commitment':
-      case 'professional':
-      case 'ecommerce':
-      case 'omnichannel':
-      case 'chain_professional': // Chain professional gets same features as individual professional
-        return {
-          enabled: true,
-          maxResolution: 1024,
-          customColors: true,
-          customLogo: true, // Enable logo for professional tier (both individual and chain)
-          bulkDownload: true,
-          analytics: false,
-          printTemplates: true,
-          whiteLabel: false,
-          dynamicQR: false
-        };
-      case 'discovery':
-      case 'storefront':
-      case 'starter':
-      case 'chain_starter': // Chain starter gets same features as individual starter
-      default:
-        return {
-          enabled: true,
-          maxResolution: 512,
-          customColors: false,
-          customLogo: false,
-          bulkDownload: false,
-          analytics: false,
-          printTemplates: false,
-          whiteLabel: false,
-          dynamicQR: false
-        };
-    }
+  
+  const features = {
+    enabled: isTierEnabled,
+    maxResolution: isTierFlexible || tierQrResolutions.includes('qr_codes_2048') ? 2048 : (isTierFlexible || tierQrResolutions.includes('qr_codes_1024') ? 1024 : 512),
+    customColors: isTierFlexible || tierQrContentTypes.includes('qr_logo'),
+    customLogo: isTierFlexible || tierQrContentTypes.includes('qr_logo'),
+    bulkDownload: isTierEnabled,
+    analytics: canUseQrAnalytics,
+    printTemplates: isTierEnabled,
+    whiteLabel: false,
+    dynamicQR: false,
   };
-  
-  const features = getQRFeatures(tierId);
 
   useEffect(() => {
     const generateQR = async () => {
@@ -85,7 +49,9 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
         const dataUrl = await generateQrDataUrl({
           data: url,
           exportSize: size,
-          styled: false,
+          styled: tierStyledEnabled,
+          dotType: tierStyledEnabled ? 'rounded' : undefined,
+          cornerType: tierStyledEnabled ? 'extra-rounded' : undefined,
           logoUrl: features.customLogo && logoUrl ? logoUrl : null,
           logoShape: 'circle',
           errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
@@ -267,18 +233,28 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
         Use this QR code on flyers, business cards, or in-store displays to let customers scan and view product details
       </p>
 
-      {/* Tier information */}
+      {/* Collapsible Tier information */}
       <div className="text-xs text-neutral-400 text-center">
-        <p>Resolution: {features.maxResolution}x{features.maxResolution}px</p>
-        {!features.customColors && (
-          <p className="text-primary-600 mt-1">
-            💎 Upgrade to Professional for branded QR codes with custom colors
-          </p>
-        )}
-        {!features.bulkDownload && (
-          <p className="text-primary-600">
-            💎 Upgrade to Professional for bulk download of all products
-          </p>
+        <button
+          onClick={() => setShowTierInfo(!showTierInfo)}
+          className="text-xs text-neutral-500 hover:text-neutral-700 underline underline-offset-2"
+        >
+          {showTierInfo ? 'Hide tier info' : 'Show tier info'}
+        </button>
+        {showTierInfo && (
+          <div className="mt-2 space-y-1">
+            <p>Resolution: {features.maxResolution}x{features.maxResolution}px</p>
+            {!features.customColors && (
+              <p className="text-primary-600 mt-1">
+                💎 Upgrade to Professional for branded QR codes with custom colors
+              </p>
+            )}
+            {!features.bulkDownload && (
+              <p className="text-primary-600">
+                💎 Upgrade to Professional for bulk download of all products
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

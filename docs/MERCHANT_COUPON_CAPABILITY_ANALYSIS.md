@@ -77,13 +77,22 @@ The existing BSaaS coupon system (`@/.devin/skills/bsaas-coupons-private-feature
 
 ### 2.3 Capability System Architecture
 
-The capability pipeline has 17 resolved domains (`@/apps/api/src/services/resolvers/types.ts:785-808`):
+The capability pipeline has 26 resolved domains (`@/apps/api/src/services/resolvers/types.ts:949-980`), indexed as `effective[0]` through `effective[25]`:
 
 ```
-commerce, payment_gateway, storefront, fulfillment, product_types,
-product_options, featured, integrations, quickstart, storefront_options,
-directory_entry, faq, crm, chatbot, barcode_scan, org_options,
-social_commerce_options, directory_promotion
+[0]  commerce              [13] directory_entry        [19] directory_promotion
+[1]  payment_gateway        [14] faq                    [20] wholesale_matching
+[2]  storefront             [15] crm                    [21] platform_services
+[3]  fulfillment            [16] chatbot                [22] storefront_hours
+[4]  barcode_scan           [17] org_options            [23] storefront_layouts
+[5]  product_types          [18] social_commerce_options [24] storefront_maps
+[6]  product_options                                [25] funnel
+[7]  featured
+[8]  integrations
+[9]  quickstart
+[10] storefront_options
+[11] storefront_qr
+[12] storefront_gallery
 ```
 
 Each domain follows the same 5-layer pattern:
@@ -107,7 +116,7 @@ The checkout flow (`@/apps/api/src/routes/checkout.ts`) currently:
 
 ### 2.5 Existing `offer_coupon_code` Field
 
-A single `offer_coupon_code` VARCHAR(100) field exists on a social commerce table (`@/apps/api/prisma/schema.prisma:1922`). This appears to be for social commerce event promotions (external coupon codes displayed in social posts), not a platform-managed coupon system. It is a display field, not a validation engine.
+A single `offer_coupon_code` VARCHAR(100) field exists on a social commerce table (`@/apps/api/prisma/schema.prisma:1938`). This appears to be for social commerce event promotions (external coupon codes displayed in social posts), not a platform-managed coupon system. It is a display field, not a validation engine.
 
 ---
 
@@ -130,6 +139,8 @@ Following the BSaaS pattern (`@/.devin/skills/add-bsaas-feature.md`):
 | Feature Key | Type | Purpose | Parent Gate | Tier-Bundled | BSaaS Purchasable |
 |---|---|---|---|---|---|
 | `coupon_enabled` | Capability gate | Master toggle for coupon system | (root) | Professional+ | Yes (lower tiers) |
+| `coupon_disabled` | Capability disable | Explicit disengagement of coupon domain | (root) | — | — |
+| `coupon_flexible` | Flexible key | Unlocks all coupon features for tier | (root) | Enterprise | — |
 | `coupon_discount_types_on` | Group gate (on) | Grants all discount type children | `coupon_enabled` | Professional+ | Yes |
 | `coupon_discount_types_off` | Group gate (off) | Explicitly disables all discount types | `coupon_enabled` | — | — |
 | `coupon_percent_off` | Individual | Percentage-based discounts | `coupon_discount_types_on` | Professional+ | Yes |
@@ -140,8 +151,13 @@ Following the BSaaS pattern (`@/.devin/skills/add-bsaas-feature.md`):
 | `coupon_limited_redemption` | Individual | Usage limits + expiry dates | `coupon_enabled` | Professional+ | Yes |
 | `coupon_analytics` | Individual | Redemption analytics dashboard | `coupon_enabled` | Professional+ | Yes |
 | `coupon_qr_sharing` | Individual | Styled QR code generation for coupon codes | `coupon_enabled` | Professional+ | Yes |
+| `coupon_spotlight` | Individual | Featured coupon display on public surfaces (storefront, directory, product pages) | `coupon_enabled` | Professional+ | Yes |
 
-**Flexible key:** `coupon_flexible` — unlocks all coupon features for a tier
+> **R17 compliance**: `coupon_disabled` follows the enablement precedence rule — `_disabled` > `_enabled` > `_flexible` > features. Every capability type MUST have a `_disabled` key in `features_list` per `capability-data-flow-rules.md` R17.
+>
+> **R23 compliance**: Every individual feature flag check in the resolver MUST include `flexible ||` prefix — including standalone booleans outside group arrays.
+
+~~**Flexible key:** `coupon_flexible` — unlocks all coupon features for a tier~~ (moved to feature table above)
 
 **QR alignment note:** The `coupon_qr_sharing` feature key gates access to the styled QR code renderer (`qr-code-styling` library) for merchant coupons. This mirrors the BSaaS QR plan's Phase 3 (`PromoCodeQRDialog.tsx`) and Phase 5 (`storefront_opt_qr_styled_on` feature key pattern). The same `qr-code-styling` library, style presets, and icon resolution logic are shared across both BSaaS promo QR codes and merchant coupon QR codes — see §3.8 for details.
 
@@ -268,16 +284,15 @@ export interface EffectiveCouponOptions {
 | `/api/tenants/:tenantId/coupons/:id/analytics` | GET | Redemption stats | Tenant auth |
 | `/api/tenants/:tenantId/coupons/dashboard` | GET | Aggregate stats | Tenant auth |
 
-**Public route** (no auth — checkout-time validation):
+**Public route** (no auth — checkout-time validation, follows `AUTH_SCOPE_ISOLATION_SPEC.md` FR-1):
 
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/api/public/coupons/validate` | POST | Validate coupon code at checkout |
+| `/api/public/tenants/:tenantId/coupons/validate` | POST | Validate coupon code at checkout |
 
-**Request:**
+**Request:** (tenantId comes from URL path, not body)
 ```json
 {
-  "tenantId": "tk-xxx",
   "code": "SUMMER20",
   "cartSubtotalCents": 5000,
   "items": [{ "inventoryItemId": "i-xxx", "categorySlug": "apparel" }],
@@ -315,7 +330,8 @@ export interface EffectiveCouponOptions {
 - **Analytics view:** per-coupon redemption count, total discount given, revenue impact
 - **Service:** `CouponService.ts` — singleton extending `TenantApiSingleton`
 - **Settings card:** in `TenantSettings.tsx` — "Coupons & Promotions" card
-- **Sidebar link:** in `DynamicTenantSidebar.tsx` — under "My Store" or "Marketing"
+- **Sidebar link:** SQL INSERT into `navigation_links` table (database-driven nav — see `.devin/skills/database-navigation-system.md`). File-based fallback in `DynamicTenantSidebar.tsx` is NOT active.
+- **Icon registration:** Register coupon icon in `useNavLinks.tsx`, `NavItemRow.tsx`, and admin navigation `page.tsx` `IconComponents` map
 
 **Customer checkout UI:**
 - **Coupon input field** in cart/checkout page — "Have a coupon code?" with apply button
@@ -330,20 +346,39 @@ export interface EffectiveCouponOptions {
 
 ### 3.6 Capability System Integration
 
-**Resolver pipeline position:** Step 18 (after `directory_promotion` at step 17)
+**Resolver pipeline position:** Step 26 (`effective[26]`, after `funnel` at step 25)
 
-**`EffectiveCapabilityResolver.ts`** — add `resolveCouponOptions()` call in pipeline.
+**`EffectiveCapabilityResolver.ts`** — add `resolveCouponOptions()` call in both `Promise.all` pipelines (primary + MV-based), add to `effective[26]` in result object mapping.
 
 **`resolvers/types.ts`** — add to `EffectiveCapabilities.effective`:
 ```typescript
 coupon_options: EffectiveCouponOptions;
 ```
+Also add `CouponOptionsMerchantSettings` interface and `couponOptions` field to `MerchantSettingsBundle`.
 
-**Frontend `CapabilityResolutionService.ts`** — add `CouponOptionsState` interface.
+**`resolvers/index.ts`** — export `resolveCouponOptions` from barrel file.
 
-**Frontend `UnifiedCapabilityService.ts`** — add `mapCouponOptions()` mapper.
+**`public-tenant-capabilities.ts`** — add `coupon_options` block to `buildExpiredCapabilitiesResponse()` with all fields disabled (R13 compliance).
+
+**`EffectiveCapabilityResolver.ts` subscription-status override** — add `result.effective.coupon_options.enabled = false` to both `isReadOnly` and `isLimited` blocks (coupon CRUD is write-heavy).
+
+**Frontend `CapabilityResolutionService.ts`** — add `CouponOptionsState` interface, fallback resolver, and add to `AllCapabilitiesState`.
+
+**Frontend `UnifiedCapabilityService.ts`** — add `BackendEffectiveCouponOptions`, `mapCouponOptions()` mapper, `getCouponOptionsState()` method.
 
 **Frontend `useCapabilityAccess.ts`** — add `useCouponCapability` hook.
+
+**Frontend `effective-capabilities.ts`** — add `CouponOptionsState` re-export.
+
+**Frontend `TenantInfoService.ts`** — add `getCouponSettings()` + `updateCouponSettings()` methods.
+
+**Frontend `PlanSummaryWidget.tsx`** — add entry to `CAPABILITY_META` array (label, icon, prefix, settingsPath).
+
+**Frontend `PlanSummaryPanel.tsx`** — add entry to `CAPABILITY_DISPLAY` map + summary block in `resolveCapabilitySummaries()`.
+
+**Frontend `PublicUnifiedCapabilityService.ts`** — add `CouponOptionsState` to `AllCapabilitiesState` mapping for public storefront reads.
+
+**Admin `capability-constraints.ts`** — if CCL constraints are added (see Section 6.7), update `CONSTRAINT_METADATA` with `coupon_options` entry (key, label, fields, value_type, operators, values).
 
 ### 3.7 Bot Knowledge Integration (Optional Enhancement)
 
@@ -358,7 +393,7 @@ Following the pattern from `BotKnowledgeEmbeddingService.ts`:
 
 **Aligned with**: `docs/BSAAS_COUPONS_GAP_CLOSURE_AND_QR_PLAN.md` Phases 3-5
 
-The BSaaS QR plan introduces styled QR codes for platform promo codes using the `qr-code-styling` library. Merchant coupons reuse the same infrastructure with a different URL scheme and icon source.
+The platform has a unified QR generation engine (`@/apps/web/src/lib/qr-engine.ts`) that serves as the single source of truth for all QR surfaces — storefront QR, BSaaS promo codes, private grant tokens, and product QR codes. Merchant coupons integrate into this same engine with new coupon-specific templates and a different URL scheme.
 
 #### QR URL Scheme
 
@@ -368,25 +403,47 @@ https://{storefrontDomain}/?coupon={couponCode}
 
 The storefront checkout page reads `coupon` from the URL query string and pre-fills the coupon code input. This mirrors the BSaaS scheme (`/settings/feature-store?promo={code}`) but targets the customer-facing storefront instead of the platform Feature Store.
 
+**Short-code variant** (see §3.9): For QR codes and offline sharing, a compact URL using the tenant's 4-character autoId is preferred:
+```
+https://visibleshelf.com/s/{autoId}?c={couponCode}
+```
+Example: `https://visibleshelf.com/s/FRSH?c=SUMMER20` — 35 chars vs 60+ for full slug URL. See §3.9 for resolution architecture.
+
 #### Shared Infrastructure from BSaaS QR Plan
 
-| Component | BSaaS QR Plan | Merchant Coupon Reuse |
+| Component | Existing Infrastructure | Merchant Coupon Integration |
 |---|---|---|
-| `qr-code-styling` library | Phase 3 install | Same package, no additional install |
-| `PromoCodeQRDialog.tsx` | Phase 3 new component | Extended as `CouponQRDialog.tsx` — same dialog shell, different URL scheme + icon source |
-| `qr-style-config.ts` | Phase 3 shared theme presets | Same theme presets + new "Merchant Promo" theme |
-| Target-aware icon embedding | Phase 3 (feature icon from `features_list.icon_name`) | Merchant coupon icon from discount type (percent icon, fixed amount icon, free shipping icon, BOGO icon) |
-| `storefront_opt_qr_styled_on` | Phase 5 public-surface QR pilot | Merchant coupon QR uses `coupon_qr_sharing` feature key (separate capability domain) |
-| Lucide SVG icon generation | Phase 3 `lucide-static` approach | Same approach for discount-type icons |
+| `qr-engine.ts` | Unified QR engine — templates, options merging, gradient + logo overlay | Add coupon-specific templates to `QrTemplateName` union + `QR_TEMPLATES` map |
+| `qr-code-styling` library | Already installed (used by styled QR path) | Same package, no additional install |
+| `PromoCodeQRDialog.tsx` | BSaaS promo QR dialog (uses `qr-engine` + `qr-style-constants`) | Extended as `CouponQRDialog.tsx` — same dialog shell pattern, different URL scheme + icon source |
+| `qr-style-config.ts` | Shared theme presets + `buildQROptions()` / `buildQROptionsFromSettings()` | Extend with coupon-specific theme configs if needed (primary engine is `qr-engine.ts`) |
+| `qr-style-constants.ts` | `DOT_STYLES`, `CORNER_STYLES`, `CORNER_DOT_STYLES` arrays for style pickers | Reuse same constants in `CouponQRDialog.tsx` style controls |
+| `QrEngineOptions` interface | Full styling options (dotType, cornerType, gradient, logo, etc.) | `CouponQRDialog.tsx` uses same interface for QR generation |
+| Target-aware icon embedding | BSaaS: feature icon from `features_list.icon_name` | Merchant coupon: discount type icon (percent, dollar, truck, gift) |
+| `storefront_opt_qr_styled_on` | Phase 5 public-surface QR pilot feature key | Merchant coupon QR uses `coupon_qr_sharing` feature key (separate capability domain) |
+| Lucide SVG icon generation | `lucide-static` approach for BSaaS icons | Same approach for discount-type icons |
 
 #### QR Style Themes
 
-| Theme | Dot Style | Color | Corners | Icon | Use Case |
+Existing templates in `qr-engine.ts` that can be reused directly:
+
+| Template | `QrTemplateName` | Dot Style | Color | Corners | Use Case |
 |---|---|---|---|---|---|
-| **Merchant Promo (default)** | `rounded` | Blue `#1a56db` | `extra-rounded` | Discount type icon or merchant logo | General coupon sharing |
-| **Flash Sale** | `classy-rounded` | Red `#dc2626` | `rounded` | Percent icon | Limited-time percent off |
-| **Free Shipping** | `extra-rounded` | Green `#16a34a` | `extra-rounded` | Truck icon | Free shipping coupons |
-| **BOGO** | `dots` | Purple `#7c3aed` | `dot` | BOGO icon | Buy-one-get-one campaigns |
+| **Promo (Default)** | `promo` | `rounded` | Blue `#1a56db` | `extra-rounded` | General coupon sharing |
+| **Promo (Sale)** | `promo-sale` | `classy-rounded` | Red `#dc2626` | `rounded` | Limited-time percent off |
+| **Bundle Promo** | `bundle-promo` | `extra-rounded` | Green `#16a34a` | `extra-rounded` | Free shipping / bundle discounts |
+| **Private Grant** | `private-grant` | `dots` | Purple `#7c3aed` | `dot` | BOGO / exclusive campaigns |
+
+New coupon-specific templates to add to `QrTemplateName` in `qr-engine.ts`:
+
+| Template | `QrTemplateName` | Dot Style | Color | Corners | Icon | Use Case |
+|---|---|---|---|---|---|---|
+| **Merchant Promo** | `merchant-promo` | `rounded` | Blue `#1a56db` | `extra-rounded` | Discount type icon or merchant logo | Default coupon sharing |
+| **Flash Sale** | `coupon-flash` | `classy-rounded` | Red `#dc2626` | `rounded` | Percent icon | Limited-time percent off |
+| **Free Shipping** | `coupon-free-ship` | `extra-rounded` | Green `#16a34a` | `extra-rounded` | Truck icon | Free shipping coupons |
+| **BOGO** | `coupon-bogo` | `dots` | Purple `#7c3aed` | `dot` | Gift icon | Buy-one-get-one campaigns |
+
+> **Note**: The existing `promo`, `promo-sale`, `bundle-promo`, and `private-grant` templates can be used directly for coupon QR codes. The new coupon-specific templates are optional — they provide distinct visual identities for merchant coupons vs platform promo codes. If added, they must be appended to the `QrTemplateName` union type and `QR_TEMPLATES` map in `qr-engine.ts`.
 
 #### Discount-Type-Aware QR Icon Resolution
 
@@ -412,7 +469,10 @@ Returns QR metadata for client-side rendering:
 {
   "success": true,
   "data": {
-    "qr_url": "https://store.visibleshelf.com/?coupon=SUMMER20",
+    "qr_url": "https://visibleshelf.com/s/FRSH?c=SUMMER20",
+    "short_code_url": "https://visibleshelf.com/s/FRSH?c=SUMMER20",
+    "full_url": "https://store.visibleshelf.com/?coupon=SUMMER20",
+    "auto_id": "FRSH",
     "coupon_code": "SUMMER20",
     "discount_type": "percent_off",
     "discount_value": 20,
@@ -431,9 +491,10 @@ Returns QR metadata for client-side rendering:
 
 **File**: `apps/web/src/app/t/[tenantId]/settings/coupons/CouponQRDialog.tsx` (new)
 
-- Reuses `PromoCodeQRDialog.tsx` dialog shell from BSaaS QR plan Phase 3
-- Generates styled QR client-side using `qr-code-styling`
+- Reuses `PromoCodeQRDialog.tsx` dialog shell pattern from BSaaS QR (same imports: `qr-engine`, `qr-style-constants`, `SectionBadge`, `Accordion`)
+- Generates styled QR client-side using `generateQrInstance()` from `qr-engine.ts`
 - Shows coupon code, storefront URL, discount info
+- URL selector: short-code URL (`/s/FRSH?c=SUMMER20`) as default for QR encoding, full storefront URL (`/tenant/{tenantId}?coupon={code}`) as optional fallback in "Copy link" dropdown
 - Theme selector (4 merchant-specific presets above)
 - Download buttons: PNG, SVG, Copy link
 - "Share to social" buttons (optional): generates a post with QR image + coupon text
@@ -441,13 +502,89 @@ Returns QR metadata for client-side rendering:
 
 #### Storefront Auto-Fill from URL
 
-**File**: Storefront checkout page (cart/checkout component)
+**File**: Storefront checkout page (`/tenant/[id]` — cart/checkout component within the modern storefront)
 
 - On page load, read `coupon` from `useSearchParams()`
 - If present, pre-fill the coupon code input and auto-validate
 - Show toast: "Coupon SUMMER20 applied — 20% off your order!"
 - If invalid (expired, usage limit), show error toast
 - This mirrors the BSaaS Feature Store auto-fill from `?promo=` (Phase 3.5)
+
+### 3.9 Short-Code Tenant Resolution via 4-Character Auto ID
+
+The platform has three tenant identification channels, all resolved through `UniversalIdentifierCache.resolveIdentifier()` (`@/apps/api/src/services/UniversalIdentifierCache.ts:97-143`):
+
+| Identifier | Format | Example | Resolution Path |
+|---|---|---|---|
+| **Tenant ID** | `tid-{nanoid}` | `tid-042hi7ju` | `prisma.tenants.findUnique({ where: { id } })` — direct PK lookup |
+| **Slug** | `business-name-state` | `fresh-market-downtown` | `prisma.tenants.findFirst({ where: { slug } })` — indexed lookup |
+| **Auto ID (4-char key)** | `[A-Z0-9]{4}` | `FRSH` | `prisma.tenants.findMany({ where: { metadata: { path: ['autoId'], equals } } })` — JSONB metadata lookup |
+
+The 4-character key is generated by `generateTenantKey()` in `@/apps/api/src/lib/id-generator.ts:499-518` — a deterministic hash from tenant ID using a 32-character alphabet (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, no ambiguous chars 0/O/1/I). The same algorithm is duplicated in `@/apps/api/src/middleware/tenantAutoId.ts:11-31`.
+
+**Existing infrastructure for autoId:**
+
+| Component | Location | Status |
+|---|---|---|
+| `generateTenantKey()` | `apps/api/src/lib/id-generator.ts:499` | Active — used in all ID generators (orders, items, photos, etc.) |
+| `generateTenantAutoId()` | `apps/api/src/middleware/tenantAutoId.ts:11` | Active — middleware + standalone |
+| `isTenantAutoId()` | `apps/api/src/middleware/tenantAutoId.ts:85` | Active — validates `/^[A-Z0-9]{4}$/` pattern |
+| `resolveTenantByIdentifier()` | `apps/api/src/services/TenantSingletonService.ts:824` | Active — tries tid → autoId → slug |
+| `UniversalIdentifierCache.resolveIdentifier()` | `apps/api/src/services/UniversalIdentifierCache.ts:97` | Active — tries tid → slug → autoId (metadata JSONB) |
+| `autoIdUrl` in `TenantInfo.urls` | `apps/api/src/services/TenantSingletonService.ts:56` | Active — `/shops/{autoId}` URL generated |
+| `/api/shops/:identifier` | `apps/api/src/routes/shops.ts:142` | Active — accepts any identifier |
+| `/api/public/shops/:identifier` | `apps/api/src/routes/public-catalog.ts:1560` | Active — public shop lookup by any identifier |
+| Frontend `autoIdUrl` links | `apps/web/src/components/shops/ShopCard.tsx:117` | Active — "Short" link button in shop cards |
+
+**Proposed short-code route for coupons:**
+
+A new public route `/s/:autoId` (or `/s/:autoId?c={couponCode}`) would resolve the tenant via `UniversalIdentifierCache` and redirect to the storefront with the coupon code pre-filled:
+
+```
+GET /s/FRSH?c=SUMMER20
+  → resolveIdentifier('FRSH') → { id: 'tid-xxx', slug: 'fresh-market-downtown' }
+  → 302 redirect to /tenant/tid-xxx?coupon=SUMMER20
+```
+
+This provides the shortest possible QR URL for offline coupon sharing (print, physical QR, social media) while maintaining full compatibility with the existing identifier resolution system. The redirect targets `/tenant/{id}` (the modern storefront) rather than `/shops/{slug}` (the legacy directory).
+
+**Why 4-char autoId is ideal for coupon QR codes:**
+
+1. **Compact** — 4 chars vs 14+ for `tid-042hi7ju` or 20+ for slug. QR codes with less data are more scannable at smaller sizes.
+2. **URL-safe** — uppercase alphanumeric only, no encoding needed
+3. **Already resolved** — `UniversalIdentifierCache` handles the lookup with 15-min encrypted cache
+4. **Frontend support** — `autoIdUrl` already generated in `TenantInfo.urls`, "Short" link buttons exist in `ShopCard.tsx`
+5. **Deterministic** — same tenant always produces same key (hash-based, not random)
+6. **No PII** — 4-char hash reveals nothing about the merchant name or location
+
+**Known gap — metadata persistence**: The `UniversalIdentifierCache.resolveFromDatabase()` method (line 222-261) looks up autoId via `metadata->>'autoId'` JSONB path, but `generateTenantAutoId()` is a pure hash function with no database persistence step. The `warmCache()` method (line 321-327) checks `metadata.autoId` — implying the autoId should be stored in tenant metadata. **Recommendation**: The coupon migration (`118_tenant_coupons.sql`) or a prerequisite migration should persist `autoId` into `tenants.metadata` for all existing tenants:
+```sql
+UPDATE tenants SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('autoId', upper(substr(encode(decode(
+  -- deterministic 4-char hash matching generateTenantKey() algorithm
+  -- computed in application layer during migration backfill
+), 'hex'), 'base64'), 1, 4)) WHERE metadata->>'autoId' IS NULL;
+```
+Alternatively, a backfill script in `scripts/` can iterate tenants and call `generateTenantKey(tenantId)` to populate `metadata.autoId`.
+
+**Coupon QR URL comparison:**
+
+| URL Format | Example | Chars | QR Density | Use Case |
+|---|---|---|---|---|
+| Full storefront + query | `https://visibleshelf.com/tenant/tid-042hi7ju?coupon=SUMMER20` | 58 | Medium | Online sharing (email, social) |
+| Short-code + query | `https://visibleshelf.com/s/FRSH?c=SUMMER20` | 42 | Low (high scannability) | **QR codes, print, physical** |
+| Legacy shops + query | `https://visibleshelf.com/shops/fresh-market-downtown?coupon=SUMMER20` | 68 | High (low scannability) | Legacy directory (not for QR) |
+
+The short-code URL produces a less dense QR matrix, enabling smaller print sizes and faster scan rates — critical for physical coupon distribution (table tents, flyers, packaging inserts).
+
+**Frontend short-code redirect page:**
+
+**File**: `apps/web/src/app/s/[autoId]/page.tsx` (new)
+
+- Server component — reads `autoId` from route params + `c` from query string
+- Calls `/api/public/shops/:identifier` to resolve tenant
+- Redirects to `/tenant/{tenantId}?coupon={c}` (official modern storefront at `/tenant/[id]`)
+- 302 redirect (not 301 — tenant slug or ID may change)
+- Error handling: invalid autoId → 404 page with "Store not found"
 
 ---
 
@@ -490,24 +627,27 @@ Following `PARENT_GATE_FEATURES`:
 
 ### Phase 1: Database & Capability Registration (3-4 days)
 
-- [ ] Migration: `098_tenant_coupons.sql` — `tenant_coupons` + `coupon_redemptions` tables, RLS, indexes, triggers
+- [ ] Migration: `118_tenant_coupons.sql` — `tenant_coupons` + `coupon_redemptions` tables, RLS, indexes, triggers. Also seed `coupon_options` capability type, 14 feature keys (1 gate + 1 disabled + 1 flexible + 2 group gates + 9 individual), `capability_features_list` links, `tier_features_list` entries, `bsaas_catalog` entries, and `navigation_links` INSERT for sidebar link
 - [ ] Prisma schema: Add both models via `db pull` + `prisma generate`
 - [ ] ID generators: `generateCouponId()` (`cpn-{tk}-{nanoid}`), `generateRedemptionId()` (`redm-{tk}-{nanoid}`)
-- [ ] Seed `features_list`: 11 coupon feature keys (1 capability gate + 2 group gates + 8 individual)
+- [ ] Seed `features_list`: 14 coupon feature keys (1 capability gate + 1 disabled + 1 flexible + 2 group gates + 9 individual)
 - [ ] Seed `capability_features_list`: Link features to `coupon_options` capability type
 - [ ] Seed `tier_features_list`: Enable features for Professional+ tiers
-- [ ] Seed `bsaas_catalog`: 10 catalog entries with pricing (group gate + individual keys; `_off` key not sold)
-- [ ] `canonical-features.ts`: Add 11 coupon feature definitions (including group gates + `coupon_qr_sharing`)
+- [ ] Seed `bsaas_catalog`: 11 catalog entries with pricing (group gate + individual keys; `_off` key and `_disabled` key not sold)
+- [ ] Seed `navigation_links`: INSERT coupon management sidebar link (database-driven nav)
+- [ ] Feature definitions are seeded via SQL migration (no `canonical-features.ts` or `tier-hierarchies.ts` files exist in this codebase — features go directly into `features_list` via migration)
 
 ### Phase 2: Backend Services & Routes (4-5 days)
 
 - [ ] `CouponService.ts` — CRUD, validate, redeem, analytics
-- [ ] `CouponResolver.ts` — capability resolver
-- [ ] `resolvers/types.ts` — add `EffectiveCouponOptions` to `EffectiveCapabilities`
-- [ ] `EffectiveCapabilityResolver.ts` — wire resolver into pipeline
+- [ ] `CouponResolver.ts` — capability resolver (include `flexible ||` prefix on all feature flag checks per R23)
+- [ ] `resolvers/types.ts` — add `EffectiveCouponOptions` + `CouponOptionsMerchantSettings` to types, add `coupon_options` to `EffectiveCapabilities.effective`, add `couponOptions` to `MerchantSettingsBundle`
+- [ ] `resolvers/index.ts` — export `resolveCouponOptions`
+- [ ] `EffectiveCapabilityResolver.ts` — wire resolver into both pipelines (primary + MV-based), add `effective[26]` mapping, add to `isReadOnly` + `isLimited` blocks
+- [ ] `public-tenant-capabilities.ts` — add `coupon_options` to `buildExpiredCapabilitiesResponse()`
 - [ ] Tenant routes: `/api/tenants/:tenantId/coupons` (CRUD + analytics)
-- [ ] Public route: `/api/public/coupons/validate` (checkout validation)
-- [ ] Route mounts in `mounts/core-routes.ts` and `mounts/admin-routes.ts`
+- [ ] Public route: `/api/public/tenants/:tenantId/coupons/validate` (checkout validation, follows AUTH_SCOPE_ISOLATION_SPEC FR-1)
+- [ ] Route registration in `routeRegistry.ts` (NOT `mounts/core-routes.ts` — that file does not exist; all routes are registered via `mountFromRegistry(app)` in `index.ts`)
 - [ ] `PARENT_GATE_FEATURES` — add `coupon_options: 'coupon_enabled'`
 - [ ] Zod validation schemas for all endpoints
 - [ ] Audit logging for coupon CRUD
@@ -526,15 +666,24 @@ Following `PARENT_GATE_FEATURES`:
 
 ### Phase 4: Frontend Merchant UI (4-5 days)
 
-- [ ] `CouponService.ts` (frontend) — singleton extending `TenantApiSingleton`
+- [ ] `CouponService.ts` (frontend) — singleton extending `TenantApiSingleton` for merchant UI
+- [ ] `PublicCouponService.ts` (frontend) — singleton extending `PublicApiSingleton` for customer-facing coupon validation (separate service per AUTH_SCOPE_ISOLATION_SPEC FR-2a)
 - [ ] `/t/:tenantId/settings/coupons/page.tsx` — server component
 - [ ] `CouponManagementClient.tsx` — coupon table, create/edit modal, deactivate
 - [ ] Coupon create form: code, type, value, min spend, max redemptions, expiry, targeting
 - [ ] Analytics view: per-coupon stats, dashboard summary
 - [ ] `TenantSettings.tsx` — "Coupons & Promotions" settings card
-- [ ] `DynamicTenantSidebar.tsx` — sidebar link (database-driven nav)
 - [ ] `CapabilityShowcase.tsx` — "Coupons" row
+- [ ] `PlanSummaryWidget.tsx` — add entry to `CAPABILITY_META` (slim dashboard widget)
+- [ ] `PlanSummaryPanel.tsx` — add entry to `CAPABILITY_DISPLAY` + summary block (full plan page)
+- [ ] `UnifiedCapabilityService.ts` — `mapCouponOptions()` mapper + `getCouponOptionsState()` method
+- [ ] `CapabilityResolutionService.ts` — `CouponOptionsState` interface + fallback resolver + add to `AllCapabilitiesState`
+- [ ] `effective-capabilities.ts` — re-export `CouponOptionsState`
+- [ ] `useCapabilityAccess.ts` — `useCouponCapability` hook
+- [ ] `TenantInfoService.ts` — `getCouponSettings()` + `updateCouponSettings()` methods
+- [ ] `PublicUnifiedCapabilityService.ts` — add coupon state to public capability mapping
 - [ ] Capability gating: hide UI when `coupon_options.enabled === false`
+- [ ] Icon registration: `useNavLinks.tsx`, `NavItemRow.tsx`, admin navigation `page.tsx` `IconComponents` map
 - [ ] **QR button** in coupon table — visible only when `coupon_qr_sharing` feature key enabled
 - [ ] `CouponQRDialog.tsx` — styled QR dialog (reuses `PromoCodeQRDialog` shell from BSaaS QR plan Phase 3)
 - [ ] QR theme presets: Merchant Promo, Flash Sale, Free Shipping, BOGO (extends `qr-style-config.ts`)
@@ -543,10 +692,10 @@ Following `PARENT_GATE_FEATURES`:
 ### Phase 5: Frontend Customer Checkout UI (2-3 days)
 
 - [ ] Coupon code input field in cart/checkout page
-- [ ] "Apply Coupon" button → calls `/api/public/coupons/validate`
+- [ ] "Apply Coupon" button → calls `/api/public/tenants/:tenantId/coupons/validate` via `PublicCouponService`
 - [ ] Discount line in order summary
 - [ ] Error/success states
-- [ ] Hide coupon input when tenant doesn't have coupon capability
+- [ ] Hide coupon input when tenant doesn't have coupon capability (check via `PublicUnifiedCapabilityService`)
 - [ ] Integration with existing checkout payment flow
 - [ ] **Storefront auto-fill from URL** — read `coupon` from `useSearchParams()`, pre-fill code, auto-validate (mirrors BSaaS Feature Store `?promo=` auto-fill from QR plan Phase 3.5)
 - [ ] Toast on auto-fill: "Coupon SUMMER20 applied — 20% off!"
@@ -557,20 +706,24 @@ Following `PARENT_GATE_FEATURES`:
 - [ ] `BotDynamicResponseService` — coupon RAG search
 - [ ] Refresh triggers on coupon CRUD
 - [ ] `BotKnowledgePage.tsx` — coupon embeddings card
-- [ ] Frontend capability hooks: `useCouponCapability`
-- [ ] `UnifiedCapabilityService.ts` — `mapCouponOptions()` mapper
+- [ ] `BotService.ts` (frontend) — extend `refreshKnowledgeEmbeddings` sourceType union + status types
 - [ ] Settings page for merchant coupon preferences (toggle domain)
+- [ ] `admin/capability-constraints.ts` — update `CONSTRAINT_METADATA` with `coupon_options` entry if CCL constraints added (see Section 6.7)
 
-### Phase 7: QR Code Sharing (2-3 days, depends on BSaaS QR Plan Phase 3)
+### Phase 7: QR Code Sharing & Short-Code Routes (3-4 days, depends on BSaaS QR Plan Phase 3)
 
-- [ ] Backend: `GET /api/tenants/:tenantId/coupons/:id/qr` — returns QR metadata (URL, discount type icon, merchant logo)
-- [ ] `CouponQRDialog.tsx` — styled QR dialog reusing `PromoCodeQRDialog` shell + `qr-code-styling` from BSaaS QR plan
-- [ ] Extend `qr-style-config.ts` with merchant coupon themes (Merchant Promo, Flash Sale, Free Shipping, BOGO)
+- [ ] Backend: `GET /api/tenants/:tenantId/coupons/:id/qr` — returns QR metadata (short-code URL, discount type icon, merchant logo)
+- [ ] `CouponQRDialog.tsx` — styled QR dialog reusing `PromoCodeQRDialog` shell pattern + `qr-engine.ts` (`generateQrInstance`, `QR_TEMPLATE_LIST`, `QrTemplateName`)
+- [ ] Add coupon-specific templates to `qr-engine.ts` `QrTemplateName` union + `QR_TEMPLATES` map (merchant-promo, coupon-flash, coupon-free-ship, coupon-bogo)
+- [ ] Extend `qr-style-config.ts` with coupon theme configs if needed (primary engine is `qr-engine.ts`)
 - [ ] Discount-type-aware icon resolution: `percent_off` → `IconPercent`, `fixed_amount` → `IconDollarSign`, `free_shipping` → `IconTruck`, `bogo` → `IconGift` (uses `lucide-static` approach from BSaaS QR plan Phase 3)
 - [ ] Merchant logo override: if `tenant_business_profile` has a logo, use it as QR center image
 - [ ] Storefront checkout auto-fill from `?coupon=` URL param
 - [ ] Capability gating: QR button visible only when `coupon_qr_sharing` feature key enabled
 - [ ] Download: PNG, SVG, Copy link
+- [ ] **Short-code redirect route**: `apps/web/src/app/s/[autoId]/page.tsx` — server component that resolves autoId via `/api/public/shops/:identifier` and 302-redirects to `/tenant/{tenantId}?coupon={c}` (official storefront, not legacy `/shops/` route) (see §3.9)
+- [ ] **Metadata backfill**: Prerequisite migration or `scripts/backfill_tenant_autoid.ts` script to persist `generateTenantKey(tenantId)` into `tenants.metadata.autoId` for all existing tenants (see §3.9 known gap)
+- [ ] **QR URL default**: Coupon QR codes use short-code URL `https://visibleshelf.com/s/{autoId}?c={couponCode}` by default; full storefront URL (`/tenant/{tenantId}?coupon={code}`) available as fallback in `CouponQRDialog.tsx` "Copy link" dropdown
 
 **Dependency**: Requires `qr-code-styling` package install + `PromoCodeQRDialog.tsx` from BSaaS QR plan Phase 3. If BSaaS QR plan is not yet implemented, Phase 7 can be deferred — merchant coupons function fully without QR sharing.
 
@@ -667,7 +820,7 @@ The Cross-Capability Constraint Layer (CCL) could enforce:
 
 | File | Purpose |
 |---|---|
-| `database/migrations/098_tenant_coupons.sql` | Table creation + RLS + indexes |
+| `database/migrations/118_tenant_coupons.sql` | Table creation + RLS + indexes + feature/capability/tier/bsaas_catalog/nav_links seeds |
 | `apps/api/src/services/CouponService.ts` | Backend coupon service (CRUD + validate + redeem) |
 | `apps/api/src/services/resolvers/CouponResolver.ts` | Capability resolver |
 | `apps/api/src/routes/coupons.ts` | Tenant coupon CRUD routes |
@@ -677,6 +830,9 @@ The Cross-Capability Constraint Layer (CCL) could enforce:
 | `apps/web/src/app/t/[tenantId]/settings/coupons/CouponManagementClient.tsx` | Merchant coupon UI |
 | `apps/web/src/app/t/[tenantId]/settings/coupons/CouponQRDialog.tsx` | Styled QR dialog for merchant coupons (reuses `PromoCodeQRDialog` shell) |
 | `apps/web/src/hooks/tenant-access/useCouponCapability.ts` | Capability hook |
+| `apps/web/src/app/s/[autoId]/page.tsx` | Short-code redirect page — resolves 4-char autoId → tenant slug, 302 redirect with coupon code (see §3.9) |
+| `apps/web/src/services/PublicCouponService.ts` | Public coupon validation service (extends `PublicApiSingleton`) |
+| `scripts/backfill_tenant_autoid.ts` | Backfill script — persists `generateTenantKey(tenantId)` into `tenants.metadata.autoId` for all existing tenants |
 
 ### Modified Files
 
@@ -688,17 +844,22 @@ The Cross-Capability Constraint Layer (CCL) could enforce:
 | `apps/api/src/services/EffectiveCapabilityResolver.ts` | Wire `CouponResolver` into pipeline |
 | `apps/api/src/routes/checkout.ts` | Add coupon validation step |
 | `apps/api/src/routes/bsaas-purchases.ts` | Add `coupon_options` to `PARENT_GATE_FEATURES` |
-| `apps/api/src/routes/mounts/core-routes.ts` | Mount coupon routes |
-| `apps/api/src/routes/routeRegistry.ts` | Register coupon routes |
+| `apps/api/src/routes/routeRegistry.ts` | Register coupon routes (all route mounting via `mountFromRegistry`) |
 | `apps/web/src/services/CapabilityResolutionService.ts` | Add `CouponOptionsState` |
 | `apps/web/src/services/UnifiedCapabilityService.ts` | Add `mapCouponOptions()` |
 | `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts` | Add `useCouponCapability` |
 | `apps/web/src/components/dashboard/CapabilityShowcase.tsx` | Add "Coupons" row |
 | `apps/web/src/components/settings/TenantSettings.tsx` | Add "Coupons & Promotions" card |
-| `packages/feature-definitions/src/definitions/canonical-features.ts` | Add 11 coupon feature definitions (capability gate + group gates + individual keys) |
-| `packages/feature-definitions/src/definitions/tier-hierarchies.ts` | Add coupon features to Professional+ tiers |
-| `apps/web/src/lib/qr-style-config.ts` | Extend with merchant coupon QR themes (shared with BSaaS QR plan) |
+| `database/migrations/118_tenant_coupons.sql` | Also seeds `features_list`, `capability_features_list`, `tier_features_list`, `bsaas_catalog`, `navigation_links` (no separate canonical-features.ts file exists in this codebase) |
+| `apps/web/src/lib/qr-engine.ts` | Add coupon-specific templates to `QrTemplateName` union + `QR_TEMPLATES` map |
+| `apps/web/src/lib/qr-style-config.ts` | Extend with coupon theme configs (secondary to `qr-engine.ts`) |
+| `apps/web/src/lib/qr-style-constants.ts` | Reused as-is (DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES for `CouponQRDialog` style controls) |
 | Storefront checkout page | Read `coupon` from URL, pre-fill + auto-validate |
+| `apps/web/src/services/PublicCouponService.ts` | Public coupon validation service (extends `PublicApiSingleton`) |
+| `apps/api/src/services/resolvers/index.ts` | Export `resolveCouponOptions` |
+| `apps/web/src/types/effective-capabilities.ts` | Re-export `CouponOptionsState` |
+| `apps/web/src/services/TenantInfoService.ts` | `getCouponSettings` + `updateCouponSettings` methods |
+| `apps/web/src/services/PublicUnifiedCapabilityService.ts` | Add coupon state to public capability mapping |
 
 ---
 

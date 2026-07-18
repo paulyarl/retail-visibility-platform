@@ -10,6 +10,8 @@ import { useStorefrontQrCapability, useAllCapabilities } from '@/hooks/tenant-ac
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 import QrPreviewPane from './QrPreviewPane';
+import { SectionBadge } from '@/components/qr/SectionBadge';
+import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES, RESOLUTIONS } from '@/lib/qr-style-constants';
 import {
   Accordion,
   AccordionItem,
@@ -81,40 +83,6 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   default_qr_resolution: '1024',
 };
 
-const DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
-  { value: 'dots', label: 'Dots' },
-  { value: 'classy', label: 'Classy' },
-  { value: 'classy-rounded', label: 'Classy Rounded' },
-];
-
-const CORNER_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded Square' },
-  { value: 'extra-rounded', label: 'Round Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const CORNER_DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const RESOLUTIONS = [
-  { value: '512', label: '512px' },
-  { value: '1024', label: '1024px' },
-  { value: '2048', label: '2048px' },
-];
-
-function SectionBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">
-      {children}
-    </span>
-  );
-}
 
 export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSettingsClientProps) {
   const [settings, setSettings] = useState<StorefrontQrSettings>(DEFAULT_SETTINGS);
