@@ -9,33 +9,14 @@ import {
 } from '@/lib/qr-engine';
 import { Download, Copy, Check, QrCode, Palette, Sparkles, Link2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 
-const DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
-  { value: 'dots', label: 'Dots' },
-  { value: 'classy', label: 'Classy' },
-  { value: 'classy-rounded', label: 'Classy Rounded' },
-];
-
-const CORNER_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded Square' },
-  { value: 'extra-rounded', label: 'Round Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const CORNER_DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const SIZE_OPTIONS = [
-  { value: 256, label: '256px' },
-  { value: 512, label: '512px' },
-  { value: 768, label: '768px' },
-  { value: 1024, label: '1024px' },
-];
+import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES, SIZE_OPTIONS } from '@/lib/qr-style-constants';
+import { SectionBadge } from '@/components/qr/SectionBadge';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/Accordion';
 
 export default function QRGeneratorClient() {
   const [targetUrl, setTargetUrl] = useState('');
@@ -360,223 +341,281 @@ export default function QRGeneratorClient() {
 
         {/* Right: Styling Controls */}
         <div className="space-y-4">
-          {/* Theme Presets */}
-          <div className="p-4 rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-            <label className="text-sm font-medium mb-2 block">Templates</label>
-            <div className="grid grid-cols-2 gap-2">
-              {QR_TEMPLATE_LIST.map((t) => (
-                <button
-                  key={t.name}
-                  onClick={() => applyTemplate(t.name)}
-                  className="px-3 py-2 text-xs rounded-md border text-left border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700"
-                >
-                  <div className="font-medium">{t.label}</div>
-                  <div className="text-neutral-400">{t.description}</div>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-neutral-400 mt-2">Click a template to apply, then customize below</p>
-          </div>
-
-          {/* Full QR Styling Controls */}
+          {/* Accordion Styling Controls */}
           <div className="space-y-4 p-4 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-neutral-700 dark:text-neutral-200">
-              <Palette className="w-4 h-4" />
-              QR Styling
-            </div>
+            <Accordion type="multiple" defaultValue={["templates"]} className="w-full">
 
-            {/* Dot Style */}
-            <div>
-              <label className="text-xs text-neutral-600 dark:text-neutral-400 mb-1.5 block">Dot Style</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {DOT_STYLES.map(s => (
-                  <div
-                    key={s.value}
-                    onClick={() => setDotType(s.value)}
-                    className={`flex items-center justify-center p-2 rounded border text-xs cursor-pointer transition-colors ${
-                      dotType === s.value
-                        ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
-                        : 'border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 hover:border-gray-300'
-                    }`}
-                  >
-                    {s.label}
+              {/* Section: Templates */}
+              <AccordionItem value="templates" className="border-b">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <Palette className="h-4 w-4 text-indigo-600" />
+                    <span className="font-medium text-neutral-900">Templates</span>
+                    <SectionBadge>{selectedTemplate}</SectionBadge>
                   </div>
-                ))}
-              </div>
-            </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {QR_TEMPLATE_LIST.map((t) => (
+                      <button
+                        key={t.name}
+                        onClick={() => applyTemplate(t.name)}
+                        className="px-3 py-2 text-xs rounded-md border text-left border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700"
+                      >
+                        <div className="font-medium">{t.label}</div>
+                        <div className="text-neutral-400">{t.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-2">Click a template to apply, then customize below</p>
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Corner Style */}
-            <div>
-              <label className="text-xs text-neutral-600 dark:text-neutral-400 mb-1.5 block">Corner Style</label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {CORNER_STYLES.map(s => (
-                  <div
-                    key={s.value}
-                    onClick={() => setCornerType(s.value)}
-                    className={`flex items-center justify-center p-2 rounded border text-xs cursor-pointer transition-colors ${
-                      cornerType === s.value
-                        ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
-                        : 'border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 hover:border-gray-300'
-                    }`}
-                  >
-                    {s.label}
+              {/* Section: Dot Style */}
+              <AccordionItem value="dot" className="border-b">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-neutral-900">Dot Style</span>
+                    <SectionBadge>{DOT_STYLES.find(s => s.value === dotType)?.label}</SectionBadge>
                   </div>
-                ))}
-              </div>
-            </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {DOT_STYLES.map(s => (
+                      <div
+                        key={s.value}
+                        onClick={() => setDotType(s.value)}
+                        className={`flex items-center justify-center p-2 rounded border text-xs cursor-pointer transition-colors ${
+                          dotType === s.value
+                            ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                            : 'border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 hover:border-gray-300'
+                        }`}
+                      >
+                        {s.label}
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Corner Dot Style */}
-            <div>
-              <label className="text-xs text-neutral-600 dark:text-neutral-400 mb-1.5 block">Corner Dot Style</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {CORNER_DOT_STYLES.map(s => (
-                  <div
-                    key={s.value}
-                    onClick={() => setCornerDotType(s.value)}
-                    className={`flex items-center justify-center p-2 rounded border text-xs cursor-pointer transition-colors ${
-                      cornerDotType === s.value
-                        ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
-                        : 'border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 hover:border-gray-300'
-                    }`}
-                  >
-                    {s.label}
+              {/* Section: Corner Style */}
+              <AccordionItem value="corner" className="border-b">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-neutral-900">Corner Style</span>
+                    <SectionBadge>{CORNER_STYLES.find(s => s.value === cornerType)?.label}</SectionBadge>
                   </div>
-                ))}
-              </div>
-            </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {CORNER_STYLES.map(s => (
+                      <div
+                        key={s.value}
+                        onClick={() => setCornerType(s.value)}
+                        className={`flex items-center justify-center p-2 rounded border text-xs cursor-pointer transition-colors ${
+                          cornerType === s.value
+                            ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                            : 'border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 hover:border-gray-300'
+                        }`}
+                      >
+                        {s.label}
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Custom Colors */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Custom Colors</span>
-                <button
-                  onClick={() => setCustomColorsEnabled(!customColorsEnabled)}
-                  className={`relative w-8 h-4 rounded-full transition-colors ${
-                    customColorsEnabled ? 'bg-indigo-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-                    customColorsEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                  }`} />
-                </button>
-              </div>
-              {customColorsEnabled && (
-                <div className="grid grid-cols-4 gap-2">
-                  <div>
-                    <label className="text-xs text-neutral-400">Dots</label>
-                    <input type="color" value={dotColor} onChange={(e) => setDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+              {/* Section: Corner Dot Style */}
+              <AccordionItem value="corner-dot" className="border-b">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-neutral-900">Corner Dot Style</span>
+                    <SectionBadge>{CORNER_DOT_STYLES.find(s => s.value === cornerDotType)?.label}</SectionBadge>
                   </div>
-                  <div>
-                    <label className="text-xs text-neutral-400">Corners</label>
-                    <input type="color" value={cornerColor} onChange={(e) => setCornerColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {CORNER_DOT_STYLES.map(s => (
+                      <div
+                        key={s.value}
+                        onClick={() => setCornerDotType(s.value)}
+                        className={`flex items-center justify-center p-2 rounded border text-xs cursor-pointer transition-colors ${
+                          cornerDotType === s.value
+                            ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                            : 'border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 hover:border-gray-300'
+                        }`}
+                      >
+                        {s.label}
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <label className="text-xs text-neutral-400">Corner Dot</label>
-                    <input type="color" value={cornerDotColor} onChange={(e) => setCornerDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-neutral-400">Background</label>
-                    <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
-                  </div>
-                </div>
-              )}
-            </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Gradient */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Gradient Effect</span>
-                </div>
-                <button
-                  onClick={() => setGradientEnabled(!gradientEnabled)}
-                  className={`relative w-8 h-4 rounded-full transition-colors ${
-                    gradientEnabled ? 'bg-indigo-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-                    gradientEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                  }`} />
-                </button>
-              </div>
-              {gradientEnabled && (
-                <>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-neutral-400">Start</label>
-                    <input type="color" value={gradientStart} onChange={(e) => setGradientStart(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+              {/* Section: Custom Colors */}
+              <AccordionItem value="colors" className="border-b">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-neutral-900">Custom Colors</span>
+                    <SectionBadge>{customColorsEnabled ? 'On' : 'Off'}</SectionBadge>
                   </div>
-                  <div>
-                    <label className="text-xs text-neutral-400">End</label>
-                    <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
-                  </div>
-                </div>
-                {/* Per-element gradient targets */}
-                <div className="grid grid-cols-3 gap-2">
-                  <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
-                    <input type="checkbox" checked={gradientOnDots} onChange={(e) => setGradientOnDots(e.target.checked)} className="rounded border-gray-300" />
-                    Dots
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
-                    <input type="checkbox" checked={gradientOnCorners} onChange={(e) => setGradientOnCorners(e.target.checked)} className="rounded border-gray-300" />
-                    Corners
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
-                    <input type="checkbox" checked={gradientOnCornerDots} onChange={(e) => setGradientOnCornerDots(e.target.checked)} className="rounded border-gray-300" />
-                    Corner Dots
-                  </label>
-                </div>
-                </>
-              )}
-            </div>
-            {/* Logo Overlay */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200">
-                <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
-                Logo Overlay
-              </div>
-              <input
-                type="text"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://example.com/logo.png (optional)"
-                className="w-full px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              {trimmedLogoUrl && (
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-neutral-500">Shape:</span>
-                    <div className="flex gap-1">
-                      {(['square', 'circle'] as const).map(s => (
-                        <button
-                          key={s}
-                          onClick={() => setLogoShape(s)}
-                          className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                            logoShape === s
-                              ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
-                              : 'border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'
-                          }`}
-                        >
-                          {s === 'square' ? 'Square' : 'Circle'}
-                        </button>
-                      ))}
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Custom Colors</span>
+                      <button
+                        onClick={() => setCustomColorsEnabled(!customColorsEnabled)}
+                        className={`relative w-8 h-4 rounded-full transition-colors ${
+                          customColorsEnabled ? 'bg-indigo-500' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                          customColorsEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                        }`} />
+                      </button>
                     </div>
+                    {customColorsEnabled && (
+                      <div className="grid grid-cols-4 gap-2">
+                        <div>
+                          <label className="text-xs text-neutral-400">Dots</label>
+                          <input type="color" value={dotColor} onChange={(e) => setDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-neutral-400">Corners</label>
+                          <input type="color" value={cornerColor} onChange={(e) => setCornerColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-neutral-400">Corner Dot</label>
+                          <input type="color" value={cornerDotColor} onChange={(e) => setCornerDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-neutral-400">Background</label>
+                          <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => setLogoUrl('')}
-                    className="text-xs text-red-500 hover:text-red-600"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-              {trimmedLogoUrl && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Logo overlay uses error correction level H. PNG download includes logo; SVG download is not available with logo.
-                </p>
-              )}
-            </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Section: Gradient */}
+              <AccordionItem value="gradient" className="border-b">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-neutral-900">Gradient</span>
+                    <SectionBadge>{gradientEnabled ? 'On' : 'Off'}</SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Gradient Effect</span>
+                      </div>
+                      <button
+                        onClick={() => setGradientEnabled(!gradientEnabled)}
+                        className={`relative w-8 h-4 rounded-full transition-colors ${
+                          gradientEnabled ? 'bg-indigo-500' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                          gradientEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                        }`} />
+                      </button>
+                    </div>
+                    {gradientEnabled && (
+                      <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-neutral-400">Start</label>
+                          <input type="color" value={gradientStart} onChange={(e) => setGradientStart(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-neutral-400">End</label>
+                          <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                          <input type="checkbox" checked={gradientOnDots} onChange={(e) => setGradientOnDots(e.target.checked)} className="rounded border-gray-300" />
+                          Dots
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                          <input type="checkbox" checked={gradientOnCorners} onChange={(e) => setGradientOnCorners(e.target.checked)} className="rounded border-gray-300" />
+                          Corners
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                          <input type="checkbox" checked={gradientOnCornerDots} onChange={(e) => setGradientOnCornerDots(e.target.checked)} className="rounded border-gray-300" />
+                          Corner Dots
+                        </label>
+                      </div>
+                      </>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Section: Logo */}
+              <AccordionItem value="logo" className="border-b-0">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-neutral-900">Logo</span>
+                    <SectionBadge>{trimmedLogoUrl ? 'Set' : 'None'}</SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200">
+                      <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                      Logo Overlay
+                    </div>
+                    <input
+                      type="text"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      placeholder="https://example.com/logo.png (optional)"
+                      className="w-full px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    {trimmedLogoUrl && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-neutral-500">Shape:</span>
+                          <div className="flex gap-1">
+                            {(['square', 'circle'] as const).map(s => (
+                              <button
+                                key={s}
+                                onClick={() => setLogoShape(s)}
+                                className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                                  logoShape === s
+                                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                                    : 'border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'
+                                }`}
+                              >
+                                {s === 'square' ? 'Square' : 'Circle'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setLogoUrl('')}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                    {trimmedLogoUrl && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Logo overlay uses error correction level H. PNG download includes logo; SVG download is not available with logo.
+                      </p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+            </Accordion>
           </div>
         </div>
       </div>

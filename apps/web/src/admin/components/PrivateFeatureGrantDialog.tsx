@@ -22,29 +22,16 @@ import { adminBsaasCatalogService, type BsaasCatalogEntry } from '@/services/Adm
 import { type BsaasBundleEntry } from '@/services/AdminBsaasBundleService';
 import { adminOperationsService } from '@/services/AdminOperationsService';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES } from '@/lib/qr-style-constants';
+import { SectionBadge } from '@/components/qr/SectionBadge';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/Accordion';
 import { Input } from '@/components/ui/Input';
 import { X, Download, Copy, Check, QrCode, Loader2, AlertCircle, Palette, Sparkles } from 'lucide-react';
-
-const DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
-  { value: 'dots', label: 'Dots' },
-  { value: 'classy', label: 'Classy' },
-  { value: 'classy-rounded', label: 'Classy Rounded' },
-];
-
-const CORNER_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded Square' },
-  { value: 'extra-rounded', label: 'Round Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const CORNER_DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'dot', label: 'Round' },
-];
 
 interface PrivateFeatureGrantDialogProps {
   open: boolean;
@@ -424,8 +411,18 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                 <p className="text-xs text-neutral-400 mt-1">Click a template to apply, then customize below</p>
               </div>
 
-              {/* Full QR Styling Controls — mirrors storefront_qr capability settings */}
-              <div className="space-y-3 p-3 rounded-md bg-gray-50 border border-gray-200">
+              {/* Collapsible Advanced Styling */}
+              <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="advanced-styling" className="border-b-0">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-3 w-full">
+                    <Palette className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="font-medium text-neutral-900">Advanced Styling</span>
+                    <SectionBadge>{dotType}</SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-3 p-3 rounded-md bg-gray-50 border border-gray-200">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700">
                   <Palette className="w-3.5 h-3.5" />
                   QR Styling
@@ -577,6 +574,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                   )}
                 </div>
               </div>
+                </AccordionContent>
+              </AccordionItem>
+              </Accordion>
 
               <div>
                 <label className="text-xs font-medium text-neutral-600 mb-1 block">Feature</label>

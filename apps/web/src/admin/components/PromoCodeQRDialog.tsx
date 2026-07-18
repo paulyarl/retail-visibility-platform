@@ -20,7 +20,15 @@ import {
   adminBsaasPromotionsService,
   type PromoQRData,
 } from '@/services/AdminBsaasPromotionsService';
-import { X, Download, Copy, Check, QrCode, Loader2 } from 'lucide-react';
+import { X, Download, Copy, Check, QrCode, Loader2, Palette, Sparkles } from 'lucide-react';
+import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES } from '@/lib/qr-style-constants';
+import { SectionBadge } from '@/components/qr/SectionBadge';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/Accordion';
 
 interface PromoCodeQRDialogProps {
   promotionCodeId: string;
@@ -41,6 +49,20 @@ export default function PromoCodeQRDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<QrTemplateName>(defaultTheme);
+  const [dotType, setDotType] = useState('rounded');
+  const [cornerType, setCornerType] = useState('extra-rounded');
+  const [cornerDotType, setCornerDotType] = useState('dot');
+  const [customColorsEnabled, setCustomColorsEnabled] = useState(false);
+  const [dotColor, setDotColor] = useState('#1a56db');
+  const [cornerColor, setCornerColor] = useState('#1a56db');
+  const [cornerDotColor, setCornerDotColor] = useState('#ffffff');
+  const [bgColor, setBgColor] = useState('#ffffff');
+  const [gradientEnabled, setGradientEnabled] = useState(false);
+  const [gradientStart, setGradientStart] = useState('#1a56db');
+  const [gradientEnd, setGradientEnd] = useState('#7c3aed');
+  const [gradientOnDots, setGradientOnDots] = useState(true);
+  const [gradientOnCorners, setGradientOnCorners] = useState(true);
+  const [gradientOnCornerDots, setGradientOnCornerDots] = useState(true);
   const [copied, setCopied] = useState<'url' | 'code' | null>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstanceRef = useRef<any>(null);
@@ -75,6 +97,19 @@ export default function PromoCodeQRDialog({
         exportSize: 512,
         styled: true,
         template: selectedTheme,
+        dotType,
+        cornerType,
+        cornerDotType,
+        dotColor: customColorsEnabled ? dotColor : undefined,
+        cornerColor: customColorsEnabled ? cornerColor : undefined,
+        cornerDotColor: customColorsEnabled ? cornerDotColor : undefined,
+        bgColor: customColorsEnabled ? bgColor : undefined,
+        gradientEnabled,
+        gradientStart,
+        gradientEnd,
+        gradientOnDots,
+        gradientOnCorners,
+        gradientOnCornerDots,
       });
       if (cancelled || !qrContainerRef.current) return;
       qrInstanceRef.current = qr;
@@ -89,7 +124,7 @@ export default function PromoCodeQRDialog({
         qrContainerRef.current.innerHTML = '';
       }
     };
-  }, [qrData, selectedTheme]);
+  }, [qrData, selectedTheme, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd, gradientOnDots, gradientOnCorners, gradientOnCornerDots]);
 
   const handleDownload = (format: 'png' | 'svg') => {
     if (!qrInstanceRef.current) return;
@@ -159,6 +194,163 @@ export default function PromoCodeQRDialog({
                   ))}
                 </div>
               </div>
+
+              {/* Collapsible Customize Styling */}
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="customize-styling" className="border-b-0">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3 w-full">
+                      <Palette className="w-3.5 h-3.5 text-purple-600" />
+                      <span className="font-medium text-neutral-900">Customize Styling</span>
+                      <SectionBadge>{customColorsEnabled || gradientEnabled ? 'Custom' : 'Default'}</SectionBadge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                    <div className="space-y-3 p-3 rounded-md bg-gray-50 border border-gray-200">
+                      {/* Dot Style */}
+                      <div>
+                        <label className="text-xs text-neutral-600 mb-1 block">Dot Style</label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {DOT_STYLES.map(s => (
+                            <div
+                              key={s.value}
+                              onClick={() => setDotType(s.value)}
+                              className={`flex items-center justify-center p-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                dotType === s.value
+                                  ? 'border-purple-400 bg-purple-50 text-purple-700'
+                                  : 'border-gray-200 bg-white hover:border-gray-300'
+                              }`}
+                            >
+                              {s.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Corner Style */}
+                      <div>
+                        <label className="text-xs text-neutral-600 mb-1 block">Corner Style</label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {CORNER_STYLES.map(s => (
+                            <div
+                              key={s.value}
+                              onClick={() => setCornerType(s.value)}
+                              className={`flex items-center justify-center p-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                cornerType === s.value
+                                  ? 'border-purple-400 bg-purple-50 text-purple-700'
+                                  : 'border-gray-200 bg-white hover:border-gray-300'
+                              }`}
+                            >
+                              {s.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Corner Dot Style */}
+                      <div>
+                        <label className="text-xs text-neutral-600 mb-1 block">Corner Dot Style</label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {CORNER_DOT_STYLES.map(s => (
+                            <div
+                              key={s.value}
+                              onClick={() => setCornerDotType(s.value)}
+                              className={`flex items-center justify-center p-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                cornerDotType === s.value
+                                  ? 'border-purple-400 bg-purple-50 text-purple-700'
+                                  : 'border-gray-200 bg-white hover:border-gray-300'
+                              }`}
+                            >
+                              {s.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Custom Colors */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-neutral-700">Custom Colors</span>
+                          <button
+                            onClick={() => setCustomColorsEnabled(!customColorsEnabled)}
+                            className={`relative w-8 h-4 rounded-full transition-colors ${
+                              customColorsEnabled ? 'bg-purple-500' : 'bg-gray-300'
+                            }`}
+                          >
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                              customColorsEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                            }`} />
+                          </button>
+                        </div>
+                        {customColorsEnabled && (
+                          <div className="grid grid-cols-4 gap-2">
+                            <div>
+                              <label className="text-xs text-neutral-400">Dots</label>
+                              <input type="color" value={dotColor} onChange={(e) => setDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-neutral-400">Corners</label>
+                              <input type="color" value={cornerColor} onChange={(e) => setCornerColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-neutral-400">Corner Dot</label>
+                              <input type="color" value={cornerDotColor} onChange={(e) => setCornerDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-neutral-400">Background</label>
+                              <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {/* Gradient */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-purple-500" />
+                            <span className="text-xs font-medium text-neutral-700">Gradient Effect</span>
+                          </div>
+                          <button
+                            onClick={() => setGradientEnabled(!gradientEnabled)}
+                            className={`relative w-8 h-4 rounded-full transition-colors ${
+                              gradientEnabled ? 'bg-purple-500' : 'bg-gray-300'
+                            }`}
+                          >
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                              gradientEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                            }`} />
+                          </button>
+                        </div>
+                        {gradientEnabled && (
+                          <>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-neutral-400">Start</label>
+                              <input type="color" value={gradientStart} onChange={(e) => setGradientStart(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-neutral-400">End</label>
+                              <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                              <input type="checkbox" checked={gradientOnDots} onChange={(e) => setGradientOnDots(e.target.checked)} className="rounded border-gray-300" />
+                              Dots
+                            </label>
+                            <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                              <input type="checkbox" checked={gradientOnCorners} onChange={(e) => setGradientOnCorners(e.target.checked)} className="rounded border-gray-300" />
+                              Corners
+                            </label>
+                            <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                              <input type="checkbox" checked={gradientOnCornerDots} onChange={(e) => setGradientOnCornerDots(e.target.checked)} className="rounded border-gray-300" />
+                              Corner Dots
+                            </label>
+                          </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
 
               {/* Promo Code */}
               <div>

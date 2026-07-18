@@ -10,6 +10,14 @@ import { useStorefrontQrCapability, useAllCapabilities } from '@/hooks/tenant-ac
 import { tenantInfoService } from '@/services/TenantInfoService';
 import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
 import QrPreviewPane from './QrPreviewPane';
+import { SectionBadge } from '@/components/qr/SectionBadge';
+import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES, RESOLUTIONS } from '@/lib/qr-style-constants';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/Accordion';
 
 interface StorefrontQrSettings {
   qr_enabled: boolean;
@@ -75,32 +83,6 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   default_qr_resolution: '1024',
 };
 
-const DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded' },
-  { value: 'extra-rounded', label: 'Extra Rounded' },
-  { value: 'dots', label: 'Dots' },
-  { value: 'classy', label: 'Classy' },
-  { value: 'classy-rounded', label: 'Classy Rounded' },
-];
-
-const CORNER_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'rounded', label: 'Rounded Square' },
-  { value: 'extra-rounded', label: 'Round Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const CORNER_DOT_STYLES = [
-  { value: 'square', label: 'Square' },
-  { value: 'dot', label: 'Round' },
-];
-
-const RESOLUTIONS = [
-  { value: '512', label: '512px' },
-  { value: '1024', label: '1024px' },
-  { value: '2048', label: '2048px' },
-];
 
 export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSettingsClientProps) {
   const [settings, setSettings] = useState<StorefrontQrSettings>(DEFAULT_SETTINGS);
@@ -236,520 +218,566 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
         {/* Left column: settings cards */}
         <div className="lg:col-span-2 space-y-6">
 
-      {/* QR Code Display Card */}
+      {/* Gate Switch — standalone master toggle */}
       {isTierEnabled && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5 text-blue-600" />
-              QR Code Display
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* QR Master Toggle */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-sm text-neutral-900">Enable QR Codes</p>
-                <p className="text-xs text-neutral-500">Master toggle for all QR code features</p>
+                <h3 className="font-semibold text-neutral-900">QR Code Display</h3>
+                <p className="text-sm text-neutral-500 mt-0.5">Master toggle for all QR code features</p>
               </div>
               <Switch
                 checked={settings.qr_enabled}
                 onCheckedChange={(v) => updateSetting('qr_enabled', v)}
               />
             </div>
+          </CardContent>
+        </Card>
+      )}
 
-            {/* QR Resolutions */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">QR Resolution</p>
-              <div className="grid grid-cols-3 gap-3">
-                {RESOLUTIONS.map(res => {
-                  const tierKey = `qr_codes_${res.value}` as 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
-                  const tierAllowed = isTierFlexible || tierQrResolutions.includes(tierKey);
-                  const settingsKey = `qr_codes_${res.value}` as keyof StorefrontQrSettings;
-                  return (
-                    <label
-                      key={res.value}
-                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                        tierAllowed
-                          ? settings.default_qr_resolution === res.value
-                            ? 'border-blue-300 bg-blue-50'
-                            : 'border-neutral-200 hover:border-neutral-300'
-                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="qr_resolution"
-                          value={res.value}
-                          checked={settings.default_qr_resolution === res.value}
-                          disabled={!tierAllowed}
-                          onChange={(e) => {
-                            updateSetting('default_qr_resolution', e.target.value);
-                            updateSetting(settingsKey, true);
-                          }}
-                          className="h-4 w-4 text-blue-600"
-                        />
-                        <span className="text-sm text-neutral-700">{res.label}</span>
-                      </div>
-                      {!tierAllowed && <Lock className="h-3 w-3 text-neutral-400" />}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
+      {/* Accordion Settings — progressive disclosure */}
+      {isTierEnabled && settings.qr_enabled && (
+        <Card>
+          <CardContent className="p-0">
+            <Accordion type="multiple" defaultValue={["style"]} className="w-full">
 
-            {/* QR Display Surfaces — public surfaces where QR codes can appear */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">QR Display Surfaces</p>
-              <p className="text-xs text-neutral-500">Choose which public surfaces display QR codes</p>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { key: 'qr_product' as const, label: 'Product QR' },
-                  { key: 'qr_store' as const, label: 'Store QR' },
-                  { key: 'qr_directory' as const, label: 'Directory QR' },
-                ].map(item => {
-                  const tierAllowed = isTierFlexible || tierQrContentTypes.includes(item.key);
-                  return (
+              {/* Section: Style */}
+              <AccordionItem value="style" className="border-b">
+                <AccordionTrigger className="px-6 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <Palette className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-neutral-900">Style</span>
+                    <SectionBadge>{!settings.qr_styled_enabled ? 'Classic' : 'Styled'}</SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-6">
+                  <div className="space-y-3 pt-2">
+                    {/* Classic Option */}
                     <div
-                      key={item.key}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        tierAllowed ? 'border-neutral-200' : 'border-neutral-200 opacity-50'
+                      onClick={() => {
+                        updateSetting('qr_classic_enabled', true);
+                        updateSetting('qr_styled_enabled', false);
+                      }}
+                      className={`flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${
+                        !settings.qr_styled_enabled
+                          ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300'
+                          : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                       }`}
                     >
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                        !settings.qr_styled_enabled ? 'bg-blue-100' : 'bg-gray-200'
+                      }`}>
+                        <QrCode className={`h-5 w-5 ${!settings.qr_styled_enabled ? 'text-blue-600' : 'text-neutral-500'}`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${!settings.qr_styled_enabled ? 'text-blue-700' : 'text-neutral-900'}`}>Classic</p>
+                          {!settings.qr_styled_enabled && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-neutral-600">Standard black-and-white QR codes with default styling</p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        !settings.qr_styled_enabled ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                      }`}>
+                        {!settings.qr_styled_enabled && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    </div>
+
+                    {/* Styled Option */}
+                    <div
+                      onClick={() => {
+                        if (!tierStyledEnabled) return;
+                        updateSetting('qr_classic_enabled', false);
+                        updateSetting('qr_styled_enabled', true);
+                      }}
+                      className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
+                        settings.qr_styled_enabled && tierStyledEnabled
+                          ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300 cursor-pointer'
+                          : tierStyledEnabled
+                            ? 'bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer'
+                            : 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                        settings.qr_styled_enabled && tierStyledEnabled ? 'bg-purple-100' : 'bg-gray-200'
+                      }`}>
+                        <Sparkles className={`h-5 w-5 ${settings.qr_styled_enabled && tierStyledEnabled ? 'text-purple-600' : 'text-neutral-500'}`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${settings.qr_styled_enabled && tierStyledEnabled ? 'text-purple-700' : 'text-neutral-900'}`}>Styled</p>
+                          {settings.qr_styled_enabled && tierStyledEnabled && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                          )}
+                          {!tierStyledEnabled && (
+                            <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-neutral-600">Custom dot styles, corner styles, colors, and gradient effects</p>
+                      </div>
+                      {!tierStyledEnabled && <Lock className="h-4 w-4 text-neutral-400" />}
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        settings.qr_styled_enabled && tierStyledEnabled ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
+                      }`}>
+                        {settings.qr_styled_enabled && tierStyledEnabled && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    </div>
+
+                    {!tierStyledEnabled && (
+                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                        <Lock className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                        <p className="text-sm text-amber-800">
+                          Styled QR codes are not available on your current plan. Upgrade to access custom dot patterns, colors, and gradients.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Section: Styling Options */}
+              {(tierStyledEnabled && settings.qr_styled_enabled) && (
+                <AccordionItem value="styling" className="border-b">
+                  <AccordionTrigger className="px-6 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <Palette className="h-5 w-5 text-purple-600" />
+                      <span className="font-medium text-neutral-900">Styling Options</span>
+                      <SectionBadge>{settings.qr_dot_type}</SectionBadge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6">
+                    <div className="space-y-4 pt-2">
+                      {/* Dot Style */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-neutral-700">Dot Style</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {DOT_STYLES.map(style => {
+                            const tierAllowed = isTierFlexible || tierDotStyles.includes(style.value as any);
+                            const isSelected = settings.qr_dot_type === style.value;
+                            return (
+                              <div
+                                key={style.value}
+                                onClick={() => {
+                                  if (!tierAllowed) return;
+                                  updateSetting('qr_dot_type', style.value);
+                                }}
+                                className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
+                                  tierAllowed
+                                    ? isSelected
+                                      ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                                      : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
+                                    : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                                }`}
+                              >
+                                {style.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Corner Style */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-neutral-700">Corner Style</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {CORNER_STYLES.map(style => {
+                            const tierAllowed = isTierFlexible || tierCornerStyles.includes(style.value as any);
+                            const isSelected = settings.qr_corner_type === style.value;
+                            return (
+                              <div
+                                key={style.value}
+                                onClick={() => {
+                                  if (!tierAllowed) return;
+                                  updateSetting('qr_corner_type', style.value);
+                                }}
+                                className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
+                                  tierAllowed
+                                    ? isSelected
+                                      ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                                      : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
+                                    : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                                }`}
+                              >
+                                {style.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Corner Dot Style */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-neutral-700">Corner Dot Style</p>
+                        <p className="text-xs text-neutral-500">Inner shape inside the 3 corner squares</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {CORNER_DOT_STYLES.map(style => {
+                            const tierAllowed = isTierFlexible || tierCornerDotStyles.includes(style.value as any);
+                            const isSelected = settings.qr_corner_dot_type === style.value;
+                            return (
+                              <div
+                                key={style.value}
+                                onClick={() => {
+                                  if (!tierAllowed) return;
+                                  updateSetting('qr_corner_dot_type', style.value);
+                                }}
+                                className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
+                                  tierAllowed
+                                    ? isSelected
+                                      ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                                      : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
+                                    : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                                }`}
+                              >
+                                {style.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Custom Colors */}
+                      {tierQrCustomColors && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
+                            <div>
+                              <p className="font-medium text-sm text-neutral-900">Custom Colors</p>
+                              <p className="text-xs text-neutral-500">Override default QR code colors</p>
+                            </div>
+                            <Switch
+                              checked={settings.qr_custom_colors_enabled}
+                              onCheckedChange={(v) => {
+                                updateSetting('qr_custom_colors_enabled', v);
+                                if (!v) {
+                                  updateSetting('qr_dot_color', '#1a56db');
+                                  updateSetting('qr_corner_color', '#1a56db');
+                                  updateSetting('qr_corner_dot_color', '#ffffff');
+                                  updateSetting('qr_bg_color', '#ffffff');
+                                }
+                              }}
+                            />
+                          </div>
+                          {settings.qr_custom_colors_enabled && (
+                            <div className="grid grid-cols-4 gap-3">
+                              <div>
+                                <label className="text-xs text-neutral-500">Dot Color</label>
+                                <input
+                                  type="color"
+                                  value={settings.qr_dot_color}
+                                  onChange={(e) => updateSetting('qr_dot_color', e.target.value)}
+                                  className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neutral-500">Corner Color</label>
+                                <input
+                                  type="color"
+                                  value={settings.qr_corner_color}
+                                  onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
+                                  className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neutral-500">Corner Dot</label>
+                                <input
+                                  type="color"
+                                  value={settings.qr_corner_dot_color}
+                                  onChange={(e) => updateSetting('qr_corner_dot_color', e.target.value)}
+                                  className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neutral-500">Background</label>
+                                <input
+                                  type="color"
+                                  value={settings.qr_bg_color}
+                                  onChange={(e) => updateSetting('qr_bg_color', e.target.value)}
+                                  className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Gradients */}
+                      {tierQrGradients && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-4 w-4 text-purple-600" />
+                              <div>
+                                <p className="font-medium text-sm text-neutral-900">Gradient Effect</p>
+                                <p className="text-xs text-neutral-500">Apply a color gradient to QR dots</p>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={settings.qr_gradient_enabled}
+                              onCheckedChange={(v) => updateSetting('qr_gradient_enabled', v)}
+                            />
+                          </div>
+                          {settings.qr_gradient_enabled && (
+                            <>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-xs text-neutral-500">Gradient Start</label>
+                                  <input
+                                    type="color"
+                                    value={settings.qr_gradient_start}
+                                    onChange={(e) => updateSetting('qr_gradient_start', e.target.value)}
+                                    className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-neutral-500">Gradient End</label>
+                                  <input
+                                    type="color"
+                                    value={settings.qr_gradient_end}
+                                    onChange={(e) => updateSetting('qr_gradient_end', e.target.value)}
+                                    className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.qr_gradient_on_dots}
+                                    onChange={(e) => updateSetting('qr_gradient_on_dots', e.target.checked)}
+                                    className="rounded border-neutral-300"
+                                  />
+                                  Dots
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.qr_gradient_on_corners}
+                                    onChange={(e) => updateSetting('qr_gradient_on_corners', e.target.checked)}
+                                    className="rounded border-neutral-300"
+                                  />
+                                  Corners
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.qr_gradient_on_corner_dots}
+                                    onChange={(e) => updateSetting('qr_gradient_on_corner_dots', e.target.checked)}
+                                    className="rounded border-neutral-300"
+                                  />
+                                  Corner Dots
+                                </label>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+
+              {/* Section: Logo */}
+              <AccordionItem value="logo" className="border-b">
+                <AccordionTrigger className="px-6 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <Image className="h-5 w-5 text-purple-600" />
+                    <span className="font-medium text-neutral-900">Logo</span>
+                    <SectionBadge>{settings.qr_logo ? 'On' : 'Off'}</SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-6">
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-neutral-500">Choose whether your merchant logo appears embedded in QR codes</p>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
                       <div className="flex items-center gap-2">
                         <Switch
-                          checked={settings[item.key] as boolean}
-                          onCheckedChange={(v) => updateSetting(item.key, v)}
-                          disabled={!tierAllowed}
+                          checked={settings.qr_logo}
+                          onCheckedChange={(v) => updateSetting('qr_logo', v)}
+                          disabled={!(isTierFlexible || tierQrContentTypes.includes('qr_logo'))}
                         />
-                        <span className="text-sm text-neutral-700">{item.label}</span>
+                        <span className="text-sm text-neutral-700">Embed Logo in QR</span>
                       </div>
-                      {!tierAllowed && <Lock className="h-3 w-3 text-neutral-400" />}
+                      {!(isTierFlexible || tierQrContentTypes.includes('qr_logo')) && <Lock className="h-3 w-3 text-neutral-400" />}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* QR Analytics — premium feature for tracking scan events */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">QR Analytics</p>
-              <p className="text-xs text-neutral-500">Track QR code scan performance and conversion metrics</p>
-              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={settings.qr_analytics_enabled}
-                    onCheckedChange={(v) => updateSetting('qr_analytics_enabled', v)}
-                    disabled={!canUseQrAnalytics}
-                  />
-                  <span className="text-sm text-neutral-700">Enable QR Scan Tracking</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!canUseQrAnalytics && <Lock className="h-3 w-3 text-neutral-400" />}
-                  {canUseQrAnalytics && settings.qr_analytics_enabled && (
-                    <Link
-                      href={`/t/${tenantId}/settings/storefront-qr/analytics`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-                    >
-                      <BarChart3 className="h-3 w-3" />
-                      View Dashboard
-                    </Link>
-                  )}
-                </div>
-              </div>
-              {!canUseQrAnalytics && (
-                <p className="text-xs text-neutral-500">
-                  QR Analytics is a premium feature. <Link href={`/t/${tenantId}/settings/subscription`} className="text-indigo-600 hover:text-indigo-700">Upgrade your plan</Link> to access scan tracking and conversion analytics.
-                </p>
-              )}
-            </div>
-
-            {/* Logo on QR Code — controls whether the merchant's logo appears on the QR */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">Logo on QR Code</p>
-              <p className="text-xs text-neutral-500">Choose whether your merchant logo appears embedded in QR codes</p>
-              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={settings.qr_logo}
-                    onCheckedChange={(v) => updateSetting('qr_logo', v)}
-                    disabled={!(isTierFlexible || tierQrContentTypes.includes('qr_logo'))}
-                  />
-                  <span className="text-sm text-neutral-700">Embed Logo in QR</span>
-                </div>
-                {!(isTierFlexible || tierQrContentTypes.includes('qr_logo')) && <Lock className="h-3 w-3 text-neutral-400" />}
-              </div>
-              {settings.qr_logo && (
-                <div className="space-y-2 mt-3">
-                  <p className="text-sm font-medium text-neutral-700">Logo Shape</p>
-                  <p className="text-xs text-neutral-500">Cutout shape for the embedded logo</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { value: 'square', label: 'Square' },
-                      { value: 'circle', label: 'Round' },
-                    ].map(shape => {
-                      const isSelected = settings.qr_logo_shape === shape.value;
-                      return (
-                        <div
-                          key={shape.value}
-                          onClick={() => updateSetting('qr_logo_shape', shape.value)}
-                          className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
-                            isSelected
-                              ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
-                              : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
-                          }`}
-                        >
-                          {shape.label}
+                    {settings.qr_logo && (
+                      <div className="space-y-2 mt-3">
+                        <p className="text-sm font-medium text-neutral-700">Logo Shape</p>
+                        <p className="text-xs text-neutral-500">Cutout shape for the embedded logo</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'square', label: 'Square' },
+                            { value: 'circle', label: 'Round' },
+                          ].map(shape => {
+                            const isSelected = settings.qr_logo_shape === shape.value;
+                            return (
+                              <div
+                                key={shape.value}
+                                onClick={() => updateSetting('qr_logo_shape', shape.value)}
+                                className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
+                                  isSelected
+                                    ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
+                                    : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
+                                }`}
+                              >
+                                {shape.label}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* QR Code Style — Radio Selection (Classic vs Styled) */}
-      {isTierEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5 text-blue-600" />
-              QR Code Style
-            </CardTitle>
-            <p className="text-sm text-neutral-600 mt-1">
-              Choose between classic black-and-white QR codes or styled QR codes with custom dot patterns, colors, and gradients.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {/* Classic Option */}
-              <div
-                onClick={() => {
-                  updateSetting('qr_classic_enabled', true);
-                  updateSetting('qr_styled_enabled', false);
-                }}
-                className={`flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${
-                  !settings.qr_styled_enabled
-                    ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300'
-                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                  !settings.qr_styled_enabled ? 'bg-blue-100' : 'bg-gray-200'
-                }`}>
-                  <QrCode className={`h-5 w-5 ${!settings.qr_styled_enabled ? 'text-blue-600' : 'text-neutral-500'}`} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className={`font-medium ${!settings.qr_styled_enabled ? 'text-blue-700' : 'text-neutral-900'}`}>
-                      Classic
-                    </p>
-                    {!settings.qr_styled_enabled && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                      </div>
                     )}
                   </div>
-                  <p className="text-sm text-neutral-600">Standard black-and-white QR codes with default styling</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  !settings.qr_styled_enabled ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                }`}>
-                  {!settings.qr_styled_enabled && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-              </div>
+                </AccordionContent>
+              </AccordionItem>
 
-              {/* Styled Option */}
-              <div
-                onClick={() => {
-                  if (!tierStyledEnabled) return;
-                  updateSetting('qr_classic_enabled', false);
-                  updateSetting('qr_styled_enabled', true);
-                }}
-                className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
-                  settings.qr_styled_enabled && tierStyledEnabled
-                    ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300 cursor-pointer'
-                    : tierStyledEnabled
-                      ? 'bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer'
-                      : 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                  settings.qr_styled_enabled && tierStyledEnabled ? 'bg-purple-100' : 'bg-gray-200'
-                }`}>
-                  <Sparkles className={`h-5 w-5 ${settings.qr_styled_enabled && tierStyledEnabled ? 'text-purple-600' : 'text-neutral-500'}`} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className={`font-medium ${settings.qr_styled_enabled && tierStyledEnabled ? 'text-purple-700' : 'text-neutral-900'}`}>
-                      Styled
-                    </p>
-                    {settings.qr_styled_enabled && tierStyledEnabled && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+              {/* Section: Resolution */}
+              <AccordionItem value="resolution" className="border-b">
+                <AccordionTrigger className="px-6 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <QrCode className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-neutral-900">Resolution</span>
+                    <SectionBadge>{settings.default_qr_resolution}px</SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-6">
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-neutral-500">Select the output resolution for generated QR codes</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {RESOLUTIONS.map(res => {
+                        const tierKey = `qr_codes_${res.value}` as 'qr_codes_512' | 'qr_codes_1024' | 'qr_codes_2048';
+                        const tierAllowed = isTierFlexible || tierQrResolutions.includes(tierKey);
+                        const settingsKey = `qr_codes_${res.value}` as keyof StorefrontQrSettings;
+                        return (
+                          <label
+                            key={res.value}
+                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                              tierAllowed
+                                ? settings.default_qr_resolution === res.value
+                                  ? 'border-blue-300 bg-blue-50'
+                                  : 'border-neutral-200 hover:border-neutral-300'
+                                : 'border-neutral-200 opacity-50 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="qr_resolution"
+                                value={res.value}
+                                checked={settings.default_qr_resolution === res.value}
+                                disabled={!tierAllowed}
+                                onChange={(e) => {
+                                  updateSetting('default_qr_resolution', e.target.value);
+                                  updateSetting(settingsKey, true);
+                                }}
+                                className="h-4 w-4 text-blue-600"
+                              />
+                              <span className="text-sm text-neutral-700">{res.label}</span>
+                            </div>
+                            {!tierAllowed && <Lock className="h-3 w-3 text-neutral-400" />}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Section: Display Surfaces */}
+              <AccordionItem value="surfaces" className="border-b">
+                <AccordionTrigger className="px-6 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-neutral-900">Display Surfaces</span>
+                    <SectionBadge>
+                      {[
+                        settings.qr_product,
+                        settings.qr_store,
+                        settings.qr_directory,
+                      ].filter(Boolean).length} of 3
+                    </SectionBadge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-6">
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-neutral-500">Choose which public surfaces display QR codes</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'qr_product' as const, label: 'Product QR' },
+                        { key: 'qr_store' as const, label: 'Store QR' },
+                        { key: 'qr_directory' as const, label: 'Directory QR' },
+                      ].map(item => {
+                        const tierAllowed = isTierFlexible || tierQrContentTypes.includes(item.key);
+                        return (
+                          <div
+                            key={item.key}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                              tierAllowed ? 'border-neutral-200' : 'border-neutral-200 opacity-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={settings[item.key] as boolean}
+                                onCheckedChange={(v) => updateSetting(item.key, v)}
+                                disabled={!tierAllowed}
+                              />
+                              <span className="text-sm text-neutral-700">{item.label}</span>
+                            </div>
+                            {!tierAllowed && <Lock className="h-3 w-3 text-neutral-400" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Section: Analytics */}
+              <AccordionItem value="analytics" className="border-b-0">
+                <AccordionTrigger className="px-6 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="h-5 w-5 text-indigo-600" />
+                    <span className="font-medium text-neutral-900">Analytics</span>
+                    <SectionBadge>{settings.qr_analytics_enabled ? 'On' : 'Off'}</SectionBadge>
+                    {!canUseQrAnalytics && <Lock className="h-3 w-3 text-neutral-400" />}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-6">
+                  <div className="space-y-2 pt-2">
+                    <p className="text-xs text-neutral-500">Track QR code scan performance and conversion metrics</p>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={settings.qr_analytics_enabled}
+                          onCheckedChange={(v) => updateSetting('qr_analytics_enabled', v)}
+                          disabled={!canUseQrAnalytics}
+                        />
+                        <span className="text-sm text-neutral-700">Enable QR Scan Tracking</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!canUseQrAnalytics && <Lock className="h-3 w-3 text-neutral-400" />}
+                        {canUseQrAnalytics && settings.qr_analytics_enabled && (
+                          <Link
+                            href={`/t/${tenantId}/settings/storefront-qr/analytics`}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                          >
+                            <BarChart3 className="h-3 w-3" />
+                            View Dashboard
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                    {!canUseQrAnalytics && (
+                      <p className="text-xs text-neutral-500">
+                        QR Analytics is a premium feature. <Link href={`/t/${tenantId}/settings/subscription`} className="text-indigo-600 hover:text-indigo-700">Upgrade your plan</Link> to access scan tracking and conversion analytics.
+                      </p>
                     )}
-                    {!tierStyledEnabled && (
-                      <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
-                    )}
                   </div>
-                  <p className="text-sm text-neutral-600">Custom dot styles, corner styles, colors, and gradient effects</p>
-                </div>
-                {!tierStyledEnabled && <Lock className="h-4 w-4 text-neutral-400" />}
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                  settings.qr_styled_enabled && tierStyledEnabled ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
-                }`}>
-                  {settings.qr_styled_enabled && tierStyledEnabled && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-              </div>
-            </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            {!tierStyledEnabled && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-                <Lock className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                <p className="text-sm text-amber-800">
-                  Styled QR codes are not available on your current plan. Upgrade to access custom dot patterns, colors, and gradients.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* QR Styling Options — only shown when Styled is selected */}
-      {isTierEnabled && tierStyledEnabled && settings.qr_styled_enabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5 text-purple-600" />
-              QR Styling Options
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Dot Style */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">Dot Style</p>
-              <div className="grid grid-cols-3 gap-2">
-                {DOT_STYLES.map(style => {
-                  const tierAllowed = isTierFlexible || tierDotStyles.includes(style.value as any);
-                  const isSelected = settings.qr_dot_type === style.value;
-                  return (
-                    <div
-                      key={style.value}
-                      onClick={() => {
-                        if (!tierAllowed) return;
-                        updateSetting('qr_dot_type', style.value);
-                      }}
-                      className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
-                        tierAllowed
-                          ? isSelected
-                            ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
-                            : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
-                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      {style.label}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Corner Style */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">Corner Style</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {CORNER_STYLES.map(style => {
-                  const tierAllowed = isTierFlexible || tierCornerStyles.includes(style.value as any);
-                  const isSelected = settings.qr_corner_type === style.value;
-                  return (
-                    <div
-                      key={style.value}
-                      onClick={() => {
-                        if (!tierAllowed) return;
-                        updateSetting('qr_corner_type', style.value);
-                      }}
-                      className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
-                        tierAllowed
-                          ? isSelected
-                            ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
-                            : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
-                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      {style.label}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Corner Dot Style (inner dots inside the 3 corner squares) */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">Corner Dot Style</p>
-              <p className="text-xs text-neutral-500">Inner shape inside the 3 corner squares</p>
-              <div className="grid grid-cols-2 gap-2">
-                {CORNER_DOT_STYLES.map(style => {
-                  const tierAllowed = isTierFlexible || tierCornerDotStyles.includes(style.value as any);
-                  const isSelected = settings.qr_corner_dot_type === style.value;
-                  return (
-                    <div
-                      key={style.value}
-                      onClick={() => {
-                        if (!tierAllowed) return;
-                        updateSetting('qr_corner_dot_type', style.value);
-                      }}
-                      className={`flex items-center justify-center p-2 rounded-lg border text-xs transition-colors ${
-                        tierAllowed
-                          ? isSelected
-                            ? 'border-purple-300 bg-purple-50 text-purple-700 cursor-pointer'
-                            : 'border-neutral-200 hover:border-neutral-300 cursor-pointer'
-                          : 'border-neutral-200 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      {style.label}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Custom Colors */}
-            {tierQrCustomColors && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
-                  <div>
-                    <p className="font-medium text-sm text-neutral-900">Custom Colors</p>
-                    <p className="text-xs text-neutral-500">Override default QR code colors</p>
-                  </div>
-                  <Switch
-                    checked={settings.qr_custom_colors_enabled}
-                    onCheckedChange={(v) => {
-                      updateSetting('qr_custom_colors_enabled', v);
-                      if (!v) {
-                        updateSetting('qr_dot_color', '#1a56db');
-                        updateSetting('qr_corner_color', '#1a56db');
-                        updateSetting('qr_corner_dot_color', '#ffffff');
-                        updateSetting('qr_bg_color', '#ffffff');
-                      }
-                    }}
-                  />
-                </div>
-                {settings.qr_custom_colors_enabled && (
-                  <div className="grid grid-cols-4 gap-3">
-                    <div>
-                      <label className="text-xs text-neutral-500">Dot Color</label>
-                      <input
-                        type="color"
-                        value={settings.qr_dot_color}
-                        onChange={(e) => updateSetting('qr_dot_color', e.target.value)}
-                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-neutral-500">Corner Color</label>
-                      <input
-                        type="color"
-                        value={settings.qr_corner_color}
-                        onChange={(e) => updateSetting('qr_corner_color', e.target.value)}
-                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-neutral-500">Corner Dot</label>
-                      <input
-                        type="color"
-                        value={settings.qr_corner_dot_color}
-                        onChange={(e) => updateSetting('qr_corner_dot_color', e.target.value)}
-                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-neutral-500">Background</label>
-                      <input
-                        type="color"
-                        value={settings.qr_bg_color}
-                        onChange={(e) => updateSetting('qr_bg_color', e.target.value)}
-                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Gradients */}
-            {tierQrGradients && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    <div>
-                      <p className="font-medium text-sm text-neutral-900">Gradient Effect</p>
-                      <p className="text-xs text-neutral-500">Apply a color gradient to QR dots</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.qr_gradient_enabled}
-                    onCheckedChange={(v) => updateSetting('qr_gradient_enabled', v)}
-                  />
-                </div>
-                {settings.qr_gradient_enabled && (
-                  <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-neutral-500">Gradient Start</label>
-                      <input
-                        type="color"
-                        value={settings.qr_gradient_start}
-                        onChange={(e) => updateSetting('qr_gradient_start', e.target.value)}
-                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-neutral-500">Gradient End</label>
-                      <input
-                        type="color"
-                        value={settings.qr_gradient_end}
-                        onChange={(e) => updateSetting('qr_gradient_end', e.target.value)}
-                        className="w-full h-10 rounded-lg border border-neutral-200 cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                  {/* Per-element gradient targets */}
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
-                      <input
-                        type="checkbox"
-                        checked={settings.qr_gradient_on_dots}
-                        onChange={(e) => updateSetting('qr_gradient_on_dots', e.target.checked)}
-                        className="rounded border-neutral-300"
-                      />
-                      Dots
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
-                      <input
-                        type="checkbox"
-                        checked={settings.qr_gradient_on_corners}
-                        onChange={(e) => updateSetting('qr_gradient_on_corners', e.target.checked)}
-                        className="rounded border-neutral-300"
-                      />
-                      Corners
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
-                      <input
-                        type="checkbox"
-                        checked={settings.qr_gradient_on_corner_dots}
-                        onChange={(e) => updateSetting('qr_gradient_on_corner_dots', e.target.checked)}
-                        className="rounded border-neutral-300"
-                      />
-                      Corner Dots
-                    </label>
-                  </div>
-                  </>
-                )}
-              </div>
-            )}
+            </Accordion>
           </CardContent>
         </Card>
       )}
