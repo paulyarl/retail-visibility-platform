@@ -8,6 +8,7 @@ import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabili
 import { StorefrontOptionFlags, StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { StyledTenantQR } from '@/components/public/StyledTenantQR';
 import { clientLogger } from '@/lib/client-logger';
+import { generateQrDataUrl } from '@/lib/qr-engine';
 
 export interface TenantQRCodeProps {
   /** The URL to encode in the QR code */
@@ -144,59 +145,6 @@ export function TenantQRCode({
       fetchTenantInfo();
     }
   }, [tenantId, capabilityFlags]);
-
-  // Overlay logo on QR code
-  const overlayLogoOnQR = async (qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> => {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'));
-        return;
-      }
-
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        canvas.width = qrCanvas.width;
-        canvas.height = qrCanvas.height;
-
-        ctx.drawImage(qrCanvas, 0, 0);
-
-        const logoSize = Math.floor(canvas.width * 0.30);
-        const logoX = (canvas.width - logoSize) / 2;
-        const logoY = (canvas.height - logoSize) / 2;
-
-        // White circular background
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Circular mask for logo
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-
-        ctx.globalAlpha = 1.0;
-        ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
-        ctx.restore();
-
-        // Border around logo
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
-        ctx.stroke();
-
-        resolve(canvas);
-      };
-      img.onerror = () => reject(new Error('Failed to load logo image'));
-      img.src = logoSrc;
-    });
-  };
 
   // Shared tier utility functions (aligned with TierGainsWelcome)
   const getTierColorPalette = (tier: string, organizationTier?: string | undefined) => {
@@ -382,73 +330,29 @@ export function TenantQRCode({
   const generateQRCode = async () => {
     if (qrImageUrl || !url) return;
 
+    // Styled QR is handled by StyledTenantQR component — skip classic generation when styled is active
+    const styledEnabled = qrState?.merchantPreferences?.qr_styled_enabled ?? false;
+    if (styledEnabled) {
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      // Extract organization tier from effective tier logic (same as TierGainsWelcome)
       const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
         tenantTier === 'organization' ? 'enterprise' : undefined;
-
-      // Get capability-aware QR settings
       const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
-      // Styled QR is handled by StyledTenantQR component — skip classic generation when styled is active
-      // All QR decisions come from qrState (storefront_qr namespace)
-      const styledEnabled = qrState?.merchantPreferences?.qr_styled_enabled ?? false;
-      if (styledEnabled) {
-        return;
-      }
+      const qrPrefs = qrState?.merchantPreferences as any;
+      const logoUrl = (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : null;
 
-      // Plain QR path: existing qrcode library for tiers without styled QR
-      const QRCode = (await import('qrcode')).default;
-
-      // Create high-resolution canvas for export
-      const exportCanvas = document.createElement('canvas');
-      const exportCtx = exportCanvas.getContext('2d');
-      if (!exportCtx) throw new Error('Could not get canvas context');
-
-      exportCanvas.width = qrSettings.exportSize;
-      exportCanvas.height = qrSettings.exportSize;
-
-      // Generate high-quality QR code
-      await QRCode.toCanvas(exportCanvas, url, {
-        width: qrSettings.exportSize,
-        margin: qrSettings.margin,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
-        errorCorrectionLevel: qrSettings.errorCorrection,
+      const dataUrl = await generateQrDataUrl({
+        data: url,
+        exportSize: qrSettings.exportSize,
+        styled: false,
+        logoUrl,
+        logoShape: qrPrefs?.qr_logo_shape || 'square',
+        errorCorrection: qrSettings.errorCorrection,
       });
-
-      let finalCanvas = exportCanvas;
-
-      // Logo eligibility: from qrState merchant prefs, with tier fallback
-      const shouldApplyLogo = qrState
-        ? (qrState.merchantPreferences as any)?.qr_logo && !!tenantLogo
-        : (() => {
-          const effectiveTier = organizationTier || tenantTier;
-          return (
-            effectiveTier === 'commitment' ||
-            effectiveTier === 'professional' ||
-            effectiveTier === 'ecommerce' ||
-            effectiveTier === 'omnichannel' ||
-            effectiveTier === 'enterprise' ||
-            effectiveTier === 'organization' ||
-            tenantTier === 'chain_professional' ||
-            tenantTier === 'chain_enterprise'
-          ) && !!tenantLogo;
-        })();
-
-      if (shouldApplyLogo) {
-        try {
-          finalCanvas = await overlayLogoOnQR(exportCanvas, tenantLogo!);
-        } catch (logoError) {
-          clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
-        }
-      }
-
-      // Generate high-quality PNG with maximum quality
-      const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
       setQrImageUrl(dataUrl);
     } catch (error) {
       clientLogger.error('Failed to generate QR code:', { detail: error });
@@ -466,121 +370,36 @@ export function TenantQRCode({
 
   // Generate QR code at specific size for download
   const generateQRCodeAtSize = async (targetSize: number): Promise<string> => {
-    // Extract organization tier from effective tier logic (same as TierGainsWelcome)
     const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') :
       tenantTier === 'organization' ? 'enterprise' : undefined;
-
-    // Get capability-aware QR settings
     const qrSettings = getCapabilityQRSettings(tenantTier, organizationTier);
 
-    // Styled QR path: use qr-code-styling when styled QR is enabled
-    // All QR decisions come from qrState (storefront_qr namespace)
-    const styledEnabled = qrState?.merchantPreferences?.qr_styled_enabled ?? false;
-    if (styledEnabled) {
-      const { default: QRCodeStyling } = await import('qr-code-styling');
-
-      const qrPrefs = qrState?.merchantPreferences as any;
-      const dotType = (qrPrefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded') as any;
-      const cornerType = (qrPrefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-      const cornerDotType = (qrPrefs?.qr_corner_dot_type || 'dot') as any;
-      const dotColor = qrPrefs?.qr_dot_color || '#1a56db';
-      const cornerColor = qrPrefs?.qr_corner_color || '#1a56db';
-      const cornerDotColor = qrPrefs?.qr_corner_dot_color || '#ffffff';
-      const bgColor = qrPrefs?.qr_bg_color || '#ffffff';
-      const useGradient = qrState?.qrGradients && qrPrefs?.qr_gradient_enabled;
-      const gradientStart = qrPrefs?.qr_gradient_start || '#1a56db';
-      const gradientEnd = qrPrefs?.qr_gradient_end || '#7c3aed';
-
-      const qr = new QRCodeStyling({
-        width: targetSize,
-        height: targetSize,
-        type: 'svg',
-        data: url,
-        image: (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : undefined,
-        imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: (qrPrefs?.qr_logo_shape || 'square') } as any,
-        dotsOptions: {
-          color: dotColor,
-          type: dotType,
-          gradient: useGradient ? {
-            type: 'linear', rotation: 45,
-            colorStops: [{ offset: 0, color: gradientStart }, { offset: 1, color: gradientEnd }],
-          } : undefined,
-        },
-        cornersSquareOptions: {
-          color: cornerColor,
-          type: cornerType,
-        },
-        cornersDotOptions: { color: cornerDotColor, type: cornerDotType },
-        backgroundOptions: { color: bgColor },
-        qrOptions: { errorCorrectionLevel: qrSettings.errorCorrection },
-      });
-
-      const blob = await qr.getRawData('png');
-      if (blob instanceof Blob) {
-        return await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }
-      throw new Error('Failed to generate styled QR data URL');
-    }
-
-    // Plain QR path: existing qrcode library
-    const QRCode = (await import('qrcode')).default;
-
-    // Create canvas for requested size
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Could not get canvas context');
-
-    canvas.width = targetSize;
-    canvas.height = targetSize;
-
-    // Generate QR code with tier-appropriate settings
-    await QRCode.toCanvas(canvas, url, {
-      width: targetSize,
-      margin: qrSettings.margin,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-      errorCorrectionLevel: qrSettings.errorCorrection,
-    });
-
-    let finalCanvas = canvas;
-
-    // Logo eligibility: from qrState merchant prefs, with tier fallback
-    const shouldApplyLogo = qrState
-      ? (qrState.merchantPreferences as any)?.qr_logo && !!tenantLogo
-      : (() => {
-        const effectiveTier = organizationTier || tenantTier;
-        return (
-          effectiveTier === 'commitment' ||
-          effectiveTier === 'professional' ||
-          effectiveTier === 'ecommerce' ||
-          effectiveTier === 'omnichannel' ||
-          effectiveTier === 'enterprise' ||
-          effectiveTier === 'organization' ||
-          tenantTier === 'chain_professional' ||
-          tenantTier === 'chain_enterprise'
-        ) && !!tenantLogo;
-      })();
+    const qrPrefs = qrState?.merchantPreferences as any;
+    const styledEnabled = qrPrefs?.qr_styled_enabled ?? false;
+    const logoUrl = (qrPrefs?.qr_logo && tenantLogo) ? tenantLogo : null;
 
     // Logo minimum size: 256px if QR logo enabled in merchant prefs, 512px otherwise
-    const logoMinSize = (qrState?.merchantPreferences as any)?.qr_logo ? 256 : 512;
+    const logoMinSize = qrPrefs?.qr_logo ? 256 : 512;
+    const effectiveLogoUrl = (logoUrl && targetSize >= logoMinSize) ? logoUrl : null;
 
-    if (shouldApplyLogo && targetSize >= logoMinSize) {
-      try {
-        finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
-      } catch (logoError) {
-        clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
-      }
-    }
-
-    // Generate data URL
-    return finalCanvas.toDataURL('image/png', 1.0);
+    return generateQrDataUrl({
+      data: url,
+      exportSize: targetSize,
+      styled: styledEnabled,
+      logoUrl: effectiveLogoUrl,
+      logoShape: qrPrefs?.qr_logo_shape || 'square',
+      errorCorrection: qrSettings.errorCorrection,
+      dotType: qrPrefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded',
+      cornerType: qrPrefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded',
+      cornerDotType: qrPrefs?.qr_corner_dot_type || 'dot',
+      dotColor: qrPrefs?.qr_dot_color || '#1a56db',
+      cornerColor: qrPrefs?.qr_corner_color || '#1a56db',
+      cornerDotColor: qrPrefs?.qr_corner_dot_color || '#ffffff',
+      bgColor: qrPrefs?.qr_bg_color || '#ffffff',
+      gradientEnabled: qrState?.qrGradients && qrPrefs?.qr_gradient_enabled,
+      gradientStart: qrPrefs?.qr_gradient_start || '#1a56db',
+      gradientEnd: qrPrefs?.qr_gradient_end || '#7c3aed',
+    });
   };
 
   const downloadQRCode = async (targetSize: number) => {

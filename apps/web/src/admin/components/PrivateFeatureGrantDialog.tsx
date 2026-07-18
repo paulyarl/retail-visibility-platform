@@ -12,19 +12,15 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import QRCodeStyling from 'qr-code-styling';
+import {
+  QR_TEMPLATE_LIST,
+  generateQrInstance,
+  type QrTemplateName,
+} from '@/lib/qr-engine';
 import { adminFeaturePurchasesService, type GrantTokenData } from '@/services/AdminFeaturePurchasesService';
 import { adminBsaasCatalogService, type BsaasCatalogEntry } from '@/services/AdminBsaasCatalogService';
 import { type BsaasBundleEntry } from '@/services/AdminBsaasBundleService';
 import { adminOperationsService } from '@/services/AdminOperationsService';
-import {
-  QR_THEME_LIST,
-  buildQROptionsFromSettings,
-  applyThemeToSettings,
-  DEFAULT_QR_STYLE_SETTINGS,
-  type QRThemeName,
-  type QrStyleSettings,
-} from '@/lib/qr-style-config';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Input } from '@/components/ui/Input';
 import { X, Download, Copy, Check, QrCode, Loader2, AlertCircle, Palette, Sparkles } from 'lucide-react';
@@ -73,10 +69,21 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
   const [grantData, setGrantData] = useState<GrantTokenData | null>(null);
   const [bundleGrantData, setBundleGrantData] = useState<GrantTokenData[]>([]);
   const [selectedResultIdx, setSelectedResultIdx] = useState(0);
-  const [styleSettings, setStyleSettings] = useState<QrStyleSettings>(DEFAULT_QR_STYLE_SETTINGS);
+  const [selectedTemplate, setSelectedTemplate] = useState<QrTemplateName>('private-grant');
+  const [dotType, setDotType] = useState('dots');
+  const [cornerType, setCornerType] = useState('dot');
+  const [cornerDotType, setCornerDotType] = useState('dot');
+  const [customColorsEnabled, setCustomColorsEnabled] = useState(true);
+  const [dotColor, setDotColor] = useState('#7c3aed');
+  const [cornerColor, setCornerColor] = useState('#7c3aed');
+  const [cornerDotColor, setCornerDotColor] = useState('#ffffff');
+  const [bgColor, setBgColor] = useState('#faf5ff');
+  const [gradientEnabled, setGradientEnabled] = useState(false);
+  const [gradientStart, setGradientStart] = useState('#7c3aed');
+  const [gradientEnd, setGradientEnd] = useState('#1a56db');
   const [copied, setCopied] = useState<'url' | 'token' | null>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
-  const qrInstanceRef = useRef<QRCodeStyling | null>(null);
+  const qrInstanceRef = useRef<any>(null);
 
   useEffect(() => {
     if (open) {
@@ -121,7 +128,18 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
     setGrantData(null);
     setBundleGrantData([]);
     setSelectedResultIdx(0);
-    setStyleSettings(DEFAULT_QR_STYLE_SETTINGS);
+    setSelectedTemplate('private-grant');
+    setDotType('dots');
+    setCornerType('dot');
+    setCornerDotType('dot');
+    setCustomColorsEnabled(true);
+    setDotColor('#7c3aed');
+    setCornerColor('#7c3aed');
+    setCornerDotColor('#ffffff');
+    setBgColor('#faf5ff');
+    setGradientEnabled(false);
+    setGradientStart('#7c3aed');
+    setGradientEnd('#1a56db');
   };
 
   const handleGenerate = async () => {
@@ -181,30 +199,55 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
   useEffect(() => {
     if (!activeGrantData || !qrContainerRef.current) return;
 
-    const options = buildQROptionsFromSettings(
-      activeGrantData.qr_url || '',
-      styleSettings,
-    );
-
-    const qr = new QRCodeStyling(options);
-    qrInstanceRef.current = qr;
-
-    qrContainerRef.current.innerHTML = '';
-    qr.append(qrContainerRef.current);
+    let cancelled = false;
+    const renderQr = async () => {
+      const qr = await generateQrInstance({
+        data: activeGrantData.qr_url || '',
+        exportSize: 512,
+        styled: true,
+        template: selectedTemplate,
+        dotType,
+        cornerType,
+        cornerDotType,
+        dotColor: customColorsEnabled ? dotColor : undefined,
+        cornerColor: customColorsEnabled ? cornerColor : undefined,
+        cornerDotColor: customColorsEnabled ? cornerDotColor : undefined,
+        bgColor: customColorsEnabled ? bgColor : undefined,
+        gradientEnabled,
+        gradientStart,
+        gradientEnd,
+      });
+      if (cancelled || !qrContainerRef.current) return;
+      qrInstanceRef.current = qr;
+      qrContainerRef.current.innerHTML = '';
+      qr.append(qrContainerRef.current);
+    };
+    renderQr();
 
     return () => {
+      cancelled = true;
       if (qrContainerRef.current) {
         qrContainerRef.current.innerHTML = '';
       }
     };
-  }, [activeGrantData, styleSettings]);
+  }, [activeGrantData, selectedTemplate, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd]);
 
-  const updateStyle = (key: keyof QrStyleSettings, value: string | boolean) => {
-    setStyleSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  const applyThemePreset = (theme: QRThemeName) => {
-    setStyleSettings(applyThemeToSettings(theme));
+  const applyTemplate = (name: QrTemplateName) => {
+    setSelectedTemplate(name);
+    const tpl = QR_TEMPLATE_LIST.find(t => t.name === name);
+    if (tpl?.defaults) {
+      const d = tpl.defaults;
+      if (d.dotType) setDotType(d.dotType);
+      if (d.cornerType) setCornerType(d.cornerType);
+      if (d.cornerDotType) setCornerDotType(d.cornerDotType);
+      if (d.dotColor) setDotColor(d.dotColor);
+      if (d.cornerColor) setCornerColor(d.cornerColor);
+      if (d.cornerDotColor) setCornerDotColor(d.cornerDotColor);
+      if (d.bgColor) setBgColor(d.bgColor);
+      if (d.gradientEnabled !== undefined) setGradientEnabled(d.gradientEnabled);
+      if (d.gradientStart) setGradientStart(d.gradientStart);
+      if (d.gradientEnd) setGradientEnd(d.gradientEnd);
+    }
   };
 
   const handleDownload = (format: 'png' | 'svg') => {
@@ -351,14 +394,14 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                 <div ref={qrContainerRef} className="rounded-lg overflow-hidden" />
               </div>
 
-              {/* Theme Presets — quick start */}
+              {/* Templates — quick start */}
               <div>
-                <label className="text-xs font-medium text-neutral-600 mb-1.5 block">Theme Presets</label>
+                <label className="text-xs font-medium text-neutral-600 mb-1.5 block">Templates</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {QR_THEME_LIST.map((t) => (
+                  {QR_TEMPLATE_LIST.filter(t => t.name !== 'default').map((t) => (
                     <button
                       key={t.name}
-                      onClick={() => applyThemePreset(t.name)}
+                      onClick={() => applyTemplate(t.name)}
                       className="px-3 py-2 text-xs rounded-md border text-left border-gray-200 hover:bg-gray-50"
                     >
                       <div className="font-medium">{t.label}</div>
@@ -366,7 +409,7 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-neutral-400 mt-1">Click a preset to apply, then customize below</p>
+                <p className="text-xs text-neutral-400 mt-1">Click a template to apply, then customize below</p>
               </div>
 
               {/* Full QR Styling Controls — mirrors storefront_qr capability settings */}
@@ -383,9 +426,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                     {DOT_STYLES.map(s => (
                       <div
                         key={s.value}
-                        onClick={() => updateStyle('dotType', s.value)}
+                        onClick={() => setDotType(s.value)}
                         className={`flex items-center justify-center p-1.5 rounded border text-xs cursor-pointer transition-colors ${
-                          styleSettings.dotType === s.value
+                          dotType === s.value
                             ? 'border-purple-400 bg-purple-50 text-purple-700'
                             : 'border-gray-200 bg-white hover:border-gray-300'
                         }`}
@@ -403,9 +446,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                     {CORNER_STYLES.map(s => (
                       <div
                         key={s.value}
-                        onClick={() => updateStyle('cornerType', s.value)}
+                        onClick={() => setCornerType(s.value)}
                         className={`flex items-center justify-center p-1.5 rounded border text-xs cursor-pointer transition-colors ${
-                          styleSettings.cornerType === s.value
+                          cornerType === s.value
                             ? 'border-purple-400 bg-purple-50 text-purple-700'
                             : 'border-gray-200 bg-white hover:border-gray-300'
                         }`}
@@ -423,9 +466,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                     {CORNER_DOT_STYLES.map(s => (
                       <div
                         key={s.value}
-                        onClick={() => updateStyle('cornerDotType', s.value)}
+                        onClick={() => setCornerDotType(s.value)}
                         className={`flex items-center justify-center p-1.5 rounded border text-xs cursor-pointer transition-colors ${
-                          styleSettings.cornerDotType === s.value
+                          cornerDotType === s.value
                             ? 'border-purple-400 bg-purple-50 text-purple-700'
                             : 'border-gray-200 bg-white hover:border-gray-300'
                         }`}
@@ -441,33 +484,33 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-neutral-700">Custom Colors</span>
                     <button
-                      onClick={() => updateStyle('customColorsEnabled', !styleSettings.customColorsEnabled)}
+                      onClick={() => setCustomColorsEnabled(!customColorsEnabled)}
                       className={`relative w-8 h-4 rounded-full transition-colors ${
-                        styleSettings.customColorsEnabled ? 'bg-purple-500' : 'bg-gray-300'
+                        customColorsEnabled ? 'bg-purple-500' : 'bg-gray-300'
                       }`}
                     >
                       <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-                        styleSettings.customColorsEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                        customColorsEnabled ? 'translate-x-4' : 'translate-x-0.5'
                       }`} />
                     </button>
                   </div>
-                  {styleSettings.customColorsEnabled && (
+                  {customColorsEnabled && (
                     <div className="grid grid-cols-4 gap-2">
                       <div>
                         <label className="text-xs text-neutral-400">Dots</label>
-                        <input type="color" value={styleSettings.dotColor} onChange={(e) => updateStyle('dotColor', e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                        <input type="color" value={dotColor} onChange={(e) => setDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                       <div>
                         <label className="text-xs text-neutral-400">Corners</label>
-                        <input type="color" value={styleSettings.cornerColor} onChange={(e) => updateStyle('cornerColor', e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                        <input type="color" value={cornerColor} onChange={(e) => setCornerColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                       <div>
                         <label className="text-xs text-neutral-400">Corner Dot</label>
-                        <input type="color" value={styleSettings.cornerDotColor} onChange={(e) => updateStyle('cornerDotColor', e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                        <input type="color" value={cornerDotColor} onChange={(e) => setCornerDotColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                       <div>
                         <label className="text-xs text-neutral-400">Background</label>
-                        <input type="color" value={styleSettings.bgColor} onChange={(e) => updateStyle('bgColor', e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                        <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                     </div>
                   )}
@@ -481,25 +524,25 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                       <span className="text-xs font-medium text-neutral-700">Gradient Effect</span>
                     </div>
                     <button
-                      onClick={() => updateStyle('gradientEnabled', !styleSettings.gradientEnabled)}
+                      onClick={() => setGradientEnabled(!gradientEnabled)}
                       className={`relative w-8 h-4 rounded-full transition-colors ${
-                        styleSettings.gradientEnabled ? 'bg-purple-500' : 'bg-gray-300'
+                        gradientEnabled ? 'bg-purple-500' : 'bg-gray-300'
                       }`}
                     >
                       <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-                        styleSettings.gradientEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                        gradientEnabled ? 'translate-x-4' : 'translate-x-0.5'
                       }`} />
                     </button>
                   </div>
-                  {styleSettings.gradientEnabled && (
+                  {gradientEnabled && (
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-neutral-400">Start</label>
-                        <input type="color" value={styleSettings.gradientStart} onChange={(e) => updateStyle('gradientStart', e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                        <input type="color" value={gradientStart} onChange={(e) => setGradientStart(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                       <div>
                         <label className="text-xs text-neutral-400">End</label>
-                        <input type="color" value={styleSettings.gradientEnd} onChange={(e) => updateStyle('gradientEnd', e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
+                        <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                     </div>
                   )}

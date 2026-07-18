@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { StorefrontQrState } from '@/services/CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
+import { generateQrDataUrl } from '@/lib/qr-engine';
 
 export interface StyledTenantQRProps {
   url: string;
@@ -33,7 +34,6 @@ export function StyledTenantQR({
 }: StyledTenantQRProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const qrInstanceRef = useRef<any>(null);
 
   const prefs = qrState?.merchantPreferences as any;
   const resolvedExportSize = exportSize
@@ -43,55 +43,24 @@ export function StyledTenantQR({
       : 512);
 
   const generateStyledQR = async (targetSize: number): Promise<string> => {
-    const { default: QRCodeStyling } = await import('qr-code-styling');
-
-    const dotType = (prefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded') as any;
-    const cornerType = (prefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded') as any;
-    const cornerDotType = (prefs?.qr_corner_dot_type || 'dot') as any;
-    const dotColor = prefs?.qr_dot_color || '#1a56db';
-    const cornerColor = prefs?.qr_corner_color || '#1a56db';
-    const cornerDotColor = prefs?.qr_corner_dot_color || '#ffffff';
-    const bgColor = prefs?.qr_bg_color || '#ffffff';
-    const useGradient = qrState?.qrGradients && prefs?.qr_gradient_enabled;
-    const gradientStart = prefs?.qr_gradient_start || '#1a56db';
-    const gradientEnd = prefs?.qr_gradient_end || '#7c3aed';
-
-    const qr = new QRCodeStyling({
-      width: targetSize,
-      height: targetSize,
-      type: 'svg',
+    return generateQrDataUrl({
       data: url,
-      image: (prefs?.qr_logo && tenantLogo) ? tenantLogo : undefined,
-      imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: (prefs?.qr_logo_shape || 'square') } as any,
-      dotsOptions: {
-        color: dotColor,
-        type: dotType,
-        gradient: useGradient ? {
-          type: 'linear', rotation: 45,
-          colorStops: [{ offset: 0, color: gradientStart }, { offset: 1, color: gradientEnd }],
-        } : undefined,
-      },
-      cornersSquareOptions: {
-        color: cornerColor,
-        type: cornerType,
-      },
-      cornersDotOptions: { color: cornerDotColor, type: cornerDotType },
-      backgroundOptions: { color: bgColor },
-      qrOptions: { errorCorrectionLevel: errorCorrection },
+      exportSize: targetSize,
+      styled: true,
+      logoUrl: prefs?.qr_logo ? tenantLogo : null,
+      logoShape: prefs?.qr_logo_shape || 'square',
+      errorCorrection,
+      dotType: prefs?.qr_dot_type || qrState?.allowedQRDotStyles?.[0] || 'rounded',
+      cornerType: prefs?.qr_corner_type || qrState?.allowedQRCornerStyles?.[0] || 'extra-rounded',
+      cornerDotType: prefs?.qr_corner_dot_type || 'dot',
+      dotColor: prefs?.qr_dot_color || '#1a56db',
+      cornerColor: prefs?.qr_corner_color || '#1a56db',
+      cornerDotColor: prefs?.qr_corner_dot_color || '#ffffff',
+      bgColor: prefs?.qr_bg_color || '#ffffff',
+      gradientEnabled: qrState?.qrGradients && prefs?.qr_gradient_enabled,
+      gradientStart: prefs?.qr_gradient_start || '#1a56db',
+      gradientEnd: prefs?.qr_gradient_end || '#7c3aed',
     });
-
-    qrInstanceRef.current = qr;
-
-    const blob = await qr.getRawData('png');
-    if (blob instanceof Blob) {
-      return await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    }
-    throw new Error('Failed to generate styled QR data URL');
   };
 
   useEffect(() => {

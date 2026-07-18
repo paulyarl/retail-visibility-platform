@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
-import QRCode from 'qrcode';
+import { generateQrDataUrl } from '@/lib/qr-engine';
 import { Download, Copy, RefreshCw } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -18,60 +18,10 @@ interface QRCodeGeneratorProps {
 export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUrl }: QRCodeGeneratorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   const { tier, loading: tierLoading, canAccess } = useTenantTier(tenantId);
   const tierId = tier?.effective?.id || null;
   const hasQRAccess = canAccess('qr_codes', 'canView');
-  
-  // Logo overlay function for enterprise tier
-  const overlayLogoOnQR = async (qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> => {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not get canvas context'));
-        return;
-      }
-
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        // Set canvas size to match QR code
-        canvas.width = qrCanvas.width;
-        canvas.height = qrCanvas.height;
-
-        // Draw QR code first
-        ctx.drawImage(qrCanvas, 0, 0);
-
-        // Calculate logo size (should be 15-20% of QR code size for readability)
-        const logoSize = Math.floor(canvas.width * 0.18); // 18% of QR size
-        const logoX = (canvas.width - logoSize) / 2;
-        const logoY = (canvas.height - logoSize) / 2;
-
-        // Create circular mask for logo
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-
-        // Draw logo
-        ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
-        ctx.restore();
-
-        // Add white border around logo
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 2, 0, Math.PI * 2);
-        ctx.stroke();
-
-        resolve(canvas);
-      };
-      img.onerror = () => reject(new Error('Failed to load logo image'));
-      img.src = logoSrc;
-    });
-  };
   
   // Map tier to QR features (similar to old getQRFeatures logic)
   const getQRFeatures = (tier: string | null) => {
@@ -132,44 +82,26 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
       if (!canvasRef.current) return;
 
       try {
-        // Generate base QR code
-        const qrCanvas = document.createElement('canvas');
-        const qrCtx = qrCanvas.getContext('2d');
-        if (!qrCtx) return;
-
-        qrCanvas.width = size;
-        qrCanvas.height = size;
-
-        // Generate QR code with higher error correction for logo overlay
-        await QRCode.toCanvas(qrCanvas, url, {
-          width: size,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF',
-          },
-          errorCorrectionLevel: features.customLogo && logoUrl ? 'H' : 'M', // Higher error correction for logos
+        const dataUrl = await generateQrDataUrl({
+          data: url,
+          exportSize: size,
+          styled: false,
+          logoUrl: features.customLogo && logoUrl ? logoUrl : null,
+          logoShape: 'circle',
+          errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
         });
 
-        let finalCanvas = qrCanvas;
-
-        // Overlay logo for enterprise users if logo is provided
-        if (features.customLogo && logoUrl) {
-          try {
-            finalCanvas = await overlayLogoOnQR(qrCanvas, logoUrl);
-          } catch (logoError) {
-            clientLogger.warn('Failed to overlay logo, using plain QR code:', { detail: logoError });
-            // Fall back to plain QR code if logo overlay fails
+        const img = new Image();
+        img.onload = () => {
+          if (!canvasRef.current) return;
+          const displayCtx = canvasRef.current.getContext('2d');
+          if (displayCtx) {
+            canvasRef.current.width = img.width;
+            canvasRef.current.height = img.height;
+            displayCtx.drawImage(img, 0, 0);
           }
-        }
-
-        // Draw final result to display canvas
-        const displayCtx = canvasRef.current.getContext('2d');
-        if (displayCtx) {
-          canvasRef.current.width = finalCanvas.width;
-          canvasRef.current.height = finalCanvas.height;
-          displayCtx.drawImage(finalCanvas, 0, 0);
-        }
+        };
+        img.src = dataUrl;
       } catch (error) {
         clientLogger.error('QR Code generation error:', { detail: error });
       }
@@ -181,41 +113,15 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
   const handleDownload = async () => {
     setIsGenerating(true);
     try {
-      // Generate high-res QR code for download (respects tier limits)
-      const qrCanvas = document.createElement('canvas');
-      const qrCtx = qrCanvas.getContext('2d');
-      if (!qrCtx) throw new Error('Could not get canvas context');
-
-      qrCanvas.width = features.maxResolution;
-      qrCanvas.height = features.maxResolution;
-
-      // Generate QR code with higher error correction for logo overlay
-      await QRCode.toCanvas(qrCanvas, url, {
-        width: features.maxResolution,
-        margin: 4,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
-        errorCorrectionLevel: features.customLogo && logoUrl ? 'H' : 'M',
+      const dataUrl = await generateQrDataUrl({
+        data: url,
+        exportSize: features.maxResolution,
+        styled: false,
+        logoUrl: features.customLogo && logoUrl ? logoUrl : null,
+        logoShape: 'circle',
+        errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
       });
 
-      let finalCanvas = qrCanvas;
-
-      // Overlay logo for enterprise users if logo is provided
-      if (features.customLogo && logoUrl) {
-        try {
-          finalCanvas = await overlayLogoOnQR(qrCanvas, logoUrl);
-        } catch (logoError) {
-          clientLogger.warn('Failed to overlay logo on download, using plain QR code:', { detail: logoError });
-          // Fall back to plain QR code if logo overlay fails
-        }
-      }
-
-      // Convert to data URL for download
-      const dataUrl = finalCanvas.toDataURL('image/png');
-
-      // Create download link
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = `qr-${productName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.png`;
@@ -240,33 +146,14 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
     // Generate high-res QR code for printing
     const generatePrintQR = async () => {
       try {
-        const qrCanvas = document.createElement('canvas');
-        const qrCtx = qrCanvas.getContext('2d');
-        if (!qrCtx) throw new Error('Could not get canvas context');
-
-        qrCanvas.width = 1024;
-        qrCanvas.height = 1024;
-
-        // Generate QR code with higher error correction for logo overlay
-        await QRCode.toCanvas(qrCanvas, url, {
-          width: 1024,
-          margin: 4,
-          errorCorrectionLevel: features.customLogo && logoUrl ? 'H' : 'M',
+        const dataUrl = await generateQrDataUrl({
+          data: url,
+          exportSize: 1024,
+          styled: false,
+          logoUrl: features.customLogo && logoUrl ? logoUrl : null,
+          logoShape: 'circle',
+          errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
         });
-
-        let finalCanvas = qrCanvas;
-
-        // Overlay logo for enterprise users if logo is provided
-        if (features.customLogo && logoUrl) {
-          try {
-            finalCanvas = await overlayLogoOnQR(qrCanvas, logoUrl);
-          } catch (logoError) {
-            clientLogger.warn('Failed to overlay logo on print, using plain QR code:', { detail: logoError });
-            // Fall back to plain QR code if logo overlay fails
-          }
-        }
-
-        const dataUrl = finalCanvas.toDataURL('image/png');
 
         printWindow.document.write(`
           <!DOCTYPE html>
