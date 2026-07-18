@@ -132,11 +132,16 @@ export function resolveStorefrontQr(
     || !!features.storefront_qr_gradients
     || !!fallbackFeatures.storefront_opt_qr_gradients);
 
+  // QR Analytics — premium feature gated by storefront_qr_analytics tier feature + merchant pref
+  const qrAnalyticsTierEnabled = flexible || !!features.storefront_qr_analytics;
+  const qrAnalyticsEnabled = mainOn && qrAnalyticsTierEnabled;
+
   // Merchant preferences
   const prefs = {
     qr_enabled: merchantPrefs?.qr_enabled !== false,
     qr_classic_enabled: merchantPrefs?.qr_classic_enabled !== false,
     qr_styled_enabled: merchantPrefs?.qr_styled_enabled !== false,
+    qr_analytics_enabled: merchantPrefs?.qr_analytics_enabled ?? false,
     qr_codes_512: merchantPrefs?.qr_codes_512 ?? false,
     qr_codes_1024: merchantPrefs?.qr_codes_1024 !== false,
     qr_codes_2048: merchantPrefs?.qr_codes_2048 ?? false,
@@ -180,7 +185,9 @@ export function resolveStorefrontQr(
     allowed_qr_corner_dot_styles: allowedQRCornerDotStyles,
     qr_custom_colors: mainOn && qrCustomColors,
     qr_gradients: mainOn && qrGradients,
+    qr_analytics_enabled: qrAnalyticsEnabled,
     can_use_qr_codes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
+    can_use_qr_analytics: qrAnalyticsEnabled && (merchantPrefs?.qr_analytics_enabled === true),
     merchant_preferences: prefs,
   };
 }

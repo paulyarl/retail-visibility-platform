@@ -354,6 +354,20 @@ const LINKS: LinkDefinition[] = [
   },
 
   {
+    id: 'qr-analytics',
+    label: () => 'QR Analytics',
+    description: () => 'Track QR code scan performance',
+    href: (ctx) => `/t/${ctx.tenantId}/settings/storefront-qr/analytics`,
+    icon: 'BarChart3',
+    category: 'visibility',
+    condition: (ctx) => {
+      const qr = ctx.capabilities?.effective.storefront_qr;
+      return !!qr && qr.can_use_qr_analytics;
+    },
+    score: () => 48,
+  },
+
+  {
     id: 'social-commerce',
     label: () => 'Social Commerce',
     description: (ctx) => {

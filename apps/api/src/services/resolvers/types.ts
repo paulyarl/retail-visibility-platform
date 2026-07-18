@@ -194,6 +194,7 @@ export interface StorefrontQrMerchantSettings {
   qr_enabled?: boolean | null;
   qr_classic_enabled?: boolean | null;
   qr_styled_enabled?: boolean | null;
+  qr_analytics_enabled?: boolean | null;
   qr_dot_type?: string | null;
   qr_corner_type?: string | null;
   qr_corner_dot_type?: string | null;
@@ -578,7 +579,9 @@ export interface EffectiveStorefrontQr {
   allowed_qr_corner_dot_styles: StorefrontOptQRCornerDotStyleType[];
   qr_custom_colors: boolean;
   qr_gradients: boolean;
+  qr_analytics_enabled: boolean;
   can_use_qr_codes: boolean;
+  can_use_qr_analytics: boolean;
   merchant_preferences: Record<string, any>;
 }
 

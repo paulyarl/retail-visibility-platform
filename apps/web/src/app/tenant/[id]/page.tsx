@@ -42,7 +42,7 @@ import { publicFaqService } from '@/services/PublicFaqService';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { publicUnifiedCapabilityService } from '@/services/PublicUnifiedCapabilityService';
-import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, type StorefrontState } from '@/services/CapabilityResolutionService';
+import { type ProductOptionFlags, type CommerceState, type PaymentGatewayState, type StorefrontState, type StorefrontLayoutState } from '@/services/CapabilityResolutionService';
 import { resolveStorefrontLayout, type StorefrontLayoutKey } from './layouts/types';
 import StorefrontEditorialLayout from './StorefrontEditorialLayout';
 import StorefrontImmersiveLayout from './StorefrontImmersiveLayout';
@@ -269,7 +269,11 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
 
     if (shopData || tenant) {
       tenantData.metadata = {
+        ...tenantMetadata,
         ...tenantData.metadata,
+        primary_color: tenantMetadata?.primaryColor || tenantMetadata?.primary_color || tenantData.metadata?.primary_color,
+        secondary_color: tenantMetadata?.secondaryColor || tenantMetadata?.secondary_color || tenantData.metadata?.secondary_color,
+        accent_color: tenantMetadata?.accentColor || tenantMetadata?.accent_color || tenantData.metadata?.accent_color,
         businessName: tenantProfileData?.business_name || shopData?.business_name || tenantData.name,
         phone: tenantProfileData?.phone_number || shopData?.phone || null,
         email: tenantProfileData?.email || shopData?.email || null,
@@ -484,7 +488,15 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       clientLogger.error('Failed to fetch social commerce options:', { detail: e });
     }
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags };
+    // Fetch storefront layout state from decoupled storefront_layouts domain
+    let storefrontLayoutState: StorefrontLayoutState | null = null;
+    try {
+      storefrontLayoutState = await publicUnifiedCapabilityService.getStorefrontLayoutsState(idResolvedBySlug);
+    } catch (e) {
+      clientLogger.error('Failed to fetch storefront layout state:', { detail: e });
+    }
+
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug, storefrontOptionFlags, storefrontLayoutState, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags };
   } catch (error) {
     clientLogger.error('Error fetching tenant storefront:', { detail: error });
     return null;
@@ -608,7 +620,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId, storefrontOptionFlags, storefrontLayoutState, commerceSettings, paymentGatewaySettings, storefrontTypeSettings, faqOptionsFlags, crmOptionsFlags, productOptionFlags, socialCommerceFlags } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
  
   if (category && currentCategory) {
@@ -740,11 +752,16 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     );
   }
 
-  // Resolve storefront layout from option flags + preview param
+  // Resolve storefront layout from decoupled storefront_layouts domain + preview param
   const storefrontLayout: StorefrontLayoutKey = resolveStorefrontLayout(
-    storefrontOptionFlags?.storefrontLayout,
+    storefrontLayoutState?.effectiveLayout ?? storefrontOptionFlags?.storefrontLayout,
     view === 'editorial' ? 'editorial' : view === 'immersive' ? 'immersive' : undefined,
   );
+
+  // console.log(`TenantStorefrontPage: storefrontLayout ${JSON.stringify(storefrontLayout)}`);
+  // console.log(`TenantStorefrontPage: storefrontLayoutState ${JSON.stringify(storefrontLayoutState)}`);
+  // console.log(`TenantStorefrontPage: storefrontOptionFlags ${JSON.stringify(storefrontOptionFlags)}`);
+  // console.log(`TenantStorefrontPage: mapLocation ${JSON.stringify(mapLocation)}`);
 
   return (
     <ProductSingletonProvider>

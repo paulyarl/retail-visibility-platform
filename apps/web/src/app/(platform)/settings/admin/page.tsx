@@ -146,6 +146,20 @@ export default function AdminDashboardPage() {
           stats: 'Traffic & engagement',
           badge: 'NEW',
         },
+        {
+          title: 'QR Analytics',
+          description: 'Cross-tenant QR code scan analytics, conversion metrics, and recent activity',
+          href: '/settings/admin/qr-analytics',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z" />
+            </svg>
+          ),
+          color: 'bg-teal-500',
+          stats: 'Scan tracking & conversions',
+          badge: 'NEW',
+        },
       ],
     },
     {
@@ -947,6 +961,19 @@ export default function AdminDashboardPage() {
           ),
           color: 'bg-purple-500',
           stats: '5-30 categories',
+          badge: 'NEW',
+        },
+        {
+          title: 'QR Code Generator',
+          description: 'Design styled QR codes for any target URL — marketing, events, print materials',
+          href: '/settings/admin/qr-generator',
+          icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h.01M4 4h.01M4 8h.01M9 4h.01M9 8h.01M9 12h.01M9 16h.01M9 20h.01M4 16h.01M16 4h.01M16 8h.01M16 12h.01M16 16h.01M4 20h.01" />
+            </svg>
+          ),
+          color: 'bg-indigo-500',
+          stats: 'Themed, downloadable PNG/SVG',
           badge: 'NEW',
         },
       ],

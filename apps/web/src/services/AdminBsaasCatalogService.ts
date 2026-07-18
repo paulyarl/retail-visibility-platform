@@ -85,7 +85,7 @@ class AdminBsaasCatalogService extends AdminApiSingleton {
 
   async update(id: string, input: Partial<BsaasCatalogInput>): Promise<BsaasCatalogEntry> {
     const result = await this.makeDefaultRequest<BsaasCatalogEntry>(
-      `/api/admin/bsaas-catalog?id=${id}`,
+      `/api/admin/bsaas-catalog/${id}`,
       { method: 'PUT', body: JSON.stringify(input) },
       'admin-bsaas-catalog-update',
       0,
@@ -100,7 +100,7 @@ class AdminBsaasCatalogService extends AdminApiSingleton {
 
   async remove(id: string): Promise<void> {
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/bsaas-catalog?id=${id}`,
+      `/api/admin/bsaas-catalog/${id}`,
       { method: 'DELETE' },
       'admin-bsaas-catalog-delete',
       0,

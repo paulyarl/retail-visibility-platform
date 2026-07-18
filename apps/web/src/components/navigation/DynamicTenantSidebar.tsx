@@ -292,6 +292,7 @@ function buildTenantNav(
         { label: 'Location Status', href: `/t/${currentTenantId}/settings/location-status`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Review Management', href: `/t/${currentTenantId}/reviews` },
         { label: 'QR Codes', href: `/t/${currentTenantId}/settings/storefront-qr`, requiredGroup: 'IS_TENANT_ADMIN' },
+        { label: 'QR Analytics', href: `/t/${currentTenantId}/settings/storefront-qr/analytics`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Image Gallery', href: `/t/${currentTenantId}/settings/storefront-gallery`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Business Hours', href: `/t/${currentTenantId}/settings/storefront-hours`, requiredGroup: 'IS_TENANT_ADMIN' },
         { label: 'Storefront Layout', href: `/t/${currentTenantId}/settings/storefront-layouts`, requiredGroup: 'IS_TENANT_ADMIN' },

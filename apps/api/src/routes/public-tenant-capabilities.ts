@@ -299,7 +299,9 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         allowed_qr_corner_dot_styles: [],
         qr_custom_colors: false,
         qr_gradients: false,
+        qr_analytics_enabled: false,
         can_use_qr_codes: false,
+        can_use_qr_analytics: false,
         merchant_preferences: {},
       },
       storefront_gallery: {

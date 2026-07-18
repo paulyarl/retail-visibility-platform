@@ -169,6 +169,20 @@ export default function StorefrontEditorialLayout({
     initialProductOptionFlags,
     initialSocialCommerceFlags,
   });
+  
+  // DEBUG
+  console.log(`StorefrontEditorialLayout: hoursStatus ${JSON.stringify(hoursStatus)}`);
+  console.log(`StorefrontEditorialLayout: logoUrl ${JSON.stringify(logoUrl)}`);
+  console.log(`StorefrontEditorialLayout: currentUrl ${JSON.stringify(currentUrl)}`);
+  console.log(`StorefrontEditorialLayout: storefrontStatus ${JSON.stringify(storefrontStatus)}`);
+  console.log(`StorefrontEditorialLayout: isRetailStore ${JSON.stringify(isRetailStore)}`);
+  console.log(`StorefrontEditorialLayout: isServiceStore ${JSON.stringify(isServiceStore)}`);
+  console.log(`StorefrontEditorialLayout: showsHours ${JSON.stringify(showsHours)}`);
+  console.log(`StorefrontEditorialLayout: optFlags ${JSON.stringify(optFlags)}`);
+  console.log(`StorefrontEditorialLayout: showsMap ${JSON.stringify(showsMap)}`);
+  console.log(`StorefrontEditorialLayout: showsInteractiveMaps ${JSON.stringify(showsInteractiveMaps)}`);
+  console.log(`StorefrontEditorialLayout: showsLocation ${JSON.stringify(showsLocation)}`);
+  console.log(`StorefrontEditorialLayout: showsHoursStatus ${JSON.stringify(showsHoursStatus)}`);
 
   // ---- Ref for hero CTA scroll ----
   const collectionRef = useRef<HTMLDivElement>(null);

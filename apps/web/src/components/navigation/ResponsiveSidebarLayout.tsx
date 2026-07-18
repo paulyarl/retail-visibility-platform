@@ -262,6 +262,10 @@ export const ResponsiveAdminLayout = ({ children }: { children: ReactNode }) => 
         {
           label: 'Analytics',
           href: '/settings/admin/analytics'
+        },
+        {
+          label: 'QR Analytics',
+          href: '/settings/admin/qr-analytics'
         }
       ]
     }

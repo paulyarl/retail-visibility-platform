@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { Save, AlertCircle, CheckCircle2, QrCode, Palette, Sparkles, Lock, Zap, ArrowRight, Globe, MapPin, Image } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, QrCode, Palette, Sparkles, Lock, Zap, ArrowRight, Globe, MapPin, Image, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useStorefrontQrCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
@@ -15,6 +15,7 @@ interface StorefrontQrSettings {
   qr_enabled: boolean;
   qr_classic_enabled: boolean;
   qr_styled_enabled: boolean;
+  qr_analytics_enabled: boolean;
   qr_codes_512: boolean;
   qr_codes_1024: boolean;
   qr_codes_2048: boolean;
@@ -34,6 +35,9 @@ interface StorefrontQrSettings {
   qr_gradient_enabled: boolean;
   qr_gradient_start: string;
   qr_gradient_end: string;
+  qr_gradient_on_dots: boolean;
+  qr_gradient_on_corners: boolean;
+  qr_gradient_on_corner_dots: boolean;
   default_qr_resolution: string;
 }
 
@@ -45,6 +49,7 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_enabled: true,
   qr_classic_enabled: true,
   qr_styled_enabled: false,
+  qr_analytics_enabled: false,
   qr_codes_512: false,
   qr_codes_1024: true,
   qr_codes_2048: false,
@@ -64,6 +69,9 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_gradient_enabled: false,
   qr_gradient_start: '#1a56db',
   qr_gradient_end: '#7c3aed',
+  qr_gradient_on_dots: true,
+  qr_gradient_on_corners: true,
+  qr_gradient_on_corner_dots: true,
   default_qr_resolution: '1024',
 };
 
@@ -162,6 +170,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
   const tierQrResolutions = tierState?.allowedQRResolutions ?? [];
   const tierQrContentTypes = tierState?.allowedQRContentTypes ?? [];
   const tierStyledEnabled = tierState?.qrStyledEnabled ?? false;
+  const canUseQrAnalytics = tierState?.canUseQrAnalytics ?? false;
   const tierQrCustomColors = tierState?.qrCustomColors ?? false;
   const tierQrGradients = tierState?.qrGradients ?? false;
   const tierDotStyles = tierState?.allowedQRDotStyles ?? [];
@@ -180,6 +189,13 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
           <h1 className="text-2xl font-bold text-neutral-900">QR Code Settings</h1>
           <p className="text-sm text-neutral-500 mt-1">Configure QR code display and styling for your storefront</p>
         </div>
+        <Link
+          href={`/t/${tenantId}/settings/storefront-qr/analytics`}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+        >
+          <BarChart3 className="w-4 h-4" />
+          View Analytics
+        </Link>
       </div>
 
       {/* Plan Summary */}
@@ -316,6 +332,39 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
               </div>
             </div>
 
+            {/* QR Analytics — premium feature for tracking scan events */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700">QR Analytics</p>
+              <p className="text-xs text-neutral-500">Track QR code scan performance and conversion metrics</p>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={settings.qr_analytics_enabled}
+                    onCheckedChange={(v) => updateSetting('qr_analytics_enabled', v)}
+                    disabled={!canUseQrAnalytics}
+                  />
+                  <span className="text-sm text-neutral-700">Enable QR Scan Tracking</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!canUseQrAnalytics && <Lock className="h-3 w-3 text-neutral-400" />}
+                  {canUseQrAnalytics && settings.qr_analytics_enabled && (
+                    <Link
+                      href={`/t/${tenantId}/settings/storefront-qr/analytics`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      <BarChart3 className="h-3 w-3" />
+                      View Dashboard
+                    </Link>
+                  )}
+                </div>
+              </div>
+              {!canUseQrAnalytics && (
+                <p className="text-xs text-neutral-500">
+                  QR Analytics is a premium feature. <Link href={`/t/${tenantId}/settings/subscription`} className="text-indigo-600 hover:text-indigo-700">Upgrade your plan</Link> to access scan tracking and conversion analytics.
+                </p>
+              )}
+            </div>
+
             {/* Logo on QR Code — controls whether the merchant's logo appears on the QR */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">Logo on QR Code</p>
@@ -331,7 +380,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                 </div>
                 {!(isTierFlexible || tierQrContentTypes.includes('qr_logo')) && <Lock className="h-3 w-3 text-neutral-400" />}
               </div>
-              {settings.qr_logo && settings.qr_styled_enabled && (
+              {settings.qr_logo && (
                 <div className="space-y-2 mt-3">
                   <p className="text-sm font-medium text-neutral-700">Logo Shape</p>
                   <p className="text-xs text-neutral-500">Cutout shape for the embedded logo</p>
@@ -646,6 +695,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                   />
                 </div>
                 {settings.qr_gradient_enabled && (
+                  <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-neutral-500">Gradient Start</label>
@@ -666,6 +716,37 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                       />
                     </div>
                   </div>
+                  {/* Per-element gradient targets */}
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={settings.qr_gradient_on_dots}
+                        onChange={(e) => updateSetting('qr_gradient_on_dots', e.target.checked)}
+                        className="rounded border-neutral-300"
+                      />
+                      Dots
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={settings.qr_gradient_on_corners}
+                        onChange={(e) => updateSetting('qr_gradient_on_corners', e.target.checked)}
+                        className="rounded border-neutral-300"
+                      />
+                      Corners
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={settings.qr_gradient_on_corner_dots}
+                        onChange={(e) => updateSetting('qr_gradient_on_corner_dots', e.target.checked)}
+                        className="rounded border-neutral-300"
+                      />
+                      Corner Dots
+                    </label>
+                  </div>
+                  </>
                 )}
               </div>
             )}

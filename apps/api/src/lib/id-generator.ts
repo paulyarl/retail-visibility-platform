@@ -1526,3 +1526,21 @@ export function generateFunnelEventId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `fevt-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+/**
+ * Generate QR analytics aggregate ID (tenant-scoped)
+ * Format: qra-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateQrAnalyticsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `qra-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate QR scan event ID (tenant-scoped)
+ * Format: qrse-{tenantKey}-{nanoid} (19 chars)
+ */
+export function generateQrScanEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `qrse-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

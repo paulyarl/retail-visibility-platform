@@ -28,6 +28,16 @@ export async function GET(request: NextRequest) {
       if (status) params.set('status', status);
       const qs = params.toString();
       endpoint = `/api/admin/feature-purchases/grants${qs ? `?${qs}` : ''}`;
+    } else if (action === 'complimentary-grants') {
+      const params = new URLSearchParams();
+      const featureKey = url.searchParams.get('featureKey');
+      const tenantId = url.searchParams.get('tenantId');
+      const status = url.searchParams.get('status');
+      if (featureKey) params.set('featureKey', featureKey);
+      if (tenantId) params.set('tenantId', tenantId);
+      if (status) params.set('status', status);
+      const qs = params.toString();
+      endpoint = `/api/admin/feature-purchases/complimentary-grants${qs ? `?${qs}` : ''}`;
     } else {
       const queryParams = url.searchParams.toString();
       endpoint = `/api/admin/feature-purchases${queryParams ? `?${queryParams}` : ''}`;
@@ -39,6 +49,68 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[Feature Purchases Proxy GET] Error:', error);
     return NextResponse.json({ error: 'Failed to fetch feature purchases' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const authResult = await requirePlatformAdmin(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { accessToken } = authResult;
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+    const requestBody = await request.json();
+
+    if (action === 'update-grant') {
+      const endpoint = `/api/admin/feature-purchases/grants/${requestBody.grant_id}`;
+      const { grant_id, ...updateData } = requestBody;
+      const response = await authenticatedFetch(endpoint, accessToken, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    if (action === 'update-complimentary') {
+      const endpoint = `/api/admin/feature-purchases/${requestBody.grant_id}`;
+      const { grant_id, ...updateData } = requestBody;
+      const response = await authenticatedFetch(endpoint, accessToken, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json({ error: 'Unknown PUT action' }, { status: 400 });
+  } catch (error) {
+    console.error('[Feature Purchases Proxy PUT] Error:', error);
+    return NextResponse.json({ error: 'Failed to process feature purchase update' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const authResult = await requirePlatformAdmin(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { accessToken } = authResult;
+    const url = new URL(request.url);
+    const grantId = url.searchParams.get('grant_id');
+
+    if (!grantId) {
+      return NextResponse.json({ error: 'Missing grant_id parameter' }, { status: 400 });
+    }
+
+    const endpoint = `/api/admin/feature-purchases/${grantId}`;
+    const response = await authenticatedFetch(endpoint, accessToken, { method: 'DELETE' });
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('[Feature Purchases Proxy DELETE] Error:', error);
+    return NextResponse.json({ error: 'Failed to delete feature purchase' }, { status: 500 });
   }
 }
 
@@ -56,6 +128,10 @@ export async function POST(request: NextRequest) {
       ? '/api/admin/feature-purchases/grant-complimentary'
       : action === 'create-grant-token'
       ? '/api/admin/feature-purchases/create-grant-token'
+      : action === 'revoke-grant'
+      ? `/api/admin/feature-purchases/grants/${requestBody.grant_id}/revoke`
+      : action === 'unrevoke-grant'
+      ? `/api/admin/feature-purchases/grants/${requestBody.grant_id}/unrevoke`
       : '/api/admin/feature-purchases';
 
     const response = await authenticatedFetch(endpoint, accessToken, {

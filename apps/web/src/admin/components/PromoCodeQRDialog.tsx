@@ -11,17 +11,15 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import QRCodeStyling from 'qr-code-styling';
+import {
+  QR_TEMPLATE_LIST,
+  generateQrInstance,
+  type QrTemplateName,
+} from '@/lib/qr-engine';
 import {
   adminBsaasPromotionsService,
   type PromoQRData,
 } from '@/services/AdminBsaasPromotionsService';
-import {
-  QR_THEMES,
-  QR_THEME_LIST,
-  buildQROptions,
-  type QRThemeName,
-} from '@/lib/qr-style-config';
 import { X, Download, Copy, Check, QrCode, Loader2 } from 'lucide-react';
 
 interface PromoCodeQRDialogProps {
@@ -29,7 +27,7 @@ interface PromoCodeQRDialogProps {
   promotionCode: string;
   open: boolean;
   onClose: () => void;
-  defaultTheme?: QRThemeName;
+  defaultTheme?: QrTemplateName;
 }
 
 export default function PromoCodeQRDialog({
@@ -42,10 +40,10 @@ export default function PromoCodeQRDialog({
   const [qrData, setQrData] = useState<PromoQRData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState<QRThemeName>(defaultTheme);
+  const [selectedTheme, setSelectedTheme] = useState<QrTemplateName>(defaultTheme);
   const [copied, setCopied] = useState<'url' | 'code' | null>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
-  const qrInstanceRef = useRef<QRCodeStyling | null>(null);
+  const qrInstanceRef = useRef<any>(null);
 
   const fetchQRData = useCallback(async () => {
     try {
@@ -70,21 +68,23 @@ export default function PromoCodeQRDialog({
   useEffect(() => {
     if (!qrData || !qrContainerRef.current) return;
 
-    const theme = QR_THEMES[selectedTheme];
-    const options = buildQROptions(
-      qrData.qr_url,
-      qrData.target_icon?.icon_name ? undefined : '/icons/visibleshelf-logo.svg',
-      theme,
-    );
-
-    const qr = new QRCodeStyling(options);
-    qrInstanceRef.current = qr;
-
-    // Clear previous content and append
-    qrContainerRef.current.innerHTML = '';
-    qr.append(qrContainerRef.current);
+    let cancelled = false;
+    const renderQr = async () => {
+      const qr = await generateQrInstance({
+        data: qrData.qr_url,
+        exportSize: 512,
+        styled: true,
+        template: selectedTheme,
+      });
+      if (cancelled || !qrContainerRef.current) return;
+      qrInstanceRef.current = qr;
+      qrContainerRef.current.innerHTML = '';
+      qr.append(qrContainerRef.current);
+    };
+    renderQr();
 
     return () => {
+      cancelled = true;
       if (qrContainerRef.current) {
         qrContainerRef.current.innerHTML = '';
       }
@@ -141,9 +141,9 @@ export default function PromoCodeQRDialog({
 
               {/* Theme Selector */}
               <div>
-                <label className="text-xs font-medium text-neutral-600 mb-1.5 block">QR Theme</label>
+                <label className="text-xs font-medium text-neutral-600 mb-1.5 block">QR Template</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {QR_THEME_LIST.map((t) => (
+                  {QR_TEMPLATE_LIST.filter(t => t.name !== 'default').map((t) => (
                     <button
                       key={t.name}
                       onClick={() => setSelectedTheme(t.name)}

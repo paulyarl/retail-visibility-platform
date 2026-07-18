@@ -2031,6 +2031,7 @@ class TenantInfoService extends TenantApiSingleton {
     qr_enabled: boolean;
     qr_classic_enabled: boolean;
     qr_styled_enabled: boolean;
+    qr_analytics_enabled: boolean;
     qr_codes_512: boolean;
     qr_codes_1024: boolean;
     qr_codes_2048: boolean;

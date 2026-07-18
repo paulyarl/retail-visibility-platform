@@ -11,6 +11,7 @@ interface ProductFooterSectionProps {
   optFlags?: StorefrontOptionFlags | null;
   currentUrl: string;
   layoutVariant?: 'classic' | 'showcase' | 'quick-commerce';
+  primaryColor?: string;
 }
 
 export function ProductFooterSection({
@@ -21,6 +22,7 @@ export function ProductFooterSection({
   optFlags,
   currentUrl,
   layoutVariant = 'classic',
+  primaryColor,
 }: ProductFooterSectionProps) {
   return (
     <StorefrontFooter
@@ -61,6 +63,7 @@ export function ProductFooterSection({
       optFlags={optFlags}
       currentUrl={currentUrl}
       variant={layoutVariant === 'quick-commerce' ? 'compact' : 'full'}
+      primaryColor={primaryColor}
     />
   );
 }

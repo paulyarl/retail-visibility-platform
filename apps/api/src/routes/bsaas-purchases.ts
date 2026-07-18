@@ -1913,6 +1913,11 @@ router.post('/redeem-grant', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'not_found', message: 'Grant token record not found' });
     }
 
+    // Check if the grant has been revoked by an admin
+    if (grantRecord.is_revoked) {
+      return res.status(403).json({ success: false, error: 'grant_revoked', message: 'This grant has been revoked' });
+    }
+
     // Check max_claims
     if (grantRecord.claims_count >= grantRecord.max_claims) {
       return res.status(410).json({ success: false, error: 'max_claims_reached', message: 'This grant has reached its maximum number of redemptions' });

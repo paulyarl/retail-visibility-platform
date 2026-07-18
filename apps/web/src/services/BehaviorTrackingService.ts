@@ -76,7 +76,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
   async sendEvent(event: TrackingEvent): Promise<void> {
     try {
       await super.makeEnhancedDefaultRequest<void>(
-        '/behavior/events',
+        '/api/behavior/events',
         {
           method: 'POST',
           body: JSON.stringify(event)
@@ -97,7 +97,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
   async sendBatch(events: TrackingEvent[]): Promise<void> {
     try {
       await super.makeEnhancedDefaultRequest<void>(
-        '/behavior/events/batch',
+        '/api/behavior/events/batch',
         {
           method: 'POST',
           body: JSON.stringify({ events })
@@ -118,7 +118,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
   async sendSession(session: TrackingSession): Promise<void> {
     try {
       await super.makeEnhancedDefaultRequest<void>(
-        '/behavior/sessions',
+        '/api/behavior/sessions',
         {
           method: 'POST',
           body: JSON.stringify(session)
@@ -138,7 +138,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
    */
   async getBehaviorAnalytics(hours: number = 24): Promise<BehaviorAnalytics> {
     const response = await super.makeEnhancedDefaultRequest<BehaviorAnalytics>(
-      `/behavior/analytics?hours=${hours}`,
+      `/api/behavior/analytics?hours=${hours}`,
       {},
       `behavior-analytics-${hours}`,
       this.ANALYTICS_TTL
@@ -170,7 +170,7 @@ class BehaviorTrackingService extends ApiSystemSingleton {
    */
   async getUserBehaviorPatterns(userId: string, days: number = 30): Promise<any> {
     const response = await super.makeEnhancedDefaultRequest<any>(
-      `/behavior/patterns/${userId}?days=${days}`,
+      `/api/behavior/patterns/${userId}?days=${days}`,
       {},
       `user-behavior-${userId}-${days}`,
       this.ANALYTICS_TTL

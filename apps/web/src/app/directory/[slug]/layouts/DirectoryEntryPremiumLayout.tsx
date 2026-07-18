@@ -27,6 +27,7 @@ import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 
 import type { DirectoryEntryLayoutProps } from './types';
+import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 
 export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutProps) {
   const {
@@ -37,6 +38,11 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
     paymentGatewayStatus, actualProductCount, fullAddress,
     isDemo, demoExpiresAt,
   } = props;
+
+  // Track QR code scans when visitor arrives via QR code
+  useQrScanTracking(tenantId, 'directory');
+
+  const primaryColor = tenantInfo?.metadata?.primaryColor || tenantInfo?.metadata?.primary_color || null;
 
   return (
     <>
@@ -50,7 +56,10 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
 
       <div className="min-h-screen bg-stone-50">
         {/* Premium Header Band */}
-        <div className="bg-stone-900 text-stone-100">
+        <div
+          className={`text-stone-100 ${primaryColor ? '' : 'bg-stone-900'}`}
+          style={primaryColor ? { background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}88 50%, ${primaryColor}33 100%)` } : undefined}
+        >
           <div className="max-w-6xl mx-auto px-6 py-6">
             <Link href="/directory" className="inline-flex items-center text-sm text-stone-400 hover:text-white transition-colors mb-4">
               <ArrowLeft className="w-4 h-4 mr-2" /> Directory

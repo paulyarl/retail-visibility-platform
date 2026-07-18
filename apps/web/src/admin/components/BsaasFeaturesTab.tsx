@@ -79,6 +79,7 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
 
   const [capabilityTypes, setCapabilityTypes] = useState<CapabilityType[]>([]);
   const [selectedCapType, setSelectedCapType] = useState<string>('');
+  const [priceInput, setPriceInput] = useState<string>('');
 
   const [formData, setFormData] = useState<BsaasCatalogInput>({
     feature_key: '',
@@ -130,6 +131,7 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
     });
     setEditingEntry(null);
     setSelectedCapType('');
+    setPriceInput('');
   };
 
   const handleAdd = () => {
@@ -152,6 +154,7 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
       sort_order: entry.sort_order,
       is_private: entry.is_private || false,
     });
+    setPriceInput(entry.price_cents > 0 ? (entry.price_cents / 100).toFixed(2) : '');
     const matchingCapType = capabilityTypes.find((ct) =>
       ct.allowed_features?.includes(entry.feature_key),
     );
@@ -448,10 +451,11 @@ export default function BsaasFeaturesTab({ onError, onSuccess }: Props) {
                 <Input
                   type="number"
                   min="0"
-                  step="0.01"
-                  value={formData.price_cents === 0 ? '' : (formData.price_cents / 100).toFixed(2)}
+                  step="1"
+                  value={priceInput}
                   onChange={(e) => {
                     const raw = e.target.value;
+                    setPriceInput(raw);
                     if (raw === '') {
                       setFormData({ ...formData, price_cents: 0 });
                     } else {

@@ -11,6 +11,8 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 import { clientLogger } from '@/lib/client-logger';
+import { tenantBrandingSettingsService } from '@/services/TenantBrandingSettingsSingletonService';
+import { ColorInput } from '@mantine/core';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -38,6 +40,9 @@ export default function TenantBrandingPage() {
   const [bannerPreview, setBannerPreview] = useState<string>('');
   const [businessName, setBusinessName] = useState<string>('');
   const [tagline, setTagline] = useState<string>('');
+  const [primaryColor, setPrimaryColor] = useState<string>('#6366f1');
+  const [secondaryColor, setSecondaryColor] = useState<string>('#8b5cf6');
+  const [accentColor, setAccentColor] = useState<string>('#f59e0b');
 
   useEffect(() => {
     loadBranding();
@@ -103,6 +108,18 @@ export default function TenantBrandingPage() {
       setLogoPreview(logoUrl);
       setBannerUrl(bannerUrl);
       setBannerPreview(bannerUrl);
+
+      // Load brand colors from branding settings
+      try {
+        const brandingSettings = await tenantBrandingSettingsService.getTenantBrandingSettings(tenantId);
+        if (brandingSettings) {
+          setPrimaryColor(brandingSettings.primaryColor || '#6366f1');
+          setSecondaryColor(brandingSettings.secondaryColor || '#8b5cf6');
+          setAccentColor(brandingSettings.accentColor || '#f59e0b');
+        }
+      } catch (brandingErr) {
+        clientLogger.warn('Failed to load brand colors:', { detail: brandingErr });
+      }
     } catch (err) {
       clientLogger.error('Failed to load branding:', { detail: err });
       setError('Failed to load branding settings');
@@ -216,6 +233,13 @@ export default function TenantBrandingPage() {
         business_description: tagline,
         logo_url: logoUrl,
         banner_url: bannerUrl,
+      });
+
+      // Save brand colors to tenant metadata via branding endpoint
+      await tenantBrandingSettingsService.updateTenantBrandingSettings(tenantId, {
+        primaryColor,
+        secondaryColor,
+        accentColor,
       });
 
       setSuccess('Branding updated successfully!');
@@ -422,6 +446,77 @@ export default function TenantBrandingPage() {
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                 This appears on your landing page and in search results
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Brand Colors */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Brand Colors</CardTitle>
+            <CardDescription>
+              Choose the primary, secondary, and accent colors for your storefront. These colors are used in the editorial and immersive layout hero banners, gradients, and accent elements.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="primary-color">Primary Color</Label>
+                <div className="mt-2">
+                  <ColorInput
+                    id="primary-color"
+                    value={primaryColor}
+                    onChange={setPrimaryColor}
+                    placeholder="#6366f1"
+                    size="sm"
+                  />
+                </div>
+                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                  Used for hero banner gradient and main accents
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="secondary-color">Secondary Color</Label>
+                <div className="mt-2">
+                  <ColorInput
+                    id="secondary-color"
+                    value={secondaryColor}
+                    onChange={setSecondaryColor}
+                    placeholder="#8b5cf6"
+                    size="sm"
+                  />
+                </div>
+                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                  Used for secondary accents and highlights
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="accent-color">Accent Color</Label>
+                <div className="mt-2">
+                  <ColorInput
+                    id="accent-color"
+                    value={accentColor}
+                    onChange={setAccentColor}
+                    placeholder="#f59e0b"
+                    size="sm"
+                  />
+                </div>
+                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                  Used for call-to-action elements and badges
+                </p>
+              </div>
+            </div>
+
+            {/* Color preview */}
+            <div className="rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+              <div
+                className="h-24 flex items justify-center"
+                style={{
+                  background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}88 50%, ${primaryColor}33 100%)`,
+                }}
+              >
+                <span className="text-white font-bold text-lg drop-shadow-lg">{businessName || 'Your Store'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>

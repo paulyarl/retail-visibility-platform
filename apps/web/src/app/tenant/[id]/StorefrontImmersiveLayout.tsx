@@ -140,12 +140,30 @@ export default function StorefrontImmersiveLayout({
     initialSocialCommerceFlags,
   });
 
+  // DEBUG
+  // console.log(`StorefrontimmersiveLayout: hoursStatus ${JSON.stringify(hoursStatus)}`);
+  // console.log(`StorefrontimmersiveLayout: logoUrl ${JSON.stringify(logoUrl)}`);
+  // console.log(`StorefrontimmersiveLayout: currentUrl ${JSON.stringify(currentUrl)}`);
+  // console.log(`StorefrontimmersiveLayout: storefrontStatus ${JSON.stringify(storefrontStatus)}`);
+  // console.log(`StorefrontimmersiveLayout: isRetailStore ${JSON.stringify(isRetailStore)}`);
+  // console.log(`StorefrontimmersiveLayout: isServiceStore ${JSON.stringify(isServiceStore)}`);
+  // console.log(`StorefrontimmersiveLayout: showsHours ${JSON.stringify(showsHours)}`);
+  // console.log(`StorefrontimmersiveLayout: optFlags ${JSON.stringify(optFlags)}`);
+  // console.log(`StorefrontimmersiveLayout: showsMap ${JSON.stringify(showsMap)}`);
+  // console.log(`StorefrontimmersiveLayout: showsInteractiveMaps ${JSON.stringify(showsInteractiveMaps)}`);
+  // console.log(`StorefrontimmersiveLayout: mapLocation ${JSON.stringify(mapLocation)}`);
+  // console.log(`StorefrontimmersiveLayout: showsLocation ${JSON.stringify(showsLocation)}`);
+  // console.log(`StorefrontimmersiveLayout: showsLocationAvailability ${JSON.stringify(showsLocationAvailability)}`);
+  // console.log(`StorefrontimmersiveLayout: contactInfo.address ${JSON.stringify(contactInfo.address)}`);
+  // console.log(`StorefrontimmersiveLayout: businessDescription ${JSON.stringify(businessDescription)}`);
+  // console.log(`StorefrontimmersiveLayout: showsHoursStatus ${JSON.stringify(showsHoursStatus)}`);
+
   const searchParams = useSearchParams();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'name'>('featured');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [infoExpanded, setInfoExpanded] = useState(false);
+  const [infoExpanded, setInfoExpanded] = useState(showsLocation);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -653,7 +671,7 @@ export default function StorefrontImmersiveLayout({
                       </div>
                     </div>
                   )}
-                  {showsMap && showsInteractiveMaps && (mapLocation || contactInfo.address) && (
+                  {showsMap && showsInteractiveMaps && (showsLocation || contactInfo.address) && (
                     <div>
                       <h4 className="font-semibold text-sm text-neutral-900 dark:text-white mb-2">Location</h4>
                       <div className="h-48">
@@ -742,6 +760,7 @@ export default function StorefrontImmersiveLayout({
         optFlags={optFlags}
         currentUrl={currentUrl}
         variant="compact"
+        primaryColor={primaryColor}
       />}
     </div>
   );

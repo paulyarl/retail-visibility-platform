@@ -4703,6 +4703,7 @@ model tenant_storefront_qr_settings {
   qr_corner_dot_type       String?   @default("dot") @db.VarChar(30)
   qr_corner_dot_color      String?   @default("#ffffff") @db.VarChar(20)
   qr_logo_shape            String?   @default("square") @db.VarChar(20)
+  qr_analytics_enabled     Boolean?  @default(false)
   tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storefront_qr_tenant")
 
   @@index([tenant_id], map: "idx_storefront_qr_tenant")
@@ -5542,17 +5543,28 @@ model supplier_mapping {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model qr_scan_events {
-  id         String    @id @db.VarChar(255)
-  tenant_id  String    @db.VarChar(255)
-  source     String?   @default("qr_code") @db.VarChar(100)
-  referrer   String?
-  user_agent String?
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
-  tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_qr_scan_events_tenant")
+  id          String    @id @db.VarChar(255)
+  tenant_id   String    @db.VarChar(255)
+  source      String?   @default("qr_code") @db.VarChar(100)
+  referrer    String?
+  user_agent  String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  surface     String?   @default("qr_landing") @db.VarChar(30)
+  consumer    String?   @default("merchant") @db.VarChar(20)
+  product_id  String?   @db.VarChar(255)
+  session_id  String?   @db.VarChar(255)
+  geo_country String?   @db.VarChar(10)
+  geo_city    String?   @db.VarChar(100)
+  device_type String?   @db.VarChar(20)
+  tenants     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_qr_scan_events_tenant")
 
   @@index([created_at(sort: Desc)], map: "idx_qr_scan_events_created_at")
   @@index([tenant_id, created_at(sort: Desc)], map: "idx_qr_scan_events_tenant_created")
   @@index([tenant_id], map: "idx_qr_scan_events_tenant_id")
+  @@index([consumer], map: "idx_qr_scan_events_consumer")
+  @@index([surface], map: "idx_qr_scan_events_surface")
+  @@index([tenant_id, consumer, created_at(sort: Desc)], map: "idx_qr_scan_events_tenant_consumer_time")
+  @@index([tenant_id, surface, created_at(sort: Desc)], map: "idx_qr_scan_events_tenant_surface_time")
 }
 
 model product_suppliers {
@@ -5623,6 +5635,10 @@ model bsaas_grant_tokens {
   qr_expires_at            DateTime                   @db.Timestamptz(6)
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  is_revoked               Boolean                    @default(false)
+  revoked_at               DateTime?                  @db.Timestamptz(6)
+  revoked_by               String?                    @db.VarChar(255)
+  notes                    String?
   bsaas_grant_token_claims bsaas_grant_token_claims[]
 
   @@index([feature_key], map: "idx_bsaas_grant_tokens_feature_key")
@@ -5787,6 +5803,38 @@ model navigation_links_backup_tenant_restore {
   metadata            Json?
 
   @@ignore
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model qr_analytics {
+  id                   String   @id @db.VarChar(255)
+  tenant_id            String   @db.VarChar(255)
+  surface              String   @db.VarChar(30)
+  consumer             String   @default("merchant") @db.VarChar(20)
+  period_start         DateTime @db.Date
+  period_end           DateTime @db.Date
+  period_type          String   @default("day") @db.VarChar(10)
+  total_scans          Int      @default(0)
+  unique_visitors      Int      @default(0)
+  unique_surfaces      Int      @default(0)
+  conversion_count     Int      @default(0)
+  revenue_cents        BigInt   @default(0)
+  conversion_rate      Decimal  @default(0) @db.Decimal(8, 4)
+  avg_revenue_per_scan BigInt   @default(0)
+  top_country          String?  @db.VarChar(10)
+  top_city             String?  @db.VarChar(100)
+  mobile_scans         Int      @default(0)
+  desktop_scans        Int      @default(0)
+  tablet_scans         Int      @default(0)
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([tenant_id, surface, consumer, period_start, period_type])
+  @@index([period_type, period_start(sort: Desc)], map: "idx_qr_analytics_period_type")
+  @@index([tenant_id, consumer, period_start(sort: Desc)], map: "idx_qr_analytics_tenant_consumer")
+  @@index([tenant_id, period_start(sort: Desc)], map: "idx_qr_analytics_tenant_period")
+  @@index([tenant_id, surface, period_start(sort: Desc)], map: "idx_qr_analytics_tenant_surface")
 }
 
 enum action {

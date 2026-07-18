@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Eye, QrCode, Sparkles } from 'lucide-react';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import { generateQrDataUrl } from '@/lib/qr-engine';
 
 export interface QrPreviewSettings {
   qr_enabled: boolean;
@@ -21,6 +22,9 @@ export interface QrPreviewSettings {
   qr_gradient_enabled: boolean;
   qr_gradient_start: string;
   qr_gradient_end: string;
+  qr_gradient_on_dots: boolean;
+  qr_gradient_on_corners: boolean;
+  qr_gradient_on_corner_dots: boolean;
   default_qr_resolution: string;
 }
 
@@ -82,77 +86,27 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
     const generate = async () => {
       setIsGenerating(true);
       try {
-        if (isStyled) {
-          const { default: QRCodeStyling } = await import('qr-code-styling');
-          const useGradient = settings.qr_gradient_enabled;
-          const qr = new QRCodeStyling({
-            width: exportSize,
-            height: exportSize,
-            type: 'svg',
-            data: previewUrl,
-            image: logoUrl || undefined,
-            imageOptions: { crossOrigin: 'anonymous', margin: 10, imageSize: 0.3, hideBackgroundDots: true, imageShape: settings.qr_logo_shape } as any,
-            dotsOptions: {
-              color: effectiveDotColor,
-              type: settings.qr_dot_type as any,
-              gradient: useGradient ? {
-                type: 'linear',
-                rotation: 45,
-                colorStops: [
-                  { offset: 0, color: settings.qr_gradient_start },
-                  { offset: 1, color: settings.qr_gradient_end },
-                ],
-              } : undefined,
-            },
-            cornersSquareOptions: {
-              color: effectiveCornerColor,
-              type: settings.qr_corner_type as any,
-            },
-            cornersDotOptions: { color: effectiveCornerDotColor, type: settings.qr_corner_dot_type as any },
-            backgroundOptions: { color: effectiveBgColor },
-            qrOptions: { errorCorrectionLevel: logoUrl ? 'H' : 'M' },
-          });
-
-          const blob = await qr.getRawData('png');
-          if (blob instanceof Blob && !cancelled) {
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            });
-            if (!cancelled) setQrImageUrl(dataUrl);
-          }
-        } else {
-          const QRCode = (await import('qrcode')).default;
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Could not get canvas context');
-
-          canvas.width = exportSize;
-          canvas.height = exportSize;
-
-          await QRCode.toCanvas(canvas, previewUrl, {
-            width: exportSize,
-            margin: exportSize >= 2048 ? 4 : exportSize >= 1024 ? 3 : 2,
-            color: { dark: '#000000', light: '#FFFFFF' },
-            errorCorrectionLevel: logoUrl ? 'H' : 'M',
-          });
-
-          let finalCanvas = canvas;
-
-          if (logoUrl) {
-            try {
-              finalCanvas = await overlayLogoOnQR(canvas, logoUrl);
-            } catch {
-              // fallback to plain QR
-            }
-          }
-
-          if (!cancelled) {
-            setQrImageUrl(finalCanvas.toDataURL('image/png', 1.0));
-          }
-        }
+        const dataUrl = await generateQrDataUrl({
+          data: previewUrl,
+          exportSize,
+          styled: isStyled,
+          logoUrl,
+          logoShape: settings.qr_logo_shape,
+          dotType: settings.qr_dot_type,
+          cornerType: settings.qr_corner_type,
+          cornerDotType: settings.qr_corner_dot_type,
+          dotColor: effectiveDotColor,
+          cornerColor: effectiveCornerColor,
+          cornerDotColor: effectiveCornerDotColor,
+          bgColor: effectiveBgColor,
+          gradientEnabled: settings.qr_gradient_enabled,
+          gradientStart: settings.qr_gradient_start,
+          gradientEnd: settings.qr_gradient_end,
+          gradientOnDots: settings.qr_gradient_on_dots,
+          gradientOnCorners: settings.qr_gradient_on_corners,
+          gradientOnCornerDots: settings.qr_gradient_on_corner_dots,
+        });
+        if (!cancelled) setQrImageUrl(dataUrl);
       } catch {
         if (!cancelled) setQrImageUrl(null);
       } finally {
@@ -176,7 +130,11 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
     settings.qr_gradient_enabled,
     settings.qr_gradient_start,
     settings.qr_gradient_end,
+    settings.qr_gradient_on_dots,
+    settings.qr_gradient_on_corners,
+    settings.qr_gradient_on_corner_dots,
     settings.default_qr_resolution,
+    settings.qr_logo_shape,
     logoUrl,
     exportSize,
   ]);
@@ -265,50 +223,4 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
       </CardContent>
     </Card>
   );
-}
-
-async function overlayLogoOnQR(qrCanvas: HTMLCanvasElement, logoSrc: string): Promise<HTMLCanvasElement> {
-  return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      reject(new Error('Could not get canvas context'));
-      return;
-    }
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      canvas.width = qrCanvas.width;
-      canvas.height = qrCanvas.height;
-      ctx.drawImage(qrCanvas, 0, 0);
-
-      const logoSize = Math.floor(canvas.width * 0.30);
-      const logoX = (canvas.width - logoSize) / 2;
-      const logoY = (canvas.height - logoSize) / 2;
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
-      ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
-      ctx.restore();
-
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3, 0, Math.PI * 2);
-      ctx.stroke();
-
-      resolve(canvas);
-    };
-    img.onerror = () => reject(new Error('Failed to load logo image'));
-    img.src = logoSrc;
-  });
 }

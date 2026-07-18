@@ -50,8 +50,11 @@ export interface StorefrontQrState {
   allowedQRCornerDotStyles: StorefrontOptQRCornerDotStyleType[];
   qrCustomColors: boolean;
   qrGradients: boolean;
+  // QR Analytics
+  qrAnalyticsEnabled: boolean;
   // Convenience flags
   canUseQRCodes: boolean;
+  canUseQrAnalytics: boolean;
   // Raw features
   features: Record<string, boolean>;
 }
@@ -295,6 +298,9 @@ class StorefrontQrService {
       || !!features.storefront_qr_gradients
       || !!features.storefront_opt_qr_gradients);
 
+    // QR Analytics — premium feature
+    const qrAnalyticsEnabled = mainOn && (flexible || !!features.storefront_qr_analytics);
+
     return {
       enabled: mainOn,
       isFlexible: flexible,
@@ -308,7 +314,9 @@ class StorefrontQrService {
       allowedQRCornerDotStyles,
       qrCustomColors,
       qrGradients,
+      qrAnalyticsEnabled,
       canUseQRCodes: mainOn && (allowedQRResolutions.length > 0 || allowedQRContentTypes.length > 0),
+      canUseQrAnalytics: qrAnalyticsEnabled,
       features,
     };
   }
@@ -330,7 +338,9 @@ class StorefrontQrService {
       allowedQRCornerDotStyles: [],
       qrCustomColors: false,
       qrGradients: false,
+      qrAnalyticsEnabled: false,
       canUseQRCodes: false,
+      canUseQrAnalytics: false,
       features: {},
     };
   }
