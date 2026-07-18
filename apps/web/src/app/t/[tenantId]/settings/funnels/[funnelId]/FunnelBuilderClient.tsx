@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -10,20 +10,15 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { ArrowLeft, Save, Plus, Trash2, GripVertical, Zap, TrendingUp, ArrowDownCircle, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, GripVertical, Zap, TrendingUp, ArrowDownCircle, Sparkles, AlertCircle, Package } from 'lucide-react';
 import FunnelService, { type FunnelWithSteps, type FunnelStepInput, type FunnelInput } from '@/services/FunnelService';
 import { useFunnelCapability } from '@/hooks/tenant-access/useCapabilityAccess';
-import { itemsSingletonService } from '@/services/ItemsSingletonService';
+import ItemPickerModal from '@/components/inventory/ItemPickerModal';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 interface FunnelBuilderClientProps {
   tenantId: string;
   funnelId: string;
-}
-
-interface ItemOption {
-  id: string;
-  name: string;
-  price_cents: number;
 }
 
 const STEP_TYPES = [
@@ -49,14 +44,13 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
   const [isActive, setIsActive] = useState(true);
   const [isDefault, setIsDefault] = useState(false);
   const [entryItemId, setEntryItemId] = useState<string | null>(null);
+  const [entryItemName, setEntryItemName] = useState<string | null>(null);
   const [steps, setSteps] = useState<FunnelStepInput[]>([]);
 
-  // Item picker state
-  const [itemSearch, setItemSearch] = useState('');
-  const [itemResults, setItemResults] = useState<ItemOption[]>([]);
-  const [searchingItems, setSearchingItems] = useState(false);
-  const [pickerForStep, setPickerForStep] = useState<number | null>(null);
-  const [pickerForEntry, setPickerForEntry] = useState(false);
+  // Item picker modal state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'entry' | number | null>(null);
+  const [stepItemNames, setStepItemNames] = useState<Record<number, string>>({});
 
   const fetchFunnel = useCallback(async () => {
     setLoading(true);
@@ -70,6 +64,8 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
       setIsActive(f.is_active);
       setIsDefault(f.is_default);
       setEntryItemId(f.entry_item_id);
+      setEntryItemName(null);
+      setStepItemNames({});
       setSteps((f.steps ?? [])
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(s => ({
@@ -85,6 +81,27 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
           is_active: s.is_active,
           metadata: s.metadata ?? undefined,
         })));
+
+      // Resolve item names for display
+      const itemIds = [
+        f.entry_item_id,
+        ...(f.steps ?? []).map(s => s.offer_item_id).filter(Boolean),
+      ].filter(Boolean) as string[];
+      if (itemIds.length > 0) {
+        const items = await Promise.all(itemIds.map(id => itemsService.getItem(id).catch(() => null)));
+        if (f.entry_item_id) {
+          const entryItem = items.find(i => i?.id === f.entry_item_id);
+          if (entryItem) setEntryItemName(entryItem.name);
+        }
+        const names: Record<number, string> = {};
+        (f.steps ?? []).forEach((s, i) => {
+          if (s.offer_item_id) {
+            const item = items.find(it => it?.id === s.offer_item_id);
+            if (item) names[i] = item.name;
+          }
+        });
+        setStepItemNames(names);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load funnel');
     } finally {
@@ -96,38 +113,25 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
     fetchFunnel();
   }, [fetchFunnel]);
 
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openPickerForEntry = () => {
+    setPickerMode('entry');
+    setPickerOpen(true);
+  };
 
-  const searchItems = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setItemResults([]);
-      return;
-    }
-    setSearchingItems(true);
-    try {
-      const result = await itemsSingletonService.getItemsComplete({
-        tenant_id: tenantId,
-        q: query,
-        limit: 20,
-      });
-      if (result?.items) {
-        setItemResults(result.items.map((item: any) => ({
-          id: item.id,
-          name: item.name || item.title || 'Untitled',
-          price_cents: item.price_cents || 0,
-        })));
-      }
-    } catch {
-      setItemResults([]);
-    } finally {
-      setSearchingItems(false);
-    }
-  }, [tenantId]);
+  const openPickerForStep = (stepIndex: number) => {
+    setPickerMode(stepIndex);
+    setPickerOpen(true);
+  };
 
-  const handleItemSearchChange = (value: string) => {
-    setItemSearch(value);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => searchItems(value), 300);
+  const handlePickerSelect = (itemId: string, itemName: string) => {
+    if (pickerMode === 'entry') {
+      setEntryItemId(itemId);
+      setEntryItemName(itemName);
+    } else if (typeof pickerMode === 'number') {
+      updateStep(pickerMode, { offer_item_id: itemId });
+      setStepItemNames(prev => ({ ...prev, [pickerMode]: itemName }));
+    }
+    setPickerMode(null);
   };
 
   const addStep = () => {
@@ -301,44 +305,21 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
             <div>
               <label className="text-sm font-medium mb-1 block">Entry Product</label>
               <div className="flex items-center gap-2">
-                <Input
-                  value={itemSearch}
-                  onChange={(e) => {
-                    setItemSearch(e.target.value);
-                    setPickerForEntry(true);
-                    setPickerForStep(null);
-                    handleItemSearchChange(e.target.value);
-                  }}
-                  placeholder="Search for a product..."
-                />
-                {entryItemId && (
-                  <Button variant="outline" size="sm" onClick={() => { setEntryItemId(null); setItemSearch(''); }}>
-                    Clear
+                {entryItemId ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium flex-1">{entryItemName || entryItemId}</span>
+                    <Button variant="outline" size="sm" onClick={() => { setEntryItemId(null); setEntryItemName(null); }}>
+                      Clear
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={openPickerForEntry}>
+                    <Package className="h-4 w-4 mr-1" />
+                    Select Product
                   </Button>
                 )}
               </div>
-              {pickerForEntry && itemResults.length > 0 && (
-                <div className="mt-2 border rounded-md max-h-48 overflow-y-auto">
-                  {itemResults.map(item => (
-                    <button
-                      key={item.id}
-                      className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-0"
-                      onClick={() => {
-                        setEntryItemId(item.id);
-                        setItemSearch(item.name);
-                        setPickerForEntry(false);
-                        setItemResults([]);
-                      }}
-                    >
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-muted-foreground ml-2">${(item.price_cents / 100).toFixed(2)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {pickerForEntry && searchingItems && (
-                <p className="text-xs text-muted-foreground mt-1">Searching...</p>
-              )}
             </div>
           )}
 
@@ -416,35 +397,22 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                     </div>
                     <div>
                       <label className="text-xs font-medium mb-1 block">Offer Product</label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={pickerForStep === index ? itemSearch : step.offer_item_id || ''}
-                          onChange={(e) => {
-                            setPickerForStep(index);
-                            setPickerForEntry(false);
-                            setItemSearch(e.target.value);
-                            handleItemSearchChange(e.target.value);
-                          }}
-                          placeholder="Search for a product..."
-                        />
-                      </div>
-                      {pickerForStep === index && itemResults.length > 0 && (
-                        <div className="mt-1 border rounded-md max-h-32 overflow-y-auto">
-                          {itemResults.map(item => (
-                            <button
-                              key={item.id}
-                              className="w-full text-left px-2 py-1 hover:bg-muted text-xs border-b last:border-0"
-                              onClick={() => {
-                                updateStep(index, { offer_item_id: item.id });
-                                setPickerForStep(null);
-                                setItemSearch('');
-                                setItemResults([]);
-                              }}
-                            >
-                              {item.name} — ${(item.price_cents / 100).toFixed(2)}
-                            </button>
-                          ))}
+                      {step.offer_item_id ? (
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs font-medium flex-1 truncate">{stepItemNames[index] || step.offer_item_id}</span>
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            updateStep(index, { offer_item_id: '' });
+                            setStepItemNames(prev => { const next = { ...prev }; delete next[index]; return next; });
+                          }}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         </div>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => openPickerForStep(index)}>
+                          <Package className="h-3 w-3 mr-1" />
+                          Select Product
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -504,6 +472,14 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
           )}
         </CardContent>
       </Card>
+
+      {/* Item Picker Modal */}
+      <ItemPickerModal
+        isOpen={pickerOpen}
+        onClose={() => { setPickerOpen(false); setPickerMode(null); }}
+        onSelect={handlePickerSelect}
+        tenantId={tenantId}
+      />
     </div>
   );
 }

@@ -41,6 +41,7 @@ import {
   resolveWholesaleMatching,
   resolvePlatformServices,
   resolveFunnelOptions,
+  resolveCouponOptions,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -247,6 +248,10 @@ export async function resolveEffectiveCapabilities(
     resolveFunnelOptions(
       rawCaps.capabilities.funnel_options?.features || {}
     ),
+    resolveCouponOptions(
+      rawCaps.capabilities.coupon_options?.features || {},
+      merchantBundle.couponOptions
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -286,6 +291,7 @@ export async function resolveEffectiveCapabilities(
       storefront_layouts: effective[23],
       storefront_maps: effective[24],
       funnel: effective[25],
+      coupon_options: effective[26],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -359,6 +365,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
+    result.effective.coupon_options.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -388,6 +395,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
+    result.effective.coupon_options.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance
@@ -731,6 +739,10 @@ export async function resolveEffectiveCapabilitiesFromMV(
     resolveFunnelOptions(
       rawCaps.capabilities.funnel_options?.features || {}
     ),
+    resolveCouponOptions(
+      rawCaps.capabilities.coupon_options?.features || {},
+      merchantBundle.couponOptions
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -770,6 +782,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       storefront_layouts: effective[23],
       storefront_maps: effective[24],
       funnel: effective[25],
+      coupon_options: effective[26],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -1170,6 +1183,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     barcodeScan,
     socialCommerceOptions,
     wholesaleMatching,
+    couponOptions,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1193,6 +1207,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_barcode_scan_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_social_commerce_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_wholesale_matching_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_coupon_options_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
   return {
@@ -1218,6 +1233,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     barcodeScan: barcodeScan as any,
     socialCommerceOptions: socialCommerceOptions as any,
     wholesaleMatching: wholesaleMatching as any,
+    couponOptions: couponOptions as any,
   };
 }
 

@@ -11,7 +11,7 @@ import { clientLogger } from '@/lib/client-logger';
 interface ItemPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (itemId: string) => void;
+  onSelect: (itemId: string, itemName: string) => void;
   tenantId: string;
 }
 
@@ -78,8 +78,8 @@ export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId }:
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleSelect = (itemId: string) => {
-    onSelect(itemId);
+  const handleSelect = (itemId: string, itemName: string) => {
+    onSelect(itemId, itemName);
     onClose();
     setSearchQuery('');
     setItems([]);
@@ -135,7 +135,7 @@ export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId }:
                 <div
                   key={item.id}
                   className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors flex items-center gap-3"
-                  onClick={() => handleSelect(item.id)}
+                  onClick={() => handleSelect(item.id, item.name)}
                 >
                   {/* Image */}
                   <div className="w-16 h-16 bg-gray-100 rounded-md flex-shrink-0 overflow-hidden">

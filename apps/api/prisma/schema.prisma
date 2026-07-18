@@ -4906,6 +4906,8 @@ model tenants {
   business_hours_list                                                                    business_hours_list?
   business_hours_special_list                                                            business_hours_special_list[]
   category_mirror_runs                                                                   category_mirror_runs[]
+  coupon_events                                                                          coupon_events[]
+  coupon_redemptions                                                                     coupon_redemptions[]
   crm_activities                                                                         crm_activities[]
   crm_alerts                                                                             crm_alerts[]
   crm_contacts                                                                           crm_contacts[]
@@ -4978,6 +4980,8 @@ model tenants {
   tenant_business_profiles_list                                                          tenant_business_profiles_list?
   tenant_chatbot_options_settings                                                        tenant_chatbot_options_settings?
   tenant_commerce_settings                                                               tenant_commerce_settings?
+  tenant_coupon_options_settings                                                         tenant_coupon_options_settings?
+  tenant_coupons                                                                         tenant_coupons[]
   tenant_crm_options_settings                                                            tenant_crm_options_settings?
   tenant_directory_entry_settings                                                        tenant_directory_entry_settings?
   tenant_faq_options_settings                                                            tenant_faq_options_settings?
@@ -5813,6 +5817,126 @@ model qr_analytics {
   @@index([tenant_id, consumer, period_start(sort: Desc)], map: "idx_qr_analytics_tenant_consumer")
   @@index([tenant_id, period_start(sort: Desc)], map: "idx_qr_analytics_tenant_period")
   @@index([tenant_id, surface, period_start(sort: Desc)], map: "idx_qr_analytics_tenant_surface")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model coupon_analytics {
+  id                      String   @id @db.VarChar(255)
+  tenant_id               String   @db.VarChar(255)
+  coupon_id               String?  @db.VarChar(255)
+  event_type              String   @db.VarChar(20)
+  surface                 String?  @db.VarChar(30)
+  period_start            DateTime @db.Date
+  period_end              DateTime @db.Date
+  period_type             String   @default("day") @db.VarChar(10)
+  total_events            Int      @default(0)
+  unique_visitors         Int      @default(0)
+  unique_coupons          Int      @default(0)
+  conversion_count        Int      @default(0)
+  conversion_rate         Decimal  @default(0) @db.Decimal(8, 4)
+  discount_cents          BigInt   @default(0)
+  revenue_cents           BigInt   @default(0)
+  avg_discount_per_redeem BigInt   @default(0)
+  top_country             String?  @db.VarChar(10)
+  top_city                String?  @db.VarChar(100)
+  mobile_scans            Int      @default(0)
+  desktop_scans           Int      @default(0)
+  tablet_scans            Int      @default(0)
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([tenant_id, coupon_id, event_type, surface, period_start, period_type])
+  @@index([period_type, period_start(sort: Desc)], map: "idx_coupon_analytics_period_type")
+  @@index([tenant_id, coupon_id, period_start(sort: Desc)], map: "idx_coupon_analytics_tenant_coupon")
+  @@index([tenant_id, event_type, period_start(sort: Desc)], map: "idx_coupon_analytics_tenant_event")
+  @@index([tenant_id, period_start(sort: Desc)], map: "idx_coupon_analytics_tenant_period")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model coupon_events {
+  id             String   @id @db.VarChar(255)
+  tenant_id      String   @db.VarChar(255)
+  coupon_id      String?  @db.VarChar(255)
+  coupon_code    String?  @db.VarChar(100)
+  event_type     String   @db.VarChar(20)
+  surface        String?  @db.VarChar(30)
+  session_id     String?  @db.VarChar(255)
+  order_id       String?  @db.VarChar(255)
+  discount_cents BigInt   @default(0)
+  source         String   @default("coupon") @db.VarChar(100)
+  referrer       String?
+  user_agent     String?
+  geo_country    String?  @db.VarChar(10)
+  geo_city       String?  @db.VarChar(100)
+  device_type    String?  @db.VarChar(20)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  tenants        tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_coupon_events_tenant")
+
+  @@index([surface], map: "idx_coupon_events_surface")
+  @@index([tenant_id, event_type, created_at(sort: Desc)], map: "idx_coupon_events_tenant_event_time")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_coupon_events_tenant_time")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model coupon_redemptions {
+  id             String         @id @db.VarChar(255)
+  tenant_id      String         @db.VarChar(255)
+  coupon_id      String         @db.VarChar(255)
+  order_id       String?        @db.VarChar(255)
+  customer_email String?        @db.VarChar(255)
+  discount_cents Int
+  redeemed_at    DateTime       @default(now()) @db.Timestamptz(6)
+  tenant_coupons tenant_coupons @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_coupon_redemptions_coupon")
+  tenants        tenants        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_coupon_redemptions_tenant")
+
+  @@index([coupon_id], map: "idx_coupon_redemptions_coupon")
+  @@index([tenant_id, redeemed_at(sort: Desc)], map: "idx_coupon_redemptions_tenant_time")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_coupon_options_settings {
+  id                 String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+  tenant_id          String   @unique @db.VarChar(255)
+  coupon_enabled     Boolean  @default(false)
+  spotlight_enabled  Boolean  @default(false)
+  featured_coupon_id String?  @db.VarChar(255)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+  tenants            tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_coupon_options_tenant")
+
+  @@index([tenant_id], map: "idx_coupon_options_tenant")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tenant_coupons {
+  id                  String               @id @db.VarChar(255)
+  tenant_id           String               @db.VarChar(255)
+  code                String               @db.VarChar(100)
+  discount_type       String               @db.VarChar(20)
+  discount_value      Int
+  min_spend_cents     Int                  @default(0)
+  max_redemptions     Int?
+  redemption_count    Int                  @default(0)
+  expires_at          DateTime?            @db.Timestamptz(6)
+  is_active           Boolean              @default(true)
+  target_type         String?              @db.VarChar(50)
+  target_ids          String[]
+  promotional_message String?
+  terms_summary       String?              @db.VarChar(500)
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime             @default(now()) @db.Timestamptz(6)
+  coupon_redemptions  coupon_redemptions[]
+  tenants             tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_coupons_tenant")
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id, is_active, expires_at], map: "idx_tenant_coupons_active")
+  @@index([tenant_id, code], map: "idx_tenant_coupons_tenant_code")
+  @@index([tenant_id, created_at(sort: Desc)], map: "idx_tenant_coupons_tenant_time")
 }
 
 enum action {

@@ -59,6 +59,7 @@ export interface MerchantSettingsBundle {
   barcodeScan: BarcodeScanMerchantSettings | null;
   socialCommerceOptions: SocialCommerceOptionsMerchantSettings | null;
   wholesaleMatching: WholesaleMatchingMerchantSettings | null;
+  couponOptions: CouponOptionsMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -931,6 +932,33 @@ export interface EffectiveFunnel {
 }
 
 // ====================
+// COUPON OPTIONS
+// ====================
+
+export type CouponDiscountType = 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
+
+export interface EffectiveCouponOptions {
+  enabled: boolean;
+  can_create_coupons: boolean;
+  can_use_percent_off: boolean;
+  can_use_fixed_amount: boolean;
+  can_use_free_shipping: boolean;
+  can_use_bogo: boolean;
+  can_target_products: boolean;
+  can_set_limits: boolean;
+  can_view_analytics: boolean;
+  can_use_qr_sharing: boolean;
+  can_use_spotlight: boolean;
+  allowed_discount_types: CouponDiscountType[];
+  is_flexible: boolean;
+}
+
+export interface CouponOptionsMerchantSettings {
+  coupon_enabled?: boolean | null;
+  spotlight_enabled?: boolean | null;
+}
+
+// ====================
 // SUBSCRIPTION CONTEXT
 // ====================
 
@@ -977,6 +1005,7 @@ export interface EffectiveCapabilities {
     wholesale_matching: EffectiveWholesaleMatching;
     platform_services: EffectivePlatformServices;
     funnel: EffectiveFunnel;
+    coupon_options: EffectiveCouponOptions;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

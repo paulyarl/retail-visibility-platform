@@ -142,6 +142,14 @@ Some IDs embed **two** correlation keys for cross-entity tracing:
 | `generateEmbedKey(tenantId)` | `ek` | `ek-{tk}-{nanoid}` | Bot embed license keys |
 | `generateBotConversationSessionId(tenantId)` | `botconv` | `botconv-{tk}-{nanoid}` | Bot conversation sessions |
 | `generateCorrelationId(tenantId?)` | `corr` | `corr-{tk\|GLBL}-{nanoid}` | Request tracing |
+| `generateQrAnalyticsId(tenantId)` | `qra` | `qra-{tk}-{nanoid}` | QR analytics aggregates |
+| `generateQrScanEventId(tenantId)` | `qrse` | `qrse-{tk}-{nanoid}` | QR scan events |
+| `generateBadgeAnalyticsId(tenantId)` | `bdga` | `bdga-{tk}-{nanoid}` | Badge analytics aggregates |
+| `generateBadgeEventId(tenantId)` | `bdge` | `bdge-{tk}-{nanoid}` | Badge events |
+| `generateCouponId(tenantId)` | `cpn` | `cpn-{tk}-{nanoid}` | Merchant coupon definitions |
+| `generateRedemptionId(tenantId)` | `redm` | `redm-{tk}-{nanoid}` | Coupon redemptions |
+| `generateCouponEventId(tenantId)` | `cpe` | `cpe-{tk}-{nanoid}` | Coupon events (view, copy, click, validate, redeem, fail) |
+| `generateCouponAnalyticsId(tenantId)` | `cpa` | `cpa-{tk}-{nanoid}` | Coupon analytics aggregates |
 
 ### Merchant Gate / Settings IDs (tenant-scoped)
 

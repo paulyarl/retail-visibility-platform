@@ -206,6 +206,8 @@ import faqPublicRoutes from '../routes/faq-public';
 import tierConfigRoutes from '../routes/tier-config';
 import funnelRoutes from '../routes/funnel';
 import funnelCheckoutRoutes from '../routes/funnel-checkout';
+import couponsRoutes from '../routes/coupons';
+import couponAnalyticsRoutes from '../routes/coupon-analytics';
 
 // Inline handler route files (extracted from index.ts)
 import inlineAuthRbacRoutes from '../routes/inline-auth-rbac';
@@ -1244,6 +1246,20 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Funnel checkout routes at /api/public/funnels/:tenantId/*',
+  },
+  {
+    path: '/api',
+    router: couponsRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Coupon tenant CRUD at /api/tenants/:tenantId/coupons and /api/tenants/:tenantId/coupons/settings',
+  },
+  {
+    path: '/api',
+    router: couponAnalyticsRoutes,
+    domain: 'misc',
+    authLevel: 'public',
+    comment: 'Coupon analytics at /api/tenants/:tenantId/coupon-analytics, /api/public/coupon-events, /api/public/tenants/:tenantId/coupons/validate, /api/public/tenants/:tenantId/coupons/spotlight, and /api/admin/coupon-analytics',
   },
 
   // ── Permissions ──────────────────────────────────────────────────────
