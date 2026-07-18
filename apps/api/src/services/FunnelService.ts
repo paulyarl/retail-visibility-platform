@@ -280,7 +280,8 @@ class FunnelService extends BaseService {
 
       if (!funnel) return null;
 
-      return funnel as unknown as FunnelWithSteps;
+      const { tenant_funnel_steps, ...rest } = funnel as any;
+      return { ...rest, steps: tenant_funnel_steps ?? [] } as unknown as FunnelWithSteps;
     } catch (error) {
       this.handleError(error);
       return null;
@@ -303,7 +304,10 @@ class FunnelService extends BaseService {
         orderBy: { created_at: 'desc' },
       });
 
-      return funnels as unknown as FunnelWithSteps[];
+      return funnels.map(({ tenant_funnel_steps, ...rest }: any) => ({
+        ...rest,
+        steps: tenant_funnel_steps ?? [],
+      })) as unknown as FunnelWithSteps[];
     } catch (error) {
       this.handleError(error);
       return [];

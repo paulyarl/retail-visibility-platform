@@ -70,7 +70,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
       setIsActive(f.is_active);
       setIsDefault(f.is_default);
       setEntryItemId(f.entry_item_id);
-      setSteps(f.steps
+      setSteps((f.steps ?? [])
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(s => ({
           step_type: s.step_type as 'order_bump' | 'upsell' | 'downsell' | 'oto',
