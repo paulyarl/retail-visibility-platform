@@ -402,6 +402,9 @@ export function TenantQRCode({
       gradientEnabled: qrState?.qrGradients && qrPrefs?.qr_gradient_enabled,
       gradientStart: qrPrefs?.qr_gradient_start || '#1a56db',
       gradientEnd: qrPrefs?.qr_gradient_end || '#7c3aed',
+      gradientOnDots: qrPrefs?.qr_gradient_on_dots ?? true,
+      gradientOnCorners: qrPrefs?.qr_gradient_on_corners ?? true,
+      gradientOnCornerDots: qrPrefs?.qr_gradient_on_corner_dots ?? true,
     });
   };
 

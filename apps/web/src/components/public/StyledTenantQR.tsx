@@ -61,6 +61,9 @@ export function StyledTenantQR({
       gradientEnabled: qrState?.qrGradients && prefs?.qr_gradient_enabled,
       gradientStart: prefs?.qr_gradient_start || '#1a56db',
       gradientEnd: prefs?.qr_gradient_end || '#7c3aed',
+      gradientOnDots: prefs?.qr_gradient_on_dots ?? true,
+      gradientOnCorners: prefs?.qr_gradient_on_corners ?? true,
+      gradientOnCornerDots: prefs?.qr_gradient_on_corner_dots ?? true,
     });
   };
 

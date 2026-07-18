@@ -161,6 +161,12 @@ export interface QrEngineOptions {
   gradientEnabled?: boolean;
   gradientStart?: string;
   gradientEnd?: string;
+  /** Apply gradient to dots (defaults to true when gradientEnabled) */
+  gradientOnDots?: boolean;
+  /** Apply gradient to corner squares (defaults to true when gradientEnabled) */
+  gradientOnCorners?: boolean;
+  /** Apply gradient to corner dots (defaults to true when gradientEnabled) */
+  gradientOnCornerDots?: boolean;
 }
 
 /**
@@ -211,6 +217,9 @@ export async function generateQrInstance(opts: QrEngineOptions): Promise<any> {
     gradientEnabled = false,
     gradientStart = '#1a56db',
     gradientEnd = '#7c3aed',
+    gradientOnDots = true,
+    gradientOnCorners = true,
+    gradientOnCornerDots = true,
   } = resolved;
 
   const gradient = gradientEnabled
@@ -229,9 +238,9 @@ export async function generateQrInstance(opts: QrEngineOptions): Promise<any> {
     height: exportSize,
     type: 'svg',
     data,
-    dotsOptions: { color: dotColor, type: dotType as any, gradient },
-    cornersSquareOptions: { color: cornerColor, type: cornerType as any, gradient },
-    cornersDotOptions: { color: cornerDotColor, type: cornerDotType as any, gradient },
+    dotsOptions: { color: dotColor, type: dotType as any, gradient: gradientEnabled && gradientOnDots ? gradient : undefined },
+    cornersSquareOptions: { color: cornerColor, type: cornerType as any, gradient: gradientEnabled && gradientOnCorners ? gradient : undefined },
+    cornersDotOptions: { color: cornerDotColor, type: cornerDotType as any, gradient: gradientEnabled && gradientOnCornerDots ? gradient : undefined },
     backgroundOptions: { color: bgColor },
     qrOptions: { errorCorrectionLevel: errorCorrection },
   });
@@ -280,6 +289,9 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
     gradientEnabled = false,
     gradientStart = '#1a56db',
     gradientEnd = '#7c3aed',
+    gradientOnDots = true,
+    gradientOnCorners = true,
+    gradientOnCornerDots = true,
   } = resolved;
 
   const gradient = gradientEnabled
@@ -301,17 +313,17 @@ async function generateStyledQr(opts: QrEngineOptions): Promise<string> {
     dotsOptions: {
       color: dotColor,
       type: dotType as any,
-      gradient,
+      gradient: gradientEnabled && gradientOnDots ? gradient : undefined,
     },
     cornersSquareOptions: {
       color: cornerColor,
       type: cornerType as any,
-      gradient,
+      gradient: gradientEnabled && gradientOnCorners ? gradient : undefined,
     },
     cornersDotOptions: {
       color: cornerDotColor,
       type: cornerDotType as any,
-      gradient,
+      gradient: gradientEnabled && gradientOnCornerDots ? gradient : undefined,
     },
     backgroundOptions: { color: bgColor },
     qrOptions: { errorCorrectionLevel: errorCorrection },

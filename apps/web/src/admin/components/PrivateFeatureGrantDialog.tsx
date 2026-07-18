@@ -81,6 +81,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
   const [gradientEnabled, setGradientEnabled] = useState(false);
   const [gradientStart, setGradientStart] = useState('#7c3aed');
   const [gradientEnd, setGradientEnd] = useState('#1a56db');
+  const [gradientOnDots, setGradientOnDots] = useState(true);
+  const [gradientOnCorners, setGradientOnCorners] = useState(true);
+  const [gradientOnCornerDots, setGradientOnCornerDots] = useState(true);
   const [copied, setCopied] = useState<'url' | 'token' | null>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstanceRef = useRef<any>(null);
@@ -140,6 +143,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
     setGradientEnabled(false);
     setGradientStart('#7c3aed');
     setGradientEnd('#1a56db');
+    setGradientOnDots(true);
+    setGradientOnCorners(true);
+    setGradientOnCornerDots(true);
   };
 
   const handleGenerate = async () => {
@@ -216,6 +222,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
         gradientEnabled,
         gradientStart,
         gradientEnd,
+        gradientOnDots,
+        gradientOnCorners,
+        gradientOnCornerDots,
       });
       if (cancelled || !qrContainerRef.current) return;
       qrInstanceRef.current = qr;
@@ -230,7 +239,7 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
         qrContainerRef.current.innerHTML = '';
       }
     };
-  }, [activeGrantData, selectedTemplate, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd]);
+  }, [activeGrantData, selectedTemplate, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd, gradientOnDots, gradientOnCorners, gradientOnCornerDots]);
 
   const applyTemplate = (name: QrTemplateName) => {
     setSelectedTemplate(name);
@@ -247,6 +256,9 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
       if (d.gradientEnabled !== undefined) setGradientEnabled(d.gradientEnabled);
       if (d.gradientStart) setGradientStart(d.gradientStart);
       if (d.gradientEnd) setGradientEnd(d.gradientEnd);
+      if (d.gradientOnDots !== undefined) setGradientOnDots(d.gradientOnDots);
+      if (d.gradientOnCorners !== undefined) setGradientOnCorners(d.gradientOnCorners);
+      if (d.gradientOnCornerDots !== undefined) setGradientOnCornerDots(d.gradientOnCornerDots);
     }
   };
 
@@ -535,6 +547,7 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                     </button>
                   </div>
                   {gradientEnabled && (
+                    <>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-neutral-400">Start</label>
@@ -545,6 +558,22 @@ export default function PrivateFeatureGrantDialog({ open, onClose, entries, bund
                         <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)} className="w-full h-8 rounded border border-gray-200 cursor-pointer" />
                       </div>
                     </div>
+                    {/* Per-element gradient targets */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                        <input type="checkbox" checked={gradientOnDots} onChange={(e) => setGradientOnDots(e.target.checked)} className="rounded border-gray-300" />
+                        Dots
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                        <input type="checkbox" checked={gradientOnCorners} onChange={(e) => setGradientOnCorners(e.target.checked)} className="rounded border-gray-300" />
+                        Corners
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                        <input type="checkbox" checked={gradientOnCornerDots} onChange={(e) => setGradientOnCornerDots(e.target.checked)} className="rounded border-gray-300" />
+                        Corner Dots
+                      </label>
+                    </div>
+                    </>
                   )}
                 </div>
               </div>

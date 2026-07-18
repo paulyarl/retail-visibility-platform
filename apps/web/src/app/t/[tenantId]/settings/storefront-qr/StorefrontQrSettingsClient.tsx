@@ -35,6 +35,9 @@ interface StorefrontQrSettings {
   qr_gradient_enabled: boolean;
   qr_gradient_start: string;
   qr_gradient_end: string;
+  qr_gradient_on_dots: boolean;
+  qr_gradient_on_corners: boolean;
+  qr_gradient_on_corner_dots: boolean;
   default_qr_resolution: string;
 }
 
@@ -66,6 +69,9 @@ const DEFAULT_SETTINGS: StorefrontQrSettings = {
   qr_gradient_enabled: false,
   qr_gradient_start: '#1a56db',
   qr_gradient_end: '#7c3aed',
+  qr_gradient_on_dots: true,
+  qr_gradient_on_corners: true,
+  qr_gradient_on_corner_dots: true,
   default_qr_resolution: '1024',
 };
 
@@ -689,6 +695,7 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                   />
                 </div>
                 {settings.qr_gradient_enabled && (
+                  <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-neutral-500">Gradient Start</label>
@@ -709,6 +716,37 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
                       />
                     </div>
                   </div>
+                  {/* Per-element gradient targets */}
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={settings.qr_gradient_on_dots}
+                        onChange={(e) => updateSetting('qr_gradient_on_dots', e.target.checked)}
+                        className="rounded border-neutral-300"
+                      />
+                      Dots
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={settings.qr_gradient_on_corners}
+                        onChange={(e) => updateSetting('qr_gradient_on_corners', e.target.checked)}
+                        className="rounded border-neutral-300"
+                      />
+                      Corners
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={settings.qr_gradient_on_corner_dots}
+                        onChange={(e) => updateSetting('qr_gradient_on_corner_dots', e.target.checked)}
+                        className="rounded border-neutral-300"
+                      />
+                      Corner Dots
+                    </label>
+                  </div>
+                  </>
                 )}
               </div>
             )}

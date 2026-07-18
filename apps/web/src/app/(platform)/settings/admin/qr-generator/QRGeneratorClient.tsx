@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   QR_TEMPLATE_LIST,
   generateQrInstance,
+  generateQrDataUrl,
   type QrTemplateName,
 } from '@/lib/qr-engine';
-import { Download, Copy, Check, QrCode, Palette, Sparkles, Link2, AlertCircle } from 'lucide-react';
+import { Download, Copy, Check, QrCode, Palette, Sparkles, Link2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 
 const DOT_STYLES = [
   { value: 'square', label: 'Square' },
@@ -51,10 +52,18 @@ export default function QRGeneratorClient() {
   const [gradientEnabled, setGradientEnabled] = useState(false);
   const [gradientStart, setGradientStart] = useState('#1a56db');
   const [gradientEnd, setGradientEnd] = useState('#7c3aed');
+  const [gradientOnDots, setGradientOnDots] = useState(true);
+  const [gradientOnCorners, setGradientOnCorners] = useState(true);
+  const [gradientOnCornerDots, setGradientOnCornerDots] = useState(true);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [logoShape, setLogoShape] = useState('square');
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstanceRef = useRef<any>(null);
+
+  const trimmedLogoUrl = logoUrl.trim() || undefined;
 
   const validateUrl = (url: string): boolean => {
     if (!url.trim()) return false;
@@ -81,6 +90,9 @@ export default function QRGeneratorClient() {
       if (d.gradientEnabled !== undefined) setGradientEnabled(d.gradientEnabled);
       if (d.gradientStart) setGradientStart(d.gradientStart);
       if (d.gradientEnd) setGradientEnd(d.gradientEnd);
+      if (d.gradientOnDots !== undefined) setGradientOnDots(d.gradientOnDots);
+      if (d.gradientOnCorners !== undefined) setGradientOnCorners(d.gradientOnCorners);
+      if (d.gradientOnCornerDots !== undefined) setGradientOnCornerDots(d.gradientOnCornerDots);
     }
   };
 
@@ -98,11 +110,90 @@ export default function QRGeneratorClient() {
   const isUrlValid = !targetUrl.trim() || validateUrl(targetUrl);
 
   useEffect(() => {
-    if (!effectiveUrl || !isUrlValid || !qrContainerRef.current) return;
+    if (!effectiveUrl || !isUrlValid) return;
 
     let cancelled = false;
-    const renderQr = async () => {
-      const qr = await generateQrInstance({
+
+    // When a logo URL is provided, use generateQrDataUrl (canvas-based logo overlay)
+    // Otherwise, use generateQrInstance for live SVG DOM preview (supports SVG download)
+    if (trimmedLogoUrl) {
+      setQrDataUrl(null);
+      const renderQrWithDataUrl = async () => {
+        const dataUrl = await generateQrDataUrl({
+          data: effectiveUrl,
+          exportSize: size,
+          styled: true,
+          template: selectedTemplate,
+          dotType,
+          cornerType,
+          cornerDotType,
+          dotColor: customColorsEnabled ? dotColor : undefined,
+          cornerColor: customColorsEnabled ? cornerColor : undefined,
+          cornerDotColor: customColorsEnabled ? cornerDotColor : undefined,
+          bgColor: customColorsEnabled ? bgColor : undefined,
+          gradientEnabled,
+          gradientStart,
+          gradientEnd,
+          gradientOnDots,
+          gradientOnCorners,
+          gradientOnCornerDots,
+          logoUrl: trimmedLogoUrl,
+          logoShape,
+        });
+        if (cancelled) return;
+        setQrDataUrl(dataUrl);
+      };
+      renderQrWithDataUrl();
+    } else {
+      setQrDataUrl(null);
+      if (!qrContainerRef.current) return;
+      const renderQrInstance = async () => {
+        const qr = await generateQrInstance({
+          data: effectiveUrl,
+          exportSize: size,
+          styled: true,
+          template: selectedTemplate,
+          dotType,
+          cornerType,
+          cornerDotType,
+          dotColor: customColorsEnabled ? dotColor : undefined,
+          cornerColor: customColorsEnabled ? cornerColor : undefined,
+          cornerDotColor: customColorsEnabled ? cornerDotColor : undefined,
+          bgColor: customColorsEnabled ? bgColor : undefined,
+          gradientEnabled,
+          gradientStart,
+          gradientEnd,
+          gradientOnDots,
+          gradientOnCorners,
+          gradientOnCornerDots,
+        });
+        if (cancelled || !qrContainerRef.current) return;
+        qrInstanceRef.current = qr;
+        qrContainerRef.current.innerHTML = '';
+        qr.append(qrContainerRef.current);
+      };
+      renderQrInstance();
+    }
+
+    return () => {
+      cancelled = true;
+      if (qrContainerRef.current) {
+        qrContainerRef.current.innerHTML = '';
+      }
+    };
+  }, [effectiveUrl, isUrlValid, selectedTemplate, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd, gradientOnDots, gradientOnCorners, gradientOnCornerDots, size, trimmedLogoUrl, logoShape]);
+
+  const handleDownload = useCallback(async (format: 'png' | 'svg') => {
+    if (!effectiveUrl) return;
+    const sanitizedName = effectiveUrl
+      .replace(/^https?:\/\//, '')
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .substring(0, 40);
+
+    // When logo is present, PNG download uses the composited data URL (includes logo)
+    // SVG download via QRCodeStyling instance does not include logo overlay
+    if (trimmedLogoUrl && format === 'png') {
+      const dataUrl = await generateQrDataUrl({
         data: effectiveUrl,
         exportSize: size,
         styled: true,
@@ -117,30 +208,22 @@ export default function QRGeneratorClient() {
         gradientEnabled,
         gradientStart,
         gradientEnd,
+        gradientOnDots,
+        gradientOnCorners,
+        gradientOnCornerDots,
+        logoUrl: trimmedLogoUrl,
+        logoShape,
       });
-      if (cancelled || !qrContainerRef.current) return;
-      qrInstanceRef.current = qr;
-      qrContainerRef.current.innerHTML = '';
-      qr.append(qrContainerRef.current);
-    };
-    renderQr();
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `qr-${sanitizedName}.png`;
+      link.click();
+      return;
+    }
 
-    return () => {
-      cancelled = true;
-      if (qrContainerRef.current) {
-        qrContainerRef.current.innerHTML = '';
-      }
-    };
-  }, [effectiveUrl, isUrlValid, selectedTemplate, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd, size]);
-
-  const handleDownload = useCallback((format: 'png' | 'svg') => {
-    if (!qrInstanceRef.current || !effectiveUrl) return;
-    const sanitizedName = effectiveUrl
-      .replace(/^https?:\/\//, '')
-      .replace(/[^a-zA-Z0-9]/g, '_')
-      .substring(0, 40);
+    if (!qrInstanceRef.current) return;
     qrInstanceRef.current.download({ name: `qr-${sanitizedName}`, extension: format });
-  }, [effectiveUrl]);
+  }, [effectiveUrl, trimmedLogoUrl, size, selectedTemplate, dotType, cornerType, cornerDotType, customColorsEnabled, dotColor, cornerColor, cornerDotColor, bgColor, gradientEnabled, gradientStart, gradientEnd, gradientOnDots, gradientOnCorners, gradientOnCornerDots, logoShape]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(effectiveUrl);
@@ -201,7 +284,11 @@ export default function QRGeneratorClient() {
           <div className="p-6 rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 flex flex-col items-center">
             <div className="text-xs font-medium text-neutral-500 mb-3">Live Preview</div>
             {effectiveUrl && isUrlValid ? (
-              <div ref={qrContainerRef} className="rounded-lg overflow-hidden" />
+              qrDataUrl ? (
+                <img src={qrDataUrl} alt="QR Code Preview" className="rounded-lg" style={{ width: 256, height: 256 }} />
+              ) : (
+                <div ref={qrContainerRef} className="rounded-lg overflow-hidden" />
+              )
             ) : (
               <div className="w-[256px] h-[256px] flex items-center justify-center bg-gray-50 dark:bg-neutral-900 rounded-lg border-2 border-dashed border-gray-200 dark:border-neutral-700">
                 <QrCode className="w-12 h-12 text-gray-300 dark:text-neutral-600" />
@@ -260,10 +347,12 @@ export default function QRGeneratorClient() {
               </button>
               <button
                 onClick={() => handleDownload('svg')}
-                className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-md border border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700"
+                disabled={!!trimmedLogoUrl}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-md border ${trimmedLogoUrl ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-neutral-600' : 'border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'}`}
+                title={trimmedLogoUrl ? 'SVG download not available with logo overlay' : ''}
               >
                 <Download className="w-4 h-4" />
-                Download SVG
+                Download SVG{trimmedLogoUrl ? ' (N/A)' : ''}
               </button>
             </div>
           )}
@@ -412,6 +501,7 @@ export default function QRGeneratorClient() {
                 </button>
               </div>
               {gradientEnabled && (
+                <>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs text-neutral-400">Start</label>
@@ -422,6 +512,69 @@ export default function QRGeneratorClient() {
                     <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)} className="w-full h-8 rounded border border-gray-200 dark:border-neutral-600 cursor-pointer" />
                   </div>
                 </div>
+                {/* Per-element gradient targets */}
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                    <input type="checkbox" checked={gradientOnDots} onChange={(e) => setGradientOnDots(e.target.checked)} className="rounded border-gray-300" />
+                    Dots
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                    <input type="checkbox" checked={gradientOnCorners} onChange={(e) => setGradientOnCorners(e.target.checked)} className="rounded border-gray-300" />
+                    Corners
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                    <input type="checkbox" checked={gradientOnCornerDots} onChange={(e) => setGradientOnCornerDots(e.target.checked)} className="rounded border-gray-300" />
+                    Corner Dots
+                  </label>
+                </div>
+                </>
+              )}
+            </div>
+            {/* Logo Overlay */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200">
+                <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                Logo Overlay
+              </div>
+              <input
+                type="text"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://example.com/logo.png (optional)"
+                className="w-full px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {trimmedLogoUrl && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-neutral-500">Shape:</span>
+                    <div className="flex gap-1">
+                      {(['square', 'circle'] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setLogoShape(s)}
+                          className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                            logoShape === s
+                              ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                              : 'border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700'
+                          }`}
+                        >
+                          {s === 'square' ? 'Square' : 'Circle'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setLogoUrl('')}
+                    className="text-xs text-red-500 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              {trimmedLogoUrl && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Logo overlay uses error correction level H. PNG download includes logo; SVG download is not available with logo.
+                </p>
               )}
             </div>
           </div>

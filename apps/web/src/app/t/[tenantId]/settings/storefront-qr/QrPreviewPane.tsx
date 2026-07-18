@@ -22,6 +22,9 @@ export interface QrPreviewSettings {
   qr_gradient_enabled: boolean;
   qr_gradient_start: string;
   qr_gradient_end: string;
+  qr_gradient_on_dots: boolean;
+  qr_gradient_on_corners: boolean;
+  qr_gradient_on_corner_dots: boolean;
   default_qr_resolution: string;
 }
 
@@ -99,6 +102,9 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
           gradientEnabled: settings.qr_gradient_enabled,
           gradientStart: settings.qr_gradient_start,
           gradientEnd: settings.qr_gradient_end,
+          gradientOnDots: settings.qr_gradient_on_dots,
+          gradientOnCorners: settings.qr_gradient_on_corners,
+          gradientOnCornerDots: settings.qr_gradient_on_corner_dots,
         });
         if (!cancelled) setQrImageUrl(dataUrl);
       } catch {
@@ -124,6 +130,9 @@ export default function QrPreviewPane({ tenantId, settings, previewUrl }: QrPrev
     settings.qr_gradient_enabled,
     settings.qr_gradient_start,
     settings.qr_gradient_end,
+    settings.qr_gradient_on_dots,
+    settings.qr_gradient_on_corners,
+    settings.qr_gradient_on_corner_dots,
     settings.default_qr_resolution,
     settings.qr_logo_shape,
     logoUrl,
