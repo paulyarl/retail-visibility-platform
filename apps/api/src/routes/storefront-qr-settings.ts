@@ -16,6 +16,7 @@ const storefrontQrSettingsSchema = z.object({
   qr_enabled: z.boolean().optional(),
   qr_classic_enabled: z.boolean().optional(),
   qr_styled_enabled: z.boolean().optional(),
+  qr_analytics_enabled: z.boolean().optional(),
   // QR Code Display group
   qr_codes_512: z.boolean().optional(),
   qr_codes_1024: z.boolean().optional(),
@@ -46,6 +47,7 @@ export const DEFAULT_QR_SETTINGS = {
   qr_enabled: true,
   qr_classic_enabled: true,
   qr_styled_enabled: false,
+  qr_analytics_enabled: false,
   qr_codes_512: false,
   qr_codes_1024: true,
   qr_codes_2048: false,
@@ -85,6 +87,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
           qr_enabled: false,
           qr_classic_enabled: false,
           qr_styled_enabled: false,
+          qr_analytics_enabled: false,
           qr_codes_512: false,
           qr_codes_1024: false,
           qr_codes_2048: false,
@@ -110,6 +113,7 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       qr_enabled: !!rawSettings.qr_enabled && tierState.enabled,
       qr_classic_enabled: tierState.qrClassicEnabled ? !!rawSettings.qr_classic_enabled : false,
       qr_styled_enabled: tierState.qrStyledEnabled ? !!rawSettings.qr_styled_enabled : false,
+      qr_analytics_enabled: tierState.canUseQrAnalytics ? !!rawSettings.qr_analytics_enabled : false,
     };
 
     // QR resolutions
@@ -219,6 +223,7 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
         qr_enabled: settings.qr_enabled,
         qr_classic_enabled: settings.qr_classic_enabled,
         qr_styled_enabled: settings.qr_styled_enabled,
+        qr_analytics_enabled: settings.qr_analytics_enabled,
         qr_codes_512: settings.qr_codes_512,
         qr_codes_1024: settings.qr_codes_1024,
         qr_codes_2048: settings.qr_codes_2048,

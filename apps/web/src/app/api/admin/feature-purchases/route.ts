@@ -62,9 +62,19 @@ export async function PUT(request: NextRequest) {
     const action = url.searchParams.get('action');
     const requestBody = await request.json();
 
-    let endpoint: string;
     if (action === 'update-grant') {
-      endpoint = `/api/admin/feature-purchases/grants/${requestBody.grant_id}`;
+      const endpoint = `/api/admin/feature-purchases/grants/${requestBody.grant_id}`;
+      const { grant_id, ...updateData } = requestBody;
+      const response = await authenticatedFetch(endpoint, accessToken, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    if (action === 'update-complimentary') {
+      const endpoint = `/api/admin/feature-purchases/${requestBody.grant_id}`;
       const { grant_id, ...updateData } = requestBody;
       const response = await authenticatedFetch(endpoint, accessToken, {
         method: 'PUT',
@@ -78,6 +88,29 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error('[Feature Purchases Proxy PUT] Error:', error);
     return NextResponse.json({ error: 'Failed to process feature purchase update' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const authResult = await requirePlatformAdmin(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { accessToken } = authResult;
+    const url = new URL(request.url);
+    const grantId = url.searchParams.get('grant_id');
+
+    if (!grantId) {
+      return NextResponse.json({ error: 'Missing grant_id parameter' }, { status: 400 });
+    }
+
+    const endpoint = `/api/admin/feature-purchases/${grantId}`;
+    const response = await authenticatedFetch(endpoint, accessToken, { method: 'DELETE' });
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('[Feature Purchases Proxy DELETE] Error:', error);
+    return NextResponse.json({ error: 'Failed to delete feature purchase' }, { status: 500 });
   }
 }
 

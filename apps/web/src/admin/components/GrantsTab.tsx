@@ -12,6 +12,7 @@ import {
   adminFeaturePurchasesService,
   type GrantToken,
   type ComplimentaryGrant,
+  type UpdateComplimentaryGrantInput,
 } from '@/services/AdminFeaturePurchasesService';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -67,6 +68,11 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
   const [editNotes, setEditNotes] = useState<string>('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [editingComp, setEditingComp] = useState<ComplimentaryGrant | null>(null);
+  const [compStatus, setCompStatus] = useState<string>('active');
+  const [compExpiresAt, setCompExpiresAt] = useState<string>('');
+  const [savingComp, setSavingComp] = useState(false);
+  const [revokingCompId, setRevokingCompId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -159,6 +165,45 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
       onError(err.message || 'Failed to un-revoke grant token');
     } finally {
       setRevokingId(null);
+    }
+  };
+
+  const handleEditCompClick = (grant: ComplimentaryGrant) => {
+    setEditingComp(grant);
+    setCompStatus(grant.status);
+    setCompExpiresAt(grant.expires_at ? grant.expires_at.slice(0, 10) : '');
+  };
+
+  const handleSaveComp = async () => {
+    if (!editingComp) return;
+    setSavingComp(true);
+    try {
+      const input: UpdateComplimentaryGrantInput = {
+        status: compStatus as any,
+        expires_at: compExpiresAt ? new Date(compExpiresAt).toISOString() : null,
+      };
+      await adminFeaturePurchasesService.updateComplimentaryGrant(editingComp.id, input);
+      onSuccess('Complimentary grant updated');
+      setEditingComp(null);
+      loadData();
+    } catch (err: any) {
+      onError(err.message || 'Failed to update complimentary grant');
+    } finally {
+      setSavingComp(false);
+    }
+  };
+
+  const handleRevokeComp = async (grant: ComplimentaryGrant) => {
+    if (!confirm(`Revoke complimentary grant for "${grant.feature_key}" from ${grant.tenant_name || grant.tenant_id}? This will remove the feature access.`)) return;
+    setRevokingCompId(grant.id);
+    try {
+      await adminFeaturePurchasesService.revokeComplimentaryGrant(grant.id);
+      onSuccess('Complimentary grant revoked');
+      loadData();
+    } catch (err: any) {
+      onError(err.message || 'Failed to revoke complimentary grant');
+    } finally {
+      setRevokingCompId(null);
     }
   };
 
@@ -410,6 +455,7 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Created</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Expires</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-600">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -444,9 +490,28 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                     {grant.expires_at ? formatDate(grant.expires_at) : <span className="text-neutral-400">Never</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="secondary" className={grant.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                    <Badge variant="secondary" className={grant.status === 'active' ? 'bg-green-100 text-green-800' : grant.status === 'expired' || grant.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}>
                       {grant.status}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleEditCompClick(grant)}
+                        className="p-1.5 rounded hover:bg-neutral-200 text-neutral-600"
+                        title="Edit grant"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleRevokeComp(grant)}
+                        disabled={revokingCompId === grant.id}
+                        className="p-1.5 rounded hover:bg-red-100 text-red-600 disabled:opacity-50"
+                        title="Revoke grant"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -455,7 +520,59 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
         </div>
       )}
 
-      {/* Edit Grant Modal */}
+      {/* Edit Complimentary Grant Modal */}
+      {editingComp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingComp(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-1">Edit Complimentary Grant</h3>
+              <p className="text-sm text-neutral-500 mb-4">
+                {editingComp.feature_key} — {editingComp.tenant_name || editingComp.tenant_id}
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+                  <select
+                    value={compStatus}
+                    onChange={(e) => setCompStatus(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-md px-3 py-2 text-sm"
+                  >
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="expired">Expired</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Expires At</label>
+                  <input
+                    type="date"
+                    value={compExpiresAt}
+                    onChange={(e) => setCompExpiresAt(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-md px-3 py-2 text-sm"
+                  />
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Leave empty for permanent (no expiry).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => setEditingComp(null)} size="sm">
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveComp} disabled={savingComp} size="sm">
+                  {savingComp ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Grant Token Modal */}
       {editingGrant && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setEditingGrant(null)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>

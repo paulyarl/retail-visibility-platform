@@ -198,6 +198,7 @@ import storeReviewsRoutes from '../routes/store-reviews';
 import brandPartnersRoutes from '../routes/brand-partners';
 import badgeRegistryRoutes from '../routes/badge-registry';
 import badgeAnalyticsRoutes from '../routes/badge-analytics';
+import qrAnalyticsRoutes from '../routes/qr-analytics';
 import heroLocationRoutes from '../routes/hero-location';
 import debugCookiesRoutes from '../routes/debug-cookies';
 import faqRoutes from '../routes/faq';
@@ -1222,6 +1223,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Badge analytics at /api/tenants/:tenantId/badge-analytics and /api/public/badge-events',
+  },
+  {
+    path: '/api',
+    router: qrAnalyticsRoutes,
+    domain: 'misc',
+    authLevel: 'public',
+    comment: 'QR analytics at /api/tenants/:tenantId/qr-analytics, /api/public/qr-events, and /api/admin/qr-analytics',
   },
   {
     path: '/api',

@@ -100,6 +100,11 @@ export interface ComplimentaryGrant {
   updated_at: string;
 }
 
+export interface UpdateComplimentaryGrantInput {
+  status?: 'active' | 'past_due' | 'trial' | 'suspended' | 'expired' | 'cancelled';
+  expires_at?: string | null;
+}
+
 class AdminFeaturePurchasesService extends AdminApiSingleton {
   private static instance: AdminFeaturePurchasesService;
 
@@ -241,6 +246,34 @@ class AdminFeaturePurchasesService extends AdminApiSingleton {
   async invalidateGrantsCache(): Promise<void> {
     await this.invalidateCachePattern('admin-feature-purchases-grants');
     await this.invalidateCachePattern('admin-feature-purchases-complimentary-grants');
+  }
+
+  async updateComplimentaryGrant(grantId: string, input: UpdateComplimentaryGrantInput): Promise<FeaturePurchase> {
+    const result = await this.makeDefaultRequest<FeaturePurchase>(
+      `/api/admin/feature-purchases/${grantId}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `admin-feature-purchases-update-${grantId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update complimentary grant');
+    }
+    await this.invalidateGrantsCache();
+    const data = (result.data as any)?.data || result.data;
+    return data;
+  }
+
+  async revokeComplimentaryGrant(grantId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<void>(
+      `/api/admin/feature-purchases/${grantId}`,
+      { method: 'DELETE' },
+      `admin-feature-purchases-delete-${grantId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to revoke complimentary grant');
+    }
+    await this.invalidateGrantsCache();
   }
 
   async createGrantToken(input: CreateGrantTokenInput): Promise<GrantTokenData> {

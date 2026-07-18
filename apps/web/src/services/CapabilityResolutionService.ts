@@ -971,7 +971,9 @@ export interface StorefrontQrState {
   allowedQRCornerDotStyles: StorefrontOptQRCornerDotStyleType[];
   qrCustomColors: boolean;
   qrGradients: boolean;
+  qrAnalyticsEnabled: boolean;
   canUseQRCodes: boolean;
+  canUseQrAnalytics: boolean;
   merchantPreferences: Record<string, any>;
   features: Record<string, boolean>;
 }

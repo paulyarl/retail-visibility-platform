@@ -387,7 +387,9 @@ interface BackendEffectiveStorefrontQr {
   allowed_qr_corner_dot_styles: string[];
   qr_custom_colors: boolean;
   qr_gradients: boolean;
+  qr_analytics_enabled: boolean;
   can_use_qr_codes: boolean;
+  can_use_qr_analytics: boolean;
   merchant_preferences: Record<string, any>;
 }
 
@@ -827,7 +829,9 @@ function mapStorefrontQr(b: BackendEffectiveStorefrontQr): StorefrontQrState {
     allowedQRCornerDotStyles: (b.allowed_qr_corner_dot_styles ?? []) as StorefrontOptQRCornerDotStyleType[],
     qrCustomColors: b.qr_custom_colors,
     qrGradients: b.qr_gradients,
+    qrAnalyticsEnabled: b.qr_analytics_enabled ?? false,
     canUseQRCodes: b.can_use_qr_codes,
+    canUseQrAnalytics: b.can_use_qr_analytics ?? false,
     merchantPreferences: b.merchant_preferences as any,
     features: {},
   };

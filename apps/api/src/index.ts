@@ -233,6 +233,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start badge analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start QR analytics aggregation (every 6 hours) — aggregates qr_scan_events into qr_analytics
+      try {
+        const { startQrAnalyticsSync } = await import('./jobs/qr-analytics-sync');
+        await startQrAnalyticsSync();
+        logger.info('QR analytics sync started');
+      } catch (err) {
+        logger.error('Failed to start QR analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start log purge job (daily at 2 AM UTC)
       try {
         const { startLogPurgeJob } = await import('./jobs/log-purge');
