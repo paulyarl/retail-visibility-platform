@@ -586,6 +586,366 @@ The short-code URL produces a less dense QR matrix, enabling smaller print sizes
 - 302 redirect (not 301 — tenant slug or ID may change)
 - Error handling: invalid autoId → 404 page with "Store not found"
 
+### 3.10 Coupon Spotlight — Public Surface Featured Coupon
+
+**Gated by**: `coupon_spotlight` feature key (BSaaS purchasable, Professional+ tier-bundled)
+
+The coupon spotlight is a **single reusable component** (`CouponSpotlight.tsx`) that any layout can render at a position appropriate to its structure. The merchant selects an active coupon, flips the "on" switch in settings, and the coupon appears on public surfaces with a promotional message and discount terms.
+
+#### Layout System Architecture
+
+The platform has three public surface types, each with multiple layouts:
+
+| Surface | Route | Layouts | Shared Props Type | Layout Switch |
+|---|---|---|---|---|
+| **Storefront** | `/tenant/[id]` | classic, editorial, immersive | `StorefrontLayoutProps` (`@/app/products/[id]/layouts/types.ts`) | `page.tsx` switch on `storefrontLayout` |
+| **Directory entry** | `/directory/[slug]` | classic, editorial, immersive, premium | `DirectoryEntryLayoutProps` (`@/app/directory/[slug]/layouts/types.ts`) | `page.tsx` switch on `effectiveLayout` |
+| **Product page** | `/products/[id]` | classic, showcase, quick-commerce | `ProductLayoutProps` (derived from storefront layout via `PRODUCT_LAYOUT_MAP`) | Product detail page |
+
+All layouts receive shared props and render sections in their own structural order. The `CouponSpotlight` component follows the same pattern as existing shared sections (e.g., `FeaturedBucketsShowcase`, `FaqStorefrontDisplay`, `LocationClosedBanner`) — one component, placed by each layout.
+
+#### Component Design
+
+**File**: `apps/web/src/components/storefront/CouponSpotlight.tsx` (new)
+
+```tsx
+interface CouponSpotlightProps {
+  tenantId: string;
+  coupon: SpotlightCoupon | null;
+  variant?: 'banner' | 'card' | 'strip';
+  className?: string;
+}
+
+interface SpotlightCoupon {
+  id: string;
+  code: string;
+  discountType: 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
+  discountValue: number;
+  promotionalMessage: string;  // merchant-written marketing copy
+  termsSummary: string;         // e.g., "Min order $50. Expires Aug 31."
+  expiresAt: string | null;
+  redemptionUrl: string;        // /tenant/{tenantId}?coupon={code} or /s/{autoId}?c={code}
+}
+```
+
+**Rendering variants** — the same component adapts to the layout's structural needs:
+
+| Variant | Use Case | Layout Placement |
+|---|---|---|
+| `banner` | Full-width promotional banner with gradient background | Top of page, below header/nav (editorial, immersive, premium) |
+| `card` | Bordered card with coupon code + terms | Sidebar or inline section (classic, editorial) |
+| `strip` | Compact horizontal strip with code + CTA | Below product title or above checkout (product pages, all storefronts) |
+
+Each layout chooses which variant to render and where to place it. The component itself handles:
+- Discount type icon (Lucide `IconPercent`, `IconDollarSign`, `IconTruck`, `IconGift`)
+- Promotional message display
+- Discount terms summary
+- Copy code button
+- "Apply now" link to checkout with `?coupon={code}` URL param
+- Expiry countdown (if `expiresAt` is set)
+- Auto-hide when coupon is expired or exhausted (client-side check + backend validation)
+
+#### Layout Placement Guide
+
+**Storefront layouts** (`/tenant/[id]`):
+
+| Layout | Variant | Position | Rationale |
+|---|---|---|---|
+| Classic | `card` | Between header and product catalog | Classic layout has vertical sections; card fits the flow |
+| Editorial | `banner` | Below hero banner, above featured spotlight | Editorial has a full-width hero; banner continues the visual flow |
+| Immersive | `strip` | Below sticky search bar, above product grid | Immersive is compact/mobile-first; strip is minimal and non-intrusive |
+
+**Directory entry layouts** (`/directory/[slug]`):
+
+| Layout | Variant | Position | Rationale |
+|---|---|---|---|
+| Classic | `card` | Below business info, above product categories | Classic directory is vertical; card fits between sections |
+| Editorial | `banner` | Below hero image, above store info | Editorial has full-width hero; banner is natural continuation |
+| Immersive | `strip` | Below header, above featured products | Immersive is compact; strip is minimal |
+| Premium | `banner` | Below premium hero, above ratings section | Premium has large hero; banner maintains visual hierarchy |
+
+**Product page layouts** (`/products/[id]`):
+
+| Layout | Variant | Position | Rationale |
+|---|---|---|---|
+| Classic | `strip` | Below product title, above price | Compact strip near purchase decision point |
+| Showcase | `card` | In sidebar, below product gallery | Showcase has room for sidebar content |
+| Quick-commerce | `strip` | Below product image, above add-to-cart | Quick-commerce is mobile-first; strip is minimal |
+
+#### Merchant Settings
+
+The merchant selects which coupon to feature via the coupon management page:
+
+**New field in `CouponOptionsMerchantSettings`**:
+```ts
+featuredCouponId: string | null;  // references tenant_coupons.id
+spotlightEnabled: boolean;        // master toggle for spotlight display
+```
+
+**UI in coupon management page** (`CouponManagementClient.tsx`):
+- Each coupon card has a "Feature on storefront" toggle
+- Toggling on sets `featuredCouponId` to that coupon's ID and `spotlightEnabled = true`
+- Only one coupon can be featured at a time (toggling on a new one turns off the previous)
+- Toggle is gated by `coupon_spotlight` capability — if not enabled, show upgrade prompt
+
+#### Public API Endpoint
+
+```
+GET /api/public/tenants/:tenantId/coupons/spotlight
+```
+
+Returns the active featured coupon for public display (no auth required, follows `AUTH_SCOPE_ISOLATION_SPEC.md` FR-1):
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cpn-FRSH-x7y2z9",
+    "code": "SUMMER20",
+    "discount_type": "percent_off",
+    "discount_value": 20,
+    "promotional_message": "Beat the heat with 20% off your entire order!",
+    "terms_summary": "Min order $50. Expires Aug 31. One use per customer.",
+    "expires_at": "2026-08-31T23:59:59Z",
+    "redemption_url": "/s/FRSH?c=SUMMER20",
+    "is_active": true,
+    "remaining_uses": 47
+  }
+}
+```
+
+Returns `{ success: true, data: null }` when:
+- `coupon_spotlight` capability is not enabled for the tenant
+- `spotlightEnabled` is false in merchant settings
+- The featured coupon is expired, exhausted, or deleted
+- The tenant subscription is read-only or limited
+
+This endpoint is called by `PublicCouponService.ts` (extends `PublicApiSingleton`) and cached client-side with the same pattern as other public capability lookups.
+
+#### Capability Gating
+
+The spotlight is gated at two levels:
+
+1. **Tier/BSaaS level**: `coupon_spotlight` feature key must be enabled in `EffectiveCouponOptions` (resolved by `CouponResolver.ts`)
+2. **Merchant level**: `spotlightEnabled` must be `true` AND `featuredCouponId` must reference a valid, active coupon
+
+If the tier loses `coupon_spotlight` (downgrade, cancellation), the public endpoint returns `null` and the component renders nothing — no error state visible to customers.
+
+#### Self-Containment (per decoupled-domain principle)
+
+The `CouponSpotlight` component reads exclusively from:
+- `EffectiveCouponOptions.spotlightEnabled` (capability state, not `optFlags` overlay)
+- `PublicCouponService.getSpotlightCoupon()` (public API singleton, not direct fetch)
+- `coupon_spotlight` feature flag from `useCouponCapability()` hook
+
+This follows the 5-dimension self-containment principle: the component does not read from `StorefrontOptionFlags` or any legacy overlay — all rendering decisions come from the dedicated `coupon_options` domain state.
+
+### 3.11 Coupon Analytics & Event Tracking
+
+**Gated by**: `coupon_analytics` feature key (BSaaS purchasable, Professional+ tier-bundled)
+
+The platform has a proven analytics pattern in `QrAnalyticsService` (`@/apps/api/src/services/QrAnalyticsService.ts`) and `BadgeAnalyticsService` (`@/apps/api/src/services/BadgeAnalyticsService.ts`). Both follow the same architecture:
+
+1. **Event table** — raw event log (e.g., `qr_scan_events`, `badge_events`)
+2. **Aggregate table** — period-based rollups (e.g., `qr_analytics`, `badge_analytics`)
+3. **Service** — `trackEvent()`, `trackEvents()` (batch), `aggregateForTenant()`, `getDashboard()`, `getTimeSeries()`
+4. **Routes** — tenant dashboard (auth), public event tracking (no auth), admin cross-tenant (auth)
+5. **Sync job** — scheduled aggregation every 6 hours, iterates active tenants, computes day/week/month rollups
+6. **Frontend** — singleton service + analytics client page with summary cards, per-surface table, time series chart, period/date filters
+
+Coupon analytics follows this exact pattern, with coupon-specific event types and metrics.
+
+#### Event Types
+
+The QR system tracks one event type (`scan`). Coupons have a richer lifecycle with multiple event types:
+
+| Event Type | Trigger | Source | Auth |
+|---|---|---|---|
+| `view` | Coupon spotlight rendered on a public surface | `CouponSpotlight.tsx` client-side | Public (no auth) |
+| `copy` | Customer clicked "Copy code" button | `CouponSpotlight.tsx` client-side | Public (no auth) |
+| `click` | Customer clicked "Apply now" link | `CouponSpotlight.tsx` client-side | Public (no auth) |
+| `validate` | Coupon code submitted at checkout | Checkout page → `/api/public/tenants/:tenantId/coupons/validate` | Public (no auth) |
+| `redeem` | Coupon successfully applied to a completed order | `checkout.ts` after successful payment | Server-side (no auth — backend triggered) |
+| `fail` | Coupon validation failed (expired, exhausted, invalid) | Checkout validation endpoint | Public (no auth) |
+
+#### Database Schema
+
+**Event table**: `coupon_events` (mirrors `qr_scan_events` + `badge_events`)
+
+```sql
+CREATE TABLE IF NOT EXISTS coupon_events (
+  id            VARCHAR(255) PRIMARY KEY,   -- cpe-{tk}-{nanoid}
+  tenant_id     VARCHAR(255) NOT NULL,
+  coupon_id     VARCHAR(255),               -- FK to tenant_coupons.id (nullable for invalid code attempts)
+  coupon_code   VARCHAR(100),               -- the code entered/displayed (for events without coupon_id)
+  event_type    VARCHAR(20) NOT NULL,       -- view, copy, click, validate, redeem, fail
+  surface       VARCHAR(30),                -- storefront, directory, product, checkout, spotlight, qr_code
+  session_id    VARCHAR(255),
+  order_id      VARCHAR(255),               -- populated on redeem events
+  discount_cents BIGINT DEFAULT 0,          -- populated on redeem events
+  source        VARCHAR(100) DEFAULT 'coupon',
+  referrer      TEXT,
+  user_agent    TEXT,
+  geo_country   VARCHAR(10),
+  geo_city      VARCHAR(100),
+  device_type   VARCHAR(20),
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes (mirror qr_scan_events pattern)
+CREATE INDEX idx_coupon_events_tenant_time ON coupon_events (tenant_id, created_at DESC);
+CREATE INDEX idx_coupon_events_tenant_event_time ON coupon_events (tenant_id, event_type, created_at DESC);
+CREATE INDEX idx_coupon_events_coupon ON coupon_events (coupon_id) WHERE coupon_id IS NOT NULL;
+CREATE INDEX idx_coupon_events_surface ON coupon_events (surface);
+
+-- RLS: public INSERT (storefront tracking from anonymous users)
+CREATE POLICY coupon_events_public_insert ON coupon_events FOR INSERT WITH CHECK (true);
+```
+
+**Aggregate table**: `coupon_analytics` (mirrors `qr_analytics` + `badge_analytics`)
+
+```sql
+CREATE TABLE IF NOT EXISTS coupon_analytics (
+  id              VARCHAR(255) PRIMARY KEY,  -- cpa-{tk}-{nanoid}
+  tenant_id       VARCHAR(255) NOT NULL,
+  coupon_id       VARCHAR(255),              -- nullable for aggregate-all-coupons rows
+  event_type      VARCHAR(20) NOT NULL,      -- view, copy, click, validate, redeem, fail
+  surface         VARCHAR(30),               -- storefront, directory, product, checkout, spotlight, qr_code
+  period_start    DATE NOT NULL,
+  period_end      DATE NOT NULL,
+  period_type     VARCHAR(10) NOT NULL DEFAULT 'day',
+
+  -- Counts
+  total_events    INT NOT NULL DEFAULT 0,
+  unique_visitors INT NOT NULL DEFAULT 0,    -- distinct session_id
+  unique_coupons  INT NOT NULL DEFAULT 0,    -- distinct coupon_id
+
+  -- Conversion funnel
+  conversion_count INT NOT NULL DEFAULT 0,   -- events that led to redeem
+  conversion_rate  DECIMAL(8,4) NOT NULL DEFAULT 0,
+
+  -- Revenue (cents) — discount applied + attributed order revenue
+  discount_cents   BIGINT NOT NULL DEFAULT 0,
+  revenue_cents    BIGINT NOT NULL DEFAULT 0,  -- order revenue from coupon-attributed orders
+  avg_discount_per_redeem BIGINT NOT NULL DEFAULT 0,
+
+  -- Geo + device (same as QR analytics)
+  top_country      VARCHAR(10),
+  top_city         VARCHAR(100),
+  mobile_scans     INT NOT NULL DEFAULT 0,
+  desktop_scans    INT NOT NULL DEFAULT 0,
+  tablet_scans     INT NOT NULL DEFAULT 0,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, coupon_id, event_type, surface, period_start, period_type)
+);
+```
+
+#### Backend Service
+
+**File**: `apps/api/src/services/CouponAnalyticsService.ts` (new)
+
+Mirrors `QrAnalyticsService.ts` structure:
+
+| Method | Purpose |
+|---|---|
+| `trackCouponEvent(input)` | Record a single coupon event (public, no auth) |
+| `trackCouponEvents(inputs)` | Batch record (public, no auth) |
+| `aggregateCouponAnalyticsForTenant(tenantId, periodType)` | Compute rollups from `coupon_events` → `coupon_analytics` |
+| `getCouponAnalyticsDashboard(tenantId, period, daysBack)` | Dashboard summary: per-coupon, per-surface, per-event-type metrics |
+| `getCouponTimeSeries(tenantId, couponId, period, daysBack)` | Time-series for a specific coupon |
+| `getCouponFunnelReport(tenantId, daysBack)` | Funnel: views → copies → clicks → validates → redeems |
+| `getCouponROIReport(tenantId, period, daysBack)` | ROI: discount given vs. revenue attributed |
+
+**ID generators** (in `id-generator.ts`):
+- `generateCouponEventId()` → `cpe-{tk}-{nanoid}`
+- `generateCouponAnalyticsId()` → `cpa-{tk}-{nanoid}`
+
+#### Routes
+
+**File**: `apps/api/src/routes/coupon-analytics.ts` (new)
+
+| Route | Auth | Purpose |
+|---|---|---|
+| `GET /api/tenants/:tenantId/coupon-analytics` | Tenant | Dashboard summary (per-coupon, per-surface, per-event-type) |
+| `GET /api/tenants/:tenantId/coupon-analytics/timeseries` | Tenant | Time-series for a specific coupon |
+| `GET /api/tenants/:tenantId/coupon-analytics/funnel` | Tenant | Conversion funnel report |
+| `GET /api/tenants/:tenantId/coupon-analytics/roi` | Tenant | ROI report (discount vs. revenue) |
+| `POST /api/tenants/:tenantId/coupon-analytics/aggregate` | Tenant | Manual aggregation trigger |
+| `POST /api/public/coupon-events` | Public | Track single coupon event (storefront/client-side) |
+| `POST /api/public/coupon-events/batch` | Public | Batch track coupon events |
+| `GET /api/admin/coupon-analytics` | Admin | Cross-tenant coupon analytics |
+
+Public event tracking follows the same pattern as `POST /api/public/qr-events` — no auth, accepts `tenantId`, `couponId`, `couponCode`, `eventType`, `surface`, `sessionId`, etc.
+
+#### Aggregation Job
+
+**File**: `apps/api/src/jobs/coupon-analytics-sync.ts` (new)
+
+- Runs every 6 hours (staggered after QR sync at 18 min startup delay)
+- Iterates all active tenants
+- Aggregates `coupon_events` → `coupon_analytics` for day/week/month periods
+- Computes per-coupon, per-surface, per-event-type rollups
+- Wired into server startup in `index.ts` alongside `qr-analytics-sync.ts` and `badge-analytics-sync.ts`
+
+#### Frontend Analytics
+
+**File**: `apps/web/src/services/CouponAnalyticsService.ts` (new)
+
+Singleton extending `TenantApiSingleton` with:
+- `getDashboard(tenantId, period, daysBack)`
+- `getTimeSeries(tenantId, couponId, period, daysBack)`
+- `getFunnelReport(tenantId, daysBack)`
+- `getROIReport(tenantId, period, daysBack)`
+- `triggerAggregation(tenantId, period)`
+- `formatCurrency()`, `formatPercent()`, `formatNumber()` helpers (same as QR/Badge analytics services)
+
+**File**: `apps/web/src/app/t/[tenantId]/settings/coupons/analytics/page.tsx` (new)
+
+Analytics page at `/t/:tenantId/settings/coupons/analytics` with:
+- Summary cards: total views, copy rate, redemption count, total discount given, revenue attributed
+- Per-coupon performance table (sortable, clickable for time series drill-down)
+- Conversion funnel visualization: view → copy → click → validate → redeem
+- Revenue vs. discount bar chart (ROI)
+- Period filter (day/week/month) + date range filter (7/14/30/60/90 days)
+- Manual refresh button (triggers aggregation)
+
+#### Event Tracking Integration Points
+
+| Integration Point | Event Type | How |
+|---|---|---|
+| `CouponSpotlight.tsx` | `view`, `copy`, `click` | Client-side `POST /api/public/coupon-events` on component mount (view), button click (copy/click) |
+| Checkout validation endpoint | `validate`, `fail` | Server-side `trackCouponEvent()` in `/api/public/tenants/:tenantId/coupons/validate` route handler |
+| Checkout success | `redeem` | Server-side `trackCouponEvent()` in `checkout.ts` after successful payment + `redeemCoupon()` |
+| QR code scan → redirect | `view` | `/s/[autoId]/page.tsx` tracks `view` event with `surface: 'qr_code'` before redirect |
+
+#### QR Analytics Cross-Reference
+
+Coupon QR codes (§3.8-3.9) generate QR scan events in the existing `qr_scan_events` table with `surface: 'promo'` (already in the `QrSurfaceType` union). The coupon analytics system adds a complementary `coupon_events` entry with `surface: 'qr_code'` when the QR redirect resolves. This provides:
+
+- **QR analytics**: scan counts, device breakdown, geo data for the QR code itself
+- **Coupon analytics**: full lifecycle funnel from QR scan → storefront view → checkout validate → redeem
+
+The two systems are complementary, not duplicative — QR analytics tracks the physical QR interaction; coupon analytics tracks the coupon lifecycle across all surfaces.
+
+#### Comparison with QR Analytics Architecture
+
+| Aspect | QR Analytics (existing) | Coupon Analytics (proposed) |
+|---|---|---|
+| **Event table** | `qr_scan_events` (072, 117) | `coupon_events` (new migration) |
+| **Aggregate table** | `qr_analytics` (117) | `coupon_analytics` (new migration) |
+| **Event types** | `scan` (single) | `view`, `copy`, `click`, `validate`, `redeem`, `fail` (6 types) |
+| **Surfaces** | storefront, product, directory, qr_landing, promo, private_grant, general | storefront, directory, product, checkout, spotlight, qr_code |
+| **Service** | `QrAnalyticsService.ts` | `CouponAnalyticsService.ts` |
+| **Routes** | `qr-analytics.ts` | `coupon-analytics.ts` |
+| **Sync job** | `qr-analytics-sync.ts` (6h) | `coupon-analytics-sync.ts` (6h) |
+| **Frontend service** | `QrAnalyticsService.ts` (web) | `CouponAnalyticsService.ts` (web) |
+| **Analytics page** | `/settings/storefront-qr/analytics` | `/settings/coupons/analytics` |
+| **Admin view** | `/settings/admin/qr-analytics` | `/settings/admin/coupon-analytics` |
+| **ID generators** | `generateQrScanEventId`, `generateQrAnalyticsId` | `generateCouponEventId`, `generateCouponAnalyticsId` |
+| **Unique metric** | Scans per surface | Conversion funnel (view → redeem) + ROI (discount vs. revenue) |
+
 ---
 
 ## 4. BSaaS Catalog Entry
@@ -606,8 +966,9 @@ The coupon capability would appear in the BSaaS Feature Store (`/settings/featur
 | `coupon_limited_redemption` | Usage Limits & Expiry | $9/mo | monthly | 14 days |
 | `coupon_analytics` | Coupon Analytics | $12/mo | monthly | 14 days |
 | `coupon_qr_sharing` | QR Code Sharing | $12/mo | monthly | 14 days |
+| `coupon_spotlight` | Coupon Spotlight | $9/mo | monthly | 14 days |
 
-**Bundle opportunity:** "Marketing Suite" bundle — coupon_enabled + discount_types_on + targeted + limited_redemption + analytics + qr_sharing at $59/mo (33% off).
+**Bundle opportunity:** "Marketing Suite" bundle — coupon_enabled + discount_types_on + targeted + limited_redemption + analytics + qr_sharing + spotlight at $65/mo (33% off).
 
 ### 4.2 Capability Engagement Rule
 
@@ -627,9 +988,9 @@ Following `PARENT_GATE_FEATURES`:
 
 ### Phase 1: Database & Capability Registration (3-4 days)
 
-- [ ] Migration: `118_tenant_coupons.sql` — `tenant_coupons` + `coupon_redemptions` tables, RLS, indexes, triggers. Also seed `coupon_options` capability type, 14 feature keys (1 gate + 1 disabled + 1 flexible + 2 group gates + 9 individual), `capability_features_list` links, `tier_features_list` entries, `bsaas_catalog` entries, and `navigation_links` INSERT for sidebar link
+- [ ] Migration: `118_tenant_coupons.sql` — `tenant_coupons` + `coupon_redemptions` + `coupon_events` + `coupon_analytics` tables, RLS, indexes, triggers. Also seed `coupon_options` capability type, 14 feature keys (1 gate + 1 disabled + 1 flexible + 2 group gates + 9 individual), `capability_features_list` links, `tier_features_list` entries, `bsaas_catalog` entries, and `navigation_links` INSERT for sidebar link
 - [ ] Prisma schema: Add both models via `db pull` + `prisma generate`
-- [ ] ID generators: `generateCouponId()` (`cpn-{tk}-{nanoid}`), `generateRedemptionId()` (`redm-{tk}-{nanoid}`)
+- [ ] ID generators: `generateCouponId()` (`cpn-{tk}-{nanoid}`), `generateRedemptionId()` (`redm-{tk}-{nanoid}`), `generateCouponEventId()` (`cpe-{tk}-{nanoid}`), `generateCouponAnalyticsId()` (`cpa-{tk}-{nanoid}`)
 - [ ] Seed `features_list`: 14 coupon feature keys (1 capability gate + 1 disabled + 1 flexible + 2 group gates + 9 individual)
 - [ ] Seed `capability_features_list`: Link features to `coupon_options` capability type
 - [ ] Seed `tier_features_list`: Enable features for Professional+ tiers
@@ -640,6 +1001,7 @@ Following `PARENT_GATE_FEATURES`:
 ### Phase 2: Backend Services & Routes (4-5 days)
 
 - [ ] `CouponService.ts` — CRUD, validate, redeem, analytics
+- [ ] `CouponAnalyticsService.ts` — event tracking (`trackCouponEvent`, `trackCouponEvents`), aggregation (`aggregateCouponAnalyticsForTenant`), dashboard, time series, funnel report, ROI report (mirrors `QrAnalyticsService.ts` pattern, see §3.11)
 - [ ] `CouponResolver.ts` — capability resolver (include `flexible ||` prefix on all feature flag checks per R23)
 - [ ] `resolvers/types.ts` — add `EffectiveCouponOptions` + `CouponOptionsMerchantSettings` to types, add `coupon_options` to `EffectiveCapabilities.effective`, add `couponOptions` to `MerchantSettingsBundle`
 - [ ] `resolvers/index.ts` — export `resolveCouponOptions`
@@ -647,6 +1009,10 @@ Following `PARENT_GATE_FEATURES`:
 - [ ] `public-tenant-capabilities.ts` — add `coupon_options` to `buildExpiredCapabilitiesResponse()`
 - [ ] Tenant routes: `/api/tenants/:tenantId/coupons` (CRUD + analytics)
 - [ ] Public route: `/api/public/tenants/:tenantId/coupons/validate` (checkout validation, follows AUTH_SCOPE_ISOLATION_SPEC FR-1)
+- [ ] Public route: `GET /api/public/tenants/:tenantId/coupons/spotlight` (featured coupon for public surfaces, follows AUTH_SCOPE_ISOLATION_SPEC FR-1) (see §3.10)
+- [ ] Public route: `POST /api/public/coupon-events` + `POST /api/public/coupon-events/batch` (event tracking from storefront/client-side, no auth, mirrors `POST /api/public/qr-events` pattern) (see §3.11)
+- [ ] Tenant routes: `GET /api/tenants/:tenantId/coupon-analytics` (dashboard), `GET .../timeseries`, `GET .../funnel`, `GET .../roi`, `POST .../aggregate` (mirrors `qr-analytics.ts` route structure) (see §3.11)
+- [ ] Admin route: `GET /api/admin/coupon-analytics` (cross-tenant analytics, auth required) (see §3.11)
 - [ ] Route registration in `routeRegistry.ts` (NOT `mounts/core-routes.ts` — that file does not exist; all routes are registered via `mountFromRegistry(app)` in `index.ts`)
 - [ ] `PARENT_GATE_FEATURES` — add `coupon_options: 'coupon_enabled'`
 - [ ] Zod validation schemas for all endpoints
@@ -661,6 +1027,7 @@ Following `PARENT_GATE_FEATURES`:
 - [ ] Store `discount_cents` on `orders` record (field already exists)
 - [ ] Store `coupon_code`, `coupon_id` in order metadata
 - [ ] Call `CouponService.redeemCoupon()` after successful payment
+- [ ] Call `CouponAnalyticsService.trackCouponEvent()` — `redeem` event with `order_id`, `discount_cents`, `surface: 'checkout'` (see §3.11)
 - [ ] Stripe PaymentIntent amount adjusted: `total_cents - discount_cents`
 - [ ] Error handling: invalid coupon → `400 coupon_invalid`, expired → `400 coupon_expired`, etc.
 
@@ -672,6 +1039,8 @@ Following `PARENT_GATE_FEATURES`:
 - [ ] `CouponManagementClient.tsx` — coupon table, create/edit modal, deactivate
 - [ ] Coupon create form: code, type, value, min spend, max redemptions, expiry, targeting
 - [ ] Analytics view: per-coupon stats, dashboard summary
+- [ ] `CouponAnalyticsService.ts` (frontend) — singleton extending `TenantApiSingleton` with `getDashboard`, `getTimeSeries`, `getFunnelReport`, `getROIReport`, `triggerAggregation` (see §3.11)
+- [ ] `/t/:tenantId/settings/coupons/analytics/page.tsx` — analytics page with summary cards, per-coupon table, conversion funnel, ROI chart, period/date filters, manual refresh (mirrors `QrAnalyticsClient.tsx` pattern) (see §3.11)
 - [ ] `TenantSettings.tsx` — "Coupons & Promotions" settings card
 - [ ] `CapabilityShowcase.tsx` — "Coupons" row
 - [ ] `PlanSummaryWidget.tsx` — add entry to `CAPABILITY_META` (slim dashboard widget)
@@ -685,6 +1054,8 @@ Following `PARENT_GATE_FEATURES`:
 - [ ] Capability gating: hide UI when `coupon_options.enabled === false`
 - [ ] Icon registration: `useNavLinks.tsx`, `NavItemRow.tsx`, admin navigation `page.tsx` `IconComponents` map
 - [ ] **QR button** in coupon table — visible only when `coupon_qr_sharing` feature key enabled
+- [ ] **Spotlight toggle** in coupon table — "Feature on storefront" toggle per coupon, visible only when `coupon_spotlight` feature key enabled (see §3.10)
+- [ ] `CouponOptionsMerchantSettings` — add `featuredCouponId` + `spotlightEnabled` fields to merchant settings bundle
 - [ ] `CouponQRDialog.tsx` — styled QR dialog (reuses `PromoCodeQRDialog` shell from BSaaS QR plan Phase 3)
 - [ ] QR theme presets: Merchant Promo, Flash Sale, Free Shipping, BOGO (extends `qr-style-config.ts`)
 - [ ] Download buttons: PNG, SVG, Copy link
@@ -727,7 +1098,51 @@ Following `PARENT_GATE_FEATURES`:
 
 **Dependency**: Requires `qr-code-styling` package install + `PromoCodeQRDialog.tsx` from BSaaS QR plan Phase 3. If BSaaS QR plan is not yet implemented, Phase 7 can be deferred — merchant coupons function fully without QR sharing.
 
-**Total estimated: 19-26 days** (critical path: Phases 1-5 = 15-20 days; Phases 6-7 = 4-6 days optional)
+### Phase 8: Coupon Spotlight — Public Surface Display (3-4 days, depends on Phases 2 + 4)
+
+- [ ] `CouponSpotlight.tsx` — single reusable component with `banner`, `card`, `strip` variants (see §3.10)
+- [ ] `PublicCouponService.ts` — add `getSpotlightCoupon()` method (extends `PublicApiSingleton`)
+- [ ] **Storefront integration**: Add `CouponSpotlight` to all 3 storefront layouts at layout-appropriate positions:
+  - [ ] `StorefrontEditorialLayout.tsx` — `banner` variant below hero section
+  - [ ] `StorefrontImmersiveLayout.tsx` — `strip` variant below sticky search bar
+  - [ ] Classic storefront layout — `card` variant between header and product catalog
+- [ ] **Directory entry integration**: Add `CouponSpotlight` to all 4 directory entry layouts at layout-appropriate positions:
+  - [ ] `DirectoryEntryEditorialLayout.tsx` — `banner` variant below hero image
+  - [ ] `DirectoryEntryImmersiveLayout.tsx` — `strip` variant below header
+  - [ ] `DirectoryEntryPremiumLayout.tsx` — `banner` variant below premium hero
+  - [ ] `DirectoryEntryClassicLayout.tsx` — `card` variant below business info
+- [ ] **Product page integration**: Add `CouponSpotlight` to product page layouts:
+  - [ ] Classic product layout — `strip` variant below product title
+  - [ ] Showcase product layout — `card` variant in sidebar
+  - [ ] Quick-commerce product layout — `strip` variant above add-to-cart
+- [ ] `DirectoryEntryLayoutProps` — add optional `spotlightCoupon` to shared props type (`@/app/directory/[slug]/layouts/types.ts`)
+- [ ] `StorefrontLayoutProps` — add optional `spotlightCoupon` to shared props type (`@/app/products/[id]/layouts/types.ts`)
+- [ ] `PublicUnifiedCapabilityService.ts` — expose `coupon_spotlight` flag in public capability state
+- [ ] Capability gating: component renders nothing when `coupon_spotlight` is disabled or no featured coupon is set
+- [ ] Auto-hide: client-side check for expired/exhausted coupon + backend validation via spotlight endpoint
+- [ ] Copy code button + "Apply now" link with `?coupon={code}` URL param
+- [ ] **Event tracking**: `POST /api/public/coupon-events` on component mount (`view` event), copy button click (`copy` event), apply link click (`click` event) — client-side, no auth (see §3.11)
+- [ ] Self-containment: reads exclusively from `coupon_options` domain state, not `StorefrontOptionFlags` overlay (per decoupled-domain principle)
+
+**Dependency**: Requires Phase 2 (backend spotlight endpoint) + Phase 4 (merchant spotlight toggle UI). Can be deferred — merchant coupons function fully without public surface spotlight.
+
+### Phase 9: Coupon Analytics & Event Tracking (3-4 days, depends on Phases 2 + 3)
+
+- [ ] `CouponAnalyticsService.ts` — backend service: `trackCouponEvent`, `trackCouponEvents` (batch), `aggregateCouponAnalyticsForTenant`, `getCouponAnalyticsDashboard`, `getCouponTimeSeries`, `getCouponFunnelReport`, `getCouponROIReport` (mirrors `QrAnalyticsService.ts`) (see §3.11)
+- [ ] `coupon-analytics.ts` routes — tenant dashboard, time series, funnel, ROI, manual aggregate (auth); public event tracking (no auth); admin cross-tenant (auth) (see §3.11)
+- [ ] `coupon-analytics-sync.ts` job — scheduled aggregation every 6 hours, iterates active tenants, computes day/week/month rollups from `coupon_events` → `coupon_analytics` (mirrors `qr-analytics-sync.ts`) (see §3.11)
+- [ ] Wire sync job into `index.ts` server startup alongside `qr-analytics-sync.ts` and `badge-analytics-sync.ts`
+- [ ] `CouponAnalyticsService.ts` (frontend) — singleton extending `TenantApiSingleton` (see §3.11)
+- [ ] `/t/:tenantId/settings/coupons/analytics/page.tsx` + `CouponAnalyticsClient.tsx` — analytics dashboard page with summary cards, per-coupon performance table, conversion funnel visualization, ROI chart, period/date filters, manual refresh (mirrors `QrAnalyticsClient.tsx`) (see §3.11)
+- [ ] **Checkout event tracking**: `validate` + `fail` events in `/api/public/tenants/:tenantId/coupons/validate` route handler; `redeem` event in `checkout.ts` after successful payment (see §3.11)
+- [ ] **Spotlight event tracking**: `view`, `copy`, `click` events from `CouponSpotlight.tsx` client-side (see §3.11)
+- [ ] **QR redirect event tracking**: `view` event with `surface: 'qr_code'` in `/s/[autoId]/page.tsx` before redirect (see §3.11)
+- [ ] Capability gating: analytics page visible only when `coupon_analytics` feature key enabled
+- [ ] Admin analytics page: `/settings/admin/coupon-analytics` (cross-tenant view, mirrors `/settings/admin/qr-analytics`)
+
+**Dependency**: Requires Phase 2 (backend service + routes) + Phase 3 (checkout `redeem` event tracking). Can be deferred — merchant coupons function fully without analytics.
+
+**Total estimated: 25-34 days** (critical path: Phases 1-5 = 15-20 days; Phases 6-7 = 4-6 days optional; Phase 8 = 3-4 days optional; Phase 9 = 3-4 days optional)
 
 ---
 
@@ -776,11 +1191,11 @@ Coupon validation happens **after** item validation but **before** Stripe Paymen
 1. Validate items & stock
 2. Validate commerce capabilities
 3. Calculate subtotal (using sale_price if applicable)
-4. NEW: Validate coupon → get discount_cents
+4. NEW: Validate coupon → get discount_cents → track `validate`/`fail` event
 5. Calculate final total: subtotal - discount + tax + shipping
 6. Create Stripe PaymentIntent for final total
 7. Create order record with discount_cents
-8. On payment success: record coupon redemption
+8. On payment success: record coupon redemption → track `redeem` event
 ```
 
 This ensures the Stripe charge amount already reflects the discount.
@@ -811,6 +1226,8 @@ The Cross-Capability Constraint Layer (CCL) could enforce:
 | QR code phishing (fake coupon QRs) | Low | QR URLs use official storefront domain only; coupon validation is server-side; invalid codes show error toast |
 | `qr-code-styling` scannability with discount-type icons | Low | Use `errorCorrectionLevel: 'H'` when icon embedded; same mitigation as BSaaS QR plan Phase 3; test with multiple QR readers |
 | QR dependency on BSaaS QR plan | Low | Phase 7 can be deferred; merchant coupons function fully without QR; `qr-code-styling` install is shared dependency |
+| Spotlight showing expired coupon | Low | Public endpoint validates coupon status server-side; component auto-hides on `data: null`; client-side expiry check as fallback |
+| Analytics event volume (spotlight views) | Low | Public event tracking is fire-and-forget (non-blocking); batch endpoint available; aggregation job runs every 6h, not real-time; same pattern as QR scan events |
 
 ---
 
@@ -832,19 +1249,27 @@ The Cross-Capability Constraint Layer (CCL) could enforce:
 | `apps/web/src/hooks/tenant-access/useCouponCapability.ts` | Capability hook |
 | `apps/web/src/app/s/[autoId]/page.tsx` | Short-code redirect page — resolves 4-char autoId → tenant slug, 302 redirect with coupon code (see §3.9) |
 | `apps/web/src/services/PublicCouponService.ts` | Public coupon validation service (extends `PublicApiSingleton`) |
+| `apps/web/src/components/storefront/CouponSpotlight.tsx` | Single reusable spotlight component with `banner`, `card`, `strip` variants (see §3.10) |
+| `apps/api/src/services/CouponAnalyticsService.ts` | Backend coupon analytics service: event tracking, aggregation, dashboard, funnel, ROI (mirrors `QrAnalyticsService.ts`) (see §3.11) |
+| `apps/api/src/routes/coupon-analytics.ts` | Coupon analytics routes: tenant dashboard, time series, funnel, ROI, public event tracking, admin cross-tenant (see §3.11) |
+| `apps/api/src/jobs/coupon-analytics-sync.ts` | Scheduled aggregation job — runs every 6h, aggregates `coupon_events` → `coupon_analytics` (mirrors `qr-analytics-sync.ts`) (see §3.11) |
+| `apps/web/src/services/CouponAnalyticsService.ts` | Frontend coupon analytics service (extends `TenantApiSingleton`) (see §3.11) |
+| `apps/web/src/app/t/[tenantId]/settings/coupons/analytics/page.tsx` | Coupon analytics page (server component) |
+| `apps/web/src/app/t/[tenantId]/settings/coupons/analytics/CouponAnalyticsClient.tsx` | Coupon analytics dashboard UI — summary cards, per-coupon table, conversion funnel, ROI chart (mirrors `QrAnalyticsClient.tsx`) (see §3.11) |
+| `apps/web/src/app/(platform)/settings/admin/coupon-analytics/page.tsx` | Admin cross-tenant coupon analytics page (mirrors `/settings/admin/qr-analytics`) |
 | `scripts/backfill_tenant_autoid.ts` | Backfill script — persists `generateTenantKey(tenantId)` into `tenants.metadata.autoId` for all existing tenants |
 
 ### Modified Files
 
 | File | Change |
 |---|---|
-| `apps/api/prisma/schema.prisma` | Add `tenant_coupons` + `coupon_redemptions` models |
-| `apps/api/src/lib/id-generator.ts` | Add `generateCouponId`, `generateRedemptionId` |
+| `apps/api/prisma/schema.prisma` | Add `tenant_coupons` + `coupon_redemptions` + `coupon_events` + `coupon_analytics` models |
+| `apps/api/src/lib/id-generator.ts` | Add `generateCouponId`, `generateRedemptionId`, `generateCouponEventId`, `generateCouponAnalyticsId` |
 | `apps/api/src/services/resolvers/types.ts` | Add `EffectiveCouponOptions` to `EffectiveCapabilities` |
 | `apps/api/src/services/EffectiveCapabilityResolver.ts` | Wire `CouponResolver` into pipeline |
-| `apps/api/src/routes/checkout.ts` | Add coupon validation step |
+| `apps/api/src/routes/checkout.ts` | Add coupon validation step + `redeem` event tracking via `CouponAnalyticsService.trackCouponEvent()` (see §3.11) |
 | `apps/api/src/routes/bsaas-purchases.ts` | Add `coupon_options` to `PARENT_GATE_FEATURES` |
-| `apps/api/src/routes/routeRegistry.ts` | Register coupon routes (all route mounting via `mountFromRegistry`) |
+| `apps/api/src/routes/routeRegistry.ts` | Register coupon routes + coupon-analytics routes (all route mounting via `mountFromRegistry`) |
 | `apps/web/src/services/CapabilityResolutionService.ts` | Add `CouponOptionsState` |
 | `apps/web/src/services/UnifiedCapabilityService.ts` | Add `mapCouponOptions()` |
 | `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts` | Add `useCouponCapability` |
@@ -860,6 +1285,16 @@ The Cross-Capability Constraint Layer (CCL) could enforce:
 | `apps/web/src/types/effective-capabilities.ts` | Re-export `CouponOptionsState` |
 | `apps/web/src/services/TenantInfoService.ts` | `getCouponSettings` + `updateCouponSettings` methods |
 | `apps/web/src/services/PublicUnifiedCapabilityService.ts` | Add coupon state to public capability mapping |
+| `apps/web/src/app/tenant/[id]/StorefrontEditorialLayout.tsx` | Add `CouponSpotlight` (banner variant) below hero section |
+| `apps/web/src/app/tenant/[id]/StorefrontImmersiveLayout.tsx` | Add `CouponSpotlight` (strip variant) below sticky search bar |
+| `apps/web/src/app/directory/[slug]/layouts/DirectoryEntryEditorialLayout.tsx` | Add `CouponSpotlight` (banner variant) below hero image |
+| `apps/web/src/app/directory/[slug]/layouts/DirectoryEntryImmersiveLayout.tsx` | Add `CouponSpotlight` (strip variant) below header |
+| `apps/web/src/app/directory/[slug]/layouts/DirectoryEntryPremiumLayout.tsx` | Add `CouponSpotlight` (banner variant) below premium hero |
+| `apps/web/src/app/directory/[slug]/layouts/DirectoryEntryClassicLayout.tsx` | Add `CouponSpotlight` (card variant) below business info |
+| `apps/web/src/app/directory/[slug]/layouts/types.ts` | Add optional `spotlightCoupon` to `DirectoryEntryLayoutProps` |
+| `apps/web/src/app/products/[id]/layouts/types.ts` | Add optional `spotlightCoupon` to `StorefrontLayoutProps` + `ProductLayoutProps` |
+| `apps/api/src/index.ts` | Wire `coupon-analytics-sync.ts` job startup + mount `coupon-analytics.ts` routes (see §3.11) |
+| `apps/web/src/app/s/[autoId]/page.tsx` | Track `view` event with `surface: 'qr_code'` via `POST /api/public/coupon-events` before redirect (see §3.11) |
 
 ---
 

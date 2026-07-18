@@ -341,24 +341,6 @@ export default function QRGeneratorClient() {
 
         {/* Right: Styling Controls */}
         <div className="space-y-4">
-          {/* Theme Presets */}
-          <div className="p-4 rounded-lg border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-            <label className="text-sm font-medium mb-2 block">Templates</label>
-            <div className="grid grid-cols-2 gap-2">
-              {QR_TEMPLATE_LIST.map((t) => (
-                <button
-                  key={t.name}
-                  onClick={() => applyTemplate(t.name)}
-                  className="px-3 py-2 text-xs rounded-md border text-left border-gray-200 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-700"
-                >
-                  <div className="font-medium">{t.label}</div>
-                  <div className="text-neutral-400">{t.description}</div>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-neutral-400 mt-2">Click a template to apply, then customize below</p>
-          </div>
-
           {/* Accordion Styling Controls */}
           <div className="space-y-4 p-4 rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800">
             <Accordion type="multiple" defaultValue={["templates"]} className="w-full">
