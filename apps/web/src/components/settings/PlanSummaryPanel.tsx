@@ -266,6 +266,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
   funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
+  coupon_options: { label: 'Coupons', icon: '🏷️', settingsPath: '/settings/coupons' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -1019,6 +1020,31 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'funnel_options',
       settingsPath: CAPABILITY_DISPLAY.funnel_options.settingsPath ?? null,
+    });
+  }
+
+  // Coupon Options
+  const cp = caps.couponOptions;
+  if (cp && cp.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const DISCOUNT_LABELS: Record<string, string> = { percent_off: 'Percent Off', fixed_amount: 'Fixed Amount', free_shipping: 'Free Shipping', bogo: 'BOGO' };
+    cp.allowedDiscountTypes.forEach(dt => { specifics.push(DISCOUNT_LABELS[dt] || dt); statuses.push({ label: DISCOUNT_LABELS[dt] || dt, status: 'enabled' }); });
+    if (cp.canTargetProducts) { specifics.push('Targeted'); statuses.push({ label: 'Targeted Coupons', status: 'enabled' }); }
+    if (cp.canSetLimits) { specifics.push('Limits'); statuses.push({ label: 'Redemption Limits', status: 'enabled' }); }
+    if (cp.canViewAnalytics) { specifics.push('Analytics'); statuses.push({ label: 'Analytics', status: 'enabled' }); }
+    if (cp.canUseQrSharing) { specifics.push('QR Sharing'); statuses.push({ label: 'QR Sharing', status: 'enabled' }); }
+    if (cp.canUseSpotlight) { specifics.push('Spotlight'); statuses.push({ label: 'Spotlight', status: 'enabled' }); }
+    summaries.push({
+      key: 'coupon_options',
+      label: CAPABILITY_DISPLAY.coupon_options.label,
+      icon: CAPABILITY_DISPLAY.coupon_options.icon,
+      enabled: cp.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'coupon_options',
+      settingsPath: CAPABILITY_DISPLAY.coupon_options.settingsPath ?? null,
     });
   }
 

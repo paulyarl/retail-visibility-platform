@@ -92,6 +92,8 @@ import {
   PlatformServiceType,
   FunnelState,
   FunnelStepType,
+  CouponOptionsState,
+  CouponDiscountType,
 } from './CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -155,6 +157,7 @@ export interface BackendEffectiveCapabilities {
     wholesale_matching: BackendEffectiveWholesaleMatching;
     platform_services: BackendEffectivePlatformServices;
     funnel: BackendEffectiveFunnel;
+    coupon_options: BackendEffectiveCouponOptions;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -1084,6 +1087,22 @@ interface BackendEffectiveFunnel {
   is_flexible: boolean;
 }
 
+interface BackendEffectiveCouponOptions {
+  enabled: boolean;
+  can_create_coupons: boolean;
+  can_use_percent_off: boolean;
+  can_use_fixed_amount: boolean;
+  can_use_free_shipping: boolean;
+  can_use_bogo: boolean;
+  can_target_products: boolean;
+  can_set_limits: boolean;
+  can_view_analytics: boolean;
+  can_use_qr_sharing: boolean;
+  can_use_spotlight: boolean;
+  allowed_discount_types: string[];
+  is_flexible: boolean;
+}
+
 function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
   return {
     enabled: b.enabled,
@@ -1093,6 +1112,24 @@ function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
     canUseUpsell: b.can_use_upsell,
     canUseDownsell: b.can_use_downsell,
     canUseOto: b.can_use_oto,
+    isFlexible: b.is_flexible,
+  };
+}
+
+function mapCouponOptions(b: BackendEffectiveCouponOptions): CouponOptionsState {
+  return {
+    enabled: b.enabled,
+    canCreateCoupons: b.can_create_coupons,
+    canUsePercentOff: b.can_use_percent_off,
+    canUseFixedAmount: b.can_use_fixed_amount,
+    canUseFreeShipping: b.can_use_free_shipping,
+    canUseBogo: b.can_use_bogo,
+    canTargetProducts: b.can_target_products,
+    canSetLimits: b.can_set_limits,
+    canViewAnalytics: b.can_view_analytics,
+    canUseQrSharing: b.can_use_qr_sharing,
+    canUseSpotlight: b.can_use_spotlight,
+    allowedDiscountTypes: (b.allowed_discount_types || []) as CouponDiscountType[],
     isFlexible: b.is_flexible,
   };
 }
@@ -1153,6 +1190,7 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
     platformServices: mapPlatformServices(b.effective.platform_services),
     funnel: mapFunnel(b.effective.funnel),
+    couponOptions: mapCouponOptions(b.effective.coupon_options),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1461,6 +1499,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.funnel;
   }
 
+  async getCouponOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<CouponOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.couponOptions;
+  }
+
   async getWholesaleMatchingState(tenantId: string, ssrAuth?: SsrAuth): Promise<WholesaleMatchingState> {
     const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.wholesaleMatching;
@@ -1500,6 +1543,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   wholesale_: 'wholesaleMatching',
   platform_service_: 'platformServices',
   platform_services_: 'platformServices',
+  coupon_: 'couponOptions',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

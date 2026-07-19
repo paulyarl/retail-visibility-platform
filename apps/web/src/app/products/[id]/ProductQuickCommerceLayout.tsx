@@ -14,6 +14,7 @@ import { ProductGalleryPanel } from '@/components/products/sections/ProductGalle
 import { ProductPurchasePanel } from '@/components/products/sections/ProductPurchasePanel';
 import { ProductBottomSections } from '@/components/products/sections/ProductBottomSections';
 import { ProductLayoutSkeleton } from '@/components/products/sections/ProductLayoutSkeleton';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { StorefrontOptionFlags, ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
 interface ProductQuickCommerceLayoutProps {
@@ -125,6 +126,10 @@ export default function ProductQuickCommerceLayout({
             sku={s.currentSku}
             variant="compact"
           />
+        </div>
+
+        <div className="mb-4">
+          <CouponSpotlight tenantId={product.tenantId} coupon={null} variant="strip" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[45fr_55fr] gap-5 lg:gap-8 mb-8">

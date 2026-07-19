@@ -33,6 +33,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { StorefrontOptionFlags } from '@/services/CapabilityResolutionService';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { PublicFaqOptionsFlags } from '@/services/CapabilityResolutionService';
 import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
@@ -474,6 +475,13 @@ export default function StorefrontClientWrapper({
           showsInteractiveMaps={showsInteractiveMaps}
           showsReviews={showsReviews}
         />
+      )}
+
+      {/* Coupon Spotlight Card */}
+      {!storefrontStatus.shouldShowPanel && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <CouponSpotlight tenantId={tenantId} coupon={null} variant="card" />
+        </div>
       )}
 
       {/* Product Section: Featured Navigation, Status Panel, Product Catalog, Featured Showcase */}

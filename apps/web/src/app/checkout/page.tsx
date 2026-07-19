@@ -10,6 +10,7 @@ import FulfillmentMethodForm, { FulfillmentMethod } from '@/components/checkout/
 import { ShippingAddressFormWithSaved } from '@/components/checkout/ShippingAddressFormWithSaved';
 import { GuestSavePaymentMethodPrompt } from '@/components/checkout/GuestSavePaymentMethodPrompt';
 import { OrderBump } from '@/components/checkout/OrderBump';
+import CouponInput from '@/components/checkout/CouponInput';
 import PayPalPaymentForm from '@/components/checkout/PayPalPaymentForm';
 import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import StripePaymentForm from '@/components/checkout/StripePaymentForm';
@@ -104,6 +105,7 @@ function CheckoutPageContent() {
   // Dynamic platform fee percentage from admin settings
   const [platformFeePercentage, setPlatformFeePercentage] = useState<number>(3.0);
   const [taxAmount, setTaxAmount] = useState<number>(0);
+  const [couponDiscount, setCouponDiscount] = useState<number>(0);
 
   // Get the cart for this tenant (gateway selected at checkout)
   const cart = tenantId ? getCart(tenantId) : null;
@@ -383,7 +385,7 @@ function CheckoutPageContent() {
   const platformFee = platformFeePercentage > 0
     ? Math.round(subtotal * (platformFeePercentage / 100))
     : 0;
-  const total = subtotal + platformFee + fulfillmentFee + taxAmount;
+  const total = Math.max(0, subtotal + platformFee + fulfillmentFee + taxAmount - couponDiscount);
 
   // Fetch dynamic platform fee percentage
   useEffect(() => {
@@ -747,6 +749,14 @@ function CheckoutPageContent() {
                     />
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Coupon Input (review step) */}
+              {currentStep === 'review' && tenantId && cartItems.length > 0 && (
+                <CouponInput
+                  tenantId={tenantId}
+                  onDiscountApplied={(discountCents) => setCouponDiscount(discountCents)}
+                />
               )}
 
               {/* Order Bump Offer (review step) */}

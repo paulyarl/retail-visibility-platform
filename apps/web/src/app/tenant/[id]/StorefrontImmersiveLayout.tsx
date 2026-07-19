@@ -28,6 +28,7 @@ import { StorefrontLayoutProps } from './layouts/types';
 import StorefrontFooter from './layouts/shared/StorefrontFooter';
 import TrustSignalsBar from './layouts/shared/TrustSignalsBar';
 import SectionDivider from './layouts/shared/SectionDivider';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import StickySearchBar from './layouts/shared/StickySearchBar';
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
@@ -318,6 +319,10 @@ export default function StorefrontImmersiveLayout({
 
             <div className="hidden md:block flex-1 max-w-md mx-4">
               <StickySearchBar tenantId={tenantId} placeholder="Search products..." />
+            </div>
+
+            <div className="w-full md:w-auto md:max-w-md mx-4">
+              <CouponSpotlight tenantId={tenantId} coupon={null} variant="strip" />
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">

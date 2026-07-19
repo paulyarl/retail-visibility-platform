@@ -799,6 +799,26 @@ export interface PlatformServicesState {
   isFlexible: boolean;
 }
 
+// --- Coupon Options ---
+
+export type CouponDiscountType = 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
+
+export interface CouponOptionsState {
+  enabled: boolean;
+  canCreateCoupons: boolean;
+  canUsePercentOff: boolean;
+  canUseFixedAmount: boolean;
+  canUseFreeShipping: boolean;
+  canUseBogo: boolean;
+  canTargetProducts: boolean;
+  canSetLimits: boolean;
+  canViewAnalytics: boolean;
+  canUseQrSharing: boolean;
+  canUseSpotlight: boolean;
+  allowedDiscountTypes: CouponDiscountType[];
+  isFlexible: boolean;
+}
+
 // --- Funnel Options ---
 
 export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
@@ -1067,6 +1087,7 @@ export interface AllCapabilitiesState {
   wholesaleMatching: WholesaleMatchingState;
   platformServices: PlatformServicesState;
   funnel: FunnelState;
+  couponOptions: CouponOptionsState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -1107,6 +1128,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   platform_services_: 'platform_services',
   funnel_options_: 'funnel_options',
   funnel_: 'funnel_options',
+  coupon_: 'coupon_options',
 };
 
 /**
@@ -2695,6 +2717,48 @@ export function resolveFunnelState(
     canUseUpsell,
     canUseDownsell,
     canUseOto,
+    isFlexible: flexible,
+  };
+}
+
+/**
+ * Resolve coupon options state from raw capability features.
+ * Feature prefix: coupon_
+ */
+export function resolveCouponOptionsState(
+  features: Record<string, boolean>
+): CouponOptionsState {
+  const disabled = !!features.coupon_disabled;
+  const enabled = !disabled && !!features.coupon_enabled;
+  const flexible = !!features.coupon_flexible;
+
+  const discountTypesOn = !disabled && (!!features.coupon_discount_types_on || flexible);
+  const discountTypesOff = !!features.coupon_discount_types_off;
+
+  const canUsePercentOff = enabled && (flexible || !!features.coupon_percent_off) && !discountTypesOff;
+  const canUseFixedAmount = enabled && (flexible || !!features.coupon_fixed_amount) && !discountTypesOff;
+  const canUseFreeShipping = enabled && (flexible || !!features.coupon_free_shipping) && !discountTypesOff;
+  const canUseBogo = enabled && (flexible || !!features.coupon_bogo) && !discountTypesOff;
+
+  const allowedDiscountTypes: CouponDiscountType[] = [];
+  if (canUsePercentOff) allowedDiscountTypes.push('percent_off');
+  if (canUseFixedAmount) allowedDiscountTypes.push('fixed_amount');
+  if (canUseFreeShipping) allowedDiscountTypes.push('free_shipping');
+  if (canUseBogo) allowedDiscountTypes.push('bogo');
+
+  return {
+    enabled,
+    canCreateCoupons: enabled,
+    canUsePercentOff,
+    canUseFixedAmount,
+    canUseFreeShipping,
+    canUseBogo,
+    canTargetProducts: enabled && (flexible || !!features.coupon_targeted),
+    canSetLimits: enabled && (flexible || !!features.coupon_limited_redemption),
+    canViewAnalytics: enabled && (flexible || !!features.coupon_analytics),
+    canUseQrSharing: enabled && (flexible || !!features.coupon_qr_sharing),
+    canUseSpotlight: enabled && (flexible || !!features.coupon_spotlight),
+    allowedDiscountTypes,
     isFlexible: flexible,
   };
 }

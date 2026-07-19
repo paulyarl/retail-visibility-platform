@@ -335,7 +335,7 @@ export class CouponService extends BaseService {
     }
 
     if (coupon.max_redemptions != null && coupon.redemption_count >= coupon.max_redemptions) {
-      return { valid: false, couponId: coupon.id, code: coupon.code, discountType: coupon.discount_type, discountValue: coupon.discount_value, discountCents: 0, minSpendCents: coupon.min_spend_cents, message: 'Coupon usage limit reached', reason: 'max_redemptions' };
+      return { valid: false, couponId: coupon.id, code: coupon.code, discountType: coupon.discount_type, discountValue: coupon.discount_value, discountCents: 0, minSpendCents: coupon.min_spend_cents, message: 'Coupon usage limit reached', reason: 'exhausted' };
     }
 
     if (cartData.subtotalCents < coupon.min_spend_cents) {

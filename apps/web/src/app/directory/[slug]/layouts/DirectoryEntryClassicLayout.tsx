@@ -26,6 +26,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
@@ -122,6 +123,11 @@ export default function DirectoryEntryClassicLayout(props: DirectoryEntryLayoutP
             )}
           </div>
         </div>
+
+        {/* Coupon Spotlight Card */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-20 mb-4">
+          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="card" />
+        </section>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-6">

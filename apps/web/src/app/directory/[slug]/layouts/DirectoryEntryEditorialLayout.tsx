@@ -23,6 +23,7 @@ import FaqStorefrontDisplay from '@/components/faq/FaqStorefrontDisplay';
 import PublicInquiryForm from '@/components/crm/PublicInquiryForm';
 import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
 
@@ -104,6 +105,11 @@ export default function DirectoryEntryEditorialLayout(props: DirectoryEntryLayou
             )}
           </div>
         </div>
+
+        {/* Coupon Spotlight Banner */}
+        <section className="max-w-6xl mx-auto px-6 -mt-6 relative z-20 mb-8">
+          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="banner" />
+        </section>
 
         {/* Asymmetric Content Grid */}
         <div className="max-w-6xl mx-auto px-6 py-12">

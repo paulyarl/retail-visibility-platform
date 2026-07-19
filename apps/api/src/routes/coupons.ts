@@ -1,5 +1,5 @@
 /**
- * Coupon Routes — Tenant CRUD + Settings
+ * Coupon Routes — Tenant CRUD + Settings + QR
  *
  * Tenant endpoints (auth required):
  *   GET    /api/tenants/:tenantId/coupons              — list coupons
@@ -7,6 +7,7 @@
  *   GET    /api/tenants/:tenantId/coupons/:id          — get single coupon
  *   PUT    /api/tenants/:tenantId/coupons/:id          — update coupon
  *   DELETE /api/tenants/:tenantId/coupons/:id          — deactivate coupon
+ *   GET    /api/tenants/:tenantId/coupons/:id/qr       — get QR metadata
  *   GET    /api/tenants/:tenantId/coupons/settings     — get coupon settings
  *   PUT    /api/tenants/:tenantId/coupons/settings     — update coupon settings
  */
@@ -15,6 +16,7 @@ import express from 'express';
 import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { logger } from '../logger';
 import { CouponService } from '../services/CouponService';
+import { prisma } from '../prisma';
 
 const router = express.Router();
 
@@ -145,6 +147,43 @@ router.put('/tenants/:tenantId/coupons/settings', authenticateToken, checkTenant
   } catch (error) {
     logger.error('[coupons] Failed to update settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to update coupon settings' });
+  }
+});
+
+/**
+ * GET /api/tenants/:tenantId/coupons/:id/qr
+ * Returns QR metadata for a coupon (short-code URL, full URL, discount type icon).
+ */
+router.get('/tenants/:tenantId/coupons/:id/qr', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId, id } = req.params;
+    const coupon = await CouponService.getInstance().getCoupon(tenantId, id);
+    if (!coupon) {
+      return res.status(404).json({ success: false, error: 'Coupon not found' });
+    }
+
+    // Resolve tenant autoId from metadata for short-code URL
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { metadata: true },
+    });
+    const autoId = (tenant?.metadata as any)?.autoId || `FRSH-${tenantId.slice(-6)}`;
+
+    res.json({
+      success: true,
+      data: {
+        id: coupon.id,
+        code: coupon.code,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        shortCodeUrl: `/s/${autoId}?c=${encodeURIComponent(coupon.code)}`,
+        fullUrl: `/tenant/${tenantId}?coupon=${encodeURIComponent(coupon.code)}`,
+        autoId,
+      },
+    });
+  } catch (error) {
+    logger.error('[coupons] Failed to get QR metadata:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'Failed to fetch QR metadata' });
   }
 });
 

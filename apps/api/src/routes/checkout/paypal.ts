@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { authenticateToken } from '../../middleware/auth';
 import { prisma } from '../../prisma';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
+import { redeemOrderCoupon } from '../../services/PostPaymentCouponRedemption';
 import { unifiedConfig } from '../../config/unifiedConfig';
 import { logger } from '../../logger';
 
@@ -276,6 +277,9 @@ router.post('/capture-order', async (req, res) => {
           updated_at: new Date(),
         },
       });
+
+      // Record coupon redemption after successful payment
+      await redeemOrderCoupon(payment.orders.id);
 
       // Post-payment fulfillment already handled above via PostPaymentFulfillment
     }

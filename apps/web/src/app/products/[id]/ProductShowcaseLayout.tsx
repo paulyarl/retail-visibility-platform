@@ -11,6 +11,7 @@ import { ProductGalleryPanel } from '@/components/products/sections/ProductGalle
 import { ProductPurchasePanel } from '@/components/products/sections/ProductPurchasePanel';
 import { ProductBottomSections } from '@/components/products/sections/ProductBottomSections';
 import { ProductLayoutSkeleton } from '@/components/products/sections/ProductLayoutSkeleton';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { StorefrontOptionFlags, ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
 interface ProductShowcaseLayoutProps {
@@ -154,6 +155,10 @@ export function ProductShowcaseLayout({
         isOpen={s.lightboxOpen}
         onClose={() => s.setLightboxOpen(false)}
       />
+
+      <div className="hidden lg:block lg:w-72 shrink-0 mb-4">
+        <CouponSpotlight tenantId={tenant?.id || ''} coupon={null} variant="card" />
+      </div>
 
       <StickyPurchaseBar
         priceCents={s.currentPriceCents}

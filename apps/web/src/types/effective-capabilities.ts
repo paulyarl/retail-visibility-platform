@@ -55,4 +55,6 @@ export type {
   CrmMessageType,
   CrmCustomerTicketType,
   CrmDashboardType,
+  CouponOptionsState,
+  CouponDiscountType,
 } from '@/services/CapabilityResolutionService';

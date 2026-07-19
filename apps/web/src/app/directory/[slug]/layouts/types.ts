@@ -35,4 +35,5 @@ export interface DirectoryEntryLayoutProps {
   fullAddress: string;
   isDemo?: boolean;
   demoExpiresAt?: string | null;
+  spotlightCoupon?: any;
 }

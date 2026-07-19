@@ -48,6 +48,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'wholesale_matching_options', label: 'Wholesale Matching', icon: '🔗', prefix: 'wholesale_', settingsPath: '/settings/wholesale' },
   { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
   { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },
+  { key: 'coupon_options', label: 'Coupons', icon: '🏷️', prefix: 'coupon_', settingsPath: '/settings/coupons' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {
@@ -104,6 +105,7 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'wholesale_matching_options': return !!caps.wholesaleMatching?.enabled;
     case 'platform_services': return !!caps.platformServices?.enabled;
     case 'funnel_options': return !!caps.funnel?.enabled;
+    case 'coupon_options': return !!caps.couponOptions?.enabled;
     default: return false;
   }
 }

@@ -93,6 +93,7 @@ export interface ProductLayoutProps {
 
   // Layout hint
   layoutVariant: ProductLayoutKey;
+  spotlightCoupon?: any;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +150,7 @@ export interface StorefrontLayoutProps {
 
   // Layout hint
   layoutVariant: StorefrontLayoutKey;
+  spotlightCoupon?: any;
 }
 
 // ---------------------------------------------------------------------------

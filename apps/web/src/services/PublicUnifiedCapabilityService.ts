@@ -47,6 +47,7 @@ import {
   PlatformServicesState,
   FunnelState,
   ChatbotOptionsState,
+  CouponOptionsState,
 } from './CapabilityResolutionService';
 import {
   BackendEffectiveCapabilities,
@@ -323,6 +324,16 @@ class PublicUnifiedCapabilityService extends PublicApiSingleton {
     return all.wholesaleMatching;
   }
 
+  async getCouponOptionsState(tenantId: string): Promise<CouponOptionsState> {
+    const all = await this.getAllCapabilities(tenantId);
+    return all.couponOptions;
+  }
+
+  async getCouponSpotlightEnabled(tenantId: string): Promise<boolean> {
+    const state = await this.getCouponOptionsState(tenantId);
+    return !!state?.canUseSpotlight;
+  }
+
   async checkFeatureByCapability(tenantId: string, featureKey: string): Promise<boolean | null> {
     const capType = getCapabilityTypeForFeature(featureKey);
     if (!capType) return null;
@@ -355,6 +366,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   wholesale_: 'wholesaleMatching',
   platform_service_: 'platformServices',
   platform_services_: 'platformServices',
+  coupon_: 'couponOptions',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

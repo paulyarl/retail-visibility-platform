@@ -25,6 +25,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
@@ -110,6 +111,11 @@ export default function DirectoryEntryImmersiveLayout(props: DirectoryEntryLayou
             </div>
           </div>
         </div>
+
+        {/* Coupon Spotlight Strip */}
+        <section className="max-w-7xl mx-auto px-6 -mt-4 relative z-20 mb-4">
+          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="strip" />
+        </section>
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-12">

@@ -40,6 +40,7 @@ import {
   WholesaleMatchingState,
   PlatformServicesState,
   FunnelState,
+  CouponOptionsState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -767,6 +768,36 @@ export function usePublicFunnelCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch funnel capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// usePublicCouponOptionsCapability
+// ====================
+
+export function usePublicCouponOptionsCapability(
+  tenantId: string | null
+): CapabilityHookState<CouponOptionsState> {
+  const [data, setData] = useState<CouponOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await publicUnifiedCapabilityService.getCouponOptionsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch coupon options capability');
     } finally {
       setLoading(false);
     }

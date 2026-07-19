@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
+import { redeemOrderCoupon } from '../../services/PostPaymentCouponRedemption';
 import { randomUUID } from 'crypto';
 import { unifiedConfig } from '../../config/unifiedConfig';
 import { logger } from '../../logger';
@@ -122,6 +123,9 @@ router.post('/process-payment', async (req, res) => {
         updated_at: new Date(),
       },
     });
+
+    // Record coupon redemption after successful payment
+    await redeemOrderCoupon(orderId);
 
     // Decrement stock and fulfill digital products via shared coordinator
     await PostPaymentFulfillment.run(orderId);

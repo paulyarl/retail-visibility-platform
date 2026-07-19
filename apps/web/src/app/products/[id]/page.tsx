@@ -40,6 +40,7 @@ import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageSta
 import { resolveProductLayout, type ProductLayoutKey } from './layouts/types';
 import ProductShowcaseLayout from './ProductShowcaseLayout';
 import ProductQuickCommerceLayout from './ProductQuickCommerceLayout';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { clientLogger } from '@/lib/client-logger';
 
 // Define the product interface based on the API response
@@ -794,10 +795,15 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 )}
               </div>
 
+              {/* Coupon Spotlight Strip */}
+              <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
+                <div className="mb-4">
+                  <CouponSpotlight tenantId={product.tenantId} coupon={null} variant="strip" />
+                </div>
+
               {/* Product Description Section */}
 
-              <div className="flex-1 lg:flex-1 min-w-0 w-full lg:w-auto">
-                <TenantPaymentProvider tenantId={product.tenantId}>
+              <TenantPaymentProvider tenantId={product.tenantId}>
                   <TierBasedLandingPage
                     disableQRCode
                     product={{
