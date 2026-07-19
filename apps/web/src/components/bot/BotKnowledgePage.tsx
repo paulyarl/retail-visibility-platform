@@ -22,6 +22,7 @@ export default function BotKnowledgePage({ tenantId }: BotKnowledgePageProps) {
   const [refreshingBizInfo, setRefreshingBizInfo] = useState(false);
   const [refreshingHours, setRefreshingHours] = useState(false);
   const [refreshingFulfillment, setRefreshingFulfillment] = useState(false);
+  const [refreshingCoupon, setRefreshingCoupon] = useState(false);
 
   const { data: status, isLoading } = useQuery({
     queryKey: ['bot', 'embeddings-status', tenantId],
@@ -119,6 +120,19 @@ export default function BotKnowledgePage({ tenantId }: BotKnowledgePageProps) {
       toast({ title: 'Failed to refresh fulfillment embeddings', description: err.message, variant: 'destructive' });
     } finally {
       setRefreshingFulfillment(false);
+    }
+  }
+
+  async function handleRefreshCoupon() {
+    setRefreshingCoupon(true);
+    try {
+      await botService.refreshKnowledgeEmbeddings(tenantId, 'coupon');
+      await queryClient.invalidateQueries({ queryKey: ['bot', 'embeddings-status', tenantId] });
+      toast({ title: 'Coupon embeddings refreshed' });
+    } catch (err: any) {
+      toast({ title: 'Failed to refresh coupon embeddings', description: err.message, variant: 'destructive' });
+    } finally {
+      setRefreshingCoupon(false);
     }
   }
 
@@ -328,6 +342,34 @@ export default function BotKnowledgePage({ tenantId }: BotKnowledgePageProps) {
                 {refreshingFulfillment ? 'Refreshing...' : 'Refresh Fulfillment Embeddings'}
               </Button>
             </div>
+
+            {/* Coupon Embeddings */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium">Coupon Embeddings</h3>
+                  <p className="text-sm text-neutral-500">Lets bot answer customer questions about active coupons and discounts</p>
+                </div>
+                <Badge variant={status?.hasCouponEmbeddings ? 'success' : 'default'}>
+                  {status?.hasCouponEmbeddings ? 'Ready' : 'Empty'}
+                </Badge>
+              </div>
+              {status?.knowledgeEmbeddingCounts
+                ?.filter((c) => c.sourceType === 'coupon')
+                .map((c) => (
+                  <Badge key={c.sourceType} variant="default">
+                    {c.count} coupon{c.count !== 1 ? 's' : ''} embedded
+                  </Badge>
+                ))}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefreshCoupon}
+                disabled={refreshingCoupon}
+              >
+                {refreshingCoupon ? 'Refreshing...' : 'Refresh Coupon Embeddings'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -374,8 +416,13 @@ export default function BotKnowledgePage({ tenantId }: BotKnowledgePageProps) {
               offer pickup?", "do you deliver?", or "how much is shipping?"
             </p>
             <p>
-              Embeddings refresh automatically when you update badges, policies, business info, hours, or fulfillment
-              settings. Use the buttons above to manually refresh after making changes.
+              <strong className="text-neutral-900 dark:text-neutral-100">Coupon Embeddings</strong> are generated from
+              your active coupons. They let the bot answer questions like "do you have any discounts?" or "what coupons
+              are available?" without inventing codes or expiry dates.
+            </p>
+            <p>
+              Embeddings refresh automatically when you update badges, policies, business info, hours, fulfillment, or
+              coupon settings. Use the buttons above to manually refresh after making changes.
             </p>
           </div>
         </CardContent>

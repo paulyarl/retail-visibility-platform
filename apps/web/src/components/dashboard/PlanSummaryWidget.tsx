@@ -48,7 +48,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'wholesale_matching_options', label: 'Wholesale Matching', icon: '🔗', prefix: 'wholesale_', settingsPath: '/settings/wholesale' },
   { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
   { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },
-  { key: 'coupon_options', label: 'Coupons', icon: '🏷️', prefix: 'coupon_', settingsPath: '/settings/coupons' },
+  { key: 'coupon_options', label: 'Coupons', icon: '🏷️', prefix: 'coupon_', settingsPath: '/settings/coupon-options' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {

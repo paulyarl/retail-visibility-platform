@@ -885,12 +885,84 @@ class BotKnowledgeEmbeddingService {
     return parts.join('\n');
   }
 
+  // ─── Coupon Embeddings ───
+
+  /**
+   * Refresh coupon embeddings for a tenant.
+   * Reads active tenant_coupons, chunks each into text,
+   * and embeds into bot_knowledge_embeddings with source_type='coupon'.
+   */
+  async refreshCouponEmbeddings(tenantId: string): Promise<{ processed: number; chunks: number }> {
+    const pool = getDirectPool();
+
+    await pool.query(
+      "DELETE FROM bot_knowledge_embeddings WHERE tenant_id = $1 AND source_type = 'coupon'",
+      [tenantId]
+    );
+
+    const coupons = await prisma.tenant_coupons.findMany({
+      where: { tenant_id: tenantId, is_active: true },
+      select: {
+        id: true,
+        code: true,
+        discount_type: true,
+        discount_value: true,
+        max_redemptions: true,
+        expires_at: true,
+        is_active: true,
+      },
+    });
+
+    if (coupons.length === 0) {
+      return { processed: 0, chunks: 0 };
+    }
+
+    const embeddingModel = await BotRagService.getInstance().getEmbeddingModel();
+    const chunks: { sourceId: string; text: string }[] = [];
+
+    for (const coupon of coupons) {
+      const parts = [
+        `Coupon: ${coupon.code}`,
+        `Discount: ${coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : coupon.discount_type === 'fixed' ? `$${(coupon.discount_value / 100).toFixed(2)} off` : coupon.discount_type === 'free_shipping' ? 'Free shipping' : coupon.discount_type === 'bogo' ? 'Buy one get one' : coupon.discount_type}`,
+      ];
+
+      if (coupon.max_redemptions) {
+        parts.push(`Max redemptions: ${coupon.max_redemptions}`);
+      }
+      if (coupon.expires_at) {
+        parts.push(`Expires: ${new Date(coupon.expires_at).toLocaleDateString()}`);
+      }
+      parts.push(`Status: ${coupon.is_active ? 'Active' : 'Inactive'}`);
+
+      chunks.push({ sourceId: coupon.id, text: parts.join('\n') });
+    }
+
+    for (const chunk of chunks) {
+      const embedding = await aiProviderFactory.generateQueryEmbedding(chunk.text);
+      const embeddingStr = JSON.stringify(embedding);
+
+      await pool.query(
+        `INSERT INTO bot_knowledge_embeddings (tenant_id, source_type, source_id, chunk_text, embedding, embedding_model)
+         VALUES ($1, 'coupon', $2, $3, $4, $5)`,
+        [tenantId, chunk.sourceId, chunk.text, embeddingStr, embeddingModel]
+      );
+    }
+
+    logger.info('[BotKnowledgeEmbeddingService] Refreshed coupon embeddings', undefined, {
+      tenantId,
+      coupons: coupons.length,
+      chunks: chunks.length,
+    });
+
+    return { processed: coupons.length, chunks: chunks.length };
+  }
+
   /**
    * Refresh knowledge embeddings by source type (or all if not specified).
    */
   async refreshKnowledgeEmbeddings(
     tenantId: string,
-    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement' | 'policy_template' | 'funnel'
+    sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'promotion' | 'feature_purchase' | 'featured_placement' | 'policy_template' | 'funnel' | 'coupon'
   ): Promise<{ processed: number; chunks: number }> {
     if (sourceType === 'badge_registry') {
       return this.refreshBadgeRegistryEmbeddings(tenantId);
@@ -922,6 +994,9 @@ class BotKnowledgeEmbeddingService {
     if (sourceType === 'funnel') {
       return this.refreshFunnelEmbeddings(tenantId);
     }
+    if (sourceType === 'coupon') {
+      return this.refreshCouponEmbeddings(tenantId);
+    }
 
     const badgeResult = await this.refreshBadgeRegistryEmbeddings(tenantId);
     const policyResult = await this.refreshPolicyEmbeddings(tenantId);
@@ -933,9 +1008,10 @@ class BotKnowledgeEmbeddingService {
     const featuredPlacementResult = await this.refreshFeaturedPlacementEmbeddings(tenantId);
     const policyTemplateResult = await this.refreshPolicyTemplateEmbeddings(tenantId);
     const funnelResult = await this.refreshFunnelEmbeddings(tenantId);
+    const couponResult = await this.refreshCouponEmbeddings(tenantId);
     return {
-      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed + policyTemplateResult.processed + funnelResult.processed,
-      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks + policyTemplateResult.chunks + funnelResult.chunks,
+      processed: badgeResult.processed + policyResult.processed + bizResult.processed + hoursResult.processed + fulfillmentResult.processed + promotionResult.processed + featurePurchaseResult.processed + featuredPlacementResult.processed + policyTemplateResult.processed + funnelResult.processed + couponResult.processed,
+      chunks: badgeResult.chunks + policyResult.chunks + bizResult.chunks + hoursResult.chunks + fulfillmentResult.chunks + promotionResult.chunks + featurePurchaseResult.chunks + featuredPlacementResult.chunks + policyTemplateResult.chunks + funnelResult.chunks + couponResult.chunks,
     };
   }
 

@@ -644,7 +644,7 @@ export default function CapabilityShowcase({
         detail: cpTier
           ? (cpDetailParts.length > 0 ? cpDetailParts.join(', ') : 'Available')
           : "Not available",
-        settingsLink: `/t/${tenantId}/settings/coupons`,
+        settingsLink: `/t/${tenantId}/settings/coupon-options`,
         constraintWarning: getConstraintWarning('coupon_options'),
       },
     ];

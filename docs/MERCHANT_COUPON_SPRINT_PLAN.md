@@ -23,8 +23,9 @@ Merchant coupons are a new capability domain (`coupon_options`) that enables mer
 | **Sprint 6** | Phase 7 | 3-4 days | QR code sharing: styled QR dialog, short-code redirect route, autoId backfill | P1 — High |
 | **Sprint 7** | Phase 9 | 3-4 days | Coupon analytics: event tracking, aggregation job, dashboard with funnel + ROI | P1 — High |
 | **Sprint 8** | Phase 6 | 2-3 days | Bot knowledge integration, CCL constraints, polish | P2 — Medium |
+| **Sprint 10** | Customer Wallet | 5-6 days | Customer coupon wallet: save coupons, browse by merchant, one-click checkout apply, expiry reminders, wallet insights | P1 — High |
 
-**Total estimated duration:** 25-34 days (critical path: 14-18 days for Sprints 1-4)
+**Total estimated duration:** 30-40 days (critical path: 14-18 days for Sprints 1-4)
 
 ---
 
@@ -37,7 +38,8 @@ Sprint 1 (DB + Capability)
   │      │      └──→ Sprint 4 (Frontend Merchant + Customer UI)
   │      │             ├──→ Sprint 5 (Coupon Spotlight) [P1]
   │      │             ├──→ Sprint 6 (QR Sharing) [P1, also depends on BSaaS QR Plan Phase 3]
-  │      │             └──→ Sprint 7 (Analytics) [P1, also depends on Sprint 3]
+  │      │             ├──→ Sprint 7 (Analytics) [P1, also depends on Sprint 3]
+  │      │             └──→ Sprint 10 (Customer Wallet) [P1, also depends on Sprint 2 + Sprint 3 + Sprint 6]
   │      └──→ Sprint 7 (Analytics) [P1 — backend service + routes can start after Sprint 2]
   └──→ Sprint 8 (Bot Knowledge + Polish) [P2 — can start after Sprint 4]
 ```
@@ -50,6 +52,7 @@ Sprint 1 (DB + Capability)
 - Sprint 6 requires BSaaS QR Plan Phase 3 (`PromoCodeQRDialog.tsx`, `qr-code-styling` package)
 - Sprint 7 requires Sprint 2 (analytics service + routes) + Sprint 3 (redeem event tracking)
 - Sprint 8 requires Sprint 4 (coupon CRUD for bot knowledge refresh triggers)
+- Sprint 10 requires Sprint 2 (CouponService) + Sprint 3 (checkout integration) + Sprint 6 (QR short-code route for scan-to-save)
 
 ---
 
@@ -641,6 +644,8 @@ Uses `lucide-static` approach from BSaaS QR plan Phase 3. Use `errorCorrectionLe
 
 Coupon QR codes use short-code URL `https://visibleshelf.com/s/{autoId}?c={couponCode}` by default. Full storefront URL (`/tenant/{tenantId}?coupon={code}`) available as fallback in `CouponQRDialog.tsx` "Copy link" dropdown.
 
+**Scan-to-Save variant** (requires Sprint 10): QR can include `&save=1` param → scanning auto-saves coupon to customer's wallet instead of just redirecting to storefront. `CouponQRDialog` offers a toggle: "Standard (visit store)" vs "Scan-to-Save (add to wallet)". See Sprint 10 task 10.19 for the short-code route auto-save flow.
+
 ### Verification
 
 - [ ] QR dialog generates scannable QR code with coupon code
@@ -830,6 +835,678 @@ Settings page for merchant coupon preferences (toggle domain) — separate from 
 - [ ] Bot can answer coupon-related questions
 - [ ] CCL constraints enforced
 - [ ] All sprints verified, feature is production-ready
+
+### After Sprint 10 (Customer Wallet Complete)
+
+- [ ] Customer can save coupons from any merchant to personal wallet
+- [ ] Wallet page shows coupons grouped by merchant with status badges
+- [ ] Checkout shows saved coupons as one-click apply options
+- [ ] QR scan-to-save: scanning a coupon QR auto-saves to wallet
+- [ ] Spotlight displays QR toggle for in-store scan-to-save
+- [ ] Expiry reminders sent for coupons expiring within 24h/3d/7d (customer notification + merchant CRM alert)
+- [ ] Merchant CRM dashboard shows coupon wallet expiry alerts as retargeting opportunities
+- [ ] Merchant analytics shows wallet insights (saves, savers, save→redeem rate)
+- [ ] `save` event integrated into conversion funnel (including `surface: 'qr_scan'`)
+- [ ] Cross-merchant coupon discovery drives platform stickiness
+
+---
+
+## Sprint 9: Coupon-Funnel Convergence (Future)
+
+**Goal:** Unify the two conversion mechanisms — coupons (future-purchase discounts) and sales funnels (inflight-purchase discounts) — by introducing a `coupon_offer` funnel step type, enabling coupon codes as upsell/downsell incentives within the funnel flow.
+
+**Duration:** 3-4 days
+**Priority:** P3 — Strategic
+**Depends on:** Sprint 7 (analytics) + existing FunnelService
+
+### Motivation
+
+Coupons and funnels share the same goal — conversion — but target different purchase stages:
+
+| Mechanism | Target | Capability | Data Model |
+|-----------|--------|------------|------------|
+| **Coupon** | Future purchases | `coupon_options` | `tenant_coupons` + `coupon_events` |
+| **Funnel** | Inflight purchases | `funnel_options` | `tenant_funnels` + `tenant_funnel_steps` |
+
+Convergence: a funnel step that applies a coupon code as an upsell/downsell incentive — "Accept this offer and get 20% off your next purchase with code SAVE20."
+
+### Tasks
+
+#### 9.1 — `coupon_offer` Funnel Step Type
+
+**Files**:
+- `apps/api/src/services/resolvers/types.ts` — add `'coupon_offer'` to `FunnelStepType` union
+- `apps/api/src/services/resolvers/FunnelResolver.ts` — add `can_use_coupon_offer` flag
+- `apps/api/src/services/FunnelService.ts` — validate `coupon_offer` steps (require `offer_item_id` = coupon ID, resolve coupon code for display)
+- `apps/api/src/routes/funnel.ts` — accept `coupon_offer` in CRUD
+
+#### 9.2 — Funnel-Coupon Linkage
+
+**Files**:
+- `apps/api/src/services/FunnelService.ts` — `FunnelStepInput.metadata.couponId` links step to coupon
+- `apps/api/src/services/CouponAnalyticsService.ts` — track `redeem` events with `surface: 'funnel'` when coupon redeemed via funnel step
+- `apps/web/src/app/t/[tenantId]/settings/funnels/[funnelId]/FunnelBuilderClient.tsx` — coupon step picker UI
+
+#### 9.3 — Unified Conversion Analytics
+
+**Files**:
+- `apps/api/src/services/CouponAnalyticsService.ts` — add `surface: 'funnel'` to funnel report
+- `apps/web/src/app/t/[tenantId]/settings/coupons/analytics/CouponAnalyticsClient.tsx` — show funnel-surface coupon performance
+- `apps/web/src/app/t/[tenantId]/settings/funnels/[funnelId]/analytics/FunnelAnalyticsClient.tsx` — show coupon conversion within funnel
+
+#### 9.4 — Capability Gating
+
+- `coupon_offer` funnel step requires **both** `funnel_options` and `coupon_options` capabilities
+- CCL constraint: `funnel.can_use_coupon_offer` **requires** `coupon_options.enabled`
+
+### Verification
+
+- [ ] Merchant can add a `coupon_offer` step to a funnel
+- [ ] Coupon code is displayed to customer when they accept the funnel step
+- [ ] Coupon redemption via funnel tracks `surface: 'funnel'` in analytics
+- [ ] Unified analytics show coupon performance across both surfaces (storefront + funnel)
+- [ ] Capability gating hides `coupon_offer` step type when either capability is disabled
+- [ ] `checkapi` + `checkweb` pass (zero TS errors)
+
+---
+
+## Sprint 10: Customer Coupon Wallet — Cross-Merchant Coupon Saving & Redemption
+
+**Goal:** Enable customers to save coupons from any platform merchant into a personal wallet, browse saved coupons organized by merchant, and apply saved coupons at checkout with one click — eliminating the pain point of remembering/clipboarding coupon codes. Extends the existing `coupon_options` capability with a customer-side engagement layer.
+
+**Duration:** 5-6 days
+**Priority:** P1 — High (conversion differentiator)
+**Depends on:** Sprint 2 (CouponService + routes) + Sprint 3 (checkout integration) + Sprint 6 (QR short-code route, for scan-to-save flow)
+
+### Motivation
+
+The existing coupon system is **merchant-side only** — merchants create coupons, customers must manually remember and type codes at checkout. This sprint introduces a **customer-side coupon wallet** that:
+
+- Eliminates coupon-code friction (no more "did I save that code?")
+- Creates cross-merchant stickiness (customers return to the platform to use saved coupons)
+- Provides merchants with **intent signals** (saved-but-not-redeemed = retargeting opportunity)
+- Extends the coupon event funnel: `view → save → redeem` (save is a new high-intent event)
+
+### Architecture Overview
+
+```
+Scenario 1 — Digital Save (storefront/directory)
+  Customer browses storefront/directory
+    → Sees CouponSpotlight or coupon card
+    → Clicks "Save to Wallet" (auth required)
+    → customer_saved_coupons record created
+    → coupon_events 'save' event tracked (surface: spotlight | directory)
+
+Scenario 2 — QR Scan-to-Save (in-store / offline)
+  Merchant displays CouponSpotlight on screen or prints QR on receipt/table tent
+    → Customer scans QR with phone camera
+    → Short-code route /s/{autoId}?c={code}&save=1 resolves
+    → If authenticated: coupon auto-saves to wallet
+    → If not authenticated: redirect to login → auto-save post-login
+    → coupon_events 'save' event tracked (surface: qr_scan)
+    → Redirected to /account/coupons with success toast
+
+Scenario 3 — Wallet Browse & Shop
+  Customer visits /account/coupons (wallet page)
+    → Sees saved coupons grouped by merchant
+    → Filters: active / expiring / redeemed / expired
+    → Clicks "Shop Now" → deep-link to merchant storefront
+    → Cross-merchant discovery: sees coupons from other stores alongside
+
+Scenario 4 — Checkout One-Click Redeem
+  Customer checks out at any merchant store
+    → Saved coupons for that tenant appear as one-click apply chips
+    → Select coupon → auto-validate → discount applied
+    → Redemption tracked → wallet status updated to 'redeemed'
+    → coupon_events 'redeem' event tracked
+
+Scenario 5 — Expiry Reminder Loop (dual-sided)
+  Saved coupon approaching expiry
+    → Daily reminder job detects coupon expiring in 24h / 3d / 7d
+    → Customer notification sent (email + in-app) with coupon-specific details:
+      - Merchant name + logo
+      - Coupon code (e.g. "SUMMER20")
+      - Discount summary (e.g. "20% off your next purchase")
+      - Expiry countdown (e.g. "Expires in 24 hours")
+      - Deep-link: /tenant/{tenantId}?coupon={code} (storefront with coupon pre-filled)
+      - "Shop Now" CTA button → applies coupon at checkout
+    → Merchant CRM alert fired (crm_alerts): "{N} customers saved coupon {code} expiring — retargeting opportunity"
+    → Customer clicks notification → lands on merchant storefront with coupon code pre-filled
+    → Merchant sees CRM alert on dashboard → can proactively engage or extend coupon
+    → Converts before expiry → wallet status → 'redeemed'
+    → CRM alert auto-dismissed on coupon redemption
+```
+
+### Tasks
+
+#### 10.1 — Migration: `119_customer_saved_coupons.sql`
+
+**File**: `database/migrations/119_customer_saved_coupons.sql`
+
+**Tables to create:**
+
+1. **`customer_saved_coupons`** — customer wallet entries
+   - `id VARCHAR(255) PRIMARY KEY` — `scpn-{nanoid}`
+   - `customer_id VARCHAR(255) NOT NULL REFERENCES customers(id)` — global customer (cross-tenant)
+   - `tenant_id VARCHAR(255) NOT NULL REFERENCES tenants(id)` — merchant the coupon belongs to
+   - `coupon_id VARCHAR(255) NOT NULL REFERENCES tenant_coupons(id)` — the saved coupon
+   - `status VARCHAR(20) DEFAULT 'saved'` — `saved` | `redeemed` | `expired`
+   - `reminder_enabled BOOLEAN DEFAULT true` — customer opt-in for expiry reminders
+   - `saved_at TIMESTAMPTZ DEFAULT NOW()`
+   - `redeemed_at TIMESTAMPTZ` — nullable, set when redemption occurs
+   - `expired_at TIMESTAMPTZ` — nullable, set when coupon expires while in wallet
+   - `UNIQUE(customer_id, coupon_id)` — one save per coupon per customer
+
+2. **`customer_coupon_reminders`** — expiry reminder log (prevents duplicate notifications)
+   - `id VARCHAR(255) PRIMARY KEY` — `crmd-{nanoid}`
+   - `customer_id VARCHAR(255) NOT NULL`
+   - `saved_coupon_id VARCHAR(255) NOT NULL REFERENCES customer_saved_coupons(id)`
+   - `reminder_type VARCHAR(20)` — `24h` | `3d` | `7d`
+   - `sent_at TIMESTAMPTZ DEFAULT NOW()`
+   - `UNIQUE(saved_coupon_id, reminder_type)` — one reminder per type per saved coupon
+
+**Indexes:**
+- `idx_customer_saved_coupons_customer_status` on `customer_saved_coupons(customer_id, status)`
+- `idx_customer_saved_coupons_customer_tenant` on `customer_saved_coupons(customer_id, tenant_id)`
+- `idx_customer_saved_coupons_coupon` on `customer_saved_coupons(coupon_id)`
+- `idx_customer_coupon_reminders_customer` on `customer_coupon_reminders(customer_id)`
+
+**RLS**: Enable on both tables. Customer-scoped: `customer_id = auth.uid()::text` (customer JWT identity). No tenant RLS — customer wallet is global across merchants.
+
+**Triggers**: `updated_at` not needed (immutable records, status updates via application layer).
+
+**Event type seed**: Add `'save'` to the `coupon_events.event_type` allowed values (no schema change needed — `event_type` is `VARCHAR(20)`, just add `save` to the application-level enum in `CouponAnalyticsService`).
+
+#### 10.2 — Prisma Schema Sync
+
+- Run `npx prisma db pull` to introspect `customer_saved_coupons` + `customer_coupon_reminders`
+- Add `CustomerSavedCoupon` + `CustomerCouponReminder` models to `schema.prisma`
+- Add relations: `customers.customer_saved_coupons[]`, `tenant_coupons.customer_saved_coupons[]`
+- Run `npx prisma generate`
+
+#### 10.3 — ID Generators
+
+**File**: `apps/api/src/lib/id-generator.ts`
+
+Add 2 new generators:
+- `generateSavedCouponId()` → `scpn-{nanoid}` (customer-scoped, not tenant-scoped — wallet is global)
+- `generateCouponReminderId()` → `crmd-{nanoid}`
+
+#### 10.4 — CustomerCouponWalletService (Backend)
+
+**File**: `apps/api/src/services/CustomerCouponWalletService.ts` (new)
+
+Singleton extending `BaseService`. Customer-authenticated (not tenant-authenticated).
+
+**Methods:**
+
+- `saveCoupon(customerId, tenantId, couponId)` — creates `customer_saved_coupons` record. Validates: coupon exists, is active, not expired, not exhausted. Idempotent (UNIQUE constraint). Tracks `save` event via `trackCouponEvent`.
+- `unsaveCoupon(customerId, savedCouponId)` — removes from wallet (DELETE). Tracks `unsave` event.
+- `listWallet(customerId, filters?)` — paginated list of saved coupons with coupon + tenant details joined. Filters: `status` (saved/redeemed/expired), `tenantId` (per-merchant view). Returns coupon code, discount type/value, merchant name/logo, expiry, status.
+- `listWalletByTenant(customerId, tenantId)` — saved coupons for a specific merchant (used at checkout).
+- `getWalletStats(customerId)` — summary: total saved, active, expiring soon (≤7d), redeemed count, total savings (sum of redeemed discounts).
+- `markRedeemed(customerId, couponId, orderId)` — called from checkout flow after successful redemption. Updates `status='redeemed'`, sets `redeemed_at`.
+- `syncExpiredStatuses()` — batch job: marks `status='expired'` for saved coupons where the underlying coupon has expired or been deactivated. Called by sync job.
+- `getExpiringSoon(customerId, daysThreshold=7)` — saved coupons expiring within threshold, for reminder notifications.
+
+**Event tracking**: Every `saveCoupon` call tracks a `save` event:
+```ts
+trackCouponEvent({
+  tenantId,
+  couponId,
+  couponCode: coupon.code,
+  eventType: 'save',
+  surface: 'spotlight' | 'directory' | 'checkout' | 'wallet',
+  sessionId,
+  source: 'customer_wallet',
+});
+```
+
+#### 10.5 — Customer Wallet API Routes
+
+**File**: `apps/api/src/routes/customer-coupons.ts` (new)
+
+**Authentication**: Customer JWT via `CustomerTokenService.extractBearerToken(req)` + `verifyAccessToken(token)`. Same pattern as `customer-auth.ts` routes.
+
+**Routes:**
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/customer-coupons/save` | Customer | Save coupon to wallet |
+| `DELETE` | `/api/customer-coupons/:savedCouponId` | Customer | Remove from wallet |
+| `GET` | `/api/customer-coupons/wallet` | Customer | List all saved coupons (with filters) |
+| `GET` | `/api/customer-coupons/wallet/by-tenant/:tenantId` | Customer | Saved coupons for a specific merchant |
+| `GET` | `/api/customer-coupons/stats` | Customer | Wallet summary stats |
+| `GET` | `/api/customer-coupons/expiring` | Customer | Coupons expiring soon |
+
+**Public route** (no auth — for "save" button visibility check):
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/public/tenants/:tenantId/coupons/saveable` | None | List active coupons a customer can save (for storefront/directory display) |
+
+**Request bodies:**
+
+```ts
+// POST /save
+{
+  tenantId: string;
+  couponId: string;
+  surface?: 'spotlight' | 'directory' | 'checkout' | 'wallet';
+  sessionId?: string;
+}
+```
+
+**Zod validation** for all request bodies.
+
+#### 10.6 — Route Registration
+
+**File**: `apps/api/src/routes/routeRegistry.ts` (modify) — register `customer-coupons` routes
+**File**: `apps/api/src/index.ts` (modify) — mount `customer-coupons` router at `/api/customer-coupons`
+
+#### 10.7 — Checkout Integration: Saved Coupon Auto-Apply
+
+**File**: `apps/api/src/routes/checkout.ts` (modify)
+
+**New checkout flow addition** (after existing coupon validation step):
+
+1. If customer is authenticated (customer JWT present in request):
+   - Fetch `listWalletByTenant(customerId, tenantId)` — saved coupons for this merchant
+   - Filter to `status='saved'` + coupon still active + not expired
+   - Return saved coupons as `availableSavedCoupons` in checkout response payload
+2. If customer selects a saved coupon at checkout:
+   - Frontend sends `savedCouponId` instead of `couponCode`
+   - Backend resolves coupon from `customer_saved_coupons` → auto-validates → applies discount
+   - After successful payment: `markRedeemed(customerId, couponId, orderId)`
+3. If customer enters a manual code AND has it saved:
+   - Detect match → mark as redeemed in wallet after successful payment
+
+**Response payload addition:**
+```ts
+{
+  // ... existing checkout response
+  availableSavedCoupons?: Array<{
+    savedCouponId: string;
+    couponId: string;
+    code: string;
+    discountType: string;
+    discountValue: number;
+    promotionalMessage: string | null;
+    termsSummary: string | null;
+    expiresAt: string | null;
+  }>;
+}
+```
+
+#### 10.8 — Expiry Reminder Job
+
+**File**: `apps/api/src/jobs/coupon-wallet-expiry-reminders.ts` (new)
+
+- Runs daily (staggered after existing jobs, e.g., 45 min startup delay)
+- For each `customer_saved_coupons` record with `status='saved'` and `reminder_enabled=true`:
+  - Check underlying coupon `expires_at`
+  - If expiring within 24h / 3d / 7d and no reminder of that type sent:
+    - Create `customer_coupon_reminders` record
+    - Send **customer notification** via `CustomerNotificationService` (email + in-app)
+    - Notification content (coupon-specific, not generic):
+      - Merchant name + logo
+      - Coupon code (e.g. "SUMMER20")
+      - Discount summary (e.g. "20% off" / "$10 off" / "Free shipping")
+      - Expiry countdown (e.g. "Expires in 24 hours")
+      - Deep-link: `/tenant/{tenantId}?coupon={code}` (storefront with coupon pre-filled)
+      - "Shop Now" CTA button → customer lands on merchant storefront with coupon ready to apply
+    - Send **merchant CRM alert** via `CrmAlertService.getInstance().create()` (fire-and-forget)
+      - `type: 'coupon_wallet'`
+      - `title: 'Saved coupon expiring soon'`
+      - `body: '{N} customers have saved coupon {code} expiring in {timeframe}. Retargeting opportunity.'`
+      - `icon: 'clock'`
+      - `metadata: { couponId, couponCode, saverCount, expiresAt, reminderType }`
+    - Merchant CRM dashboard shows alert in `crm_alerts` feed (existing `CrmTenantService` dashboard widget)
+- Wire into `index.ts` server startup
+
+#### 10.9 — Expired Status Sync Job
+
+**File**: `apps/api/src/jobs/coupon-wallet-status-sync.ts` (new)
+
+- Runs daily
+- Calls `CustomerCouponWalletService.syncExpiredStatuses()`
+- Batch updates `customer_saved_coupons.status = 'expired'` where:
+  - `status = 'saved'`
+  - Underlying coupon `is_active = false` OR `expires_at < NOW()` OR `redemption_count >= max_redemptions`
+- Wire into `index.ts` server startup
+
+#### 10.10 — Frontend: CustomerCouponWalletService
+
+**File**: `apps/web/src/services/CustomerCouponWalletService.ts` (new)
+
+Singleton extending `CustomerApiSingleton`:
+
+- `saveCoupon(tenantId, couponId, surface?)` → POST `/api/customer-coupons/save`
+- `unsaveCoupon(savedCouponId)` → DELETE `/api/customer-coupons/:id`
+- `getWallet(filters?)` → GET `/api/customer-coupons/wallet`
+- `getWalletByTenant(tenantId)` → GET `/api/customer-coupons/wallet/by-tenant/:tenantId`
+- `getStats()` → GET `/api/customer-coupons/stats`
+- `getExpiringSoon()` → GET `/api/customer-coupons/expiring`
+- `getSaveableCoupons(tenantId)` → GET `/api/public/tenants/:tenantId/coupons/saveable` (no auth)
+
+**Types:**
+```ts
+export interface SavedCoupon {
+  savedCouponId: string;
+  couponId: string;
+  tenantId: string;
+  tenantName: string;
+  tenantLogo: string | null;
+  code: string;
+  discountType: string;
+  discountValue: number;
+  promotionalMessage: string | null;
+  termsSummary: string | null;
+  expiresAt: string | null;
+  status: 'saved' | 'redeemed' | 'expired';
+  savedAt: string;
+  redeemedAt: string | null;
+}
+
+export interface WalletStats {
+  totalSaved: number;
+  active: number;
+  expiringSoon: number;
+  redeemed: number;
+  totalSavingsCents: number;
+}
+```
+
+#### 10.11 — Frontend: Customer Wallet Page
+
+**Files:**
+- `apps/web/src/app/account/coupons/page.tsx` (new) — server component wrapper
+- `apps/web/src/app/account/coupons/CouponWalletClient.tsx` (new) — client component
+
+**Features:**
+
+- **Wallet stats header**: Total saved, active, expiring soon, redeemed, total savings (mirrors account overview stat cards)
+- **Filter tabs**: All | Active | Expiring Soon | Redeemed | Expired
+- **Per-merchant grouping**: Coupons grouped by tenant with merchant name + logo header
+- **Coupon cards**: Discount type icon, code (with copy button), discount value, promotional message, terms summary, expiry countdown, status badge
+- **Actions per coupon**:
+  - "Shop Now" → link to `/tenant/{tenantId}?coupon={code}` (deep-link to merchant storefront with coupon pre-filled)
+  - "Remove" → unsave (with confirmation)
+- **Empty state**: "No saved coupons yet — browse stores and save coupons for easy access at checkout"
+- **Expiring soon banner**: Prominent warning for coupons expiring within 48h
+- **Loading + error states**
+
+#### 10.12 — Frontend: CustomerSidebar Nav Item
+
+**File**: `apps/web/src/components/customer/CustomerSidebar.tsx` (modify)
+
+Add "My Coupons" nav item:
+```ts
+{ href: '/account/coupons', label: 'My Coupons', icon: TicketIcon }
+```
+
+Position after "Orders" (high visibility for engagement).
+
+#### 10.13 — Frontend: Account Overview Widget
+
+**File**: `apps/web/src/app/account/page.tsx` (modify)
+
+Add a "Saved Coupons" stat card to the quick stats grid:
+- Icon: `TicketIcon` (or `Tags`)
+- Count: total active saved coupons
+- Link to `/account/coupons`
+
+#### 10.14 — Frontend: Save-to-Wallet Button Component
+
+**File**: `apps/web/src/components/coupons/SaveCouponButton.tsx` (new)
+
+Reusable button component for storefront/directory surfaces:
+
+**Props**: `tenantId`, `couponId`, `couponCode`, `variant` ('icon' | 'full'), `surface`
+
+**Auth-state-aware behavior (3 states):**
+
+| State | What customer sees | Action |
+|-------|-------------------|--------|
+| **Authenticated + not saved** | "Save to Wallet" button (bookmark icon) | Click → instant save (API call, no page navigation) → toast "Coupon {code} saved to your wallet" → button becomes "Saved ✓". **Customer stays on current page.** |
+| **Authenticated + already saved** | "Saved ✓" (filled bookmark icon, green) | Click → unsave (with confirmation toast). **Customer stays on current page.** |
+| **Not authenticated** | "Save" button (bookmark icon) | Click → redirect to `/customerlogin?redirect={currentPath}&saveCoupon={couponId}&saveTenantId={tenantId}&saveCode={couponCode}` |
+
+**Authenticated save = zero navigation:**
+- Save is a background API call (`POST /api/customer-coupons/save`) — no page reload, no redirect
+- Optimistic UI: button flips to "Saved ✓" immediately, rolls back on API error
+- Toast notification confirms save: "Coupon {code} saved to your wallet" with optional "View wallet" link
+- Customer remains on the storefront/directory/product page they were browsing
+- This is critical for conversion: redirecting away from a merchant's store to the wallet page breaks the shopping flow and may cause the customer to not return
+
+**Unauthenticated save flow (post-login auto-save):**
+1. Customer clicks "Save" on spotlight → redirected to login page with save params in URL
+2. Login page shows contextual banner: "Sign in to save coupon {code} from {merchantName} to your wallet"
+3. After successful login (or registration): `saveCoupon` param detected → auto-save executes → **redirect back to original page** (`redirect` param) with success toast "Coupon {code} saved to your wallet" — customer lands where they started, not on the wallet page
+4. If customer registers new account: same auto-save executes post-registration → redirect back to original page
+5. If customer abandons login: returns to original page, no save performed
+
+**On save**: calls `customerCouponWalletService.saveCoupon()` (background API call), shows toast "Coupon {code} saved to your wallet" with optional "View wallet" link
+**On unsave**: calls `unsaveCoupon()` (background API call), shows toast "Coupon removed from wallet"
+**Optimistic UI**: immediate state change, rollback on error
+**Variant `'icon'`**: bookmark-style icon button (for spotlight strips, compact cards)
+**Variant `'full'`**: full button with text (for coupon detail views, wallet page)
+
+#### 10.14a — Frontend: Spotlight Action Bar with Account Access
+
+**File**: `apps/web/src/components/coupons/CouponSpotlightActionBar.tsx` (new)
+
+The CouponSpotlight action bar is the primary engagement surface for coupons. It must serve both authenticated and unauthenticated customers with clear paths to action.
+
+**Action bar layout (left → right):**
+
+```
+[Copy Code]  [Save to Wallet]  [QR Code]  [Sign In / Account]
+```
+
+**Components:**
+
+1. **Copy Code** — existing button (Sprint 5), copies coupon code to clipboard. Available to all visitors (no auth required).
+2. **Save to Wallet** (`SaveCouponButton`) — auth-state-aware (see task 10.14). Shows "Save" for all users; behavior changes based on auth state.
+3. **QR Code** — inline QR toggle (see task 10.15). Available to all visitors (merchant can display, customer can scan).
+4. **Account button** — auth-state-aware:
+   - **Not authenticated**: "Sign In" link button → `/customerlogin?redirect={currentPath}` (subtle, secondary style — not aggressive, doesn't push login over coupon engagement)
+   - **Authenticated**: user avatar / initials with dropdown → links to `/account`, `/account/coupons`, `/account/orders`, logout
+
+**Why an account button on the spotlight action bar:**
+- Customers encountering coupons from a merchant they haven't visited before may not have a platform account yet
+- The "Save" button triggers login, but some customers want to browse first and sign in later — the account button provides a non-disruptive entry point
+- After saving, authenticated customers can quickly jump to their wallet from the spotlight without navigating through the account menu
+- The account button is **subtle** (secondary style, not primary CTA) — the primary action is "Save to Wallet", not "Sign In"
+
+**Surfaces where the action bar appears:**
+- Storefront CouponSpotlight (all 3 layout variants)
+- Directory entry CouponSpotlight (all 4 layout variants)
+- Product page CouponSpotlight (all 3 layout variants)
+- Standalone coupon landing page (if QR redirect targets a dedicated coupon page instead of storefront)
+
+#### 10.14b — Frontend: Coupon Wallet Mini-Widget (Engagement-Activated)
+
+**File**: `apps/web/src/components/coupons/CouponWalletMiniWidget.tsx` (new)
+
+A floating widget that materializes on the page **only after a customer saves their first coupon**. Completely invisible when wallet is empty or customer hasn't engaged. Appears next to the CouponSpotlight as a subtle visual confirmation + persistent wallet access point.
+
+**Visibility rules:**
+
+| State | Widget visibility |
+|-------|------------------|
+| **Not authenticated** | Invisible (no wallet to show) |
+| **Authenticated + 0 saved coupons** | Invisible (nothing to show yet) |
+| **Authenticated + 1+ saved coupons** | Visible — materializes with subtle animation |
+| **Authenticated + just saved a coupon** | Visible + pulse animation (draws attention to the new save) |
+
+**Widget appearance (when visible):**
+
+```
+┌─────────────────────────┐
+│  🎫  3 Saved Coupons    │
+│  1 expiring soon        │
+│  View Wallet →          │
+└─────────────────────────┘
+```
+
+- **Compact pill/card** — positioned adjacent to the CouponSpotlight component (not a full sidebar, not a modal)
+- **Coupon count badge** — total active saved coupons (e.g. "3 Saved Coupons")
+- **Expiry alert** — if any saved coupon expires within 7 days, shows "1 expiring soon" in amber/orange
+- **"View Wallet →"** — link to `/account/coupons` (opens in same tab, or new tab if customer prefers)
+- **Just-saved pulse** — when a customer saves a coupon from the spotlight, the widget slides in (if first save) or pulses (if already visible) with a brief "Coupon saved ✓" confirmation, then settles to its resting state
+
+**Behavior:**
+- **On first save (0 → 1)**: widget materializes with slide-in animation + pulse + "Coupon {code} saved" confirmation text (fades after 3s, widget remains visible)
+- **On subsequent saves (N → N+1)**: count increments with brief pulse animation, no page navigation
+- **On unsave (N → N-1)**: count decrements; if count reaches 0, widget fades out and becomes invisible again
+- **On coupon expiry**: count stays same but status updates; if an active coupon expires, the "expiring soon" badge may appear or disappear
+- **Persistent within session**: once visible, the widget stays on the page as the customer scrolls/browses — it's a persistent companion, not a transient toast
+- **Non-blocking**: widget is positioned to not overlap critical content (floats near spotlight, respects z-index layering)
+
+**Why this works for the non-disruptive save flow:**
+- Customer saves a coupon from spotlight → stays on page (task 10.14) → widget materializes next to spotlight → visual confirmation without navigation
+- Customer can continue browsing the merchant's store with the widget as a subtle reminder: "you have coupons saved, they're safe in your wallet"
+- The widget is the **bridge between the spotlight engagement and the wallet page** — it confirms the save happened, shows running count, and provides a single-click path to the wallet when the customer is ready
+- **Invisible by default** = zero clutter for new/unauthenticated visitors. The widget earns its presence through engagement.
+
+**Props**: `customerId`, `tenantId` (optional — for per-merchant coupon count), `position` ('spotlight-adjacent' | 'floating')
+
+**Data source**: `customerCouponWalletService.getStats()` — polled on mount + refreshed after each save/unsave action. Lightweight (single API call, cached for 60s).
+
+#### 10.15 — Frontend: Save Button Integration Points
+
+**Files to modify:**
+
+1. **`CouponSpotlight.tsx`** (Sprint 5 component) — Add `SaveCouponButton` variant `'icon'` next to copy-code button. Also add inline QR code toggle: clicking the QR icon on the spotlight renders a scannable QR encoding the short-code URL with `&save=1` param (see task 10.19). Customer scans → coupon auto-saves to wallet. This is the **in-store QR scan-to-save** flow: merchant displays spotlight on a screen/tabletop display, customer scans QR → coupon lands in wallet → available at checkout across all platform merchants. Also render `CouponWalletMiniWidget` adjacent to the spotlight — invisible by default, materializes on first save.
+2. **Storefront checkout coupon input** (Sprint 4) — Add saved coupons section above manual code input:
+   - "Your Saved Coupons" horizontal scroll of coupon chips
+   - Each chip: discount type icon + code + "Apply" button
+   - One-click apply → validates → shows discount in order summary
+   - If no saved coupons: collapse section, show manual input only
+3. **Directory store cards** (`StoreCard.tsx`, `UnifiedStoreCard.tsx`) — Add `SaveCouponButton` to promoted coupon badge display
+
+#### 10.19 — QR Scan-to-Save: Short-Code Route Wallet Auto-Save
+
+**Files:**
+- `apps/web/src/app/s/[autoId]/page.tsx` (modify — Sprint 6 short-code redirect) — detect `&save=1` query param
+- `apps/api/src/routes/customer-coupons.ts` (modify) — add `POST /api/customer-coupons/save-by-code` endpoint (resolves coupon by tenant + code, then saves)
+- `apps/web/src/app/s/[autoId]/SaveCouponRedirect.tsx` (new) — client component for auto-save redirect flow
+
+**Flow:**
+
+1. **Merchant generates QR** (Sprint 6 `CouponQRDialog`) with `save=1` flag → QR encodes `https://visibleshelf.com/s/{autoId}?c={code}&save=1`
+2. **Customer scans QR** → short-code route resolves tenant → detects `save=1`
+3. **If customer authenticated**: auto-save coupon to wallet → redirect to `/account/coupons?saved={couponId}` with success toast "Coupon {code} saved to your wallet"
+4. **If customer not authenticated**: redirect to `/customerlogin?redirect=/s/{autoId}?c={code}&save=1&saveCoupon={couponId}` → after login, auto-save executes → redirect to wallet page
+5. **If coupon already saved**: redirect to wallet with "Already in your wallet" message
+6. **If coupon expired/exhausted**: redirect to storefront with "This coupon is no longer available" message
+
+**Backend endpoint**: `POST /api/customer-coupons/save-by-code`
+```ts
+// Request
+{
+  tenantId: string;  // resolved from autoId
+  couponCode: string; // from 'c' query param
+  surface: 'qr_scan';
+}
+// Response
+{
+  success: boolean;
+  savedCoupon?: SavedCoupon;
+  alreadySaved?: boolean;
+  error?: string;  // 'coupon_not_found' | 'coupon_expired' | 'coupon_exhausted'
+}
+```
+
+**Why this is a platform differentiator**: No other e-commerce platform offers cross-merchant QR scan-to-wallet. Customers scan once at any participating merchant → coupon lives in their wallet → redeemable at checkout across all platform stores. This creates:
+- **Offline-to-online bridge**: in-store displays, printed receipts, table tents → scan → save → shop online later
+- **Cross-merchant discovery**: customer scans QR at Store A → sees Store A's coupon in wallet alongside coupons from Stores B, C, D → discovers new merchants
+- **Zero-friction save**: no app install, no clipboard, no remembering codes — scan and it's there
+
+### Verification (QR Scan-to-Save)
+
+- [ ] QR with `&save=1` param triggers auto-save flow on scan
+- [ ] Authenticated customer: coupon auto-saved, redirected to wallet with success toast
+- [ ] Unauthenticated customer: redirected to login, then auto-save executes post-login
+- [ ] Already-saved coupon: shows "Already in your wallet" message
+- [ ] Expired coupon: shows "no longer available" message
+- [ ] `save` event tracked with `surface: 'qr_scan'` in coupon events
+- [ ] Spotlight QR toggle generates scannable QR with `save=1` param
+- [ ] `checkapi` + `checkweb` pass
+
+#### 10.16 — Frontend: Checkout Saved Coupons Panel
+
+**File**: `apps/web/src/components/checkout/SavedCouponsPanel.tsx` (new)
+
+**Props**: `tenantId`, `customerId`, `onApplyCoupon`, `selectedCouponId`
+
+**Features:**
+- Fetches `getWalletByTenant(tenantId)` on mount
+- Shows horizontal scrollable list of active saved coupons
+- Each coupon: discount icon, code, value, "Apply" button
+- Selected coupon highlighted with checkmark
+- "Use code instead" link → falls back to manual code input
+- Empty state: "No saved coupons for this store — enter a code or browse available coupons"
+- Integrates with existing checkout coupon flow (Sprint 4)
+
+#### 10.17 — Analytics: Save Event in Funnel
+
+**File**: `apps/api/src/services/CouponAnalyticsService.ts` (modify)
+
+- Add `'save'` to `CouponEventType` union
+- Update `getCouponFunnelReport()` — funnel now: `view → save → copy → click → validate → redeem`
+- `save` event is the highest-intent pre-checkout signal (higher than view/copy)
+- Merchant dashboard (Sprint 7) shows save count per coupon
+
+#### 10.18 — Merchant Analytics: Wallet Insights
+
+**File**: `apps/api/src/services/CouponAnalyticsService.ts` (modify)
+
+New method: `getWalletInsights(tenantId, daysBack)`
+
+Returns:
+- `totalSaves` — how many customers saved this merchant's coupons
+- `uniqueSavers` — distinct customers who saved
+- `saveToRedeemRate` — % of saved coupons that were redeemed
+- `savedButNotRedeemed` — high-intent retargeting list (count only, not PII)
+- `avgTimeToRedeem` — avg hours between save and redeem
+- `expiringInWallet` — saved coupons expiring within 7d (retargeting opportunity)
+
+**Route**: `GET /api/tenants/:tenantId/coupon-analytics/wallet-insights` (auth + tenant admin)
+
+**Frontend**: Add "Wallet Insights" tab to `CouponAnalyticsClient.tsx` (Sprint 7 dashboard)
+
+### Verification
+
+- [ ] `customer_saved_coupons` table created with RLS + indexes
+- [ ] Customer can save a coupon from spotlight/storefront/directory
+- [ ] Customer can view wallet at `/account/coupons` grouped by merchant
+- [ ] Wallet stats show correct counts (saved, active, expiring, redeemed, savings)
+- [ ] Customer can remove a coupon from wallet
+- [ ] Checkout shows saved coupons for the current merchant as one-click apply options
+- [ ] Selecting a saved coupon at checkout applies discount correctly
+- [ ] After successful checkout with saved coupon, wallet status updates to `redeemed`
+- [ ] Expiry reminder job sends customer notifications AND merchant CRM alerts for coupons expiring within 24h/3d/7d
+- [ ] Merchant CRM dashboard shows coupon wallet expiry alerts in `crm_alerts` feed
+- [ ] Expired status sync job marks wallet entries as `expired` when underlying coupon expires
+- [ ] `save` event tracked in `coupon_events` and visible in analytics funnel
+- [ ] Merchant analytics shows wallet insights (saves, savers, save→redeem rate)
+- [ ] Authenticated customer saving a coupon stays on current page (no redirect to wallet)
+- [ ] Save toast includes optional "View wallet" link for navigation without disrupting shopping flow
+- [ ] Coupon Wallet Mini-Widget is invisible for unauthenticated users and authenticated users with 0 saved coupons
+- [ ] Mini-Widget materializes with slide-in animation on first save (0 → 1)
+- [ ] Mini-Widget shows correct coupon count + "expiring soon" badge
+- [ ] Mini-Widget count increments/decrements on save/unsave without page navigation
+- [ ] Mini-Widget fades out when last coupon is unsaved (count → 0)
+- [ ] Mini-Widget does not overlap critical page content
+- [ ] Unauthenticated customer clicking "Save" redirects to login with contextual banner + post-login auto-save + return to original page
+- [ ] New customer registration triggers auto-save post-registration (no extra step)
+- [ ] Spotlight action bar shows "Sign In" for unauthenticated users, avatar dropdown for authenticated
+- [ ] Account button on spotlight action bar is subtle (secondary style), "Save to Wallet" is primary CTA
+- [ ] CustomerSidebar shows "My Coupons" nav item
+- [ ] Account overview shows saved coupons stat card
+- [ ] `checkapi` + `checkweb` pass (zero TS errors)
 
 ---
 

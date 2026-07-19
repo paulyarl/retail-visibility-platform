@@ -17,6 +17,7 @@ import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { logger } from '../logger';
 import { CouponService } from '../services/CouponService';
 import { prisma } from '../prisma';
+import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = express.Router();
 
@@ -49,6 +50,7 @@ router.post('/tenants/:tenantId/coupons', authenticateToken, checkTenantAccess, 
     const { tenantId } = req.params;
     const actor = (req.user as any)?.id;
     const coupon = await CouponService.getInstance().createCoupon(tenantId, req.body, actor);
+    BotKnowledgeEmbeddingService.getInstance().refreshCouponEmbeddings(tenantId).catch(() => {});
     res.status(201).json({ success: true, data: coupon });
   } catch (error: any) {
     const message = error?.message || 'Failed to create coupon';
@@ -89,6 +91,7 @@ router.put('/tenants/:tenantId/coupons/:id', authenticateToken, checkTenantAcces
     const { tenantId, id } = req.params;
     const actor = (req.user as any)?.id;
     const coupon = await CouponService.getInstance().updateCoupon(tenantId, id, req.body, actor);
+    BotKnowledgeEmbeddingService.getInstance().refreshCouponEmbeddings(tenantId).catch(() => {});
     res.json({ success: true, data: coupon });
   } catch (error: any) {
     const message = error?.message || 'Failed to update coupon';
@@ -110,6 +113,7 @@ router.delete('/tenants/:tenantId/coupons/:id', authenticateToken, checkTenantAc
     const { tenantId, id } = req.params;
     const actor = (req.user as any)?.id;
     await CouponService.getInstance().deactivateCoupon(tenantId, id, actor);
+    BotKnowledgeEmbeddingService.getInstance().refreshCouponEmbeddings(tenantId).catch(() => {});
     res.json({ success: true, message: 'Coupon deactivated' });
   } catch (error: any) {
     const message = error?.message || 'Failed to deactivate coupon';

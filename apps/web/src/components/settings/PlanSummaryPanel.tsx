@@ -266,7 +266,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
   funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
-  coupon_options: { label: 'Coupons', icon: '🏷️', settingsPath: '/settings/coupons' },
+  coupon_options: { label: 'Coupons', icon: '🏷️', settingsPath: '/settings/coupon-options' },
 };
 
 // --- Resolved feature extraction per capability ---

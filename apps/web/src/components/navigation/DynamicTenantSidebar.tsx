@@ -334,6 +334,10 @@ function buildTenantNav(
       badge: 'NEW',
       badgeVariant: 'new',
       requiredGroup: 'IS_TENANT_USER',
+      children: [
+        { label: 'Coupon Management', href: `/t/${currentTenantId}/settings/coupons` },
+        { label: 'Coupon Options', href: `/t/${currentTenantId}/settings/coupon-options`, requiredGroup: 'IS_TENANT_ADMIN' },
+      ],
     },
     {
       label: 'My Integrations',

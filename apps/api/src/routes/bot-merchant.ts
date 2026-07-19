@@ -387,6 +387,7 @@ router.get('/embeddings/status', authenticateToken, async (req, res) => {
     const hasBusinessInfoEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'business_info');
     const hasHoursEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'hours');
     const hasFulfillmentEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'fulfillment');
+    const hasCouponEmbeddings = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'coupon');
     const knowledgeEmbeddingCounts = await knowledgeService.getKnowledgeEmbeddingCounts(tenantId);
     res.json({
       success: true,
@@ -398,6 +399,7 @@ router.get('/embeddings/status', authenticateToken, async (req, res) => {
       hasBusinessInfoEmbeddings,
       hasHoursEmbeddings,
       hasFulfillmentEmbeddings,
+      hasCouponEmbeddings,
       knowledgeEmbeddingCounts,
     });
   } catch (error) {
