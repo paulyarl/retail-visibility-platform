@@ -110,7 +110,20 @@ class FunnelService extends BaseService {
       if (!allowed.includes(step.step_type)) {
         throw new Error(`Funnel step type '${step.step_type}' is not allowed by this tenant's plan`);
       }
-      if (!step.offer_item_id) {
+
+      if (step.step_type === 'coupon_offer') {
+        if (!step.offer_item_id) {
+          throw new Error('Every coupon_offer step must have a coupon offer_item_id');
+        }
+        const coupon = await prisma.tenant_coupons.findFirst({
+          where: { id: step.offer_item_id, tenant_id: tenantId, is_active: true },
+        });
+        if (!coupon) {
+          throw new Error(`Coupon ${step.offer_item_id} not found or is not active`);
+        }
+        step.display_title = step.display_title ?? coupon.code;
+        step.display_description = step.display_description ?? `Use code ${coupon.code} on a future purchase`;
+      } else if (!step.offer_item_id) {
         throw new Error('Every funnel step must have an offer_item_id');
       }
     }

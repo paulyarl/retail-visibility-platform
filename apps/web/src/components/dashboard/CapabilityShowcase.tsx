@@ -313,6 +313,7 @@ export default function CapabilityShowcase({
     if (fn?.canUseUpsell) fnDetailParts.push('Upsell');
     if (fn?.canUseDownsell) fnDetailParts.push('Downsell');
     if (fn?.canUseOto) fnDetailParts.push('OTO');
+    if (fn?.canUseCouponOffer) fnDetailParts.push('Coupon Offer');
 
     // --- Coupon Options ---
     const cp = cap.couponOptions;

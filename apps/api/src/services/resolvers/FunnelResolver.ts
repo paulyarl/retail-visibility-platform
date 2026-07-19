@@ -18,6 +18,7 @@ const STEP_KEY_MAP: { key: string; type: FunnelStepType }[] = [
   { key: 'funnel_options_builder_upsell', type: 'upsell' },
   { key: 'funnel_options_builder_downsell', type: 'downsell' },
   { key: 'funnel_options_builder_oto', type: 'oto' },
+  { key: 'funnel_options_builder_coupon_offer', type: 'coupon_offer' },
 ];
 
 export function resolveFunnelOptions(features: Record<string, boolean>): EffectiveFunnel {
@@ -47,6 +48,7 @@ export function resolveFunnelOptions(features: Record<string, boolean>): Effecti
     can_use_upsell: enabled && allowed_steps.includes('upsell'),
     can_use_downsell: enabled && allowed_steps.includes('downsell'),
     can_use_oto: enabled && allowed_steps.includes('oto'),
+    can_use_coupon_offer: enabled && allowed_steps.includes('coupon_offer'),
     is_flexible: flexible,
   };
 }

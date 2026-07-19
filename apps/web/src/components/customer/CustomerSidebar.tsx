@@ -11,7 +11,8 @@ import {
   LogOut,
   User,
   CreditCard,
-  Download
+  Download,
+  Ticket
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { href: '/account', label: 'Overview', icon: LayoutDashboard },
   { href: '/account/orders', label: 'Orders', icon: Package },
+  { href: '/account/coupons', label: 'My Coupons', icon: Ticket },
   { href: '/account/downloads', label: 'Digital Downloads', icon: Download },
   { href: '/account/addresses', label: 'Addresses', icon: MapPin },
   { href: '/account/payment-methods', label: 'Payment Methods', icon: CreditCard },

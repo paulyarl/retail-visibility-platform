@@ -821,7 +821,7 @@ export interface CouponOptionsState {
 
 // --- Funnel Options ---
 
-export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto' | 'coupon_offer';
 
 export interface FunnelState {
   enabled: boolean;
@@ -831,6 +831,7 @@ export interface FunnelState {
   canUseUpsell: boolean;
   canUseDownsell: boolean;
   canUseOto: boolean;
+  canUseCouponOffer: boolean;
   isFlexible: boolean;
 }
 
@@ -2703,11 +2704,13 @@ export function resolveFunnelState(
   const canUseUpsell = builderEnabled && (flexible || !!features.funnel_options_builder_upsell);
   const canUseDownsell = builderEnabled && (flexible || !!features.funnel_options_builder_downsell);
   const canUseOto = builderEnabled && (flexible || !!features.funnel_options_builder_oto);
+  const canUseCouponOffer = builderEnabled && (flexible || !!features.funnel_options_builder_coupon_offer);
 
   if (canUseOrderBump) allowedSteps.push('order_bump');
   if (canUseUpsell) allowedSteps.push('upsell');
   if (canUseDownsell) allowedSteps.push('downsell');
   if (canUseOto) allowedSteps.push('oto');
+  if (canUseCouponOffer) allowedSteps.push('coupon_offer');
 
   return {
     enabled,
@@ -2717,6 +2720,7 @@ export function resolveFunnelState(
     canUseUpsell,
     canUseDownsell,
     canUseOto,
+    canUseCouponOffer,
     isFlexible: flexible,
   };
 }

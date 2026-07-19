@@ -10,9 +10,10 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { ArrowLeft, Save, Plus, Trash2, GripVertical, Zap, TrendingUp, ArrowDownCircle, Sparkles, AlertCircle, Package } from 'lucide-react';
-import FunnelService, { type FunnelWithSteps, type FunnelStepInput, type FunnelInput } from '@/services/FunnelService';
-import { useFunnelCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { ArrowLeft, Save, Plus, Trash2, GripVertical, Zap, TrendingUp, ArrowDownCircle, Sparkles, AlertCircle, Package, Tag } from 'lucide-react';
+import FunnelService, { type FunnelWithSteps, type FunnelStepInput, type FunnelInput, type FunnelStepType } from '@/services/FunnelService';
+import { useFunnelCapability, useCouponOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { CouponService, type Coupon } from '@/services/CouponService';
 import ItemPickerModal from '@/components/inventory/ItemPickerModal';
 import { itemsService } from '@/services/ItemsSingletonService';
 
@@ -26,12 +27,15 @@ const STEP_TYPES = [
   { value: 'upsell', label: 'Upsell', icon: TrendingUp, description: 'Post-purchase upgrade offer' },
   { value: 'downsell', label: 'Downsell', icon: ArrowDownCircle, description: 'Post-decline alternative offer' },
   { value: 'oto', label: 'One-Time Offer', icon: Sparkles, description: 'Limited-time exclusive offer' },
+  { value: 'coupon_offer', label: 'Coupon Offer', icon: Tag, description: 'Offer a coupon code for a future purchase' },
 ] as const;
 
 export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilderClientProps) {
   const router = useRouter();
   const { data: capability } = useFunnelCapability(tenantId);
+  const { data: couponCap } = useCouponOptionsCapability(tenantId);
   const [funnel, setFunnel] = useState<FunnelWithSteps | null>(null);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +73,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
       setSteps((f.steps ?? [])
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(s => ({
-          step_type: s.step_type as 'order_bump' | 'upsell' | 'downsell' | 'oto',
+          step_type: s.step_type as FunnelStepType,
           offer_item_id: s.offer_item_id,
           display_title: s.display_title,
           display_description: s.display_description,
@@ -112,6 +116,13 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
   useEffect(() => {
     fetchFunnel();
   }, [fetchFunnel]);
+
+  useEffect(() => {
+    CouponService.getInstance()
+      .listCoupons(tenantId)
+      .then((result) => setCoupons(result.coupons))
+      .catch(() => {});
+  }, [tenantId]);
 
   const openPickerForEntry = () => {
     setPickerMode('entry');
@@ -203,6 +214,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
     if (stepType === 'upsell') return capability.canUseUpsell;
     if (stepType === 'downsell') return capability.canUseDownsell;
     if (stepType === 'oto') return capability.canUseOto;
+    if (stepType === 'coupon_offer') return (capability.canUseCouponOffer && !!couponCap?.enabled) || false;
     return false;
   };
 
@@ -386,7 +398,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                       <label className="text-xs font-medium mb-1 block">Step Type</label>
                       <Select
                         value={step.step_type}
-                        onChange={(e) => updateStep(index, { step_type: e.target.value as 'order_bump' | 'upsell' | 'downsell' | 'oto' })}
+                        onChange={(e) => updateStep(index, { step_type: e.target.value as FunnelStepType })}
                       >
                         {STEP_TYPES.map(t => (
                           <option key={t.value} value={t.value} disabled={!isStepTypeAllowed(t.value)}>
@@ -396,8 +408,20 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                       </Select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium mb-1 block">Offer Product</label>
-                      {step.offer_item_id ? (
+                      <label className="text-xs font-medium mb-1 block">{step.step_type === 'coupon_offer' ? 'Offer Coupon' : 'Offer Product'}</label>
+                      {step.step_type === 'coupon_offer' ? (
+                        <Select
+                          value={step.offer_item_id}
+                          onChange={(e) => updateStep(index, { offer_item_id: e.target.value })}
+                        >
+                          <option value="">Select a coupon</option>
+                          {coupons.map((coupon) => (
+                            <option key={coupon.id} value={coupon.id}>
+                              {coupon.code} ({coupon.discountType})
+                            </option>
+                          ))}
+                        </Select>
+                      ) : step.offer_item_id ? (
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground" />
                           <span className="text-xs font-medium flex-1 truncate">{stepItemNames[index] || step.offer_item_id}</span>

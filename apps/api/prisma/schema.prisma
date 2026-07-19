@@ -1112,8 +1112,10 @@ model customers {
   crm_inquiries                     crm_inquiries[]
   crm_support_tickets               crm_support_tickets[]
   customer_addresses                customer_addresses[]
+  customer_coupon_reminders         customer_coupon_reminders[]
   customer_notification_preferences customer_notification_preferences?
   customer_payment_methods          customer_payment_methods[]
+  customer_saved_coupons            customer_saved_coupons[]
   customer_tenant_relationships     customer_tenant_relationships[]
   digital_access_grants             digital_access_grants[]
   orders                            orders[]
@@ -4915,6 +4917,7 @@ model tenants {
   crm_support_tickets                                                                    crm_support_tickets[]
   crm_tasks                                                                              crm_tasks[]
   crm_user_read_states                                                                   crm_user_read_states[]
+  customer_saved_coupons                                                                 customer_saved_coupons[]
   customer_tenant_relationships                                                          customer_tenant_relationships[]
   digital_access_grants                                                                  digital_access_grants[]
   digital_download_pages                                                                 digital_download_pages[]
@@ -5914,29 +5917,75 @@ model tenant_coupon_options_settings {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_coupons {
-  id                  String               @id @db.VarChar(255)
-  tenant_id           String               @db.VarChar(255)
-  code                String               @db.VarChar(100)
-  discount_type       String               @db.VarChar(20)
-  discount_value      Int
-  min_spend_cents     Int                  @default(0)
-  max_redemptions     Int?
-  redemption_count    Int                  @default(0)
-  expires_at          DateTime?            @db.Timestamptz(6)
-  is_active           Boolean              @default(true)
-  target_type         String?              @db.VarChar(50)
-  target_ids          String[]
-  promotional_message String?
-  terms_summary       String?              @db.VarChar(500)
-  created_at          DateTime             @default(now()) @db.Timestamptz(6)
-  updated_at          DateTime             @default(now()) @db.Timestamptz(6)
-  coupon_redemptions  coupon_redemptions[]
-  tenants             tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_coupons_tenant")
+  id                     String                   @id @db.VarChar(255)
+  tenant_id              String                   @db.VarChar(255)
+  code                   String                   @db.VarChar(100)
+  discount_type          String                   @db.VarChar(20)
+  discount_value         Int
+  min_spend_cents        Int                      @default(0)
+  max_redemptions        Int?
+  redemption_count       Int                      @default(0)
+  expires_at             DateTime?                @db.Timestamptz(6)
+  is_active              Boolean                  @default(true)
+  target_type            String?                  @db.VarChar(50)
+  target_ids             String[]
+  promotional_message    String?
+  terms_summary          String?                  @db.VarChar(500)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  coupon_redemptions     coupon_redemptions[]
+  customer_saved_coupons customer_saved_coupons[]
+  tenants                tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_coupons_tenant")
 
   @@unique([tenant_id, code])
   @@index([tenant_id, is_active, expires_at], map: "idx_tenant_coupons_active")
   @@index([tenant_id, code], map: "idx_tenant_coupons_tenant_code")
   @@index([tenant_id, created_at(sort: Desc)], map: "idx_tenant_coupons_tenant_time")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customer_coupon_reminders {
+  id                     String                 @id @db.VarChar(255)
+  customer_id            String                 @db.VarChar(255)
+  saved_coupon_id        String                 @db.VarChar(255)
+  reminder_type          String                 @db.VarChar(20)
+  sent_at                DateTime               @default(now()) @db.Timestamptz(6)
+  metadata               Json?
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  customers              customers              @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customer_saved_coupons customer_saved_coupons @relation(fields: [saved_coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([saved_coupon_id, reminder_type])
+  @@index([customer_id], map: "idx_customer_coupon_reminders_customer")
+  @@index([saved_coupon_id], map: "idx_customer_coupon_reminders_saved_coupon")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model customer_saved_coupons {
+  id                        String                      @id @db.VarChar(255)
+  customer_id               String                      @db.VarChar(255)
+  tenant_id                 String                      @db.VarChar(255)
+  coupon_id                 String                      @db.VarChar(255)
+  status                    String                      @default("saved") @db.VarChar(20)
+  reminder_enabled          Boolean                     @default(true)
+  saved_at                  DateTime                    @default(now()) @db.Timestamptz(6)
+  redeemed_at               DateTime?                   @db.Timestamptz(6)
+  expired_at                DateTime?                   @db.Timestamptz(6)
+  metadata                  Json?
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  customer_coupon_reminders customer_coupon_reminders[]
+  tenant_coupons            tenant_coupons              @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers                 customers                   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants                   tenants                     @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([customer_id, coupon_id])
+  @@index([coupon_id], map: "idx_customer_saved_coupons_coupon")
+  @@index([customer_id, status], map: "idx_customer_saved_coupons_customer_status")
+  @@index([customer_id, tenant_id], map: "idx_customer_saved_coupons_customer_tenant")
 }
 
 enum action {

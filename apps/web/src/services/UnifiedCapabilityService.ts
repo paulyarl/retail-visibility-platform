@@ -1084,6 +1084,7 @@ interface BackendEffectiveFunnel {
   can_use_upsell: boolean;
   can_use_downsell: boolean;
   can_use_oto: boolean;
+  can_use_coupon_offer: boolean;
   is_flexible: boolean;
 }
 
@@ -1112,6 +1113,7 @@ function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
     canUseUpsell: b.can_use_upsell,
     canUseDownsell: b.can_use_downsell,
     canUseOto: b.can_use_oto,
+    canUseCouponOffer: b.can_use_coupon_offer,
     isFlexible: b.is_flexible,
   };
 }

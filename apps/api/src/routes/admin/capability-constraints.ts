@@ -387,11 +387,12 @@ const CONSTRAINT_METADATA: ConstraintMetadata = {
       fields: [
         { field: 'enabled', label: 'Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'builder_enabled', label: 'Builder Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
-        { field: 'allowed_steps', label: 'Allowed Steps', value_type: 'array', operators: ARRAY_OPS, values: ['order_bump', 'upsell', 'downsell', 'oto'] },
+        { field: 'allowed_steps', label: 'Allowed Steps', value_type: 'array', operators: ARRAY_OPS, values: ['order_bump', 'upsell', 'downsell', 'oto', 'coupon_offer'] },
         { field: 'can_use_order_bump', label: 'Can Use Order Bump', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'can_use_upsell', label: 'Can Use Upsell', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'can_use_downsell', label: 'Can Use Downsell', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'can_use_oto', label: 'Can Use OTO', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_coupon_offer', label: 'Can Use Coupon Offer', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
         { field: 'is_flexible', label: 'Is Flexible', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
       ],
     },

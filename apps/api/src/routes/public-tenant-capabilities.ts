@@ -497,6 +497,7 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_upsell: false,
         can_use_downsell: false,
         can_use_oto: false,
+        can_use_coupon_offer: false,
         is_flexible: false,
       },
       coupon_options: {

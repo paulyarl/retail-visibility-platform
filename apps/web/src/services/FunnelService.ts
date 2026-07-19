@@ -7,7 +7,7 @@
 
 import TenantApiSingleton from '../providers/base/TenantApiSingleton';
 
-export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto' | 'coupon_offer';
 
 export interface FunnelStep {
   id: string;

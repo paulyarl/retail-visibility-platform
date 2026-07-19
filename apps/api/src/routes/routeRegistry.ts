@@ -181,6 +181,7 @@ import customerAuthTokenRoutes from '../routes/customer-auth-token';
 import customerAddressesRoutes from '../routes/customer-addresses';
 import customerNotificationsRoutes from '../routes/customer-notifications';
 import customerPaymentMethodsRoutes from '../routes/customer-payment-methods';
+import customerCouponRoutes, { publicTenantRouter as customerCouponPublicRouter } from '../routes/customer-coupons';
 
 // Misc
 import billingRoutes from '../routes/billing';
@@ -497,6 +498,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'public',
     authLevel: 'public',
     comment: 'Active featured resolver (public tenant router)',
+  },
+  {
+    path: '/api/public/tenants/:tenantId',
+    router: customerCouponPublicRouter,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Public saveable coupons for a tenant',
   },
   {
     path: '/api',
@@ -1055,6 +1063,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'customer',
     authLevel: 'public',
     comment: 'Customer payment methods routes',
+  },
+  {
+    path: '/api/customer-coupons',
+    router: customerCouponRoutes,
+    domain: 'customer',
+    authLevel: 'public',
+    comment: 'Customer coupon wallet routes',
   },
   {
     path: '/api/debug-cookies',

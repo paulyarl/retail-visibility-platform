@@ -918,7 +918,7 @@ export interface EffectiveDirectoryPromotion {
 // SALES FUNNELS
 // ====================
 
-export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto' | 'coupon_offer';
 
 export interface EffectiveFunnel {
   enabled: boolean;
@@ -928,6 +928,7 @@ export interface EffectiveFunnel {
   can_use_upsell: boolean;
   can_use_downsell: boolean;
   can_use_oto: boolean;
+  can_use_coupon_offer: boolean;
   is_flexible: boolean;
 }
 

@@ -1580,3 +1580,21 @@ export function generateCouponAnalyticsId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `cpa-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+/**
+ * Generate saved-coupon (wallet) ID (tenant-scoped)
+ * Format: scpn-{tenantKey}-{nanoid} (20 chars)
+ */
+export function generateSavedCouponId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `scpn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate coupon expiry reminder ID (tenant-scoped)
+ * Format: crmd-{tenantKey}-{nanoid} (20 chars)
+ */
+export function generateCouponReminderId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmd-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

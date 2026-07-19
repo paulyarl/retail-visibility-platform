@@ -351,6 +351,27 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     message: 'Targeted product coupons require physical product inventory',
     resolution_hint: 'Add physical product types or disable product targeting for this coupon',
   },
+
+  // ── Funnel coupon_offer requires coupon capability to be enabled ──
+  {
+    id: 'funnel_coupon_offer_requires_coupon_options',
+    type: 'requires',
+    severity: 'block',
+    source: {
+      capability: 'funnel',
+      field: 'can_use_coupon_offer',
+      operator: 'is_true',
+      value: true,
+    },
+    target: {
+      capability: 'coupon_options',
+      field: 'enabled',
+      operator: 'is_true',
+      value: true,
+    },
+    message: 'Coupon offer funnel steps require the coupon capability to be enabled',
+    resolution_hint: 'Enable coupons in coupon options or remove the coupon offer funnel step',
+  },
 ];
 
 // ====================

@@ -1010,6 +1010,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     if (fn.canUseUpsell) { specifics.push('Upsell'); statuses.push({ label: 'Upsell', status: 'enabled' }); }
     if (fn.canUseDownsell) { specifics.push('Downsell'); statuses.push({ label: 'Downsell', status: 'enabled' }); }
     if (fn.canUseOto) { specifics.push('One-Time Offer'); statuses.push({ label: 'One-Time Offer', status: 'enabled' }); }
+    if (fn.canUseCouponOffer) { specifics.push('Coupon Offer'); statuses.push({ label: 'Coupon Offer', status: 'enabled' }); }
     summaries.push({
       key: 'funnel_options',
       label: CAPABILITY_DISPLAY.funnel_options.label,

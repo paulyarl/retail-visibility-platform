@@ -24,9 +24,9 @@ import { generateCouponEventId, generateCouponAnalyticsId } from '../lib/id-gene
 // TYPES
 // ====================
 
-export type CouponEventType = 'view' | 'copy' | 'click' | 'validate' | 'redeem' | 'fail';
+export type CouponEventType = 'view' | 'copy' | 'click' | 'validate' | 'redeem' | 'fail' | 'save' | 'unsave';
 export type PeriodType = 'day' | 'week' | 'month';
-export type CouponSurface = 'storefront' | 'directory' | 'email' | 'social' | 'qr' | 'direct' | 'checkout';
+export type CouponSurface = 'storefront' | 'directory' | 'email' | 'social' | 'qr' | 'direct' | 'checkout' | 'spotlight' | 'wallet' | 'qr_scan';
 export type DeviceType = 'mobile' | 'desktop' | 'tablet' | 'unknown';
 
 export interface CouponEventInput {
