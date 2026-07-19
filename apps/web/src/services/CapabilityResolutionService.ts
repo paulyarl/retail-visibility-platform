@@ -781,6 +781,29 @@ export interface DirectoryPromotionState {
   allowedTiers: PromotionTierType[];
 }
 
+// --- Org Options ---
+
+export type OrgTabKey =
+  | 'overview' | 'locations' | 'propagation' | 'capabilities'
+  | 'team' | 'commerce' | 'billing';
+
+export type OrgPanelKey =
+  | 'task_checklist' | 'quick_links' | 'system_status'
+  | 'recommendations' | 'crm_summary';
+
+export type OrgPropagationType =
+  | 'org_propagation_products' | 'org_propagation_categories'
+  | 'org_propagation_business_info' | 'org_propagation_settings';
+
+export interface OrgOptionsState {
+  enabled: boolean;
+  isFlexible: boolean;
+  allowedTabs: OrgTabKey[];
+  allowedPanels: OrgPanelKey[];
+  allowedPropagationTypes: OrgPropagationType[];
+  orgAvailable: boolean;
+}
+
 // --- Platform Services ---
 
 export type PlatformServiceType =
@@ -834,7 +857,7 @@ export interface FunnelState {
   canUseOto: boolean;
   canUseCouponOffer: boolean;
   isFlexible: boolean;
-  merchantPreferences: null;
+  merchantPreferences: { order_bump_enabled?: boolean | null; upsell_enabled?: boolean | null; downsell_enabled?: boolean | null; oto_enabled?: boolean | null; coupon_offer_enabled?: boolean | null } | null;
 }
 
 // --- Chatbot Options ---
@@ -1087,6 +1110,7 @@ export interface AllCapabilitiesState {
   chatbotOptions: ChatbotOptionsState;
   socialCommerceOptions: SocialCommerceOptionsState;
   directoryPromotion: DirectoryPromotionState;
+  orgOptions: OrgOptionsState;
   wholesaleMatching: WholesaleMatchingState;
   platformServices: PlatformServicesState;
   funnel: FunnelState;
@@ -1126,6 +1150,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   chatbot_: 'chatbot_options',
   social_commerce_: 'social_commerce_options',
   directory_promotion_: 'directory_promotion',
+  org_: 'organization_options',
   wholesale_: 'wholesale_matching',
   platform_service_: 'platform_services',
   platform_services_: 'platform_services',
@@ -2772,4 +2797,187 @@ export function resolveCouponOptionsState(
 }
 
 // End of capability resolution functions — no classes remain.
+
+/**
+ * Resolve chatbot options state from raw capability features.
+ * Feature prefix: chatbot_
+ */
+export function resolveChatbotOptionsState(
+  features: Record<string, boolean>,
+  capabilityEnabled?: boolean
+): ChatbotOptionsState {
+  const cleanFeatures: Record<string, boolean> = {};
+  for (const [key, val] of Object.entries(features)) {
+    cleanFeatures[key.trim()] = val;
+  }
+  const feat = cleanFeatures;
+
+  const disabled = !!feat.chatbot_disabled;
+  const enabled = !disabled && (!!feat.chatbot_enabled || !!capabilityEnabled);
+  const flexible = !!feat.chatbot_flexible;
+
+  const staticEnabled = flexible || !!feat.chatbot_static_on || !!feat.chatbot_static_enabled;
+  const dynamicEnabled = flexible || !!feat.chatbot_dynamic_on || !!feat.chatbot_dynamic_enabled;
+  const skillsEnabled = flexible || !!feat.chatbot_skills_on || !!feat.chatbot_skills_enabled;
+  const kbEnabled = flexible || !!feat.chatbot_kb_on || !!feat.chatbot_kb_enabled;
+  const widgetEnabled = flexible || !!feat.chatbot_widget_on || !!feat.chatbot_widget_enabled;
+
+  const allowedResponseEngines: ChatbotResponseEngineType[] = [];
+  if (flexible) {
+    allowedResponseEngines.push('chatbot_static_lookup', 'chatbot_shared_dynamic', 'chatbot_lora_finetuned', 'chatbot_dedicated');
+  } else {
+    if (feat.chatbot_static_lookup) allowedResponseEngines.push('chatbot_static_lookup');
+    if (feat.chatbot_shared_dynamic) allowedResponseEngines.push('chatbot_shared_dynamic');
+    if (feat.chatbot_lora_finetuned) allowedResponseEngines.push('chatbot_lora_finetuned');
+    if (feat.chatbot_dedicated) allowedResponseEngines.push('chatbot_dedicated');
+  }
+
+  const allowedSkillTypes: ChatbotSkillType[] = [];
+  if (flexible) {
+    allowedSkillTypes.push('chatbot_skill_product_search', 'chatbot_skill_inventory', 'chatbot_skill_order_tracking', 'chatbot_skill_store_hours', 'chatbot_skill_cross_merchant', 'chatbot_skill_crm_assistant', 'chatbot_skill_policy_faq');
+  } else {
+    if (feat.chatbot_skill_product_search) allowedSkillTypes.push('chatbot_skill_product_search');
+    if (feat.chatbot_skill_inventory) allowedSkillTypes.push('chatbot_skill_inventory');
+    if (feat.chatbot_skill_order_tracking) allowedSkillTypes.push('chatbot_skill_order_tracking');
+    if (feat.chatbot_skill_store_hours) allowedSkillTypes.push('chatbot_skill_store_hours');
+    if (feat.chatbot_skill_cross_merchant) allowedSkillTypes.push('chatbot_skill_cross_merchant');
+    if (feat.chatbot_skill_crm_assistant) allowedSkillTypes.push('chatbot_skill_crm_assistant');
+    if (feat.chatbot_skill_policy_faq) allowedSkillTypes.push('chatbot_skill_policy_faq');
+  }
+
+  const allowedKbTypes: ChatbotKnowledgeBaseType[] = [];
+  if (flexible) {
+    allowedKbTypes.push('chatbot_kb_static_faq', 'chatbot_kb_rag_retrieval', 'chatbot_kb_product_scoped', 'chatbot_kb_gap_report', 'chatbot_kb_auto_sync');
+  } else {
+    if (feat.chatbot_kb_static_faq) allowedKbTypes.push('chatbot_kb_static_faq');
+    if (feat.chatbot_kb_rag_retrieval) allowedKbTypes.push('chatbot_kb_rag_retrieval');
+    if (feat.chatbot_kb_product_scoped) allowedKbTypes.push('chatbot_kb_product_scoped');
+    if (feat.chatbot_kb_gap_report) allowedKbTypes.push('chatbot_kb_gap_report');
+    if (feat.chatbot_kb_auto_sync) allowedKbTypes.push('chatbot_kb_auto_sync');
+  }
+
+  const allowedWidgetTypes: ChatbotWidgetType[] = [];
+  if (flexible) {
+    allowedWidgetTypes.push('chatbot_widget_embed', 'chatbot_widget_custom_theme', 'chatbot_widget_skill_cards', 'chatbot_widget_after_hours');
+  } else {
+    if (feat.chatbot_widget_embed) allowedWidgetTypes.push('chatbot_widget_embed');
+    if (feat.chatbot_widget_custom_theme) allowedWidgetTypes.push('chatbot_widget_custom_theme');
+    if (feat.chatbot_widget_skill_cards) allowedWidgetTypes.push('chatbot_widget_skill_cards');
+    if (feat.chatbot_widget_after_hours) allowedWidgetTypes.push('chatbot_widget_after_hours');
+  }
+
+  const allTypes = [...allowedResponseEngines, ...allowedSkillTypes, ...allowedKbTypes, ...allowedWidgetTypes];
+
+  return {
+    enabled: enabled && !disabled,
+    isFlexible: flexible,
+    staticEnabled: enabled && !disabled && staticEnabled,
+    dynamicEnabled: enabled && !disabled && dynamicEnabled,
+    skillsEnabled: enabled && !disabled && skillsEnabled,
+    kbEnabled: enabled && !disabled && kbEnabled,
+    widgetEnabled: enabled && !disabled && widgetEnabled,
+    allowedResponseEngines,
+    allowedSkillTypes,
+    allowedKbTypes,
+    allowedWidgetTypes,
+    chatbotAvailable: enabled && !disabled && allTypes.length > 0,
+    canUseWidgetCustomTheme: enabled && !disabled && widgetEnabled,
+    canUseWidgetSkillCards: enabled && !disabled && widgetEnabled,
+    canUseWidgetAfterHours: enabled && !disabled && widgetEnabled,
+    merchantPreferences: null,
+    features: cleanFeatures,
+  };
+}
+
+/**
+ * Resolve org options state from raw capability features.
+ * Feature prefix: org_
+ */
+export function resolveOrgOptionsState(
+  features: Record<string, boolean>,
+  capabilityEnabled?: boolean
+): OrgOptionsState {
+  const cleanFeatures: Record<string, boolean> = {};
+  for (const [key, val] of Object.entries(features)) {
+    cleanFeatures[key.trim()] = val;
+  }
+  const feat = cleanFeatures;
+
+  const disabled = !!feat.org_disabled;
+  const enabled = !disabled && (!!feat.org_enabled || !!capabilityEnabled);
+  const flexible = !!feat.org_flexible;
+
+  const allowedTabs: OrgTabKey[] = [];
+  if (enabled) {
+    allowedTabs.push('overview');
+    allowedTabs.push('billing');
+    if (flexible || feat.org_tab_locations) allowedTabs.push('locations');
+    if (flexible || feat.org_tab_propagation) allowedTabs.push('propagation');
+    if (flexible || feat.org_tab_capabilities) allowedTabs.push('capabilities');
+    if (flexible || feat.org_tab_team) allowedTabs.push('team');
+    if (flexible || feat.org_tab_commerce) allowedTabs.push('commerce');
+  }
+
+  const allowedPanels: OrgPanelKey[] = [];
+  if (enabled) {
+    if (flexible || feat.org_panel_task_checklist) allowedPanels.push('task_checklist');
+    if (flexible || feat.org_panel_quick_links) allowedPanels.push('quick_links');
+    if (flexible || feat.org_panel_system_status) allowedPanels.push('system_status');
+    if (flexible || feat.org_panel_recommendations) allowedPanels.push('recommendations');
+    if (flexible || feat.org_panel_crm_summary) allowedPanels.push('crm_summary');
+  }
+
+  const allowedPropagationTypes: OrgPropagationType[] = [];
+  if (enabled) {
+    if (flexible || feat.org_propagation_products) allowedPropagationTypes.push('org_propagation_products');
+    if (flexible || feat.org_propagation_categories) allowedPropagationTypes.push('org_propagation_categories');
+    if (flexible || feat.org_propagation_business_info) allowedPropagationTypes.push('org_propagation_business_info');
+    if (flexible || feat.org_propagation_settings) allowedPropagationTypes.push('org_propagation_settings');
+  }
+
+  return {
+    enabled: enabled && !disabled,
+    isFlexible: flexible,
+    allowedTabs,
+    allowedPanels,
+    allowedPropagationTypes,
+    orgAvailable: enabled && !disabled && (allowedTabs.length > 0 || allowedPanels.length > 0),
+  };
+}
+
+/**
+ * Resolve directory promotion state from raw capability features.
+ * Feature prefix: directory_promotion_
+ */
+export function resolveDirectoryPromotionState(
+  features: Record<string, boolean>,
+  capabilityEnabled?: boolean
+): DirectoryPromotionState {
+  const cleanFeatures: Record<string, boolean> = {};
+  for (const [key, val] of Object.entries(features)) {
+    cleanFeatures[key.trim()] = val;
+  }
+  const feat = cleanFeatures;
+
+  const disabled = !!feat.directory_promotion_disabled;
+  const flexible = !!feat.directory_promotion_flexible;
+  const allLevels: PromotionTierType[] = ['basic', 'premium', 'featured'];
+  const hasAnyPromotionFeature = allLevels.some(t => !!feat[`directory_promotion_level_${t}`]);
+  const enabled = !disabled && (!!feat.directory_promotion_enabled || flexible || hasAnyPromotionFeature || !!capabilityEnabled);
+
+  const allowedTiers: PromotionTierType[] = [];
+  if (flexible || enabled) {
+    for (const t of allLevels) {
+      if (flexible || feat[`directory_promotion_level_${t}`]) {
+        allowedTiers.push(t);
+      }
+    }
+  }
+
+  return {
+    enabled: enabled && !disabled,
+    isFlexible: flexible,
+    allowedTiers,
+  };
+}
 // UnifiedCapabilityService is the single service entry-point now.

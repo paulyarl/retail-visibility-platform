@@ -2811,7 +2811,7 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
-  async updateCouponSettings(tenantId: string, settings: { spotlightEnabled?: boolean; featuredCouponId?: string | null }): Promise<any> {
+  async updateCouponSettings(tenantId: string, settings: { couponEnabled?: boolean; spotlightEnabled?: boolean; featuredCouponId?: string | null }): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
         `/api/tenants/${tenantId}/coupons/settings`,

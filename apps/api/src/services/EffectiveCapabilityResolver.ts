@@ -246,7 +246,8 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.storefront_options?.features || {}
     ),
     resolveFunnelOptions(
-      rawCaps.capabilities.funnel_options?.features || {}
+      rawCaps.capabilities.funnel_options?.features || {},
+      merchantBundle.funnelOptions
     ),
     resolveCouponOptions(
       rawCaps.capabilities.coupon_options?.features || {},
@@ -737,7 +738,8 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.storefront_options?.features || {}
     ),
     resolveFunnelOptions(
-      rawCaps.capabilities.funnel_options?.features || {}
+      rawCaps.capabilities.funnel_options?.features || {},
+      merchantBundle.funnelOptions
     ),
     resolveCouponOptions(
       rawCaps.capabilities.coupon_options?.features || {},
@@ -1186,6 +1188,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     socialCommerceOptions,
     wholesaleMatching,
     couponOptions,
+    funnelOptions,
   ] = await Promise.all([
     safeQuery(() => prisma.tenant_commerce_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_payment_gateway_settings.findUnique({ where: { tenant_id: tenantId } })),
@@ -1210,6 +1213,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     safeQuery(() => prisma.tenant_social_commerce_options_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_wholesale_matching_settings.findUnique({ where: { tenant_id: tenantId } })),
     safeQuery(() => prisma.tenant_coupon_options_settings.findUnique({ where: { tenant_id: tenantId } })),
+    safeQuery(() => prisma.tenant_funnel_options_settings.findUnique({ where: { tenant_id: tenantId } })),
   ]);
 
   return {
@@ -1236,6 +1240,7 @@ async function fetchMerchantSettings(tenantId: string): Promise<MerchantSettings
     socialCommerceOptions: socialCommerceOptions as any,
     wholesaleMatching: wholesaleMatching as any,
     couponOptions: couponOptions as any,
+    funnelOptions: funnelOptions as any,
   };
 }
 

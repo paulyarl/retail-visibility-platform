@@ -207,6 +207,7 @@ import faqPublicRoutes from '../routes/faq-public';
 import tierConfigRoutes from '../routes/tier-config';
 import funnelRoutes from '../routes/funnel';
 import funnelCheckoutRoutes from '../routes/funnel-checkout';
+import funnelOptionsSettingsRoutes from '../routes/funnel-options-settings';
 import couponsRoutes from '../routes/coupons';
 import couponAnalyticsRoutes from '../routes/coupon-analytics';
 
@@ -1261,6 +1262,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Funnel checkout routes at /api/public/funnels/:tenantId/*',
+  },
+  {
+    path: '/api',
+    router: funnelOptionsSettingsRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Funnel options settings at /api/tenants/:tenantId/funnels/settings',
   },
   {
     path: '/api',

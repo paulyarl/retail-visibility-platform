@@ -489,6 +489,11 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_social_media_kit: false,
         is_flexible: false,
       },
+      directory_promotion: {
+        enabled: false,
+        allowed_tiers: [],
+        is_flexible: false,
+      },
       funnel: {
         enabled: false,
         builder_enabled: false,

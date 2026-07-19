@@ -263,6 +263,8 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
   chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot/options' },
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
+  directory_promotion: { label: 'Directory Promotion', icon: '✨', settingsPath: '/settings/promotion' },
+  organization_options: { label: 'Organization', icon: '🏢', settingsPath: '/organization' },
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
   funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
@@ -1046,6 +1048,45 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'coupon_options',
       settingsPath: CAPABILITY_DISPLAY.coupon_options.settingsPath ?? null,
+    });
+  }
+
+  // Directory Promotion
+  const dp = caps.directoryPromotion;
+  if (dp && dp.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    dp.allowedTiers.forEach(t => { specifics.push(t.charAt(0).toUpperCase() + t.slice(1)); statuses.push({ label: t.charAt(0).toUpperCase() + t.slice(1), status: 'enabled' }); });
+    summaries.push({
+      key: 'directory_promotion',
+      label: CAPABILITY_DISPLAY.directory_promotion.label,
+      icon: CAPABILITY_DISPLAY.directory_promotion.icon,
+      enabled: dp.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'directory_promotion',
+      settingsPath: CAPABILITY_DISPLAY.directory_promotion.settingsPath ?? null,
+    });
+  }
+
+  // Organization Options
+  const oo = caps.orgOptions;
+  if (oo && oo.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const TAB_LABELS: Record<string, string> = { overview: 'Overview', locations: 'Locations', propagation: 'Propagation', capabilities: 'Capabilities', team: 'Team', commerce: 'Commerce', billing: 'Billing' };
+    oo.allowedTabs.forEach(t => { specifics.push(TAB_LABELS[t] || t); statuses.push({ label: TAB_LABELS[t] || t, status: 'enabled' }); });
+    summaries.push({
+      key: 'organization_options',
+      label: CAPABILITY_DISPLAY.organization_options.label,
+      icon: CAPABILITY_DISPLAY.organization_options.icon,
+      enabled: oo.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'organization_options',
+      settingsPath: CAPABILITY_DISPLAY.organization_options.settingsPath ?? null,
     });
   }
 

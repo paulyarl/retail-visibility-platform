@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Plus, RefreshCw, Trash2, Edit3, BarChart3, Filter, Zap, TrendingUp, ArrowDownCircle, Sparkles } from 'lucide-react';
-import FunnelService, { type FunnelWithSteps } from '@/services/FunnelService';
+import { Plus, RefreshCw, Trash2, Edit3, BarChart3, Filter, Zap, TrendingUp, ArrowDownCircle, Sparkles, Tag } from 'lucide-react';
+import { Switch } from '@/components/ui/Switch';
+import FunnelService, { type FunnelWithSteps, type FunnelOptionsSettings } from '@/services/FunnelService';
 import { useFunnelCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 
 interface FunnelListClientProps {
@@ -21,17 +22,28 @@ const STEP_TYPE_ICONS: Record<string, typeof Zap> = {
   upsell: TrendingUp,
   downsell: ArrowDownCircle,
   oto: Sparkles,
+  coupon_offer: Tag,
 };
+
+const STEP_TOGGLE_CONFIG: { key: keyof FunnelOptionsSettings; step: string; label: string; icon: typeof Zap; description: string }[] = [
+  { key: 'order_bump_enabled', step: 'order_bump', label: 'Order Bump', icon: Zap, description: 'Pre-checkout add-on offer' },
+  { key: 'upsell_enabled', step: 'upsell', label: 'Upsell', icon: TrendingUp, description: 'Post-purchase upgrade offer' },
+  { key: 'downsell_enabled', step: 'downsell', label: 'Downsell', icon: ArrowDownCircle, description: 'Post-decline alternative offer' },
+  { key: 'oto_enabled', step: 'oto', label: 'One-Time Offer', icon: Sparkles, description: 'Limited-time exclusive offer' },
+  { key: 'coupon_offer_enabled', step: 'coupon_offer', label: 'Coupon Offer', icon: Tag, description: 'Offer a coupon code for a future purchase' },
+];
 
 export default function FunnelListClient({ tenantId }: FunnelListClientProps) {
   const router = useRouter();
-  const { data: capability, loading: capLoading } = useFunnelCapability(tenantId);
+  const { data: capability, loading: capLoading, refetch: refetchCap } = useFunnelCapability(tenantId);
   const [funnels, setFunnels] = useState<FunnelWithSteps[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<FunnelWithSteps | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [merchantSettings, setMerchantSettings] = useState<FunnelOptionsSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   const fetchFunnels = useCallback(async () => {
     setLoading(true);
@@ -50,6 +62,39 @@ export default function FunnelListClient({ tenantId }: FunnelListClientProps) {
   useEffect(() => {
     fetchFunnels();
   }, [fetchFunnels]);
+
+  useEffect(() => {
+    if (!capability?.enabled || !capability?.builderEnabled) return;
+    setSettingsLoading(true);
+    FunnelService.getSettings(tenantId)
+      .then(s => setMerchantSettings(s))
+      .catch(() => setMerchantSettings(null))
+      .finally(() => setSettingsLoading(false));
+  }, [tenantId, capability?.enabled, capability?.builderEnabled]);
+
+  const isStepTierAllowed = (step: string): boolean => {
+    if (!capability) return false;
+    if (capability.isFlexible) return true;
+    if (step === 'order_bump') return capability.canUseOrderBump;
+    if (step === 'upsell') return capability.canUseUpsell;
+    if (step === 'downsell') return capability.canUseDownsell;
+    if (step === 'oto') return capability.canUseOto;
+    if (step === 'coupon_offer') return capability.canUseCouponOffer;
+    return false;
+  };
+
+  const handleToggleStep = async (key: keyof FunnelOptionsSettings, value: boolean) => {
+    if (!merchantSettings) return;
+    const updated = { ...merchantSettings, [key]: value };
+    setMerchantSettings(updated);
+    try {
+      await FunnelService.updateSettings(tenantId, { [key]: value });
+      refetchCap();
+    } catch (err: any) {
+      setMerchantSettings(merchantSettings);
+      setError(err?.message || 'Failed to update funnel settings');
+    }
+  };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -158,37 +203,46 @@ export default function FunnelListClient({ tenantId }: FunnelListClientProps) {
         </div>
       </div>
 
-      {capability.isFlexible && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm">
-              <Badge variant="success">Flexible Tier</Badge>
-              <span className="text-muted-foreground">
-                All step types available: Order Bump, Upsell, Downsell, One-Time Offer
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!capability.isFlexible && capability.allowedSteps.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Available step types:</span>
-              {capability.allowedSteps.map(step => {
-                const Icon = STEP_TYPE_ICONS[step] || Zap;
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Funnel Step Preferences</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+          {capability.isFlexible && <Badge variant="success" className="mb-3">Flexible Tier</Badge>}
+          {settingsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <div className="space-y-3">
+              {STEP_TOGGLE_CONFIG.map(({ key, step, label, icon: Icon, description }) => {
+                const tierAllowed = isStepTierAllowed(step);
+                const merchantEnabled = merchantSettings ? !!merchantSettings[key] : true;
+                const enabled = tierAllowed && merchantEnabled;
                 return (
-                  <Badge key={step} variant="default">
-                    <Icon className="h-3 w-3 mr-1" />
-                    {step.replace('_', ' ')}
-                  </Badge>
+                  <div key={key} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div className="flex items-center gap-3">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">{label}</div>
+                        <div className="text-xs text-muted-foreground">{description}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!tierAllowed && (
+                        <span className="text-xs text-muted-foreground">Not in plan</span>
+                      )}
+                      <Switch
+                        checked={enabled}
+                        disabled={!tierAllowed || !merchantSettings}
+                        onCheckedChange={(v) => handleToggleStep(key, v)}
+                      />
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {error && (
         <Card>

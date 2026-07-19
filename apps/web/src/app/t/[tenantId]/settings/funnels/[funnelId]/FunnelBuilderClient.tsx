@@ -209,7 +209,6 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
 
   const isStepTypeAllowed = (stepType: string) => {
     if (!capability) return false;
-    if (capability.isFlexible) return true;
     if (stepType === 'order_bump') return capability.canUseOrderBump;
     if (stepType === 'upsell') return capability.canUseUpsell;
     if (stepType === 'downsell') return capability.canUseDownsell;
@@ -377,7 +376,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                         {step.step_type.replace('_', ' ')}
                       </Badge>
                       {!isAllowed && (
-                        <span className="text-xs text-destructive">Not available on your plan</span>
+                        <span className="text-xs text-destructive">Not available</span>
                       )}
                     </div>
                     <div className="flex gap-1">

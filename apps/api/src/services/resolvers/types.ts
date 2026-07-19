@@ -60,6 +60,7 @@ export interface MerchantSettingsBundle {
   socialCommerceOptions: SocialCommerceOptionsMerchantSettings | null;
   wholesaleMatching: WholesaleMatchingMerchantSettings | null;
   couponOptions: CouponOptionsMerchantSettings | null;
+  funnelOptions: FunnelOptionsMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -930,7 +931,15 @@ export interface EffectiveFunnel {
   can_use_oto: boolean;
   can_use_coupon_offer: boolean;
   is_flexible: boolean;
-  merchant_preferences: null;
+  merchant_preferences: FunnelOptionsMerchantSettings | null;
+}
+
+export interface FunnelOptionsMerchantSettings {
+  order_bump_enabled?: boolean | null;
+  upsell_enabled?: boolean | null;
+  downsell_enabled?: boolean | null;
+  oto_enabled?: boolean | null;
+  coupon_offer_enabled?: boolean | null;
 }
 
 // ====================

@@ -46,6 +46,10 @@ import {
   SocialCommerceExperienceType,
   DirectoryPromotionState,
   PromotionTierType,
+  OrgOptionsState,
+  OrgTabKey,
+  OrgPanelKey,
+  OrgPropagationType,
   CommercePaymentType,
   GatewayType,
   StorefrontType,
@@ -154,6 +158,7 @@ export interface BackendEffectiveCapabilities {
     barcode_scan: BackendEffectiveBarcodeScan;
     social_commerce_options: BackendEffectiveSocialCommerceOptions;
     directory_promotion: BackendEffectiveDirectoryPromotion;
+    org_options: BackendEffectiveOrgOptions;
     wholesale_matching: BackendEffectiveWholesaleMatching;
     platform_services: BackendEffectivePlatformServices;
     funnel: BackendEffectiveFunnel;
@@ -1032,11 +1037,31 @@ interface BackendEffectiveDirectoryPromotion {
   is_flexible: boolean;
 }
 
+interface BackendEffectiveOrgOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  allowed_tabs: string[];
+  allowed_panels: string[];
+  allowed_propagation_types: string[];
+  org_available: boolean;
+}
+
 function mapDirectoryPromotion(b: BackendEffectiveDirectoryPromotion): DirectoryPromotionState {
   return {
     enabled: b.enabled,
     isFlexible: b.is_flexible,
     allowedTiers: (b.allowed_tiers || []) as PromotionTierType[],
+  };
+}
+
+function mapOrgOptions(b: BackendEffectiveOrgOptions): OrgOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    allowedTabs: (b.allowed_tabs || []) as OrgTabKey[],
+    allowedPanels: (b.allowed_panels || []) as OrgPanelKey[],
+    allowedPropagationTypes: (b.allowed_propagation_types || []) as OrgPropagationType[],
+    orgAvailable: b.org_available,
   };
 }
 
@@ -1086,7 +1111,7 @@ interface BackendEffectiveFunnel {
   can_use_oto: boolean;
   can_use_coupon_offer: boolean;
   is_flexible: boolean;
-  merchant_preferences: null;
+  merchant_preferences: { order_bump_enabled?: boolean | null; upsell_enabled?: boolean | null; downsell_enabled?: boolean | null; oto_enabled?: boolean | null; coupon_offer_enabled?: boolean | null } | null;
 }
 
 interface BackendEffectiveCouponOptions {
@@ -1117,7 +1142,7 @@ function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
     canUseOto: b.can_use_oto,
     canUseCouponOffer: b.can_use_coupon_offer,
     isFlexible: b.is_flexible,
-    merchantPreferences: null,
+    merchantPreferences: b.merchant_preferences ?? null,
   };
 }
 
@@ -1193,6 +1218,7 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     chatbotOptions: mapChatbot(b.effective.chatbot),
     socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
     directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
+    orgOptions: mapOrgOptions(b.effective.org_options),
     wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
     platformServices: mapPlatformServices(b.effective.platform_services),
     funnel: mapFunnel(b.effective.funnel),
@@ -1493,6 +1519,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
   async getDirectoryPromotionState(tenantId: string, ssrAuth?: SsrAuth): Promise<DirectoryPromotionState> {
     const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.directoryPromotion;
+  }
+
+  async getOrgOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<OrgOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.orgOptions;
   }
 
   async getPlatformServicesState(tenantId: string, ssrAuth?: SsrAuth): Promise<PlatformServicesState> {

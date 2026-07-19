@@ -45,6 +45,8 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'directory_entry', label: 'Directory Entry', icon: '📍', prefix: 'directory_entry_', settingsPath: '/settings/directory' },
   { key: 'chatbot_options', label: 'Chatbot', icon: '🤖', prefix: 'chatbot_', settingsPath: '/bot/options' },
   { key: 'social_commerce_options', label: 'Social Commerce', icon: '🛍️', prefix: 'social_commerce_', settingsPath: '/settings/social-commerce' },
+  { key: 'directory_promotion', label: 'Directory Promotion', icon: '✨', prefix: 'directory_promotion_', settingsPath: '/settings/promotion' },
+  { key: 'organization_options', label: 'Organization', icon: '🏢', prefix: 'org_', settingsPath: '/organization' },
   { key: 'wholesale_matching_options', label: 'Wholesale Matching', icon: '🔗', prefix: 'wholesale_', settingsPath: '/settings/wholesale' },
   { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
   { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },
@@ -102,6 +104,8 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'directory_entry': return caps.directoryEntryOptions.enabled;
     case 'chatbot_options': return caps.chatbotOptions.enabled;
     case 'social_commerce_options': return caps.socialCommerceOptions.enabled;
+    case 'directory_promotion': return !!caps.directoryPromotion?.enabled;
+    case 'organization_options': return !!caps.orgOptions?.enabled;
     case 'wholesale_matching_options': return !!caps.wholesaleMatching?.enabled;
     case 'platform_services': return !!caps.platformServices?.enabled;
     case 'funnel_options': return !!caps.funnel?.enabled;

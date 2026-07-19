@@ -505,7 +505,9 @@ When deploying a capability change, verify ALL of these:
 - [ ] `useXxxCapability` hook uses `UnifiedCapabilityService` (not `CapabilityResolutionService`)
 - [ ] `PlanSummaryPanel` has entry in `CAPABILITY_DISPLAY` + summary block in `resolveCapabilitySummaries()`
 - [ ] `PlanSummaryWidget` has entry in `CAPABILITY_META` (slim dashboard widget — label, icon, prefix, settingsPath)
+- [ ] `PlanSummaryWidget` `getCapabilityEnabled` switch has a case for the new capability key (returns `caps.xxx.enabled`)
 - [ ] `CapabilityShowcase` has row in `rows` array with correct `merchantGated` computation
+- [ ] `CAPABILITY_FEATURE_PREFIXES` in `CapabilityResolutionService.ts` has the feature prefix mapping for the new capability (e.g., `org_: 'organization_options'`)
 - [ ] Settings page gates toggles by tier state
 - [ ] Expired/inactive tenant returns 200 with disabled capabilities (not 404) — see R13 in `capability-data-flow-rules.md`
 - [ ] `buildExpiredCapabilitiesResponse` includes the new capability domain with all fields disabled
