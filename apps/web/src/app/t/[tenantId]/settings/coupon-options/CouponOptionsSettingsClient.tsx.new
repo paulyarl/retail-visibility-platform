@@ -1,0 +1,366 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Switch';
+import { Badge } from '@/components/ui/Badge';
+import { Select } from '@/components/ui/Select';
+import { Label } from '@/components/ui/Label';
+import { AlertCircle, Save, Tag, List, Plus, BarChart3, Settings, ArrowRight, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { useCouponOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
+import { tenantInfoService } from '@/services/TenantInfoService';
+import { CouponService, Coupon } from '@/services/CouponService';
+import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import { clientLogger } from '@/lib/client-logger';
+import { toast } from '@/hooks/use-toast';
+
+interface CouponSettings {
+  coupon_enabled: boolean;
+  spotlight_enabled: boolean;
+  featured_coupon_id: string | null;
+}
+
+interface CouponOptionsSettingsClientProps {
+  tenantId: string;
+}
+
+interface QuickAction {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  variant: 'general' | 'product';
+}
+
+function getQuickActions(settings: CouponSettings, tenantId: string, capState: import('@/services/CapabilityResolutionService').CouponOptionsState | null): QuickAction[] {
+  const actions: QuickAction[] = [];
+
+  if (!settings.coupon_enabled || !capState?.enabled) return actions;
+
+  if (capState.canCreateCoupons) {
+    actions.push({
+      id: 'manage-coupons',
+      label: 'Manage Coupons',
+      description: 'View and edit your coupon definitions',
+      href: `/t/${tenantId}/settings/coupons`,
+      icon: List,
+      variant: 'general',
+    });
+    actions.push({
+      id: 'create-coupon',
+      label: 'Create Coupon',
+      description: 'Add a new percent-off, fixed-amount, or BOGO coupon',
+      href: `/t/${tenantId}/settings/coupons`,
+      icon: Plus,
+      variant: 'product',
+    });
+  }
+
+  if (capState.canViewAnalytics) {
+    actions.push({
+      id: 'coupon-analytics',
+      label: 'Coupon Analytics',
+      description: 'Track redemptions, ROI, and conversion funnel',
+      href: `/t/${tenantId}/analytics/coupons`,
+      icon: BarChart3,
+      variant: 'product',
+    });
+  }
+
+  if (capState.canUseSpotlight) {
+    actions.push({
+      id: 'storefront-preview',
+      label: 'Storefront Preview',
+      description: 'See how your highlighted coupon appears to customers',
+      href: `/t/${tenantId}/storefront`,
+      icon: Tag,
+      variant: 'general',
+    });
+  }
+
+  return actions;
+}
+
+export default function CouponOptionsSettingsClient({ tenantId }: CouponOptionsSettingsClientProps) {
+  const couponCap = useCouponOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
+  const capState = couponCap.data;
+  const isTierAllowed = !!capState && (capState.enabled || capState.isFlexible || capState.allowedDiscountTypes.length > 0);
+
+  const [settings, setSettings] = useState<CouponSettings>({
+    coupon_enabled: false,
+    spotlight_enabled: false,
+    featured_coupon_id: null,
+  });
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    loadSettings();
+  }, [tenantId]);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const [fetchedSettings, couponsResult] = await Promise.all([
+        tenantInfoService.getCouponSettings(tenantId),
+        CouponService.getInstance().listCoupons(tenantId).catch(() => ({ coupons: [] as Coupon[], total: 0 })),
+      ]);
+      setSettings({
+        coupon_enabled: fetchedSettings?.couponEnabled ?? false,
+        spotlight_enabled: fetchedSettings?.spotlightEnabled ?? false,
+        featured_coupon_id: fetchedSettings?.featuredCouponId ?? null,
+      });
+      setCoupons(couponsResult.coupons.filter((c) => c.isActive));
+    } catch (err) {
+      clientLogger.error('Failed to load coupon options settings:', { detail: err });
+      toast({ title: 'Error', description: 'Failed to load coupon options', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setMessage(null);
+      const result = await tenantInfoService.updateCouponSettings(tenantId, {
+        couponEnabled: settings.coupon_enabled,
+        spotlightEnabled: settings.spotlight_enabled,
+        featuredCouponId: settings.featured_coupon_id,
+      });
+      if (!result) throw new Error('Failed to save coupon options settings');
+      toast({ title: 'Saved', description: 'Coupon options settings have been updated', variant: 'success' });
+      setMessage({ type: 'success', text: 'Coupon options settings saved successfully.' });
+    } catch (err: any) {
+      clientLogger.error('Failed to save coupon options settings:', { detail: err });
+      setMessage({ type: 'error', text: err?.message || 'Failed to save coupon options settings' });
+      toast({ title: 'Error', description: err?.message || 'Failed to save coupon options settings', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggle = (key: keyof CouponSettings) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleFeaturedCouponChange = (value: string) => {
+    setSettings((prev) => ({ ...prev, featured_coupon_id: value || null }));
+  };
+
+  const spotlightAllowed = !!capState?.canUseSpotlight;
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-48 bg-neutral-200 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Plan Summary */}
+      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="coupon_options" tenantId={tenantId} />
+
+      {message && (
+        <div className={`p-3 rounded-lg flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm">{message.text}</span>
+        </div>
+      )}
+
+      {/* Master Toggle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tag className="h-5 w-5 text-primary-600" />
+            Coupon Capability
+          </CardTitle>
+          <p className="text-sm text-neutral-600 mt-1">
+            Enable or disable coupon redemption for this tenant.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <Tag className="h-5 w-5 text-primary-600" />
+              <div>
+                <p className="font-medium text-neutral-900">Enable Coupons</p>
+                <p className="text-sm text-neutral-600">Allow customers to apply coupons during checkout</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {!isTierAllowed && (
+                <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
+              )}
+              {isTierAllowed && !settings.coupon_enabled && (
+                <span className="text-xs text-amber-600 font-medium">Disabled by you</span>
+              )}
+              <Switch
+                id="coupon-enabled-toggle"
+                checked={isTierAllowed ? settings.coupon_enabled : false}
+                onCheckedChange={() => handleToggle('coupon_enabled')}
+                disabled={!isTierAllowed}
+              />
+            </div>
+          </div>
+
+          {!isTierAllowed && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-800">
+                Coupon options are not included in your current plan. Upgrade to enable coupons.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Spotlight Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-primary-600" />
+            Spotlight
+          </CardTitle>
+          <p className="text-sm text-neutral-600 mt-1">
+            Highlight a featured coupon on your storefront.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <Tag className="h-5 w-5 text-primary-600" />
+              <div>
+                <p className="font-medium text-neutral-900">Enable Spotlight</p>
+                <p className="text-sm text-neutral-600">Show a featured coupon on your storefront</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {!spotlightAllowed && (
+                <span className="text-xs text-amber-600 font-medium">Not included in your plan</span>
+              )}
+              <Switch
+                id="spotlight-enabled-toggle"
+                checked={spotlightAllowed && settings.coupon_enabled ? settings.spotlight_enabled : false}
+                onCheckedChange={() => handleToggle('spotlight_enabled')}
+                disabled={!spotlightAllowed || !settings.coupon_enabled}
+              />
+            </div>
+          </div>
+
+          {settings.spotlight_enabled && settings.coupon_enabled && (
+            <div className="space-y-2">
+              <Label htmlFor="featured-coupon-select">Featured Coupon</Label>
+              <Select
+                id="featured-coupon-select"
+                value={settings.featured_coupon_id ?? ''}
+                onChange={(e) => handleFeaturedCouponChange(e.target.value)}
+                disabled={!spotlightAllowed || !settings.coupon_enabled}
+              >
+                <option value="">Select a featured coupon</option>
+                {coupons.map((coupon) => (
+                  <option key={coupon.id} value={coupon.id}>
+                    {coupon.code} ({coupon.discountType})
+                  </option>
+                ))}
+              </Select>
+              {coupons.length === 0 && (
+                <p className="text-xs text-amber-600">Create an active coupon on the management page first.</p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Plan Features */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary-600" />
+            Plan Features
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {capState?.canUsePercentOff && <Badge variant="default">Percent Off</Badge>}
+          {capState?.canUseFixedAmount && <Badge variant="default">Fixed Amount</Badge>}
+          {capState?.canUseFreeShipping && <Badge variant="default">Free Shipping</Badge>}
+          {capState?.canUseBogo && <Badge variant="default">BOGO</Badge>}
+          {capState?.canTargetProducts && <Badge variant="default">Targeted</Badge>}
+          {capState?.canSetLimits && <Badge variant="default">Limits</Badge>}
+          {capState?.canViewAnalytics && <Badge variant="default">Analytics</Badge>}
+          {capState?.canUseQrSharing && <Badge variant="default">QR Sharing</Badge>}
+          {capState?.canUseSpotlight && <Badge variant="default">Spotlight</Badge>}
+          {(capState?.allowedDiscountTypes?.length ?? 0) === 0 && !capState?.isFlexible && (
+            <p className="text-sm text-gray-500">No coupon features are enabled for this tenant.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving} variant='gradient' style={{ color: 'white' }}>
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? 'Saving...' : 'Save Coupon Options'}
+        </Button>
+      </div>
+
+      {/* What's Next */}
+      {(() => {
+        const actions = getQuickActions(settings, tenantId, capState);
+        if (actions.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                What's Next
+              </CardTitle>
+              <p className="text-sm text-neutral-600 mt-1">
+                Continue setting up your coupon program
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {actions.map((action) => {
+                  const IconComp = action.icon;
+                  const variantStyles = {
+                    product: 'bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-900',
+                    general: 'bg-gray-50 border-gray-200 hover:border-gray-300 text-neutral-900',
+                  };
+                  const iconStyles = {
+                    product: 'text-blue-600',
+                    general: 'text-neutral-600',
+                  };
+                  return (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors ${variantStyles[action.variant]}`}
+                    >
+                      <IconComp className={`h-5 w-5 shrink-0 ${iconStyles[action.variant]}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{action.label}</p>
+                        <p className="text-xs opacity-80 truncate">{action.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+    </div>
+  );
+}

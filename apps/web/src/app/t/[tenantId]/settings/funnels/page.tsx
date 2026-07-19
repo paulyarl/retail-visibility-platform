@@ -1,18 +1,18 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import FunnelListClient from './FunnelListClient';
+import FunnelOptionsSettingsClient from './FunnelOptionsSettingsClient';
 import { TenantGuard } from '@/components/tenant/TenantGuard';
 
 export const metadata: Metadata = {
-  title: 'Sales Funnels - Store Settings',
-  description: 'Manage your sales funnels, order bumps, upsells, and one-time offers',
+  title: 'Funnel Options - Store Settings',
+  description: 'Manage sales funnel capability and merchant preferences',
 };
 
 interface PageProps {
   params: Promise<{ tenantId: string }>;
 }
 
-export default async function FunnelsPage({ params }: PageProps) {
+export default async function FunnelOptionsSettingsPage({ params }: PageProps) {
   const { tenantId } = await params;
 
   if (!tenantId) {
@@ -21,7 +21,7 @@ export default async function FunnelsPage({ params }: PageProps) {
 
   return (
     <TenantGuard tenantId={tenantId}>
-      <FunnelListClient tenantId={tenantId} />
+      <FunnelOptionsSettingsClient tenantId={tenantId} />
     </TenantGuard>
   );
 }

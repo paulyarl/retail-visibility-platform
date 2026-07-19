@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Capability Access Hooks
  * 
@@ -41,9 +43,11 @@ import {
   ChatbotOptionsState,
   SocialCommerceOptionsState,
   DirectoryPromotionState,
+  OrgOptionsState,
   WholesaleMatchingState,
   PlatformServicesState,
   FunnelState,
+  CouponOptionsState,
   AllCapabilitiesState,
   ConstraintViolationState,
   ConstraintStatusMapState,
@@ -704,6 +708,36 @@ export function useDirectoryPromotionCapability(
 }
 
 // ====================
+// useOrgOptionsCapability
+// ====================
+
+export function useOrgOptionsCapability(
+  tenantId: string | null
+): CapabilityHookState<OrgOptionsState> {
+  const [data, setData] = useState<OrgOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const all = await unifiedCapabilityService.getAllCapabilities(tenantId);
+      setData(all.orgOptions);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch org options capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
 // useWholesaleMatchingCapability
 // ====================
 
@@ -783,6 +817,36 @@ export function useFunnelCapability(
       setData(state);
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch funnel capability');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { data, loading, error, refetch: fetch };
+}
+
+// ====================
+// useCouponOptionsCapability
+// ====================
+
+export function useCouponOptionsCapability(
+  tenantId: string | null
+): CapabilityHookState<CouponOptionsState> {
+  const [data, setData] = useState<CouponOptionsState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await unifiedCapabilityService.getCouponOptionsState(tenantId);
+      setData(state);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch coupon options capability');
     } finally {
       setLoading(false);
     }

@@ -288,6 +288,90 @@ export const CAPABILITY_CONSTRAINTS: CrossCapabilityConstraint[] = [
     message: 'Sales funnels work best with an Online storefront',
     resolution_hint: 'Switch storefront type to Online for optimal funnel conversion',
   },
+
+  // ── Free-shipping coupons require shipping fulfillment ──
+  {
+    id: 'coupon_free_shipping_requires_fulfillment_shipping',
+    type: 'requires',
+    severity: 'block',
+    source: {
+      capability: 'coupon_options',
+      field: 'allowed_discount_types',
+      operator: 'includes',
+      value: 'free_shipping',
+    },
+    target: {
+      capability: 'fulfillment',
+      field: 'effective_shows_shipping',
+      operator: 'is_true',
+      value: true,
+    },
+    message: 'Free shipping coupons require shipping fulfillment to be enabled',
+    resolution_hint: 'Enable shipping fulfillment in your fulfillment settings or remove free shipping discount type',
+  },
+
+  // ── BOGO coupons recommend product variants ──
+  {
+    id: 'coupon_bogo_recommends_product_variants',
+    type: 'recommends',
+    severity: 'warn',
+    source: {
+      capability: 'coupon_options',
+      field: 'allowed_discount_types',
+      operator: 'includes',
+      value: 'bogo',
+    },
+    target: {
+      capability: 'product_options',
+      field: 'effective_shows_variants',
+      operator: 'is_true',
+      value: true,
+    },
+    message: 'Buy-one-get-one coupons work best when product variants are enabled',
+    resolution_hint: 'Enable product variants in your product options settings for better BOGO targeting',
+  },
+
+  // ── Targeted coupons require physical product inventory ──
+  {
+    id: 'coupon_targeted_requires_physical_product_type',
+    type: 'requires',
+    severity: 'warn',
+    source: {
+      capability: 'coupon_options',
+      field: 'can_target_products',
+      operator: 'is_true',
+      value: true,
+    },
+    target: {
+      capability: 'product_types',
+      field: 'effective_types',
+      operator: 'includes',
+      value: 'physical',
+    },
+    message: 'Targeted product coupons require physical product inventory',
+    resolution_hint: 'Add physical product types or disable product targeting for this coupon',
+  },
+
+  // ── Funnel coupon_offer requires coupon capability to be enabled ──
+  {
+    id: 'funnel_coupon_offer_requires_coupon_options',
+    type: 'requires',
+    severity: 'block',
+    source: {
+      capability: 'funnel',
+      field: 'can_use_coupon_offer',
+      operator: 'is_true',
+      value: true,
+    },
+    target: {
+      capability: 'coupon_options',
+      field: 'enabled',
+      operator: 'is_true',
+      value: true,
+    },
+    message: 'Coupon offer funnel steps require the coupon capability to be enabled',
+    resolution_hint: 'Enable coupons in coupon options or remove the coupon offer funnel step',
+  },
 ];
 
 // ====================

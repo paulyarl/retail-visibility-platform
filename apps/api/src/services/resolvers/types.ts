@@ -59,6 +59,8 @@ export interface MerchantSettingsBundle {
   barcodeScan: BarcodeScanMerchantSettings | null;
   socialCommerceOptions: SocialCommerceOptionsMerchantSettings | null;
   wholesaleMatching: WholesaleMatchingMerchantSettings | null;
+  couponOptions: CouponOptionsMerchantSettings | null;
+  funnelOptions: FunnelOptionsMerchantSettings | null;
 }
 
 export interface CommerceMerchantSettings {
@@ -917,7 +919,7 @@ export interface EffectiveDirectoryPromotion {
 // SALES FUNNELS
 // ====================
 
-export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto' | 'coupon_offer';
 
 export interface EffectiveFunnel {
   enabled: boolean;
@@ -927,7 +929,45 @@ export interface EffectiveFunnel {
   can_use_upsell: boolean;
   can_use_downsell: boolean;
   can_use_oto: boolean;
+  can_use_coupon_offer: boolean;
   is_flexible: boolean;
+  merchant_preferences: FunnelOptionsMerchantSettings | null;
+}
+
+export interface FunnelOptionsMerchantSettings {
+  order_bump_enabled?: boolean | null;
+  upsell_enabled?: boolean | null;
+  downsell_enabled?: boolean | null;
+  oto_enabled?: boolean | null;
+  coupon_offer_enabled?: boolean | null;
+}
+
+// ====================
+// COUPON OPTIONS
+// ====================
+
+export type CouponDiscountType = 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
+
+export interface EffectiveCouponOptions {
+  enabled: boolean;
+  can_create_coupons: boolean;
+  can_use_percent_off: boolean;
+  can_use_fixed_amount: boolean;
+  can_use_free_shipping: boolean;
+  can_use_bogo: boolean;
+  can_target_products: boolean;
+  can_set_limits: boolean;
+  can_view_analytics: boolean;
+  can_use_qr_sharing: boolean;
+  can_use_spotlight: boolean;
+  allowed_discount_types: CouponDiscountType[];
+  is_flexible: boolean;
+  merchant_preferences: CouponOptionsMerchantSettings | null;
+}
+
+export interface CouponOptionsMerchantSettings {
+  coupon_enabled?: boolean | null;
+  spotlight_enabled?: boolean | null;
 }
 
 // ====================
@@ -977,6 +1017,7 @@ export interface EffectiveCapabilities {
     wholesale_matching: EffectiveWholesaleMatching;
     platform_services: EffectivePlatformServices;
     funnel: EffectiveFunnel;
+    coupon_options: EffectiveCouponOptions;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

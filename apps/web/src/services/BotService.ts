@@ -439,6 +439,7 @@ class BotService extends TenantApiSingleton {
     hasBusinessInfoEmbeddings: boolean;
     hasHoursEmbeddings: boolean;
     hasFulfillmentEmbeddings: boolean;
+    hasCouponEmbeddings: boolean;
     knowledgeEmbeddingCounts?: { sourceType: string; count: number }[];
   }> {
     const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
@@ -458,6 +459,7 @@ class BotService extends TenantApiSingleton {
       hasBusinessInfoEmbeddings: result.data.hasBusinessInfoEmbeddings ?? false,
       hasHoursEmbeddings: result.data.hasHoursEmbeddings ?? false,
       hasFulfillmentEmbeddings: result.data.hasFulfillmentEmbeddings ?? false,
+      hasCouponEmbeddings: result.data.hasCouponEmbeddings ?? false,
       knowledgeEmbeddingCounts: result.data.knowledgeEmbeddingCounts ?? [],
     };
   }
@@ -484,7 +486,7 @@ class BotService extends TenantApiSingleton {
     return result.data;
   }
 
-  async refreshKnowledgeEmbeddings(tenantId: string, sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment'): Promise<any> {
+  async refreshKnowledgeEmbeddings(tenantId: string, sourceType?: 'badge_registry' | 'policy' | 'business_info' | 'hours' | 'fulfillment' | 'coupon'): Promise<any> {
     const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
       `/api/tenants/${tenantId}/bot/embeddings/knowledge/refresh`,
       { method: 'POST', body: JSON.stringify({ sourceType }) },

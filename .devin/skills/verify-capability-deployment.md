@@ -153,6 +153,15 @@ Two components on the tenant dashboard display capability status. A capability m
 - [ ] The capability appears in the plan summary card
 - [ ] If the capability has constraint violations, a constraint warnings section appears with color-coded severity (red for block, amber for warn)
 
+**PlanSummaryWidget** (`apps/web/src/components/dashboard/PlanSummaryWidget.tsx`):
+- [ ] The capability has an entry in the `CAPABILITY_META` array (key, label, icon, prefix, settingsPath)
+- [ ] The `getCapabilityEnabled` switch has a case for the capability key that returns `caps.<domain>.enabled`
+- [ ] The capability appears in the slim dashboard widget with correct color coding
+
+**CapabilityResolutionService** (`apps/web/src/services/CapabilityResolutionService.ts`):
+- [ ] The capability has an entry in `CAPABILITY_FEATURE_PREFIXES` mapping (e.g., `org_: 'organization_options'`)
+- [ ] A fallback resolver function `resolve<Domain>State` exists for use when the unified endpoint is unavailable
+
 ### 9. Check Cross-Capability Constraints (CCL)
 
 If the capability has cross-capability dependencies (e.g., "service storefront requires service product type"), verify the CCL integration:
@@ -194,6 +203,8 @@ ORDER BY sort_order;
 | `fulfillment` | `FulfillmentResolver.ts` | `fulfillment-settings.ts` | `mapFulfillment` |
 | `barcode_scan` | `BarcodeScanResolver.ts` | `barcode-scan-settings.ts` | `mapBarcodeScan` |
 | `chatbot_options` | `ChatbotOptionsResolver.ts` | `chatbot-options-settings.ts` | `mapChatbot` |
+| `directory_promotion` | `DirectoryPromotionResolver.ts` | — (purchased) | `mapDirectoryPromotion` |
+| `organization_options` | `OrgOptionsResolver.ts` | — (org-scoped) | `mapOrgOptions` |
 
 All resolution happens in the backend resolver. The frontend `UnifiedCapabilityService` only maps.
 
@@ -224,3 +235,9 @@ All resolution happens in the backend resolver. The frontend `UnifiedCapabilityS
 12. **Missing `flexible ||` prefix on standalone feature flags (R23)**: When a resolver checks a standalone boolean feature flag (e.g., `!!features.featured_expiry_monitor`) without prefixing with `flexible ||`, the feature stays disabled on flexible tiers even though the admin granted full capability access via `*_flexible`. This is the most common bug for standalone flags outside the group array pattern. Fix: prefix every `!!features.<key>` check with `flexible ||`, except for the master gate checks themselves (`*_enabled`, `*_disabled`, `*_flexible`).
 
 13. **Frontend fallback resolver out of sync with backend resolver**: When `apps/web/src/services/CapabilityResolutionService.ts` contains a fallback `resolveXxxState` function used when the unified endpoint is unavailable, changes to `apps/api/src/services/resolvers/XxxResolver.ts` must also be applied to the frontend fallback. Mismatches in `_on`/`_off` group gate precedence, `enabled` fallback, or `effective_*` derivation cause dashboard or settings pages to disagree with the API. Fix: compare the frontend fallback resolver with the backend resolver and align master gate precedence, group gate fallback, and effective flag computation. Run `pnpm checkweb` after updating. See R30 in `capability-data-flow-rules.md`.
+
+14. **Missing `getCapabilityEnabled` switch case in PlanSummaryWidget**: The `PlanSummaryWidget.tsx` `getCapabilityEnabled` function has a switch statement that maps capability keys to `caps.<domain>.enabled`. If a new capability is added to `CAPABILITY_META` but not to the switch, the widget shows the capability as disabled (red) even when it's enabled. Fix: add a case for the new capability key returning `caps.<domain>.enabled`.
+
+15. **Missing `CAPABILITY_FEATURE_PREFIXES` entry**: The `CAPABILITY_FEATURE_PREFIXES` map in `CapabilityResolutionService.ts` maps feature key prefixes to capability type keys (e.g., `org_: 'organization_options'`). If a new capability is added without the prefix mapping, `getCapabilityTypeForFeature()` returns `null` for that capability's features, causing them to be uncategorized in the frontend. Fix: add the prefix mapping entry.
+
+16. **Missing `buildExpiredCapabilitiesResponse` entry**: When a new capability is added, it must be included in the `buildExpiredCapabilitiesResponse` function in `public-tenant-capabilities.ts` with all fields disabled. Without this, expired/inactive tenants get a response missing the capability domain, causing frontend TypeScript errors (the `AllCapabilitiesState` interface expects all domains to be present). Fix: add a disabled entry for the new capability with all required fields set to `false`/`[]`.

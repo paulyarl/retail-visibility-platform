@@ -174,6 +174,7 @@ const PARENT_GATE_FEATURES: Record<string, string> = {
   directory_promotion: 'directory_promotion_enabled',
   organization_options: 'org_enabled',
   integration_options: 'integration_enabled',
+  coupon_options: 'coupon_enabled',
 };
 
 /**

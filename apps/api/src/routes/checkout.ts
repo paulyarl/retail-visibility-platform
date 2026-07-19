@@ -19,6 +19,8 @@ import {
   CheckoutMode,
 } from '../utils/deposit-calculator';
 import { taxService } from '../services/TaxService';
+import { CouponService } from '../services/CouponService';
+import { trackCouponEvent } from '../services/CouponAnalyticsService';
 import { socialPixelService } from '../services/SocialPixelService';
 import { logger } from '../logger';
 import {
@@ -226,6 +228,60 @@ router.post('/orders', async (req: Request, res: Response) => {
     }
     
     const checkoutCapabilities = getCheckoutMode(commerceCapabilities);
+
+    // ── COUPON VALIDATION (Sprint 3) ────────────────────────────────
+    let discountCents = 0;
+    let couponResult: any = null;
+    const couponService = CouponService.getInstance();
+
+    if (req.body.coupon_code && typeof req.body.coupon_code === 'string') {
+      const couponCode = req.body.coupon_code.trim();
+      if (couponCode.length > 0) {
+        try {
+          const validation = await couponService.validateCoupon(
+            tenant_id,
+            couponCode,
+            { subtotalCents: 0, items: [] } // Subtotal will be calculated after item validation
+          );
+          couponResult = validation;
+
+          if (!validation.valid) {
+            // Track fail event
+            await trackCouponEvent({
+              tenantId: tenant_id,
+              couponId: validation.couponId ?? undefined,
+              couponCode: validation.code,
+              eventType: 'fail',
+              surface: 'checkout',
+            });
+
+            // Return error for invalid coupon
+            return res.status(400).json({
+              success: false,
+              error: `coupon_${validation.reason || 'invalid'}`,
+              message: validation.message || 'Invalid coupon',
+              reason: validation.reason,
+            });
+          }
+
+          // Track validate event for valid coupon
+          await trackCouponEvent({
+            tenantId: tenant_id,
+            couponId: validation.couponId ?? undefined,
+            couponCode: validation.code,
+            eventType: 'validate',
+            surface: 'checkout',
+          });
+        } catch (err) {
+          // Log but don't fail checkout for coupon errors
+          logger.warn('[Checkout] Coupon validation error:', undefined, {
+            tenantId: tenant_id,
+            couponCode: req.body.coupon_code,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
 
     // Validate items and check stock availability
     // Fetch item details from database - frontend only needs to send id and quantity
@@ -509,6 +565,62 @@ router.post('/orders', async (req: Request, res: Response) => {
     });
     const totals = calculateOrderTotals(line_items, shipping_cents);
 
+    // Recalculate coupon validation with actual subtotal (Sprint 3 fix)
+    if (req.body.coupon_code && couponResult?.valid) {
+      try {
+        const recalc = await couponService.validateCoupon(
+          tenant_id,
+          (req.body.coupon_code as string).trim(),
+          { subtotalCents: totals.subtotal_cents, items: validatedItems.map(i => ({ productId: i.id, categoryId: undefined, collectionId: undefined })) }
+        );
+        if (!recalc.valid) {
+          await trackCouponEvent({
+            tenantId: tenant_id,
+            couponId: recalc.couponId ?? undefined,
+            couponCode: recalc.code,
+            eventType: 'fail',
+            surface: 'checkout',
+          });
+          return res.status(400).json({
+            success: false,
+            error: `coupon_${recalc.reason || 'invalid'}`,
+            message: recalc.message || 'Invalid coupon',
+            reason: recalc.reason,
+          });
+        }
+        couponResult = recalc;
+        discountCents = recalc.discountCents;
+      } catch (recalcErr) {
+        logger.warn('[Checkout] Coupon recalculation error:', undefined, {
+          tenantId: tenant_id,
+          error: recalcErr instanceof Error ? recalcErr.message : String(recalcErr),
+        });
+      }
+    }
+
+    // ── APPLY COUPON DISCOUNT (Sprint 3) ───────────────────────────────
+    if (couponResult?.valid && couponResult?.discountCents > 0) {
+      discountCents = couponResult.discountCents;
+      totals.subtotal_cents = Math.max(0, totals.subtotal_cents - discountCents);
+      totals.total_cents = totals.subtotal_cents + totals.tax_cents + totals.shipping_cents;
+      // Apply discount to line items proportionally
+      const totalBeforeDiscount = line_items.reduce((sum, li) => sum + li.subtotal_cents, 0);
+      line_items.forEach(li => {
+        const proportion = totalBeforeDiscount > 0 ? li.subtotal_cents / totalBeforeDiscount : 0;
+        li.discount_cents = Math.round(discountCents * proportion);
+        li.subtotal_cents = Math.max(0, li.subtotal_cents - li.discount_cents);
+        li.total_cents = li.subtotal_cents + (li.tax_cents || 0);
+      });
+      // Fix rounding drift: adjust last item
+      const appliedDiscount = line_items.reduce((sum, li) => sum + (li.discount_cents || 0), 0);
+      if (appliedDiscount !== discountCents && line_items.length > 0) {
+        const lastItem = line_items[line_items.length - 1];
+        lastItem.discount_cents += (discountCents - appliedDiscount);
+        lastItem.subtotal_cents = Math.max(0, lastItem.subtotal_cents - (discountCents - appliedDiscount));
+        lastItem.total_cents = lastItem.subtotal_cents + (lastItem.tax_cents || 0);
+      }
+    }
+
     // Calculate sales tax using TaxService (Stripe Tax or manual rate)
     let calculatedTaxCents = totals.tax_cents;
     try {
@@ -786,10 +898,17 @@ router.post('/orders', async (req: Request, res: Response) => {
           ...(pickup_tenant_id ? { pickup_tenant_id, is_multi_location_order: true } : {}),
           ...(paymentTenantId !== tenant_id ? { payment_tenant_id: paymentTenantId, is_hero_payment: true } : {}),
           ...(platformFeeCents > 0 ? { platform_fee_cents: platformFeeCents, platform_fee_percentage: platformFeePercentage } : {}),
+          ...(couponResult?.valid ? {
+            coupon_code: couponResult.code,
+            coupon_id: couponResult.couponId,
+            discount_cents: discountCents,
+            coupon_discount_type: couponResult.discountType,
+          } : {}),
         },
         updated_at: new Date(),
         // Order totals
         subtotal_cents: totals.subtotal_cents,
+        discount_cents: discountCents,
         tax_cents: totals.tax_cents,
         shipping_cents: totals.shipping_cents,
         total_cents: orderTotalCents,
@@ -858,6 +977,10 @@ router.post('/orders', async (req: Request, res: Response) => {
         deposit_percentage: depositCalculation?.depositPercentage || null,
       },
     });
+
+    // ── COUPON REDEMPTION deferred to payment success (Sprint 3 fix) ──
+    // Redemption is recorded when payment is confirmed in checkout/{stripe,paypal,square}.ts
+    // This prevents redeeming a coupon for an order that never gets paid.
 
     // Send order placed notification (async, don't wait)
     const { getOrderNotificationService } = await import('../services/OrderNotificationService');

@@ -7,6 +7,7 @@
 
 import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
+import { Prisma } from '@prisma/client';
 import { generateFunnelId, generateFunnelStepId } from '../lib/id-generator';
 import { resolveEffectiveCapabilities } from './EffectiveCapabilityResolver';
 import BotKnowledgeEmbeddingService from './BotKnowledgeEmbeddingService';
@@ -110,7 +111,20 @@ class FunnelService extends BaseService {
       if (!allowed.includes(step.step_type)) {
         throw new Error(`Funnel step type '${step.step_type}' is not allowed by this tenant's plan`);
       }
-      if (!step.offer_item_id) {
+
+      if (step.step_type === 'coupon_offer') {
+        if (!step.offer_item_id) {
+          throw new Error('Every coupon_offer step must have a coupon offer_item_id');
+        }
+        const coupon = await prisma.tenant_coupons.findFirst({
+          where: { id: step.offer_item_id, tenant_id: tenantId, is_active: true },
+        });
+        if (!coupon) {
+          throw new Error(`Coupon ${step.offer_item_id} not found or is not active`);
+        }
+        step.display_title = step.display_title ?? coupon.code;
+        step.display_description = step.display_description ?? `Use code ${coupon.code} on a future purchase`;
+      } else if (!step.offer_item_id) {
         throw new Error('Every funnel step must have an offer_item_id');
       }
     }
@@ -280,7 +294,8 @@ class FunnelService extends BaseService {
 
       if (!funnel) return null;
 
-      return funnel as unknown as FunnelWithSteps;
+      const { tenant_funnel_steps, ...rest } = funnel as any;
+      return { ...rest, steps: tenant_funnel_steps ?? [] } as unknown as FunnelWithSteps;
     } catch (error) {
       this.handleError(error);
       return null;
@@ -303,7 +318,10 @@ class FunnelService extends BaseService {
         orderBy: { created_at: 'desc' },
       });
 
-      return funnels as unknown as FunnelWithSteps[];
+      return funnels.map(({ tenant_funnel_steps, ...rest }: any) => ({
+        ...rest,
+        steps: tenant_funnel_steps ?? [],
+      })) as unknown as FunnelWithSteps[];
     } catch (error) {
       this.handleError(error);
       return [];
@@ -324,6 +342,79 @@ class FunnelService extends BaseService {
 
   async deactivateFunnel(tenantId: string, funnelId: string): Promise<FunnelWithSteps | null> {
     return this.updateFunnel(tenantId, funnelId, { is_active: false });
+  }
+
+  async getFunnelOptionsSettings(tenantId: string): Promise<{
+    funnelOptionsEnabled: boolean;
+    orderBumpEnabled: boolean;
+    upsellEnabled: boolean;
+    downsellEnabled: boolean;
+    otoEnabled: boolean;
+    couponOfferEnabled: boolean;
+  }> {
+    const rows = await prisma.$queryRaw<
+      Array<{
+        funnel_options_enabled: boolean | null;
+        order_bump_enabled: boolean | null;
+        upsell_enabled: boolean | null;
+        downsell_enabled: boolean | null;
+        oto_enabled: boolean | null;
+        coupon_offer_enabled: boolean | null;
+      }>
+    >(
+      Prisma.sql`SELECT funnel_options_enabled, order_bump_enabled, upsell_enabled, downsell_enabled, oto_enabled, coupon_offer_enabled
+                 FROM tenant_funnel_options_settings
+                 WHERE tenant_id = ${tenantId}`
+    );
+
+    const row = rows[0];
+    return {
+      funnelOptionsEnabled: row?.funnel_options_enabled ?? true,
+      orderBumpEnabled: row?.order_bump_enabled ?? true,
+      upsellEnabled: row?.upsell_enabled ?? true,
+      downsellEnabled: row?.downsell_enabled ?? true,
+      otoEnabled: row?.oto_enabled ?? true,
+      couponOfferEnabled: row?.coupon_offer_enabled ?? true,
+    };
+  }
+
+  async updateFunnelOptionsSettings(
+    tenantId: string,
+    settings: {
+      funnelOptionsEnabled?: boolean;
+      orderBumpEnabled?: boolean;
+      upsellEnabled?: boolean;
+      downsellEnabled?: boolean;
+      otoEnabled?: boolean;
+      couponOfferEnabled?: boolean;
+    }
+  ): Promise<void> {
+    await prisma.$executeRaw(
+      Prisma.sql`INSERT INTO tenant_funnel_options_settings (
+        tenant_id,
+        funnel_options_enabled,
+        order_bump_enabled,
+        upsell_enabled,
+        downsell_enabled,
+        oto_enabled,
+        coupon_offer_enabled
+      ) VALUES (
+        ${tenantId},
+        ${settings.funnelOptionsEnabled ?? true},
+        ${settings.orderBumpEnabled ?? true},
+        ${settings.upsellEnabled ?? true},
+        ${settings.downsellEnabled ?? true},
+        ${settings.otoEnabled ?? true},
+        ${settings.couponOfferEnabled ?? true}
+      )
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        funnel_options_enabled = EXCLUDED.funnel_options_enabled,
+        order_bump_enabled = EXCLUDED.order_bump_enabled,
+        upsell_enabled = EXCLUDED.upsell_enabled,
+        downsell_enabled = EXCLUDED.downsell_enabled,
+        oto_enabled = EXCLUDED.oto_enabled,
+        coupon_offer_enabled = EXCLUDED.coupon_offer_enabled`
+    );
   }
 }
 

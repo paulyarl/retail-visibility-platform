@@ -181,6 +181,7 @@ import customerAuthTokenRoutes from '../routes/customer-auth-token';
 import customerAddressesRoutes from '../routes/customer-addresses';
 import customerNotificationsRoutes from '../routes/customer-notifications';
 import customerPaymentMethodsRoutes from '../routes/customer-payment-methods';
+import customerCouponRoutes, { publicTenantRouter as customerCouponPublicRouter } from '../routes/customer-coupons';
 
 // Misc
 import billingRoutes from '../routes/billing';
@@ -206,6 +207,9 @@ import faqPublicRoutes from '../routes/faq-public';
 import tierConfigRoutes from '../routes/tier-config';
 import funnelRoutes from '../routes/funnel';
 import funnelCheckoutRoutes from '../routes/funnel-checkout';
+import funnelOptionsSettingsRoutes from '../routes/funnel-options-settings';
+import couponsRoutes from '../routes/coupons';
+import couponAnalyticsRoutes from '../routes/coupon-analytics';
 
 // Inline handler route files (extracted from index.ts)
 import inlineAuthRbacRoutes from '../routes/inline-auth-rbac';
@@ -495,6 +499,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'public',
     authLevel: 'public',
     comment: 'Active featured resolver (public tenant router)',
+  },
+  {
+    path: '/api/public/tenants/:tenantId',
+    router: customerCouponPublicRouter,
+    domain: 'public',
+    authLevel: 'public',
+    comment: 'Public saveable coupons for a tenant',
   },
   {
     path: '/api',
@@ -1055,6 +1066,13 @@ export const routeRegistry: RouteEntry[] = [
     comment: 'Customer payment methods routes',
   },
   {
+    path: '/api/customer-coupons',
+    router: customerCouponRoutes,
+    domain: 'customer',
+    authLevel: 'public',
+    comment: 'Customer coupon wallet routes',
+  },
+  {
     path: '/api/debug-cookies',
     router: debugCookiesRoutes,
     domain: 'misc',
@@ -1244,6 +1262,27 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Funnel checkout routes at /api/public/funnels/:tenantId/*',
+  },
+  {
+    path: '/api',
+    router: funnelOptionsSettingsRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Funnel options settings at /api/tenants/:tenantId/funnels/settings',
+  },
+  {
+    path: '/api',
+    router: couponsRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Coupon tenant CRUD at /api/tenants/:tenantId/coupons and /api/tenants/:tenantId/coupons/settings',
+  },
+  {
+    path: '/api',
+    router: couponAnalyticsRoutes,
+    domain: 'misc',
+    authLevel: 'public',
+    comment: 'Coupon analytics at /api/tenants/:tenantId/coupon-analytics, /api/public/coupon-events, /api/public/tenants/:tenantId/coupons/validate, /api/public/tenants/:tenantId/coupons/spotlight, and /api/admin/coupon-analytics',
   },
 
   // ── Permissions ──────────────────────────────────────────────────────

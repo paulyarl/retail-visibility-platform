@@ -23,7 +23,11 @@ export type QrTemplateName =
   | 'promo'
   | 'promo-sale'
   | 'bundle-promo'
-  | 'private-grant';
+  | 'private-grant'
+  | 'merchant-promo'
+  | 'coupon-flash'
+  | 'coupon-free-ship'
+  | 'coupon-bogo';
 
 export interface QrTemplate {
   name: QrTemplateName;
@@ -106,6 +110,82 @@ export const QR_TEMPLATES: Record<QrTemplateName, QrTemplate> = {
       gradientEnabled: false,
       gradientStart: '#16a34a',
       gradientEnd: '#7c3aed',
+      logoShape: 'square',
+    },
+  },
+  'merchant-promo': {
+    name: 'merchant-promo',
+    label: 'Merchant Promo',
+    description: 'Merchant coupon promotion',
+    defaults: {
+      styled: true,
+      dotType: 'rounded',
+      cornerType: 'extra-rounded',
+      cornerDotType: 'dot',
+      dotColor: '#f59e0b',
+      cornerColor: '#f59e0b',
+      cornerDotColor: '#ffffff',
+      bgColor: '#fffbeb',
+      gradientEnabled: false,
+      gradientStart: '#f59e0b',
+      gradientEnd: '#d97706',
+      logoShape: 'square',
+    },
+  },
+  'coupon-flash': {
+    name: 'coupon-flash',
+    label: 'Coupon Flash',
+    description: 'Flash sale coupon',
+    defaults: {
+      styled: true,
+      dotType: 'classy-rounded',
+      cornerType: 'rounded',
+      cornerDotType: 'dot',
+      dotColor: '#dc2626',
+      cornerColor: '#dc2626',
+      cornerDotColor: '#ffffff',
+      bgColor: '#fef2f2',
+      gradientEnabled: false,
+      gradientStart: '#dc2626',
+      gradientEnd: '#991b1b',
+      logoShape: 'square',
+    },
+  },
+  'coupon-free-ship': {
+    name: 'coupon-free-ship',
+    label: 'Coupon Free Shipping',
+    description: 'Free shipping offer',
+    defaults: {
+      styled: true,
+      dotType: 'rounded',
+      cornerType: 'extra-rounded',
+      cornerDotType: 'dot',
+      dotColor: '#16a34a',
+      cornerColor: '#16a34a',
+      cornerDotColor: '#ffffff',
+      bgColor: '#f0fdf4',
+      gradientEnabled: false,
+      gradientStart: '#16a34a',
+      gradientEnd: '#15803d',
+      logoShape: 'square',
+    },
+  },
+  'coupon-bogo': {
+    name: 'coupon-bogo',
+    label: 'Coupon BOGO',
+    description: 'Buy one get one offer',
+    defaults: {
+      styled: true,
+      dotType: 'extra-rounded',
+      cornerType: 'extra-rounded',
+      cornerDotType: 'dot',
+      dotColor: '#9333ea',
+      cornerColor: '#9333ea',
+      cornerDotColor: '#ffffff',
+      bgColor: '#faf5ff',
+      gradientEnabled: false,
+      gradientStart: '#9333ea',
+      gradientEnd: '#6b21a8',
       logoShape: 'square',
     },
   },

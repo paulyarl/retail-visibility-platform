@@ -34,6 +34,8 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
+  Tag,
+  Building2,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -282,6 +284,16 @@ export default function CapabilityShowcase({
     if (dp?.allowedTiers.includes('premium')) dpDetailParts.push('Premium');
     if (dp?.allowedTiers.includes('featured')) dpDetailParts.push('Featured');
 
+    // --- Organization Options ---
+    const oo = cap.orgOptions;
+    const ooTier = oo?.enabled ?? false;
+    const ooDetailParts: string[] = [];
+    if (oo?.allowedTabs.includes('locations')) ooDetailParts.push('Locations');
+    if (oo?.allowedTabs.includes('propagation')) ooDetailParts.push('Propagation');
+    if (oo?.allowedTabs.includes('capabilities')) ooDetailParts.push('Capabilities');
+    if (oo?.allowedTabs.includes('team')) ooDetailParts.push('Team');
+    if (oo?.allowedTabs.includes('commerce')) ooDetailParts.push('Commerce');
+
     // --- Platform Services ---
     const ps = cap.platformServices;
     const psEnabled = ps?.enabled ?? false;
@@ -312,6 +324,22 @@ export default function CapabilityShowcase({
     if (fn?.canUseUpsell) fnDetailParts.push('Upsell');
     if (fn?.canUseDownsell) fnDetailParts.push('Downsell');
     if (fn?.canUseOto) fnDetailParts.push('OTO');
+    if (fn?.canUseCouponOffer) fnDetailParts.push('Coupon Offer');
+
+    // --- Coupon Options ---
+    const cp = cap.couponOptions;
+    const cpTier = cp?.enabled ?? false;
+    const cpMerchantGated = false;
+    const cpDetailParts: string[] = [];
+    if (cp?.canUsePercentOff) cpDetailParts.push('Percent Off');
+    if (cp?.canUseFixedAmount) cpDetailParts.push('Fixed Amount');
+    if (cp?.canUseFreeShipping) cpDetailParts.push('Free Shipping');
+    if (cp?.canUseBogo) cpDetailParts.push('BOGO');
+    if (cp?.canTargetProducts) cpDetailParts.push('Targeted');
+    if (cp?.canSetLimits) cpDetailParts.push('Limits');
+    if (cp?.canViewAnalytics) cpDetailParts.push('Analytics');
+    if (cp?.canUseQrSharing) cpDetailParts.push('QR Sharing');
+    if (cp?.canUseSpotlight) cpDetailParts.push('Spotlight');
 
     return [
       {
@@ -585,6 +613,18 @@ export default function CapabilityShowcase({
         constraintWarning: getConstraintWarning('directory_promotion'),
       },
       {
+        key: "orgOptions",
+        label: "Organization",
+        icon: <Building2 className="w-4 h-4" />,
+        enabled: ooTier,
+        status: ooTier ? "enabled" : "tier-gated",
+        detail: ooTier
+          ? (ooDetailParts.length > 0 ? ooDetailParts.join(', ') : 'Available')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/organization`,
+        constraintWarning: getConstraintWarning('org_options'),
+      },
+      {
         key: "wholesaleMatching",
         label: "Wholesale Matching",
         icon: <Link2 className="w-4 h-4" />,
@@ -618,6 +658,18 @@ export default function CapabilityShowcase({
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/funnels`,
         constraintWarning: getConstraintWarning('funnel'),
+      },
+      {
+        key: "couponOptions",
+        label: "Coupons",
+        icon: <Tag className="w-4 h-4" />,
+        enabled: cpTier,
+        status: getStatus(cpTier, cpMerchantGated),
+        detail: cpTier
+          ? (cpDetailParts.length > 0 ? cpDetailParts.join(', ') : 'Available')
+          : "Not available",
+        settingsLink: `/t/${tenantId}/settings/coupon-options`,
+        constraintWarning: getConstraintWarning('coupon_options'),
       },
     ];
   }, [capabilities, tenantId]);

@@ -46,6 +46,10 @@ import {
   SocialCommerceExperienceType,
   DirectoryPromotionState,
   PromotionTierType,
+  OrgOptionsState,
+  OrgTabKey,
+  OrgPanelKey,
+  OrgPropagationType,
   CommercePaymentType,
   GatewayType,
   StorefrontType,
@@ -92,6 +96,8 @@ import {
   PlatformServiceType,
   FunnelState,
   FunnelStepType,
+  CouponOptionsState,
+  CouponDiscountType,
 } from './CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -152,9 +158,11 @@ export interface BackendEffectiveCapabilities {
     barcode_scan: BackendEffectiveBarcodeScan;
     social_commerce_options: BackendEffectiveSocialCommerceOptions;
     directory_promotion: BackendEffectiveDirectoryPromotion;
+    org_options: BackendEffectiveOrgOptions;
     wholesale_matching: BackendEffectiveWholesaleMatching;
     platform_services: BackendEffectivePlatformServices;
     funnel: BackendEffectiveFunnel;
+    coupon_options: BackendEffectiveCouponOptions;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -1029,11 +1037,31 @@ interface BackendEffectiveDirectoryPromotion {
   is_flexible: boolean;
 }
 
+interface BackendEffectiveOrgOptions {
+  enabled: boolean;
+  is_flexible: boolean;
+  allowed_tabs: string[];
+  allowed_panels: string[];
+  allowed_propagation_types: string[];
+  org_available: boolean;
+}
+
 function mapDirectoryPromotion(b: BackendEffectiveDirectoryPromotion): DirectoryPromotionState {
   return {
     enabled: b.enabled,
     isFlexible: b.is_flexible,
     allowedTiers: (b.allowed_tiers || []) as PromotionTierType[],
+  };
+}
+
+function mapOrgOptions(b: BackendEffectiveOrgOptions): OrgOptionsState {
+  return {
+    enabled: b.enabled,
+    isFlexible: b.is_flexible,
+    allowedTabs: (b.allowed_tabs || []) as OrgTabKey[],
+    allowedPanels: (b.allowed_panels || []) as OrgPanelKey[],
+    allowedPropagationTypes: (b.allowed_propagation_types || []) as OrgPropagationType[],
+    orgAvailable: b.org_available,
   };
 }
 
@@ -1081,7 +1109,26 @@ interface BackendEffectiveFunnel {
   can_use_upsell: boolean;
   can_use_downsell: boolean;
   can_use_oto: boolean;
+  can_use_coupon_offer: boolean;
   is_flexible: boolean;
+  merchant_preferences: { order_bump_enabled?: boolean | null; upsell_enabled?: boolean | null; downsell_enabled?: boolean | null; oto_enabled?: boolean | null; coupon_offer_enabled?: boolean | null } | null;
+}
+
+interface BackendEffectiveCouponOptions {
+  enabled: boolean;
+  can_create_coupons: boolean;
+  can_use_percent_off: boolean;
+  can_use_fixed_amount: boolean;
+  can_use_free_shipping: boolean;
+  can_use_bogo: boolean;
+  can_target_products: boolean;
+  can_set_limits: boolean;
+  can_view_analytics: boolean;
+  can_use_qr_sharing: boolean;
+  can_use_spotlight: boolean;
+  allowed_discount_types: string[];
+  is_flexible: boolean;
+  merchant_preferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null } | null;
 }
 
 function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
@@ -1093,7 +1140,28 @@ function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
     canUseUpsell: b.can_use_upsell,
     canUseDownsell: b.can_use_downsell,
     canUseOto: b.can_use_oto,
+    canUseCouponOffer: b.can_use_coupon_offer,
     isFlexible: b.is_flexible,
+    merchantPreferences: b.merchant_preferences ?? null,
+  };
+}
+
+function mapCouponOptions(b: BackendEffectiveCouponOptions): CouponOptionsState {
+  return {
+    enabled: b.enabled,
+    canCreateCoupons: b.can_create_coupons,
+    canUsePercentOff: b.can_use_percent_off,
+    canUseFixedAmount: b.can_use_fixed_amount,
+    canUseFreeShipping: b.can_use_free_shipping,
+    canUseBogo: b.can_use_bogo,
+    canTargetProducts: b.can_target_products,
+    canSetLimits: b.can_set_limits,
+    canViewAnalytics: b.can_view_analytics,
+    canUseQrSharing: b.can_use_qr_sharing,
+    canUseSpotlight: b.can_use_spotlight,
+    allowedDiscountTypes: (b.allowed_discount_types || []) as CouponDiscountType[],
+    isFlexible: b.is_flexible,
+    merchantPreferences: b.merchant_preferences ?? null,
   };
 }
 
@@ -1150,9 +1218,11 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     chatbotOptions: mapChatbot(b.effective.chatbot),
     socialCommerceOptions: mapSocialCommerceOptions(b.effective.social_commerce_options),
     directoryPromotion: mapDirectoryPromotion(b.effective.directory_promotion),
+    orgOptions: mapOrgOptions(b.effective.org_options),
     wholesaleMatching: mapWholesaleMatching(b.effective.wholesale_matching),
     platformServices: mapPlatformServices(b.effective.platform_services),
     funnel: mapFunnel(b.effective.funnel),
+    couponOptions: mapCouponOptions(b.effective.coupon_options),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,
@@ -1451,6 +1521,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
     return all.directoryPromotion;
   }
 
+  async getOrgOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<OrgOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.orgOptions;
+  }
+
   async getPlatformServicesState(tenantId: string, ssrAuth?: SsrAuth): Promise<PlatformServicesState> {
     const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.platformServices;
@@ -1459,6 +1534,11 @@ class UnifiedCapabilityService extends TenantApiSingleton {
   async getFunnelState(tenantId: string, ssrAuth?: SsrAuth): Promise<FunnelState> {
     const all = await this.getAllCapabilities(tenantId, ssrAuth);
     return all.funnel;
+  }
+
+  async getCouponOptionsState(tenantId: string, ssrAuth?: SsrAuth): Promise<CouponOptionsState> {
+    const all = await this.getAllCapabilities(tenantId, ssrAuth);
+    return all.couponOptions;
   }
 
   async getWholesaleMatchingState(tenantId: string, ssrAuth?: SsrAuth): Promise<WholesaleMatchingState> {
@@ -1500,6 +1580,7 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   wholesale_: 'wholesaleMatching',
   platform_service_: 'platformServices',
   platform_services_: 'platformServices',
+  coupon_: 'couponOptions',
 };
 
 function getCapabilityTypeForFeature(featureKey: string): string | null {

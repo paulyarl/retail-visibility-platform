@@ -7,7 +7,7 @@
 
 import TenantApiSingleton from '../providers/base/TenantApiSingleton';
 
-export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto';
+export type FunnelStepType = 'order_bump' | 'upsell' | 'downsell' | 'oto' | 'coupon_offer';
 
 export interface FunnelStep {
   id: string;
@@ -25,6 +25,15 @@ export interface FunnelStep {
   metadata: Record<string, any> | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface FunnelOptionsSettings {
+  funnel_options_enabled: boolean;
+  order_bump_enabled: boolean;
+  upsell_enabled: boolean;
+  downsell_enabled: boolean;
+  oto_enabled: boolean;
+  coupon_offer_enabled: boolean;
 }
 
 export interface FunnelWithSteps {
@@ -100,6 +109,14 @@ export interface FunnelAovComparison {
   orders_with_funnel: number;
   orders_without_funnel: number;
   uplift_percent: number;
+}
+
+export interface FunnelOptionsSettings {
+  order_bump_enabled: boolean;
+  upsell_enabled: boolean;
+  downsell_enabled: boolean;
+  oto_enabled: boolean;
+  coupon_offer_enabled: boolean;
 }
 
 interface ApiEnvelope<T> {
@@ -231,6 +248,68 @@ class FunnelServiceClass extends TenantApiSingleton {
       timeseries: result.data.timeseries || [],
       aov: result.data.aov || null,
     };
+  }
+
+  async getFunnelOptionsSettings(tenantId: string): Promise<FunnelOptionsSettings> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<FunnelOptionsSettings>>(
+      `/api/tenants/${tenantId}/funnels/options`,
+      { method: 'GET' },
+      `funnel-options-settings-${tenantId}`,
+      this.cacheTTL
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (result.data.error) throw new Error(result.data.error);
+    return (result.data.data as FunnelOptionsSettings) || {
+      funnel_options_enabled: true,
+      order_bump_enabled: true,
+      upsell_enabled: true,
+      downsell_enabled: true,
+      oto_enabled: true,
+      coupon_offer_enabled: true,
+    };
+  }
+
+  async updateFunnelOptionsSettings(tenantId: string, settings: FunnelOptionsSettings): Promise<void> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
+      `/api/tenants/${tenantId}/funnels/options`,
+      { method: 'PUT', body: JSON.stringify({
+        funnelOptionsEnabled: settings.funnel_options_enabled,
+        orderBumpEnabled: settings.order_bump_enabled,
+        upsellEnabled: settings.upsell_enabled,
+        downsellEnabled: settings.downsell_enabled,
+        otoEnabled: settings.oto_enabled,
+        couponOfferEnabled: settings.coupon_offer_enabled,
+      }) },
+      undefined,
+      undefined
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (result.data.error) throw new Error(result.data.error);
+    this.invalidateCache(`funnel-options-settings-${tenantId}`);
+  }
+
+  async getSettings(tenantId: string): Promise<FunnelOptionsSettings> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ settings: FunnelOptionsSettings }>>(
+      `/api/tenants/${tenantId}/funnels/settings`,
+      { method: 'GET' },
+      undefined,
+      undefined
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (result.data.error) throw new Error(result.data.error);
+    return result.data.settings;
+  }
+
+  async updateSettings(tenantId: string, settings: Partial<FunnelOptionsSettings>): Promise<FunnelOptionsSettings> {
+    const result = await this.makeDefaultRequest<ApiEnvelope<{ settings: FunnelOptionsSettings }>>(
+      `/api/tenants/${tenantId}/funnels/settings`,
+      { method: 'PUT', body: JSON.stringify(settings) },
+      undefined,
+      undefined
+    );
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+    if (result.data.error) throw new Error(result.data.error);
+    return result.data.settings;
   }
 }
 

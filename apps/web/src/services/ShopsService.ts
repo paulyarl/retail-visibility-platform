@@ -541,6 +541,35 @@ class ShopsService extends PublicApiSingleton {
     return resolution.shop || null;
   }
 
+  /**
+   * Resolve the tenant ID for a shop by any identifier (slug, tenantId, or autoId)
+   * Uses the public /api/shops/:identifier endpoint directly.
+   */
+  async getShopTenantIdByIdentifier(identifier: string): Promise<string | null> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/shops/${encodeURIComponent(identifier)}`,
+        {},
+        `shop-tenant-id-${identifier}`,
+        0,
+        {
+          context: AppContext.SHOP,
+          isolation: CacheIsolation.SHOP
+        }
+      );
+
+      if (!result.success) {
+        return null;
+      }
+
+      const responseData = result.data?.data || result.data;
+      return responseData?.tenantId || null;
+    } catch (error) {
+      clientLogger.error('[ShopsService] Failed to resolve shop tenant ID:', { detail: error });
+      return null;
+    }
+  }
+
   // ====================
   // SHOP PRODUCTS OPERATIONS
   // ====================

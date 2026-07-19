@@ -28,6 +28,7 @@ import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 
 // Status panel
 import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 // Shared
 import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
@@ -472,6 +473,11 @@ export default function StorefrontEditorialLayout({
           )}
         </div>
       </section>}
+
+      {/* Coupon Spotlight Banner */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20 mb-8">
+        <CouponSpotlight tenantId={tenant?.id || ''} coupon={null} variant="banner" />
+      </section>
 
       {/* ================================================================= */}
       {/* FEATURED SPOTLIGHT (2-col asymmetric)                              */}

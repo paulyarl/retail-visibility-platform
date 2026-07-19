@@ -263,9 +263,12 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   directory_entry: { label: 'Directory Entry', icon: '📍', settingsPath: '/settings/directory' },
   chatbot_options: { label: 'Chatbot', icon: '🤖', settingsPath: '/bot/options' },
   social_commerce_options: { label: 'Social Commerce', icon: '🛍️', settingsPath: '/settings/social-commerce' },
+  directory_promotion: { label: 'Directory Promotion', icon: '✨', settingsPath: '/settings/promotion' },
+  organization_options: { label: 'Organization', icon: '🏢', settingsPath: '/organization' },
   wholesale_matching_options: { label: 'Wholesale Matching', icon: '🔗', settingsPath: '/settings/wholesale' },
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
   funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
+  coupon_options: { label: 'Coupons', icon: '🏷️', settingsPath: '/settings/coupon-options' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -1009,6 +1012,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
     if (fn.canUseUpsell) { specifics.push('Upsell'); statuses.push({ label: 'Upsell', status: 'enabled' }); }
     if (fn.canUseDownsell) { specifics.push('Downsell'); statuses.push({ label: 'Downsell', status: 'enabled' }); }
     if (fn.canUseOto) { specifics.push('One-Time Offer'); statuses.push({ label: 'One-Time Offer', status: 'enabled' }); }
+    if (fn.canUseCouponOffer) { specifics.push('Coupon Offer'); statuses.push({ label: 'Coupon Offer', status: 'enabled' }); }
     summaries.push({
       key: 'funnel_options',
       label: CAPABILITY_DISPLAY.funnel_options.label,
@@ -1019,6 +1023,70 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'funnel_options',
       settingsPath: CAPABILITY_DISPLAY.funnel_options.settingsPath ?? null,
+    });
+  }
+
+  // Coupon Options
+  const cp = caps.couponOptions;
+  if (cp && cp.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const DISCOUNT_LABELS: Record<string, string> = { percent_off: 'Percent Off', fixed_amount: 'Fixed Amount', free_shipping: 'Free Shipping', bogo: 'BOGO' };
+    cp.allowedDiscountTypes.forEach(dt => { specifics.push(DISCOUNT_LABELS[dt] || dt); statuses.push({ label: DISCOUNT_LABELS[dt] || dt, status: 'enabled' }); });
+    if (cp.canTargetProducts) { specifics.push('Targeted'); statuses.push({ label: 'Targeted Coupons', status: 'enabled' }); }
+    if (cp.canSetLimits) { specifics.push('Limits'); statuses.push({ label: 'Redemption Limits', status: 'enabled' }); }
+    if (cp.canViewAnalytics) { specifics.push('Analytics'); statuses.push({ label: 'Analytics', status: 'enabled' }); }
+    if (cp.canUseQrSharing) { specifics.push('QR Sharing'); statuses.push({ label: 'QR Sharing', status: 'enabled' }); }
+    if (cp.canUseSpotlight) { specifics.push('Spotlight'); statuses.push({ label: 'Spotlight', status: 'enabled' }); }
+    summaries.push({
+      key: 'coupon_options',
+      label: CAPABILITY_DISPLAY.coupon_options.label,
+      icon: CAPABILITY_DISPLAY.coupon_options.icon,
+      enabled: cp.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'coupon_options',
+      settingsPath: CAPABILITY_DISPLAY.coupon_options.settingsPath ?? null,
+    });
+  }
+
+  // Directory Promotion
+  const dp = caps.directoryPromotion;
+  if (dp && dp.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    dp.allowedTiers.forEach(t => { specifics.push(t.charAt(0).toUpperCase() + t.slice(1)); statuses.push({ label: t.charAt(0).toUpperCase() + t.slice(1), status: 'enabled' }); });
+    summaries.push({
+      key: 'directory_promotion',
+      label: CAPABILITY_DISPLAY.directory_promotion.label,
+      icon: CAPABILITY_DISPLAY.directory_promotion.icon,
+      enabled: dp.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'directory_promotion',
+      settingsPath: CAPABILITY_DISPLAY.directory_promotion.settingsPath ?? null,
+    });
+  }
+
+  // Organization Options
+  const oo = caps.orgOptions;
+  if (oo && oo.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    const TAB_LABELS: Record<string, string> = { overview: 'Overview', locations: 'Locations', propagation: 'Propagation', capabilities: 'Capabilities', team: 'Team', commerce: 'Commerce', billing: 'Billing' };
+    oo.allowedTabs.forEach(t => { specifics.push(TAB_LABELS[t] || t); statuses.push({ label: TAB_LABELS[t] || t, status: 'enabled' }); });
+    summaries.push({
+      key: 'organization_options',
+      label: CAPABILITY_DISPLAY.organization_options.label,
+      icon: CAPABILITY_DISPLAY.organization_options.icon,
+      enabled: oo.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'organization_options',
+      settingsPath: CAPABILITY_DISPLAY.organization_options.settingsPath ?? null,
     });
   }
 

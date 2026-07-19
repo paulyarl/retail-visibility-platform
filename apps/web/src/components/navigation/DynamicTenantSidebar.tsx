@@ -186,6 +186,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 7a2 2 0 11-4 0 2 2 0 014 0zM12 7a2 2 0 10-4 0 2 2 0 004 0z M8 11h8a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-6a2 2 0 012-2z M9 17h.01M15 17h.01M12 3v4M4 21h16" />
     </svg>
   ),
+  Tags: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+    </svg>
+  ),
 };
 
 // Role icon mapping for dynamic templates
@@ -320,6 +325,18 @@ function buildTenantNav(
         { label: 'Skills', href: `/t/${currentTenantId}/bot/skills` },
         { label: 'Knowledge', href: `/t/${currentTenantId}/bot/knowledge` },
         { label: 'Widget', href: `/t/${currentTenantId}/bot/widget` },
+      ],
+    },
+    {
+      label: 'Coupons',
+      href: `/t/${currentTenantId}/settings/coupons`,
+      icon: <Icon.Tags />,
+      badge: 'NEW',
+      badgeVariant: 'new',
+      requiredGroup: 'IS_TENANT_USER',
+      children: [
+        { label: 'Coupon Management', href: `/t/${currentTenantId}/settings/coupons` },
+        { label: 'Coupon Options', href: `/t/${currentTenantId}/settings/coupon-options`, requiredGroup: 'IS_TENANT_ADMIN' },
       ],
     },
     {

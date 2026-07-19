@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { customerOrderService, CustomerOrder } from '@/services/CustomerOrderService';
 import { customerAddressesService } from '@/services/CustomerAddressesService';
-import { Package, MapPin, ShoppingBag, Clock, TrendingUp, Download } from 'lucide-react';
+import customerCouponWalletService from '@/services/CustomerCouponWalletService';
+import { Package, MapPin, ShoppingBag, Clock, TrendingUp, Download, Ticket } from 'lucide-react';
 import CrmCustomerWidget from '@/components/crm/CrmCustomerWidget';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -16,13 +17,17 @@ export default function AccountOverviewPage() {
   const [recentOrders, setRecentOrders] = useState<CustomerOrder[]>([]);
   const [digitalDownloadsCount, setDigitalDownloadsCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
+  const [savedCouponCount, setSavedCouponCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (customer?.email) {
       loadRecentOrders();
     }
-  }, [customer?.email]);
+    if (customer?.id) {
+      loadSavedCouponCount();
+    }
+  }, [customer?.email, customer?.id]);
 
   const loadRecentOrders = async () => {
     if (!customer?.email) return;
@@ -58,6 +63,18 @@ export default function AccountOverviewPage() {
     }
   };
 
+  const loadSavedCouponCount = async () => {
+    try {
+      const result = await customerCouponWalletService.getStats();
+      if (result.success && result.stats) {
+        setSavedCouponCount(result.stats.active);
+      }
+    } catch (error) {
+      clientLogger.error('Failed to load saved coupon count:', { detail: error });
+      setSavedCouponCount(0);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -88,7 +105,7 @@ export default function AccountOverviewPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -132,6 +149,22 @@ export default function AccountOverviewPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Link href="/account/coupons">
+          <Card className="hover:border-blue-300 hover:shadow-md transition-all cursor-pointer h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Ticket className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Saved Coupons</p>
+                  <p className="text-2xl font-bold text-gray-900">{savedCouponCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Recent Orders */}

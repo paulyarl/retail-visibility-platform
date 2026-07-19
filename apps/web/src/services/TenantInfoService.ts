@@ -2794,6 +2794,44 @@ class TenantInfoService extends TenantApiSingleton {
     }
   }
 
+  async getCouponSettings(tenantId: string): Promise<any> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/coupons/settings`,
+        {},
+        `tenant-coupon-settings-${tenantId}`,
+        this.cacheTTL,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) return null;
+      return result.data?.data ?? result.data ?? null;
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to get coupon settings:', { detail: error });
+      return null;
+    }
+  }
+
+  async updateCouponSettings(tenantId: string, settings: { couponEnabled?: boolean; spotlightEnabled?: boolean; featuredCouponId?: string | null }): Promise<any> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        `/api/tenants/${tenantId}/coupons/settings`,
+        { method: 'PUT', body: JSON.stringify(settings) },
+        undefined,
+        0,
+        { context: AppContext.TENANT, isolation: CacheIsolation.TENANT, requestType: RequestType.AUTHENTICATED }
+      );
+      if (!result.success) {
+        clientLogger.error('[TenantInfoService] Failed to update coupon settings:', { detail: result.error });
+        return null;
+      }
+      await this.invalidateCache(`tenant-coupon-settings-${tenantId}`);
+      return result.data?.data ?? result.data ?? null;
+    } catch (error) {
+      clientLogger.error('[TenantInfoService] Failed to update coupon settings:', { detail: error });
+      return null;
+    }
+  }
+
   async getOrganizations(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(

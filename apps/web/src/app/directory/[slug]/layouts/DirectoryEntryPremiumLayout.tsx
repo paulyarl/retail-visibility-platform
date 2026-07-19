@@ -25,6 +25,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 import DemoBadge from '@/components/shared/DemoBadge';
+import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 
 import type { DirectoryEntryLayoutProps } from './types';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
@@ -105,6 +106,11 @@ export default function DirectoryEntryPremiumLayout(props: DirectoryEntryLayoutP
             <img src={listing.coverImageUrl} alt="" className="w-full h-full object-cover" />
           </div>
         )}
+
+        {/* Coupon Spotlight Banner */}
+        <section className="max-w-6xl mx-auto px-6 -mt-6 relative z-20 mb-4">
+          <CouponSpotlight tenantId={listing.tenantId} coupon={null} variant="banner" />
+        </section>
 
         {/* Content */}
         <div className="max-w-6xl mx-auto px-6 py-12">

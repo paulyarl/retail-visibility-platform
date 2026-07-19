@@ -50,6 +50,12 @@ const SUPPORT_KEYWORDS = [
   'assistance', 'representative', 'manager', 'complain',
 ];
 
+const COUPON_KEYWORDS = [
+  'coupon', 'discount', 'promo', 'promo code', 'promotion code', 'voucher',
+  'save', 'deal', 'offer', 'percentage off', 'percent off', 'money off',
+  'free shipping', 'buy one get one', 'bogo', 'code', 'coupon code',
+];
+
 const POLICY_KEYWORDS = [
   'return policy', 'shipping policy', 'refund policy', 'privacy policy',
   'terms of service', 'terms and conditions', 'refund', 'return',
@@ -70,6 +76,11 @@ function isSupportQuery(message: string): boolean {
 function isPolicyQuery(message: string): boolean {
   const lower = message.toLowerCase();
   return POLICY_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isCouponQuery(message: string): boolean {
+  const lower = message.toLowerCase();
+  return COUPON_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 const SYSTEM_PROMPT_TEMPLATE = (config: BotConfig, surface?: string) => {
@@ -415,6 +426,23 @@ class BotDynamicResponseService {
       } catch (funnelError) {
         logger.warn('[BotDynamicResponseService] Funnel RAG search failed, continuing without funnel context', undefined, {
           error: funnelError instanceof Error ? funnelError.message : String(funnelError),
+        });
+      }
+
+      // Coupon offer context — inject when customer asks about coupons/discounts
+      try {
+        const hasCoupon = await knowledgeService.hasKnowledgeEmbeddings(tenantId, 'coupon');
+        if (hasCoupon && isCouponQuery(message)) {
+          const couponResult = await knowledgeService.searchKnowledge(tenantId, message, ['coupon'], 3);
+          if (couponResult.chunks.length > 0) {
+            knowledgeContext += '\n\nActive coupon offers context (only mention coupons listed here; do not invent codes, discounts, or expiry dates):\n' +
+              couponResult.chunks.map(c => c.chunkText).join('\n\n');
+            knowledgeContextUsed = true;
+          }
+        }
+      } catch (couponError) {
+        logger.warn('[BotDynamicResponseService] Coupon RAG search failed, continuing without coupon context', undefined, {
+          error: couponError instanceof Error ? couponError.message : String(couponError),
         });
       }
     } catch (knowledgeError) {

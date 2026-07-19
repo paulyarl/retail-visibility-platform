@@ -1544,3 +1544,57 @@ export function generateQrScanEventId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `qrse-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+/**
+ * Generate tenant coupon ID (tenant-scoped)
+ * Format: cpn-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateCouponId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cpn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate coupon redemption ID (tenant-scoped)
+ * Format: redm-{tenantKey}-{nanoid} (19 chars)
+ */
+export function generateRedemptionId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `redm-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate coupon event ID (tenant-scoped)
+ * Format: cpe-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateCouponEventId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cpe-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate coupon analytics aggregate ID (tenant-scoped)
+ * Format: cpa-{tenantKey}-{nanoid} (18 chars)
+ */
+export function generateCouponAnalyticsId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cpa-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate saved-coupon (wallet) ID (tenant-scoped)
+ * Format: scpn-{tenantKey}-{nanoid} (20 chars)
+ */
+export function generateSavedCouponId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `scpn-${generateTenantKey(tenantId)}-${nanoid()}`;
+}
+
+/**
+ * Generate coupon expiry reminder ID (tenant-scoped)
+ * Format: crmd-{tenantKey}-{nanoid} (20 chars)
+ */
+export function generateCouponReminderId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmd-${generateTenantKey(tenantId)}-${nanoid()}`;
+}

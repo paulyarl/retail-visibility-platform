@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { stripeConnectService } from '../../services/payments/StripeConnectService';
 import { PostPaymentFulfillment } from '../../services/PostPaymentFulfillment';
+import { redeemOrderCoupon } from '../../services/PostPaymentCouponRedemption';
 import FunnelEngine from '../../services/FunnelEngine';
 import { logger } from '../../logger';
 
@@ -164,6 +165,9 @@ router.post('/confirm-payment', async (req, res) => {
         updated_at: new Date(),
       },
     });
+
+    // Record coupon redemption after successful payment
+    await redeemOrderCoupon(payment.orders.id);
 
     // Retrieve PaymentIntent from Stripe to get PaymentMethod details for saved payment methods
     let paymentMethodId: string | undefined;

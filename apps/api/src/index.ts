@@ -242,6 +242,15 @@ if (process.env.NODE_ENV !== "test") {
         logger.error('Failed to start QR analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
 
+      // Start coupon analytics aggregation (every 6 hours) — aggregates coupon_events into coupon_analytics
+      try {
+        const { startCouponAnalyticsSync } = await import('./jobs/coupon-analytics-sync');
+        await startCouponAnalyticsSync();
+        logger.info('Coupon analytics sync started');
+      } catch (err) {
+        logger.error('Failed to start coupon analytics sync', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
+
       // Start log purge job (daily at 2 AM UTC)
       try {
         const { startLogPurgeJob } = await import('./jobs/log-purge');
