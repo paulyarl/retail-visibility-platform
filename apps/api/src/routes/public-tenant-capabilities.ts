@@ -499,6 +499,7 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_oto: false,
         can_use_coupon_offer: false,
         is_flexible: false,
+        merchant_preferences: null,
       },
       coupon_options: {
         enabled: false,
@@ -514,6 +515,7 @@ export function buildExpiredCapabilitiesResponse(tenant: {
         can_use_spotlight: false,
         allowed_discount_types: [],
         is_flexible: false,
+        merchant_preferences: null,
       },
     },
     constraint_violations: [],

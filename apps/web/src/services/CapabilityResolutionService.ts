@@ -817,6 +817,7 @@ export interface CouponOptionsState {
   canUseSpotlight: boolean;
   allowedDiscountTypes: CouponDiscountType[];
   isFlexible: boolean;
+  merchantPreferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null } | null;
 }
 
 // --- Funnel Options ---
@@ -833,6 +834,7 @@ export interface FunnelState {
   canUseOto: boolean;
   canUseCouponOffer: boolean;
   isFlexible: boolean;
+  merchantPreferences: null;
 }
 
 // --- Chatbot Options ---
@@ -2722,6 +2724,7 @@ export function resolveFunnelState(
     canUseOto,
     canUseCouponOffer,
     isFlexible: flexible,
+    merchantPreferences: null,
   };
 }
 
@@ -2764,6 +2767,7 @@ export function resolveCouponOptionsState(
     canUseSpotlight: enabled && (flexible || !!features.coupon_spotlight),
     allowedDiscountTypes,
     isFlexible: flexible,
+    merchantPreferences: null,
   };
 }
 

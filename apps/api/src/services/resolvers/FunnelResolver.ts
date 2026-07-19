@@ -50,5 +50,6 @@ export function resolveFunnelOptions(features: Record<string, boolean>): Effecti
     can_use_oto: enabled && allowed_steps.includes('oto'),
     can_use_coupon_offer: enabled && allowed_steps.includes('coupon_offer'),
     is_flexible: flexible,
+    merchant_preferences: null,
   };
 }

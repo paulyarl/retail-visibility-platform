@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useCouponOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { CouponService, Coupon } from '@/services/CouponService';

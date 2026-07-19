@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Public Capability Access Hooks
  *

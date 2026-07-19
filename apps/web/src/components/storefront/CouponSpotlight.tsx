@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Percent, DollarSign, Truck, Gift, Copy, Check } from 'lucide-react';
 import { PublicCouponService } from '@/services/PublicCouponService';

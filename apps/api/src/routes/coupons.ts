@@ -68,6 +68,21 @@ router.post('/tenants/:tenantId/coupons', authenticateToken, checkTenantAccess, 
  * GET /api/tenants/:tenantId/coupons/:id
  * Get a single coupon by ID.
  */
+/**
+ * GET /api/tenants/:tenantId/coupons/settings
+ * Get coupon settings (spotlight toggle, featured coupon).
+ */
+router.get('/tenants/:tenantId/coupons/settings', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const settings = await CouponService.getInstance().getSettings(tenantId);
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error('[coupons] Failed to get settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'Failed to get coupon settings' });
+  }
+});
+
 router.get('/tenants/:tenantId/coupons/:id', authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     const { tenantId, id } = req.params;
@@ -79,6 +94,22 @@ router.get('/tenants/:tenantId/coupons/:id', authenticateToken, checkTenantAcces
   } catch (error) {
     logger.error('[coupons] Failed to get coupon:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to get coupon' });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/coupons/settings
+ * Update coupon settings (spotlight toggle, featured coupon).
+ */
+router.put('/tenants/:tenantId/coupons/settings', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const actor = (req.user as any)?.id;
+    await CouponService.getInstance().updateSettings(tenantId, req.body, actor);
+    res.json({ success: true, message: 'Settings updated' });
+  } catch (error) {
+    logger.error('[coupons] Failed to update settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ success: false, error: 'Failed to update coupon settings' });
   }
 });
 
@@ -120,37 +151,6 @@ router.delete('/tenants/:tenantId/coupons/:id', authenticateToken, checkTenantAc
     const status = message === 'coupon_not_found' ? 404 : 500;
     logger.error('[coupons] Failed to deactivate coupon:', undefined, { error: { name: error?.name || 'Error', message, stack: error?.stack } });
     res.status(status).json({ success: false, error: message });
-  }
-});
-
-/**
- * GET /api/tenants/:tenantId/coupons/settings
- * Get coupon settings (spotlight toggle, featured coupon).
- */
-router.get('/tenants/:tenantId/coupons/settings', authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const settings = await CouponService.getInstance().getSettings(tenantId);
-    res.json({ success: true, data: settings });
-  } catch (error) {
-    logger.error('[coupons] Failed to get settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({ success: false, error: 'Failed to get coupon settings' });
-  }
-});
-
-/**
- * PUT /api/tenants/:tenantId/coupons/settings
- * Update coupon settings (spotlight toggle, featured coupon).
- */
-router.put('/tenants/:tenantId/coupons/settings', authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const actor = (req.user as any)?.id;
-    await CouponService.getInstance().updateSettings(tenantId, req.body, actor);
-    res.json({ success: true, message: 'Settings updated' });
-  } catch (error) {
-    logger.error('[coupons] Failed to update settings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({ success: false, error: 'Failed to update coupon settings' });
   }
 });
 

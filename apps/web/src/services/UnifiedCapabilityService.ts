@@ -1086,6 +1086,7 @@ interface BackendEffectiveFunnel {
   can_use_oto: boolean;
   can_use_coupon_offer: boolean;
   is_flexible: boolean;
+  merchant_preferences: null;
 }
 
 interface BackendEffectiveCouponOptions {
@@ -1102,6 +1103,7 @@ interface BackendEffectiveCouponOptions {
   can_use_spotlight: boolean;
   allowed_discount_types: string[];
   is_flexible: boolean;
+  merchant_preferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null } | null;
 }
 
 function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
@@ -1115,6 +1117,7 @@ function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
     canUseOto: b.can_use_oto,
     canUseCouponOffer: b.can_use_coupon_offer,
     isFlexible: b.is_flexible,
+    merchantPreferences: null,
   };
 }
 
@@ -1133,6 +1136,7 @@ function mapCouponOptions(b: BackendEffectiveCouponOptions): CouponOptionsState 
     canUseSpotlight: b.can_use_spotlight,
     allowedDiscountTypes: (b.allowed_discount_types || []) as CouponDiscountType[],
     isFlexible: b.is_flexible,
+    merchantPreferences: b.merchant_preferences ?? null,
   };
 }
 

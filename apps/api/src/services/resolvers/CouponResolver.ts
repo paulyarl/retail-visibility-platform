@@ -34,11 +34,11 @@ export function resolveCouponOptions(
   const groupOn = flexible || !!features.coupon_discount_types_on;
   const groupOff = !!features.coupon_discount_types_off;
 
-  const canTargetProducts = !!features.coupon_targeted;
-  const canSetLimits = !!features.coupon_limited_redemption;
-  const canViewAnalytics = !!features.coupon_analytics;
-  const canUseQrSharing = !!features.coupon_qr_sharing;
-  const canUseSpotlight = !!features.coupon_spotlight;
+  const canTargetProducts = flexible || !!features.coupon_targeted;
+  const canSetLimits = flexible || !!features.coupon_limited_redemption;
+  const canViewAnalytics = flexible || !!features.coupon_analytics;
+  const canUseQrSharing = flexible || !!features.coupon_qr_sharing;
+  const canUseSpotlight = flexible || !!features.coupon_spotlight;
 
   // Determine allowed discount types from group gate + individual feature keys
   const allowed_discount_types: CouponDiscountType[] = [];
@@ -70,5 +70,6 @@ export function resolveCouponOptions(
     can_use_spotlight: effectiveEnabled && canUseSpotlight,
     allowed_discount_types: effectiveEnabled ? allowed_discount_types : [],
     is_flexible: flexible,
+    merchant_preferences: merchantPrefs ?? null,
   };
 }

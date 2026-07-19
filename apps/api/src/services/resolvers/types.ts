@@ -930,6 +930,7 @@ export interface EffectiveFunnel {
   can_use_oto: boolean;
   can_use_coupon_offer: boolean;
   is_flexible: boolean;
+  merchant_preferences: null;
 }
 
 // ====================
@@ -952,6 +953,7 @@ export interface EffectiveCouponOptions {
   can_use_spotlight: boolean;
   allowed_discount_types: CouponDiscountType[];
   is_flexible: boolean;
+  merchant_preferences: CouponOptionsMerchantSettings | null;
 }
 
 export interface CouponOptionsMerchantSettings {

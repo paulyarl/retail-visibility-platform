@@ -850,6 +850,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
+    result.effective.coupon_options.enabled = false;
   }
 
   if (isLimited) {
@@ -861,6 +862,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.wholesale_matching.enabled = false;
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
+    result.effective.coupon_options.enabled = false;
   }
 
   // Org-level subscription status check
