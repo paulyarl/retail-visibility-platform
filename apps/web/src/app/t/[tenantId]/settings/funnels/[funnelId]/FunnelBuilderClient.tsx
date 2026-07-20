@@ -86,10 +86,10 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
           metadata: s.metadata ?? undefined,
         })));
 
-      // Resolve item names for display
+      // Resolve item names for display (skip coupon_offer steps — their offer_item_id is a coupon ID)
       const itemIds = [
         f.entry_item_id,
-        ...(f.steps ?? []).map(s => s.offer_item_id).filter(Boolean),
+        ...(f.steps ?? []).filter(s => s.step_type !== 'coupon_offer').map(s => s.offer_item_id).filter(Boolean),
       ].filter(Boolean) as string[];
       if (itemIds.length > 0) {
         const items = await Promise.all(itemIds.map(id => itemsService.getItem(id).catch(() => null)));
@@ -99,7 +99,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
         }
         const names: Record<number, string> = {};
         (f.steps ?? []).forEach((s, i) => {
-          if (s.offer_item_id) {
+          if (s.offer_item_id && s.step_type !== 'coupon_offer') {
             const item = items.find(it => it?.id === s.offer_item_id);
             if (item) names[i] = item.name;
           }
