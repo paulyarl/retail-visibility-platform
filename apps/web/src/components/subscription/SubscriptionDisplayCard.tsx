@@ -67,7 +67,7 @@ interface SubscriptionDisplayCardProps {
   className?: string;
 }
 
-const TOTAL_CAPABILITY_DOMAINS = 16;
+const TOTAL_CAPABILITY_DOMAINS = 27;
 
 const CAPABILITY_DOMAINS: Array<{ key: string; label: string; field: keyof AllCapabilitiesState }> = [
   { key: 'commerce', label: 'Commerce', field: 'commerce' },
@@ -75,25 +75,40 @@ const CAPABILITY_DOMAINS: Array<{ key: string; label: string; field: keyof AllCa
   { key: 'storefront', label: 'Storefront', field: 'storefront' },
   { key: 'barcodeScan', label: 'Barcode Scan', field: 'barcodeScan' },
   { key: 'fulfillment', label: 'Fulfillment', field: 'fulfillment' },
+  { key: 'productType', label: 'Product Types', field: 'productType' },
   { key: 'productOptions', label: 'Product Options', field: 'productOptions' },
   { key: 'featuredOptions', label: 'Featured Options', field: 'featuredOptions' },
   { key: 'integrationOptions', label: 'Integrations', field: 'integrationOptions' },
   { key: 'quickstartOptions', label: 'Quickstart', field: 'quickstartOptions' },
   { key: 'storefrontOptions', label: 'Storefront Options', field: 'storefrontOptions' },
+  { key: 'storefrontQr', label: 'Storefront QR', field: 'storefrontQr' },
+  { key: 'storefrontGallery', label: 'Image Gallery', field: 'storefrontGallery' },
+  { key: 'storefrontHours', label: 'Business Hours', field: 'storefrontHours' },
+  { key: 'storefrontLayouts', label: 'Storefront Layouts', field: 'storefrontLayouts' },
+  { key: 'storefrontMaps', label: 'Storefront Maps', field: 'storefrontMaps' },
   { key: 'directoryEntryOptions', label: 'Directory Entry', field: 'directoryEntryOptions' },
   { key: 'faqOptions', label: 'FAQ', field: 'faqOptions' },
   { key: 'crmOptions', label: 'CRM', field: 'crmOptions' },
   { key: 'chatbotOptions', label: 'Chatbot', field: 'chatbotOptions' },
   { key: 'socialCommerceOptions', label: 'Social Commerce', field: 'socialCommerceOptions' },
   { key: 'directoryPromotion', label: 'Directory Promotion', field: 'directoryPromotion' },
+  { key: 'orgOptions', label: 'Organization', field: 'orgOptions' },
+  { key: 'wholesaleMatching', label: 'Wholesale Matching', field: 'wholesaleMatching' },
+  { key: 'platformServices', label: 'Platform Services', field: 'platformServices' },
+  { key: 'funnel', label: 'Sales Funnels', field: 'funnel' },
+  { key: 'couponOptions', label: 'Coupons', field: 'couponOptions' },
 ];
 
 function countEnabledCapabilities(caps: AllCapabilitiesState): number {
   const domains = [
     caps.commerce, caps.paymentGateway, caps.storefront, caps.barcodeScan,
-    caps.fulfillment, caps.productOptions, caps.featuredOptions, caps.integrationOptions,
-    caps.quickstartOptions, caps.storefrontOptions, caps.directoryEntryOptions,
+    caps.fulfillment, caps.productType, caps.productOptions, caps.featuredOptions,
+    caps.integrationOptions, caps.quickstartOptions, caps.storefrontOptions,
+    caps.storefrontQr, caps.storefrontGallery, caps.storefrontHours,
+    caps.storefrontLayouts, caps.storefrontMaps, caps.directoryEntryOptions,
     caps.faqOptions, caps.crmOptions, caps.chatbotOptions, caps.socialCommerceOptions,
+    caps.directoryPromotion, caps.orgOptions, caps.wholesaleMatching,
+    caps.platformServices, caps.funnel, caps.couponOptions,
   ];
   return domains.filter(d => d?.enabled).length;
 }
