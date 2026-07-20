@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { Badge } from '@/components/ui/Badge';
 import { toast } from '@/hooks/use-toast';
-import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useChatbotOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { botService } from '@/services/BotService';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
+import { Zap, ArrowRight, Settings, MessageSquare, BarChart3, BookOpen } from 'lucide-react';
 
 interface BotOptionsPageProps {
   tenantId: string;
@@ -80,6 +82,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 
 export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
   const { data: chatbotCaps } = useChatbotOptionsCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
   const [settings, setSettings] = useState<ChatbotOptionsSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -140,11 +143,8 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </div>
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
       {/* Tier Status Banner */}
       {chatbotCaps && (
@@ -213,6 +213,82 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
           </CardContent>
         </Card>
       ))}
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </div>
+
+      {/* What's Next */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-600" />
+            What's Next
+          </CardTitle>
+          <p className="text-sm text-neutral-600 mt-1">
+            Continue setup for the chatbot features you just enabled
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {settings.chatbot_enabled && (
+              <Link
+                href={`/t/${tenantId}/bot/config`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 hover:border-blue-300 text-blue-900 transition-colors"
+              >
+                <Settings className="h-5 w-5 shrink-0 text-blue-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Bot Configuration</p>
+                  <p className="text-xs opacity-80 truncate">Set bot name, avatar, greeting, and personality</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.chatbot_kb_enabled && (
+              <Link
+                href={`/t/${tenantId}/bot/knowledge`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-purple-200 bg-purple-50 hover:border-purple-300 text-purple-900 transition-colors"
+              >
+                <BookOpen className="h-5 w-5 shrink-0 text-purple-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Knowledge Base</p>
+                  <p className="text-xs opacity-80 truncate">Refresh FAQ and policy embeddings for RAG</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.chatbot_widget_enabled && (
+              <Link
+                href={`/t/${tenantId}/bot/widget`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-green-200 bg-green-50 hover:border-green-300 text-green-900 transition-colors"
+              >
+                <MessageSquare className="h-5 w-5 shrink-0 text-green-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Widget Setup</p>
+                  <p className="text-xs opacity-80 truncate">Customize widget appearance and embed code</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.chatbot_enabled && (
+              <Link
+                href={`/t/${tenantId}/bot/analytics`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50 hover:border-amber-300 text-amber-900 transition-colors"
+              >
+                <BarChart3 className="h-5 w-5 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Bot Analytics</p>
+                  <p className="text-xs opacity-80 truncate">View conversation metrics and performance</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

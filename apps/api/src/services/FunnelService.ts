@@ -345,12 +345,12 @@ class FunnelService extends BaseService {
   }
 
   async getFunnelOptionsSettings(tenantId: string): Promise<{
-    funnelOptionsEnabled: boolean;
-    orderBumpEnabled: boolean;
-    upsellEnabled: boolean;
-    downsellEnabled: boolean;
-    otoEnabled: boolean;
-    couponOfferEnabled: boolean;
+    funnel_options_enabled: boolean;
+    order_bump_enabled: boolean;
+    upsell_enabled: boolean;
+    downsell_enabled: boolean;
+    oto_enabled: boolean;
+    coupon_offer_enabled: boolean;
   }> {
     const rows = await prisma.$queryRaw<
       Array<{
@@ -369,12 +369,12 @@ class FunnelService extends BaseService {
 
     const row = rows[0];
     return {
-      funnelOptionsEnabled: row?.funnel_options_enabled ?? true,
-      orderBumpEnabled: row?.order_bump_enabled ?? true,
-      upsellEnabled: row?.upsell_enabled ?? true,
-      downsellEnabled: row?.downsell_enabled ?? true,
-      otoEnabled: row?.oto_enabled ?? true,
-      couponOfferEnabled: row?.coupon_offer_enabled ?? true,
+      funnel_options_enabled: row?.funnel_options_enabled ?? true,
+      order_bump_enabled: row?.order_bump_enabled ?? true,
+      upsell_enabled: row?.upsell_enabled ?? true,
+      downsell_enabled: row?.downsell_enabled ?? true,
+      oto_enabled: row?.oto_enabled ?? true,
+      coupon_offer_enabled: row?.coupon_offer_enabled ?? true,
     };
   }
 

@@ -19,11 +19,14 @@ import {
   Search,
   ThumbsUp,
   Bot,
+  Zap,
+  ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useFaqOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useFaqOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { faqService } from '@/services/FaqService';
 import FaqControlPanel from './FaqControlPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface FaqOptionsSettings {
   faq_enabled: boolean;
@@ -138,6 +141,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 export default function FaqOptionsPage({ tenantId }: FaqOptionsPageProps) {
   const { data: faqCap } = useFaqOptionsCapability(tenantId);
   const tierState = faqCap;
+  const allCaps = useAllCapabilities(tenantId);
 
   const [settings, setSettings] = useState<FaqOptionsSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -201,6 +205,9 @@ export default function FaqOptionsPage({ tenantId }: FaqOptionsPageProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href={`/t/${tenantId}/faq`} className="p-2 rounded-md hover:bg-neutral-100 text-neutral-500">
@@ -354,6 +361,75 @@ export default function FaqOptionsPage({ tenantId }: FaqOptionsPageProps) {
           {saving ? 'Saving...' : 'Save FAQ Options'}
         </Button>
       </div>
+
+      {/* What's Next */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-600" />
+            What's Next
+          </CardTitle>
+          <p className="text-sm text-neutral-600 mt-1">
+            Continue setup for the FAQ features you just enabled
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {settings.faq_enabled && (
+              <Link
+                href={`/t/${tenantId}/faq`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 hover:border-blue-300 text-blue-900 transition-colors"
+              >
+                <HelpCircle className="h-5 w-5 shrink-0 text-blue-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">FAQ Hub</p>
+                  <p className="text-xs opacity-80 truncate">Create and manage your FAQs</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.faq_chatbot_knowledge_base && (
+              <Link
+                href={`/t/${tenantId}/bot/knowledge`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-purple-200 bg-purple-50 hover:border-purple-300 text-purple-900 transition-colors"
+              >
+                <Bot className="h-5 w-5 shrink-0 text-purple-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Bot Knowledge</p>
+                  <p className="text-xs opacity-80 truncate">Refresh bot knowledge embeddings from FAQs</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.faq_storefront_enabled && (
+              <Link
+                href={`/t/${tenantId}/settings/tenant`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-green-200 bg-green-50 hover:border-green-300 text-green-900 transition-colors"
+              >
+                <Store className="h-5 w-5 shrink-0 text-green-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Storefront Settings</p>
+                  <p className="text-xs opacity-80 truncate">Customize your storefront page where FAQs appear</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+            {settings.faq_preview_gap_report && (
+              <Link
+                href={`/t/${tenantId}/faq`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50 hover:border-amber-300 text-amber-900 transition-colors"
+              >
+                <BarChart3 className="h-5 w-5 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Gap Report</p>
+                  <p className="text-xs opacity-80 truncate">Review unanswered customer questions and create new FAQs</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Coverage Dashboard */}
       {settings.faq_enabled && (

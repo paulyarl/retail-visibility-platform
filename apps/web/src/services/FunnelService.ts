@@ -112,6 +112,7 @@ export interface FunnelAovComparison {
 }
 
 export interface FunnelOptionsSettings {
+  funnel_options_enabled: boolean;
   order_bump_enabled: boolean;
   upsell_enabled: boolean;
   downsell_enabled: boolean;
