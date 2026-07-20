@@ -48,6 +48,9 @@ export class CouponService extends TenantApiSingleton {
       { tenantId }
     );
     const responseData = result.data?.data || result.data;
+    if (Array.isArray(responseData)) {
+      return { coupons: responseData, total: result.data?.total ?? responseData.length };
+    }
     return responseData || { coupons: [], total: 0 };
   }
 

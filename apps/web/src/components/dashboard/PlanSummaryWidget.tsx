@@ -46,7 +46,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'chatbot_options', label: 'Chatbot', icon: '🤖', prefix: 'chatbot_', settingsPath: '/bot/options' },
   { key: 'social_commerce_options', label: 'Social Commerce', icon: '🛍️', prefix: 'social_commerce_', settingsPath: '/settings/social-commerce' },
   { key: 'directory_promotion', label: 'Directory Promotion', icon: '✨', prefix: 'directory_promotion_', settingsPath: '/settings/promotion' },
-  { key: 'organization_options', label: 'Organization', icon: '🏢', prefix: 'org_', settingsPath: '/organization' },
+  { key: 'organization_options', label: 'Organization', icon: '🏢', prefix: 'org_', settingsPath: '/settings/organization' },
   { key: 'wholesale_matching_options', label: 'Wholesale Matching', icon: '🔗', prefix: 'wholesale_', settingsPath: '/settings/wholesale' },
   { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
   { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },

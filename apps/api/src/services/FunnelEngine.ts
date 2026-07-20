@@ -67,6 +67,8 @@ class FunnelEngine extends BaseService {
       return null;
     }
 
+    const allowedSteps = caps.effective.funnel.allowed_steps || [];
+
     const where: any = {
       tenant_id: tenantId,
       is_active: true,
@@ -100,12 +102,15 @@ class FunnelEngine extends BaseService {
         continue;
       }
 
+      const filteredSteps = steps.filter((s) => allowedSteps.includes(s.step_type as FunnelStepType));
+      if (filteredSteps.length === 0) continue;
+
       return {
         funnel_id: funnel.id,
         name: funnel.name,
         entry_item_id: funnel.entry_item_id,
         trigger_type: funnel.trigger_type,
-        steps: steps.map((s) => ({
+        steps: filteredSteps.map((s) => ({
           id: s.id,
           step_type: s.step_type as FunnelStepType,
           offer_item_id: s.offer_item_id,
@@ -193,6 +198,11 @@ class FunnelEngine extends BaseService {
     sessionId?: string,
     customerId?: string
   ): Promise<{ accepted: boolean; revenue_cents: number; orderItemId?: string }> {
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps?.effective.funnel.enabled || !caps.effective.funnel.allowed_steps.includes('order_bump')) {
+      throw new Error('Order bump steps are not available for this tenant');
+    }
+
     const step = await prisma.tenant_funnel_steps.findFirst({
       where: { id: stepId, funnel_id: funnelId, tenant_id: tenantId, step_type: 'order_bump', is_active: true },
     });
@@ -249,6 +259,11 @@ class FunnelEngine extends BaseService {
     tenantId: string,
     orderId: string
   ): Promise<{ funnelId: string; stepId: string; step: CheckoutFunnel['steps'][number] } | null> {
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps?.effective.funnel.enabled) return null;
+
+    const allowedSteps = caps.effective.funnel.allowed_steps || [];
+
     const orderItems = await prisma.order_items.findMany({
       where: { order_id: orderId },
       select: { inventory_item_id: true },
@@ -273,8 +288,10 @@ class FunnelEngine extends BaseService {
 
     if (!funnel || funnel.tenant_funnel_steps.length === 0) return null;
 
-    // Post-payment steps exclude order_bump
-    const step = funnel.tenant_funnel_steps.find((s) => s.step_type !== 'order_bump');
+    // Post-payment steps exclude order_bump and must be in allowed_steps
+    const step = funnel.tenant_funnel_steps.find(
+      (s) => s.step_type !== 'order_bump' && allowedSteps.includes(s.step_type as FunnelStepType)
+    );
     if (!step) return null;
 
     return {
@@ -307,12 +324,23 @@ class FunnelEngine extends BaseService {
     sessionId?: string,
     customerId?: string
   ): Promise<FunnelStepResult> {
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps?.effective.funnel.enabled) {
+      throw new Error('Funnel steps are not available for this tenant');
+    }
+
+    const allowedSteps = caps.effective.funnel.allowed_steps || [];
+
     const step = await prisma.tenant_funnel_steps.findFirst({
       where: { id: stepId, funnel_id: funnelId, tenant_id: tenantId, is_active: true },
     });
 
     if (!step) {
       throw new Error('Funnel step not found');
+    }
+
+    if (!allowedSteps.includes(step.step_type as FunnelStepType)) {
+      throw new Error(`Funnel step type '${step.step_type}' is not available for this tenant`);
     }
 
     const analytics = FunnelAnalyticsService.getInstance();
@@ -356,12 +384,14 @@ class FunnelEngine extends BaseService {
       where: { id: nextStepId, funnel_id: funnelId, tenant_id: tenantId, is_active: true },
     });
 
+    const nextStepAllowed = nextStep && allowedSteps.includes(nextStep.step_type as FunnelStepType);
+
     return {
       accepted,
       order_id: orderId,
       step_id: stepId,
       next_step_id: nextStepId,
-      next_step: nextStep
+      next_step: nextStep && nextStepAllowed
         ? {
             id: nextStep.id,
             step_type: nextStep.step_type as FunnelStepType,
