@@ -203,7 +203,7 @@ export function useStorefrontState({
     if (featuredCap.data?.enabled && featuredCap.data.effectiveTypes) {
       return featuredCap.data.effectiveTypes as string[];
     }
-    console.log('[useStorefrontState] allowedFeaturedTypes FALLBACK (empty = show all)');
+    // console.log('[useStorefrontState] allowedFeaturedTypes FALLBACK (empty = show all)');
     return []; // empty = show all (graceful fallback)
   }, [featuredCap.data]);
 
