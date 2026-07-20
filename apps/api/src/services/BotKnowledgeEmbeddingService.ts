@@ -724,7 +724,6 @@ class BotKnowledgeEmbeddingService {
         tenant_funnel_steps: {
           where: { is_active: true },
           orderBy: { sort_order: 'asc' },
-          include: { inventory_items: { select: { name: true, description: true } } },
         },
       },
     });
@@ -745,7 +744,7 @@ class BotKnowledgeEmbeddingService {
 
       if (funnel.tenant_funnel_steps.length > 0) {
         const stepDescriptions = funnel.tenant_funnel_steps.map((step, index) => {
-          const offerName = step.inventory_items?.name || step.offer_item_id;
+          const offerName = step.offer_item_id;
           const lines = [`${index + 1}. ${step.step_type}: ${step.display_title || offerName}`];
           if (step.display_description) lines.push(`   Description: ${step.display_description}`);
           if (step.price_cents) lines.push(`   Offer price: $${(step.price_cents / 100).toFixed(2)}`);

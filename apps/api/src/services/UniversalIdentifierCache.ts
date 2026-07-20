@@ -297,7 +297,8 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: true,
           name: true,
           subscription_status: true,
-          metadata: true
+          metadata: true,
+          auto_id: true
         }
       });
 
@@ -318,9 +319,8 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           await this.setCache(`identifier:${tenant.slug}`, slugTenant);
         }
 
-        // Check for autoId in metadata
-        const metadata = tenant.metadata as any || {};
-        const autoId = metadata.autoId;
+        // Use auto_id column (deterministic 4-char hash stored on tenant record)
+        const autoId = tenant.auto_id;
         if (autoId) {
           const autoIdTenant = { ...resolvedTenant, type: 'auto_id' as const };
           await this.setCache(`identifier:${autoId}`, autoIdTenant);

@@ -17,6 +17,7 @@ import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { logger } from '../logger';
 import { CouponService } from '../services/CouponService';
 import { prisma } from '../prisma';
+import { generateTenantAutoId } from '../middleware/tenantAutoId';
 import BotKnowledgeEmbeddingService from '../services/BotKnowledgeEmbeddingService';
 
 const router = express.Router();
@@ -166,12 +167,19 @@ router.get('/tenants/:tenantId/coupons/:id/qr', authenticateToken, checkTenantAc
       return res.status(404).json({ success: false, error: 'Coupon not found' });
     }
 
-    // Resolve tenant autoId from metadata for short-code URL
+    // Resolve tenant autoId — use stored auto_id column, generate and persist if missing
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
-      select: { metadata: true },
+      select: { auto_id: true },
     });
-    const autoId = (tenant?.metadata as any)?.autoId || `FRSH-${tenantId.slice(-6)}`;
+    let autoId = tenant?.auto_id;
+    if (!autoId) {
+      autoId = generateTenantAutoId(tenantId);
+      await prisma.tenants.update({
+        where: { id: tenantId },
+        data: { auto_id: autoId },
+      });
+    }
 
     res.json({
       success: true,

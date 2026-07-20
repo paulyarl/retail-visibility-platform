@@ -163,7 +163,7 @@ router.get('/:identifier', async (req, res) => {
       tenantId: unifiedShop.tenantId,
       name: unifiedShop.name,
       slug: unifiedShop.slug,
-      autoId: unifiedShop.subdomain?.toUpperCase() || 'AUTOID',
+      autoId: unifiedShop.autoId || unifiedShop.subdomain?.toUpperCase() || 'AUTOID',
       description: unifiedShop.description,
       location: `${unifiedShop.city}, ${unifiedShop.state}`,
       address: unifiedShop.address,

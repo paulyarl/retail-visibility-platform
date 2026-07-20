@@ -771,6 +771,7 @@ class ShopService extends UniversalSingleton {
           t.subscription_status as fallback_subscription_status,
           t.subscription_tier as fallback_subscription_tier,
           t.subdomain as fallback_subdomain,
+          t.auto_id as auto_id,
           t.directory_visible as fallback_directory_visible,
           t.metadata as fallback_metadata,
           t.is_demo,
@@ -785,7 +786,7 @@ class ShopService extends UniversalSingleton {
           FROM inventory_items
           GROUP BY tenant_id
         ) ic ON ic.tenant_id = dsl.tenant_id
-        WHERE (dsl.tenant_id = $1 OR dsl.slug = $1)
+        WHERE (dsl.tenant_id = $1 OR dsl.slug = $1 OR t.auto_id = UPPER($1))
           AND dsl.is_published = true
         LIMIT 1
       `;
@@ -845,6 +846,7 @@ class ShopService extends UniversalSingleton {
         currency: rawShop.fallback_currency,
         subscriptionStatus: rawShop.fallback_subscription_status,
         subdomain: rawShop.fallback_subdomain,
+        autoId: rawShop.auto_id,
         directoryVisible: rawShop.fallback_directory_visible,
         metadata: rawShop.fallback_metadata,
         isDemo: rawShop.is_demo || false,

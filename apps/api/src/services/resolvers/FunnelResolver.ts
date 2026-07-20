@@ -38,7 +38,6 @@ export function resolveFunnelOptions(
   const flexible = !!features.funnel_options_flexible;
   const groupOn = flexible || !!features.funnel_options_builder_on;
   const groupOff = !!features.funnel_options_builder_off;
-  const builderEnabled = masterEnabled && !disabled && groupOn && !groupOff;
 
   // Tier-gate: which steps are allowed by tier
   const tierAllowedSteps: FunnelStepType[] = [];
@@ -62,6 +61,12 @@ export function resolveFunnelOptions(
   const allowed_steps = tierAllowedSteps.filter(s => merchantGate(s));
 
   const enabled = masterEnabled && !disabled && allowed_steps.length > 0;
+  // The funnel builder is the only way to create funnels, so it is coupled
+  // to the capability type: if the tenant has any allowed steps, the builder
+  // is enabled. The builder_on group gate and builder_off gate still control
+  // step resolution above, but builderEnabled no longer hard-blocks the UI
+  // when steps are already assigned by tier.
+  const builderEnabled = enabled && !groupOff;
 
   return {
     enabled,
