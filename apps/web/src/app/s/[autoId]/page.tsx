@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
-import { shopsService } from '@/services/ShopsService';
+import { shortCodeService } from '@/services/ShortCodeService';
 import { PublicCouponService } from '@/services/PublicCouponService';
 
 export default async function ShortCodePage({
@@ -12,8 +12,8 @@ export default async function ShortCodePage({
   const { autoId } = params;
   const couponCode = searchParams.c || '';
 
-  // Resolve tenant via public shops API
-  const tenantId = await shopsService.getShopTenantIdByIdentifier(autoId);
+  // Resolve tenant via dedicated short-code API
+  const tenantId = await shortCodeService.resolveTenantId(autoId);
 
   if (!tenantId) {
     notFound();
