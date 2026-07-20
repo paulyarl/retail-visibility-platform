@@ -52,6 +52,36 @@ router.post('/tenants/:tenantId/funnels', authenticateToken, async (req, res) =>
 });
 
 /**
+ * GET /api/tenants/:tenantId/funnels/options
+ * Get funnel options merchant preferences.
+ */
+router.get('/tenants/:tenantId/funnels/options', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const settings = await FunnelService.getInstance().getFunnelOptionsSettings(tenantId);
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error('[funnel] Failed to get funnel options settings', undefined, { tenantId: req.params.tenantId, error: (error as Error).message });
+    res.status(500).json({ error: 'Failed to get funnel options settings' });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId/funnels/options
+ * Update funnel options merchant preferences.
+ */
+router.put('/tenants/:tenantId/funnels/options', authenticateToken, checkTenantAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    await FunnelService.getInstance().updateFunnelOptionsSettings(tenantId, req.body);
+    res.json({ success: true, message: 'Funnel options updated successfully' });
+  } catch (error) {
+    logger.error('[funnel] Failed to update funnel options settings', undefined, { tenantId: req.params.tenantId, error: (error as Error).message });
+    res.status(500).json({ error: 'Failed to update funnel options settings' });
+  }
+});
+
+/**
  * GET /api/tenants/:tenantId/funnels/:funnelId
  */
 router.get('/tenants/:tenantId/funnels/:funnelId', authenticateToken, async (req, res) => {
@@ -137,36 +167,6 @@ router.get('/tenants/:tenantId/funnels/:funnelId/analytics', authenticateToken, 
   } catch (error) {
     logger.error('[funnel] Failed to get analytics', undefined, { tenantId: req.params.tenantId, funnelId: req.params.funnelId, error: (error as Error).message });
     res.status(500).json({ error: 'Failed to get funnel analytics' });
-  }
-});
-
-/**
- * GET /api/tenants/:tenantId/funnels/options
- * Get funnel options merchant preferences.
- */
-router.get('/tenants/:tenantId/funnels/options', authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    const settings = await FunnelService.getInstance().getFunnelOptionsSettings(tenantId);
-    res.json({ success: true, data: settings });
-  } catch (error) {
-    logger.error('[funnel] Failed to get funnel options settings', undefined, { tenantId: req.params.tenantId, error: (error as Error).message });
-    res.status(500).json({ error: 'Failed to get funnel options settings' });
-  }
-});
-
-/**
- * PUT /api/tenants/:tenantId/funnels/options
- * Update funnel options merchant preferences.
- */
-router.put('/tenants/:tenantId/funnels/options', authenticateToken, checkTenantAccess, async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    await FunnelService.getInstance().updateFunnelOptionsSettings(tenantId, req.body);
-    res.json({ success: true, message: 'Funnel options updated successfully' });
-  } catch (error) {
-    logger.error('[funnel] Failed to update funnel options settings', undefined, { tenantId: req.params.tenantId, error: (error as Error).message });
-    res.status(500).json({ error: 'Failed to update funnel options settings' });
   }
 });
 

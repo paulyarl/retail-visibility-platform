@@ -222,9 +222,23 @@ export class CouponService extends BaseService {
       updateData.discount_value = updates.discountValue;
     }
     if (updates.minSpendCents !== undefined) updateData.min_spend_cents = updates.minSpendCents;
-    if (updates.maxRedemptions !== undefined) updateData.max_redemptions = updates.maxRedemptions ?? null;
+    if (updates.maxRedemptions !== undefined) {
+      const caps = await resolveEffectiveCapabilities(tenantId);
+      if (updates.maxRedemptions != null && !caps?.effective.coupon_options?.can_set_limits) {
+        throw new Error('limits_not_allowed');
+      }
+      updateData.max_redemptions = updates.maxRedemptions ?? null;
+    }
     if (updates.expiresAt !== undefined) updateData.expires_at = updates.expiresAt ?? null;
-    if (updates.targetType !== undefined) updateData.target_type = updates.targetType;
+    if (updates.targetType !== undefined) {
+      if (updates.targetType !== 'all') {
+        const caps = await resolveEffectiveCapabilities(tenantId);
+        if (!caps?.effective.coupon_options?.can_target_products) {
+          throw new Error('targeting_not_allowed');
+        }
+      }
+      updateData.target_type = updates.targetType;
+    }
     if (updates.targetIds !== undefined) updateData.target_ids = updates.targetIds;
     if (updates.promotionalMessage !== undefined) updateData.promotional_message = updates.promotionalMessage;
     if (updates.termsSummary !== undefined) updateData.terms_summary = updates.termsSummary;
@@ -324,6 +338,19 @@ export class CouponService extends BaseService {
 
     if (!coupon) {
       return { valid: false, couponId: null, code, discountType: 'none', discountValue: 0, discountCents: 0, minSpendCents: 0, message: 'Coupon not found', reason: 'not_found' };
+    }
+
+    // Effective capability gate — ensures tier, purchases, admin grants, and merchant prefs are all respected
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    const couponCaps = caps?.effective.coupon_options;
+    if (!couponCaps?.enabled) {
+      return { valid: false, couponId: coupon.id, code: coupon.code, discountType: coupon.discount_type, discountValue: coupon.discount_value, discountCents: 0, minSpendCents: coupon.min_spend_cents, message: 'Coupons are not currently available', reason: 'capability_disabled' };
+    }
+    if (!couponCaps.allowed_discount_types.includes(coupon.discount_type as any)) {
+      return { valid: false, couponId: coupon.id, code: coupon.code, discountType: coupon.discount_type, discountValue: coupon.discount_value, discountCents: 0, minSpendCents: coupon.min_spend_cents, message: 'This coupon type is no longer available', reason: 'discount_type_not_allowed' };
+    }
+    if (coupon.target_type && coupon.target_type !== 'all' && !couponCaps.can_target_products) {
+      return { valid: false, couponId: coupon.id, code: coupon.code, discountType: coupon.discount_type, discountValue: coupon.discount_value, discountCents: 0, minSpendCents: coupon.min_spend_cents, message: 'Targeted coupons are no longer available', reason: 'targeting_not_allowed' };
     }
 
     if (!coupon.is_active) {
@@ -433,6 +460,12 @@ export class CouponService extends BaseService {
   // ====================
 
   async getSpotlightCoupon(tenantId: string): Promise<Coupon | null> {
+    // Effective capability gate — spotlight must be allowed by tier/purchases/admin grants AND merchant pref
+    const caps = await resolveEffectiveCapabilities(tenantId);
+    if (!caps?.effective.coupon_options?.can_use_spotlight) {
+      return null;
+    }
+
     const settings = await prisma.tenant_coupon_options_settings.findUnique({
       where: { tenant_id: tenantId },
     });

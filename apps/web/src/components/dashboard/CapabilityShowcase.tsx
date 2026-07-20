@@ -621,7 +621,7 @@ export default function CapabilityShowcase({
         detail: ooTier
           ? (ooDetailParts.length > 0 ? ooDetailParts.join(', ') : 'Available')
           : "Not available",
-        settingsLink: `/t/${tenantId}/organization`,
+        settingsLink: `/t/${tenantId}/settings/organization`,
         constraintWarning: getConstraintWarning('org_options'),
       },
       {
