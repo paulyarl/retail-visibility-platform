@@ -48,6 +48,7 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
   const [spotlightSaving, setSpotlightSaving] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [qrCoupon, setQrCoupon] = useState<{ id: string; code: string } | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const couponService = CouponService.getInstance();
 
@@ -142,8 +143,6 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
       setSaving(false);
     }
   };
-
-  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const handleToggleActive = async (coupon: Coupon) => {
     setTogglingId(coupon.id);
