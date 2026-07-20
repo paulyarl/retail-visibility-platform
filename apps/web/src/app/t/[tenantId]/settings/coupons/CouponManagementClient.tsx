@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog';
-import { Plus, Pencil, Trash2, Star, QrCode, Loader2, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, QrCode, Loader2, Tag, ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
 import CouponQRDialog from './CouponQRDialog';
 
 interface CouponFormData {
@@ -35,7 +36,7 @@ const EMPTY_FORM: CouponFormData = {
 };
 
 export default function CouponManagementClient({ tenantId }: { tenantId: string }) {
-  const { data: capState, loading: capLoading } = useCouponOptionsCapability(tenantId);
+  const { data: capState, loading: capLoading, error: capError } = useCouponOptionsCapability(tenantId);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,9 +71,12 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
         setFeaturedCouponId(settings.featuredCouponId ?? null);
       }
     } catch {
-      // non-critical
+      // non-critical — fall back to merchantPreferences from capability state
+      if (capState?.merchantPreferences) {
+        setSpotlightEnabled(capState.merchantPreferences.spotlight_enabled ?? false);
+      }
     }
-  }, [tenantId]);
+  }, [tenantId, capState?.merchantPreferences]);
 
   useEffect(() => {
     if (capState?.enabled) {
@@ -88,7 +92,7 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
       </div>
     );
   }
-  if (!capState?.enabled) {
+  if (capError || !capState || !capState.enabled) {
     return (
       <div className="p-6 text-center">
         <Tag className="mx-auto h-12 w-12 text-gray-300 mb-4" />
@@ -181,6 +185,13 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
 
   return (
     <div className="p-6 space-y-6">
+      <Link
+        href={`/t/${tenantId}/dashboard`}
+        className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Coupon Management</h1>

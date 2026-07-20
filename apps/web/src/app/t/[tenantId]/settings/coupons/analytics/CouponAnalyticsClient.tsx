@@ -24,7 +24,7 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
 const DAYS_BACK_OPTIONS = [7, 14, 30, 60, 90];
 
 export default function CouponAnalyticsClient({ tenantId }: CouponAnalyticsClientProps) {
-  const { data: capState, loading: capLoading } = useCouponOptionsCapability(tenantId);
+  const { data: capState, loading: capLoading, error: capError } = useCouponOptionsCapability(tenantId);
   const [dashboard, setDashboard] = useState<any>(null);
   const [funnel, setFunnel] = useState<any>(null);
   const [roi, setRoi] = useState<any>(null);
@@ -102,7 +102,7 @@ export default function CouponAnalyticsClient({ tenantId }: CouponAnalyticsClien
     );
   }
 
-  if (!capState?.enabled || !capState?.canViewAnalytics) {
+  if (capError || !capState || !capState.enabled || !capState.canViewAnalytics) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
         <Tag className="w-12 h-12 text-gray-300 mx-auto mb-3" />

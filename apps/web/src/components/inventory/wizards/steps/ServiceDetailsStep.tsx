@@ -298,7 +298,7 @@ export default function ServiceDetailsStep({ data, errors, onChange }: ServiceDe
                   id="depositAmount"
                   type="number"
                   min={0}
-                  step="0.01"
+                  step="1"
                   placeholder="e.g. 50.00"
                   value={data.depositAmount ?? ''}
                   onChange={(e) => {

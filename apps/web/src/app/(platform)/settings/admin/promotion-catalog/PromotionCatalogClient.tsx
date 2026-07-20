@@ -376,7 +376,7 @@ function PlanModal({ plan, levels, onClose, onSaved }: { plan: PromotionPlan | n
               <label className="block text-sm font-medium text-gray-700 mb-1">Price (USD)</label>
               <input
                 type="number"
-                step="0.01"
+                step="1"
                 value={form.priceCents}
                 onChange={(e) => setForm({ ...form, priceCents: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"

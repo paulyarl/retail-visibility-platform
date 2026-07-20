@@ -607,7 +607,7 @@ export default function ServiceChargesTab() {
               placeholder="0.00"
               decimalScale={2}
               min={0}
-              step={0.01}
+              step={1}
               {...createForm.getInputProps('amountDollars')}
               required
             />
@@ -805,7 +805,7 @@ export default function ServiceChargesTab() {
               placeholder="0.00"
               decimalScale={2}
               min={0}
-              step={0.01}
+              step={1}
               {...editForm.getInputProps('amountDollars')}
               required
             />

@@ -215,7 +215,7 @@ export default function VariantBulkOperations({
             <label className="block text-sm font-medium mb-2">Sale Price ($)</label>
             <input
               type="number"
-              step="0.01"
+              step="1"
               min="0"
               placeholder="0.00"
               value={operationData.salePriceCents ? operationData.salePriceCents / 100 : ''}

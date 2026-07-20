@@ -364,7 +364,7 @@ export default function ProductVariants({
                 <Input
                   label="Price ($)"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   value={priceInputs[index] !== undefined ? priceInputs[index] : (variants[index].price_cents / 100).toFixed(2)}
                   onChange={(e) => handlePriceInputChange(index, e.target.value)}
@@ -377,7 +377,7 @@ export default function ProductVariants({
                 <Input
                   label="Sale Price ($)"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   value={salePriceInputs[index] !== undefined ? salePriceInputs[index] : (variants[index].sale_price_cents ? (variants[index].sale_price_cents / 100).toFixed(2) : '')}
                   onChange={(e) => handleSalePriceInputChange(index, e.target.value)}
