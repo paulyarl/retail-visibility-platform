@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog';
-import { Plus, Pencil, Trash2, Star, QrCode, Loader2, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, QrCode, Loader2, Tag, ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
 import CouponQRDialog from './CouponQRDialog';
 
 interface CouponFormData {
@@ -184,6 +185,13 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
 
   return (
     <div className="p-6 space-y-6">
+      <Link
+        href={`/t/${tenantId}/dashboard`}
+        className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Back to Dashboard
+      </Link>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Coupon Management</h1>
