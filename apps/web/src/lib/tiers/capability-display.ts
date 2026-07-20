@@ -25,6 +25,10 @@ export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: 
   { key: 'storefront_types', label: 'Storefront Types', flexibleKeys: ['storefront_flexible'], group: 'Platform Presence' },
   { key: 'storefront_options', label: 'Storefront Options', flexibleKeys: ['storefront_opt_flexible'], group: 'Platform Presence' },
   { key: 'storefront_qr', label: 'QR Codes', flexibleKeys: ['storefront_qr_flexible'], group: 'Platform Presence' },
+  { key: 'storefront_gallery', label: 'Image Gallery', flexibleKeys: ['storefront_gallery_flexible'], group: 'Platform Presence' },
+  { key: 'storefront_hours', label: 'Business Hours', flexibleKeys: ['storefront_hours_flexible'], group: 'Platform Presence' },
+  { key: 'storefront_layouts', label: 'Storefront Layouts', flexibleKeys: ['storefront_layouts_flexible'], group: 'Platform Presence' },
+  { key: 'storefront_maps', label: 'Storefront Maps', flexibleKeys: ['storefront_maps_flexible'], group: 'Platform Presence' },
   { key: 'fulfillment_options', label: 'Fulfillment', flexibleKeys: ['fulfillment_flexible'], group: 'Commerce & Conversion' },
   { key: 'barcode_scan_options', label: 'Barcode Scan', flexibleKeys: ['barcode_flexible'], group: 'Clover & Inventory' },
   { key: 'product_types', label: 'Product Types', flexibleKeys: ['product_types_flexible'], group: 'Clover & Inventory' },
@@ -38,7 +42,11 @@ export const CAPABILITY_META: Array<{ key: string; label: string; flexibleKeys: 
   { key: 'directory_entry_options', label: 'Directory Entry', flexibleKeys: ['directory_entry_flexible'], group: 'Google Visibility' },
   { key: 'social_commerce_options', label: 'Social Commerce', flexibleKeys: ['social_commerce_flexible'], group: 'Management & Growth' },
   { key: 'directory_promotion', label: 'Directory Promotion', flexibleKeys: ['directory_promotion_flexible'], group: 'Google Visibility' },
-  { key: 'wholesale_matching_options', label: 'Wholesale Matching', flexibleKeys: ['wholesale_matching_flexible'], group: 'Commerce & Conversion' },
+  { key: 'wholesale_matching', label: 'Wholesale Matching', flexibleKeys: ['wholesale_matching_flexible'], group: 'Commerce & Conversion' },
+  { key: 'organization_options', label: 'Organization', flexibleKeys: ['org_flexible'], group: 'Management & Growth' },
+  { key: 'platform_services', label: 'Platform Services', flexibleKeys: [], group: 'Management & Growth' },
+  { key: 'funnel_options', label: 'Sales Funnels', flexibleKeys: ['funnel_options_flexible'], group: 'Commerce & Conversion' },
+  { key: 'coupon_options', label: 'Coupons', flexibleKeys: ['coupon_flexible'], group: 'Commerce & Conversion' },
 ];
 
 export interface ResolvedCapSummary {
@@ -55,6 +63,10 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
   const sf = caps.storefront;
   const so = caps.storefrontOptions;
   const sqr = caps.storefrontQr;
+  const sg = caps.storefrontGallery;
+  const sh = caps.storefrontHours;
+  const sl = caps.storefrontLayouts;
+  const sm = caps.storefrontMaps;
   const fl = caps.fulfillment;
   const bc = caps.barcodeScan;
   const pt = caps.productType;
@@ -69,6 +81,10 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
   const scc = caps.socialCommerceOptions;
   const dp = caps.directoryPromotion;
   const wm = caps.wholesaleMatching;
+  const org = caps.orgOptions;
+  const ps = caps.platformServices;
+  const fn = caps.funnel;
+  const coupon = caps.couponOptions;
 
   return [
     { key: 'commerce_types', label: 'Commerce', enabled: c.enabled, flexible: c.isFlexible, detail: c.effectivePaymentType !== 'none' ? `Payments: ${c.effectivePaymentType}` : 'Disabled' },
@@ -76,6 +92,10 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
     { key: 'storefront_types', label: 'Storefront Types', enabled: sf.type !== 'none' && (sf.allowedTypes ?? []).length > 0, flexible: sf.isFlexible, detail: sf.effectiveType !== 'none' ? `Type: ${sf.effectiveType}` : 'Not configured' },
     { key: 'storefront_options', label: 'Storefront Options', enabled: so.enabled, flexible: so.isFlexible, detail: so.enabled ? (so.isFlexible ? 'All options unlocked' : 'Customizable') : 'Default' },
     { key: 'storefront_qr', label: 'QR Codes', enabled: sqr.enabled, flexible: sqr.isFlexible, detail: sqr.enabled ? (sqr.qrStyledEnabled ? 'Styled QR enabled' : sqr.qrClassicEnabled ? 'Classic QR' : 'Available') : 'Not available' },
+    { key: 'storefront_gallery', label: 'Image Gallery', enabled: sg.enabled, flexible: sg.isFlexible, detail: sg.enabled ? (sg.canUseMagazineGallery ? 'Magazine gallery' : sg.canUseGallery ? 'Image gallery' : 'Available') : 'Not available' },
+    { key: 'storefront_hours', label: 'Business Hours', enabled: sh.enabled, flexible: sh.isFlexible, detail: sh.enabled ? (sh.canShowHoursDisplay ? 'Hours display' : 'Available') : 'Not available' },
+    { key: 'storefront_layouts', label: 'Storefront Layouts', enabled: sl.enabled, flexible: sl.isFlexible, detail: sl.enabled ? (sl.effectiveLayout ? `Layout: ${sl.effectiveLayout}` : 'Available') : 'Not available' },
+    { key: 'storefront_maps', label: 'Storefront Maps', enabled: sm.enabled, flexible: sm.isFlexible, detail: sm.enabled ? (sm.canUseInteractiveMaps ? 'Interactive maps' : sm.canShowMapDisplay ? 'Map display' : 'Available') : 'Not available' },
     { key: 'fulfillment_options', label: 'Fulfillment', enabled: fl.enabled, flexible: fl.isFlexible, detail: fl.effectiveShowsPickup || fl.effectiveShowsDelivery || fl.effectiveShowsShipping ? [fl.effectiveShowsPickup && 'Pickup', fl.effectiveShowsDelivery && 'Delivery', fl.effectiveShowsShipping && 'Shipping'].filter(Boolean).join(', ') : 'Not configured' },
     { key: 'barcode_scan_options', label: 'Barcode Scan', enabled: bc.enabled, flexible: bc.isFlexible, detail: (bc.effectiveModes ?? []).length > 0 ? `Modes: ${bc.effectiveModes.join(', ')}` : 'Not available' },
     { key: 'product_types', label: 'Product Types', enabled: pt.enabled, flexible: pt.isFlexible, detail: (pt.effectiveTypes ?? []).length > 0 ? pt.effectiveTypes.join(', ') : 'Standard' },
@@ -89,7 +109,11 @@ export function summarizeResolvedCapabilities(caps: AllCapabilitiesState): Resol
     { key: 'directory_entry_options', label: 'Directory Entry', enabled: de.enabled, flexible: de.isFlexible, detail: de.enabled ? `${de.effectiveLayout ?? 'classic'} layout` : 'Not available' },
     { key: 'social_commerce_options', label: 'Social Commerce', enabled: scc.enabled, flexible: scc.isFlexible, detail: scc.enabled ? [scc.metaEnabled && 'Meta', scc.tiktokEnabled && 'TikTok', scc.canUseShareButtons && 'Share'].filter(Boolean).join(', ') || 'Available' : 'Not available' },
     { key: 'directory_promotion', label: 'Directory Promotion', enabled: dp.enabled, flexible: dp.isFlexible, detail: dp.enabled ? (dp.allowedTiers ?? []).join(', ') : 'Not available' },
-    { key: 'wholesale_matching_options', label: 'Wholesale Matching', enabled: wm.enabled, flexible: wm.isFlexible, detail: wm.enabled ? `Tier: ${wm.tier}` : 'Not available' },
+    { key: 'wholesale_matching', label: 'Wholesale Matching', enabled: wm.enabled, flexible: wm.isFlexible, detail: wm.enabled ? `Tier: ${wm.tier}` : 'Not available' },
+    { key: 'organization_options', label: 'Organization', enabled: org.enabled, flexible: org.isFlexible, detail: org.enabled ? (org.allowedTabs ?? []).join(', ') : 'Not available' },
+    { key: 'platform_services', label: 'Platform Services', enabled: ps.enabled, flexible: ps.isFlexible, detail: ps.enabled ? ((ps.allowedServices ?? []).length > 0 ? ps.allowedServices.join(', ') : 'Available') : 'Not available' },
+    { key: 'funnel_options', label: 'Sales Funnels', enabled: fn.enabled, flexible: fn.isFlexible, detail: fn.enabled ? (fn.allowedSteps ?? []).join(', ') : 'Not available' },
+    { key: 'coupon_options', label: 'Coupons', enabled: coupon.enabled, flexible: coupon.isFlexible, detail: coupon.enabled ? (coupon.allowedDiscountTypes ?? []).join(', ') : 'Not available' },
   ];
 }
 
@@ -221,6 +245,11 @@ export function buildEffectiveFeatures(
       payment_gateway_options: allCaps.paymentGateway?.features || {},
       storefront_types: allCaps.storefront?.features || {},
       storefront_options: allCaps.storefrontOptions?.features || {},
+      storefront_qr: allCaps.storefrontQr?.features || {},
+      storefront_gallery: allCaps.storefrontGallery?.features || {},
+      storefront_hours: allCaps.storefrontHours?.features || {},
+      storefront_layouts: allCaps.storefrontLayouts?.features || {},
+      storefront_maps: allCaps.storefrontMaps?.features || {},
       fulfillment_options: allCaps.fulfillment?.features || {},
       barcode_scan_options: allCaps.barcodeScan?.features || {},
       product_types: allCaps.productType?.features || {},
@@ -233,6 +262,7 @@ export function buildEffectiveFeatures(
       faq_options: allCaps.faqOptions?.features || {},
       directory_entry_options: allCaps.directoryEntryOptions?.features || {},
       social_commerce_options: allCaps.socialCommerceOptions?.features || {},
+      wholesale_matching: allCaps.wholesaleMatching?.features || {},
     };
     capFlexibleSet.forEach(capKey => {
       const rawMap = rawFeatureMaps[capKey];
