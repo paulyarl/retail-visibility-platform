@@ -303,8 +303,8 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                 <label className="text-sm font-medium mb-1 block">Min Cart Value ($)</label>
                 <Input
                   type="number"
-                  step="0.01"
-                  value={minCartValueCents !== null ? (minCartValueCents / 100).toFixed(2) : ''}
+                  step="1"
+                  value={minCartValueCents !== null ? minCartValueCents / 100 : ''}
                   onChange={(e) => setMinCartValueCents(e.target.value ? Math.round(parseFloat(e.target.value) * 100) : null)}
                   placeholder="0.00"
                 />
@@ -464,8 +464,8 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                       <label className="text-xs font-medium mb-1 block">Offer Price ($)</label>
                       <Input
                         type="number"
-                        step="0.01"
-                        value={step.price_cents !== null && step.price_cents !== undefined ? (step.price_cents / 100).toFixed(2) : ''}
+                        step="1"
+                        value={step.price_cents !== null && step.price_cents !== undefined ? step.price_cents / 100 : ''}
                         onChange={(e) => updateStep(index, { price_cents: e.target.value ? Math.round(parseFloat(e.target.value) * 100) : null })}
                         placeholder="Leave empty for product price"
                       />
@@ -474,8 +474,8 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                       <label className="text-xs font-medium mb-1 block">Discount ($)</label>
                       <Input
                         type="number"
-                        step="0.01"
-                        value={step.discount_cents ? (step.discount_cents / 100).toFixed(2) : '0'}
+                        step="1"
+                        value={step.discount_cents ? step.discount_cents / 100 : '0'}
                         onChange={(e) => updateStep(index, { discount_cents: e.target.value ? Math.round(parseFloat(e.target.value) * 100) : 0 })}
                         placeholder="0.00"
                       />

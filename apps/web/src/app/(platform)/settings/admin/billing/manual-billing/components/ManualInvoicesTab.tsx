@@ -499,7 +499,7 @@ export default function ManualInvoicesTab() {
               placeholder="0.00"
               decimalScale={2}
               min={0}
-              step={0.01}
+              step={1}
               {...createForm.getInputProps('amountDollars')}
               required
             />
@@ -568,7 +568,7 @@ export default function ManualInvoicesTab() {
               placeholder="0.00"
               decimalScale={2}
               min={0}
-              step={0.01}
+              step={1}
               {...markPaidForm.getInputProps('amountDollars')}
               required
             />
@@ -660,7 +660,7 @@ export default function ManualInvoicesTab() {
               placeholder="0.00"
               decimalScale={2}
               min={0}
-              step={0.01}
+              step={1}
               {...editForm.getInputProps('amountDollars')}
               required
             />

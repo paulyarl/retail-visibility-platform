@@ -156,7 +156,7 @@ export default function PaymentSettingsPage() {
                 <Input
                   id="minimumAmount"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   value={paymentSettings.minimumPaymentAmount.amount / 100}
                   onChange={(e) => handleAmountChange(e.target.value)}

@@ -138,7 +138,7 @@ export function CreateTierModal({ isOpen, onClose, onSubmit, submitting }: Creat
                 value={form.priceMonthly}
                 onChange={(e) => setForm({ ...form, priceMonthly: e.target.value })}
                 placeholder="e.g., 99.00"
-                step="0.01"
+                step="1"
                 className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
               />
             </div>
@@ -343,7 +343,7 @@ export function EditTierModal({ isOpen, tier, onClose, onSubmit, submitting }: E
                 type="number"
                 value={form.priceMonthly}
                 onChange={(e) => setForm({ ...form, priceMonthly: e.target.value })}
-                step="0.01"
+                step="1"
                 className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
               />
             </div>

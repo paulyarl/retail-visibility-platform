@@ -94,7 +94,7 @@ export default function CouponAnalyticsClient({ tenantId }: CouponAnalyticsClien
     }
   };
 
-  if (capLoading) {
+  if (capLoading || !capState) {
     return (
       <div className="flex items-center justify-center py-20">
         <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
@@ -102,7 +102,7 @@ export default function CouponAnalyticsClient({ tenantId }: CouponAnalyticsClien
     );
   }
 
-  if (!capState?.enabled || !capState?.canViewAnalytics) {
+  if (!capState.enabled || !capState.canViewAnalytics) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
         <Tag className="w-12 h-12 text-gray-300 mx-auto mb-3" />

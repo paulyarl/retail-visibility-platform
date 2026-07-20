@@ -196,7 +196,7 @@ export default function ProductAdoptionModal({
                 value={price}
                 onChange={(val) => setPrice(Number(val) || 0)}
                 min={0}
-                step={0.01}
+                step={1}
               />
               <NumberInput
                 label="Initial Stock"

@@ -70,9 +70,12 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
         setFeaturedCouponId(settings.featuredCouponId ?? null);
       }
     } catch {
-      // non-critical
+      // non-critical — fall back to merchantPreferences from capability state
+      if (capState?.merchantPreferences) {
+        setSpotlightEnabled(capState.merchantPreferences.spotlight_enabled ?? false);
+      }
     }
-  }, [tenantId]);
+  }, [tenantId, capState?.merchantPreferences]);
 
   useEffect(() => {
     if (capState?.enabled) {
@@ -81,14 +84,14 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
     }
   }, [capState?.enabled, loadCoupons, loadSpotlightSettings]);
 
-  if (capLoading) {
+  if (capLoading || !capState) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
       </div>
     );
   }
-  if (!capState?.enabled) {
+  if (capState && !capState.enabled) {
     return (
       <div className="p-6 text-center">
         <Tag className="mx-auto h-12 w-12 text-gray-300 mb-4" />

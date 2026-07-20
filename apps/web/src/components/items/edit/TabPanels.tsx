@@ -215,7 +215,7 @@ export function PricingTab({ values, setters, saving, tenantId }: TabProps) {
         <Input
           label="List Price (Regular Price)"
           type="number"
-          step="0.01"
+          step="1"
           min="0"
           value={values.price}
           onChange={(e) => setters.setPrice(e.target.value)}
@@ -229,7 +229,7 @@ export function PricingTab({ values, setters, saving, tenantId }: TabProps) {
         <Input
           label="Sale Price (Optional)"
           type="number"
-          step="0.01"
+          step="1"
           min="0"
           value={values.salePrice}
           onChange={(e) => setters.setSalePrice(e.target.value)}
