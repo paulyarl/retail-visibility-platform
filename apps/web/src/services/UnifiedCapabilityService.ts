@@ -9,8 +9,6 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
-import { RequestType } from '@/providers/base/FlexibleApiSingleton';
-import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import {
   AllCapabilitiesState,
   CommerceState,
@@ -1284,15 +1282,10 @@ class UnifiedCapabilityService extends TenantApiSingleton {
         const endpoint = `/api/tenants/${tenantId}/effective-capabilities`;
         const result = await this.makeDefaultRequest<{ success: boolean; data: BackendEffectiveCapabilities }>(
           endpoint,
-          {},
+          { method: 'GET' },
           cachekey,
           this.CACHE_TTL,
-          {
-            context: AppContext.TENANT,
-            isolation: CacheIsolation.TENANT,
-            requestType: RequestType.AUTHENTICATED,
-            ssrAuth
-          }
+          ssrAuth ? { ssrAuth } : undefined
         );
         if (!result.success) {
           clientLogger.error('[UnifiedCapabilityService] Failed to fetch capabilities:', { detail: result.error });

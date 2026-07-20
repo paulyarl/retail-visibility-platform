@@ -35,7 +35,7 @@ const EMPTY_FORM: CouponFormData = {
 };
 
 export default function CouponManagementClient({ tenantId }: { tenantId: string }) {
-  const { data: capState, loading: capLoading } = useCouponOptionsCapability(tenantId);
+  const { data: capState, loading: capLoading, error: capError } = useCouponOptionsCapability(tenantId);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -84,14 +84,14 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
     }
   }, [capState?.enabled, loadCoupons, loadSpotlightSettings]);
 
-  if (capLoading || !capState) {
+  if (capLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
       </div>
     );
   }
-  if (capState && !capState.enabled) {
+  if (capError || !capState || !capState.enabled) {
     return (
       <div className="p-6 text-center">
         <Tag className="mx-auto h-12 w-12 text-gray-300 mb-4" />
