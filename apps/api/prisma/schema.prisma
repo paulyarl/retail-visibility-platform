@@ -5925,14 +5925,20 @@ model coupon_redemptions {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tenant_coupon_options_settings {
-  id                 String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
-  tenant_id          String   @unique @db.VarChar(255)
-  coupon_enabled     Boolean  @default(false)
-  spotlight_enabled  Boolean  @default(false)
-  featured_coupon_id String?  @db.VarChar(255)
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @db.Timestamptz(6)
-  tenants            tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_coupon_options_tenant")
+  id                      String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+  tenant_id               String   @unique @db.VarChar(255)
+  coupon_enabled          Boolean  @default(false)
+  spotlight_enabled       Boolean  @default(false)
+  featured_coupon_id      String?  @db.VarChar(255)
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+  percent_off_enabled     Boolean  @default(true)
+  fixed_amount_enabled    Boolean  @default(true)
+  free_shipping_enabled   Boolean  @default(true)
+  bogo_enabled            Boolean  @default(true)
+  target_products_enabled Boolean  @default(true)
+  qr_sharing_enabled      Boolean  @default(true)
+  tenants                 tenants  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_coupon_options_tenant")
 
   @@index([tenant_id], map: "idx_coupon_options_tenant")
 }

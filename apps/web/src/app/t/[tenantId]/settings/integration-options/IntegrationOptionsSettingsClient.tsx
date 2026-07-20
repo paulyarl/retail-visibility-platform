@@ -8,7 +8,7 @@ import { Link2, ShoppingCart, Search, Save, AlertCircle, ArrowRight, Plug, Packa
 import Link from 'next/link';
 import { useIntegrationOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import type { IntegrationType, IntegrationGroup } from '@/services/CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -250,7 +250,7 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
   if (isIntegrationExplicitlyDisabled) {
     return (
       <div className="space-y-6">
-        <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="integration_options" tenantId={tenantId} />
+        <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
         <div className="p-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 dark:bg-amber-900/50 rounded-full mb-4">
             <AlertCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
@@ -268,8 +268,8 @@ export default function IntegrationOptionsSettingsClient({ tenantId }: Integrati
 
   return (
     <div className="space-y-6">
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="integration_options" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${

@@ -7,7 +7,7 @@ import { Save, AlertCircle, CheckCircle2, Lock, Zap, ArrowRight, Globe, MapPin, 
 import Link from 'next/link';
 import { useStorefrontLayoutsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface StorefrontLayoutsSettings {
   layouts_enabled: boolean;
@@ -98,8 +98,8 @@ export default function StorefrontLayoutsSettingsClient({ tenantId }: Storefront
         </div>
       </div>
 
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps ?? null} loading={!allCaps} highlightCapability="storefront_layouts" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps ?? null} loading={!allCaps} tenantId={tenantId} />
 
       {/* Error banner */}
       {error && (

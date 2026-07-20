@@ -8,7 +8,7 @@ import { Save, AlertCircle, CheckCircle2, Image, Lock, LayoutGrid, GalleryHorizo
 import Link from 'next/link';
 import { useStorefrontGalleryCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface StorefrontGallerySettings {
   gallery_enabled: boolean;
@@ -121,8 +121,8 @@ export default function StorefrontGallerySettingsClient({ tenantId }: Storefront
         </div>
       </div>
 
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps ?? null} loading={!allCaps} highlightCapability="storefront_gallery" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps ?? null} loading={!allCaps} tenantId={tenantId} />
 
       {/* Error banner */}
       {error && (

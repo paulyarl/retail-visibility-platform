@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { useStorefrontOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { getStorefrontOptMeta, StorefrontOptGroup } from '@/utils/storefrontOptions';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import { clientLogger } from '@/lib/client-logger';
 
 interface StorefrontOptionsSettings {
@@ -261,10 +261,9 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
   if (cap && !cap.enabled) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <PlanSummaryPanel
+        <PlanSummaryWidget
           capabilities={allCaps.data}
           loading={allCaps.loading}
-          highlightCapability="storefront_options"
           tenantId={tenantId}
         />
         <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
@@ -286,11 +285,10 @@ export default function StorefrontOptionsSettingsClient({ tenantId }: Storefront
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Plan Summary */}
-      <PlanSummaryPanel
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget
         capabilities={allCaps.data}
         loading={allCaps.loading}
-        highlightCapability="storefront_options"
         tenantId={tenantId}
       />
 

@@ -9,6 +9,9 @@
  *   <capability_key>_<group>_<feature>
  *
  * For coupon_options the group is "discount_types" and the features are the discount types.
+ *
+ * Merchant gates: each feature has a merchant toggle (default true). The effective
+ * can_use_* flag is tier-allowed AND merchant-enabled. This mirrors FunnelResolver.
  */
 
 import type {
@@ -17,11 +20,11 @@ import type {
   CouponOptionsMerchantSettings,
 } from './types';
 
-const DISCOUNT_TYPE_MAP: { key: string; type: CouponDiscountType }[] = [
-  { key: 'coupon_percent_off', type: 'percent_off' },
-  { key: 'coupon_fixed_amount', type: 'fixed_amount' },
-  { key: 'coupon_free_shipping', type: 'free_shipping' },
-  { key: 'coupon_bogo', type: 'bogo' },
+const DISCOUNT_TYPE_MAP: { key: string; type: CouponDiscountType; toggleKey: keyof CouponOptionsMerchantSettings }[] = [
+  { key: 'coupon_percent_off', type: 'percent_off', toggleKey: 'percent_off_enabled' },
+  { key: 'coupon_fixed_amount', type: 'fixed_amount', toggleKey: 'fixed_amount_enabled' },
+  { key: 'coupon_free_shipping', type: 'free_shipping', toggleKey: 'free_shipping_enabled' },
+  { key: 'coupon_bogo', type: 'bogo', toggleKey: 'bogo_enabled' },
 ];
 
 export function resolveCouponOptions(
@@ -34,27 +37,54 @@ export function resolveCouponOptions(
   const groupOn = flexible || !!features.coupon_discount_types_on;
   const groupOff = !!features.coupon_discount_types_off;
 
-  const canTargetProducts = flexible || !!features.coupon_targeted;
-  const canSetLimits = flexible || !!features.coupon_limited_redemption;
-  const canViewAnalytics = flexible || !!features.coupon_analytics;
-  const canUseQrSharing = flexible || !!features.coupon_qr_sharing;
-  const canUseSpotlight = flexible || !!features.coupon_spotlight;
+  const tierCanTargetProducts = flexible || !!features.coupon_targeted;
+  const tierCanSetLimits = flexible || !!features.coupon_limited_redemption;
+  const tierCanViewAnalytics = flexible || !!features.coupon_analytics;
+  const tierCanUseQrSharing = flexible || !!features.coupon_qr_sharing;
+  const tierCanUseSpotlight = flexible || !!features.coupon_spotlight;
 
-  // Determine allowed discount types from group gate + individual feature keys
-  const allowed_discount_types: CouponDiscountType[] = [];
+  // Determine tier-allowed discount types from group gate + individual feature keys
+  const tierAllowedDiscountTypes: CouponDiscountType[] = [];
   for (const { key, type } of DISCOUNT_TYPE_MAP) {
     if (groupOn && !groupOff) {
-      allowed_discount_types.push(type);
+      tierAllowedDiscountTypes.push(type);
     } else if (!groupOff && !!features[key]) {
-      allowed_discount_types.push(type);
+      tierAllowedDiscountTypes.push(type);
     }
   }
 
-  const tierEnabled = masterEnabled && !disabled && allowed_discount_types.length > 0;
+  const tierEnabled = masterEnabled && !disabled && tierAllowedDiscountTypes.length > 0;
+
+  // Merchant gate helper (default true if no prefs)
+  const merchantGate = (toggleKey: keyof CouponOptionsMerchantSettings): boolean => {
+    if (!merchantPrefs) return true;
+    const val = merchantPrefs[toggleKey];
+    return val === null || val === undefined ? true : !!val;
+  };
 
   // Merchant preference soft toggle (default: enabled if tier allows)
-  const prefEnabled = merchantPrefs?.coupon_enabled !== false;
+  const prefEnabled = merchantGate('coupon_enabled');
   const effectiveEnabled = tierEnabled && prefEnabled;
+
+  // Apply merchant gates to each feature
+  const mPercentOff = merchantGate('percent_off_enabled');
+  const mFixedAmount = merchantGate('fixed_amount_enabled');
+  const mFreeShipping = merchantGate('free_shipping_enabled');
+  const mBogo = merchantGate('bogo_enabled');
+  const mTargetProducts = merchantGate('target_products_enabled');
+  const mQrSharing = merchantGate('qr_sharing_enabled');
+  const mSpotlight = merchantGate('spotlight_enabled');
+
+  // Filter discount types by merchant gate
+  const allowed_discount_types = effectiveEnabled
+    ? tierAllowedDiscountTypes.filter(dt => {
+        if (dt === 'percent_off') return mPercentOff;
+        if (dt === 'fixed_amount') return mFixedAmount;
+        if (dt === 'free_shipping') return mFreeShipping;
+        if (dt === 'bogo') return mBogo;
+        return true;
+      })
+    : [];
 
   return {
     enabled: effectiveEnabled,
@@ -63,12 +93,12 @@ export function resolveCouponOptions(
     can_use_fixed_amount: effectiveEnabled && allowed_discount_types.includes('fixed_amount'),
     can_use_free_shipping: effectiveEnabled && allowed_discount_types.includes('free_shipping'),
     can_use_bogo: effectiveEnabled && allowed_discount_types.includes('bogo'),
-    can_target_products: effectiveEnabled && canTargetProducts,
-    can_set_limits: effectiveEnabled && canSetLimits,
-    can_view_analytics: effectiveEnabled && canViewAnalytics,
-    can_use_qr_sharing: effectiveEnabled && canUseQrSharing,
-    can_use_spotlight: effectiveEnabled && canUseSpotlight,
-    allowed_discount_types: effectiveEnabled ? allowed_discount_types : [],
+    can_target_products: effectiveEnabled && tierCanTargetProducts && mTargetProducts,
+    can_set_limits: effectiveEnabled && tierCanSetLimits,
+    can_view_analytics: effectiveEnabled && tierCanViewAnalytics,
+    can_use_qr_sharing: effectiveEnabled && tierCanUseQrSharing && mQrSharing,
+    can_use_spotlight: effectiveEnabled && tierCanUseSpotlight && mSpotlight,
+    allowed_discount_types,
     is_flexible: flexible,
     merchant_preferences: merchantPrefs ?? null,
   };

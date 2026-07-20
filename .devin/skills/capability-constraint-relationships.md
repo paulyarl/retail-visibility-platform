@@ -12,7 +12,7 @@ Admins can define cross-capability constraint relationships via the admin UI at 
 2. `CapabilityConstraintService.ts` loads active constraints from DB (60s in-memory cache)
 3. `CapabilityConstraintResolver.applyCrossCapabilityConstraints()` evaluates all constraints against the assembled effective capability manifest during resolution (Step 5.5)
 4. Violations are surfaced to:
-   - **Dashboard** — `ConstraintAlertBanner` (block=red, warn=amber) + `CapabilityShowcase` row-level warnings + `PlanSummaryPanel` constraint section
+   - **Dashboard** — `ConstraintAlertBanner` (block=red, warn=amber) + `CapabilityShowcase` row-level warnings + `PlanSummaryPanel` constraint section (plan-summary page) + `PlanSummaryWidget` (dashboard + options pages)
    - **Settings PUT handlers** — `validateProposedChange()` blocks writes that would introduce `block`-severity violations (returns 403 `constraint_violation`)
 5. Static fallback: `CapabilityConstraintRegistry.ts` seeds 6 initial constraints. If DB is empty or unreachable, these are used instead.
 

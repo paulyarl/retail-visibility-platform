@@ -9,7 +9,7 @@ import { AlertCircle, Save, Filter, Zap, TrendingUp, ArrowDownCircle, Sparkles, 
 import Link from 'next/link';
 import { useFunnelCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import FunnelService, { type FunnelOptionsSettings, type FunnelStepType } from '@/services/FunnelService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import { clientLogger } from '@/lib/client-logger';
 import { toast } from '@/hooks/use-toast';
 
@@ -137,7 +137,7 @@ export default function FunnelOptionsSettingsClient({ tenantId }: FunnelOptionsS
 
   return (
     <div className="space-y-6">
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="funnel_options" tenantId={tenantId} />
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>

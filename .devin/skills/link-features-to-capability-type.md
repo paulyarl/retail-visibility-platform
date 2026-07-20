@@ -132,7 +132,7 @@ Linking features to a capability type only makes them **available at the capabil
 
 4. **Add a merchant toggle** on the settings page if the feature should be configurable per-tenant.
 
-5. **Update the PlanSummaryPanel** (`@/components/settings/PlanSummaryPanel.tsx`) to surface the new features in the tenant dashboard plan summary:
+5. **Update the PlanSummaryPanel** (`@/components/settings/PlanSummaryPanel.tsx` — for the dedicated plan-summary page only; options pages use `PlanSummaryWidget`) to surface the new features in the tenant dashboard plan summary:
    - Add label maps for any new feature types / layouts.
    - Update `resolveCapabilitySummaries` to list the new features under the correct capability block (e.g. `product_options`, `storefront_options`).
    - If the feature uses an effective state (tier-allowed + merchant preference), add the effective flag to `CapabilityResolutionService` and reference it in the panel.

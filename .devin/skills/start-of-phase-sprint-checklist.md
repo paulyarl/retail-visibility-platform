@@ -192,7 +192,7 @@ cd apps/web && npx tsc --noEmit
   4. Resolver (`XxxResolver.ts`) + types + `EffectiveCapabilityResolver.ts`
   5. Route (`xxx-options-settings.ts` with GET + PUT + tier filtering + cache invalidation)
   6. Map (`UnifiedCapabilityService.ts` + `CapabilityResolutionService.ts`)
-  7. Display (`PlanSummaryWidget.tsx` (dashboard) + `PlanSummaryPanel.tsx` (plan-summary page) + `CapabilityShowcase.tsx` + settings page)
+  7. Display (`PlanSummaryWidget.tsx` (dashboard + options pages) + `PlanSummaryPanel.tsx` (plan-summary page only) + `CapabilityShowcase.tsx` + settings page)
   8. Verify (TS checks + `verify-capability-deployment.md`)
 
 - [ ] **Check for cross-capability constraints.** Will the new feature depend on or conflict with another capability? If yes, plan a constraint entry in `capability_constraints_list` and `CapabilityConstraintRegistry.ts`.

@@ -38,7 +38,7 @@ Use this when you need to add a new `FunnelStepType` that is not a product offer
 - Add the new `can_use_<step>` field to `CONSTRAINT_METADATA` in `apps/api/src/routes/admin/capability-constraints.ts`.
 - Add any cross-capability CCL constraints in `apps/api/src/services/resolvers/CapabilityConstraintRegistry.ts` (e.g., `funnel.can_use_coupon_offer` requires `coupon_options.enabled`).
 - Add the new field/empty default to `buildExpiredCapabilitiesResponse` in `apps/api/src/routes/public-tenant-capabilities.ts`.
-- Surface the new feature in `PlanSummaryPanel.tsx` and `CapabilityShowcase.tsx` if it should appear in plan summaries.
+- Surface the new feature in `PlanSummaryWidget.tsx` (dashboard + options pages), `PlanSummaryPanel.tsx` (plan-summary page only), and `CapabilityShowcase.tsx` if it should appear in plan summaries.
 
 ## 6. Feature seeding
 

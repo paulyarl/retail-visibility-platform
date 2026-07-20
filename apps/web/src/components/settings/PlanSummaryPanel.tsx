@@ -1043,7 +1043,7 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       label: CAPABILITY_DISPLAY.coupon_options.label,
       icon: CAPABILITY_DISPLAY.coupon_options.icon,
       enabled: cp.enabled,
-      merchantGated: false,
+      merchantGated: true,
       specificFeatures: specifics,
       featureStatuses: statuses,
       isHighlighted: highlight === 'coupon_options',

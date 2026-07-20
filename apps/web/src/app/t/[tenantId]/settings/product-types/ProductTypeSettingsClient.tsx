@@ -8,7 +8,7 @@ import { Package, Download, Layers, Wrench, Save, AlertCircle, Settings, Externa
 import Link from 'next/link';
 import { useProductTypeCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import { clientLogger } from '@/lib/client-logger';
 
 interface ProductTypeSettings {
@@ -179,8 +179,8 @@ export default function ProductTypeSettingsClient({ tenantId }: ProductTypeSetti
 
   return (
     <div className="space-y-6">
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="product_types" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>

@@ -230,7 +230,7 @@ After seeding feature keys into `features_list`, the feature is **not automatica
    - Destructure the tier-gate boolean from the capability hook data (e.g. `showsSupplierCatalog = productOptionsCap.data?.showsSupplierCatalog ?? true`).
    - Render a toggle row in the appropriate group card, following the same pattern as existing features (tier-gated `Switch` with "Not included in your plan" label when disabled).
 
-10. **Update the PlanSummaryPanel** in `apps/web/src/components/settings/PlanSummaryPanel.tsx`:
+10. **Update the PlanSummaryPanel** in `apps/web/src/components/settings/PlanSummaryPanel.tsx` (for the dedicated plan-summary page only — options pages use `PlanSummaryWidget` instead):
    - Add the capability type key to the `CAPABILITY_DISPLAY` map with a label, icon, and `settingsPath`.
    - Add a summary block in `resolveCapabilitySummaries()` that reads from the mapped state (e.g. `caps.chatbotOptions`) and pushes feature labels + statuses.
    - If the capability is entirely new, also add it to `AllCapabilitiesState` in `CapabilityResolutionService.ts` and `mapAll` in `UnifiedCapabilityService.ts` (covered in step 8).
@@ -238,7 +238,7 @@ After seeding feature keys into `features_list`, the feature is **not automatica
 10b. **Update the PlanSummaryWidget** in `apps/web/src/components/dashboard/PlanSummaryWidget.tsx`:
    - Add an entry to the `CAPABILITY_META` array with the capability key, label, icon, feature key prefix, and `settingsPath`.
    - The widget uses the prefix to determine color-coded status (green=tier, red=disabled, orange=merchant-gated, blue=purchased, purple=admin-grant) by checking `purchasedFeatureKeys` and `overrideFeatureKeys` for keys matching the prefix.
-   - A capability missing from `CAPABILITY_META` will not appear on the dashboard slim widget.
+   - A capability missing from `CAPABILITY_META` will not appear on the dashboard widget OR on any options/settings pages (which now use the widget instead of the full panel).
 
 11. **Update the CapabilityShowcase** in `apps/web/src/components/dashboard/CapabilityShowcase.tsx`:
     - Add a row to the `rows` array in the `useMemo` block for the new capability.
@@ -328,7 +328,7 @@ After unification, `features` on every state object is always `{}` (legacy compa
 - **Do not forget the Zod validation schema** — when adding a new enum value to a capability's type union (e.g. `'social'` in `StorefrontTypeValue`), the `z.enum([...])` in the route file must be updated to include it. TypeScript will not catch this because Zod enums are runtime constructs. A missing value causes the PUT endpoint to 400-reject the new value before it reaches the tier gate, even though the resolver, service, and frontend all accept it.
 - **Do not forget the merchant settings toggle** — a feature wired in the backend resolver, Zod schema, and `UnifiedCapabilityService` mapper will still be invisible to merchants if the settings client component (e.g. `ProductOptionsSettingsClient.tsx`) doesn't render a toggle for it. This is the most commonly skipped step — the backend and mapper work silently, but the merchant has no UI to control it.
 - **Do not forget the `*State` type in `CapabilityResolutionService.ts`** — when adding a field to an existing domain, the `BackendEffective{Domain}` interface in `UnifiedCapabilityService.ts` and the `{Domain}State` interface in `CapabilityResolutionService.ts` must both be updated. The hook (e.g. `useProductOptionsCapability`) returns `CapabilityHookState<{Domain}State>`, so a field missing from the State type is inaccessible even if the mapper and backend are correct.
-- **Do not forget the PlanSummaryPanel** — a capability missing from `CAPABILITY_DISPLAY` and `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx` will not appear in the tenant's plan summary card, even though it works functionally.
+- **Do not forget the PlanSummaryPanel and PlanSummaryWidget** — a capability missing from `CAPABILITY_DISPLAY` and `resolveCapabilitySummaries()` in `PlanSummaryPanel.tsx` will not appear on the dedicated plan-summary page. A capability missing from `CAPABILITY_META` in `PlanSummaryWidget.tsx` will not appear on the dashboard OR on any options/settings pages (which now use the widget instead of the full panel).
 - **Do not forget the CapabilityShowcase** — a capability missing from the `rows` array in `CapabilityShowcase.tsx` will not appear in the "Your Capabilities" card on the tenant dashboard, even though it works functionally.
 - **Do not forget CCL write-time validation** — if a `block` severity constraint references the new capability, the PUT handler MUST call `await validateProposedChange()` with a simulated effective state before persisting. Forgetting this allows invalid configurations to be saved. See R22 in `capability-data-flow-rules.md`.
 - **Do not forget the `flexible ||` prefix on standalone feature flags** — when adding a new feature flag to a resolver, always prefix the check with `flexible ||` (R23). Standalone booleans outside the group array pattern (e.g., `featured_expiry_monitor`) are the most commonly missed. Without the prefix, the feature stays disabled on flexible tiers even though the admin granted full capability access via `*_flexible`.

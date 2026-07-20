@@ -12,7 +12,7 @@ Capability-altering features (commerce settings, fulfillment options, product op
 |---|---|
 | Settings pages (`/settings/commerce`, `/settings/product-options`, etc.) | Any tenant member could navigate directly via URL |
 | Sidebar nav links | Non-admin users see links to pages they can't access |
-| Dashboard widgets (`PlanSummaryPanel`, `CapabilityShowcase`) | Clickable links route non-admins to gated pages |
+| Dashboard widgets (`PlanSummaryWidget`, `CapabilityShowcase`) | Clickable links route non-admins to gated pages |
 | `TenantSettings` cards | Cards were clickable by all roles |
 | API PUT/POST routes | No tenant-role check on write operations |
 
@@ -144,12 +144,12 @@ Pass `readOnly` prop based on `canEdit`:
 ```tsx
 const { canEdit } = useTenantBehaviorAccess(tenantId);
 
-<PlanSummaryPanel readOnly={!canEdit} />
+<PlanSummaryWidget readOnly={!canEdit} />
 <CapabilityShowcase readOnly={!canEdit} />
 ```
 
 When `readOnly` is true:
-- `PlanSummaryPanel`: Capability card links are non-clickable
+- `PlanSummaryWidget`: Capability links are non-clickable
 - `CapabilityShowcase`: `Link` components replaced with non-clickable `div`
 
 ### 5. Gating an API Route (Layer 5)
@@ -222,7 +222,7 @@ return filterByTenantRole(filterByCapability(filterNavItems(processedItems)));
 | Entrance Point | TENANT_ADMIN | TENANT_MANAGER | TENANT_MEMBER | TENANT_VIEWER |
 |---|---|---|---|---|
 | Capability settings pages | Full access | AccessDenied | AccessDenied | AccessDenied |
-| PlanSummaryPanel links | Clickable | Read-only | Read-only | Read-only |
+| PlanSummaryWidget links | Clickable | Read-only | Read-only | Read-only |
 | CapabilityShowcase links | Clickable | Read-only | Read-only | Read-only |
 | TenantSettings cards | Clickable | Disabled | Disabled | Disabled |
 | Sidebar nav links (admin) | Visible | Hidden | Hidden | Hidden |
@@ -239,7 +239,7 @@ When adding a new capability-altering feature, verify all 5 layers:
 
 - [ ] **Layer 1 — Sidebar:** Add `requiredGroup: 'IS_TENANT_ADMIN'` to nav item in `buildTenantNav()` and/or set `required_group` column in `navigation_links` table
 - [ ] **Layer 2 — Settings Card:** Add `accessOptions: { roles: ['admin', 'support'] }` to card in `TenantSettings.tsx`
-- [ ] **Layer 3 — Dashboard:** Pass `readOnly={!canEdit}` to `PlanSummaryPanel` and `CapabilityShowcase`
+- [ ] **Layer 3 — Dashboard:** Pass `readOnly={!canEdit}` to `PlanSummaryWidget` and `CapabilityShowcase`
 - [ ] **Layer 4 — Page Guard:** Wrap page with `<TenantGuard tenantId={tenantId}>`
 - [ ] **Layer 5 — API:** Apply `requireTenantAdmin` middleware to PUT/POST route
 

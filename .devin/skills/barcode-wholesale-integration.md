@@ -288,7 +288,7 @@ The `wholesale_matching` capability is fully wired through the 8-phase deploymen
 - **`EffectiveCapabilityResolver.ts`**: Added to `buildExpiredCapabilitiesResponse`, `isReadOnly` override block, and `isLimited` override block (R13, R23, R27)
 - **`CAPABILITY_META`** (`apps/web/src/lib/tiers/capability-display.ts`): Entry with label, icon, and summary fields
 - **`summarizeResolvedCapabilities`**: Includes `wholesale_matching` in the summary output
-- **`PlanSummaryPanel.tsx`** (`CAPABILITY_DISPLAY` map): Display entry for the plan summary panel
+- **`PlanSummaryPanel.tsx`** (`CAPABILITY_DISPLAY` map): Display entry for the plan summary panel (plan-summary page only — options pages use `PlanSummaryWidget`)
 - **`CapabilityShowcase.tsx`** (rows array): Row with icon, label, enabled check, status, detail, settings link, and constraint warning
 - **`CONSTRAINT_METADATA`** (`apps/api/src/routes/admin/capability-constraints.ts`): Entry with capability key, label, fields, operators, and values
 - **`UnifiedCapabilityService.ts`**: Backend interface mapping including `can_view_brand_partners`

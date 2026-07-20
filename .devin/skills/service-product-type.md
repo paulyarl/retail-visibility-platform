@@ -208,7 +208,7 @@ const pricingModel = metadata.pricingModel || metadata.pricing_model || product.
    - Multi-select toggle pattern (not radio) for `selected_product_types`
    - Validate against `allowedTypes` from capability resolver
 
-5. **Update `PlanSummaryPanel.tsx`**:
+5. **Update `PlanSummaryPanel.tsx`** (plan-summary page only — options pages use `PlanSummaryWidget`):
    - Add type to `PRODUCT_TYPE_LABELS` record
    - Use `effectiveTypes.includes(t)` for status (not scalar `effectiveType`)
 

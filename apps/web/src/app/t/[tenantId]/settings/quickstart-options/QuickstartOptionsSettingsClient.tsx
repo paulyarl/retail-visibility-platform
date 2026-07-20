@@ -8,7 +8,7 @@ import { Rocket, Sparkles, Bot, Image, Save, AlertCircle, LayoutGrid, CheckCircl
 import Link from 'next/link';
 import { useQuickstartOptionsCapability, useAllCapabilities, useStorefrontCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import { clientLogger } from '@/lib/client-logger';
 
 interface QuickstartOptionsSettings {
@@ -173,11 +173,10 @@ export default function QuickstartOptionsSettingsClient({ tenantId }: Quickstart
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Plan Summary */}
-      <PlanSummaryPanel
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget
         capabilities={allCaps.data}
         loading={allCaps.loading}
-        highlightCapability="quickstart_options"
         tenantId={tenantId}
       />
 

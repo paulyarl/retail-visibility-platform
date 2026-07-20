@@ -968,6 +968,12 @@ export interface EffectiveCouponOptions {
 export interface CouponOptionsMerchantSettings {
   coupon_enabled?: boolean | null;
   spotlight_enabled?: boolean | null;
+  percent_off_enabled?: boolean | null;
+  fixed_amount_enabled?: boolean | null;
+  free_shipping_enabled?: boolean | null;
+  bogo_enabled?: boolean | null;
+  target_products_enabled?: boolean | null;
+  qr_sharing_enabled?: boolean | null;
 }
 
 // ====================

@@ -147,7 +147,7 @@ Two components on the tenant dashboard display capability status. A capability m
 - [ ] The row appears in the "Your Capabilities" card on the tenant dashboard
 - [ ] If the capability has active constraint violations, an `AlertTriangle` icon + amber warning text is shown
 
-**PlanSummaryPanel** (`apps/web/src/components/settings/PlanSummaryPanel.tsx`):
+**PlanSummaryPanel** (`apps/web/src/components/settings/PlanSummaryPanel.tsx`) — dedicated plan-summary page only:
 - [ ] The capability type key is in the `CAPABILITY_DISPLAY` map
 - [ ] A summary block exists in `resolveCapabilitySummaries()` that reads from the mapped state
 - [ ] The capability appears in the plan summary card
