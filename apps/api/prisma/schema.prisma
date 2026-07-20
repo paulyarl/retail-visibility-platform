@@ -2222,6 +2222,7 @@ model inventory_items {
   product_variants                                                                product_variants[]
   shopping_cart_items                                                             shopping_cart_items[]
   store_reviews                                                                   store_reviews[]
+  tenant_funnel_steps                                                             tenant_funnel_steps[]
   tenant_sales_funnels                                                            tenant_sales_funnels[]
 
   @@unique([tenant_id, sku])
@@ -5759,6 +5760,7 @@ model tenant_funnel_steps {
   accept_to_step       tenant_funnel_steps?  @relation("FunnelStepBranchingAccept", fields: [accept_to_step_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_accept_to")
   other_steps_accept   tenant_funnel_steps[] @relation("FunnelStepBranchingAccept")
   tenant_sales_funnels tenant_sales_funnels  @relation(fields: [funnel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_funnel_steps_funnel")
+  inventory_items      inventory_items?      @relation(fields: [offer_item_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_offer_item")
   skip_to_step         tenant_funnel_steps?  @relation("FunnelStepBranchingSkip", fields: [skip_to_step_id], references: [id], onUpdate: NoAction, map: "fk_tenant_funnel_steps_skip_to")
   other_steps_skip     tenant_funnel_steps[] @relation("FunnelStepBranchingSkip")
 
