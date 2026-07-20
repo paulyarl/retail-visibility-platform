@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { CouponService } from '../services/CouponService';
+import { prisma } from '../prisma';
+import { generateTenantAutoId } from '../middleware/tenantAutoId';
 
 export default async function handler(req: Request, res: Response) {
   const { tenantId, id } = req.params;
@@ -9,6 +11,21 @@ export default async function handler(req: Request, res: Response) {
     if (!coupon) {
       return res.status(404).json({ success: false, error: 'Coupon not found' });
     }
+
+    // Resolve tenant autoId — use stored auto_id column, generate and persist if missing
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId as string },
+      select: { auto_id: true },
+    });
+    let autoId = tenant?.auto_id;
+    if (!autoId) {
+      autoId = generateTenantAutoId(tenantId as string);
+      await prisma.tenants.update({
+        where: { id: tenantId as string },
+        data: { auto_id: autoId },
+      });
+    }
+
     res.json({
       success: true,
       data: {
@@ -16,7 +33,7 @@ export default async function handler(req: Request, res: Response) {
         code: coupon.code,
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
-        shortCodeUrl: `/s/FRSH?c=${encodeURIComponent(coupon.code)}`,
+        shortCodeUrl: `/s/${autoId}?c=${encodeURIComponent(coupon.code)}`,
         fullUrl: `/tenant/${tenantId}?coupon=${encodeURIComponent(coupon.code)}`,
       },
     });

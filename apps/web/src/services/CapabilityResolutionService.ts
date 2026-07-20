@@ -2720,24 +2720,31 @@ export function resolveFunnelState(
   features: Record<string, boolean>
 ): FunnelState {
   const disabled = !!features.funnel_options_disabled;
-  const enabled = !disabled && (!!features.funnel_options_enabled || !!features.funnel_options_builder_on);
+  const masterEnabled = !disabled && !!features.funnel_options_enabled;
   const flexible = !!features.funnel_options_flexible;
-  const builderOn = !disabled && (!!features.funnel_options_builder_on || flexible);
+  const groupOn = flexible || !!features.funnel_options_builder_on;
   const builderOff = !!features.funnel_options_builder_off;
-  const builderEnabled = enabled && builderOn && !builderOff;
 
   const allowedSteps: FunnelStepType[] = [];
-  const canUseOrderBump = builderEnabled && (flexible || !!features.funnel_options_builder_order_bump);
-  const canUseUpsell = builderEnabled && (flexible || !!features.funnel_options_builder_upsell);
-  const canUseDownsell = builderEnabled && (flexible || !!features.funnel_options_builder_downsell);
-  const canUseOto = builderEnabled && (flexible || !!features.funnel_options_builder_oto);
-  const canUseCouponOffer = builderEnabled && (flexible || !!features.funnel_options_builder_coupon_offer);
+  const canUseOrderBump = !builderOff && (groupOn || !!features.funnel_options_builder_order_bump) && (flexible || !!features.funnel_options_builder_order_bump);
+  const canUseUpsell = !builderOff && (groupOn || !!features.funnel_options_builder_upsell) && (flexible || !!features.funnel_options_builder_upsell);
+  const canUseDownsell = !builderOff && (groupOn || !!features.funnel_options_builder_downsell) && (flexible || !!features.funnel_options_builder_downsell);
+  const canUseOto = !builderOff && (groupOn || !!features.funnel_options_builder_oto) && (flexible || !!features.funnel_options_builder_oto);
+  const canUseCouponOffer = !builderOff && (groupOn || !!features.funnel_options_builder_coupon_offer) && (flexible || !!features.funnel_options_builder_coupon_offer);
 
   if (canUseOrderBump) allowedSteps.push('order_bump');
   if (canUseUpsell) allowedSteps.push('upsell');
   if (canUseDownsell) allowedSteps.push('downsell');
   if (canUseOto) allowedSteps.push('oto');
   if (canUseCouponOffer) allowedSteps.push('coupon_offer');
+
+  const enabled = masterEnabled && allowedSteps.length > 0;
+  // The funnel builder is the only way to create funnels, so it is coupled
+  // to the capability type: if the tenant has any allowed steps, the builder
+  // is enabled. The builder_on group gate and builder_off gate still control
+  // step resolution above, but builderEnabled no longer hard-blocks the UI
+  // when steps are already assigned by tier.
+  const builderEnabled = enabled && !builderOff;
 
   return {
     enabled,
