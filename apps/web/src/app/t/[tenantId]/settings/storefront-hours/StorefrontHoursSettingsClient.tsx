@@ -8,7 +8,7 @@ import { Save, AlertCircle, CheckCircle2, Clock, Lock, Zap, ArrowRight, Globe, M
 import Link from 'next/link';
 import { useStorefrontHoursCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface StorefrontHoursSettings {
   hours_enabled: boolean;
@@ -107,8 +107,8 @@ export default function StorefrontHoursSettingsClient({ tenantId }: StorefrontHo
         </div>
       </div>
 
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps ?? null} loading={!allCaps} highlightCapability="storefront_hours" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps ?? null} loading={!allCaps} tenantId={tenantId} />
 
       {/* Error banner */}
       {error && (

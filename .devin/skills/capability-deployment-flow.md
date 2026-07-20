@@ -24,7 +24,7 @@ Phase 4: Resolve         → XxxResolver.ts + types.ts + EffectiveCapabilityReso
 Phase 4.5: Constraints   → capability_constraints_list DB table + CapabilityConstraintRegistry.ts fallback (if cross-capability deps)
 Phase 5: Route           → xxx-options-settings.ts (GET + PUT + tier filtering + cache invalidation + constraint validation)
 Phase 6: Map             → UnifiedCapabilityService.ts + CapabilityResolutionService.ts
-Phase 7: Display         → PlanSummaryWidget.tsx (dashboard) + PlanSummaryPanel.tsx (dedicated page) + CapabilityShowcase.tsx + settings page
+Phase 7: Display         → PlanSummaryWidget.tsx (dashboard + options pages) + PlanSummaryPanel.tsx (dedicated plan-summary page only) + CapabilityShowcase.tsx + settings page
 Phase 8: Verify          → verify-capability-deployment.md checklist + pnpm checkapi/checkweb
 ```
 
@@ -355,7 +355,7 @@ router.put('/:tenantId/xxx-options', authenticateToken, async (req, res) => {
    - If the new component has different props than the existing one (e.g., `gallery: Photo[]` vs `images: Image[]`), map the data at the call site — don't change the component's interface
    - The `LandingPageFeatures` interface in `useProductDetailState.ts` and the local copy in `TierBasedLandingPage.tsx` must both be extended with the new fields, and `safeFeatures` must override from `initialOptFlags`
 
-> **Note**: The dashboard now renders `PlanSummaryWidget` (slim widget with color-coded capability type names) instead of the full `PlanSummaryPanel`. The full panel is rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page. Both components must be updated when adding a new capability — `CAPABILITY_DISPLAY` in `PlanSummaryPanel.tsx` for the full page, and `CAPABILITY_META` in `PlanSummaryWidget.tsx` for the dashboard.
+> **Note**: `PlanSummaryWidget` (slim widget with color-coded capability type names) is rendered on both the tenant dashboard AND all capability options/settings pages. The full `PlanSummaryPanel` is rendered ONLY on the dedicated `/t/{tenantId}/settings/plan-summary` page. Both components must be updated when adding a new capability — `CAPABILITY_DISPLAY` in `PlanSummaryPanel.tsx` for the full page, and `CAPABILITY_META` in `PlanSummaryWidget.tsx` for the dashboard + options pages. Options pages should NOT import `PlanSummaryPanel` — use `PlanSummaryWidget` instead to save real estate. The widget includes a "View full plan details" link to the dedicated plan-summary page.
 
 ### PlanSummaryPanel Rules
 
@@ -410,7 +410,7 @@ const allowedCount = cap?.allowedResponseEngines.length + cap?.allowedSkillTypes
 5. Verify frontend mapper maps all fields correctly
 6. Verify React hook uses `UnifiedCapabilityService` (not old `CapabilityResolutionService`)
 7. Verify settings page gates toggles by tier
-8. Verify PlanSummaryPanel and CapabilityShowcase display the capability
+8. Verify PlanSummaryWidget (on dashboard + options pages), PlanSummaryPanel (on plan-summary page), and CapabilityShowcase display the capability
 9. Run type checks: `pnpm checkapi` and `pnpm checkweb`
 
 **Common root causes** (from `verify-capability-deployment.md`):
@@ -503,8 +503,8 @@ When deploying a capability change, verify ALL of these:
 - [ ] `mapXxx()` maps all fields including `merchant_preferences`
 - [ ] Fallback resolver in `CapabilityResolutionService.ts` includes `merchantPreferences: null`
 - [ ] `useXxxCapability` hook uses `UnifiedCapabilityService` (not `CapabilityResolutionService`)
-- [ ] `PlanSummaryPanel` has entry in `CAPABILITY_DISPLAY` + summary block in `resolveCapabilitySummaries()`
-- [ ] `PlanSummaryWidget` has entry in `CAPABILITY_META` (slim dashboard widget — label, icon, prefix, settingsPath)
+- [ ] `PlanSummaryPanel` has entry in `CAPABILITY_DISPLAY` + summary block in `resolveCapabilitySummaries()` (for the dedicated plan-summary page only)
+- [ ] `PlanSummaryWidget` has entry in `CAPABILITY_META` (slim widget — label, icon, prefix, settingsPath) — used on both dashboard AND options pages
 - [ ] `PlanSummaryWidget` `getCapabilityEnabled` switch has a case for the new capability key (returns `caps.xxx.enabled`)
 - [ ] `CapabilityShowcase` has row in `rows` array with correct `merchantGated` computation
 - [ ] `CAPABILITY_FEATURE_PREFIXES` in `CapabilityResolutionService.ts` has the feature prefix mapping for the new capability (e.g., `org_: 'organization_options'`)

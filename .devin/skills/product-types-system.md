@@ -92,7 +92,7 @@ const { physicalProducts, serviceProducts, digitalProducts, hybridProducts } = u
 - **State** (`CapabilityResolutionService.ts`): `ProductTypeState` interface includes `effectiveTypes: ProductType[]` and `selected_product_types` in merchant preferences. `resolveProductTypeState` computes the array
 - **Mapper** (`UnifiedCapabilityService.ts`): `mapProductType` maps backend `effective_types` and `selected_product_types` to frontend state
 - **UI** (`ProductTypeSettingsClient.tsx`): Checkboxes with `handleTypeToggle` add/remove from `selected_product_types` array. Checkbox indicator is `rounded-md` (square) with checkmark SVG
-- **Display components**: `CapabilityShowcase.tsx`, `PlanSummaryPanel.tsx`, `SystemStatusService.ts` all use `effectiveTypes` array for display
+- **Display components**: `CapabilityShowcase.tsx`, `PlanSummaryWidget.tsx` (dashboard + options pages), `PlanSummaryPanel.tsx` (plan-summary page only), `SystemStatusService.ts` all use `effectiveTypes` array for display
 
 ## CCL Constraints
 

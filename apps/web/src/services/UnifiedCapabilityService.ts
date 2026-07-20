@@ -1128,7 +1128,7 @@ interface BackendEffectiveCouponOptions {
   can_use_spotlight: boolean;
   allowed_discount_types: string[];
   is_flexible: boolean;
-  merchant_preferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null } | null;
+  merchant_preferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null; percent_off_enabled?: boolean | null; fixed_amount_enabled?: boolean | null; free_shipping_enabled?: boolean | null; bogo_enabled?: boolean | null; target_products_enabled?: boolean | null; qr_sharing_enabled?: boolean | null } | null;
 }
 
 function mapFunnel(b: BackendEffectiveFunnel): FunnelState {

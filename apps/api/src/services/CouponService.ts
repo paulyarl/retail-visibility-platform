@@ -465,7 +465,17 @@ export class CouponService extends BaseService {
   // SETTINGS
   // ====================
 
-  async getSettings(tenantId: string): Promise<{ couponEnabled: boolean; spotlightEnabled: boolean; featuredCouponId: string | null }> {
+  async getSettings(tenantId: string): Promise<{
+    couponEnabled: boolean;
+    spotlightEnabled: boolean;
+    featuredCouponId: string | null;
+    percentOffEnabled: boolean;
+    fixedAmountEnabled: boolean;
+    freeShippingEnabled: boolean;
+    bogoEnabled: boolean;
+    targetProductsEnabled: boolean;
+    qrSharingEnabled: boolean;
+  }> {
     const settings = await prisma.tenant_coupon_options_settings.findUnique({
       where: { tenant_id: tenantId },
     });
@@ -473,10 +483,26 @@ export class CouponService extends BaseService {
       couponEnabled: settings?.coupon_enabled ?? false,
       spotlightEnabled: settings?.spotlight_enabled ?? false,
       featuredCouponId: settings?.featured_coupon_id ?? null,
+      percentOffEnabled: settings?.percent_off_enabled ?? true,
+      fixedAmountEnabled: settings?.fixed_amount_enabled ?? true,
+      freeShippingEnabled: settings?.free_shipping_enabled ?? true,
+      bogoEnabled: settings?.bogo_enabled ?? true,
+      targetProductsEnabled: settings?.target_products_enabled ?? true,
+      qrSharingEnabled: settings?.qr_sharing_enabled ?? true,
     };
   }
 
-  async updateSettings(tenantId: string, updates: { couponEnabled?: boolean; spotlightEnabled?: boolean; featuredCouponId?: string | null }, actor?: string): Promise<void> {
+  async updateSettings(tenantId: string, updates: {
+    couponEnabled?: boolean;
+    spotlightEnabled?: boolean;
+    featuredCouponId?: string | null;
+    percentOffEnabled?: boolean;
+    fixedAmountEnabled?: boolean;
+    freeShippingEnabled?: boolean;
+    bogoEnabled?: boolean;
+    targetProductsEnabled?: boolean;
+    qrSharingEnabled?: boolean;
+  }, actor?: string): Promise<void> {
     const existing = await prisma.tenant_coupon_options_settings.findUnique({
       where: { tenant_id: tenantId },
     });
@@ -486,6 +512,12 @@ export class CouponService extends BaseService {
       if (updates.couponEnabled !== undefined) updateData.coupon_enabled = updates.couponEnabled;
       if (updates.spotlightEnabled !== undefined) updateData.spotlight_enabled = updates.spotlightEnabled;
       if (updates.featuredCouponId !== undefined) updateData.featured_coupon_id = updates.featuredCouponId;
+      if (updates.percentOffEnabled !== undefined) updateData.percent_off_enabled = updates.percentOffEnabled;
+      if (updates.fixedAmountEnabled !== undefined) updateData.fixed_amount_enabled = updates.fixedAmountEnabled;
+      if (updates.freeShippingEnabled !== undefined) updateData.free_shipping_enabled = updates.freeShippingEnabled;
+      if (updates.bogoEnabled !== undefined) updateData.bogo_enabled = updates.bogoEnabled;
+      if (updates.targetProductsEnabled !== undefined) updateData.target_products_enabled = updates.targetProductsEnabled;
+      if (updates.qrSharingEnabled !== undefined) updateData.qr_sharing_enabled = updates.qrSharingEnabled;
 
       await prisma.tenant_coupon_options_settings.update({
         where: { tenant_id: tenantId },
@@ -498,6 +530,12 @@ export class CouponService extends BaseService {
           coupon_enabled: updates.couponEnabled ?? false,
           spotlight_enabled: updates.spotlightEnabled ?? false,
           featured_coupon_id: updates.featuredCouponId ?? null,
+          percent_off_enabled: updates.percentOffEnabled ?? true,
+          fixed_amount_enabled: updates.fixedAmountEnabled ?? true,
+          free_shipping_enabled: updates.freeShippingEnabled ?? true,
+          bogo_enabled: updates.bogoEnabled ?? true,
+          target_products_enabled: updates.targetProductsEnabled ?? true,
+          qr_sharing_enabled: updates.qrSharingEnabled ?? true,
         },
       });
     }

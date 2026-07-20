@@ -251,16 +251,16 @@ if (data.selected_type) {
 - The mapper should preserve `enabled` at the top level and expose `effective_*` values
 - Do not add resolution logic — the backend already resolved everything
 
-**PlanSummaryPanel**: `apps/web/src/components/settings/PlanSummaryPanel.tsx`
+**PlanSummaryPanel**: `apps/web/src/components/settings/PlanSummaryPanel.tsx` — dedicated plan-summary page ONLY
 
 - Uses `capabilities` prop from `AllCapabilitiesState` (mapped from unified endpoint)
 - Each card shows enabled/disabled status using `capability.enabled` (not `Object.keys(capability.features).length`)
 - New sub-capabilities under an existing group appear automatically if the unified endpoint returns them
-- Rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page (not directly on the dashboard)
+- Rendered on the dedicated `/t/{tenantId}/settings/plan-summary` page only — NOT on options/settings pages (those use `PlanSummaryWidget`)
 
-**PlanSummaryWidget**: `apps/web/src/components/dashboard/PlanSummaryWidget.tsx`
+**PlanSummaryWidget**: `apps/web/src/components/dashboard/PlanSummaryWidget.tsx` — used on dashboard AND all options/settings pages
 
-- Slim dashboard widget showing clickable capability type names with color-coded status dots
+- Slim widget showing clickable capability type names with color-coded status dots
 - Color determined by source of effectiveness: green (tier), red (disabled), orange (merchant-gated), blue (purchased), purple (admin grant)
 - Uses `purchasedFeatureKeys` and `overrideFeatureKeys` from `AllCapabilitiesState` to determine color
 - Add an entry to `CAPABILITY_META` array with key, label, icon, prefix, and settingsPath

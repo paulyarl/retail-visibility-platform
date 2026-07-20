@@ -8,7 +8,7 @@ import { ScanLine, Keyboard, Usb, Camera, Save, AlertCircle, ArrowRight, Zap, Ba
 import Link from 'next/link';
 import { useBarcodeScanCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import { clientLogger } from '@/lib/client-logger';
 
 interface BarcodeScanSettings {
@@ -154,8 +154,8 @@ export default function BarcodeScanOptionsSettingsClient({ tenantId }: BarcodeSc
 
   return (
     <div className="space-y-6">
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="barcode_scan_options" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${

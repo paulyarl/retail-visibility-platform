@@ -343,7 +343,7 @@ The feature flag system is **on a migration path to the capability architecture*
 - **Tier-aware gating**: Capabilities respect subscription tier boundaries — features unlock by plan, not by env var or DB toggle. Feature flags cannot express "available on Professional tier, not on Starter."
 - **Merchant self-service**: Capabilities expose per-feature merchant toggles via settings pages. Merchants see what their plan includes and can opt-in to tier-allowed features. Feature flags require admin intervention or env var changes.
 - **Cross-capability constraints**: The Constraint Layer (CCL) can express dependencies between capabilities (e.g., "service storefront requires service product type"). Feature flags have no dependency model.
-- **Dashboard visibility**: `PlanSummaryPanel` and `CapabilityShowcase` automatically render capability state — tier-allowed, merchant-gated, enabled, or disabled. Feature flags have no dashboard representation.
+- **Dashboard visibility**: `PlanSummaryWidget` (dashboard + options pages) and `CapabilityShowcase` automatically render capability state — tier-allowed, merchant-gated, enabled, or disabled. Feature flags have no dashboard representation.
 - **Consistent data flow**: The 6-layer architecture (resolver → orchestrator → route → service → hook → dashboard) ensures backend and frontend never diverge. Feature flags have three independent systems that can disagree.
 - **Well-documented**: Capability deployment follows `capability-deployment-flow.md` (8-phase pipeline) and `capability-data-flow-rules.md` (23 rules). Feature flags have no deployment skill.
 - **DB-managed**: Feature keys, tier assignments, and merchant prefs are all DB rows managed via admin UI or SQL. No env var redeployment needed.

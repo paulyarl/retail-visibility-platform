@@ -328,7 +328,7 @@ When adding or modifying platform services, verify:
 | `apps/web/src/hooks/tenant-access/useCapabilityAccess.ts` | `usePlatformServicesCapability` hook |
 | `apps/web/src/components/dashboard/CapabilityShowcase.tsx` | Dashboard showcase row |
 | `apps/web/src/components/dashboard/PlanSummaryWidget.tsx` | Dashboard slim widget (capability status colors) |
-| `apps/web/src/components/settings/PlanSummaryPanel.tsx` | Full plan summary panel (feature detail cards) |
+| `apps/web/src/components/settings/PlanSummaryPanel.tsx` | Full plan summary panel (feature detail cards — plan-summary page only) |
 | `database/migrations/107_platform_services_capability.sql` | Seed migration |
 
 ## Design Doc

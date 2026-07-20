@@ -8,7 +8,7 @@ import { Save, AlertCircle, CheckCircle2, QrCode, Palette, Sparkles, Lock, Zap, 
 import Link from 'next/link';
 import { useStorefrontQrCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { tenantInfoService } from '@/services/TenantInfoService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import QrPreviewPane from './QrPreviewPane';
 import { SectionBadge } from '@/components/qr/SectionBadge';
 import { DOT_STYLES, CORNER_STYLES, CORNER_DOT_STYLES, RESOLUTIONS } from '@/lib/qr-style-constants';
@@ -180,8 +180,8 @@ export default function StorefrontQrSettingsClient({ tenantId }: StorefrontQrSet
         </Link>
       </div>
 
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps ?? null} loading={!allCaps} highlightCapability="storefront_qr" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps ?? null} loading={!allCaps} tenantId={tenantId} />
 
       {/* Error banner */}
       {error && (

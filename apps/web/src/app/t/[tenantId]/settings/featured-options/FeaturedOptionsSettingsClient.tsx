@@ -8,7 +8,7 @@ import { Star, ShoppingBag, TrendingUp, Save, AlertCircle, ArrowRight, Zap, Tag,
 import Link from 'next/link';
 import { useFeaturedOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import PlanSummaryPanel from '@/components/settings/PlanSummaryPanel';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 import {
   FeaturedType,
   TENANT_FEATURED_TYPES,
@@ -210,8 +210,8 @@ export default function FeaturedOptionsSettingsClient({ tenantId }: FeaturedOpti
 
   return (
     <div className="space-y-6">
-      {/* Plan Summary */}
-      <PlanSummaryPanel capabilities={allCaps.data} loading={allCaps.loading} highlightCapability="featured_options" tenantId={tenantId} />
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
 
       {message && (
         <div className={`p-3 rounded-lg flex items-center gap-2 ${
