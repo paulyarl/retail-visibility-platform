@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog';
-import { Plus, Pencil, Trash2, Star, QrCode, Loader2, Tag, ChevronLeft } from 'lucide-react';
+import { Plus, Pencil, Star, QrCode, Loader2, Tag, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import CouponQRDialog from './CouponQRDialog';
 
@@ -143,14 +143,19 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
     }
   };
 
-  const handleDeactivate = async (coupon: Coupon) => {
-    if (!confirm(`Deactivate coupon "${coupon.code}"?`)) return;
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const handleToggleActive = async (coupon: Coupon) => {
+    setTogglingId(coupon.id);
+    const newValue = !coupon.isActive;
     try {
-      await couponService.deactivateCoupon(tenantId, coupon.id);
-      toast({ title: 'Coupon deactivated', description: `${coupon.code} is now inactive`, variant: 'success' });
+      await couponService.updateCoupon(tenantId, coupon.id, { isActive: newValue });
+      toast({ title: newValue ? 'Coupon activated' : 'Coupon deactivated', description: `${coupon.code} is now ${newValue ? 'active' : 'inactive'}`, variant: 'success' });
       await loadCoupons();
     } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || 'Failed to deactivate coupon', variant: 'destructive' });
+      toast({ title: 'Error', description: e?.message || 'Failed to toggle coupon', variant: 'destructive' });
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -307,16 +312,14 @@ export default function CouponManagementClient({ tenantId }: { tenantId: string 
                         <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(c)} title="Edit">
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        {c.isActive && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeactivate(c)}
-                            title="Deactivate"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <Switch
+                          checked={c.isActive}
+                          onCheckedChange={() => handleToggleActive(c)}
+                          disabled={togglingId === c.id}
+                          title={c.isActive ? 'Deactivate' : 'Activate'}
+                        />
+                        {togglingId === c.id && (
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                         )}
                       </div>
                     </td>

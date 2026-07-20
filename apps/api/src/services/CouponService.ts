@@ -35,6 +35,7 @@ export interface CouponInput {
   targetIds?: string[];
   promotionalMessage?: string;
   termsSummary?: string;
+  isActive?: boolean;
 }
 
 export interface Coupon {
@@ -242,6 +243,7 @@ export class CouponService extends BaseService {
     if (updates.targetIds !== undefined) updateData.target_ids = updates.targetIds;
     if (updates.promotionalMessage !== undefined) updateData.promotional_message = updates.promotionalMessage;
     if (updates.termsSummary !== undefined) updateData.terms_summary = updates.termsSummary;
+    if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
 
     const coupon = await prisma.tenant_coupons.update({
       where: { id: couponId },
