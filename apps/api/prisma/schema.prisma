@@ -4899,7 +4899,7 @@ model tenants {
   demo_template                                                                          String?                                  @db.VarChar(50)
   org_standing_mode                                                                      String?                                  @default("independent") @db.VarChar(20)
   standing_mode_grace_until                                                              DateTime?                                @db.Timestamp(6)
-  auto_id                                                                                String                                   @db.VarChar(4)
+  auto_id                                                                                String?                                  @db.VarChar(4)
   abandoned_carts                                                                        abandoned_carts[]
   bot_configurations                                                                     bot_configurations?
   bot_conversations                                                                      bot_conversations[]
