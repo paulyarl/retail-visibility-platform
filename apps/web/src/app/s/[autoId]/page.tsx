@@ -1,19 +1,21 @@
 import { redirect, notFound } from 'next/navigation';
-import { shopsService } from '@/services/ShopsService';
+import { shortCodeService } from '@/services/ShortCodeService';
 import { PublicCouponService } from '@/services/PublicCouponService';
+
+export const dynamic = 'force-dynamic';
 
 export default async function ShortCodePage({
   params,
   searchParams,
 }: {
-  params: { autoId: string };
-  searchParams: { c?: string };
+  params: Promise<{ autoId: string }>;
+  searchParams: Promise<{ c?: string }>;
 }) {
-  const { autoId } = params;
-  const couponCode = searchParams.c || '';
+  const { autoId } = await params;
+  const { c: couponCode = '' } = await searchParams;
 
-  // Resolve tenant via public shops API
-  const tenantId = await shopsService.getShopTenantIdByIdentifier(autoId);
+  // Resolve tenant via dedicated short-code API
+  const tenantId = await shortCodeService.resolveTenantId(autoId);
 
   if (!tenantId) {
     notFound();
@@ -21,12 +23,12 @@ export default async function ShortCodePage({
 
   // Track view event with surface 'qr_code' (fire-and-forget, non-blocking)
   const publicCouponService = PublicCouponService.getInstance();
-  await publicCouponService.trackEvent(tenantId, {
+  publicCouponService.trackEvent(tenantId, {
     couponCode,
     eventType: 'view',
     surface: 'qr_code',
     source: 'short_code_redirect',
-  });
+  }).catch(() => {});
 
   redirect(`/tenant/${tenantId}?coupon=${encodeURIComponent(couponCode)}`);
 }

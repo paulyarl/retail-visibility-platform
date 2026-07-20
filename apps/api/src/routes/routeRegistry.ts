@@ -69,6 +69,9 @@ import slugGenerationRoutes from '../routes/slug-generation';
 // Shops (public shop directory browsing)
 import shopsRoutes from '../routes/shops';
 
+// Short code (autoId resolution for QR redirect URLs)
+import shortCodeRoutes from '../routes/short-code';
+
 // Storefront
 import storefrontRoutes from '../routes/storefront';
 import storefrontFeaturedRoutes from '../routes/storefront-featured';
@@ -397,6 +400,15 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'shops',
     authLevel: 'public',
     comment: 'Public shop directory, trending, categories, featured products, shop details',
+  },
+
+  // ── Short Code (autoId → tenantId resolution for QR redirect URLs) ──
+  {
+    path: '/api/short-code',
+    router: shortCodeRoutes,
+    domain: 'short-code',
+    authLevel: 'public',
+    comment: 'Resolve 4-char autoId to tenantId for /s/[autoId] short URL redirects',
   },
 
   // ── Directory (orchestrator handles all /api/directory sub-routes) ───
