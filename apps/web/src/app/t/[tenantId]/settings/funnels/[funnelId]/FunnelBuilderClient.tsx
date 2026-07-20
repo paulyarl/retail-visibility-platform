@@ -232,7 +232,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
           <CardContent className="p-8 text-center">
             <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-lg font-medium mb-2">Funnel Not Found</h2>
-            <Button onClick={() => router.push(`/t/${tenantId}/settings/funnels`)}>
+            <Button onClick={() => router.push(`/t/${tenantId}/settings/funnels/list`)}>
               Back to Funnels
             </Button>
           </CardContent>
@@ -246,7 +246,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => router.push(`/t/${tenantId}/settings/funnels`)}>
+          <Button variant="ghost" size="sm" onClick={() => router.push(`/t/${tenantId}/settings/funnels/list`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
