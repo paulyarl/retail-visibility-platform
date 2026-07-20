@@ -1251,6 +1251,13 @@ export const routeRegistry: RouteEntry[] = [
   },
   {
     path: '/api',
+    router: funnelOptionsSettingsRoutes,
+    domain: 'misc',
+    authLevel: 'tenant',
+    comment: 'Funnel options settings at /api/tenants/:tenantId/funnels/settings',
+  },
+  {
+    path: '/api',
     router: funnelRoutes,
     domain: 'misc',
     authLevel: 'tenant',
@@ -1262,13 +1269,6 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Funnel checkout routes at /api/public/funnels/:tenantId/*',
-  },
-  {
-    path: '/api',
-    router: funnelOptionsSettingsRoutes,
-    domain: 'misc',
-    authLevel: 'tenant',
-    comment: 'Funnel options settings at /api/tenants/:tenantId/funnels/settings',
   },
   {
     path: '/api',

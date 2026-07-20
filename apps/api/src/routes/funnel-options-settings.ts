@@ -34,8 +34,8 @@ const FUNNEL_FEATURE_KEYS = [
   'coupon_offer_enabled',
 ] as const;
 
-// GET /:tenantId/funnels/settings
-router.get('/:tenantId/funnels/settings', authenticateToken, async (req, res) => {
+// GET /tenants/:tenantId/funnels/settings
+router.get('/tenants/:tenantId/funnels/settings', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -57,8 +57,8 @@ router.get('/:tenantId/funnels/settings', authenticateToken, async (req, res) =>
   }
 });
 
-// PUT /:tenantId/funnels/settings
-router.put('/:tenantId/funnels/settings', authenticateToken, async (req, res) => {
+// PUT /tenants/:tenantId/funnels/settings
+router.put('/tenants/:tenantId/funnels/settings', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
