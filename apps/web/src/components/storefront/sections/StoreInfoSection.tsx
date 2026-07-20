@@ -226,17 +226,17 @@ function ClassicStoreInfo({
 
   
   // DEBUG
-  console.log(`StoreInfoSection: hoursStatus ${JSON.stringify(hoursStatus)}`);
-  console.log(`StoreInfoSection: businessHours ${JSON.stringify(businessHours)}`);
-  console.log(`StoreInfoSection: mapLocation ${JSON.stringify(mapLocation)}`);
-  console.log(`StoreInfoSection: storefrontStatus ${JSON.stringify(storefrontStatus)}`);
-  console.log(`StoreInfoSection: isRetailStore ${JSON.stringify(isRetailStore)}`);
-  console.log(`StoreInfoSection: showsHoursStatus ${JSON.stringify(showsHoursStatus)}`);
-  console.log(`StoreInfoSection: showsAnimatedHours ${JSON.stringify(showsAnimatedHours)}`);
-  console.log(`StoreInfoSection: showsHours ${JSON.stringify(showsHours)}`);
-  console.log(`StoreInfoSection: showsLocation ${JSON.stringify(showsLocation)}`);
-  console.log(`StoreInfoSection: showsMap ${JSON.stringify(showsMap)}`);
-  console.log(`StoreInfoSection: showsHoursStatus ${JSON.stringify(showsHoursStatus)}`);
+  // console.log(`StoreInfoSection: hoursStatus ${JSON.stringify(hoursStatus)}`);
+  // console.log(`StoreInfoSection: businessHours ${JSON.stringify(businessHours)}`);
+  // console.log(`StoreInfoSection: mapLocation ${JSON.stringify(mapLocation)}`);
+  // console.log(`StoreInfoSection: storefrontStatus ${JSON.stringify(storefrontStatus)}`);
+  // console.log(`StoreInfoSection: isRetailStore ${JSON.stringify(isRetailStore)}`);
+  // console.log(`StoreInfoSection: showsHoursStatus ${JSON.stringify(showsHoursStatus)}`);
+  // console.log(`StoreInfoSection: showsAnimatedHours ${JSON.stringify(showsAnimatedHours)}`);
+  // console.log(`StoreInfoSection: showsHours ${JSON.stringify(showsHours)}`);
+  // console.log(`StoreInfoSection: showsLocation ${JSON.stringify(showsLocation)}`);
+  // console.log(`StoreInfoSection: showsMap ${JSON.stringify(showsMap)}`);
+  // console.log(`StoreInfoSection: showsHoursStatus ${JSON.stringify(showsHoursStatus)}`);
 
   return (
     <>

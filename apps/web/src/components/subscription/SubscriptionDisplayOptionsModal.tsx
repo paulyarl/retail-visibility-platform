@@ -35,14 +35,18 @@ const LAYOUT_OPTIONS = [
   { value: 'expanded', label: 'Expanded', description: 'Multi-column, detailed view' },
 ] as const;
 
-const TOTAL_CAPABILITY_DOMAINS = 16;
+const TOTAL_CAPABILITY_DOMAINS = 27;
 
 function countEnabledCapabilities(caps: AllCapabilitiesState): number {
   const domains = [
     caps.commerce, caps.paymentGateway, caps.storefront, caps.barcodeScan,
-    caps.fulfillment, caps.productOptions, caps.featuredOptions, caps.integrationOptions,
-    caps.quickstartOptions, caps.storefrontOptions, caps.directoryEntryOptions,
+    caps.fulfillment, caps.productType, caps.productOptions, caps.featuredOptions,
+    caps.integrationOptions, caps.quickstartOptions, caps.storefrontOptions,
+    caps.storefrontQr, caps.storefrontGallery, caps.storefrontHours,
+    caps.storefrontLayouts, caps.storefrontMaps, caps.directoryEntryOptions,
     caps.faqOptions, caps.crmOptions, caps.chatbotOptions, caps.socialCommerceOptions,
+    caps.directoryPromotion, caps.orgOptions, caps.wholesaleMatching,
+    caps.platformServices, caps.funnel, caps.couponOptions,
   ];
   return domains.filter(d => d?.enabled).length;
 }
