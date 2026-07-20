@@ -8,6 +8,7 @@ import { logger } from '../logger';
 const router = Router();
 
 const funnelOptionsSettingsSchema = z.object({
+  funnel_options_enabled: z.boolean().optional(),
   order_bump_enabled: z.boolean().optional(),
   upsell_enabled: z.boolean().optional(),
   downsell_enabled: z.boolean().optional(),
@@ -16,6 +17,7 @@ const funnelOptionsSettingsSchema = z.object({
 });
 
 const DEFAULT_SETTINGS = {
+  funnel_options_enabled: true,
   order_bump_enabled: true,
   upsell_enabled: true,
   downsell_enabled: true,
@@ -24,6 +26,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const FUNNEL_FEATURE_KEYS = [
+  'funnel_options_enabled',
   'order_bump_enabled',
   'upsell_enabled',
   'downsell_enabled',
@@ -96,6 +99,7 @@ router.put('/:tenantId/funnels/settings', authenticateToken, async (req, res) =>
     res.json({
       success: true,
       settings: {
+        funnel_options_enabled: settings.funnel_options_enabled,
         order_bump_enabled: settings.order_bump_enabled,
         upsell_enabled: settings.upsell_enabled,
         downsell_enabled: settings.downsell_enabled,

@@ -30,8 +30,9 @@ import {
   Crown,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCrmOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useCrmOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface CrmOptionsSettings {
   crm_enabled: boolean;
@@ -180,6 +181,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 export default function CrmOptionsPage({ tenantId }: CrmOptionsPageProps) {
   const { data: crmCap } = useCrmOptionsCapability(tenantId);
   const tierState = crmCap;
+  const allCaps = useAllCapabilities(tenantId);
 
   const [settings, setSettings] = useState<CrmOptionsSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -246,6 +248,9 @@ export default function CrmOptionsPage({ tenantId }: CrmOptionsPageProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href={`/t/${tenantId}/support`} className="p-2 rounded-md hover:bg-neutral-100 text-neutral-500">

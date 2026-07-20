@@ -25,10 +25,11 @@ import {
   Globe,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useSocialCommerceOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useSocialCommerceOptionsCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { socialCommerceOptionsService } from '@/services/SocialCommerceOptionsService';
 import { useSocialCommerceConnections } from '@/hooks/useSocialCommerceConnections';
 import { CheckCircle2, AlertTriangle, Plus, Link2 } from 'lucide-react';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface SocialCommerceSettings {
   social_commerce_enabled: boolean;
@@ -107,6 +108,7 @@ const EXPERIENCE_GROUP: FeatureGroup = {
 export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerceSettingsClientProps) {
   const { data: socialCap } = useSocialCommerceOptionsCapability(tenantId);
   const tierState = socialCap;
+  const allCaps = useAllCapabilities(tenantId);
   const { socialLinks, metaStatus, tiktokStatus } = useSocialCommerceConnections(tenantId);
 
   const [settings, setSettings] = useState<SocialCommerceSettings>(DEFAULT_SETTINGS);
@@ -170,6 +172,9 @@ export default function SocialCommerceSettingsClient({ tenantId }: SocialCommerc
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href={`/t/${tenantId}/settings/storefront-type-options`} className="p-2 rounded-md hover:bg-neutral-100 text-neutral-500">

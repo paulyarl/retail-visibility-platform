@@ -9,8 +9,9 @@ import { CreditCard, ShoppingCart, DollarSign, Package, Save, AlertCircle, Info,
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
-import { useCommerceCapability, usePaymentGatewayCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { useCommerceCapability, usePaymentGatewayCapability, useAllCapabilities } from '@/hooks/tenant-access/useCapabilityAccess';
 import { clientLogger } from '@/lib/client-logger';
+import PlanSummaryWidget from '@/components/dashboard/PlanSummaryWidget';
 
 interface CommerceSettings {
   // Payment Options
@@ -125,6 +126,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
   // Capability-aware resolution — supersedes legacy tier-based commerce feature detection
   const commerceCap = useCommerceCapability(tenantId);
   const paymentCap = usePaymentGatewayCapability(tenantId);
+  const allCaps = useAllCapabilities(tenantId);
 
   // Preset deposit percentages
   const depositPresets = [
@@ -248,6 +250,9 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Plan Summary Widget */}
+      <PlanSummaryWidget capabilities={allCaps.data} loading={allCaps.loading} tenantId={tenantId} />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
