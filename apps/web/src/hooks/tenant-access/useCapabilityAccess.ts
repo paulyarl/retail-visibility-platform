@@ -805,7 +805,7 @@ export function useFunnelCapability(
   tenantId: string | null
 ): CapabilityHookState<FunnelState> {
   const [data, setData] = useState<FunnelState | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!tenantId);
   const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
@@ -835,7 +835,7 @@ export function useCouponOptionsCapability(
   tenantId: string | null
 ): CapabilityHookState<CouponOptionsState> {
   const [data, setData] = useState<CouponOptionsState | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!tenantId);
   const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
