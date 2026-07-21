@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BlockNoteViewRaw as BlockNoteView, useCreateBlockNote, createReactBlockSpec } from '@blocknote/react';
+import { BlockNoteView, useCreateBlockNote, createReactBlockSpec } from '@blocknote/react';
 import { BlockNoteSchema, defaultBlockSpecs } from '@blocknote/core';
 import { cn } from '@/lib/utils';
 import { Check, Info, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
