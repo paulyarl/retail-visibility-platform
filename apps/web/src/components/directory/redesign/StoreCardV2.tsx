@@ -37,7 +37,7 @@ export default function StoreCardV2({
   const canUseExternal = store.canUseExternalLink && !!store.website;
   const destinationUrl = canUseExternal
     ? (store.website as string)
-    : `/directory/${store.tenantId}`;
+    : `/directory/${store.slug || store.tenantId}`;
   const isExternalLink = canUseExternal;
 
   const formatRating = (rating: number) =>
@@ -49,14 +49,14 @@ export default function StoreCardV2({
   const handleDirectoryClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/directory/${store.tenantId}`);
+    router.push(`/directory/${store.slug || store.tenantId}`);
   };
 
   // Compact layout for immersive — always links to directory entry page
   if (isImmersive) {
     return (
       <Link
-        href={`/directory/${store.tenantId}`}
+        href={`/directory/${store.slug || store.tenantId}`}
         className="block group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 rounded-xl"
       >
         <div className="flex items-start gap-3 p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:shadow-md transition-all duration-200">

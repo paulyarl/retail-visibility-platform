@@ -92,7 +92,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
 
     try {
       const result = isServer
-        ? await this.makeDefaultRequest<TenantDirectoryStatus>(`/directory/tenant/${tenantId}`, { method: 'GET' })
+        ? await this.makeDefaultRequest<TenantDirectoryStatus>(`/api/directory/tenant/${tenantId}`, { method: 'GET' })
         : await super.makeDefaultRequest<TenantDirectoryStatus>(
             `/api/directory/tenant/${tenantId}`,
             {},
@@ -130,7 +130,7 @@ class TenantDirectorySingletonService extends TenantApiSingleton {
       console.log('[TenantDirectorySingleton] Making tenant slug request during SSR');
       try {
         // Use makeDefaultRequest for SSR requests (this is already a TenantApiSingleton)
-        const result = await this.makeDefaultRequest<{ slug: string | null }>(`/directory/tenant/${tenantId}`, {
+        const result = await this.makeDefaultRequest<{ slug: string | null }>(`/api/directory/tenant/${tenantId}`, {
           method: 'GET'
         });
         console.log('[TenantDirectorySingleton] SSR tenant slug result:', result);

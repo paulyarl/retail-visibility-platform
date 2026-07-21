@@ -440,7 +440,8 @@ router.get('/tenant/:identifier', async (req, res) => {
     return res.json({ 
       slug: result.rows[0].slug,
       tenantId: resolvedTenant.id,
-      identifierType: resolvedTenant.type
+      identifierType: resolvedTenant.type,
+      hasDirectoryListing: true
     });
   } catch (error: any) {
     logger.error('[GET /api/directory/tenant/:identifier] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });

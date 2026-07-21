@@ -68,7 +68,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
   const canUseExternal = listing.canUseExternalLink && !!listing.website;
   const destinationUrl = canUseExternal
     ? (listing.website as string)
-    : `/directory/${listing.tenantId}`;
+    : `/directory/${listing.slug || listing.tenantId}`;
   const isExternalLink = canUseExternal;
 
   // Format rating
@@ -80,7 +80,7 @@ export default function StoreCard({ listing, index, contextCategory }: StoreCard
   const handleDirectoryPageClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/directory/${listing.tenantId}`);
+    router.push(`/directory/${listing.slug || listing.tenantId}`);
   };
 
   // Handle publish to directory action (placeholder for future implementation)
