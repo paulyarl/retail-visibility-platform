@@ -5,6 +5,9 @@ import { BlockNoteViewRaw as BlockNoteView, useCreateBlockNote, createReactBlock
 import { BlockNoteSchema, defaultBlockSpecs } from '@blocknote/core';
 import { cn } from '@/lib/utils';
 import { Check, Info, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
+import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
+import { itemsService } from '@/services/ItemsSingletonService';
+import { parseVideoUrl } from './ProductVideoPlayer';
 import '@blocknote/react/style.css';
 
 import { contentBlocksSchema, ContentBlock, ContentBlocks, DEFAULT_CONTENT_BLOCKS } from './content-blocks';
@@ -127,6 +130,7 @@ interface RichContentEditorProps {
   value?: ContentBlocks;
   onChange?: (value: ContentBlocks) => void;
   className?: string;
+  tenantId?: string;
 }
 
 function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | null {
@@ -233,12 +237,49 @@ function blockNoteToContentBlocks(blocks: { type: string; props?: Record<string,
   return blocks.flatMap(blockNoteToContentBlock).filter(Boolean) as ContentBlock[];
 }
 
-function CustomBlockToolbar({ editor }: { editor: any }) {
+async function handleUploadFile(file: File, tenantId?: string): Promise<string> {
+  const processed = await uploadImage(file, ImageUploadPresets.product);
+  if (processed.error || !processed.dataUrl) {
+    throw new Error(processed.error?.message || 'Image upload failed');
+  }
+  if (tenantId) {
+    const result = await itemsService.uploadTempPhoto({ tenantId, dataUrl: processed.dataUrl });
+    return result.url;
+  }
+  return processed.dataUrl;
+}
+
+function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: string }) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const insert = (type: string, props?: Record<string, unknown>, content?: unknown) => {
     if (!editor) return;
     const position = editor.getTextCursorPosition?.();
     const ref = position?.block ?? editor.document[0];
     editor.insertBlocks?.([{ type, props, content }], ref, 'after');
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await handleUploadFile(file, tenantId);
+      insert('image', { url, name: file.name, caption: '' });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleVideoInsert = () => {
+    const url = window.prompt('Paste a YouTube or Vimeo URL');
+    if (!url) return;
+    if (!parseVideoUrl(url)) {
+      window.alert('Invalid URL. Only YouTube and Vimeo links are supported.');
+      return;
+    }
+    insert('video', { url, caption: '' });
   };
 
   return (
@@ -289,17 +330,45 @@ function CustomBlockToolbar({ editor }: { editor: any }) {
       >
         + Callout
       </button>
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="rounded bg-green-100 px-2 py-1 text-sm text-green-800 hover:bg-green-200"
+      >
+        + Image
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageSelect}
+      />
+      <button
+        type="button"
+        onClick={handleVideoInsert}
+        className="rounded bg-red-100 px-2 py-1 text-sm text-red-800 hover:bg-red-200"
+      >
+        + Video
+      </button>
     </div>
   );
 }
 
-export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, className }: RichContentEditorProps) {
+export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, className, tenantId }: RichContentEditorProps) {
   const initialContent = React.useMemo(() => {
     const blocks = contentBlocksToBlockNote(value.blocks);
     return blocks.length > 0 ? blocks : undefined;
   }, []);
 
-  const editor: any = useCreateBlockNote({ schema, initialContent: initialContent as any } as any, []);
+  const editor: any = useCreateBlockNote(
+    {
+      schema,
+      initialContent: initialContent as any,
+      uploadFile: (file: File) => handleUploadFile(file, tenantId),
+    } as any,
+    [],
+  );
 
   const handleChange = () => {
     const blocks = blockNoteToContentBlocks(editor.document as any[]);
@@ -311,7 +380,7 @@ export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, cl
 
   return (
     <div className={className}>
-      <CustomBlockToolbar editor={editor} />
+      <CustomBlockToolbar editor={editor} tenantId={tenantId} />
       <BlockNoteView editor={editor} onChange={handleChange} theme="light" />
     </div>
   );

@@ -161,6 +161,7 @@ export default function CreateItemPage({
           featuringOptions: review.featuringOptions || {},
           videoUrl: media.videoUrl || null,
           videoThumbnail: media.videoThumbnail || null,
+          content_blocks: content.contentBlocks || undefined,
         },
       };
 
