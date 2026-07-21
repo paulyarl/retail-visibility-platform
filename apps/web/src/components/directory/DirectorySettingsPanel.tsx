@@ -17,6 +17,15 @@ import {
   getLayoutPreviewSlides,
 } from '@/utils/directoryEntryLayouts';
 import { clientLogger } from '@/lib/client-logger';
+import { Card, CardContent } from '@/components/ui/Card';
+import { SectionBadge } from '@/components/qr/SectionBadge';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/Accordion';
+import { Tag, LayoutTemplate, FileText, Image as ImageIcon, ToggleRight } from 'lucide-react';
 
 interface DirectorySettingsPanelProps {
   tenantId: string;
@@ -266,6 +275,17 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
   const missingBusinessName = !listing.businessProfile?.businessName;
   const missingPrimaryCategory = !primaryCategory;
 
+  const enabledSectionCount = [
+    rawSettings.hours_display,
+    rawSettings.map_display,
+    rawSettings.storefront_contact,
+    rawSettings.location_display,
+    rawSettings.interactive_maps,
+    rawSettings.storefront_social_media,
+    rawSettings.enhanced_seo,
+    rawSettings.external_link_enabled,
+  ].filter(Boolean).length;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -298,242 +318,439 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Settings Form */}
         <div className="space-y-6">
-          {/* Categories */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Categories
-            </h3>
-            <DirectoryCategorySelectorAdapter
-              primary={primaryCategory}
-              secondary={secondaryCategories}
-              onPrimaryChange={setPrimaryCategory}
-              onSecondaryChange={setSecondaryCategories}
-            />
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Accordion type="multiple" defaultValue={["categories"]} className="w-full">
 
-          {/* Directory Entry Layout */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Directory Page Layout
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Choose how your directory listing page appears to visitors.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {DIRECTORY_ENTRY_LAYOUT_ORDER.map((layout) => {
-                const meta = DIRECTORY_ENTRY_LAYOUT_META[layout];
-                const isAllowed = allowedLayouts.includes(layout);
-                const isSelected = directoryEntryLayout === layout;
-                return (
-                  <div
-                    key={layout}
-                    className={`relative rounded-xl border transition-all ${
-                      isSelected
-                        ? 'border-blue-500 ring-2 ring-blue-500/40'
-                        : isAllowed
-                        ? 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                        : 'border-gray-100 dark:border-gray-700 opacity-60'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      disabled={!isAllowed}
-                      onClick={() => setDirectoryEntryLayout(layout)}
-                      aria-pressed={isSelected}
-                      aria-label={`Select ${meta.label} layout`}
-                      className={`block w-full text-left ${isAllowed ? '' : 'cursor-not-allowed'}`}
-                    >
-                      {/* 4:3 preview carousel */}
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-gray-100 dark:bg-gray-700">
-                        <LayoutPreviewCarousel slides={getLayoutPreviewSlides(layout, meta.label)} icon={meta.icon} />
-                        {isSelected && (
-                          <span className="absolute right-2 top-2 z-10 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
-                            Selected
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <span className="block text-sm font-semibold text-gray-900 dark:text-white">
-                          {meta.label}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-                          {meta.description}
-                        </span>
-                        {!isAllowed && (
-                          <span className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                            {meta.isPremium ? 'Upgrade for Premium' : 'Not included in your plan'}
-                          </span>
-                        )}
-                      </div>
-                    </button>
+                {/* Section: Categories */}
+                <AccordionItem value="categories" className="border-b">
+                  <AccordionTrigger className="px-6 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <Tag className="h-5 w-5 text-blue-600" />
+                      <span className="font-medium text-neutral-900">Categories</span>
+                      <SectionBadge>{primaryCategory ? 'Set' : 'None'}</SectionBadge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6">
+                    <DirectoryCategorySelectorAdapter
+                      primary={primaryCategory}
+                      secondary={secondaryCategories}
+                      onPrimaryChange={setPrimaryCategory}
+                      onSecondaryChange={setSecondaryCategories}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
 
-                    {/* Live preview link (only when allowed and we have a slug) */}
-                    {isAllowed && listing?.slug && (
-                      <a
-                        href={`/directory/${listing.slug}?layout_preview=${layout}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block border-t border-gray-100 dark:border-gray-700 px-3 py-2 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                {/* Section: Directory Page Layout */}
+                <AccordionItem value="layout" className="border-b">
+                  <AccordionTrigger className="px-6 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <LayoutTemplate className="h-5 w-5 text-purple-600" />
+                      <span className="font-medium text-neutral-900">Page Layout</span>
+                      <SectionBadge>{DIRECTORY_ENTRY_LAYOUT_META[directoryEntryLayout]?.label || 'Classic'}</SectionBadge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Choose how your directory listing page appears to visitors.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {DIRECTORY_ENTRY_LAYOUT_ORDER.map((layout) => {
+                        const meta = DIRECTORY_ENTRY_LAYOUT_META[layout];
+                        const isAllowed = allowedLayouts.includes(layout);
+                        const isSelected = directoryEntryLayout === layout;
+                        return (
+                          <div
+                            key={layout}
+                            className={`relative rounded-xl border transition-all ${
+                              isSelected
+                                ? 'border-blue-500 ring-2 ring-blue-500/40'
+                                : isAllowed
+                                ? 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                                : 'border-gray-100 dark:border-gray-700 opacity-60'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              disabled={!isAllowed}
+                              onClick={() => setDirectoryEntryLayout(layout)}
+                              aria-pressed={isSelected}
+                              aria-label={`Select ${meta.label} layout`}
+                              className={`block w-full text-left ${isAllowed ? '' : 'cursor-not-allowed'}`}
+                            >
+                              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-gray-100 dark:bg-gray-700">
+                                <LayoutPreviewCarousel slides={getLayoutPreviewSlides(layout, meta.label)} icon={meta.icon} />
+                                {isSelected && (
+                                  <span className="absolute right-2 top-2 z-10 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-medium text-white">
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+                              <div className="p-3">
+                                <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                                  {meta.label}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                  {meta.description}
+                                </span>
+                                {!isAllowed && (
+                                  <span className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                    {meta.isPremium ? 'Upgrade for Premium' : 'Not included in your plan'}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+
+                            {isAllowed && listing?.slug && (
+                              <a
+                                href={`/directory/${listing.slug}?layout_preview=${layout}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block border-t border-gray-100 dark:border-gray-700 px-3 py-2 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                              >
+                                Preview in new tab →
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-3 mt-4">
+                      <button
+                        type="button"
+                        onClick={handleSaveLayout}
+                        disabled={layoutSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                       >
-                        Preview in new tab →
-                      </a>
+                        {layoutSaving ? 'Saving...' : 'Save Layout'}
+                      </button>
+                      {layoutSaveMessage && (
+                        <span className={`text-sm ${layoutSaveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                          {layoutSaveMessage}
+                        </span>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Section: Description & Keywords */}
+                <AccordionItem value="content" className="border-b">
+                  <AccordionTrigger className="px-6 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-neutral-900">Description & Keywords</span>
+                      <SectionBadge>{seoDescription.length}/500 · {seoKeywords.length}/10</SectionBadge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6">
+                    <div className="space-y-4">
+                      <div>
+                        <textarea
+                          value={seoDescription}
+                          onChange={(e) => setSeoDescription(e.target.value)}
+                          rows={6}
+                          maxLength={500}
+                          placeholder="Describe your business, products, and services..."
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        />
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          {seoDescription.length}/500 characters • Helps customers find you in search
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex gap-2 mb-3">
+                          <input
+                            type="text"
+                            value={keywordInput}
+                            onChange={(e) => setKeywordInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
+                            placeholder="Add keyword..."
+                            maxLength={30}
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddKeyword}
+                            disabled={!keywordInput.trim() || seoKeywords.length >= 10}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {seoKeywords.map((keyword) => (
+                            <span
+                              key={keyword}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                            >
+                              {keyword}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveKeyword(keyword)}
+                                className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          {seoKeywords.length}/10 keywords • Used for search optimization
+                        </p>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Section: Store Gallery */}
+                <AccordionItem value="gallery" className="border-b">
+                  <AccordionTrigger className="px-6 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <ImageIcon className="h-5 w-5 text-orange-600" />
+                      <span className="font-medium text-neutral-900">Store Gallery</span>
+                      <SectionBadge>{rawSettings.gallery_display_mode === 'magazine' ? 'Magazine' : 'Carousel'}</SectionBadge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Add up to 10 photos to showcase your business on the directory page
+                    </p>
+                    {listing && (
+                      <DirectoryPhotoGallery
+                        listing={listing}
+                        tenantId={tenantId}
+                        onUpdate={() => {
+                          // Refresh the listing preview when photos change
+                          // The useDirectoryListing hook should automatically refresh
+                        }}
+                      />
                     )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-3 mt-4">
-              <button
-                type="button"
-                onClick={handleSaveLayout}
-                disabled={layoutSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                {layoutSaving ? 'Saving...' : 'Save Layout'}
-              </button>
-              {layoutSaveMessage && (
-                <span className={`text-sm ${layoutSaveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
-                  {layoutSaveMessage}
-                </span>
-              )}
-            </div>
-          </div>
 
-          {/* SEO Description */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Description
-            </h3>
-            <textarea
-              value={seoDescription}
-              onChange={(e) => setSeoDescription(e.target.value)}
-              rows={6}
-              maxLength={500}
-              placeholder="Describe your business, products, and services..."
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-            />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {seoDescription.length}/500 characters • Helps customers find you in search
-            </p>
-          </div>
-
-          {/* Keywords */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Keywords
-            </h3>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={keywordInput}
-                onChange={(e) => setKeywordInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
-                placeholder="Add keyword..."
-                maxLength={30}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              />
-              <button
-                type="button"
-                onClick={handleAddKeyword}
-                disabled={!keywordInput.trim() || seoKeywords.length >= 10}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {seoKeywords.map((keyword) => (
-                <span
-                  key={keyword}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                >
-                  {keyword}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveKeyword(keyword)}
-                    className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {seoKeywords.length}/10 keywords • Used for search optimization
-            </p>
-          </div>
-
-          {/* Photo Gallery */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Store Gallery
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Add up to 10 photos to showcase your business on the directory page
-            </p>
-            {listing && (
-              <DirectoryPhotoGallery
-                listing={listing}
-                tenantId={tenantId}
-                onUpdate={() => {
-                  // Refresh the listing preview when photos change
-                  // The useDirectoryListing hook should automatically refresh
-                }}
-              />
-            )}
-
-            {/* Gallery Display Mode */}
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                Gallery Display Mode
-              </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Choose how photos are displayed on the directory page. This setting also applies to product page galleries.
-              </p>
-              <div className="space-y-2">
-                <button
-                  onClick={() => setGalleryMode('carousel')}
-                  className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
-                    (rawSettings.gallery_display_mode || 'carousel') === 'carousel'
-                      ? 'bg-orange-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  <div className="flex-shrink-0 mt-0.5">
-                    <div className={`w-4 h-4 rounded-full border-2 ${(rawSettings.gallery_display_mode || 'carousel') === 'carousel' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
-                      {(rawSettings.gallery_display_mode || 'carousel') === 'carousel' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                        Gallery Display Mode
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Choose how photos are displayed on the directory page. This setting also applies to product page galleries.
+                      </p>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setGalleryMode('carousel')}
+                          className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                            (rawSettings.gallery_display_mode || 'carousel') === 'carousel'
+                              ? 'bg-orange-600 text-white shadow-md'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            <div className={`w-4 h-4 rounded-full border-2 ${(rawSettings.gallery_display_mode || 'carousel') === 'carousel' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
+                              {(rawSettings.gallery_display_mode || 'carousel') === 'carousel' && <div className="w-2 h-2 rounded-full bg-white" />}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium">Carousel</p>
+                            <p className={`text-sm ${(rawSettings.gallery_display_mode || 'carousel') === 'carousel' ? 'text-orange-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                              One image at a time with navigation. Classic controlled viewing.
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setGalleryMode('magazine')}
+                          className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
+                            rawSettings.gallery_display_mode === 'magazine'
+                              ? 'bg-rose-600 text-white shadow-md'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                          }`}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            <div className={`w-4 h-4 rounded-full border-2 ${rawSettings.gallery_display_mode === 'magazine' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
+                              {rawSettings.gallery_display_mode === 'magazine' && <div className="w-2 h-2 rounded-full bg-white" />}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium">Magazine</p>
+                            <p className={`text-sm ${rawSettings.gallery_display_mode === 'magazine' ? 'text-rose-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                              All images displayed at once in a magazine mosaic. Maximum visual impact.
+                            </p>
+                          </div>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="font-medium">Carousel</p>
-                    <p className={`text-sm ${(rawSettings.gallery_display_mode || 'carousel') === 'carousel' ? 'text-orange-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                      One image at a time with navigation. Classic controlled viewing.
-                    </p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setGalleryMode('magazine')}
-                  className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg text-left transition-all ${
-                    rawSettings.gallery_display_mode === 'magazine'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  <div className="flex-shrink-0 mt-0.5">
-                    <div className={`w-4 h-4 rounded-full border-2 ${rawSettings.gallery_display_mode === 'magazine' ? 'border-white' : 'border-gray-400'} flex items-center justify-center`}>
-                      {rawSettings.gallery_display_mode === 'magazine' && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Section: Directory Sections */}
+                <AccordionItem value="sections" className="border-b-0">
+                  <AccordionTrigger className="px-6 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <ToggleRight className="h-5 w-5 text-teal-600" />
+                      <span className="font-medium text-neutral-900">Directory Sections</span>
+                      <SectionBadge>{enabledSectionCount} on</SectionBadge>
                     </div>
-                  </div>
-                  <div>
-                    <p className="font-medium">Magazine</p>
-                    <p className={`text-sm ${rawSettings.gallery_display_mode === 'magazine' ? 'text-rose-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                      All images displayed at once in a magazine mosaic. Maximum visual impact.
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Choose which sections appear on your directory listing
                     </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
+                    <div className="space-y-3">
+                      {/* Hours */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Hours</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Business hours display</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowHours ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.hours_display}
+                            disabled={!capState?.canShowHours}
+                            onChange={(e) => toggleRaw('hours_display', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* Map */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Map</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Interactive location map</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.map_display}
+                            disabled={!capState?.canShowMap}
+                            onChange={(e) => toggleRaw('map_display', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* Contact */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Contact Info</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Phone, email, address</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowContact ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.storefront_contact}
+                            disabled={!capState?.canShowContact}
+                            onChange={(e) => toggleRaw('storefront_contact', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* Location */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Location</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Show business address</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.location_display}
+                            disabled={!capState?.canShowMap}
+                            onChange={(e) => toggleRaw('location_display', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* Interactive Maps */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Interactive Map</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Embedded map widget</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.interactive_maps}
+                            disabled={!capState?.canShowMap}
+                            onChange={(e) => toggleRaw('interactive_maps', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* Social */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Social Media</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Links to social profiles</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowSocial ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.storefront_social_media}
+                            disabled={!capState?.canShowSocial}
+                            onChange={(e) => toggleRaw('storefront_social_media', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* SEO */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">SEO</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Search engine optimization</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowSeo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.enhanced_seo}
+                            disabled={!capState?.canShowSeo}
+                            onChange={(e) => toggleRaw('enhanced_seo', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      {/* External Link */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">External Website Link</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Allow directory cards to link to your website</p>
+                        </div>
+                        <label className={`relative inline-flex items-center ${!capState?.canShowExternalLink ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!rawSettings.external_link_enabled}
+                            disabled={!capState?.canShowExternalLink}
+                            onChange={(e) => toggleRaw('external_link_enabled', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={handleSaveSections}
+                        disabled={sectionSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      >
+                        {sectionSaving ? 'Saving...' : 'Save Sections'}
+                      </button>
+                      {sectionSaveMessage && (
+                        <span className={`text-sm ${sectionSaveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                          {sectionSaveMessage}
+                        </span>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+              </Accordion>
+            </CardContent>
+          </Card>
 
           {/* Profile Sync */}
           {listing.isPublished && (
@@ -669,169 +886,6 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               Preview
             </h3>
             <DirectoryListingPreview listing={listing} />
-          </div>
-
-          {/* Directory Sections — capability-gated toggles */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Directory Sections
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Choose which sections appear on your directory listing
-            </p>
-            <div className="space-y-3">
-              {/* Hours */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Hours</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Business hours display</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowHours ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.hours_display}
-                    disabled={!capState?.canShowHours}
-                    onChange={(e) => toggleRaw('hours_display', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* Map */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Map</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Interactive location map</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.map_display}
-                    disabled={!capState?.canShowMap}
-                    onChange={(e) => toggleRaw('map_display', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* Contact */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Contact Info</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Phone, email, address</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowContact ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.storefront_contact}
-                    disabled={!capState?.canShowContact}
-                    onChange={(e) => toggleRaw('storefront_contact', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* Location */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Location</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Show business address</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.location_display}
-                    disabled={!capState?.canShowMap}
-                    onChange={(e) => toggleRaw('location_display', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* Interactive Maps */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Interactive Map</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Embedded map widget</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowMap ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.interactive_maps}
-                    disabled={!capState?.canShowMap}
-                    onChange={(e) => toggleRaw('interactive_maps', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* Social */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Social Media</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Links to social profiles</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowSocial ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.storefront_social_media}
-                    disabled={!capState?.canShowSocial}
-                    onChange={(e) => toggleRaw('storefront_social_media', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* SEO */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">SEO</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Search engine optimization</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowSeo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.enhanced_seo}
-                    disabled={!capState?.canShowSeo}
-                    onChange={(e) => toggleRaw('enhanced_seo', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              {/* External Link */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">External Website Link</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Allow directory cards to link to your website</p>
-                </div>
-                <label className={`relative inline-flex items-center ${!capState?.canShowExternalLink ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!rawSettings.external_link_enabled}
-                    disabled={!capState?.canShowExternalLink}
-                    onChange={(e) => toggleRaw('external_link_enabled', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={handleSaveSections}
-                disabled={sectionSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                {sectionSaving ? 'Saving...' : 'Save Sections'}
-              </button>
-              {sectionSaveMessage && (
-                <span className={`text-sm ${sectionSaveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
-                  {sectionSaveMessage}
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Public Link */}

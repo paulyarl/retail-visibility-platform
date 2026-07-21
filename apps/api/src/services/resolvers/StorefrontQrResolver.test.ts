@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveStorefrontQr } from './StorefrontQrResolver';
+import { DEFAULT_QR_SETTINGS } from '../../routes/storefront-qr-settings';
 
 describe('resolveStorefrontQr', () => {
   it('returns disabled when no features are present', () => {
@@ -214,5 +215,16 @@ describe('resolveStorefrontQr', () => {
     const result = resolveStorefrontQr(features, null);
     expect(result.qr_analytics_enabled).toBe(false);
     expect(result.can_use_qr_analytics).toBe(false);
+  });
+});
+
+describe('DEFAULT_QR_SETTINGS gradient target fields', () => {
+  it('includes qr_gradient_on_dots, qr_gradient_on_corners, qr_gradient_on_corner_dots', () => {
+    expect(DEFAULT_QR_SETTINGS).toHaveProperty('qr_gradient_on_dots');
+    expect(DEFAULT_QR_SETTINGS).toHaveProperty('qr_gradient_on_corners');
+    expect(DEFAULT_QR_SETTINGS).toHaveProperty('qr_gradient_on_corner_dots');
+    expect(DEFAULT_QR_SETTINGS.qr_gradient_on_dots).toBe(true);
+    expect(DEFAULT_QR_SETTINGS.qr_gradient_on_corners).toBe(true);
+    expect(DEFAULT_QR_SETTINGS.qr_gradient_on_corner_dots).toBe(true);
   });
 });
