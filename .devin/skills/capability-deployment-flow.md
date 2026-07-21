@@ -14,6 +14,18 @@ This skill is the **connective tissue** that links all capability-related skills
 - Debugging a capability that **isn't showing correctly** on the dashboard or settings page
 - Auditing the **data flow consistency** of an existing capability
 
+## Reference Implementations
+
+When implementing a new capability, emulate the closest matching reference:
+
+| Complexity | Reference | Why |
+|---|---|---|
+| **Simple (types)** | `ProductTypeResolver.ts` | Pure function, clean R17 precedence, legacy key fallback, clear tier/merchant separation. The simplest canonical pattern. |
+| **Simple (types, DB-backed)** | `StorefrontTypeResolver.ts` | Same pattern but delegates to a service for tier state. Use when resolver needs DB access. |
+| **Complex (options)** | `StorefrontQrResolver.ts` + `StorefrontQrResolver.test.ts` | Groups, sub-groups, flexible fallback, and the canonical R33 test pattern. Use for any options capability with multiple feature groups. |
+
+**Key principle**: The resolver's return object has two kinds of fields — **tier-level** (derived from `features` only) and **merchant-gated** (derived from `features` AND `merchantPrefs`). The reference implementations show this separation clearly. Never mix the two (R33).
+
 ## The 8-Phase Deployment Pipeline
 
 ```
@@ -163,11 +175,18 @@ resolveXxxOptions(
 ),
 ```
 
+**Reference implementations** (emulate these when in doubt):
+- **Simple (types capability)**: `ProductTypeResolver.ts` — pure function, clean R17 precedence, legacy fallback, clear separation of tier-level vs merchant-gated fields. The simplest canonical pattern.
+- **Simple (types capability, DB-backed)**: `StorefrontTypeResolver.ts` — same pattern but delegates tier-gate logic to a service. Use when the resolver needs DB access for tier state.
+- **Complex (options capability)**: `StorefrontQrResolver.ts` + `StorefrontQrResolver.test.ts` — groups, sub-groups, flexible fallback, and the canonical R33 test pattern (tier allows + merchant pref false → tier-level field still `true`). Use as the reference for any options capability with multiple feature groups.
+
 **Rules**:
 - R1: Resolver MUST accept `merchantPrefs` and produce both `allowed_*` (tier-only) and `can_use_*` / `effective_*` (tier + merchant)
 - R2: `enabled` = tier feature enabled AND merchant master switch on
 - R3: `*Available` is convenience only — never use as sole tier check in dashboard
 - R23: Every individual feature flag check MUST include `flexible ||` prefix — including standalone booleans outside group arrays. Flexible tiers unlock ALL features in the capability; missing the prefix causes features to stay disabled on flexible tiers.
+- R33: Merchant preferences MUST NEVER gate tier-level fields (`allowed_*`, `*_enabled`, `*_styled_enabled`, etc.). Only `can_use_*`, `effective_*`, and `merchant_preferences` fields may reference merchant prefs. See `capability-data-flow-rules.md` R33.
+- R34: Every new field added to a resolver's return object MUST have a unit test in `XxxResolver.test.ts` verifying: (1) tier allows + default/null merchant prefs → field is `true`, (2) tier allows + merchant pref explicitly false → tier-level field still `true`, (3) tier does not allow → field is `false`. This is the automated enforcement of R33. See `capability-data-flow-rules.md` R34.
 - For choice-based config (layouts, types, modes): compute a single `effective_*` value, not just raw merchant preference
 - Trim feature keys to avoid whitespace issues: `cleanFeatures[key.trim()] = val`
 
@@ -489,6 +508,8 @@ When deploying a capability change, verify ALL of these:
 - [ ] Resolver follows enablement precedence (R17): `*_disabled` > `*_enabled` > `*_flexible` > features
 - [ ] Every individual feature flag check in the resolver includes `flexible ||` prefix (R23) — including standalone booleans outside group arrays
 - [ ] Resolver returns `merchant_preferences` field
+- [ ] No tier-level field in resolver output references `prefs.*` or `merchantPrefs.*` (R33 audit — only `can_use_*`, `effective_*`, and `merchant_preferences` may use merchant prefs)
+- [ ] Resolver unit test added for every new output field with default/null merchant prefs (R34 — at minimum: tier allows + default prefs → `true`, tier allows + pref false → tier-level field still `true`, tier does not allow → `false`)
 - [ ] Orchestrator passes `merchantBundle.xxx` to resolver
 - [ ] If cross-capability dependency exists: insert constraint into `capability_constraints_list` DB table (R20)
 - [ ] Also add static fallback entry in `CapabilityConstraintRegistry.ts` (used when DB is unavailable)
@@ -523,5 +544,6 @@ When deploying a capability change, verify ALL of these:
 - [ ] **Route URL namespace matches auth scope**: public routes at `/api/public/tenants/:tenantId/*`, private routes at `/api/tenants/:tenantId/*` (see `AUTH_SCOPE_ISOLATION_SPEC.md` FR-1, FR-2)
 - [ ] **Frontend service base class matches route auth scope**: `PublicApiSingleton` → `/api/public/...` URL, `TenantApiSingleton` → `/api/tenants/...` URL (see `AUTH_SCOPE_ISOLATION_SPEC.md` FR-2a)
 - [ ] **No `router.use(authenticateToken)` at router level** in orchestrator-mounted sub-routers — use per-route `authenticateToken` only (see `AUTH_SCOPE_ISOLATION_SPEC.md` FR-3)
+- [ ] Resolver unit tests pass (`npx vitest run src/services/resolvers/XxxResolver.test.ts`)
 - [ ] `pnpm checkapi` passes with zero TS errors
 - [ ] `pnpm checkweb` passes with zero TS errors
