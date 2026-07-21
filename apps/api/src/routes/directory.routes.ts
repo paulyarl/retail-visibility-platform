@@ -56,7 +56,7 @@ router.use('/premium-featured-products', directoryPremiumFeaturedRoutes);
 
 // ── 2. Root-mounted routers with only static or scoped paths ────────────
 router.use('/', directoryConsolidatedRoutes);        // /consolidated/:slug
-router.use('/', directoryRandomFeaturedRoutes);       // /, /debug, /available
+router.use('/random-featured', directoryRandomFeaturedRoutes); // /random-featured, /random-featured/debug, /random-featured/available
 router.use('/', directoryRandomFeaturedGlobalRoutes); // /random-featured-global
 router.use('/', directoryCategoriesEnhancedRoutes);   // /categories/enhanced, /categories/types, /categories/storefront, /resolve-slug/:slug, /:slug/related
 router.use('/', directoryMapRoutes);                  // /map/locations

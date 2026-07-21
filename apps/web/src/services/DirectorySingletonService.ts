@@ -449,7 +449,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     const response = await this.makeDefaultRequest<{
       listings?: any[];
     }>(
-      `/api/directory/stores?limit=100&sort=activity`,
+      `/api/directory/mv/search?limit=100&sort=recent`,
       {},
       `directory-promoted-stores`,
       this.CACHE_TTL_MEDIUM,
