@@ -40,6 +40,42 @@ export interface FunnelStepResult {
   revenue_cents: number;
 }
 
+export interface ProductFunnelOfferItem {
+  name: string;
+  image_url: string | null;
+  product_type: 'physical' | 'digital' | 'hybrid';
+  price_cents: number;
+  stock: number | null;
+  description: string | null;
+}
+
+export interface ProductFunnelCoupon {
+  code: string;
+  discount_type: string;
+  discount_value: number;
+}
+
+export interface ProductFunnelStep {
+  id: string;
+  step_type: FunnelStepType;
+  offer_item_id: string;
+  display_title: string | null;
+  display_description: string | null;
+  price_cents: number | null;
+  discount_cents: number;
+  sort_order: number;
+  offer_item: ProductFunnelOfferItem | null;
+  coupon: ProductFunnelCoupon | null;
+}
+
+export interface ProductFunnelPreview {
+  funnel_id: string;
+  name: string;
+  trigger_type: string;
+  metadata: { show_preview?: boolean } | null;
+  steps: ProductFunnelStep[];
+}
+
 class FunnelEngine extends BaseService {
   private static instance: FunnelEngine;
 
@@ -124,6 +160,98 @@ class FunnelEngine extends BaseService {
     }
 
     return null;
+  }
+
+  /**
+   * Resolve an enriched product-page funnel preview for a given product.
+   * Reuses checkout funnel resolution, then batch-enriches offer items and
+   * coupon_offer steps with human-readable details for the product page.
+   */
+  async getProductFunnelPreview(
+    tenantId: string,
+    productId: string
+  ): Promise<ProductFunnelPreview | null> {
+    const checkout = await this.getCheckoutFunnel(tenantId, productId, 0);
+    if (!checkout || checkout.trigger_type === 'cart_value') {
+      return null;
+    }
+
+    const funnel = await prisma.tenant_sales_funnels.findUnique({
+      where: { id: checkout.funnel_id },
+      select: { metadata: true },
+    });
+    const metadata = (funnel?.metadata as Record<string, any> | null) || {};
+    if (metadata.show_preview === false) {
+      return null;
+    }
+
+    const offerItemIds = checkout.steps.map((s) => s.offer_item_id).filter(Boolean);
+    const couponOfferIds = checkout.steps
+      .filter((s) => s.step_type === 'coupon_offer')
+      .map((s) => s.offer_item_id);
+
+    const [offerItems, coupons] = await Promise.all([
+      offerItemIds.length
+        ? prisma.inventory_items.findMany({
+            where: { id: { in: offerItemIds }, tenant_id: tenantId },
+            select: {
+              id: true,
+              name: true,
+              image_url: true,
+              product_type: true,
+              price_cents: true,
+              stock: true,
+              description: true,
+            },
+          })
+        : Promise.resolve([] as { id: string; name: string; image_url: string | null; product_type: any; price_cents: number; stock: number; description: string | null }[]),
+      couponOfferIds.length
+        ? prisma.tenant_coupons.findMany({
+            where: { id: { in: couponOfferIds }, tenant_id: tenantId, is_active: true },
+            select: { id: true, code: true, discount_type: true, discount_value: true },
+          })
+        : Promise.resolve([] as { id: string; code: string; discount_type: string; discount_value: number }[]),
+    ]);
+
+    const itemMap = new Map(offerItems.map((i) => [i.id, i]));
+    const couponMap = new Map(coupons.map((c) => [c.id, c]));
+
+    const steps: ProductFunnelStep[] = checkout.steps.map((s) => {
+      const item = itemMap.get(s.offer_item_id) ?? null;
+      const coupon = s.step_type === 'coupon_offer' ? (couponMap.get(s.offer_item_id) ?? null) : null;
+
+      return {
+        id: s.id,
+        step_type: s.step_type,
+        offer_item_id: s.offer_item_id,
+        display_title: s.display_title,
+        display_description: s.display_description,
+        price_cents: s.price_cents,
+        discount_cents: s.discount_cents,
+        sort_order: s.sort_order,
+        offer_item: item
+          ? {
+              name: item.name,
+              image_url: item.image_url,
+              product_type: item.product_type as 'physical' | 'digital' | 'hybrid',
+              price_cents: item.price_cents,
+              stock: item.stock ?? null,
+              description: item.description ?? null,
+            }
+          : null,
+        coupon: coupon
+          ? { code: coupon.code, discount_type: coupon.discount_type, discount_value: coupon.discount_value }
+          : null,
+      };
+    });
+
+    return {
+      funnel_id: checkout.funnel_id,
+      name: checkout.name,
+      trigger_type: checkout.trigger_type,
+      metadata: metadata as { show_preview?: boolean } | null,
+      steps,
+    };
   }
 
   /**

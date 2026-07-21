@@ -5,9 +5,11 @@
  * during the checkout flow.
  *
  * Routes:
- *   GET  /api/public/funnels/:tenantId/checkout        — resolve active checkout funnel
- *   POST /api/public/funnels/:tenantId/order-bump    — accept/decline order bump
- *   POST /api/public/funnels/:tenantId/step/:stepId  — accept/decline upsell/downsell/OTO
+ *   GET  /api/public/funnels/:tenantId/checkout            — resolve active checkout funnel
+ *   GET  /api/public/funnels/:tenantId/product/:productId — resolve enriched product-page funnel preview
+ *   POST /api/public/funnels/:tenantId/preview-event      — track product-page preview click/buy-now events
+ *   POST /api/public/funnels/:tenantId/order-bump         — accept/decline order bump
+ *   POST /api/public/funnels/:tenantId/step/:stepId       — accept/decline upsell/downsell/OTO
  */
 
 import express from 'express';
@@ -118,6 +120,80 @@ router.post('/public/funnels/:tenantId/step/:stepId', async (req, res) => {
   } catch (error) {
     logger.error('[funnel-checkout] Failed to process funnel step', undefined, { tenantId: req.params.tenantId, stepId: req.params.stepId, error: (error as Error).message });
     res.status(500).json({ error: (error as Error).message || 'Failed to process funnel step' });
+  }
+});
+
+/**
+ * GET /api/public/funnels/:tenantId/product/:productId
+ * Resolve an enriched product-page funnel preview for a specific product.
+ * Query: sessionId, customerId
+ */
+router.get('/public/funnels/:tenantId/product/:productId', async (req, res) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const sessionId = req.query.sessionId as string | undefined;
+    const customerId = req.query.customerId as string | undefined;
+
+    const engine = FunnelEngine.getInstance();
+    const funnel = await engine.getProductFunnelPreview(tenantId, productId);
+
+    if (!funnel) {
+      return res.json({ success: true, funnel: null });
+    }
+
+    // Track a preview_viewed event for each step displayed
+    const analytics = FunnelAnalyticsService.getInstance();
+    await Promise.all(
+      funnel.steps.map((step) =>
+        analytics.trackFunnelEvent({
+          tenantId,
+          funnelId: funnel.funnel_id,
+          stepId: step.id,
+          eventType: 'preview_viewed',
+          sessionId,
+          customerId,
+          productId,
+        })
+      )
+    );
+
+    res.json({ success: true, funnel });
+  } catch (error) {
+    logger.error('[funnel-checkout] Failed to resolve product funnel preview', undefined, { tenantId: req.params.tenantId, productId: req.params.productId, error: (error as Error).message });
+    res.status(500).json({ error: 'Failed to resolve product funnel preview' });
+  }
+});
+
+/**
+ * POST /api/public/funnels/:tenantId/preview-event
+ * Track product-page funnel preview interactions (step click / buy now).
+ * Body: { funnelId, stepId, eventType, productId, sessionId?, customerId? }
+ */
+router.post('/public/funnels/:tenantId/preview-event', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { funnelId, stepId, eventType, productId, sessionId, customerId } = req.body;
+
+    const allowedTypes = ['preview_step_clicked', 'preview_buy_now_clicked'];
+    if (!funnelId || !eventType || !allowedTypes.includes(eventType)) {
+      return res.status(400).json({ error: 'funnelId, eventType and a valid preview event type are required' });
+    }
+
+    const analytics = FunnelAnalyticsService.getInstance();
+    await analytics.trackFunnelEvent({
+      tenantId,
+      funnelId,
+      stepId,
+      eventType,
+      sessionId,
+      customerId,
+      productId,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[funnel-checkout] Failed to track preview event', undefined, { tenantId: req.params.tenantId, error: (error as Error).message });
+    res.status(500).json({ error: 'Failed to track preview event' });
   }
 });
 
