@@ -111,6 +111,14 @@ export interface FunnelAovComparison {
   uplift_percent: number;
 }
 
+export interface FunnelPreviewMetrics {
+  preview_views: number;
+  step_clicks: number;
+  buy_now_clicks: number;
+  checkout_views: number;
+  preview_to_checkout_rate: number;
+}
+
 export interface FunnelOptionsSettings {
   funnel_options_enabled: boolean;
   order_bump_enabled: boolean;
@@ -234,7 +242,7 @@ class FunnelServiceClass extends TenantApiSingleton {
   async getFunnelAnalytics(
     tenantId: string,
     funnelId: string
-  ): Promise<{ summary: FunnelAnalyticsSummary | null; steps: FunnelStepConversion[]; timeseries: FunnelTimeSeries[]; aov: FunnelAovComparison | null }> {
+  ): Promise<{ summary: FunnelAnalyticsSummary | null; steps: FunnelStepConversion[]; timeseries: FunnelTimeSeries[]; aov: FunnelAovComparison | null; preview: FunnelPreviewMetrics | null }> {
     const result = await this.makeDefaultRequest<ApiEnvelope<any>>(
       `/api/tenants/${tenantId}/funnels/${funnelId}/analytics`,
       { method: 'GET' },
@@ -248,6 +256,7 @@ class FunnelServiceClass extends TenantApiSingleton {
       steps: result.data.steps || [],
       timeseries: result.data.timeseries || [],
       aov: result.data.aov || null,
+      preview: result.data.preview || null,
     };
   }
 

@@ -32,7 +32,7 @@ interface SquarePaymentFormProps {
     postalCode: string;
     country: string;
   };
-  fulfillmentMethod?: 'pickup' | 'delivery' | 'shipping';
+  fulfillmentMethod?: 'pickup' | 'delivery' | 'shipping' | 'digital';
   cartItems: Array<{
     id: string;
     name: string;

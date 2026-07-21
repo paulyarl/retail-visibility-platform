@@ -26,6 +26,7 @@ const {
   mockPrismaTenants,
   mockPrismaTenantFeaturePurchases,
   mockPrismaBsaasBundles,
+  mockPrismaFunnelEvents,
   mockPromotionCodesList,
   mockCouponsRetrieve,
   mockValidateCouponTargets,
@@ -76,6 +77,9 @@ const {
   mockPrismaBsaasBundles: {
     findUnique: vi.fn(),
   },
+  mockPrismaFunnelEvents: {
+    groupBy: vi.fn(),
+  },
   mockPromotionCodesList: vi.fn(),
   mockCouponsRetrieve: vi.fn(),
   mockValidateCouponTargets: vi.fn(),
@@ -97,6 +101,7 @@ vi.mock('../prisma', () => ({
     tenants: mockPrismaTenants,
     tenant_feature_purchases: mockPrismaTenantFeaturePurchases,
     bsaas_bundles: mockPrismaBsaasBundles,
+    funnel_events: mockPrismaFunnelEvents,
   },
 }));
 
@@ -155,6 +160,7 @@ import { resolveWholesaleMatching } from '../services/resolvers/WholesaleMatchin
 import { calculateRenewalCharge } from '../jobs/bsaas-renewal';
 import { validatePromoCode } from '../routes/bsaas-purchases';
 import { processClickExpiry } from '../jobs/affiliate-click-expiry';
+import FunnelAnalyticsService from '../services/FunnelAnalyticsService';
 
 // ── Test data fixtures ─────────────────────────────────────────────────
 
@@ -1505,5 +1511,59 @@ describe('DirectoryEntryOptionsResolver', () => {
     expect(result.merchant_preferences).not.toHaveProperty('storefront_opt_enabled');
     expect(result.merchant_preferences).not.toHaveProperty('image_gallery_5');
     expect(result.merchant_preferences).not.toHaveProperty('qr_product');
+  });
+});
+
+describe('Sprint 6 — Funnel analytics preview metrics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('aggregates preview funnel metrics from funnel_events', async () => {
+    mockPrismaFunnelEvents.groupBy.mockResolvedValue([
+      { event_type: 'preview_viewed', _count: { id: 100 } },
+      { event_type: 'preview_step_clicked', _count: { id: 25 } },
+      { event_type: 'preview_buy_now_clicked', _count: { id: 10 } },
+      { event_type: 'viewed', _count: { id: 12 } },
+    ]);
+
+    const result = await FunnelAnalyticsService.getInstance().getPreviewMetrics(
+      'tenant_test_001',
+      'funnel_test_001'
+    );
+
+    expect(result.preview_views).toBe(100);
+    expect(result.step_clicks).toBe(25);
+    expect(result.buy_now_clicks).toBe(10);
+    expect(result.checkout_views).toBe(12);
+    expect(result.preview_to_checkout_rate).toBe(0.12);
+    expect(mockPrismaFunnelEvents.groupBy).toHaveBeenCalledWith({
+      by: ['event_type'],
+      where: {
+        tenant_id: 'tenant_test_001',
+        funnel_id: 'funnel_test_001',
+        event_type: {
+          in: ['preview_viewed', 'preview_step_clicked', 'preview_buy_now_clicked', 'viewed'],
+        },
+      },
+      _count: { id: true },
+    });
+  });
+
+  it('returns zeroed preview metrics when no events exist', async () => {
+    mockPrismaFunnelEvents.groupBy.mockResolvedValue([]);
+
+    const result = await FunnelAnalyticsService.getInstance().getPreviewMetrics(
+      'tenant_test_001',
+      'funnel_test_001'
+    );
+
+    expect(result).toEqual({
+      preview_views: 0,
+      step_clicks: 0,
+      buy_now_clicks: 0,
+      checkout_views: 0,
+      preview_to_checkout_rate: 0,
+    });
   });
 });

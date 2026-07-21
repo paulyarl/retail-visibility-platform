@@ -15,6 +15,8 @@ function SuccessPageContent() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+  const [order, setOrder] = useState<any | null>(null);
+  const [showDigitalConfirmation, setShowDigitalConfirmation] = useState(false);
   const [guestEmail, setGuestEmail] = useState<string>('');
   const [guestTenantId, setGuestTenantId] = useState<string>('');
   const [guestGatewayType, setGuestGatewayType] = useState<string>('');
@@ -50,6 +52,7 @@ function SuccessPageContent() {
 
         // Fetch order details using service
         const order = await checkoutService.getOrder(confirmResult.orderId);
+        setOrder(order);
 
         if (order) {
           if (order.customer_email) {
@@ -126,8 +129,15 @@ function SuccessPageContent() {
             setShowGuestPrompt(true);
           }
         } else {
-          // No save intent — redirect immediately
+          // No save intent — check for digital order before redirect
           const isLoggedIn = customerAuthService.isAuthenticated();
+          const hasDigital = order?.order_items?.some(
+            (i: any) => i.product_type === 'digital' || i.product?.product_type === 'digital' || i.is_digital
+          );
+          if (hasDigital) {
+            setShowDigitalConfirmation(true);
+            return;
+          }
           router.replace(isLoggedIn ? '/account/orders' : '/my-orders');
         }
       } catch (err: any) {
@@ -197,6 +207,39 @@ function SuccessPageContent() {
   const handleSkip = () => {
     router.push('/my-orders');
   };
+
+  if (showDigitalConfirmation && order) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 space-y-6 text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
+          <h1 className="text-2xl font-bold text-gray-900">Your digital order is confirmed</h1>
+          <p className="text-gray-600">Order {order.order_number}</p>
+          <div className="text-left bg-gray-50 rounded-lg p-4 space-y-2">
+            {order.order_items?.map((item: any, idx: number) => (
+              <div key={idx} className="flex justify-between text-sm">
+                <span>{item.quantity} × {item.product_name || item.name}</span>
+                <span className="font-medium">
+                  ${(((item.total_cents ?? (item.price_cents ?? 0) * item.quantity)) / 100).toFixed(2)}
+                </span>
+              </div>
+            ))}
+            <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold">
+              <span>Total</span>
+              <span>${(order.total_cents / 100).toFixed(2)}</span>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600">Check your email for download and access instructions.</p>
+          <button
+            onClick={() => router.push('/my-orders')}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 w-full"
+          >
+            View My Orders
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (showGuestPrompt) {
     return (

@@ -27,6 +27,7 @@ interface ProductDigitalLayoutProps {
   currentUrl?: string;
   storefrontType?: string;
   socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
+  funnelPreview?: React.ReactNode;
 }
 
 export default function ProductDigitalLayout({
@@ -42,6 +43,7 @@ export default function ProductDigitalLayout({
   currentUrl,
   storefrontType,
   socialCommerceFlags,
+  funnelPreview,
 }: ProductDigitalLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl, productOptFlags });
 
@@ -127,6 +129,8 @@ export default function ProductDigitalLayout({
             fulfillmentPane={fulfillmentPane}
           />
         </div>
+
+        {funnelPreview}
 
         <ProductBottomSections
           product={product}

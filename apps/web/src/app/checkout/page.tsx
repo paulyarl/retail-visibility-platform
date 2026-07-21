@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin, Globe } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
-import { getCart, clearCart, validateFulfillmentMethod } from '@/lib/cart/cartManager';
+import { getCart, clearCart, addToCart, validateFulfillmentMethod } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { usePublicCommerceCapability, usePublicPaymentGatewayCapability } from '@/hooks/tenant-access/usePublicCapabilityAccess';
@@ -26,6 +26,7 @@ import { customerPaymentMethodsService } from '@/services/CustomerPaymentMethods
 import { customerAuthService } from '@/services/CustomerAuthService';
 import { publicPlatformFeeService } from '@/services/PublicPlatformFeeService';
 import { checkoutService } from '@/services/CheckoutService';
+import { itemsService } from '@/services/ItemsSingletonService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal' | 'stripe';
@@ -51,13 +52,16 @@ function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const tenantId = searchParams?.get('tenantId');
   const gatewayType = searchParams?.get('gatewayType') as PaymentMethod | null;
+  const directCheckout = searchParams?.get('direct_checkout') === 'true';
+  const directProductId = searchParams?.get('product_id');
 
   const { carts } = useMultiCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('review');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod | null>(null);
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod | 'digital' | null>(null);
+  const [isDirectDigital, setIsDirectDigital] = useState(false);
   const [fulfillmentFee, setFulfillmentFee] = useState<number>(0);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(gatewayType || 'square');
@@ -67,6 +71,43 @@ function CheckoutPageContent() {
   const [showGuestSavePrompt, setShowGuestSavePrompt] = useState(false);
   const [pendingPaymentMethodToken, setPendingPaymentMethodToken] = useState<string | null>(null);
   const { isAuthenticated } = useCustomerAuth();
+
+  // Direct checkout for digital single-items
+  useEffect(() => {
+    if (!tenantId || !directCheckout || !directProductId) return;
+
+    const loadDirectItem = async () => {
+      try {
+        const [item, profile] = await Promise.all([
+          itemsService.getItem(directProductId),
+          tenantPublicService.getPublicTenantProfile(tenantId),
+        ]);
+        if (!item || item.status !== 'active' || item.product_type !== 'digital') return;
+
+        clearCart(tenantId);
+        addToCart(
+          tenantId,
+          (profile as any)?.data?.name || (profile as any)?.name || 'Store',
+          {
+            product_id: item.id,
+            product_name: item.name,
+            product_sku: item.sku,
+            product_image: item.image_url || undefined,
+            quantity: 1,
+            price_cents: item.sale_price_cents ?? item.price_cents ?? item.priceCents ?? 0,
+            productType: item.product_type,
+          },
+          (profile as any)?.data?.logo_url || (profile as any)?.logoUrl || undefined
+        );
+        setFulfillmentMethod('digital');
+        setIsDirectDigital(true);
+      } catch {
+        // Non-fatal: fall back to normal cart flow
+      }
+    };
+
+    loadDirectItem();
+  }, [tenantId, directCheckout, directProductId]);
 
   // Capability-aware commerce and payment gateway resolution
   const commerceCap = usePublicCommerceCapability(tenantId);
@@ -517,7 +558,12 @@ function CheckoutPageContent() {
     setCustomerInfo(info);
     setCustomerId(custId || null);
     setSelectedAddressId(addrId || null);
-    setCurrentStep('fulfillment');
+    if (isDirectDigital) {
+      setFulfillmentMethod('digital');
+      setCurrentStep('payment');
+    } else {
+      setCurrentStep('fulfillment');
+    }
   };
 
   const handleFulfillmentSubmit = (method: FulfillmentMethod, fee: number) => {
@@ -541,6 +587,10 @@ function CheckoutPageContent() {
   const handleShippingSubmit = (address: ShippingAddress, isNew?: boolean) => {
     setShippingAddress(address);
     setCurrentStep('payment');
+  };
+
+  const handlePaymentBack = () => {
+    setCurrentStep(isDirectDigital ? 'review' : 'shipping');
   };
 
   const handlePaymentSuccess = async (orderNumber: string, gatewayTransactionId?: string, paymentMethodDetails?: { token?: string; cardLast4?: string; cardBrand?: string; expiryMonth?: number; expiryYear?: string }) => {
@@ -805,7 +855,7 @@ function CheckoutPageContent() {
 
               {/* Step 4: Payment */}
               {currentStep === 'payment' && customerInfo && fulfillmentMethod && (
-                fulfillmentMethod === 'pickup' || shippingAddress
+                fulfillmentMethod === 'digital' || fulfillmentMethod === 'pickup' || shippingAddress
               ) && (
                   <Card>
                     <CardHeader>
@@ -950,7 +1000,7 @@ function CheckoutPageContent() {
                             fulfillmentMethod={fulfillmentMethod}
                             cartItems={mappedCartItems}
                             onSuccess={handlePaymentSuccess}
-                            onBack={() => setCurrentStep('shipping')}
+                            onBack={handlePaymentBack}
                             squareConfig={squareConfig}
                             checkoutMode={checkoutMode}
                           />
@@ -962,7 +1012,7 @@ function CheckoutPageContent() {
                             fulfillmentMethod={fulfillmentMethod}
                             cartItems={mappedCartItems}
                             onSuccess={handlePaymentSuccess}
-                            onBack={() => setCurrentStep('shipping')}
+                            onBack={handlePaymentBack}
                             tenantId={tenantId || ''}
                             savePaymentMethod={savePaymentMethod}
                             checkoutMode={checkoutMode}
@@ -975,7 +1025,7 @@ function CheckoutPageContent() {
                             fulfillmentMethod={fulfillmentMethod}
                             cartItems={mappedCartItems}
                             onSuccess={handlePaymentSuccess}
-                            onBack={() => setCurrentStep('shipping')}
+                            onBack={handlePaymentBack}
                             checkoutMode={checkoutMode}
                           />
                         )

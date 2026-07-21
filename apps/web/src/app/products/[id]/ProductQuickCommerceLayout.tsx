@@ -33,6 +33,7 @@ interface ProductQuickCommerceLayoutProps {
   productOptFlags?: ProductOptionFlags | null;
   storefrontType?: string;
   socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
+  funnelPreview?: React.ReactNode;
 }
 
 export default function ProductQuickCommerceLayout({
@@ -47,6 +48,7 @@ export default function ProductQuickCommerceLayout({
   productOptFlags,
   storefrontType,
   socialCommerceFlags,
+  funnelPreview,
 }: ProductQuickCommerceLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
 
@@ -189,6 +191,8 @@ export default function ProductQuickCommerceLayout({
             socialCommerceFlags={socialCommerceFlags}
           />
         </div>
+
+        {funnelPreview}
 
         <ProductBottomSections
           product={product}

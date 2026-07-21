@@ -15,7 +15,7 @@ import FunnelService, { type FunnelWithSteps, type FunnelStepInput, type FunnelI
 import { useFunnelCapability, useCouponOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { CouponService, type Coupon } from '@/services/CouponService';
 import ItemPickerModal from '@/components/inventory/ItemPickerModal';
-import { itemsService } from '@/services/ItemsSingletonService';
+import { itemsService, type Item } from '@/services/ItemsSingletonService';
 
 interface FunnelBuilderClientProps {
   tenantId: string;
@@ -50,6 +50,8 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
   const [entryItemId, setEntryItemId] = useState<string | null>(null);
   const [entryItemName, setEntryItemName] = useState<string | null>(null);
   const [steps, setSteps] = useState<FunnelStepInput[]>([]);
+  const [showPreview, setShowPreview] = useState(true);
+  const [stepProductTypes, setStepProductTypes] = useState<Record<number, string>>({});
 
   // Item picker modal state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -67,6 +69,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
       setMinCartValueCents(f.min_cart_value_cents);
       setIsActive(f.is_active);
       setIsDefault(f.is_default);
+      setShowPreview(f.metadata?.show_preview !== false);
       setEntryItemId(f.entry_item_id);
       setEntryItemName(null);
       setStepItemNames({});
@@ -98,13 +101,18 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
           if (entryItem) setEntryItemName(entryItem.name);
         }
         const names: Record<number, string> = {};
+        const types: Record<number, string> = {};
         (f.steps ?? []).forEach((s, i) => {
           if (s.offer_item_id && s.step_type !== 'coupon_offer') {
             const item = items.find(it => it?.id === s.offer_item_id);
-            if (item) names[i] = item.name;
+            if (item) {
+              names[i] = item.name;
+              if (item.product_type) types[i] = item.product_type;
+            }
           }
         });
         setStepItemNames(names);
+        setStepProductTypes(types);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load funnel');
@@ -141,6 +149,13 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
     } else if (typeof pickerMode === 'number') {
       updateStep(pickerMode, { offer_item_id: itemId });
       setStepItemNames(prev => ({ ...prev, [pickerMode]: itemName }));
+      itemsService.getItem(itemId)
+        .then((it: Item | null) => {
+          if (it?.product_type) {
+            setStepProductTypes(prev => ({ ...prev, [pickerMode]: it.product_type as string }));
+          }
+        })
+        .catch(() => {});
     }
     setPickerMode(null);
   };
@@ -194,6 +209,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
         min_cart_value_cents: triggerType === 'cart_value' ? minCartValueCents : null,
         is_active: isActive,
         is_default: isDefault,
+        metadata: { ...(funnel?.metadata ?? {}), show_preview: showPreview },
         steps: steps.filter(s => s.offer_item_id),
       };
       await FunnelService.updateFunnel(tenantId, funnelId, data);
@@ -343,7 +359,17 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
               <Switch checked={isDefault} onCheckedChange={setIsDefault} />
               <label className="text-sm">Default Funnel</label>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showPreview} onCheckedChange={setShowPreview} />
+              <label className="text-sm">Show funnel preview on product page</label>
+            </div>
           </div>
+          {!showPreview && (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4 mt-0.5" />
+              <span>Funnel offers will only appear during checkout — not on the product page.</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -427,6 +453,7 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                           <Button variant="ghost" size="sm" onClick={() => {
                             updateStep(index, { offer_item_id: '' });
                             setStepItemNames(prev => { const next = { ...prev }; delete next[index]; return next; });
+                            setStepProductTypes(prev => { const next = { ...prev }; delete next[index]; return next; });
                           }}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
@@ -439,6 +466,19 @@ export default function FunnelBuilderClient({ tenantId, funnelId }: FunnelBuilde
                       )}
                     </div>
                   </div>
+
+                  {step.step_type !== 'coupon_offer' && stepProductTypes[index] && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="capitalize">{stepProductTypes[index]}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {stepProductTypes[index] === 'digital'
+                          ? "This offer will show as 'Instant access' on digital products"
+                          : stepProductTypes[index] === 'physical'
+                            ? 'Ships with order on physical products'
+                            : 'Ships or instant access on hybrid products'}
+                      </span>
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-xs font-medium mb-1 block">Display Title</label>

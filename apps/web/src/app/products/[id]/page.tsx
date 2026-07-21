@@ -41,6 +41,7 @@ import { resolveProductLayout, type ProductLayoutKey } from './layouts/types';
 import ProductShowcaseLayout from './ProductShowcaseLayout';
 import ProductQuickCommerceLayout from './ProductQuickCommerceLayout';
 import ProductDigitalLayout from './ProductDigitalLayout';
+import { ProductFunnelPreview } from '@/components/products/ProductFunnelPreview';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -571,6 +572,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     productWithEnrichment.productType || null,
   );
 
+  const funnelPreview = (
+    <ProductFunnelPreview
+      tenantId={product.tenantId}
+      productId={product.id}
+      productPriceCents={product.priceCents}
+      productType={product.productType || 'physical'}
+      layoutVariant={productLayout}
+    />
+  );
+
   return (
     <>
       <SocialPixels tenantId={product.tenantId} usePublic />
@@ -686,6 +697,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 productOptFlags={productOptFlags}
                 storefrontType={storefrontType}
                 socialCommerceFlags={socialCommerceFlags}
+                funnelPreview={funnelPreview}
               />
             </TenantPaymentProvider>
           </div>
@@ -702,6 +714,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 productOptFlags={productOptFlags}
                 storefrontType={storefrontType}
                 socialCommerceFlags={socialCommerceFlags}
+                funnelPreview={funnelPreview}
               />
             </TenantPaymentProvider>
           </div>
@@ -752,6 +765,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 productOptFlags={productOptFlags}
                 storefrontType={storefrontType}
                 socialCommerceFlags={socialCommerceFlags}
+                funnelPreview={funnelPreview}
               />
             </TenantPaymentProvider>
           </div>
@@ -869,6 +883,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               </div>
 
             </div>
+          {funnelPreview}
           </div>
         )}
         {/* Business Description - Merchant Branding - Full Width */}
