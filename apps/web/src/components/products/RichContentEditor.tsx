@@ -1,14 +1,16 @@
 'use client';
 
 import React from 'react';
-import { BlockNoteView, useCreateBlockNote, createReactBlockSpec } from '@blocknote/react';
+import { useCreateBlockNote, createReactBlockSpec } from '@blocknote/react';
+import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs } from '@blocknote/core';
 import { cn } from '@/lib/utils';
 import { Check, Info, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { itemsService } from '@/services/ItemsSingletonService';
 import { parseVideoUrl } from './ProductVideoPlayer';
-import '@blocknote/react/style.css';
+import '@blocknote/mantine/style.css';
+import '@blocknote/core/fonts/inter.css';
 
 import { contentBlocksSchema, ContentBlock, ContentBlocks, DEFAULT_CONTENT_BLOCKS } from './content-blocks';
 
