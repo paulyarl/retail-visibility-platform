@@ -1,11 +1,19 @@
 'use client';
 
 import React from 'react';
-import { useCreateBlockNote, createReactBlockSpec } from '@blocknote/react';
+import {
+  useCreateBlockNote,
+  createReactBlockSpec,
+  FormattingToolbar,
+  FormattingToolbarController,
+  BasicTextStyleButton,
+  ColorStyleButton,
+  CreateLinkButton,
+} from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs } from '@blocknote/core';
 import { cn } from '@/lib/utils';
-import { Check, Info, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
+import { getIcon, ICON_OPTIONS } from './icon-map';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { itemsService } from '@/services/ItemsSingletonService';
 import { parseVideoUrl } from './ProductVideoPlayer';
@@ -32,16 +40,6 @@ const CALLOUT_STYLES = {
   warning: 'bg-amber-50 border-amber-200 text-amber-900',
   success: 'bg-green-50 border-green-200 text-green-900',
   error: 'bg-red-50 border-red-200 text-red-900',
-};
-
-type IconComponent = React.ComponentType<{ className?: string; size?: number; style?: React.CSSProperties }>;
-
-const ICON_MAP: Record<string, IconComponent> = {
-  check: Check,
-  info: Info,
-  'alert-circle': AlertCircle,
-  'x-circle': XCircle,
-  help: HelpCircle,
 };
 
 const buttonBlockSpec = createReactBlockSpec(
@@ -97,7 +95,7 @@ const iconBlockSpec = createReactBlockSpec(
   },
   {
     render: ({ block }) => {
-      const Icon = ICON_MAP[block.props.name] || HelpCircle;
+      const Icon = getIcon(block.props.name);
       return <Icon className="inline-block h-5 w-5" style={{ color: block.props.color || undefined }} />;
     },
   },
@@ -310,18 +308,23 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
       >
         + Pill
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          const name = window.prompt('Icon name (e.g. check, info)', 'check');
+      <select
+        defaultValue=""
+        onChange={(e) => {
+          const name = e.currentTarget.value;
           if (!name) return;
-          const color = window.prompt('Icon color (optional)');
-          insert('icon', { name, color: color || '' });
+          insert('icon', { name, color: '' });
+          e.currentTarget.value = '';
         }}
-        className="rounded bg-gray-100 px-2 py-1 text-sm text-gray-800 hover:bg-gray-200"
+        className="rounded bg-gray-100 px-2 py-1 text-sm text-gray-800 hover:bg-gray-200 cursor-pointer"
       >
-        + Icon
-      </button>
+        <option value="">+ Icon</option>
+        {ICON_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         onClick={() => {
@@ -383,7 +386,28 @@ export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, cl
   return (
     <div className={className}>
       <CustomBlockToolbar editor={editor} tenantId={tenantId} />
-      <BlockNoteView editor={editor} onChange={handleChange} theme="light" />
+      <BlockNoteView
+        editor={editor}
+        onChange={handleChange}
+        theme="light"
+        formattingToolbar={false}
+      >
+        <FormattingToolbarController formattingToolbar={CustomFormattingToolbar as any} />
+      </BlockNoteView>
     </div>
+  );
+}
+
+function CustomFormattingToolbar() {
+  return (
+    <FormattingToolbar>
+      <BasicTextStyleButton basicTextStyle="bold" />
+      <BasicTextStyleButton basicTextStyle="italic" />
+      <BasicTextStyleButton basicTextStyle="underline" />
+      <BasicTextStyleButton basicTextStyle="strike" />
+      <BasicTextStyleButton basicTextStyle="code" />
+      <ColorStyleButton />
+      <CreateLinkButton />
+    </FormattingToolbar>
   );
 }

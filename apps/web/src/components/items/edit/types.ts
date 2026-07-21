@@ -1,6 +1,7 @@
 import { Item } from '@/services/itemsDataService';
 import { ProductType } from '../ProductTypeSelector';
 import { DigitalProductData } from '../DigitalProductConfig';
+import { ContentBlocks } from '@/components/products/content-blocks';
 
 export type ItemStatus = 'draft' | 'active' | 'archived';
 export type ItemCondition = 'new' | 'used' | 'refurbished';
@@ -23,6 +24,7 @@ export interface ItemFormValues {
   stock: string;
   description: string;
   enhancedDescription: string;
+  contentBlocks?: ContentBlocks;
   features: string;
   specifications: string;
   status: ItemStatus;
@@ -47,6 +49,7 @@ export interface ItemFormSetters {
   setStock: (v: string) => void;
   setDescription: (v: string) => void;
   setEnhancedDescription: (v: string) => void;
+  setContentBlocks: (v: ContentBlocks) => void;
   setFeatures: (v: string) => void;
   setSpecifications: (v: string) => void;
   setStatus: (v: ItemStatus) => void;

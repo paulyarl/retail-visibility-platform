@@ -2,17 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { ContentBlock, ContentBlocks } from './content-blocks';
 import { ProductVideoPlayer } from './ProductVideoPlayer';
-import { Check, Info, AlertCircle, XCircle, HelpCircle } from 'lucide-react';
-
-type IconComponent = React.ComponentType<{ className?: string; size?: number; style?: React.CSSProperties }>;
-
-const ICON_MAP: Record<string, IconComponent> = {
-  check: Check,
-  info: Info,
-  'alert-circle': AlertCircle,
-  'x-circle': XCircle,
-  help: HelpCircle,
-};
+import { getIcon } from './icon-map';
 
 const CALLOUT_STYLES = {
   info: 'bg-blue-50 border-blue-200 text-blue-900',
@@ -132,7 +122,7 @@ function Block({ block }: { block: ContentBlock }) {
       );
 
     case 'icon': {
-      const Icon = ICON_MAP[block.name] || HelpCircle;
+      const Icon = getIcon(block.name);
       return <Icon className="inline-block h-5 w-5" style={{ color: block.color }} />;
     }
 
