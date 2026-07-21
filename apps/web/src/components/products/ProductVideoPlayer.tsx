@@ -17,7 +17,7 @@ interface VideoInfo {
   isPlaylist?: boolean;
 }
 
-function parseVideoUrl(url: string): VideoInfo | null {
+export function parseVideoUrl(url: string): VideoInfo | null {
   if (!url) return null;
 
   try {

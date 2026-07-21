@@ -7,36 +7,30 @@ import { ChevronLeft, ShoppingCart } from 'lucide-react';
 import { useProductLayoutState } from './layouts/hooks/useProductLayoutState';
 import { useQrScanTracking } from '@/hooks/useQrScanTracking';
 import { ProductBreadcrumb } from './layouts/shared/ProductBreadcrumb';
-import { ProductTrustBar } from './layouts/shared/ProductTrustBar';
-import { StickyPurchaseBar } from './layouts/shared/StickyPurchaseBar';
-import { ProductImageLightbox } from './layouts/shared/ProductImageLightbox';
 import { ProductGalleryPanel } from '@/components/products/sections/ProductGalleryPanel';
-import { ProductPurchasePanel } from '@/components/products/sections/ProductPurchasePanel';
 import { ProductBottomSections } from '@/components/products/sections/ProductBottomSections';
 import { ProductLayoutSkeleton } from '@/components/products/sections/ProductLayoutSkeleton';
+import DigitalPurchasePanel from '@/components/products/sections/DigitalPurchasePanel';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { StorefrontOptionFlags, ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
-interface ProductQuickCommerceLayoutProps {
+interface ProductDigitalLayoutProps {
   product: any;
   tenant: any;
-  storeStatus?: any;
-  gallery?: React.ReactNode;
   videoPlayer?: React.ReactNode;
   fulfillmentPane?: React.ReactNode;
-  slug?: string;
-  currentUrl?: string;
   productSlug?: string;
   slugType?: string;
   disableQRCode?: boolean;
   initialOptFlags?: StorefrontOptionFlags | null;
   productOptFlags?: ProductOptionFlags | null;
+  currentUrl?: string;
   storefrontType?: string;
   socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
   funnelPreview?: React.ReactNode;
 }
 
-export default function ProductQuickCommerceLayout({
+export default function ProductDigitalLayout({
   product,
   tenant,
   videoPlayer,
@@ -46,22 +40,15 @@ export default function ProductQuickCommerceLayout({
   disableQRCode,
   initialOptFlags,
   productOptFlags,
+  currentUrl,
   storefrontType,
   socialCommerceFlags,
   funnelPreview,
-}: ProductQuickCommerceLayoutProps) {
-  const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
+}: ProductDigitalLayoutProps) {
+  const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl, productOptFlags });
 
   // Track QR code scans when visitor arrives via QR code
   useQrScanTracking(product.tenantId, 'product', { productId: product.id });
-
-  // Use server-provided flags directly to avoid hydration mismatches
-  const showsLocation = productOptFlags?.showsLocationDisplay ?? s.showsLocation ?? true;
-  const showsMap = productOptFlags?.showsMapDisplay ?? s.showsMap ?? true;
-  const showsHours = productOptFlags?.showsHoursDisplay ?? s.showsHours ?? true;
-  const showsLocationAvailability = productOptFlags?.showsLocationAvailability ?? s.showsLocationAvailability ?? true;
-  const isOnlineStore = tenant?.storeType === 'online' || tenant?.metadata?.store_type === 'online' || false;
-  const isRetailStore = !isOnlineStore && (tenant?.storeType === 'retail' || tenant?.metadata?.store_type === 'retail' || (s.isRetailStore ?? true));
 
   if (s.loading) return <ProductLayoutSkeleton layoutVariant="quick-commerce" />;
 
@@ -119,22 +106,11 @@ export default function ProductQuickCommerceLayout({
           productTitle={s.productTitle}
         />
 
-        <div className="mt-2 mb-4">
-          <ProductTrustBar
-            productId={product.id}
-            tenantId={product.tenantId}
-            stock={s.effectiveStock}
-            availability={s.effectiveAvailability}
-            sku={s.currentSku}
-            variant="compact"
-          />
-        </div>
-
         <div className="mb-4">
           <CouponSpotlight tenantId={product.tenantId} coupon={null} variant="strip" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[45fr_55fr] gap-5 lg:gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-5 lg:gap-8 mb-8">
           <ProductGalleryPanel
             product={product}
             safeFeatures={s.safeFeatures}
@@ -144,51 +120,13 @@ export default function ProductQuickCommerceLayout({
             storefrontType={storefrontType}
           />
 
-          <ProductPurchasePanel
+          <DigitalPurchasePanel
             product={product}
             tenant={tenant}
-            layoutVariant="quick-commerce"
-            safeFeatures={s.safeFeatures}
-            selectedVariant={s.selectedVariant}
-            setSelectedVariant={s.setSelectedVariant}
-            quantity={s.quantity}
-            hasVariants={s.hasVariants}
-            currentPriceCents={s.currentPriceCents}
-            currentListPriceCents={s.currentListPriceCents}
-            currentStock={s.currentStock}
-            currentSku={s.currentSku}
-            currentAvailability={s.currentAvailability}
-            variantPriceRange={s.variantPriceRange}
-            variantStockInfo={s.variantStockInfo}
-            effectiveCanPurchase={s.effectiveCanPurchase}
-            effectiveGatewayType={s.effectiveGatewayType}
-            commerceDisabled={s.commerceDisabled}
-            showStatusPanel={s.showStatusPanel}
-            showsQRCodes={s.showsQRCodes}
-            showsLocationAvailability={showsLocationAvailability}
-            optFlags={s.optFlags}
-            resolvedCurrentUrl={s.resolvedCurrentUrl}
-            businessLogo={s.businessLogo}
-            layout={s.layout}
-            isRetailStore={isRetailStore}
-            productTitle={s.productTitle}
-            conditionLabel={s.conditionLabel}
-            effectiveAvailability={s.effectiveAvailability}
-            effectiveStock={s.effectiveStock}
-            categoryName={s.categoryName}
-            categorySlug={s.categorySlug}
-            cartButtonRef={s.cartButtonRef}
-            variantSelectorRef={s.variantSelectorRef}
-            maxQuantity={s.maxQuantity}
-            handleQuantityDecrement={s.handleQuantityDecrement}
-            handleQuantityIncrement={s.handleQuantityIncrement}
-            handleQuantityInput={s.handleQuantityInput}
-            fulfillmentPane={fulfillmentPane}
-            disableQRCode={disableQRCode}
-            productSlug={productSlug}
-            slugType={slugType}
-            storefrontType={storefrontType}
+            layoutState={s}
             socialCommerceFlags={socialCommerceFlags}
+            storefrontType={storefrontType}
+            fulfillmentPane={fulfillmentPane}
           />
         </div>
 
@@ -200,32 +138,14 @@ export default function ProductQuickCommerceLayout({
           layoutVariant="quick-commerce"
           safeFeatures={s.safeFeatures}
           resolvedCurrentUrl={s.resolvedCurrentUrl}
-          showsLocation={showsLocation}
-          showsMap={showsMap}
-          showsHours={showsHours}
-          isRetailStore={isRetailStore}
-          isOnlineStore={isOnlineStore}
-          hoursStatus={s.hoursStatus}
+          showsLocation={false}
+          showsMap={false}
+          showsHours={false}
+          isRetailStore={false}
+          isOnlineStore={true}
+          hoursStatus={null}
         />
       </div>
-
-      <ProductImageLightbox
-        images={s.lightboxImages}
-        initialIndex={s.lightboxIndex}
-        isOpen={s.lightboxOpen}
-        onClose={() => s.setLightboxOpen(false)}
-      />
-
-      <StickyPurchaseBar
-        priceCents={s.currentPriceCents}
-        salePriceCents={s.selectedVariant?.sale_price_cents || product.salePriceCents}
-        availability={s.effectiveAvailability}
-        onAddToCart={() => s.cartButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-        hasVariants={s.hasVariants}
-        variantSelected={!!s.selectedVariant}
-        onSelectVariant={s.scrollToVariantSelector}
-        cartButtonRef={s.cartButtonRef}
-      />
     </div>
   );
 }

@@ -37,6 +37,8 @@ import { Switch } from '@/components/ui/Switch';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
 import { clientLogger } from '@/lib/client-logger';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { ContentBlocks } from '@/components/products/content-blocks';
 
 interface ContentStepProps {
   data: {
@@ -48,9 +50,11 @@ interface ContentStepProps {
     seoDescription?: string;
     tags: string[];
     enrichedMetadata?: Record<string, any>;
+    contentBlocks?: ContentBlocks;
   };
   errors: Record<string, string>;
   onChange: (data: any) => void;
+  tenantId?: string;
 }
 
 const COMMON_FEATURES = [
@@ -90,7 +94,7 @@ const SPECIFICATION_TEMPLATES = {
   }
 };
 
-export default function ContentStep({ data, errors, onChange }: ContentStepProps) {
+export default function ContentStep({ data, errors, onChange, tenantId }: ContentStepProps) {
   const [newFeature, setNewFeature] = useState('');
   const [newSpecKey, setNewSpecKey] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
@@ -140,6 +144,13 @@ export default function ContentStep({ data, errors, onChange }: ContentStepProps
     onChange({
       ...data,
       enhancedDescription: value
+    });
+  };
+
+  const handleContentBlocksChange = (contentBlocks: ContentBlocks) => {
+    onChange({
+      ...data,
+      contentBlocks
     });
   };
 
@@ -393,6 +404,20 @@ export default function ContentStep({ data, errors, onChange }: ContentStepProps
             <AlertDescription>{enhancedDescriptionError}</AlertDescription>
           </Alert>
         )}
+      </div>
+
+      {/* Rich Content Blocks */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-medium">Rich Content Blocks</Label>
+          <p className="text-sm text-gray-500">Add formatted text, images, videos, buttons, and callouts</p>
+        </div>
+        <RichContentEditor
+          value={data.contentBlocks}
+          onChange={handleContentBlocksChange}
+          tenantId={tenantId}
+          className="min-h-[300px] rounded-md border bg-white p-2"
+        />
       </div>
 
       <Separator />

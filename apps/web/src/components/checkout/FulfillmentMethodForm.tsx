@@ -12,7 +12,7 @@ interface FulfillmentMethodFormProps {
   tenantId: string;
   subtotal: number;
   onSubmit: (method: FulfillmentMethod, fee: number) => void;
-  initialMethod?: FulfillmentMethod;
+  initialMethod?: FulfillmentMethod | 'digital';
 }
 
 export default function FulfillmentMethodForm({
@@ -29,7 +29,7 @@ export default function FulfillmentMethodForm({
   const showsDelivery = settings?.effectiveShowsDelivery ?? settings?.showsDelivery ?? true;
   const showsShipping = settings?.effectiveShowsShipping ?? settings?.showsShipping ?? true;
 
-  const [selectedMethod, setSelectedMethod] = useState<FulfillmentMethod | null>(initialMethod || null);
+  const [selectedMethod, setSelectedMethod] = useState<FulfillmentMethod | 'digital' | null>(initialMethod || null);
 
   // Auto-select first available method on initial load
   if (!selectedMethod && settings) {
@@ -65,7 +65,7 @@ export default function FulfillmentMethodForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedMethod) return;
+    if (!selectedMethod || selectedMethod === 'digital') return;
     let fee = 0;
     if (selectedMethod === 'delivery') fee = getDeliveryFee();
     else if (selectedMethod === 'shipping') fee = getShippingFee();

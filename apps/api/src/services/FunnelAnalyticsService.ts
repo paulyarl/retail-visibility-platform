@@ -19,7 +19,16 @@ export interface TrackFunnelEventInput {
   sessionId?: string;
   customerId?: string;
   revenueCents?: number;
+  productId?: string;
   metadata?: Record<string, any>;
+}
+
+export interface PreviewMetrics {
+  preview_views: number;
+  step_clicks: number;
+  buy_now_clicks: number;
+  checkout_views: number;
+  preview_to_checkout_rate: number;
 }
 
 export interface FunnelDashboardSummary {
@@ -78,7 +87,7 @@ class FunnelAnalyticsService extends BaseService {
           session_id: input.sessionId ?? null,
           customer_id: input.customerId ?? null,
           revenue_cents: input.revenueCents ?? 0,
-          metadata: input.metadata ?? {},
+          metadata: { product_id: input.productId ?? null, ...(input.metadata ?? {}) },
         },
       });
     } catch (error) {
@@ -101,7 +110,7 @@ class FunnelAnalyticsService extends BaseService {
             session_id: input.sessionId ?? null,
             customer_id: input.customerId ?? null,
             revenue_cents: input.revenueCents ?? 0,
-            metadata: input.metadata ?? {},
+            metadata: { product_id: input.productId ?? null, ...(input.metadata ?? {}) },
           })),
         });
       });
@@ -251,6 +260,49 @@ class FunnelAnalyticsService extends BaseService {
     } catch (error) {
       this.handleError(error);
       return [];
+    }
+  }
+
+  async getPreviewMetrics(tenantId: string, funnelId: string): Promise<PreviewMetrics> {
+    try {
+      const events = await prisma.funnel_events.groupBy({
+        by: ['event_type'],
+        where: {
+          tenant_id: tenantId,
+          funnel_id: funnelId,
+          event_type: {
+            in: ['preview_viewed', 'preview_step_clicked', 'preview_buy_now_clicked', 'viewed'],
+          },
+        },
+        _count: { id: true },
+      });
+
+      const byType = new Map<string, number>();
+      for (const ev of events) {
+        byType.set(ev.event_type, ev._count.id);
+      }
+
+      const preview_views = byType.get('preview_viewed') ?? 0;
+      const step_clicks = byType.get('preview_step_clicked') ?? 0;
+      const buy_now_clicks = byType.get('preview_buy_now_clicked') ?? 0;
+      const checkout_views = byType.get('viewed') ?? 0;
+
+      return {
+        preview_views,
+        step_clicks,
+        buy_now_clicks,
+        checkout_views,
+        preview_to_checkout_rate: preview_views > 0 ? checkout_views / preview_views : 0,
+      };
+    } catch (error) {
+      this.handleError(error);
+      return {
+        preview_views: 0,
+        step_clicks: 0,
+        buy_now_clicks: 0,
+        checkout_views: 0,
+        preview_to_checkout_rate: 0,
+      };
     }
   }
 

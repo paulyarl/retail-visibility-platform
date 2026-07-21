@@ -17,8 +17,8 @@ import { PublicCrmOptionsFlags } from '@/services/CapabilityResolutionService';
 /** Storefront layout identifiers (set by merchant in settings) */
 export type StorefrontLayoutKey = 'classic' | 'editorial' | 'immersive';
 
-/** Product page layout identifiers (derived from storefront layout) */
-export type ProductLayoutKey = 'classic' | 'showcase' | 'quick-commerce';
+/** Product page layout identifiers (derived from storefront layout + product type) */
+export type ProductLayoutKey = 'classic' | 'showcase' | 'quick-commerce' | 'digital';
 
 /** Maps storefront layout → product page layout */
 export const PRODUCT_LAYOUT_MAP: Record<StorefrontLayoutKey, ProductLayoutKey> = {
@@ -39,6 +39,7 @@ export const PRODUCT_LAYOUT_LABELS: Record<ProductLayoutKey, string> = {
   classic: 'Classic',
   showcase: 'Product Showcase',
   'quick-commerce': 'Quick Commerce',
+  digital: 'Digital Product',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -160,15 +161,20 @@ export interface StorefrontLayoutProps {
 export function resolveProductLayout(
   storefrontLayout?: string | null,
   previewLayout?: string | null,
+  productType?: string | null,
 ): ProductLayoutKey {
   // Direct product layout preview (e.g. ?layout_preview=quick-commerce)
-  const productLayouts: ProductLayoutKey[] = ['classic', 'showcase', 'quick-commerce'];
+  const productLayouts: ProductLayoutKey[] = ['classic', 'showcase', 'quick-commerce', 'digital'];
   if (previewLayout && productLayouts.includes(previewLayout as ProductLayoutKey)) {
     return previewLayout as ProductLayoutKey;
   }
   // Storefront layout preview (e.g. ?layout_preview=immersive → quick-commerce)
   if (previewLayout && previewLayout in PRODUCT_LAYOUT_MAP) {
     return PRODUCT_LAYOUT_MAP[previewLayout as StorefrontLayoutKey];
+  }
+  // Digital products auto-route to the digital layout unless preview overrides
+  if (productType === 'digital' || productType === 'hybrid') {
+    return 'digital';
   }
   if (storefrontLayout && storefrontLayout in PRODUCT_LAYOUT_MAP) {
     return PRODUCT_LAYOUT_MAP[storefrontLayout as StorefrontLayoutKey];

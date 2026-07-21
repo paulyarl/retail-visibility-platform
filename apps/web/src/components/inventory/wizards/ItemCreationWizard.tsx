@@ -53,6 +53,7 @@ import OrganizationStep from './steps/OrganizationStep';
 import ReviewStep from './steps/ReviewStep';
 import ServiceDetailsStep from './steps/ServiceDetailsStep';
 import { clientLogger } from '@/lib/client-logger';
+import { ContentBlocks, DEFAULT_CONTENT_BLOCKS } from '@/components/products/content-blocks';
 
 interface ItemCreationWizardProps {
   tenantId: string;
@@ -142,6 +143,7 @@ interface WizardData {
     // Structured enrichment data stored as metadata.* in inventory_items
     // Aligns with scan.ts extractStructuredMetadata and item detail page reader
     enrichedMetadata?: Record<string, any>;
+    contentBlocks?: ContentBlocks;
   };
   
   // Step 5: Media & Visuals
@@ -215,6 +217,19 @@ interface WizardData {
   };
 }
 
+function parseContentBlocks(raw: unknown): ContentBlocks | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).blocks)) {
+      return parsed as ContentBlocks;
+    }
+  } catch {
+    // ignore invalid JSON
+  }
+  return undefined;
+}
+
 const INITIAL_DATA: WizardData = {
   basicInfo: {
     name: '',
@@ -279,7 +294,8 @@ const INITIAL_DATA: WizardData = {
     features: [],
     specifications: {},
     tags: [],
-    enrichedMetadata: {}
+    enrichedMetadata: {},
+    contentBlocks: DEFAULT_CONTENT_BLOCKS
   },
   media: {
     primaryImage: null,
@@ -523,7 +539,8 @@ export default function ItemCreationWizard({
           enhancedDescription: productData.marketing_description || '',
           features: productData.features || metadata.features || [],
           specifications: productData.specifications || metadata.specifications || {},
-          tags: metadata.tags || []
+          tags: metadata.tags || [],
+          contentBlocks: parseContentBlocks(metadata.content_blocks ?? metadata.contentBlocks) ?? DEFAULT_CONTENT_BLOCKS
         },
         media: {
           primaryImage: productData.imageUrl || productData.image_url ? {
@@ -1156,6 +1173,7 @@ export default function ItemCreationWizard({
             data={wizardData.content}
             errors={errors}
             onChange={(data) => handleStepData({ content: data })}
+            tenantId={tenantId}
           />
         );
       case 4:

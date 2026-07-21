@@ -30,6 +30,7 @@ interface ProductShowcaseLayoutProps {
   productOptFlags?: ProductOptionFlags | null;
   storefrontType?: string;
   socialCommerceFlags?: { enabled?: boolean; canUseShareButtons?: boolean; canUseSocialProof?: boolean } | null;
+  funnelPreview?: React.ReactNode;
 }
 
 export function ProductShowcaseLayout({
@@ -44,6 +45,7 @@ export function ProductShowcaseLayout({
   productOptFlags,
   storefrontType,
   socialCommerceFlags,
+  funnelPreview,
 }: ProductShowcaseLayoutProps) {
   const s = useProductLayoutState({ product, tenant, initialOptFlags, currentUrl: undefined, productOptFlags });
 
@@ -133,6 +135,8 @@ export function ProductShowcaseLayout({
             socialCommerceFlags={socialCommerceFlags}
           />
         </div>
+
+        {funnelPreview}
 
         <ProductBottomSections
           product={product}

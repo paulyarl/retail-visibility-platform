@@ -28,7 +28,7 @@ interface OrderSummaryProps {
   shipping: number;
   total: number;
   tax?: number;
-  fulfillmentMethod?: 'pickup' | 'delivery' | 'shipping';
+  fulfillmentMethod?: 'pickup' | 'delivery' | 'shipping' | 'digital';
   // Tier 3 Commitment - Deposit fields
   checkoutMode?: 'deposit' | 'full_payment' | 'disabled';
   depositOption?: 'required' | 'optional' | 'none';
@@ -68,6 +68,7 @@ export function OrderSummary({
     if (!fulfillmentMethod) return 'Fulfillment';
     if (fulfillmentMethod === 'pickup') return 'Pickup';
     if (fulfillmentMethod === 'delivery') return 'Delivery';
+    if (fulfillmentMethod === 'digital') return 'Digital delivery';
     return 'Shipping';
   };
 

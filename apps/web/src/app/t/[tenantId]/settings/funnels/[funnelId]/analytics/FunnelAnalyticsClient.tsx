@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ArrowLeft, BarChart3, Eye, Check, X, DollarSign, TrendingUp, Zap, ArrowDownCircle, Sparkles, Scale } from 'lucide-react';
-import FunnelService, { type FunnelAnalyticsSummary, type FunnelStepConversion, type FunnelTimeSeries, type FunnelAovComparison } from '@/services/FunnelService';
+import FunnelService, { type FunnelAnalyticsSummary, type FunnelStepConversion, type FunnelTimeSeries, type FunnelAovComparison, type FunnelPreviewMetrics } from '@/services/FunnelService';
 
 interface FunnelAnalyticsClientProps {
   tenantId: string;
@@ -35,6 +35,7 @@ export default function FunnelAnalyticsClient({ tenantId, funnelId }: FunnelAnal
   const [steps, setSteps] = useState<FunnelStepConversion[]>([]);
   const [timeseries, setTimeseries] = useState<FunnelTimeSeries[]>([]);
   const [aov, setAov] = useState<FunnelAovComparison | null>(null);
+  const [previewMetrics, setPreviewMetrics] = useState<FunnelPreviewMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +48,7 @@ export default function FunnelAnalyticsClient({ tenantId, funnelId }: FunnelAnal
       setSteps(data.steps);
       setTimeseries(data.timeseries);
       setAov(data.aov);
+      setPreviewMetrics(data.preview);
     } catch (err: any) {
       setError(err?.message || 'Failed to load analytics');
     } finally {
@@ -133,6 +135,38 @@ export default function FunnelAnalyticsClient({ tenantId, funnelId }: FunnelAnal
               </CardContent>
             </Card>
           </div>
+
+          {/* Preview → Checkout Metrics */}
+          {previewMetrics && (previewMetrics.preview_views > 0 || previewMetrics.step_clicks > 0 || previewMetrics.buy_now_clicks > 0) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="h-5 w-5" />
+                  Preview → Checkout
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="border rounded-lg p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Preview Views</div>
+                    <p className="text-xl font-bold">{previewMetrics.preview_views}</p>
+                  </div>
+                  <div className="border rounded-lg p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Step Clicks</div>
+                    <p className="text-xl font-bold">{previewMetrics.step_clicks}</p>
+                  </div>
+                  <div className="border rounded-lg p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Buy Now Clicks</div>
+                    <p className="text-xl font-bold">{previewMetrics.buy_now_clicks}</p>
+                  </div>
+                  <div className="border rounded-lg p-3 bg-blue-50 dark:bg-blue-950/20">
+                    <div className="text-xs text-muted-foreground mb-1">Conversion Rate</div>
+                    <p className="text-xl font-bold text-blue-600">{formatPercent(previewMetrics.preview_to_checkout_rate)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Revenue Uplift */}
           {summary.revenue_uplift_cents > 0 && (
