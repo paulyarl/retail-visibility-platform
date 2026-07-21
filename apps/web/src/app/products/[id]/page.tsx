@@ -40,6 +40,7 @@ import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageSta
 import { resolveProductLayout, type ProductLayoutKey } from './layouts/types';
 import ProductShowcaseLayout from './ProductShowcaseLayout';
 import ProductQuickCommerceLayout from './ProductQuickCommerceLayout';
+import ProductDigitalLayout from './ProductDigitalLayout';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -567,6 +568,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const productLayout: ProductLayoutKey = resolveProductLayout(
     productOptFlags?.effectiveLayout,
     layout_preview,
+    productWithEnrichment.productType || null,
   );
 
   return (
@@ -679,6 +681,22 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                 videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} /> : undefined}
                 fulfillmentPane={productOptFlags?.showsFulfillment !== false ? <FulfillmentOptionsPane tenantId={product.tenantId} isPublic /> : undefined}
+                currentUrl={currentUrl}
+                initialOptFlags={optFlags}
+                productOptFlags={productOptFlags}
+                storefrontType={storefrontType}
+                socialCommerceFlags={socialCommerceFlags}
+              />
+            </TenantPaymentProvider>
+          </div>
+        ) : productLayout === 'digital' ? (
+          /* ── Layout D: Digital Product ── */
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <TenantPaymentProvider tenantId={product.tenantId}>
+              <ProductDigitalLayout
+                product={productWithEnrichment}
+                tenant={tenant as any}
+                videoPlayer={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl ? <ProductVideoPlayer videoUrl={(product as any).videoUrl || (product as any).video_url || product.metadata?.videoUrl} title={`${product.title} Video`} compact /> : undefined}
                 currentUrl={currentUrl}
                 initialOptFlags={optFlags}
                 productOptFlags={productOptFlags}
