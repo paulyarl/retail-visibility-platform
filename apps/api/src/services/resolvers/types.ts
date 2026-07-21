@@ -209,6 +209,9 @@ export interface StorefrontQrMerchantSettings {
   qr_gradient_enabled?: boolean | null;
   qr_gradient_start?: string | null;
   qr_gradient_end?: string | null;
+  qr_gradient_on_dots?: boolean | null;
+  qr_gradient_on_corners?: boolean | null;
+  qr_gradient_on_corner_dots?: boolean | null;
   qr_codes_512?: boolean | null;
   qr_codes_1024?: boolean | null;
   qr_codes_2048?: boolean | null;

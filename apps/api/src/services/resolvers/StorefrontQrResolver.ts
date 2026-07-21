@@ -162,6 +162,9 @@ export function resolveStorefrontQr(
     qr_gradient_enabled: merchantPrefs?.qr_gradient_enabled ?? false,
     qr_gradient_start: merchantPrefs?.qr_gradient_start ?? null,
     qr_gradient_end: merchantPrefs?.qr_gradient_end ?? null,
+    qr_gradient_on_dots: merchantPrefs?.qr_gradient_on_dots ?? true,
+    qr_gradient_on_corners: merchantPrefs?.qr_gradient_on_corners ?? true,
+    qr_gradient_on_corner_dots: merchantPrefs?.qr_gradient_on_corner_dots ?? true,
   };
 
   // Effective filters
