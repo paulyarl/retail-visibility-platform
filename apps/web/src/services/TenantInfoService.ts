@@ -2051,6 +2051,9 @@ class TenantInfoService extends TenantApiSingleton {
     qr_gradient_enabled: boolean;
     qr_gradient_start: string;
     qr_gradient_end: string;
+    qr_gradient_on_dots: boolean;
+    qr_gradient_on_corners: boolean;
+    qr_gradient_on_corner_dots: boolean;
     default_qr_resolution: string;
   } | null> {
     try {

@@ -17,6 +17,18 @@ This skill defines the canonical pattern for how a tier-gated capability flows f
 6. Dashboard Display Layer     → PlanSummaryWidget.tsx (dashboard + options pages) + PlanSummaryPanel.tsx (plan-summary page only) + CapabilityShowcase.tsx — renders capability summaries
 ```
 
+## Reference Implementations
+
+When implementing or debugging a capability, emulate the closest matching reference:
+
+| Complexity | Reference Files | Why |
+|---|---|---|
+| **Simple (types)** | `ProductTypeResolver.ts` | Pure function, clean R17 precedence, legacy key fallback, clear tier/merchant separation. The simplest canonical pattern to follow. |
+| **Simple (types, DB-backed)** | `StorefrontTypeResolver.ts` | Same pattern but delegates tier-gate logic to a service. Use when the resolver needs DB access for tier state. |
+| **Complex (options)** | `StorefrontQrResolver.ts` + `StorefrontQrResolver.test.ts` | Groups, sub-groups, flexible fallback, and the canonical R33 test pattern (tier allows + merchant pref false → tier-level field still `true`). Use as the reference for any options capability with multiple feature groups. |
+
+**Key principle**: The resolver's return object has two kinds of fields — **tier-level** (derived from `features` only) and **merchant-gated** (derived from `features` AND `merchantPrefs`). The reference implementations show this separation clearly. Never mix the two (R33).
+
 ## The Canonical Pattern (Tier-Gated + Merchant-Gated)
 
 Capabilities with both tier hard-gates and merchant soft-gates follow this pattern. This is the REQUIRED pattern for all capabilities.
@@ -716,6 +728,41 @@ merchant_preferences: {
 **Real-world example**: `StorefrontQrResolver.ts` had `qr_styled_enabled`, `qr_custom_colors`, `qr_gradients`, and `qr_classic_enabled` all gated by `prefs.qr_styled_enabled` or `prefs.qr_classic_enabled`. This caused the styled QR option to be invisible to merchants whose `qr_styled_enabled` pref defaulted to `false`, even when the tier allowed styled QR. The fix removed all `prefs.*` gating from these tier-level fields.
 
 **Companion skill**: `decoupled-domain-self-containment.md` — covers the frontend side of this boundary: components must read from dedicated domain state, not the legacy `StorefrontOptionFlags` overlay. Includes a deviation audit of Hours, Maps, Gallery, and Layout domains.
+
+### R34: Every New Resolver Output Field Must Have a Unit Test
+
+When adding a new field to a resolver's return object (`EffectiveXxx`), a unit test MUST be added to the resolver's test file (`XxxResolver.test.ts`) verifying the field's behavior with **default/null merchant prefs**. This is the automated enforcement of the R33 audit rule.
+
+**Why this rule exists**: R33 documents the bug pattern where merchant prefs incorrectly gate tier-level fields, but R33's audit rule is manual — a developer must remember to check every field. Unit tests automate this check. The QR Analytics bug (where `can_use_qr_analytics` was gated by `merchantPrefs.qr_analytics_enabled === true`, creating a chicken-and-egg where the toggle was disabled because the merchant hadn't enabled it yet, but couldn't enable it because the toggle was disabled) would have been caught by a single test case with default merchant prefs.
+
+**Required test cases for each new output field**:
+
+1. **Tier allows + merchant pref is default/null**: Field must be `true` for tier-level fields (`allowed_*`, `*_enabled`, `*_styled_enabled`, etc.) and `true` for `can_use_*` fields. This catches R33 bugs — if the field is incorrectly gated by merchant prefs, it will be `false` when it should be `true`.
+2. **Tier allows + merchant pref explicitly false**: Tier-level fields MUST still be `true` (merchant pref lives in `merchant_preferences`, not in the tier-level field). `can_use_*` fields MUST be `true` (the tier allows it; the merchant pref is a runtime concern, not a capability gate).
+3. **Tier does not allow**: Field MUST be `false`. This catches the inverse bug where a field is always `true` regardless of tier.
+
+**Reference test file**: `StorefrontQrResolver.test.ts` — contains the canonical R33/R34 test pattern. Lines 156-167 and 169-180 verify tier-level fields with merchant prefs false, and lines 204-210 verify `can_use_qr_analytics` with merchant pref false (the exact bug that was caught).
+
+**Test pattern** (mirror the existing styled QR tests):
+```ts
+it('tier allows <feature> even when merchant pref <pref> is false (R33)', () => {
+  const features = { <cap>_enabled: true, <cap>_flexible: true };
+  const merchantPrefs = { <pref>: false };
+  const result = resolveXxx(features, merchantPrefs);
+  expect(result.<tier_level_field>).toBe(true);  // tier wins
+  expect(result.can_use_<feature>).toBe(true);   // tier allows, merchant pref is runtime concern
+  expect(result.merchant_preferences.<pref>).toBe(false);  // pref preserved
+});
+
+it('disables <feature> when tier does not allow it', () => {
+  const features = { <cap>_enabled: true };
+  const result = resolveXxx(features, null);
+  expect(result.<tier_level_field>).toBe(false);
+  expect(result.can_use_<feature>).toBe(false);
+});
+```
+
+**Audit rule**: When reviewing a PR that adds a new field to `EffectiveXxx`, verify the resolver test file has at least one test case with default/null merchant prefs for that field. If the field is tier-level (not `can_use_*`, `effective_*`, or `merchant_preferences`), verify the test confirms the field is `true` when the tier allows it and merchant prefs are default — this is the R33 automated check.
 
 ## File Reference
 

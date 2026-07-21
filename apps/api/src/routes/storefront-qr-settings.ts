@@ -38,6 +38,9 @@ const storefrontQrSettingsSchema = z.object({
   qr_gradient_enabled: z.boolean().optional(),
   qr_gradient_start: z.string().optional(),
   qr_gradient_end: z.string().optional(),
+  qr_gradient_on_dots: z.boolean().optional(),
+  qr_gradient_on_corners: z.boolean().optional(),
+  qr_gradient_on_corner_dots: z.boolean().optional(),
   // Defaults
   default_qr_resolution: z.string().optional(),
 });
@@ -67,6 +70,9 @@ export const DEFAULT_QR_SETTINGS = {
   qr_gradient_enabled: false,
   qr_gradient_start: '#1a56db',
   qr_gradient_end: '#7c3aed',
+  qr_gradient_on_dots: true,
+  qr_gradient_on_corners: true,
+  qr_gradient_on_corner_dots: true,
   default_qr_resolution: '1024',
 };
 
@@ -97,6 +103,9 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
           qr_directory: false,
           qr_gradient_enabled: false,
           qr_custom_colors_enabled: false,
+          qr_gradient_on_dots: true,
+          qr_gradient_on_corners: true,
+          qr_gradient_on_corner_dots: true,
         },
         tierState,
       });
@@ -140,6 +149,9 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierFilteredSettings.qr_gradient_enabled = tierState.qrGradients ? !!rawSettings.qr_gradient_enabled : false;
       tierFilteredSettings.qr_gradient_start = rawSettings.qr_gradient_start || '#1a56db';
       tierFilteredSettings.qr_gradient_end = rawSettings.qr_gradient_end || '#7c3aed';
+      tierFilteredSettings.qr_gradient_on_dots = rawSettings.qr_gradient_on_dots !== false;
+      tierFilteredSettings.qr_gradient_on_corners = rawSettings.qr_gradient_on_corners !== false;
+      tierFilteredSettings.qr_gradient_on_corner_dots = rawSettings.qr_gradient_on_corner_dots !== false;
     } else {
       tierFilteredSettings.qr_dot_type = 'rounded';
       tierFilteredSettings.qr_corner_type = 'extra-rounded';
@@ -153,6 +165,9 @@ router.get('/:tenantId/storefront-qr', authenticateToken, async (req, res) => {
       tierFilteredSettings.qr_gradient_enabled = false;
       tierFilteredSettings.qr_gradient_start = '#1a56db';
       tierFilteredSettings.qr_gradient_end = '#7c3aed';
+      tierFilteredSettings.qr_gradient_on_dots = true;
+      tierFilteredSettings.qr_gradient_on_corners = true;
+      tierFilteredSettings.qr_gradient_on_corner_dots = true;
     }
 
     // Defaults (not tier-gated)
@@ -243,6 +258,9 @@ router.put('/:tenantId/storefront-qr', authenticateToken, requireTenantAdmin, re
         qr_gradient_enabled: settings.qr_gradient_enabled,
         qr_gradient_start: settings.qr_gradient_start,
         qr_gradient_end: settings.qr_gradient_end,
+        qr_gradient_on_dots: settings.qr_gradient_on_dots,
+        qr_gradient_on_corners: settings.qr_gradient_on_corners,
+        qr_gradient_on_corner_dots: settings.qr_gradient_on_corner_dots,
         default_qr_resolution: settings.default_qr_resolution,
       },
     });
