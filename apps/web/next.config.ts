@@ -6,6 +6,7 @@ import withPWAInit from "next-pwa";
 
 const isSentryEnabled = !!(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT) && process.env.SENTRY_DISABLE_BUILD_PLUGIN !== 'true';
 const isPwaEnabled = process.env.ENABLE_PWA === 'true';
+const isVercel = process.env.VERCEL === '1';
 
 const withPWA = isPwaEnabled ? withPWAInit({
   dest: "public",
@@ -73,12 +74,14 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: { bodySizeLimit: "15mb" },
-    // Enable Turbopack filesystem cache for builds (for future switch from --webpack)
-    turbopackFileSystemCacheForBuild: true,
+    // Turbopack filesystem cache has caused 45-minute hangs on Vercel.
+    // Keep it enabled locally for faster rebuilds, disable on Vercel builds.
+    turbopackFileSystemCacheForBuild: !isVercel,
   },
 
-  // Configure Turbopack root directory to silence multiple-lockfile warning
-  turbopack: {
+  // Configure Turbopack root directory to silence multiple-lockfile warning.
+  // Disabled on Vercel to avoid scanning the entire monorepo during the build.
+  turbopack: isVercel ? undefined : {
     root: path.resolve(__dirname, '../..'),
   },
 
