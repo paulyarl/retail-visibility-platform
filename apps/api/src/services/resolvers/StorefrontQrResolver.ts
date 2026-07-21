@@ -187,7 +187,7 @@ export function resolveStorefrontQr(
     qr_gradients: mainOn && qrGradients,
     qr_analytics_enabled: qrAnalyticsEnabled,
     can_use_qr_codes: mainOn && (effectiveQRResolutions.length > 0 || effectiveQRContentTypes.length > 0),
-    can_use_qr_analytics: qrAnalyticsEnabled && (merchantPrefs?.qr_analytics_enabled === true),
+    can_use_qr_analytics: qrAnalyticsEnabled,
     merchant_preferences: prefs,
   };
 }
