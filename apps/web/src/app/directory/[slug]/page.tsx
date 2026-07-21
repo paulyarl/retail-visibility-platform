@@ -109,7 +109,7 @@ async function getConsolidatedDirectoryData(identifier: string): Promise<Directo
       return null; // Identifier not found anywhere — true 404
     }
 
-    if (!status.hasDirectoryListing || !status.slug) {
+    if (!status.slug) {
       // Tenant exists but directory listing is not published
       return { type: 'pending', tenantId: status.tenantId || identifier };
     }
