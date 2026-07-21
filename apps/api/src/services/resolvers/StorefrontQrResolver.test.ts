@@ -228,3 +228,25 @@ describe('DEFAULT_QR_SETTINGS gradient target fields', () => {
     expect(DEFAULT_QR_SETTINGS.qr_gradient_on_corner_dots).toBe(true);
   });
 });
+
+describe('resolveStorefrontQr gradient target merchant preferences', () => {
+  it('includes gradient target fields in merchant_preferences with default true', () => {
+    const features = { storefront_qr_enabled: true, storefront_qr_flexible: true };
+    const result = resolveStorefrontQr(features, null);
+    expect(result.merchant_preferences).toHaveProperty('qr_gradient_on_dots');
+    expect(result.merchant_preferences).toHaveProperty('qr_gradient_on_corners');
+    expect(result.merchant_preferences).toHaveProperty('qr_gradient_on_corner_dots');
+    expect(result.merchant_preferences.qr_gradient_on_dots).toBe(true);
+    expect(result.merchant_preferences.qr_gradient_on_corners).toBe(true);
+    expect(result.merchant_preferences.qr_gradient_on_corner_dots).toBe(true);
+  });
+
+  it('preserves merchant pref qr_gradient_on_dots=false', () => {
+    const features = { storefront_qr_enabled: true, storefront_qr_flexible: true };
+    const merchantPrefs = { qr_gradient_on_dots: false };
+    const result = resolveStorefrontQr(features, merchantPrefs);
+    expect(result.merchant_preferences.qr_gradient_on_dots).toBe(false);
+    expect(result.merchant_preferences.qr_gradient_on_corners).toBe(true);
+    expect(result.merchant_preferences.qr_gradient_on_corner_dots).toBe(true);
+  });
+});

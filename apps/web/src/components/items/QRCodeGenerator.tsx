@@ -45,15 +45,28 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
     const generateQR = async () => {
       if (!canvasRef.current) return;
 
+      const prefs = qrCapability?.merchantPreferences as any;
+
       try {
         const dataUrl = await generateQrDataUrl({
           data: url,
           exportSize: size,
           styled: tierStyledEnabled,
-          dotType: tierStyledEnabled ? 'rounded' : undefined,
-          cornerType: tierStyledEnabled ? 'extra-rounded' : undefined,
+          dotType: tierStyledEnabled ? (prefs?.qr_dot_type || 'rounded') : undefined,
+          cornerType: tierStyledEnabled ? (prefs?.qr_corner_type || 'extra-rounded') : undefined,
+          cornerDotType: tierStyledEnabled ? (prefs?.qr_corner_dot_type || 'dot') : undefined,
+          dotColor: prefs?.qr_dot_color || '#1a56db',
+          cornerColor: prefs?.qr_corner_color || '#1a56db',
+          cornerDotColor: prefs?.qr_corner_dot_color || '#ffffff',
+          bgColor: prefs?.qr_bg_color || '#ffffff',
+          gradientEnabled: tierStyledEnabled && qrCapability?.qrGradients && prefs?.qr_gradient_enabled,
+          gradientStart: prefs?.qr_gradient_start || '#1a56db',
+          gradientEnd: prefs?.qr_gradient_end || '#7c3aed',
+          gradientOnDots: prefs?.qr_gradient_on_dots ?? true,
+          gradientOnCorners: prefs?.qr_gradient_on_corners ?? true,
+          gradientOnCornerDots: prefs?.qr_gradient_on_corner_dots ?? true,
           logoUrl: features.customLogo && logoUrl ? logoUrl : null,
-          logoShape: 'circle',
+          logoShape: prefs?.qr_logo_shape || 'circle',
           errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
         });
 
@@ -74,17 +87,31 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
     };
 
     generateQR();
-  }, [url, size, features.customLogo, logoUrl]);
+  }, [url, size, features.customLogo, logoUrl, qrCapability]);
 
   const handleDownload = async () => {
     setIsGenerating(true);
     try {
+      const prefs = qrCapability?.merchantPreferences as any;
       const dataUrl = await generateQrDataUrl({
         data: url,
         exportSize: features.maxResolution,
-        styled: false,
+        styled: tierStyledEnabled,
+        dotType: tierStyledEnabled ? (prefs?.qr_dot_type || 'rounded') : undefined,
+        cornerType: tierStyledEnabled ? (prefs?.qr_corner_type || 'extra-rounded') : undefined,
+        cornerDotType: tierStyledEnabled ? (prefs?.qr_corner_dot_type || 'dot') : undefined,
+        dotColor: prefs?.qr_dot_color || '#1a56db',
+        cornerColor: prefs?.qr_corner_color || '#1a56db',
+        cornerDotColor: prefs?.qr_corner_dot_color || '#ffffff',
+        bgColor: prefs?.qr_bg_color || '#ffffff',
+        gradientEnabled: tierStyledEnabled && qrCapability?.qrGradients && prefs?.qr_gradient_enabled,
+        gradientStart: prefs?.qr_gradient_start || '#1a56db',
+        gradientEnd: prefs?.qr_gradient_end || '#7c3aed',
+        gradientOnDots: prefs?.qr_gradient_on_dots ?? true,
+        gradientOnCorners: prefs?.qr_gradient_on_corners ?? true,
+        gradientOnCornerDots: prefs?.qr_gradient_on_corner_dots ?? true,
         logoUrl: features.customLogo && logoUrl ? logoUrl : null,
-        logoShape: 'circle',
+        logoShape: prefs?.qr_logo_shape || 'circle',
         errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
       });
 
@@ -112,12 +139,26 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
     // Generate high-res QR code for printing
     const generatePrintQR = async () => {
       try {
+        const prefs = qrCapability?.merchantPreferences as any;
         const dataUrl = await generateQrDataUrl({
           data: url,
           exportSize: 1024,
-          styled: false,
+          styled: tierStyledEnabled,
+          dotType: tierStyledEnabled ? (prefs?.qr_dot_type || 'rounded') : undefined,
+          cornerType: tierStyledEnabled ? (prefs?.qr_corner_type || 'extra-rounded') : undefined,
+          cornerDotType: tierStyledEnabled ? (prefs?.qr_corner_dot_type || 'dot') : undefined,
+          dotColor: prefs?.qr_dot_color || '#1a56db',
+          cornerColor: prefs?.qr_corner_color || '#1a56db',
+          cornerDotColor: prefs?.qr_corner_dot_color || '#ffffff',
+          bgColor: prefs?.qr_bg_color || '#ffffff',
+          gradientEnabled: tierStyledEnabled && qrCapability?.qrGradients && prefs?.qr_gradient_enabled,
+          gradientStart: prefs?.qr_gradient_start || '#1a56db',
+          gradientEnd: prefs?.qr_gradient_end || '#7c3aed',
+          gradientOnDots: prefs?.qr_gradient_on_dots ?? true,
+          gradientOnCorners: prefs?.qr_gradient_on_corners ?? true,
+          gradientOnCornerDots: prefs?.qr_gradient_on_corner_dots ?? true,
           logoUrl: features.customLogo && logoUrl ? logoUrl : null,
-          logoShape: 'circle',
+          logoShape: prefs?.qr_logo_shape || 'circle',
           errorCorrection: features.customLogo && logoUrl ? 'H' : 'M',
         });
 
