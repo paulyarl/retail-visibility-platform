@@ -2,6 +2,7 @@
 
 import { Input, Button } from '@/components/ui';
 import { useProductTypeCapability } from '@/hooks/tenant-access/useCapabilityAccess';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
 import ProductTypeSelector from '../ProductTypeSelector';
 import DigitalProductConfig from '../DigitalProductConfig';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
@@ -270,7 +271,7 @@ export function PricingTab({ values, setters, saving, tenantId }: TabProps) {
 
 // ── Content Tab ──────────────────────────────────────────────────────────
 
-export function ContentTab({ values, setters, saving }: TabProps) {
+export function ContentTab({ values, setters, saving, tenantId }: TabProps) {
   return (
     <div className="space-y-4">
       <div>
@@ -299,6 +300,20 @@ export function ContentTab({ values, setters, saving }: TabProps) {
           className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed"
         />
         <p className="text-xs text-neutral-500 mt-1">Detailed marketing copy for product pages (optional)</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+          Rich Content
+        </label>
+        <div className="border border-neutral-300 rounded-lg bg-white dark:bg-neutral-900">
+          <RichContentEditor
+            value={values.contentBlocks}
+            onChange={setters.setContentBlocks}
+            tenantId={tenantId || ''}
+          />
+        </div>
+        <p className="text-xs text-neutral-500 mt-1">Visual product content blocks (optional)</p>
       </div>
 
       <div>

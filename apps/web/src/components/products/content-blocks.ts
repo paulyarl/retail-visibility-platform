@@ -39,12 +39,28 @@ export const buttonBlockSchema = z.object({
   label: z.string().min(1),
   url: z.string().min(1),
   variant: z.enum(['primary', 'secondary', 'outline']).default('primary'),
+  size: z.enum(['small', 'medium', 'large']).default('medium'),
+  foregroundColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
 });
 
 export const buttonPillBlockSchema = z.object({
   type: z.literal('button_pill'),
   label: z.string().min(1),
   variant: z.enum(['success', 'warning', 'info', 'neutral']).default('info'),
+  foregroundColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
+});
+
+export const iconButtonBlockSchema = z.object({
+  type: z.literal('icon_button'),
+  icon: z.string().min(1),
+  label: z.string().min(1),
+  url: z.string().min(1),
+  variant: z.enum(['primary', 'secondary', 'outline']).default('primary'),
+  size: z.enum(['small', 'medium', 'large']).default('medium'),
+  foregroundColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
 });
 
 export const iconBlockSchema = z.object({
@@ -68,6 +84,7 @@ export const contentBlockSchema = z.union([
   videoEmbedBlockSchema,
   buttonBlockSchema,
   buttonPillBlockSchema,
+  iconButtonBlockSchema,
   iconBlockSchema,
   calloutBlockSchema,
 ]);
@@ -94,7 +111,7 @@ export const SAMPLE_CONTENT_BLOCKS: ContentBlocks = {
     { type: 'numbered_list', items: ['Purchase', 'Download', 'Enjoy'] },
     { type: 'image', src: 'https://placehold.co/800x400', alt: 'Product preview', caption: 'Preview image' },
     { type: 'video_embed', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', caption: 'Watch the trailer' },
-    { type: 'button', label: 'Buy now', url: 'https://example.com/checkout', variant: 'primary' },
+    { type: 'button', label: 'Buy now', url: 'https://example.com/checkout', variant: 'primary', size: 'medium' },
     { type: 'button_pill', label: 'Best seller', variant: 'success' },
     { type: 'icon', name: 'check', color: '#22c55e' },
     { type: 'callout', style: 'info', text: 'Includes 30-day money-back guarantee.' },

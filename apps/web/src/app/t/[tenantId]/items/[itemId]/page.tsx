@@ -20,6 +20,20 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import ProductCategoryContext from '@/components/products/ProductCategoryContext';
 import { ProductVideoPlayer } from '@/components/products/ProductVideoPlayer';
 import { clientLogger } from '@/lib/client-logger';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { ContentBlocks, contentBlocksSchema } from '@/components/products/content-blocks';
+
+function parseContentBlocks(raw: unknown): ContentBlocks | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const result = contentBlocksSchema.safeParse(parsed);
+    if (result.success) return result.data;
+  } catch {
+    // ignore invalid content_blocks data
+  }
+  return undefined;
+}
 
 interface ItemDetailPageProps {
   params: Promise<{
@@ -69,6 +83,7 @@ interface EnrichedItem extends ItemType {
   // Additional specs
   specifications?: Record<string, any>;
   environmentalInfo?: string[];
+  contentBlocks?: ContentBlocks;
 }
 
 interface Photo {
@@ -258,6 +273,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       // Extract completeness score
       if (metadata.completeness) {
         enrichedFields.completeness = metadata.completeness;
+      }
+
+      // Extract rich content blocks
+      if (metadata.content_blocks || metadata.contentBlocks) {
+        enrichedFields.contentBlocks = parseContentBlocks(metadata.content_blocks ?? metadata.contentBlocks);
       }
       
       // Normalize the item data to match frontend expectations
@@ -576,6 +596,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
                     {(item as any).marketing_description}
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Rich Content Blocks */}
+            {item.contentBlocks && item.contentBlocks.blocks.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+                    Rich Content
+                  </h2>
+                  <RichContentRenderer content={item.contentBlocks} />
                 </CardContent>
               </Card>
             )}

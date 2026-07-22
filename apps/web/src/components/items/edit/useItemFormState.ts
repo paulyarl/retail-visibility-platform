@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Item } from '@/services/itemsDataService';
 import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
+import { ContentBlocks, contentBlocksSchema } from '@/components/products/content-blocks';
 import { useVariantsSingleton } from '@/lib/singletons/VariantsSingleton';
 import { ProductType } from '../ProductTypeSelector';
 import { DigitalProductData } from '../DigitalProductConfig';
@@ -47,6 +48,18 @@ function getTenantIdFromUrl(): string | null {
   }
 }
 
+function parseContentBlocks(raw: unknown): ContentBlocks | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const result = contentBlocksSchema.safeParse(parsed);
+    if (result.success) return result.data;
+  } catch {
+    // ignore invalid content_blocks data
+  }
+  return undefined;
+}
+
 const DEFAULT_DIGITAL: DigitalProductData = {
   deliveryMethod: 'direct_download',
   assets: [],
@@ -76,6 +89,7 @@ export function useItemFormState(
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
   const [enhancedDescription, setEnhancedDescription] = useState('');
+  const [contentBlocks, setContentBlocks] = useState<ContentBlocks | undefined>(undefined);
   const [features, setFeatures] = useState('');
   const [specifications, setSpecifications] = useState('');
   const [status, setStatus] = useState<ItemStatus>('draft');
@@ -110,6 +124,7 @@ export function useItemFormState(
       setDescription(item.description || '');
       const metadata = (item as any).metadata || {};
       setEnhancedDescription(metadata.enhancedDescription || '');
+      setContentBlocks(parseContentBlocks(metadata.content_blocks ?? metadata.contentBlocks));
       setFeatures(Array.isArray(metadata.features) ? metadata.features.join('\n') : '');
       setSpecifications(metadata.specifications ? JSON.stringify(metadata.specifications, null, 2) : '');
       const currentStatus = item.itemStatus || item.status || 'draft';
@@ -144,6 +159,7 @@ export function useItemFormState(
       setStock('0');
       setDescription('');
       setEnhancedDescription('');
+      setContentBlocks(undefined);
       setFeatures('');
       setSpecifications('');
       setStatus('active');
@@ -253,6 +269,10 @@ export function useItemFormState(
         }
       }
 
+      if (contentBlocks && contentBlocks.blocks.length > 0) {
+        metadata.content_blocks = contentBlocks;
+      }
+
       const updatedItem = {
         ...(itemRef || {}),
         sku: finalSku,
@@ -345,7 +365,7 @@ export function useItemFormState(
     } finally {
       setSaving(false);
     }
-  }, [sku, name, brand, manufacturer, condition, mpn, gtin, gtinEnrichment, price, salePrice, stock, description, enhancedDescription, features, specifications, status, tenantCategoryId, gatewaySelection, productType, digitalProductData, variantsActions]);
+  }, [sku, name, brand, manufacturer, condition, mpn, gtin, gtinEnrichment, price, salePrice, stock, description, enhancedDescription, contentBlocks, features, specifications, status, tenantCategoryId, gatewaySelection, productType, digitalProductData, variantsActions]);
 
   const handleClose = useCallback((onClose: () => void) => {
     if (!saving) {
@@ -356,12 +376,12 @@ export function useItemFormState(
 
   return {
     sku, name, brand, manufacturer, condition, mpn, gtin, price, salePrice, stock,
-    description, enhancedDescription, features, specifications, status,
+    description, enhancedDescription, contentBlocks, features, specifications, status,
     tenantCategoryId, gatewaySelection, productType, digitalProductData,
     saving, error, showCategorySelector, tenantId,
     gtinEnriching, gtinEnrichment, handleGtinEnrich,
     setSku, setName, setBrand, setManufacturer, setCondition, setMpn, setGtin,
-    setPrice, setSalePrice, setStock, setDescription, setEnhancedDescription,
+    setPrice, setSalePrice, setStock, setDescription, setEnhancedDescription, setContentBlocks,
     setFeatures, setSpecifications, setStatus, setTenantCategoryId,
     setGatewaySelection, setProductType, setDigitalProductData,
     setError, setShowCategorySelector, variantsActions,
