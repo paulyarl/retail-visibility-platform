@@ -4,6 +4,7 @@ import React from 'react';
 import {
   useCreateBlockNote,
   createReactBlockSpec,
+  createReactInlineContentSpec,
   FormattingToolbar,
   FormattingToolbarController,
   BasicTextStyleButton,
@@ -132,7 +133,7 @@ const iconButtonBlockSpec = createReactBlockSpec(
   },
 )();
 
-const iconBlockSpec = createReactBlockSpec(
+const iconInlineSpec = createReactInlineContentSpec(
   {
     type: 'icon',
     propSchema: {
@@ -142,12 +143,16 @@ const iconBlockSpec = createReactBlockSpec(
     content: 'none',
   },
   {
-    render: ({ block }) => {
-      const Icon = getIcon(block.props.name);
-      return <Icon className="inline-block h-5 w-5" style={{ color: block.props.color || undefined }} />;
+    render: ({ inlineContent, contentRef }) => {
+      const Icon = getIcon(inlineContent.props.name);
+      return (
+        <span ref={contentRef} className="inline-block h-5 w-5 align-middle" style={{ color: inlineContent.props.color || undefined }}>
+          <Icon />
+        </span>
+      );
     },
   },
-)();
+);
 
 const calloutBlockSpec = createReactBlockSpec(
   {
@@ -169,8 +174,11 @@ const schema = BlockNoteSchema.create({
     ...defaultBlockSpecs,
     button: buttonBlockSpec,
     button_pill: buttonPillBlockSpec,
-    icon: iconBlockSpec,
+    icon_button: iconButtonBlockSpec,
     callout: calloutBlockSpec,
+  },
+  inlineContentSpecs: {
+    icon: iconInlineSpec,
   },
 });
 
@@ -184,13 +192,13 @@ interface RichContentEditorProps {
 function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | null {
   switch (block.type) {
     case 'paragraph':
-      return { type: 'paragraph', content: block.text };
+      return { type: 'paragraph', content: textToInlineContent(block.text) };
     case 'heading':
-      return { type: 'heading', props: { level: block.level }, content: block.text };
+      return { type: 'heading', props: { level: block.level }, content: textToInlineContent(block.text) };
     case 'bullet_list':
-      return block.items.map((item) => ({ type: 'bulletListItem', content: item }));
+      return block.items.map((item) => ({ type: 'bulletListItem', content: textToInlineContent(item) }));
     case 'numbered_list':
-      return block.items.map((item) => ({ type: 'numberedListItem', content: item }));
+      return block.items.map((item) => ({ type: 'numberedListItem', content: textToInlineContent(item) }));
     case 'image':
       return {
         type: 'image',
@@ -234,19 +242,42 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
         },
       };
     case 'icon':
-      return { type: 'icon', props: { name: block.name, color: block.color ?? '' } };
+      return { type: 'paragraph', content: [{ type: 'icon', props: { name: block.name, color: block.color ?? '' } }] };
     case 'callout':
-      return { type: 'callout', props: { style: block.style }, content: block.text };
+      return { type: 'callout', props: { style: block.style }, content: textToInlineContent(block.text) };
     default:
       return null;
   }
 }
 
-function inlineToText(content: unknown): string {
+function textToInlineContent(text: string): unknown[] {
+  const parts: unknown[] = [];
+  const regex = /\{\{icon:([^:{}]+)(?::([^:{}]*))?\}\}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    parts.push({ type: 'icon', props: { name: match[1], color: match[2] || '' } });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+function inlineToString(content: unknown): string {
   if (!content) return '';
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
-    return content.map((c) => (typeof c === 'string' ? c : (c as { text?: string }).text ?? '')).join('');
+    return content
+      .map((node) => {
+        if (typeof node === 'string') return node;
+        const n = node as { type?: string; text?: string; props?: { name?: string; color?: string } };
+        if (n.type === 'icon') {
+          return `{{icon:${n.props?.name ?? 'help'}:${n.props?.color ?? ''}}}`;
+        }
+        return n.text ?? '';
+      })
+      .join('');
   }
   return '';
 }
@@ -254,17 +285,17 @@ function inlineToText(content: unknown): string {
 function blockNoteToContentBlock(block: { type: string; props?: Record<string, unknown>; content?: unknown }): ContentBlock | ContentBlock[] | null {
   switch (block.type) {
     case 'paragraph':
-      return { type: 'paragraph', text: inlineToText(block.content) };
+      return { type: 'paragraph', text: inlineToString(block.content) };
     case 'heading':
       return {
         type: 'heading',
         level: (block.props?.level as number) ?? 2,
-        text: inlineToText(block.content),
+        text: inlineToString(block.content),
       };
     case 'bulletListItem':
-      return { type: 'bullet_list', items: [inlineToText(block.content)] };
+      return { type: 'bullet_list', items: [inlineToString(block.content)] };
     case 'numberedListItem':
-      return { type: 'numbered_list', items: [inlineToText(block.content)] };
+      return { type: 'numbered_list', items: [inlineToString(block.content)] };
     case 'image':
       return {
         type: 'image',
@@ -317,7 +348,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
       return {
         type: 'callout',
         style: (block.props?.style as 'info' | 'warning' | 'success' | 'error') ?? 'info',
-        text: inlineToText(block.content),
+        text: inlineToString(block.content),
       };
     default:
       return null;
@@ -408,7 +439,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         onChange={(e) => {
           const name = e.currentTarget.value;
           if (!name) return;
-          insert('icon', { name, color: '' });
+          editor.insertInlineContent?.([{ type: 'icon', props: { name, color: '' } }]);
           e.currentTarget.value = '';
         }}
         className="rounded bg-gray-100 px-2 py-1 text-sm text-gray-800 hover:bg-gray-200 cursor-pointer"
@@ -516,7 +547,7 @@ export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, cl
     }
   };
 
-  const isCustomBlock = selectedBlock && ['button', 'button_pill', 'icon_button', 'icon', 'callout'].includes(selectedBlock.type);
+  const isCustomBlock = selectedBlock && ['button', 'button_pill', 'icon_button', 'callout'].includes(selectedBlock.type);
 
   return (
     <div className={className}>
@@ -602,18 +633,6 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
           </select>
           <input defaultValue={props.foregroundColor} onBlur={(e) => update('foregroundColor', e.target.value)} placeholder="Text color" className={inputClass} />
           <input defaultValue={props.backgroundColor} onBlur={(e) => update('backgroundColor', e.target.value)} placeholder="Bg color" className={inputClass} />
-        </>
-      )}
-      {block.type === 'icon' && (
-        <>
-          <select value={props.name} onChange={(e) => update('name', e.target.value)} className={selectClass}>
-            {ICON_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <input defaultValue={props.color} onBlur={(e) => update('color', e.target.value)} placeholder="Color" className={inputClass} />
         </>
       )}
       {block.type === 'callout' && (
