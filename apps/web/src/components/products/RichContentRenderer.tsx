@@ -102,21 +102,52 @@ function Block({ block }: { block: ContentBlock }) {
         </figure>
       );
 
-    case 'button':
+    case 'button': {
+      const sizeClasses = {
+        small: 'text-sm px-2 py-1',
+        medium: 'text-base px-4 py-2',
+        large: 'text-lg px-6 py-3',
+      };
       return (
         <a
           href={block.url}
           target="_blank"
           rel="noopener noreferrer"
-          className={cn('inline-block rounded-md px-4 py-2 font-medium transition-colors', BUTTON_VARIANTS[block.variant])}
+          className={cn('inline-block rounded-md font-medium transition-colors', sizeClasses[block.size || 'medium'], BUTTON_VARIANTS[block.variant])}
+          style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
         >
           {block.label}
         </a>
       );
+    }
+
+    case 'icon_button': {
+      const sizeClasses = {
+        small: 'text-sm px-2 py-1',
+        medium: 'text-base px-4 py-2',
+        large: 'text-lg px-6 py-3',
+      };
+      const Icon = getIcon(block.icon);
+      return (
+        <a
+          href={block.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn('inline-flex items-center gap-2 rounded-md font-medium transition-colors', sizeClasses[block.size || 'medium'], BUTTON_VARIANTS[block.variant])}
+          style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
+        >
+          <Icon className="h-4 w-4" />
+          {block.label}
+        </a>
+      );
+    }
 
     case 'button_pill':
       return (
-        <span className={cn('inline-flex rounded-full px-3 py-1 text-sm font-medium', PILL_VARIANTS[block.variant])}>
+        <span
+          className={cn('inline-flex rounded-full px-3 py-1 text-sm font-medium', PILL_VARIANTS[block.variant])}
+          style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
+        >
           {block.label}
         </span>
       );
