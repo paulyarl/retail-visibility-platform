@@ -24,6 +24,23 @@ const PILL_VARIANTS = {
   neutral: 'bg-gray-100 text-gray-800',
 };
 
+function RichText({ text }: { text: string }) {
+  if (!text) return null;
+  const nodes: React.ReactNode[] = [];
+  const regex = /\{\{icon:([^:{}]+)(?::([^:{}]*))?\}\}/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) nodes.push(<span key={key++}>{text.slice(last, match.index)}</span>);
+    const Icon = getIcon(match[1]);
+    nodes.push(<Icon key={key++} className="inline-block h-5 w-5 align-middle" style={{ color: match[2] || undefined }} />);
+    last = regex.lastIndex;
+  }
+  if (last < text.length) nodes.push(<span key={key++}>{text.slice(last)}</span>);
+  return <>{nodes}</>;
+}
+
 function Heading({
   level,
   className,
@@ -55,12 +72,12 @@ function Heading({
 function Block({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case 'paragraph':
-      return <p className="mb-4 text-base leading-relaxed text-gray-900">{block.text}</p>;
+      return <p className="mb-4 text-base leading-relaxed text-gray-900"><RichText text={block.text} /></p>;
 
     case 'heading':
       return (
         <Heading level={block.level} className="mb-3 mt-6 font-semibold text-gray-900">
-          {block.text}
+          <RichText text={block.text} />
         </Heading>
       );
 
@@ -68,7 +85,7 @@ function Block({ block }: { block: ContentBlock }) {
       return (
         <ul className="mb-4 list-disc space-y-1 pl-6 text-gray-900">
           {block.items.map((item, index) => (
-            <li key={index}>{item}</li>
+            <li key={index}><RichText text={item} /></li>
           ))}
         </ul>
       );
@@ -77,7 +94,7 @@ function Block({ block }: { block: ContentBlock }) {
       return (
         <ol className="mb-4 list-decimal space-y-1 pl-6 text-gray-900">
           {block.items.map((item, index) => (
-            <li key={index}>{item}</li>
+            <li key={index}><RichText text={item} /></li>
           ))}
         </ol>
       );
@@ -160,7 +177,7 @@ function Block({ block }: { block: ContentBlock }) {
     case 'callout':
       return (
         <div className={cn('mb-4 rounded-lg border p-4', CALLOUT_STYLES[block.style])}>
-          {block.text}
+          <RichText text={block.text} />
         </div>
       );
 
