@@ -169,6 +169,7 @@ const schema = BlockNoteSchema.create({
     ...defaultBlockSpecs,
     button: buttonBlockSpec,
     button_pill: buttonPillBlockSpec,
+    icon_button: iconButtonBlockSpec,
     icon: iconBlockSpec,
     callout: calloutBlockSpec,
   },
