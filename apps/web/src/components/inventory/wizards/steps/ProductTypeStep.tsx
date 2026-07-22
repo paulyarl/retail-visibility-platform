@@ -85,7 +85,8 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
   const [showAddAttribute, setShowAddAttribute] = useState(false);
   const [skuError, setSkuError] = useState<string>('');
   const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
-  const variantImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [variantImageUrlInputs, setVariantImageUrlInputs] = useState<Record<string, string>>({});
+  const variantImageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Product type capability gating (allowed types from tier + merchant prefs)
   const productTypeCap = useProductTypeCapability(tenantId || null);
@@ -368,6 +369,30 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
       v.id === variantId ? { ...v, image_url: null, image_path: null } : v
     );
     onChange({ ...data, variants: updatedVariants });
+  };
+
+  // Handle variant image upload from a pasted URL
+  const handleVariantImageUrl = async (variantId: string, imageUrl: string) => {
+    const url = imageUrl.trim();
+    if (!tenantId || !url) return;
+
+    setUploadingVariantId(variantId);
+    try {
+      const { imageFetchService } = await import('@/services/ImageFetchService');
+      const file = await imageFetchService.fetchExternalImageAsFile(url, `variant-${variantId}.jpg`);
+
+      if (!file) {
+        clientLogger.error('[ProductTypeStep] Failed to fetch image from URL:', { variantId, url });
+        return;
+      }
+
+      await handleVariantImageUpload(variantId, file);
+      setVariantImageUrlInputs(prev => ({ ...prev, [variantId]: '' }));
+    } catch (error) {
+      clientLogger.error('[ProductTypeStep] Variant image URL upload error:', { detail: error });
+    } finally {
+      setUploadingVariantId(null);
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -1173,35 +1198,66 @@ export default function ProductTypeStep({ data, errors, onChange, tenantId, pare
                                     </Button>
                                   </div>
                                 ) : (
-                                  <>
-                                    <input
-                                      ref={variantImageInputRef}
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleVariantImageUpload(variant.id, file);
-                                      }}
-                                      className="hidden"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={uploadingVariantId === variant.id}
-                                      onClick={() => {
-                                        variantImageInputRef.current?.click();
-                                      }}
-                                    >
-                                      {uploadingVariantId === variant.id ? (
-                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                      ) : (
-                                        <Upload className="h-3 w-3 mr-1" />
-                                      )}
-                                      Upload
-                                    </Button>
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        ref={(el) => { variantImageInputRefs.current[variant.id] = el; }}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleVariantImageUpload(variant.id, file);
+                                          if (e.target) e.target.value = '';
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={uploadingVariantId === variant.id}
+                                        onClick={() => {
+                                          variantImageInputRefs.current[variant.id]?.click();
+                                        }}
+                                      >
+                                        {uploadingVariantId === variant.id ? (
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        ) : (
+                                          <Upload className="h-3 w-3 mr-1" />
+                                        )}
+                                        Upload
+                                      </Button>
+                                      <Input
+                                        type="url"
+                                        placeholder="Or paste image URL..."
+                                        value={variantImageUrlInputs[variant.id] || ''}
+                                        onChange={(e) => setVariantImageUrlInputs(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleVariantImageUrl(variant.id, variantImageUrlInputs[variant.id] || '');
+                                          }
+                                        }}
+                                        disabled={uploadingVariantId === variant.id}
+                                        className="text-sm flex-1 min-w-0"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={uploadingVariantId === variant.id || !variantImageUrlInputs[variant.id]?.trim()}
+                                        onClick={() => handleVariantImageUrl(variant.id, variantImageUrlInputs[variant.id] || '')}
+                                      >
+                                        {uploadingVariantId === variant.id ? (
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        ) : (
+                                          <Image className="h-3 w-3 mr-1" />
+                                        )}
+                                        Use
+                                      </Button>
+                                    </div>
                                     <span className="text-xs text-gray-400">No image</span>
-                                  </>
+                                  </div>
                                 )}
                               </div>
                             </div>
