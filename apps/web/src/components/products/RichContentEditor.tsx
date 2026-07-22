@@ -12,7 +12,7 @@ import {
   CreateLinkButton,
 } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
-import { BlockNoteSchema, defaultBlockSpecs } from '@blocknote/core';
+import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from '@blocknote/core';
 import { cn } from '@/lib/utils';
 import { getIcon, ICON_OPTIONS } from './icon-map';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
@@ -178,6 +178,7 @@ const schema = BlockNoteSchema.create({
     callout: calloutBlockSpec,
   },
   inlineContentSpecs: {
+    ...defaultInlineContentSpecs,
     icon: iconInlineSpec,
   },
 });
