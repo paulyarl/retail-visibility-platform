@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useProductOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { 
@@ -191,6 +191,8 @@ export default function MediaStep({ data, errors, productType, variants, onChang
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<any | null>(null);
   const [showVariantPhotoModal, setShowVariantPhotoModal] = useState(false);
+  const [primaryImageUrl, setPrimaryImageUrl] = useState('');
+  const [galleryImageUrl, setGalleryImageUrl] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
     imageId: string;
@@ -200,6 +202,56 @@ export default function MediaStep({ data, errors, productType, variants, onChang
   }>({ isOpen: false, imageId: '', isPrimary: false, imageName: '', isVideo: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const lastVariantImageUrls = useRef<Record<string, string>>({});
+
+  // Sync Step 2 variant images into Step 5 variant media (one-time seed per URL)
+  useEffect(() => {
+    if (!variants?.length) return;
+
+    let hasChanges = false;
+    const updatedSpecificImages = { ...data.variantMedia.variantSpecificImages };
+
+    variants.forEach((variant: any) => {
+      const step2Url = variant.image_url;
+      const lastUrl = lastVariantImageUrls.current[variant.id];
+
+      if (step2Url === lastUrl) {
+        return;
+      }
+
+      lastVariantImageUrls.current[variant.id] = step2Url || '';
+
+      if (!step2Url) return;
+
+      const existing = updatedSpecificImages[variant.id] || [];
+      if (existing.some((p: any) => p.url === step2Url)) {
+        return;
+      }
+
+      hasChanges = true;
+      updatedSpecificImages[variant.id] = [
+        {
+          id: `variant-step2-${variant.id}-${Date.now()}`,
+          url: step2Url,
+          name: variant.variant_name || variant.name || 'Variant Image',
+          path: variant.image_path || '',
+          isStep2Image: true,
+          uploadedAt: new Date()
+        },
+        ...existing
+      ];
+    });
+
+    if (hasChanges) {
+      onChange({
+        ...data,
+        variantMedia: {
+          ...data.variantMedia,
+          variantSpecificImages: updatedSpecificImages
+        }
+      });
+    }
+  }, [variants, data, onChange]);
 
   // Note: Photos are uploaded to Supabase immediately during wizard
   // This avoids localStorage quota issues with base64 data
@@ -268,6 +320,71 @@ export default function MediaStep({ data, errors, productType, variants, onChang
       setUploadProgress(0);
     }
   }, [data, onChange, tenantId]);
+
+  // Handle image upload from a pasted URL
+  const handleImageUrlUpload = async (imageUrl: string, isPrimary: boolean) => {
+    const url = imageUrl.trim();
+    if (!tenantId || !url) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const { imageFetchService } = await import('@/services/ImageFetchService');
+      const file = await imageFetchService.fetchExternalImageAsFile(
+        url,
+        isPrimary ? 'primary.jpg' : `gallery-${Date.now()}.jpg`
+      );
+
+      if (!file) {
+        clientLogger.error('[MediaStep] Failed to fetch image from URL:', { url });
+        return;
+      }
+
+      const result = await uploadImage(file, ImageUploadPresets.product);
+
+      if (result.error) {
+        clientLogger.error('[MediaStep] Image compression error:', { detail: result.error });
+        return;
+      }
+
+      const uploadResult = await itemsService.uploadTempPhoto({
+        tenantId,
+        dataUrl: result.dataUrl,
+      });
+
+      console.log('[MediaStep] Photo uploaded to Supabase from URL:', uploadResult.url);
+
+      const uploadedImage: UploadedImage = {
+        id: uploadResult.id,
+        url: uploadResult.url,
+        path: uploadResult.path,
+        name: file.name,
+        size: uploadResult.bytes || result.compressedSize,
+        type: uploadResult.contentType || result.contentType,
+        uploadedAt: new Date()
+      };
+
+      if (isPrimary) {
+        onChange({
+          ...data,
+          primaryImage: uploadedImage
+        });
+        setPrimaryImageUrl('');
+      } else {
+        onChange({
+          ...data,
+          galleryImages: [...data.galleryImages, uploadedImage]
+        });
+        setGalleryImageUrl('');
+      }
+    } catch (error) {
+      clientLogger.error('[MediaStep] Image URL upload error:', { detail: error });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
 
   // Handle drag and drop
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -419,7 +536,22 @@ export default function MediaStep({ data, errors, productType, variants, onChang
     setShowVariantPhotoModal(true);
   };
 
-  const handleVariantPhotosChange = (variantId: string, photos: any[]) => {
+  const handleVariantPhotosChange = async (variantId: string, photos: any[]) => {
+    const currentPhotos = data.variantMedia.variantSpecificImages?.[variantId] || [];
+    const removedPhotos = currentPhotos.filter((p: any) => !photos.some((newPhoto: any) => newPhoto.id === p.id));
+
+    for (const photo of removedPhotos) {
+      if (photo.path) {
+        try {
+          await itemsService.deleteTempPhoto(photo.path);
+          console.log('[MediaStep] Deleted variant temp photo from Supabase:', photo.path);
+        } catch (error) {
+          clientLogger.error('[MediaStep] Failed to delete variant temp photo:', { detail: error });
+          // Continue with local removal even if delete fails
+        }
+      }
+    }
+
     onChange({
       ...data,
       variantMedia: {
@@ -525,11 +657,37 @@ export default function MediaStep({ data, errors, productType, variants, onChang
           <Label className="text-base font-medium">
             Primary Image {!productType.hasVariants && <span className="text-red-500">*</span>}
           </Label>
-          <Button onClick={handlePrimaryImageUpload} disabled={isUploading}
-          variant='gradient' style={{ color: 'white' }}>
-            <Upload className="h-4 w-4 mr-2" />
-            {isUploading ? 'Uploading...' : 'Upload'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Input
+              type="url"
+              placeholder="Or paste image URL..."
+              value={primaryImageUrl}
+              onChange={(e) => setPrimaryImageUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleImageUrlUpload(primaryImageUrl, true);
+                }
+              }}
+              disabled={isUploading}
+              className="text-sm w-64"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={isUploading || !primaryImageUrl.trim()}
+              onClick={() => handleImageUrlUpload(primaryImageUrl, true)}
+            >
+              {isUploading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Image className="h-3 w-3 mr-1" />}
+              Use
+            </Button>
+            <Button onClick={handlePrimaryImageUpload} disabled={isUploading}
+            variant='gradient' style={{ color: 'white' }}>
+              <Upload className="h-4 w-4 mr-2" />
+              {isUploading ? 'Uploading...' : 'Upload'}
+            </Button>
+          </div>
         </div>
 
         <input
@@ -610,7 +768,31 @@ export default function MediaStep({ data, errors, productType, variants, onChang
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label className="text-base font-medium">Gallery Images</Label>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
+            <Input
+              type="url"
+              placeholder="Or paste image URL..."
+              value={galleryImageUrl}
+              onChange={(e) => setGalleryImageUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleImageUrlUpload(galleryImageUrl, false);
+                }
+              }}
+              disabled={isUploading}
+              className="text-sm w-64"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={isUploading || !galleryImageUrl.trim()}
+              onClick={() => handleImageUrlUpload(galleryImageUrl, false)}
+            >
+              {isUploading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Image className="h-3 w-3 mr-1" />}
+              Use
+            </Button>
             <Badge variant="default">{data.galleryImages.length} images</Badge>
             <Button onClick={handleGalleryUpload} disabled={isUploading}
             variant='gradient' style={{ color: 'white' }}>
