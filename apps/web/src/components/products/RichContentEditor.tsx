@@ -29,6 +29,7 @@ const BUTTON_VARIANTS = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700',
   secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
   outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50',
+  gradient: 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600',
 };
 
 const PILL_VARIANTS = {
@@ -36,6 +37,7 @@ const PILL_VARIANTS = {
   warning: 'bg-amber-100 text-amber-800',
   info: 'bg-blue-100 text-blue-800',
   neutral: 'bg-gray-100 text-gray-800',
+  gradient: 'bg-gradient-to-r from-green-400 to-blue-500 text-white',
 };
 
 const CALLOUT_STYLES = {
@@ -57,7 +59,7 @@ const buttonBlockSpec = createReactBlockSpec(
     propSchema: {
       label: { default: 'Button', type: 'string' },
       url: { default: '#', type: 'string' },
-      variant: { default: 'primary', values: ['primary', 'secondary', 'outline'] as const },
+      variant: { default: 'primary', values: ['primary', 'secondary', 'outline', 'gradient'] as const },
       size: { default: 'medium', values: ['small', 'medium', 'large'] as const },
       foregroundColor: { default: '', type: 'string' },
       backgroundColor: { default: '', type: 'string' },
@@ -87,7 +89,7 @@ const buttonPillBlockSpec = createReactBlockSpec(
     type: 'button_pill',
     propSchema: {
       label: { default: 'Pill', type: 'string' },
-      variant: { default: 'info', values: ['success', 'warning', 'info', 'neutral'] as const },
+      variant: { default: 'info', values: ['success', 'warning', 'info', 'neutral', 'gradient'] as const },
       foregroundColor: { default: '', type: 'string' },
       backgroundColor: { default: '', type: 'string' },
       textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
@@ -115,7 +117,7 @@ const iconButtonBlockSpec = createReactBlockSpec(
       icon: { default: 'check', type: 'string' },
       label: { default: 'Button', type: 'string' },
       url: { default: '#', type: 'string' },
-      variant: { default: 'primary', values: ['primary', 'secondary', 'outline'] as const },
+      variant: { default: 'primary', values: ['primary', 'secondary', 'outline', 'gradient'] as const },
       size: { default: 'medium', values: ['small', 'medium', 'large'] as const },
       foregroundColor: { default: '', type: 'string' },
       backgroundColor: { default: '', type: 'string' },
@@ -359,7 +361,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         type: 'button',
         label: (block.props?.label as string) ?? 'Button',
         url: (block.props?.url as string) ?? '#',
-        variant: (block.props?.variant as 'primary' | 'secondary' | 'outline') ?? 'primary',
+        variant: (block.props?.variant as 'primary' | 'secondary' | 'outline' | 'gradient') ?? 'primary',
         size: (block.props?.size as 'small' | 'medium' | 'large') ?? 'medium',
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
@@ -369,7 +371,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
       return {
         type: 'button_pill',
         label: (block.props?.label as string) ?? 'Pill',
-        variant: (block.props?.variant as 'success' | 'warning' | 'info' | 'neutral') ?? 'info',
+        variant: (block.props?.variant as 'success' | 'warning' | 'info' | 'neutral' | 'gradient') ?? 'info',
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
         textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
@@ -380,7 +382,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         icon: (block.props?.icon as string) ?? 'check',
         label: (block.props?.label as string) ?? 'Button',
         url: (block.props?.url as string) ?? '#',
-        variant: (block.props?.variant as 'primary' | 'secondary' | 'outline') ?? 'primary',
+        variant: (block.props?.variant as 'primary' | 'secondary' | 'outline' | 'gradient') ?? 'primary',
         size: (block.props?.size as 'small' | 'medium' | 'large') ?? 'medium',
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
@@ -710,6 +712,7 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
             <option value="primary">Primary</option>
             <option value="secondary">Secondary</option>
             <option value="outline">Outline</option>
+            <option value="gradient">Gradient</option>
           </select>
           <select value={props.size} onChange={(e) => update('size', e.target.value)} className={selectClass}>
             <option value="small">Small</option>
@@ -737,6 +740,7 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
             <option value="warning">Warning</option>
             <option value="info">Info</option>
             <option value="neutral">Neutral</option>
+            <option value="gradient">Gradient</option>
           </select>
           <input defaultValue={props.foregroundColor} onBlur={(e) => update('foregroundColor', e.target.value)} placeholder="Text color" className={inputClass} />
           <input defaultValue={props.backgroundColor} onBlur={(e) => update('backgroundColor', e.target.value)} placeholder="Bg color" className={inputClass} />
