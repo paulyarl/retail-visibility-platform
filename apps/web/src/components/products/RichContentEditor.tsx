@@ -10,6 +10,7 @@ import {
   BasicTextStyleButton,
   ColorStyleButton,
   CreateLinkButton,
+  TextAlignButton,
 } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from '@blocknote/core';
@@ -203,13 +204,13 @@ interface RichContentEditorProps {
 function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | null {
   switch (block.type) {
     case 'paragraph':
-      return { type: 'paragraph', content: textToInlineContent(block.text) };
+      return { type: 'paragraph', props: { textAlignment: block.textAlign || 'left' }, content: textToInlineContent(block.text) };
     case 'heading':
-      return { type: 'heading', props: { level: block.level }, content: textToInlineContent(block.text) };
+      return { type: 'heading', props: { level: block.level, textAlignment: block.textAlign || 'left' }, content: textToInlineContent(block.text) };
     case 'bullet_list':
-      return block.items.map((item) => ({ type: 'bulletListItem', content: textToInlineContent(item) }));
+      return block.items.map((item) => ({ type: 'bulletListItem', props: { textAlignment: block.textAlign || 'left' }, content: textToInlineContent(item) }));
     case 'numbered_list':
-      return block.items.map((item) => ({ type: 'numberedListItem', content: textToInlineContent(item) }));
+      return block.items.map((item) => ({ type: 'numberedListItem', props: { textAlignment: block.textAlign || 'left' }, content: textToInlineContent(item) }));
     case 'image':
       return {
         type: 'image',
@@ -299,17 +300,18 @@ function inlineToString(content: unknown): string {
 function blockNoteToContentBlock(block: { type: string; props?: Record<string, unknown>; content?: unknown }): ContentBlock | ContentBlock[] | null {
   switch (block.type) {
     case 'paragraph':
-      return { type: 'paragraph', text: inlineToString(block.content) };
+      return { type: 'paragraph', text: inlineToString(block.content), textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
     case 'heading':
       return {
         type: 'heading',
         level: (block.props?.level as number) ?? 2,
         text: inlineToString(block.content),
+        textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     case 'bulletListItem':
-      return { type: 'bullet_list', items: [inlineToString(block.content)] };
+      return { type: 'bullet_list', items: [inlineToString(block.content)], textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
     case 'numberedListItem':
-      return { type: 'numbered_list', items: [inlineToString(block.content)] };
+      return { type: 'numbered_list', items: [inlineToString(block.content)], textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
     case 'image':
       return {
         type: 'image',
@@ -595,6 +597,10 @@ function CustomFormattingToolbar() {
       <BasicTextStyleButton basicTextStyle="code" />
       <ColorStyleButton />
       <CreateLinkButton />
+      <TextAlignButton textAlignment="left" />
+      <TextAlignButton textAlignment="center" />
+      <TextAlignButton textAlignment="right" />
+      <TextAlignButton textAlignment="justify" />
     </FormattingToolbar>
   );
 }

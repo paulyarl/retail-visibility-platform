@@ -45,12 +45,14 @@ function Heading({
   level,
   className,
   children,
+  style,
 }: {
   level: number;
   className: string;
   children: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
-  const props = { className, children };
+  const props = { className, children, style };
   switch (level) {
     case 1:
       return <h1 {...props} />;
@@ -72,18 +74,18 @@ function Heading({
 function Block({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case 'paragraph':
-      return <p className="mb-4 text-base leading-relaxed text-gray-900"><RichText text={block.text} /></p>;
+      return <p className="mb-4 text-base leading-relaxed text-gray-900" style={{ textAlign: block.textAlign }}><RichText text={block.text} /></p>;
 
     case 'heading':
       return (
-        <Heading level={block.level} className="mb-3 mt-6 font-semibold text-gray-900">
+        <Heading level={block.level} className="mb-3 mt-6 font-semibold text-gray-900" style={{ textAlign: block.textAlign }}>
           <RichText text={block.text} />
         </Heading>
       );
 
     case 'bullet_list':
       return (
-        <ul className="mb-4 list-disc space-y-1 pl-6 text-gray-900">
+        <ul className="mb-4 list-disc space-y-1 pl-6 text-gray-900" style={{ textAlign: block.textAlign }}>
           {block.items.map((item, index) => (
             <li key={index}><RichText text={item} /></li>
           ))}
@@ -92,7 +94,7 @@ function Block({ block }: { block: ContentBlock }) {
 
     case 'numbered_list':
       return (
-        <ol className="mb-4 list-decimal space-y-1 pl-6 text-gray-900">
+        <ol className="mb-4 list-decimal space-y-1 pl-6 text-gray-900" style={{ textAlign: block.textAlign }}>
           {block.items.map((item, index) => (
             <li key={index}><RichText text={item} /></li>
           ))}
