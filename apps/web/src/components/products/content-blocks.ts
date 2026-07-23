@@ -86,6 +86,15 @@ export const calloutBlockSchema = z.object({
   textSize: z.enum(['paragraph', 'h1', 'h2', 'h3']).optional(),
 });
 
+export const sideBySideBlockSchema = z.object({
+  type: z.literal('side_by_side'),
+  imagePosition: z.enum(['left', 'right']).default('left'),
+  imageSrc: z.string(),
+  imageAlt: z.string().optional(),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+});
+
 export const contentBlockSchema = z.union([
   paragraphBlockSchema,
   headingBlockSchema,
@@ -98,6 +107,7 @@ export const contentBlockSchema = z.union([
   iconButtonBlockSchema,
   iconBlockSchema,
   calloutBlockSchema,
+  sideBySideBlockSchema,
 ]);
 
 export const contentBlocksSchema = z.object({
