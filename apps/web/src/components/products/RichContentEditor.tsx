@@ -208,20 +208,21 @@ const sideBySideBlockSpec = createReactBlockSpec(
       imagePosition: { default: 'left', values: ['left', 'right'] as const },
       imageSrc: { default: '', type: 'string' },
       imageAlt: { default: '', type: 'string' },
-      text: { default: '', type: 'string' },
       textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
     },
-    content: 'none',
+    content: 'inline',
   },
   {
-    render: ({ block }) => (
+    render: ({ block, contentRef }) => (
       <div className="flex items-start gap-4">
         {block.props.imagePosition === 'left' && (
           <img src={block.props.imageSrc} alt={block.props.imageAlt} className="w-1/3 rounded-md object-cover" />
         )}
-        <div className="flex-1" style={{ textAlign: block.props.textAlign || 'left' }}>
-          {block.props.text}
-        </div>
+        <div
+          ref={contentRef}
+          className="flex-1"
+          style={{ textAlign: block.props.textAlign || 'left' }}
+        />
         {block.props.imagePosition === 'right' && (
           <img src={block.props.imageSrc} alt={block.props.imageAlt} className="w-1/3 rounded-md object-cover" />
         )}
@@ -328,9 +329,9 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
           imagePosition: block.imagePosition || 'left',
           imageSrc: block.imageSrc || '',
           imageAlt: block.imageAlt || '',
-          text: block.text || '',
           textAlign: block.textAlign || 'left',
         },
+        content: (block.content && (block.content as unknown[]).length ? block.content : textToInlineContent(block.text || '')) as unknown[],
       };
     default:
       return null;
@@ -451,7 +452,8 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         imagePosition: (block.props?.imagePosition as 'left' | 'right') ?? 'left',
         imageSrc: (block.props?.imageSrc as string) ?? '',
         imageAlt: (block.props?.imageAlt as string) || undefined,
-        text: (block.props?.text as string) ?? '',
+        text: inlineToString(block.content),
+        content: (block.content ?? undefined) as unknown[] | undefined,
         textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     default:
@@ -873,7 +875,6 @@ function BlockSettingsPanel({ editor, block, tenantId }: { editor: any; block: a
             <option value="left">Image left</option>
             <option value="right">Image right</option>
           </select>
-          <textarea defaultValue={props.text} onBlur={(e) => update('text', e.target.value)} placeholder="Text" className={cn(inputClass, 'min-h-[4rem]')} />
         </>
       )}
       {(['button', 'button_pill', 'icon_button', 'callout', 'side_by_side'].includes(block.type)) && (

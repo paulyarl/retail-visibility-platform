@@ -91,7 +91,8 @@ export const sideBySideBlockSchema = z.object({
   imagePosition: z.enum(['left', 'right']).default('left'),
   imageSrc: z.string(),
   imageAlt: z.string().optional(),
-  text: z.string(),
+  text: z.string().optional(),
+  content: z.array(z.unknown()).optional(),
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
