@@ -694,6 +694,33 @@ const inputClass = 'rounded border border-neutral-300 px-2 py-1 text-sm dark:bor
 const selectClass = 'rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100';
 const deleteClass = 'rounded bg-red-100 px-2 py-1 text-sm text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-200';
 
+const COLOR_OPTIONS = [
+  { label: 'Default', value: '' },
+  { label: 'Black', value: '#000000' },
+  { label: 'White', value: '#ffffff' },
+  { label: 'Blue', value: '#2563eb' },
+  { label: 'Red', value: '#dc2626' },
+  { label: 'Green', value: '#16a34a' },
+  { label: 'Yellow', value: '#ca8a04' },
+  { label: 'Purple', value: '#9333ea' },
+  { label: 'Pink', value: '#db2777' },
+  { label: 'Orange', value: '#ea580c' },
+  { label: 'Gray', value: '#4b5563' },
+];
+
+function ColorSelect({ value, onChange, label }: { value?: string; onChange: (v: string) => void; label?: string }) {
+  return (
+    <select value={value || ''} onChange={(e) => onChange(e.target.value)} className={selectClass}>
+      <option value="">{label ?? 'Color...'}</option>
+      {COLOR_OPTIONS.map((c) => (
+        <option key={c.value || 'default'} value={c.value}>
+          {c.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
   const update = (key: string, value: string) => {
     editor.updateBlock?.(block.id, { props: { [key]: value } });
@@ -728,8 +755,8 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
               ))}
             </select>
           )}
-          <input defaultValue={props.foregroundColor} onBlur={(e) => update('foregroundColor', e.target.value)} placeholder="Text color" className={inputClass} />
-          <input defaultValue={props.backgroundColor} onBlur={(e) => update('backgroundColor', e.target.value)} placeholder="Bg color" className={inputClass} />
+          <ColorSelect value={props.foregroundColor} onChange={(v) => update('foregroundColor', v)} label="Text color" />
+          <ColorSelect value={props.backgroundColor} onChange={(v) => update('backgroundColor', v)} label="Bg color" />
         </>
       )}
       {block.type === 'button_pill' && (
@@ -742,8 +769,8 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
             <option value="neutral">Neutral</option>
             <option value="gradient">Gradient</option>
           </select>
-          <input defaultValue={props.foregroundColor} onBlur={(e) => update('foregroundColor', e.target.value)} placeholder="Text color" className={inputClass} />
-          <input defaultValue={props.backgroundColor} onBlur={(e) => update('backgroundColor', e.target.value)} placeholder="Bg color" className={inputClass} />
+          <ColorSelect value={props.foregroundColor} onChange={(v) => update('foregroundColor', v)} label="Text color" />
+          <ColorSelect value={props.backgroundColor} onChange={(v) => update('backgroundColor', v)} label="Bg color" />
         </>
       )}
       {block.type === 'callout' && (
@@ -760,8 +787,8 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
             <option value="h2">H2</option>
             <option value="h3">H3</option>
           </select>
-          <input defaultValue={props.foregroundColor} onBlur={(e) => update('foregroundColor', e.target.value)} placeholder="Text color" className={inputClass} />
-          <input defaultValue={props.backgroundColor} onBlur={(e) => update('backgroundColor', e.target.value)} placeholder="Bg color" className={inputClass} />
+          <ColorSelect value={props.foregroundColor} onChange={(v) => update('foregroundColor', v)} label="Text color" />
+          <ColorSelect value={props.backgroundColor} onChange={(v) => update('backgroundColor', v)} label="Bg color" />
         </>
       )}
       {(['button', 'button_pill', 'icon_button', 'callout'].includes(block.type)) && (
