@@ -33,6 +33,45 @@ const PILL_VARIANTS = {
   gradient: 'bg-gradient-to-r from-green-400 to-blue-500 text-white',
 };
 
+function IconNode({ name, color }: { name?: string; color?: string }) {
+  const Icon = getIcon(name ?? 'help');
+  return <Icon className="inline-block h-5 w-5 align-middle" style={{ color: color || undefined }} />;
+}
+
+function StyledSpan({ node }: { node: any }) {
+  const text = node.text ?? '';
+  const style: React.CSSProperties = {};
+  if (node.styles?.textColor) style.color = node.styles.textColor;
+  if (node.styles?.backgroundColor) style.backgroundColor = node.styles.backgroundColor;
+  let children: React.ReactNode = text;
+  if (node.styles?.bold) children = <strong>{children}</strong>;
+  if (node.styles?.italic) children = <em>{children}</em>;
+  if (node.styles?.underline) children = <u>{children}</u>;
+  if (node.styles?.strike) children = <s>{children}</s>;
+  if (node.styles?.code) children = <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">{children}</code>;
+  if (node.styles?.link) {
+    children = (
+      <a href={node.styles.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+        {children}
+      </a>
+    );
+  }
+  return <span style={style}>{children}</span>;
+}
+
+function RichInlineContent({ content }: { content?: unknown[] }) {
+  return (
+    <>
+      {(content ?? []).map((node, i) => {
+        if (typeof node === 'string') return <span key={i}>{node}</span>;
+        const n = node as any;
+        if (n?.type === 'icon') return <IconNode key={i} name={n.props?.name} color={n.props?.color} />;
+        return <StyledSpan key={i} node={n} />;
+      })}
+    </>
+  );
+}
+
 function RichText({ text }: { text: string }) {
   if (!text) return null;
   const nodes: React.ReactNode[] = [];
@@ -205,7 +244,7 @@ function Block({ block }: { block: ContentBlock }) {
       const image = <img src={block.imageSrc} alt={block.imageAlt} className="w-1/3 rounded-md object-cover" />;
       const text = (
         <div className="flex-1" style={{ textAlign: block.textAlign }}>
-          <RichText text={block.text} />
+          {block.content ? <RichInlineContent content={block.content} /> : <RichText text={block.text || ''} />}
         </div>
       );
       return (
