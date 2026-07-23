@@ -9,14 +9,22 @@ import { logger } from '../logger';
 
 // List of dangerous patterns to block
 const DANGEROUS_PATTERNS = [
-  // SQL injection patterns - more specific to avoid false positives
-  /(\bUNION\s+SELECT|\bSELECT\s+.*\bFROM\b|\bINSERT\s+INTO|\bUPDATE\s+.*\bSET\b|\bDELETE\s+FROM\b|\bDROP\s+TABLE|\bCREATE\s+TABLE|\bALTER\s+TABLE|\bEXEC\s*\(|\bEXECUTE\s*\()/i,
+  // SQL injection patterns - require real SQL syntax to avoid false positives on product content
+  /\bUNION\s+SELECT\b(?=\s*(?:\*|ALL\b|DISTINCT\b|\w+\s+\bFROM\b))/i,
+  /\bSELECT\s+(?:\*|[\w\s,]+?)\s+\bFROM\s+[\w"]+\b(?=\s*(?:;|WHERE\b|JOIN\b|GROUP\b|ORDER\b|LIMIT\b|HAVING\b|INTERSECT\b|UNION\b|EXCEPT\b|ON\b|INNER\b|LEFT\b|RIGHT\b|CROSS\b|SELECT\b|INSERT\b|UPDATE\b|DELETE\b|DROP\b|CREATE\b|ALTER\b|EXEC\b|EXECUTE\b|$))/i,
+  /\bINSERT\s+INTO\s+[\w"]+\b(?=\s*(?:\(|;|SELECT\b|VALUES\b|$))/i,
+  /\bUPDATE\s+[\w"]+\s+SET\s+\w+\s*(?==)/i,
+  /\bDELETE\s+FROM\s+[\w"]+\b(?=\s*(?:;|WHERE\b|JOIN\b|GROUP\b|ORDER\b|LIMIT\b|HAVING\b|INTERSECT\b|UNION\b|EXCEPT\b|ON\b|INNER\b|LEFT\b|RIGHT\b|CROSS\b|SELECT\b|INSERT\b|UPDATE\b|DELETE\b|DROP\b|CREATE\b|ALTER\b|EXEC\b|EXECUTE\b|$))/i,
+  /\bDROP\s+TABLE\s+[\w"]+\b(?=\s*(?:;|$))/i,
+  /\bCREATE\s+TABLE\s+[\w"]+\b(?=\s*(?:\(|;|$))/i,
+  /\bALTER\s+TABLE\s+[\w"]+\b(?=\s*(?:ADD\b|DROP\b|RENAME\b|ALTER\b|MODIFY\b|;|$))/i,
+  /\bEXEC\s*\(|\bEXECUTE\s*\(/i,
   // XSS patterns
   /(<script|javascript:|vbscript:|onload=|onerror=|onclick=|onmouseover=)/i,
   // Path traversal
   /(\.\.|\/etc\/passwd|\/etc\/shadow|\/proc\/|\/home\/)/i,
-  // SQL comments
-  /(-{2,}|\/\*|\*\/)/,
+  // SQL comments - require trailing whitespace after -- to avoid flagging URL tokens
+  /(-{2,}\s|\/\*|\*\/)/,
 ];
 
 // File upload security
