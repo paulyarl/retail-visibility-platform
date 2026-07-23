@@ -11,6 +11,7 @@ import {
   ColorStyleButton,
   CreateLinkButton,
   TextAlignButton,
+  useBlockNoteEditor,
 } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from '@blocknote/core';
@@ -588,19 +589,70 @@ export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, cl
 }
 
 function CustomFormattingToolbar() {
+  const editor = useBlockNoteEditor() as any;
+  const block = editor?.getTextCursorPosition?.()?.block as { type: string; id: string } | undefined;
+  const type = block?.type ?? 'paragraph';
+  const blockId = block?.id;
+  const isText = ['paragraph', 'heading', 'bulletListItem', 'numberedListItem', 'callout'].includes(type);
+  const isHeading = type === 'heading';
+  const isImage = type === 'image';
+  const isCallout = type === 'callout';
+
   return (
     <FormattingToolbar>
-      <BasicTextStyleButton basicTextStyle="bold" />
-      <BasicTextStyleButton basicTextStyle="italic" />
-      <BasicTextStyleButton basicTextStyle="underline" />
-      <BasicTextStyleButton basicTextStyle="strike" />
-      <BasicTextStyleButton basicTextStyle="code" />
-      <ColorStyleButton />
-      <CreateLinkButton />
-      <TextAlignButton textAlignment="left" />
-      <TextAlignButton textAlignment="center" />
-      <TextAlignButton textAlignment="right" />
-      <TextAlignButton textAlignment="justify" />
+      {isText && (
+        <>
+          <BasicTextStyleButton basicTextStyle="bold" />
+          <BasicTextStyleButton basicTextStyle="italic" />
+          <BasicTextStyleButton basicTextStyle="underline" />
+          <BasicTextStyleButton basicTextStyle="strike" />
+          <BasicTextStyleButton basicTextStyle="code" />
+          <ColorStyleButton />
+          <CreateLinkButton />
+        </>
+      )}
+      {(isText || isImage) && (
+        <div className="ml-2 flex items-center gap-1 border-l border-neutral-300 pl-2 dark:border-neutral-700">
+          {isCallout ? (
+            ['left', 'center', 'right', 'justify'].map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => editor.updateBlock?.(blockId, { props: { textAlign: a } })}
+                className="rounded px-2 py-1 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              >
+                {a[0].toUpperCase()}
+              </button>
+            ))
+          ) : (
+            <>
+              <TextAlignButton textAlignment="left" />
+              <TextAlignButton textAlignment="center" />
+              <TextAlignButton textAlignment="right" />
+              <TextAlignButton textAlignment="justify" />
+            </>
+          )}
+        </div>
+      )}
+      {isHeading && (
+        <div className="ml-2 flex items-center gap-1 border-l border-neutral-300 pl-2 dark:border-neutral-700">
+          {[1, 2, 3].map((lvl) => (
+            <button
+              key={lvl}
+              type="button"
+              onClick={() => editor.updateBlock?.(blockId, { props: { level: lvl } })}
+              className="rounded px-2 py-1 text-xs font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            >
+              H{lvl}
+            </button>
+          ))}
+        </div>
+      )}
+      {isImage && (
+        <div className="ml-2 flex items-center gap-1 border-l border-neutral-300 pl-2 dark:border-neutral-700">
+          <CreateLinkButton />
+        </div>
+      )}
     </FormattingToolbar>
   );
 }
@@ -668,12 +720,21 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
         </select>
       )}
       {(['button', 'button_pill', 'icon_button', 'callout'].includes(block.type)) && (
-        <select value={props.textAlign || 'left'} onChange={(e) => update('textAlign', e.target.value)} className={selectClass}>
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-          <option value="justify">Justify</option>
-        </select>
+        <div className="flex items-center gap-1">
+          {(['left', 'center', 'right', 'justify'] as const).map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => update('textAlign', a)}
+              className={cn(
+                'rounded px-2 py-1 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                (props.textAlign || 'left') === a ? 'bg-neutral-200 dark:bg-neutral-700' : 'bg-white dark:bg-neutral-900'
+              )}
+            >
+              {a[0].toUpperCase()}
+            </button>
+          ))}
+        </div>
       )}
       <button type="button" onClick={remove} className={deleteClass}>
         Delete
