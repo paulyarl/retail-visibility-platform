@@ -165,18 +165,36 @@ const iconInlineSpec = createReactInlineContentSpec(
   },
 );
 
+const CALLOUT_TEXT_SIZE_CLASSES = {
+  paragraph: 'text-base',
+  h1: 'text-3xl font-semibold',
+  h2: 'text-2xl font-semibold',
+  h3: 'text-xl font-semibold',
+};
+
 const calloutBlockSpec = createReactBlockSpec(
   {
     type: 'callout',
     propSchema: {
       style: { default: 'info', values: ['info', 'warning', 'success', 'error'] as const },
       textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
+      foregroundColor: { default: '', type: 'string' },
+      backgroundColor: { default: '', type: 'string' },
+      textSize: { default: 'paragraph', values: ['paragraph', 'h1', 'h2', 'h3'] as const },
     },
     content: 'inline',
   },
   {
     render: ({ block, contentRef }) => (
-      <div className={cn('rounded-lg border p-4', CALLOUT_STYLES[block.props.style])} style={{ textAlign: block.props.textAlign || 'left' }} ref={contentRef} />
+      <div
+        className={cn('rounded-lg border p-4', CALLOUT_STYLES[block.props.style], CALLOUT_TEXT_SIZE_CLASSES[block.props.textSize])}
+        style={{
+          textAlign: block.props.textAlign || 'left',
+          color: block.props.foregroundColor || undefined,
+          backgroundColor: block.props.backgroundColor || undefined,
+        }}
+        ref={contentRef}
+      />
     ),
   },
 )();
@@ -260,7 +278,17 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
     case 'icon':
       return { type: 'paragraph', content: [{ type: 'icon', props: { name: block.name, color: block.color ?? '' } }] };
     case 'callout':
-      return { type: 'callout', props: { style: block.style, textAlign: block.textAlign || 'left' }, content: textToInlineContent(block.text) };
+      return {
+        type: 'callout',
+        props: {
+          style: block.style,
+          textAlign: block.textAlign || 'left',
+          foregroundColor: block.foregroundColor || '',
+          backgroundColor: block.backgroundColor || '',
+          textSize: block.textSize || 'paragraph',
+        },
+        content: textToInlineContent(block.text),
+      };
     default:
       return null;
   }
@@ -370,6 +398,9 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         style: (block.props?.style as 'info' | 'warning' | 'success' | 'error') ?? 'info',
         text: inlineToString(block.content),
         textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
+        foregroundColor: (block.props?.foregroundColor as string) || undefined,
+        backgroundColor: (block.props?.backgroundColor as string) || undefined,
+        textSize: (block.props?.textSize as 'paragraph' | 'h1' | 'h2' | 'h3') || undefined,
       };
     default:
       return null;
@@ -712,12 +743,22 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
         </>
       )}
       {block.type === 'callout' && (
-        <select value={props.style} onChange={(e) => update('style', e.target.value)} className={selectClass}>
-          <option value="info">Info</option>
-          <option value="warning">Warning</option>
-          <option value="success">Success</option>
-          <option value="error">Error</option>
-        </select>
+        <>
+          <select value={props.style} onChange={(e) => update('style', e.target.value)} className={selectClass}>
+            <option value="info">Info</option>
+            <option value="warning">Warning</option>
+            <option value="success">Success</option>
+            <option value="error">Error</option>
+          </select>
+          <select value={props.textSize || 'paragraph'} onChange={(e) => update('textSize', e.target.value)} className={selectClass}>
+            <option value="paragraph">Paragraph</option>
+            <option value="h1">H1</option>
+            <option value="h2">H2</option>
+            <option value="h3">H3</option>
+          </select>
+          <input defaultValue={props.foregroundColor} onBlur={(e) => update('foregroundColor', e.target.value)} placeholder="Text color" className={inputClass} />
+          <input defaultValue={props.backgroundColor} onBlur={(e) => update('backgroundColor', e.target.value)} placeholder="Bg color" className={inputClass} />
+        </>
       )}
       {(['button', 'button_pill', 'icon_button', 'callout'].includes(block.type)) && (
         <div className="flex items-center gap-1">
