@@ -42,6 +42,7 @@ export const buttonBlockSchema = z.object({
   size: z.enum(['small', 'medium', 'large']).default('medium'),
   foregroundColor: z.string().optional(),
   backgroundColor: z.string().optional(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const buttonPillBlockSchema = z.object({
@@ -50,6 +51,7 @@ export const buttonPillBlockSchema = z.object({
   variant: z.enum(['success', 'warning', 'info', 'neutral']).default('info'),
   foregroundColor: z.string().optional(),
   backgroundColor: z.string().optional(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const iconButtonBlockSchema = z.object({
@@ -61,6 +63,7 @@ export const iconButtonBlockSchema = z.object({
   size: z.enum(['small', 'medium', 'large']).default('medium'),
   foregroundColor: z.string().optional(),
   backgroundColor: z.string().optional(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const iconBlockSchema = z.object({
@@ -73,6 +76,7 @@ export const calloutBlockSchema = z.object({
   type: z.literal('callout'),
   style: z.enum(['info', 'warning', 'success', 'error']).default('info'),
   text: z.string().min(1),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const contentBlockSchema = z.union([

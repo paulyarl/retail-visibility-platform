@@ -59,20 +59,23 @@ const buttonBlockSpec = createReactBlockSpec(
       size: { default: 'medium', values: ['small', 'medium', 'large'] as const },
       foregroundColor: { default: '', type: 'string' },
       backgroundColor: { default: '', type: 'string' },
+      textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
     },
     content: 'none',
   },
   {
     render: ({ block }) => (
-      <a
-        href={block.props.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn('inline-block rounded-md font-medium transition-colors', buttonSizeClasses[block.props.size], BUTTON_VARIANTS[block.props.variant])}
-        style={{ color: block.props.foregroundColor || undefined, backgroundColor: block.props.backgroundColor || undefined }}
-      >
-        {block.props.label}
-      </a>
+      <div style={{ textAlign: block.props.textAlign || 'left' }}>
+        <a
+          href={block.props.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn('inline-block rounded-md font-medium transition-colors', buttonSizeClasses[block.props.size], BUTTON_VARIANTS[block.props.variant])}
+          style={{ color: block.props.foregroundColor || undefined, backgroundColor: block.props.backgroundColor || undefined }}
+        >
+          {block.props.label}
+        </a>
+      </div>
     ),
   },
 )();
@@ -85,17 +88,20 @@ const buttonPillBlockSpec = createReactBlockSpec(
       variant: { default: 'info', values: ['success', 'warning', 'info', 'neutral'] as const },
       foregroundColor: { default: '', type: 'string' },
       backgroundColor: { default: '', type: 'string' },
+      textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
     },
     content: 'none',
   },
   {
     render: ({ block }) => (
-      <span
-        className={cn('inline-flex rounded-full px-3 py-1 text-sm font-medium', PILL_VARIANTS[block.props.variant])}
-        style={{ color: block.props.foregroundColor || undefined, backgroundColor: block.props.backgroundColor || undefined }}
-      >
-        {block.props.label}
-      </span>
+      <div style={{ textAlign: block.props.textAlign || 'left' }}>
+        <span
+          className={cn('inline-flex rounded-full px-3 py-1 text-sm font-medium', PILL_VARIANTS[block.props.variant])}
+          style={{ color: block.props.foregroundColor || undefined, backgroundColor: block.props.backgroundColor || undefined }}
+        >
+          {block.props.label}
+        </span>
+      </div>
     ),
   },
 )();
@@ -111,6 +117,7 @@ const iconButtonBlockSpec = createReactBlockSpec(
       size: { default: 'medium', values: ['small', 'medium', 'large'] as const },
       foregroundColor: { default: '', type: 'string' },
       backgroundColor: { default: '', type: 'string' },
+      textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
     },
     content: 'none',
   },
@@ -118,16 +125,18 @@ const iconButtonBlockSpec = createReactBlockSpec(
     render: ({ block }) => {
       const Icon = getIcon(block.props.icon);
       return (
-        <a
-          href={block.props.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn('inline-flex items-center gap-2 rounded-md font-medium transition-colors', buttonSizeClasses[block.props.size], BUTTON_VARIANTS[block.props.variant])}
-          style={{ color: block.props.foregroundColor || undefined, backgroundColor: block.props.backgroundColor || undefined }}
-        >
-          <Icon className="h-4 w-4" />
-          {block.props.label}
-        </a>
+        <div style={{ textAlign: block.props.textAlign || 'left' }}>
+          <a
+            href={block.props.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn('inline-flex items-center gap-2 rounded-md font-medium transition-colors', buttonSizeClasses[block.props.size], BUTTON_VARIANTS[block.props.variant])}
+            style={{ color: block.props.foregroundColor || undefined, backgroundColor: block.props.backgroundColor || undefined }}
+          >
+            <Icon className="h-4 w-4" />
+            {block.props.label}
+          </a>
+        </div>
       );
     },
   },
@@ -159,12 +168,13 @@ const calloutBlockSpec = createReactBlockSpec(
     type: 'callout',
     propSchema: {
       style: { default: 'info', values: ['info', 'warning', 'success', 'error'] as const },
+      textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
     },
     content: 'inline',
   },
   {
     render: ({ block, contentRef }) => (
-      <div className={cn('rounded-lg border p-4', CALLOUT_STYLES[block.props.style])} ref={contentRef} />
+      <div className={cn('rounded-lg border p-4', CALLOUT_STYLES[block.props.style])} style={{ textAlign: block.props.textAlign || 'left' }} ref={contentRef} />
     ),
   },
 )();
@@ -217,6 +227,7 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
           size: block.size,
           foregroundColor: block.foregroundColor || '',
           backgroundColor: block.backgroundColor || '',
+          textAlign: block.textAlign || 'left',
         },
       };
     case 'button_pill':
@@ -227,6 +238,7 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
           variant: block.variant,
           foregroundColor: block.foregroundColor || '',
           backgroundColor: block.backgroundColor || '',
+          textAlign: block.textAlign || 'left',
         },
       };
     case 'icon_button':
@@ -240,12 +252,13 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
           size: block.size,
           foregroundColor: block.foregroundColor || '',
           backgroundColor: block.backgroundColor || '',
+          textAlign: block.textAlign || 'left',
         },
       };
     case 'icon':
       return { type: 'paragraph', content: [{ type: 'icon', props: { name: block.name, color: block.color ?? '' } }] };
     case 'callout':
-      return { type: 'callout', props: { style: block.style }, content: textToInlineContent(block.text) };
+      return { type: 'callout', props: { style: block.style, textAlign: block.textAlign || 'left' }, content: textToInlineContent(block.text) };
     default:
       return null;
   }
@@ -319,6 +332,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         size: (block.props?.size as 'small' | 'medium' | 'large') ?? 'medium',
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
+        textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     case 'button_pill':
       return {
@@ -327,6 +341,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         variant: (block.props?.variant as 'success' | 'warning' | 'info' | 'neutral') ?? 'info',
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
+        textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     case 'icon_button':
       return {
@@ -338,6 +353,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         size: (block.props?.size as 'small' | 'medium' | 'large') ?? 'medium',
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
+        textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     case 'icon':
       return {
@@ -350,6 +366,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         type: 'callout',
         style: (block.props?.style as 'info' | 'warning' | 'success' | 'error') ?? 'info',
         text: inlineToString(block.content),
+        textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     default:
       return null;
@@ -642,6 +659,14 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
           <option value="warning">Warning</option>
           <option value="success">Success</option>
           <option value="error">Error</option>
+        </select>
+      )}
+      {(['button', 'button_pill', 'icon_button', 'callout'].includes(block.type)) && (
+        <select value={props.textAlign || 'left'} onChange={(e) => update('textAlign', e.target.value)} className={selectClass}>
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+          <option value="justify">Justify</option>
         </select>
       )}
       <button type="button" onClick={remove} className={deleteClass}>
