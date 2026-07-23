@@ -3,22 +3,26 @@ import { z } from 'zod';
 export const paragraphBlockSchema = z.object({
   type: z.literal('paragraph'),
   text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const headingBlockSchema = z.object({
   type: z.literal('heading'),
   level: z.number().int().min(1).max(6),
   text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const bulletListBlockSchema = z.object({
   type: z.literal('bullet_list'),
   items: z.array(z.string()),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const numberedListBlockSchema = z.object({
   type: z.literal('numbered_list'),
   items: z.array(z.string()),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
 export const imageBlockSchema = z.object({
