@@ -62,6 +62,7 @@ interface ItemCreationWizardProps {
   onCancel?: () => void;
   allowStepJumping?: boolean;
   productId?: string; // For editing existing products
+  cloneFromId?: string; // For prefilling a new item from an existing product
   onAddToQueue?: (productData: any) => void;
 }
 
@@ -366,13 +367,14 @@ const BASE_STEPS = [
 
 const CATALOG_STEP = { id: 'catalog-search', title: 'Catalog Search', description: 'Search supplier catalogs for a match' };
 
-export default function ItemCreationWizard({ 
-  tenantId, 
-  initialData, 
-  onComplete, 
+export default function ItemCreationWizard({
+  tenantId,
+  initialData,
+  onComplete,
   onCancel,
   allowStepJumping = false,
   productId,
+  cloneFromId,
   onAddToQueue
 }: ItemCreationWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -445,44 +447,46 @@ export default function ItemCreationWizard({
     }
   }, [isEditing]);
 
-  // Load existing product data if productId is provided
+  // Load existing product data if productId or cloneFromId is provided
   useEffect(() => {
-    if (productId) {
+    if (productId || cloneFromId) {
       loadExistingProduct();
     }
-  }, [productId]);
+  }, [productId, cloneFromId]);
 
   const loadExistingProduct = async () => {
-    if (!productId) return;
-    
+    const targetId = productId || cloneFromId;
+    const isCloning = !productId && !!cloneFromId;
+    if (!targetId) return;
+
     setIsLoading(true);
     try {
       // Fetch product via service
-      const productData = await itemsService.getItem(productId);
-      
+      const productData = await itemsService.getItem(targetId);
+
       if (!productData) {
         throw new Error('Failed to load product');
       }
-      
-      console.log('[ItemCreationWizard] Loaded product for editing:', productData);
-      
+
+      console.log(`[ItemCreationWizard] Loaded product for ${isCloning ? 'cloning' : 'editing'}:`, productData);
+
       // Extract metadata fields
       const metadata = productData.metadata || {};
-      
+
       // Map existing product data to wizard data structure
       setWizardData({
         ...INITIAL_DATA,
         basicInfo: {
-          name: productData.name || '',
+          name: isCloning && productData.name ? `Copy of ${productData.name}` : productData.name || '',
           brand: productData.brand || '',
           manufacturer: productData.manufacturer || '',
           condition: (productData.condition?.replace('brand_new', 'new') || 'new') as 'new' | 'used' | 'refurbished',
           mpn: productData.mpn || '',
-          status: productData.item_status === 'active' ? 'active' : 'draft'
+          status: isCloning ? 'draft' : (productData.item_status === 'active' ? 'active' : 'draft')
         },
         productType: {
           type: productData.product_type || 'physical',
-          sku: productData.sku || '',
+          sku: isCloning ? '' : (productData.sku || ''),
           hasVariants: productData.has_variants || false,
           stockQuantity: productData.stock || 0,
           variants: productData.variants || productData.product_variants || [],

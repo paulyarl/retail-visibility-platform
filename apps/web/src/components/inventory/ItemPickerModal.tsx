@@ -13,6 +13,7 @@ interface ItemPickerModalProps {
   onClose: () => void;
   onSelect: (itemId: string, itemName: string) => void;
   tenantId: string;
+  title?: string;
 }
 
 interface Item {
@@ -25,7 +26,7 @@ interface Item {
   item_status?: string;
 }
 
-export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId }: ItemPickerModalProps) {
+export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId, title = 'Select Item to Edit' }: ItemPickerModalProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +97,7 @@ export default function ItemPickerModal({ isOpen, onClose, onSelect, tenantId }:
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Select Item to Edit
+            {title}
           </DialogTitle>
         </DialogHeader>
 
