@@ -201,6 +201,30 @@ function Block({ block }: { block: ContentBlock }) {
         </div>
       );
 
+    case 'side_by_side': {
+      const image = <img src={block.imageSrc} alt={block.imageAlt} className="w-1/3 rounded-md object-cover" />;
+      const text = (
+        <div className="flex-1" style={{ textAlign: block.textAlign }}>
+          <RichText text={block.text} />
+        </div>
+      );
+      return (
+        <div className="mb-4 flex items-start gap-4">
+          {block.imagePosition === 'left' ? (
+            <>
+              {image}
+              {text}
+            </>
+          ) : (
+            <>
+              {text}
+              {image}
+            </>
+          )}
+        </div>
+      );
+    }
+
     default:
       return null;
   }

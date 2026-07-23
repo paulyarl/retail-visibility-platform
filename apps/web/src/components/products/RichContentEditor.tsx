@@ -201,6 +201,35 @@ const calloutBlockSpec = createReactBlockSpec(
   },
 )();
 
+const sideBySideBlockSpec = createReactBlockSpec(
+  {
+    type: 'side_by_side',
+    propSchema: {
+      imagePosition: { default: 'left', values: ['left', 'right'] as const },
+      imageSrc: { default: '', type: 'string' },
+      imageAlt: { default: '', type: 'string' },
+      text: { default: '', type: 'string' },
+      textAlign: { default: 'left', values: ['left', 'center', 'right', 'justify'] as const },
+    },
+    content: 'none',
+  },
+  {
+    render: ({ block }) => (
+      <div className="flex items-start gap-4">
+        {block.props.imagePosition === 'left' && (
+          <img src={block.props.imageSrc} alt={block.props.imageAlt} className="w-1/3 rounded-md object-cover" />
+        )}
+        <div className="flex-1" style={{ textAlign: block.props.textAlign || 'left' }}>
+          {block.props.text}
+        </div>
+        {block.props.imagePosition === 'right' && (
+          <img src={block.props.imageSrc} alt={block.props.imageAlt} className="w-1/3 rounded-md object-cover" />
+        )}
+      </div>
+    ),
+  },
+)();
+
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
@@ -208,6 +237,7 @@ const schema = BlockNoteSchema.create({
     button_pill: buttonPillBlockSpec,
     icon_button: iconButtonBlockSpec,
     callout: calloutBlockSpec,
+    side_by_side: sideBySideBlockSpec,
   },
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
@@ -290,6 +320,17 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
           textSize: block.textSize || 'paragraph',
         },
         content: textToInlineContent(block.text),
+      };
+    case 'side_by_side':
+      return {
+        type: 'side_by_side',
+        props: {
+          imagePosition: block.imagePosition || 'left',
+          imageSrc: block.imageSrc || '',
+          imageAlt: block.imageAlt || '',
+          text: block.text || '',
+          textAlign: block.textAlign || 'left',
+        },
       };
     default:
       return null;
@@ -403,6 +444,15 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         foregroundColor: (block.props?.foregroundColor as string) || undefined,
         backgroundColor: (block.props?.backgroundColor as string) || undefined,
         textSize: (block.props?.textSize as 'paragraph' | 'h1' | 'h2' | 'h3') || undefined,
+      };
+    case 'side_by_side':
+      return {
+        type: 'side_by_side',
+        imagePosition: (block.props?.imagePosition as 'left' | 'right') ?? 'left',
+        imageSrc: (block.props?.imageSrc as string) ?? '',
+        imageAlt: (block.props?.imageAlt as string) || undefined,
+        text: (block.props?.text as string) ?? '',
+        textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
     default:
       return null;
@@ -558,6 +608,13 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
       />
       <button
         type="button"
+        onClick={() => insert('side_by_side', { imageSrc: 'https://placehold.co/200x150', text: 'Text next to image', imagePosition: 'left' })}
+        className="rounded bg-purple-100 px-2 py-1 text-sm text-purple-800 hover:bg-purple-200"
+      >
+        + Side-by-side
+      </button>
+      <button
+        type="button"
         onClick={handleVideoInsert}
         className="rounded bg-red-100 px-2 py-1 text-sm text-red-800 hover:bg-red-200"
       >
@@ -601,12 +658,12 @@ export function RichContentEditor({ value = DEFAULT_CONTENT_BLOCKS, onChange, cl
     }
   };
 
-  const isCustomBlock = selectedBlock && ['button', 'button_pill', 'icon_button', 'callout'].includes(selectedBlock.type);
+  const isCustomBlock = selectedBlock && ['button', 'button_pill', 'icon_button', 'callout', 'side_by_side'].includes(selectedBlock.type);
 
   return (
     <div className={className}>
       <CustomBlockToolbar editor={editor} tenantId={tenantId} />
-      {isCustomBlock && <BlockSettingsPanel key={selectedBlock.id} editor={editor} block={selectedBlock} />}
+      {isCustomBlock && <BlockSettingsPanel key={selectedBlock.id} editor={editor} block={selectedBlock} tenantId={tenantId} />}
       <BlockNoteView
         editor={editor}
         onChange={handleChange}
@@ -721,12 +778,25 @@ function ColorSelect({ value, onChange, label }: { value?: string; onChange: (v:
   );
 }
 
-function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
+function BlockSettingsPanel({ editor, block, tenantId }: { editor: any; block: any; tenantId?: string }) {
   const update = (key: string, value: string) => {
     editor.updateBlock?.(block.id, { props: { [key]: value } });
   };
   const remove = () => editor.removeBlocks?.([block.id]);
   const props = block.props || {};
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await handleUploadFile(file, tenantId);
+      update('imageSrc', url);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      e.target.value = '';
+    }
+  };
 
   return (
     <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
@@ -791,7 +861,22 @@ function BlockSettingsPanel({ editor, block }: { editor: any; block: any }) {
           <ColorSelect value={props.backgroundColor} onChange={(v) => update('backgroundColor', v)} label="Bg color" />
         </>
       )}
-      {(['button', 'button_pill', 'icon_button', 'callout'].includes(block.type)) && (
+      {block.type === 'side_by_side' && (
+        <>
+          <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageSelect} />
+          <button type="button" onClick={() => fileInputRef.current?.click()} className={inputClass}>
+            Upload image
+          </button>
+          <input defaultValue={props.imageSrc} onBlur={(e) => update('imageSrc', e.target.value)} placeholder="Image URL" className={inputClass} />
+          <input defaultValue={props.imageAlt} onBlur={(e) => update('imageAlt', e.target.value)} placeholder="Alt text" className={inputClass} />
+          <select value={props.imagePosition} onChange={(e) => update('imagePosition', e.target.value)} className={selectClass}>
+            <option value="left">Image left</option>
+            <option value="right">Image right</option>
+          </select>
+          <textarea defaultValue={props.text} onBlur={(e) => update('text', e.target.value)} placeholder="Text" className={cn(inputClass, 'min-h-[4rem]')} />
+        </>
+      )}
+      {(['button', 'button_pill', 'icon_button', 'callout', 'side_by_side'].includes(block.type)) && (
         <div className="flex items-center gap-1">
           {(['left', 'center', 'right', 'justify'] as const).map((a) => (
             <button
