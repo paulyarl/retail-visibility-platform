@@ -22,6 +22,7 @@ const BUTTON_VARIANTS = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700',
   secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
   outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50',
+  gradient: 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600',
 };
 
 const PILL_VARIANTS = {
@@ -29,6 +30,7 @@ const PILL_VARIANTS = {
   warning: 'bg-amber-100 text-amber-800',
   info: 'bg-blue-100 text-blue-800',
   neutral: 'bg-gray-100 text-gray-800',
+  gradient: 'bg-gradient-to-r from-green-400 to-blue-500 text-white',
 };
 
 function RichText({ text }: { text: string }) {
