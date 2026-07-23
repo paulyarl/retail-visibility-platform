@@ -126,15 +126,17 @@ function Block({ block }: { block: ContentBlock }) {
         large: 'text-lg px-6 py-3',
       };
       return (
-        <a
-          href={block.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn('inline-block rounded-md font-medium transition-colors', sizeClasses[block.size || 'medium'], BUTTON_VARIANTS[block.variant])}
-          style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
-        >
-          {block.label}
-        </a>
+        <div style={{ textAlign: block.textAlign }}>
+          <a
+            href={block.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn('inline-block rounded-md font-medium transition-colors', sizeClasses[block.size || 'medium'], BUTTON_VARIANTS[block.variant])}
+            style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
+          >
+            {block.label}
+          </a>
+        </div>
       );
     }
 
@@ -146,27 +148,31 @@ function Block({ block }: { block: ContentBlock }) {
       };
       const Icon = getIcon(block.icon);
       return (
-        <a
-          href={block.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn('inline-flex items-center gap-2 rounded-md font-medium transition-colors', sizeClasses[block.size || 'medium'], BUTTON_VARIANTS[block.variant])}
-          style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
-        >
-          <Icon className="h-4 w-4" />
-          {block.label}
-        </a>
+        <div style={{ textAlign: block.textAlign }}>
+          <a
+            href={block.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn('inline-flex items-center gap-2 rounded-md font-medium transition-colors', sizeClasses[block.size || 'medium'], BUTTON_VARIANTS[block.variant])}
+            style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
+          >
+            <Icon className="h-4 w-4" />
+            {block.label}
+          </a>
+        </div>
       );
     }
 
     case 'button_pill':
       return (
-        <span
-          className={cn('inline-flex rounded-full px-3 py-1 text-sm font-medium', PILL_VARIANTS[block.variant])}
-          style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
-        >
-          {block.label}
-        </span>
+        <div style={{ textAlign: block.textAlign }}>
+          <span
+            className={cn('inline-flex rounded-full px-3 py-1 text-sm font-medium', PILL_VARIANTS[block.variant])}
+            style={{ color: block.foregroundColor, backgroundColor: block.backgroundColor }}
+          >
+            {block.label}
+          </span>
+        </div>
       );
 
     case 'icon': {
@@ -176,7 +182,7 @@ function Block({ block }: { block: ContentBlock }) {
 
     case 'callout':
       return (
-        <div className={cn('mb-4 rounded-lg border p-4', CALLOUT_STYLES[block.style])}>
+        <div className={cn('mb-4 rounded-lg border p-4', CALLOUT_STYLES[block.style])} style={{ textAlign: block.textAlign }}>
           <RichText text={block.text} />
         </div>
       );
