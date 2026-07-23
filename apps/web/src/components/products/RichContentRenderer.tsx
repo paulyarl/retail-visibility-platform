@@ -11,6 +11,13 @@ const CALLOUT_STYLES = {
   error: 'bg-red-50 border-red-200 text-red-900',
 };
 
+const CALLOUT_TEXT_SIZES = {
+  paragraph: 'text-base',
+  h1: 'text-3xl font-semibold',
+  h2: 'text-2xl font-semibold',
+  h3: 'text-xl font-semibold',
+};
+
 const BUTTON_VARIANTS = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700',
   secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
@@ -184,7 +191,10 @@ function Block({ block }: { block: ContentBlock }) {
 
     case 'callout':
       return (
-        <div className={cn('mb-4 rounded-lg border p-4', CALLOUT_STYLES[block.style])} style={{ textAlign: block.textAlign }}>
+        <div
+          className={cn('mb-4 rounded-lg border p-4', CALLOUT_STYLES[block.style], CALLOUT_TEXT_SIZES[block.textSize || 'paragraph'])}
+          style={{ textAlign: block.textAlign, color: block.foregroundColor, backgroundColor: block.backgroundColor }}
+        >
           <RichText text={block.text} />
         </div>
       );

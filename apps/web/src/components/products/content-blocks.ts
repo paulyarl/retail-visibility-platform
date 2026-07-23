@@ -81,6 +81,9 @@ export const calloutBlockSchema = z.object({
   style: z.enum(['info', 'warning', 'success', 'error']).default('info'),
   text: z.string().min(1),
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+  foregroundColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  textSize: z.enum(['paragraph', 'h1', 'h2', 'h3']).optional(),
 });
 
 export const contentBlockSchema = z.union([
