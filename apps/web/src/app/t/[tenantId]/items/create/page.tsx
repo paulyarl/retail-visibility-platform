@@ -9,7 +9,7 @@ import ItemPickerModal from "@/components/inventory/ItemPickerModal";
 import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
 import { itemsService } from '@/services/ItemsSingletonService';
 import { Button } from '@mantine/core';
-import { Edit, Plus } from 'lucide-react';
+import { Edit, Plus, Copy } from 'lucide-react';
 import { clientLogger } from '@/lib/client-logger';
 
 export default function CreateItemPage({
@@ -23,12 +23,19 @@ export default function CreateItemPage({
   const productId = searchParams.get('productId');
   const isEditing = !!productId;
   const [showItemPicker, setShowItemPicker] = useState(false);
+  const [showClonePicker, setShowClonePicker] = useState(false);
+  const [cloneFromId, setCloneFromId] = useState<string | null>(null);
 
   const { tenantId } = use(params);
 
   const handleSelectItem = (itemId: string) => {
     // Navigate to edit mode with selected item
     router.push(`/t/${tenantId}/items/create?productId=${itemId}`);
+  };
+
+  const handleSelectCloneSource = (itemId: string) => {
+    setCloneFromId(itemId);
+    setShowClonePicker(false);
   };
 
   const handleAddToQueue = async (productData: any) => {
@@ -204,10 +211,14 @@ export default function CreateItemPage({
     <div className="container mx-auto py-8">
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
       
-      {/* Header with Edit Button */}
+      {/* Header with Edit/Clone Buttons */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">
-          {isEditing ? 'Edit with Product Wizard' : 'Add with Product Wizard'}
+          {isEditing
+            ? 'Edit with Product Wizard'
+            : cloneFromId
+            ? 'Clone with Product Wizard'
+            : 'Add with Product Wizard'}
         </h1>
         <div className="flex items-center gap-2">
           <Button
@@ -216,6 +227,13 @@ export default function CreateItemPage({
             onClick={() => setShowItemPicker(true)}
           >
             Edit Existing
+          </Button>
+          <Button
+            variant="subtle"
+            leftSection={<Copy className="w-4 h-4" />}
+            onClick={() => setShowClonePicker(true)}
+          >
+            Clone Existing
           </Button>
           {isEditing && (
             <Button
@@ -232,6 +250,7 @@ export default function CreateItemPage({
       <ItemCreationWizard
         tenantId={tenantId}
         productId={productId || undefined}
+        cloneFromId={cloneFromId || undefined}
         allowStepJumping={isEditing} // Enable step jumping only during editing
         onAddToQueue={handleAddToQueue}
         onComplete={handleComplete}
@@ -248,6 +267,15 @@ export default function CreateItemPage({
         onClose={() => setShowItemPicker(false)}
         onSelect={handleSelectItem}
         tenantId={tenantId}
+      />
+
+      {/* Clone Source Picker Modal */}
+      <ItemPickerModal
+        isOpen={showClonePicker}
+        onClose={() => setShowClonePicker(false)}
+        onSelect={handleSelectCloneSource}
+        tenantId={tenantId}
+        title="Select Item to Clone"
       />
     </div>
   );
