@@ -341,8 +341,8 @@ export default function TenantTaskDetailPage() {
                 )}
                 <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
               </div>
-              {m.content_blocks ? (
-                <RichContentRenderer content={m.content_blocks as ContentBlocks} />
+              {m.content_blocks?.blocks?.length ? (
+                <RichContentRenderer content={m.content_blocks} />
               ) : (
                 <p className="text-sm whitespace-pre-wrap">{m.content}</p>
               )}

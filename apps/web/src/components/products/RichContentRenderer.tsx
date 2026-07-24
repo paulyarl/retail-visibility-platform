@@ -269,7 +269,8 @@ function Block({ block }: { block: ContentBlock }) {
   }
 }
 
-export function RichContentRenderer({ content }: { content: ContentBlocks }) {
+export function RichContentRenderer({ content }: { content: ContentBlocks | null | undefined }) {
+  if (!content?.blocks?.length) return null;
   return (
     <div className="rich-content">
       {content.blocks.map((block, index) => (

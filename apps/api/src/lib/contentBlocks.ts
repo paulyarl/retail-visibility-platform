@@ -124,16 +124,35 @@ export function validateContentBlocks(value: unknown): ContentBlocks | null {
   return parsed.success ? parsed.data : null;
 }
 
-function collectTextFromValue(value: unknown): string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(collectTextFromValue);
-  if (value && typeof value === 'object') {
-    return Object.values(value).flatMap(collectTextFromValue);
+function collectTextFromBlock(block: ContentBlock): string[] {
+  switch (block.type) {
+    case 'paragraph':
+    case 'heading':
+      return [block.text];
+    case 'callout':
+      return [block.text];
+    case 'bullet_list':
+    case 'numbered_list':
+      return block.items;
+    case 'image':
+      return [block.caption, block.alt].filter((s): s is string => typeof s === 'string');
+    case 'video_embed':
+      return [block.caption].filter((s): s is string => typeof s === 'string');
+    case 'button':
+    case 'icon_button':
+      return [block.label];
+    case 'button_pill':
+      return [block.label];
+    case 'icon':
+      return [block.name];
+    case 'side_by_side':
+      return [block.text, block.imageAlt].filter((s): s is string => typeof s === 'string');
+    default:
+      return [];
   }
-  return [];
 }
 
 export function contentBlocksToPlainText(content: ContentBlocks): string {
-  const parts = content.blocks.flatMap(block => collectTextFromValue(block));
+  const parts = content.blocks.flatMap(block => collectTextFromBlock(block));
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
