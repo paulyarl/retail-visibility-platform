@@ -19,7 +19,6 @@ declare global {
   interface Window {
     fbq?: (...args: any[]) => void;
     ttq?: any;
-    _fbq?: any;
     _fbqLoaded?: boolean;
     _ttqLoaded?: boolean;
   }

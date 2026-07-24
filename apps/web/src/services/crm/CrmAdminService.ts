@@ -15,6 +15,7 @@ import type {
   CrmActivity, CreateActivityInput,
   CrmInquiry, CreateInquiryInput, UpdateInquiryInput,
   CrmAlert, CrmOrder, RequestListParams, CrmRequestItem,
+  CrmProject, CreateProjectInput, UpdateProjectInput,
 } from '@/types/crm';
 
 class CrmAdminService extends AdminApiSingleton {
@@ -45,6 +46,7 @@ class CrmAdminService extends AdminApiSingleton {
       'crm-activities',
       'crm-inquiries',
       'crm-requests',
+      'crm-projects',
     ];
   }
 
@@ -163,7 +165,7 @@ class CrmAdminService extends AdminApiSingleton {
     return this.unwrap<CrmTicket[]>(result);
   }
 
-  async listGlobalTickets(filters?: { assignedTo?: string; status?: string; priority?: string; category?: string }): Promise<CrmTicket[]> {
+  async listGlobalTickets(filters?: { assignedTo?: string; status?: string; priority?: string; category?: string; projectId?: string }): Promise<CrmTicket[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString() : '';
@@ -180,6 +182,15 @@ class CrmAdminService extends AdminApiSingleton {
   async createTicket(tenantId: string, data: CreateTicketInput): Promise<CrmTicket> {
     const result = await this.makeDefaultRequest<CrmTicket>(
       `/api/admin/crm/tenants/${tenantId}/tickets`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTicket>(result);
+  }
+
+  async createProjectTicket(projectId: string, data: CreateTicketInput): Promise<CrmTicket> {
+    const result = await this.makeDefaultRequest<CrmTicket>(
+      `/api/admin/crm/projects/${projectId}/tickets`,
       { method: 'POST', body: JSON.stringify(data) }
     );
     await this.invalidateServiceCaches();
@@ -217,7 +228,7 @@ class CrmAdminService extends AdminApiSingleton {
   }
 
   // --- Tasks (CRUD) ---
-  async listTasks(filters?: { assignedTo?: string; status?: string; tenantId?: string }): Promise<CrmTask[]> {
+  async listTasks(filters?: { assignedTo?: string; status?: string; tenantId?: string; projectId?: string }): Promise<CrmTask[]> {
     const qs = filters ? new URLSearchParams(
       Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString() : '';
@@ -445,6 +456,101 @@ class CrmAdminService extends AdminApiSingleton {
       5 * 60 * 1000
     );
     return this.unwrap<CrmInquiry[]>(result);
+  }
+
+  // --- Projects (CRUD) ---
+  async listProjects(filters?: { status?: string }): Promise<CrmProject[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
+    ).toString() : '';
+    const cacheKey = `crm-projects-${qs}`;
+    const result = await this.makeDefaultRequest<CrmProject[]>(
+      `/api/admin/crm/projects${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      5 * 60 * 1000
+    );
+    return this.unwrap<CrmProject[]>(result);
+  }
+
+  async getProject(projectId: string): Promise<CrmProject> {
+    const cacheKey = `crm-project-${projectId}`;
+    const result = await this.makeDefaultRequest<CrmProject>(
+      `/api/admin/crm/projects/${projectId}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmProject>(result);
+  }
+
+  async createProject(data: CreateProjectInput): Promise<CrmProject> {
+    const result = await this.makeDefaultRequest<CrmProject>(
+      '/api/admin/crm/projects',
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmProject>(result);
+  }
+
+  async updateProject(projectId: string, data: UpdateProjectInput): Promise<CrmProject> {
+    const result = await this.makeDefaultRequest<CrmProject>(
+      `/api/admin/crm/projects/${projectId}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmProject>(result);
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<void>(
+      `/api/admin/crm/projects/${projectId}`,
+      { method: 'DELETE' }
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  async listProjectTasks(projectId: string, filters?: { status?: string; assignedTo?: string }): Promise<CrmTask[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
+    ).toString() : '';
+    const cacheKey = `crm-project-tasks-${projectId}-${qs}`;
+    const result = await this.makeDefaultRequest<CrmTask[]>(
+      `/api/admin/crm/projects/${projectId}/tasks${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmTask[]>(result);
+  }
+
+  async listProjectTickets(projectId: string, filters?: { status?: string; priority?: string; assignedTo?: string }): Promise<CrmTicket[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][]
+    ).toString() : '';
+    const cacheKey = `crm-project-tickets-${projectId}-${qs}`;
+    const result = await this.makeDefaultRequest<CrmTicket[]>(
+      `/api/admin/crm/projects/${projectId}/tickets${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmTicket[]>(result);
+  }
+
+  async listProjectActivities(projectId: string, filters?: { type?: string; taskId?: string; ticketId?: string; limit?: number }): Promise<CrmActivity[]> {
+    const qs = filters ? new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)] as [string, string])
+    ).toString() : '';
+    const cacheKey = `crm-project-activities-${projectId}-${qs}`;
+    const result = await this.makeDefaultRequest<CrmActivity[]>(
+      `/api/admin/crm/projects/${projectId}/activities${qs ? `?${qs}` : ''}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000
+    );
+    return this.unwrap<CrmActivity[]>(result);
   }
 
   // --- Directory Promotions ---

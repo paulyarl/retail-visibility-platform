@@ -211,7 +211,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     if (ticket.assigned_to !== userId && ticket.tenant_id !== PLATFORM_TENANT_ID) {
       // Also allow if ticket is from one of their tenants
       const tenantIds = getTenantIds(req);
-      if (!tenantIds.includes(ticket.tenant_id)) {
+      if (!ticket.tenant_id || !tenantIds.includes(ticket.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
@@ -237,7 +237,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
 
     if (ticket.assigned_to !== userId && ticket.tenant_id !== PLATFORM_TENANT_ID) {
       const tenantIds = getTenantIds(req);
-      if (!tenantIds.includes(ticket.tenant_id)) {
+      if (!ticket.tenant_id || !tenantIds.includes(ticket.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
@@ -252,6 +252,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
       author_type: 'platform',
       author_name: actorName,
       content: req.body.content,
+      content_blocks: req.body.content_blocks,
       is_internal: req.body.is_internal || false,
     });
 

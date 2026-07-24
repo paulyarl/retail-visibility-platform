@@ -26,6 +26,14 @@ export interface Phase1Data {
   tenantId?: string;
   tenantSlug?: string;
   
+  // Attribution (ref / UTM)
+  referral?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  
   // Timestamps
   completedAt?: string;
   startedAt: string;

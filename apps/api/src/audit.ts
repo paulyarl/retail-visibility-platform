@@ -7,7 +7,7 @@ import { generateQuickStart } from "./lib/id-generator";
 export type AuditPayload = Record<string, any> | null | undefined;
 
 export async function audit(opts: {
-  tenantId: string;
+  tenantId?: string;
   actor?: string | null;
   action: string;
   payload?: AuditPayload;
@@ -35,14 +35,14 @@ export async function audit(opts: {
     // Map entity_type from payload if provided, otherwise default to 'other'
     // CRM entities use: crm_contact, crm_ticket, crm_task, crm_activity, crm_inquiry
     const validEntityTypes = ['inventory_item', 'tenant', 'policy', 'oauth', 'other',
-      'crm_contact', 'crm_ticket', 'crm_task', 'crm_activity', 'crm_inquiry'];
+      'crm_contact', 'crm_ticket', 'crm_task', 'crm_activity', 'crm_inquiry', 'crm_project'];
     const entityType = (opts.payload?.entity_type && validEntityTypes.includes(opts.payload.entity_type))
       ? opts.payload.entity_type
       : 'other';
 
     const auditData: any = {
       id: generateQuickStart("auditid"),
-      tenant_id: opts.tenantId,
+      tenant_id: opts.tenantId || 'platform',
       action: mappedAction, // Use mapped enum value instead of string
       actor_id: opts.actor || 'system', // Prisma model expects snake_case
       actor_type: 'system', // Prisma model expects snake_case

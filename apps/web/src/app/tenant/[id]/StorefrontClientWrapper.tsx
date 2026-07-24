@@ -40,6 +40,7 @@ import { ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
 // Extracted storefront section components
 import { StorefrontHeader } from '@/components/storefront/sections/StorefrontHeader';
+import { PinterestSaveButton } from '@/components/tracking/PinterestSaveButton';
 import { ProductSection } from '@/components/storefront/sections/ProductSection';
 import { StoreInfoSection, StoreAboutSection } from '@/components/storefront/sections/StoreInfoSection';
 import { FAQSection } from '@/components/storefront/sections/FAQSection';
@@ -434,6 +435,14 @@ export default function StorefrontClientWrapper({
         handleViewCart={handleViewCart}
         currentUrl={currentUrl}
       />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex justify-end">
+        <PinterestSaveButton
+          url={currentUrl}
+          description={businessName}
+          imageUrl={logoUrl}
+        />
+      </div>
 
       {/* Subscription status panel for non-active subscriptions */}
       <SubscriptionStatusPanel

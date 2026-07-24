@@ -17,7 +17,7 @@ const router = Router();
  */
 router.post('/', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, businessName, businessType, phone } = req.body;
+    const { firstName, lastName, businessName, businessType, phone, referral, utm_source, utm_medium, utm_campaign, utm_content, utm_term } = req.body;
     
     // Get user from session (set by auth middleware) or try to get from Auth0
     let userId = req.user?.id;
@@ -70,6 +70,12 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
           businessName,
           businessType,
           phone,
+          referral,
+          utm_source,
+          utm_medium,
+          utm_campaign,
+          utm_content,
+          utm_term,
           completedAt: new Date().toISOString(),
         },
         updated_at: new Date(),

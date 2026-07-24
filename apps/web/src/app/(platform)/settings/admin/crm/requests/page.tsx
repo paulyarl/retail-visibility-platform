@@ -176,7 +176,7 @@ export default function CrmRequestsHubPage() {
                   {!r.is_read && <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />}
                 </div>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  {r.tenant_name || r.tenant_id} · {r.assigned_to || 'Unassigned'}
+                  {r.tenant_name || r.tenant_id || 'No tenant'} · {r.assigned_to || 'Unassigned'}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -190,7 +190,7 @@ export default function CrmRequestsHubPage() {
                 </span>
               </div>
               <Link
-                href={r.type === 'ticket' ? `/settings/admin/crm/tickets/${r.id}` : `/settings/admin/crm/tenants/${r.tenant_id}`}
+                href={r.type === 'ticket' ? `/settings/admin/crm/tickets/${r.id}` : r.tenant_id ? `/settings/admin/crm/tenants/${r.tenant_id}` : `/settings/admin/crm/projects`}
                 className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400"
                 onClick={(e) => e.stopPropagation()}
               >

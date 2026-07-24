@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@/components/ui';
 import { crmCustomerService } from '@/services/crm/CrmCustomerService';
 import { getContrastColor } from '@/lib/color-utils';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTicket, CrmTicketMessage } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -23,7 +26,8 @@ export default function CustomerTicketDetailPage() {
   const [ticket, setTicket] = useState<CrmTicket | null>(null);
   const [messages, setMessages] = useState<CrmTicketMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reply, setReply] = useState('');
+  const [reply, setReply] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,14 +59,16 @@ export default function CustomerTicketDetailPage() {
   }, [ticketId]);
 
   async function handleReply() {
-    if (!reply.trim()) return;
+    if (reply.blocks.length === 0) return;
     setSubmitting(true);
     try {
       const msg = await crmCustomerService.createTicketMessage(ticketId, {
-        content: reply.trim(),
+        content_blocks: reply,
+        is_internal: false,
       });
       setMessages(prev => [...prev, msg]);
-      setReply('');
+      setReply(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
     } catch (err) {
       clientLogger.error('[Customer Ticket Detail] Reply error:', { detail: err });
     } finally {
@@ -107,9 +113,9 @@ export default function CustomerTicketDetailPage() {
               {ticket.tenant_logo ? (
                 <img src={ticket.tenant_logo} alt="" className="w-5 h-5 rounded object-cover" />
               ) : (
-                <span className="w-5 h-5 rounded bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[9px] font-bold text-neutral-500">{(ticket.tenant_name || ticket.tenant_id).charAt(0)}</span>
+                <span className="w-5 h-5 rounded bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[9px] font-bold text-neutral-500">{(ticket.tenant_name || ticket.tenant_id || '?').charAt(0)}</span>
               )}
-              {ticket.tenant_name || ticket.tenant_id}
+              {ticket.tenant_name || ticket.tenant_id || 'Unknown'}
             </span> · Created {new Date(ticket.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -147,7 +153,11 @@ export default function CustomerTicketDetailPage() {
               <span className="text-xs font-medium">{m.author_name}</span>
               <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
             </div>
-            <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+            {m.content_blocks ? (
+              <RichContentRenderer content={m.content_blocks as ContentBlocks} />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+            )}
           </div>
           );
         })}
@@ -160,17 +170,17 @@ export default function CustomerTicketDetailPage() {
       {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
         <Card>
           <CardContent className="space-y-3">
-            <textarea
+            <RichContentEditor
+              key={replyKey}
               value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="Type your reply..."
-              rows={3}
-              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+              onChange={setReply}
+              tenantId={ticket?.tenant_id || undefined}
+              className="min-h-[160px]"
             />
             <div className="flex justify-end">
               <button
                 onClick={handleReply}
-                disabled={!reply.trim() || submitting}
+                disabled={reply.blocks.length === 0 || submitting}
                 className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Sending...' : 'Send Reply'}

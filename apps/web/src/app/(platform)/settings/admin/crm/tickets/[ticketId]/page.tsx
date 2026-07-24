@@ -8,6 +8,9 @@ import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminUsersService, type AdminUser } from '@/services/AdminUsersService';
 import { getContrastColor } from '@/lib/color-utils';
 import CrmPageShell from '@/components/crm/CrmPageShell';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -48,7 +51,8 @@ export default function CrmTicketDetailPage() {
   const [messages, setMessages] = useState<CrmTicketMessage[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [replyContent, setReplyContent] = useState('');
+  const [replyContent, setReplyContent] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [noteContent, setNoteContent] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -100,12 +104,13 @@ export default function CrmTicketDetailPage() {
   }
 
   async function handleSendReply() {
-    if (!replyContent.trim()) return;
+    if (replyContent.blocks.length === 0) return;
     setSending(true);
     try {
-      const message = await crmAdminService.createTicketMessage(ticketId, { content: replyContent.trim(), is_internal: false });
+      const message = await crmAdminService.createTicketMessage(ticketId, { content_blocks: replyContent, is_internal: false });
       setMessages(prev => [...prev, message]);
-      setReplyContent('');
+      setReplyContent(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
     } catch (err) {
       clientLogger.error('[Ticket Detail] Reply error:', { detail: err });
     } finally {
@@ -200,7 +205,7 @@ export default function CrmTicketDetailPage() {
                   value={ticket.assigned_to || ''}
                   onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value || undefined })}
                   disabled={updating || isClosed}
-                  options={[{ value: '', label: '— Unassigned —' }, ...admins.map(a => ({ value: a.id, label: a.email }))]}
+                  options={[{ value: '', label: '— Unassigned —' }, ...admins.map(a => ({ value: a.id, label: a.name || [a.firstName, a.lastName].filter(Boolean).join(' ') || a.email }))]}
                 />
               </div>
               <div>
@@ -217,7 +222,13 @@ export default function CrmTicketDetailPage() {
               </div>
             </div>
             <div className="mt-4 text-sm text-neutral-500 space-y-1">
-              <p><span className="font-medium">Tenant:</span> <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_id}</Link></p>
+              <p><span className="font-medium">Scope:</span> {ticket.tenant_id ? (
+                <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_name || ticket.tenant_id}</Link>
+              ) : ticket.project_id ? (
+                <Link href={`/settings/admin/crm/projects/${ticket.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
+              ) : (
+                <span className="text-neutral-400">No scope</span>
+              )}</p>
               <p><span className="font-medium">Created:</span> {new Date(ticket.created_at).toLocaleString()}</p>
               {ticket.first_responded_at && <p><span className="font-medium">First Response:</span> {new Date(ticket.first_responded_at).toLocaleString()}</p>}
               {ticket.resolved_at && <p><span className="font-medium">Resolved:</span> {new Date(ticket.resolved_at).toLocaleString()}</p>}
@@ -263,7 +274,11 @@ export default function CrmTicketDetailPage() {
                         </div>
                         <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      {m.content_blocks ? (
+                        <RichContentRenderer content={m.content_blocks as ContentBlocks} />
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      )}
                     </div>
                   );
                 })}
@@ -273,14 +288,15 @@ export default function CrmTicketDetailPage() {
             {/* Reply form */}
             <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
               <div className="space-y-3">
-                <Textarea
+                <RichContentEditor
+                  key={replyKey}
                   value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="Type a public reply visible to the tenant/customer..."
-                  className="min-h-[100px]"
+                  onChange={setReplyContent}
+                  tenantId={ticket?.tenant_id || undefined}
+                  className="min-h-[160px]"
                 />
                 <div className="flex justify-end">
-                  <Button onClick={handleSendReply} disabled={sending || !replyContent.trim()}>
+                  <Button onClick={handleSendReply} disabled={sending || replyContent.blocks.length === 0}>
                     {sending ? <Spinner size="sm" /> : 'Send Reply'}
                   </Button>
                 </div>

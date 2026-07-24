@@ -123,11 +123,21 @@ export default function CrmGlobalTicketsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-neutral-500 text-xs">
-                    <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_id}</Link>
+                    {t.tenant_id ? (
+                      <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_name || t.tenant_id}</Link>
+                    ) : t.project_id ? (
+                      <Link href={`/settings/admin/crm/projects/${t.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
+                    ) : (
+                      <span className="text-neutral-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {updatingId === t.id ? (
                       <Spinner size="sm" />
+                    ) : t.status === 'closed' ? (
+                      <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
+                        Closed
+                      </span>
                     ) : (
                       <select
                         value={t.status}
@@ -152,6 +162,10 @@ export default function CrmGlobalTicketsPage() {
                   <td className="px-4 py-3">
                     {updatingId === t.id ? (
                       <Spinner size="sm" />
+                    ) : t.status === 'closed' ? (
+                      <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${PRIORITY_COLORS[t.priority] || 'bg-gray-100 text-gray-800'}`}>
+                        {t.priority}
+                      </span>
                     ) : (
                       <select
                         value={t.priority}
@@ -172,7 +186,7 @@ export default function CrmGlobalTicketsPage() {
                       </select>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-neutral-500 text-xs">{t.assigned_to || '—'}</td>
+                  <td className="px-4 py-3 text-neutral-500 text-xs">{t.assigned_to_name || t.assigned_to || '—'}</td>
                   <td className="px-4 py-3 text-xs text-neutral-500">{new Date(t.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">

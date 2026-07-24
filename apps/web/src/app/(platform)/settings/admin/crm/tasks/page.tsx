@@ -90,6 +90,12 @@ export default function CrmGlobalTasksPage() {
     [staffUsers]
   );
 
+  const userMap = useMemo(() => {
+    const map = new Map<string, string>();
+    staffUsers.forEach(u => map.set(u.id, u.name || u.email));
+    return map;
+  }, [staffUsers]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -138,7 +144,7 @@ export default function CrmGlobalTasksPage() {
     try {
       await crmAdminService.updateTask(editTask.id, {
         title: editTask.title,
-        description: editTask.description || undefined,
+        description: editTask.description ?? undefined,
         priority: editTask.priority,
         due_date: editTask.due_date || undefined,
         assigned_to: editTask.assigned_to || undefined,
@@ -260,9 +266,17 @@ export default function CrmGlobalTasksPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
-                          <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="text-xs text-neutral-500 hover:underline" title={t.tenant_id}>
-                            {tenantNameMap.get(t.tenant_id) || t.tenant_id}
-                          </Link>
+                          {t.tenant_id ? (
+                            <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="text-xs text-neutral-500 hover:underline" title={t.tenant_id}>
+                              {tenantNameMap.get(t.tenant_id) || t.tenant_id}
+                            </Link>
+                          ) : t.project_id ? (
+                            <Link href={`/settings/admin/crm/projects/${t.project_id}`} className="text-xs text-amber-600 hover:underline">
+                              📁 Project
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-neutral-400">No scope</span>
+                          )}
                           {t.priority && (
                             <Badge variant={t.priority === 'high' ? 'warning' : 'default'}>
                               {t.priority}
@@ -289,7 +303,7 @@ export default function CrmGlobalTasksPage() {
                           </p>
                         )}
                         {t.assigned_to && (
-                          <p className="text-xs text-neutral-400 mt-1">@{t.assigned_to}</p>
+                          <p className="text-xs text-neutral-400 mt-1">@{userMap.get(t.assigned_to) || t.assigned_to}</p>
                         )}
                       </div>
                     );

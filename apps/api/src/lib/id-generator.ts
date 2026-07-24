@@ -1016,6 +1016,16 @@ export function generateCrmAlertId(tenantId: string): string {
 }
 
 /**
+ * Generate CRM Project ID
+ * Format: crmproj-{nanoid} (16 chars)
+ * URL-safe, readable, unique
+ */
+export function generateCrmProjectId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `crmproj-${nanoid()}`;
+}
+
+/**
  * Generate bot conversation session ID
  * Format: botconv-{tenantKey}-{nanoid} (20 chars)
  * URL-safe, readable, unique, tenant-traceable

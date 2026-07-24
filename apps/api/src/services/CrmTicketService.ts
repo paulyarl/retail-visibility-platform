@@ -30,13 +30,49 @@ export class CrmTicketService extends BaseService {
 
   /**
    * Global ticket queue (all tenants)
+   * Enriches with tenant_name and assigned_to_name
    */
-  async listGlobal(filters: { assignedTo?: string; status?: string; priority?: string; category?: string } = {}) {
+  async listGlobal(filters: { assignedTo?: string; status?: string; priority?: string; category?: string; projectId?: string } = {}) {
     const where: any = {};
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
     if (filters.category) where.category = filters.category;
+    if (filters.projectId) where.project_id = filters.projectId;
+
+    const tickets = await prisma.crm_support_tickets.findMany({
+      where,
+      include: { tenants: { select: { name: true } } },
+      orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+    });
+
+    const assignedToIds = [...new Set(tickets.map(t => t.assigned_to).filter(Boolean))] as string[];
+    let userNameMap: Record<string, string> = {};
+    if (assignedToIds.length > 0) {
+      const users = await prisma.users.findMany({
+        where: { id: { in: assignedToIds } },
+        select: { id: true, first_name: true, last_name: true, email: true },
+      });
+      userNameMap = Object.fromEntries(
+        users.map(u => [u.id, [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email])
+      );
+    }
+
+    return tickets.map(t => ({
+      ...t,
+      tenant_name: t.tenants?.name ?? null,
+      assigned_to_name: t.assigned_to ? (userNameMap[t.assigned_to] ?? null) : null,
+    }));
+  }
+
+  /**
+   * List tickets for a specific project
+   */
+  async listByProject(projectId: string, filters: { status?: string; priority?: string; assignedTo?: string } = {}) {
+    const where: any = { project_id: projectId };
+    if (filters.status) where.status = filters.status;
+    if (filters.priority) where.priority = filters.priority;
+    if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     return prisma.crm_support_tickets.findMany({ where, orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }] });
   }
 
@@ -50,14 +86,36 @@ export class CrmTicketService extends BaseService {
   }
 
   async getById(ticketId: string) {
-    return prisma.crm_support_tickets.findUnique({ where: { id: ticketId } });
+    const ticket = await prisma.crm_support_tickets.findUnique({
+      where: { id: ticketId },
+      include: { tenants: { select: { name: true } } },
+    });
+    if (!ticket) return null;
+
+    let assigned_to_name: string | null = null;
+    if (ticket.assigned_to) {
+      const user = await prisma.users.findUnique({
+        where: { id: ticket.assigned_to },
+        select: { first_name: true, last_name: true, email: true },
+      });
+      if (user) {
+        assigned_to_name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
+      }
+    }
+
+    return {
+      ...ticket,
+      tenant_name: ticket.tenants?.name ?? null,
+      assigned_to_name,
+    };
   }
 
   /**
    * Create ticket (platform or tenant user)
    */
   async create(data: {
-    tenant_id: string;
+    tenant_id?: string;
+    project_id?: string;
     contact_id?: string;
     customer_id?: string;
     title: string;
@@ -68,7 +126,11 @@ export class CrmTicketService extends BaseService {
     inquiry_id?: string;
     faq_id?: string;
   }) {
-    return prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(data.tenant_id), ...data } });
+    if (!data.tenant_id && !data.project_id) {
+      throw new Error('Either tenant_id or project_id is required');
+    }
+    const idKey = data.tenant_id || 'project';
+    return prisma.crm_support_tickets.create({ data: { id: generateCrmTicketId(idKey), ...data } });
   }
 
   /**
@@ -148,10 +210,12 @@ export class CrmTicketService extends BaseService {
 
     // Auto-log status change as activity
     if (data.status && data.status !== ticket.status) {
+      const activityIdKey = ticket.tenant_id || 'project';
       await prisma.crm_activities.create({
         data: {
-          id: generateCrmActivityId(ticket.tenant_id),
+          id: generateCrmActivityId(activityIdKey),
           tenant_id: ticket.tenant_id,
+          project_id: ticket.project_id,
           ticket_id: ticketId,
           actor_id: actorId,
           actor_type: actorType,
@@ -166,10 +230,12 @@ export class CrmTicketService extends BaseService {
 
     // Auto-log assignment change as activity
     if (data.assigned_to && data.assigned_to !== ticket.assigned_to) {
+      const activityIdKey = ticket.tenant_id || 'project';
       await prisma.crm_activities.create({
         data: {
-          id: generateCrmActivityId(ticket.tenant_id),
+          id: generateCrmActivityId(activityIdKey),
           tenant_id: ticket.tenant_id,
+          project_id: ticket.project_id,
           ticket_id: ticketId,
           actor_id: actorId,
           actor_type: actorType,

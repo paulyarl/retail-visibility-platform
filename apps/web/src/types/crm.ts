@@ -1,3 +1,5 @@
+import type { ContentBlocks } from '@/components/products/content-blocks';
+
 /**
  * CRM Type Definitions
  * Shared types for all three CRM service surfaces (Admin, Tenant, Customer)
@@ -108,7 +110,8 @@ export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export interface CrmTicket {
   id: string;
-  tenant_id: string;
+  tenant_id: string | null;
+  project_id?: string | null;
   tenant_name?: string;
   tenant_logo?: string | null;
   contact_id: string | null;
@@ -119,6 +122,7 @@ export interface CrmTicket {
   priority: TicketPriority;
   category: string | null;
   assigned_to: string | null;
+  assigned_to_name?: string | null;
   inquiry_id: string | null;
   faq_id: string | null;
   first_responded_at: string | null;
@@ -129,6 +133,7 @@ export interface CrmTicket {
 
 export interface CreateTicketInput {
   tenant_id?: string; // required for customer, inferred for tenant
+  project_id?: string; // for internal project-scoped tickets
   title: string;
   description?: string;
   priority?: TicketPriority;
@@ -156,12 +161,14 @@ export interface CrmTicketMessage {
   author_type: AuthorType;
   author_name: string;
   content: string;
+  content_blocks?: ContentBlocks | null;
   is_internal: boolean;
   created_at: string;
 }
 
 export interface CreateTicketMessageInput {
-  content: string;
+  content?: string;
+  content_blocks?: ContentBlocks;
   is_internal?: boolean;
 }
 
@@ -173,12 +180,14 @@ export interface CrmTaskMessage {
   author_type: AuthorType;
   author_name: string;
   content: string;
+  content_blocks?: ContentBlocks | null;
   is_internal: boolean;
   created_at: string;
 }
 
 export interface CreateTaskMessageInput {
-  content: string;
+  content?: string;
+  content_blocks?: ContentBlocks;
   is_internal?: boolean;
 }
 
@@ -188,7 +197,8 @@ export type TaskPriority = 'low' | 'medium' | 'high';
 
 export interface CrmTask {
   id: string;
-  tenant_id: string;
+  tenant_id: string | null;
+  project_id?: string | null;
   contact_id: string | null;
   title: string;
   description: string | null;
@@ -203,7 +213,8 @@ export interface CrmTask {
 }
 
 export interface CreateTaskInput {
-  tenant_id: string;
+  tenant_id?: string;
+  project_id?: string;
   title: string;
   description?: string;
   priority?: TaskPriority;
@@ -225,7 +236,8 @@ export interface UpdateTaskInput {
 // --- Activity ---
 export interface CrmActivity {
   id: string;
-  tenant_id: string;
+  tenant_id: string | null;
+  project_id?: string | null;
   ticket_id: string | null;
   task_id: string | null;
   actor_id: string;
@@ -309,8 +321,8 @@ export type RequestType = 'ticket' | 'task' | 'inquiry';
 export interface CrmRequestItem {
   id: string;
   type: RequestType;
-  tenant_id: string;
-  tenant_name: string;
+  tenant_id: string | null;
+  tenant_name: string | null;
   title: string;
   status: string;
   priority: string;
@@ -350,4 +362,39 @@ export interface CrmTenantCrmStats {
   unread_activity_count: number;
   last_read_activity_at: string | null;
   last_read_alert_at: string | null;
+}
+
+// --- Project ---
+export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
+
+export interface CrmProject {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  stats?: CrmProjectStats;
+}
+
+export interface CrmProjectStats {
+  total_tasks: number;
+  pending_tasks: number;
+  in_progress_tasks: number;
+  completed_tasks: number;
+  total_tickets: number;
+  open_tickets: number;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateProjectInput {
+  name?: string;
+  description?: string;
+  status?: ProjectStatus;
 }

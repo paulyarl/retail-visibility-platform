@@ -1,8 +1,27 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import AllCategoriesClient from './AllCategoriesClient';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Categories - VisibleShelf Directory',
+  description:
+    'Browse local businesses by category on VisibleShelf. Find stores, services, restaurants, and more in your community.',
+  openGraph: {
+    title: 'Categories - VisibleShelf Directory',
+    description: 'Browse local businesses by category on VisibleShelf.',
+    type: 'website',
+    images: [{ url: '/favicon.ico' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Categories - VisibleShelf Directory',
+    description: 'Browse local businesses by category on VisibleShelf.',
+    images: [{ url: '/favicon.ico' }],
+  },
+};
 
 export default function AllCategoriesPage() {
   return (

@@ -576,6 +576,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
       type: 'website',
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: businessName,
+      description: `${typeLabel.desc} from ${businessName}`,
+      images: tenant.metadata?.logo_url ? [tenant.metadata.logo_url] : [],
+    },
     other: {
       'application/ld+json': JSON.stringify(schema),
     },

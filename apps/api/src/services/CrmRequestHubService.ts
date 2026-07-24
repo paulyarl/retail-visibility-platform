@@ -12,8 +12,8 @@ import { CrmRequestReadService } from './CrmRequestReadService';
 export interface RequestHubItem {
   id: string;
   type: 'ticket' | 'task' | 'inquiry';
-  tenant_id: string;
-  tenant_name: string;
+  tenant_id: string | null;
+  tenant_name: string | null;
   title: string;
   status: string | null;
   priority: string | null;
@@ -83,7 +83,7 @@ export class CrmRequestHubService extends BaseService {
         id: t.id,
         type: 'ticket',
         tenant_id: t.tenant_id,
-        tenant_name: await getTenantName(t.tenant_id),
+        tenant_name: t.tenant_id ? await getTenantName(t.tenant_id) : null,
         title: t.title,
         status: t.status,
         priority: t.priority,
@@ -98,7 +98,7 @@ export class CrmRequestHubService extends BaseService {
         id: t.id,
         type: 'task',
         tenant_id: t.tenant_id,
-        tenant_name: await getTenantName(t.tenant_id),
+        tenant_name: t.tenant_id ? await getTenantName(t.tenant_id) : null,
         title: t.title,
         status: t.status,
         priority: t.priority,

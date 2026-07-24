@@ -7,6 +7,9 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, Button, Selec
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminOperationsService, type AdminTenant, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTask, CrmTaskMessage, TaskStatus, TaskPriority } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -44,7 +47,8 @@ export default function CrmTaskDetailPage() {
   const [tenants, setTenants] = useState<AdminTenant[]>([]);
   const [staffUsers, setStaffUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [replyContent, setReplyContent] = useState('');
+  const [replyContent, setReplyContent] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [noteContent, setNoteContent] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -118,7 +122,7 @@ export default function CrmTaskDetailPage() {
     try {
       await crmAdminService.updateTask(editTask.id, {
         title: editTask.title,
-        description: editTask.description || undefined,
+        description: editTask.description ?? undefined,
         priority: editTask.priority,
         due_date: editTask.due_date || undefined,
         assigned_to: editTask.assigned_to || undefined,
@@ -135,12 +139,13 @@ export default function CrmTaskDetailPage() {
   }
 
   async function handleSendReply() {
-    if (!replyContent.trim()) return;
+    if (replyContent.blocks.length === 0) return;
     setSending(true);
     try {
-      const message = await crmAdminService.createTaskMessage(taskId, { content: replyContent.trim(), is_internal: false });
+      const message = await crmAdminService.createTaskMessage(taskId, { content_blocks: replyContent, is_internal: false });
       setMessages(prev => [...prev, message]);
-      setReplyContent('');
+      setReplyContent(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
     } catch (err) {
       clientLogger.error('[Task Detail] Reply error:', { detail: err });
     } finally {
@@ -166,7 +171,7 @@ export default function CrmTaskDetailPage() {
     setDeleting(true);
     try {
       await crmAdminService.deleteTask(taskId);
-      window.location.href = '/settings/admin/crm/tasks';
+      window.location.href = task?.project_id ? `/settings/admin/crm/projects/${task.project_id}` : '/settings/admin/crm/tasks';
     } catch (err) {
       clientLogger.error('[Task Detail] Delete error:', { detail: err });
     } finally {
@@ -208,19 +213,30 @@ export default function CrmTaskDetailPage() {
           )}
         </span>
       }
-      breadcrumbs={[
-        { label: 'Settings', href: '/settings' },
-        { label: 'Admin' },
-        { label: 'CRM', href: '/settings/admin/crm' },
-        { label: 'Tasks', href: '/settings/admin/crm/tasks' },
-        { label: task.title },
-      ]}
+      breadcrumbs={
+        task.project_id
+          ? [
+              { label: 'Settings', href: '/settings' },
+              { label: 'Admin' },
+              { label: 'CRM', href: '/settings/admin/crm' },
+              { label: 'Projects', href: '/settings/admin/crm/projects' },
+              { label: 'Project', href: `/settings/admin/crm/projects/${task.project_id}` },
+              { label: task.title },
+            ]
+          : [
+              { label: 'Settings', href: '/settings' },
+              { label: 'Admin' },
+              { label: 'CRM', href: '/settings/admin/crm' },
+              { label: 'Tasks', href: '/settings/admin/crm/tasks' },
+              { label: task.title },
+            ]
+      }
       actions={
         <div className="flex gap-3 items-center">
           <Button size="sm" variant="outline" onClick={() => { setEditTask(task); setShowEdit(true); }}>Edit</Button>
           <Button size="sm" variant="ghost" onClick={() => setDeleteConfirm(true)} className="text-red-600 hover:text-red-700">Delete</Button>
-          <Link href="/settings/admin/crm/tasks" className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400">
-            Back to Tasks
+          <Link href={task.project_id ? `/settings/admin/crm/projects/${task.project_id}` : '/settings/admin/crm/tasks'} className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400">
+            {task.project_id ? 'Back to Project' : 'Back to Tasks'}
           </Link>
         </div>
       }
@@ -276,7 +292,13 @@ export default function CrmTaskDetailPage() {
               </div>
             )}
             <div className="mt-4 text-sm text-neutral-500 space-y-1">
-              <p><span className="font-medium">Tenant:</span> <Link href={`/settings/admin/crm/tenants/${task.tenant_id}`} className="text-amber-600 hover:underline">{tenantNameMap.get(task.tenant_id) || task.tenant_id}</Link></p>
+              <p><span className="font-medium">Scope:</span> {task.tenant_id ? (
+                <Link href={`/settings/admin/crm/tenants/${task.tenant_id}`} className="text-amber-600 hover:underline">{tenantNameMap.get(task.tenant_id) || task.tenant_id}</Link>
+              ) : task.project_id ? (
+                <Link href={`/settings/admin/crm/projects/${task.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
+              ) : (
+                <span className="text-neutral-400">No scope</span>
+              )}</p>
               <p><span className="font-medium">Created:</span> {new Date(task.created_at).toLocaleString()}</p>
               {task.completed_at && <p><span className="font-medium">Completed:</span> {new Date(task.completed_at).toLocaleString()}</p>}
             </div>
@@ -321,7 +343,11 @@ export default function CrmTaskDetailPage() {
                         </div>
                         <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      {m.content_blocks?.blocks?.length ? (
+                        <RichContentRenderer content={m.content_blocks} />
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      )}
                     </div>
                   );
                 })}
@@ -332,14 +358,15 @@ export default function CrmTaskDetailPage() {
             {!isCompleted && (
               <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
                 <div className="space-y-3">
-                  <Textarea
+                  <RichContentEditor
+                    key={replyKey}
                     value={replyContent}
-                    onChange={(e) => setReplyContent(e.target.value)}
-                    placeholder="Type a message visible to all task participants..."
-                    className="min-h-[100px]"
+                    onChange={setReplyContent}
+                    tenantId={task?.tenant_id || undefined}
+                    className="min-h-[160px]"
                   />
                   <div className="flex justify-end">
-                    <Button onClick={handleSendReply} disabled={sending || !replyContent.trim()}>
+                    <Button onClick={handleSendReply} disabled={sending || replyContent.blocks.length === 0}>
                       {sending ? <Spinner size="sm" /> : 'Send Message'}
                     </Button>
                   </div>

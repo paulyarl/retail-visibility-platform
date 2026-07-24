@@ -10,6 +10,7 @@ import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSing
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import type {
   CrmTicket, CrmTicketMessage, CrmTask, CrmActivity, CrmAlert,
+  CreateTicketMessageInput,
 } from '@/types/crm';
 
 export interface PersonalCrmDashboard {
@@ -129,7 +130,7 @@ class PersonalCrmService extends AuthenticatedApiSingleton {
     return this.unwrap<CrmTicketMessage[]>(result);
   }
 
-  async createTicketMessage(ticketId: string, data: { content: string; is_internal?: boolean }): Promise<CrmTicketMessage> {
+  async createTicketMessage(ticketId: string, data: CreateTicketMessageInput): Promise<CrmTicketMessage> {
     const result = await this.makeDefaultRequest<CrmTicketMessage>(
       `/api/personal/crm/tickets/${ticketId}/messages`,
       { method: 'POST', body: JSON.stringify(data) },

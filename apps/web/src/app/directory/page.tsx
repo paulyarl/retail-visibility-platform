@@ -1,9 +1,30 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { resolveDirectoryLayout, type DirectoryLayoutKey } from '@/components/directory/redesign/types';
 import DirectoryShell from '@/components/directory/redesign/layouts/DirectoryShell';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'VisibleShelf Directory - Find Local Stores & Products',
+  description:
+    'Discover local businesses and their products in the VisibleShelf directory. Browse stores by category, location, and store type.',
+  openGraph: {
+    title: 'VisibleShelf Directory - Find Local Stores & Products',
+    description:
+      'Discover local businesses and their products in the VisibleShelf directory.',
+    type: 'website',
+    images: [{ url: '/favicon.ico' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'VisibleShelf Directory - Find Local Stores & Products',
+    description:
+      'Discover local businesses and their products in the VisibleShelf directory.',
+    images: [{ url: '/favicon.ico' }],
+  },
+};
 
 export default async function DirectoryPage({
   searchParams,

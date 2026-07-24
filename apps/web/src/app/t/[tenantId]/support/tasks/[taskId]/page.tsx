@@ -7,6 +7,9 @@ import { Card, CardContent, Spinner } from '@/components/ui';
 import { crmTenantCrmService } from '@/services/crm/CrmTenantCrmService';
 import { tenantUserService, User } from '@/services/TenantUserService';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTask, CrmTaskMessage, CrmActivity, TaskStatus } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -35,6 +38,8 @@ export default function TenantTaskDetailPage() {
   const [activities, setActivities] = useState<CrmActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState('');
+  const [replyBlocks, setReplyBlocks] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [isInternal, setIsInternal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -76,15 +81,19 @@ export default function TenantTaskDetailPage() {
   }
 
   async function handleReply() {
-    if (!reply.trim()) return;
+    if (isInternal ? !reply.trim() : replyBlocks.blocks.length === 0) return;
     setSubmitting(true);
     try {
-      const msg = await crmTenantCrmService.createTaskMessage(taskId, {
-        content: reply.trim(),
-        is_internal: isInternal,
-      });
+      const msg = await crmTenantCrmService.createTaskMessage(
+        taskId,
+        isInternal
+          ? { content: reply.trim(), is_internal: true }
+          : { content_blocks: replyBlocks, is_internal: false }
+      );
       setMessages(prev => [...prev, msg]);
       setReply('');
+      setReplyBlocks(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
       setIsInternal(false);
     } catch (err) {
       clientLogger.error('[Tenant Task Detail] Reply error:', { detail: err });
@@ -332,7 +341,11 @@ export default function TenantTaskDetailPage() {
                 )}
                 <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
               </div>
-              <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+              {m.content_blocks?.blocks?.length ? (
+                <RichContentRenderer content={m.content_blocks} />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+              )}
             </div>
           );
         })}
@@ -369,13 +382,23 @@ export default function TenantTaskDetailPage() {
       {!isClosed && (
         <Card>
           <CardContent className="space-y-3">
-            <textarea
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="Type your message..."
-              rows={3}
-              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-            />
+            {isInternal ? (
+              <textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="Type an internal note..."
+                rows={3}
+                className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+              />
+            ) : (
+              <RichContentEditor
+                key={replyKey}
+                value={replyBlocks}
+                onChange={setReplyBlocks}
+                tenantId={tenantId}
+                className="min-h-[160px]"
+              />
+            )}
             <div className="flex items-center justify-between">
               <label className="inline-flex items-center gap-2 text-xs text-neutral-500 cursor-pointer">
                 <input
@@ -388,7 +411,7 @@ export default function TenantTaskDetailPage() {
               </label>
               <button
                 onClick={handleReply}
-                disabled={!reply.trim() || submitting}
+                disabled={(isInternal ? !reply.trim() : replyBlocks.blocks.length === 0) || submitting}
                 className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Sending...' : 'Send Message'}

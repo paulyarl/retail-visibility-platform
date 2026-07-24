@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui';
 import FeaturesShowcase from '@/components/FeaturesShowcase';
 import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { useUTM } from '@/hooks/useUTM';
 import Image from 'next/image';
 import ChainPropagationCallout from '@/components/ChainPropagationCallout';
 import CapabilityComparisonMatrix from '@/components/subscription/CapabilityComparisonMatrix';
@@ -673,6 +674,7 @@ const tiers = [
 
 export default function FeaturesPage() {
   const { settings } = usePlatformSettings();
+  const { withUTM } = useUTM();
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -701,7 +703,7 @@ export default function FeaturesPage() {
               <a href="/auth/login">
                 <Button variant="ghost" size="sm">Sign In</Button>
               </a>
-              <a href="/auth/signup">
+              <a href={withUTM('/auth/signup')}>
                 <Button size="sm">Get Started</Button>
               </a>
             </div>
@@ -726,7 +728,7 @@ export default function FeaturesPage() {
               Everything you need to dominate local search and drive customers to your store. No website developer needed.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <a href="/auth/signup">
+              <a href={withUTM('/auth/signup')}>
                 <Button size="lg">Start Free Trial</Button>
               </a>
               <Link href="#pricing">
@@ -1118,7 +1120,7 @@ export default function FeaturesPage() {
             </div>
 
             {/* QR Marketing */}
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-lg p-6">
+            <div id="qr" className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-lg p-6">
               <div className="text-4xl mb-3">📱</div>
               <h3 className="text-lg font-bold text-neutral-900 mb-2">QR Code Marketing</h3>
               <ul className="space-y-1 text-sm text-neutral-700">
@@ -1692,7 +1694,7 @@ export default function FeaturesPage() {
                   </div>
                 )}
                 
-                <a href="/auth/signup" className="block mb-6">
+                <a href={withUTM('/auth/signup')} className="block mb-6">
                   <Button className="w-full" variant={tier.popular ? 'primary' : 'secondary'}>
                     {tier.cta}
                   </Button>
@@ -2898,7 +2900,7 @@ export default function FeaturesPage() {
             <p className="text-lg text-neutral-300 mb-6">
               This isn't just software — it's a complete business transformation platform.
             </p>
-            <a href="/auth/signup">
+            <a href={withUTM('/auth/signup')}>
               <Button size="lg" className="bg-white text-neutral-900 hover:bg-neutral-100">
                 Start Your Transformation
               </Button>
@@ -3164,7 +3166,7 @@ export default function FeaturesPage() {
             Join 1,500+ retailers who trust our platform to manage and grow their business.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <a href="/auth/signup">
+            <a href={withUTM('/auth/signup')}>
               <Button size="lg" variant="secondary">
                 Start Free Trial
               </Button>
