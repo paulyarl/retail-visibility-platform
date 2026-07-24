@@ -280,9 +280,7 @@ class CrmAdminService extends AdminApiSingleton {
       2 * 60 * 1000,
       { context: this.defaultContext, isolation: this.defaultIsolation }
     );
-    const messages = this.unwrap<CrmTaskMessage[]>(result);
-    console.log('[CrmAdminService.listTaskMessages] raw body:', result.data, 'unwrapped:', messages);
-    return messages;
+    return this.unwrap<CrmTaskMessage[]>(result);
   }
 
   async createTaskMessage(taskId: string, data: CreateTaskMessageInput): Promise<CrmTaskMessage> {
