@@ -86,7 +86,28 @@ export class CrmTicketService extends BaseService {
   }
 
   async getById(ticketId: string) {
-    return prisma.crm_support_tickets.findUnique({ where: { id: ticketId } });
+    const ticket = await prisma.crm_support_tickets.findUnique({
+      where: { id: ticketId },
+      include: { tenants: { select: { name: true } } },
+    });
+    if (!ticket) return null;
+
+    let assigned_to_name: string | null = null;
+    if (ticket.assigned_to) {
+      const user = await prisma.users.findUnique({
+        where: { id: ticket.assigned_to },
+        select: { first_name: true, last_name: true, email: true },
+      });
+      if (user) {
+        assigned_to_name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
+      }
+    }
+
+    return {
+      ...ticket,
+      tenant_name: ticket.tenants?.name ?? null,
+      assigned_to_name,
+    };
   }
 
   /**

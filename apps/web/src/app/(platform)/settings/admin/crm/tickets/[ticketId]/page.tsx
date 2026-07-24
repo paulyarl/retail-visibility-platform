@@ -205,7 +205,7 @@ export default function CrmTicketDetailPage() {
                   value={ticket.assigned_to || ''}
                   onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value || undefined })}
                   disabled={updating || isClosed}
-                  options={[{ value: '', label: '— Unassigned —' }, ...admins.map(a => ({ value: a.id, label: a.email }))]}
+                  options={[{ value: '', label: '— Unassigned —' }, ...admins.map(a => ({ value: a.id, label: a.name || [a.firstName, a.lastName].filter(Boolean).join(' ') || a.email }))]}
                 />
               </div>
               <div>
@@ -223,7 +223,7 @@ export default function CrmTicketDetailPage() {
             </div>
             <div className="mt-4 text-sm text-neutral-500 space-y-1">
               <p><span className="font-medium">Scope:</span> {ticket.tenant_id ? (
-                <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_id}</Link>
+                <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_name || ticket.tenant_id}</Link>
               ) : ticket.project_id ? (
                 <Link href={`/settings/admin/crm/projects/${ticket.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
               ) : (

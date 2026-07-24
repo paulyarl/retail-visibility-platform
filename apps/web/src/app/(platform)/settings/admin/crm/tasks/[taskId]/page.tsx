@@ -122,7 +122,7 @@ export default function CrmTaskDetailPage() {
     try {
       await crmAdminService.updateTask(editTask.id, {
         title: editTask.title,
-        description: editTask.description,
+        description: editTask.description ?? undefined,
         priority: editTask.priority,
         due_date: editTask.due_date || undefined,
         assigned_to: editTask.assigned_to || undefined,
