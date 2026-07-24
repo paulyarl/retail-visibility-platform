@@ -71,7 +71,10 @@ export default function CrmTaskDetailPage() {
         adminOperationsService.getUsers(1, 200, { role: 'PLATFORM_SUPPORT' }),
       ]);
       if (taskRes.status === 'fulfilled' && taskRes.value) setTask(taskRes.value);
-      if (messagesRes.status === 'fulfilled') setMessages(messagesRes.value);
+      if (messagesRes.status === 'fulfilled') {
+        console.log('[CRM Task Debug] loaded messages:', messagesRes.value);
+        setMessages(messagesRes.value);
+      }
       if (tenantsRes.status === 'fulfilled') setTenants(tenantsRes.value.tenants || []);
       if (adminUsersRes.status === 'fulfilled' || platformAdminRes.status === 'fulfilled' || platformSupportRes.status === 'fulfilled') {
         const allStaff = [
