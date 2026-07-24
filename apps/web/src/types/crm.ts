@@ -1,3 +1,5 @@
+import type { ContentBlocks } from '@/components/products/content-blocks';
+
 /**
  * CRM Type Definitions
  * Shared types for all three CRM service surfaces (Admin, Tenant, Customer)
@@ -156,12 +158,14 @@ export interface CrmTicketMessage {
   author_type: AuthorType;
   author_name: string;
   content: string;
+  content_blocks?: ContentBlocks | null;
   is_internal: boolean;
   created_at: string;
 }
 
 export interface CreateTicketMessageInput {
-  content: string;
+  content?: string;
+  content_blocks?: ContentBlocks;
   is_internal?: boolean;
 }
 
@@ -173,12 +177,14 @@ export interface CrmTaskMessage {
   author_type: AuthorType;
   author_name: string;
   content: string;
+  content_blocks?: ContentBlocks | null;
   is_internal: boolean;
   created_at: string;
 }
 
 export interface CreateTaskMessageInput {
-  content: string;
+  content?: string;
+  content_blocks?: ContentBlocks;
   is_internal?: boolean;
 }
 

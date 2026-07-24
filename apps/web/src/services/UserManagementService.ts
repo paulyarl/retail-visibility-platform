@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { getStoredUTMParams } from '@/lib/utm';
 import { clientLogger } from '@/lib/client-logger';
 
 export interface UserInfo {
@@ -350,12 +351,23 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     businessType: string;
     phone: string;
   }): Promise<{ success: boolean; user?: any; tenant?: { id: string; name: string } | null; error?: string }> {
+    const utm = getStoredUTMParams();
+    const payload = {
+      ...data,
+      referral: utm.ref,
+      utm_source: utm.utm_source,
+      utm_medium: utm.utm_medium,
+      utm_campaign: utm.utm_campaign,
+      utm_content: utm.utm_content,
+      utm_term: utm.utm_term,
+    };
+
     const result = await this.makeDefaultRequest<any>(
       '/api/auth/onboarding',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       },
       'platform-onboarding-complete',
       0 // Don't cache

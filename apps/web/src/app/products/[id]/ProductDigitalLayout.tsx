@@ -10,6 +10,7 @@ import { ProductBreadcrumb } from './layouts/shared/ProductBreadcrumb';
 import { ProductGalleryPanel } from '@/components/products/sections/ProductGalleryPanel';
 import { ProductBottomSections } from '@/components/products/sections/ProductBottomSections';
 import { ProductLayoutSkeleton } from '@/components/products/sections/ProductLayoutSkeleton';
+import { PinterestSaveButton } from '@/components/tracking/PinterestSaveButton';
 import DigitalPurchasePanel from '@/components/products/sections/DigitalPurchasePanel';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { StorefrontOptionFlags, ProductOptionFlags } from '@/services/CapabilityResolutionService';
@@ -105,6 +106,14 @@ export default function ProductDigitalLayout({
           categorySlug={s.categorySlug}
           productTitle={s.productTitle}
         />
+
+        <div className="flex items-center justify-end mb-2">
+          <PinterestSaveButton
+            url={s.resolvedCurrentUrl}
+            description={s.productTitle || product.title}
+            imageUrl={product.images?.[0]?.url}
+          />
+        </div>
 
         <div className="mb-4">
           <CouponSpotlight tenantId={product.tenantId} coupon={null} variant="strip" />

@@ -8,6 +8,9 @@ import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminUsersService, type AdminUser } from '@/services/AdminUsersService';
 import { getContrastColor } from '@/lib/color-utils';
 import CrmPageShell from '@/components/crm/CrmPageShell';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -48,7 +51,8 @@ export default function CrmTicketDetailPage() {
   const [messages, setMessages] = useState<CrmTicketMessage[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [replyContent, setReplyContent] = useState('');
+  const [replyContent, setReplyContent] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [noteContent, setNoteContent] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -100,12 +104,13 @@ export default function CrmTicketDetailPage() {
   }
 
   async function handleSendReply() {
-    if (!replyContent.trim()) return;
+    if (replyContent.blocks.length === 0) return;
     setSending(true);
     try {
-      const message = await crmAdminService.createTicketMessage(ticketId, { content: replyContent.trim(), is_internal: false });
+      const message = await crmAdminService.createTicketMessage(ticketId, { content_blocks: replyContent, is_internal: false });
       setMessages(prev => [...prev, message]);
-      setReplyContent('');
+      setReplyContent(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
     } catch (err) {
       clientLogger.error('[Ticket Detail] Reply error:', { detail: err });
     } finally {
@@ -263,7 +268,11 @@ export default function CrmTicketDetailPage() {
                         </div>
                         <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      {m.content_blocks ? (
+                        <RichContentRenderer content={m.content_blocks as ContentBlocks} />
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                      )}
                     </div>
                   );
                 })}
@@ -273,14 +282,15 @@ export default function CrmTicketDetailPage() {
             {/* Reply form */}
             <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
               <div className="space-y-3">
-                <Textarea
+                <RichContentEditor
+                  key={replyKey}
                   value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="Type a public reply visible to the tenant/customer..."
-                  className="min-h-[100px]"
+                  onChange={setReplyContent}
+                  tenantId={ticket?.tenant_id}
+                  className="min-h-[160px]"
                 />
                 <div className="flex justify-end">
-                  <Button onClick={handleSendReply} disabled={sending || !replyContent.trim()}>
+                  <Button onClick={handleSendReply} disabled={sending || replyContent.blocks.length === 0}>
                     {sending ? <Spinner size="sm" /> : 'Send Reply'}
                   </Button>
                 </div>

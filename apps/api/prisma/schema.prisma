@@ -727,10 +727,27 @@ model consent_records {
   @@index([user_id, consent_type], map: "idx_consent_records_user_type")
 }
 
+model crm_projects {
+  id                  String                @id @db.VarChar(255)
+  name                String                @db.VarChar(255)
+  description         String?
+  status              String                @default("active") @db.VarChar(20)
+  created_by          String                @db.VarChar(255)
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  closed_at           DateTime?             @db.Timestamptz(6)
+  crm_activities      crm_activities[]
+  crm_support_tickets crm_support_tickets[]
+  crm_tasks           crm_tasks[]
+
+  @@index([status], map: "idx_crm_projects_status")
+  @@index([created_at], map: "idx_crm_projects_created_at")
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_activities {
   id                  String               @id
-  tenant_id           String               @db.VarChar(255)
+  tenant_id           String?              @db.VarChar(255)
   ticket_id           String?
   task_id             String?
   actor_id            String               @db.VarChar(255)
@@ -741,8 +758,10 @@ model crm_activities {
   metadata            Json?                @default("{}")
   is_internal         Boolean?             @default(false)
   created_at          DateTime?            @default(now()) @db.Timestamptz(6)
+  project_id          String?              @db.VarChar(255)
+  crm_projects        crm_projects?        @relation(fields: [project_id], references: [id], onUpdate: NoAction, map: "fk_crm_activities_project")
   crm_tasks           crm_tasks?           @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_activities_task")
-  tenants             tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_activities_tenant")
+  tenants             tenants?             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_activities_tenant")
   crm_support_tickets crm_support_tickets? @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_activities_ticket")
 
   @@index([actor_id, actor_type], map: "idx_crm_activities_actor")
@@ -750,6 +769,7 @@ model crm_activities {
   @@index([tenant_id, created_at], map: "idx_crm_activities_tenant_created")
   @@index([tenant_id, activity_type], map: "idx_crm_activities_tenant_type")
   @@index([ticket_id], map: "idx_crm_activities_ticket_id")
+  @@index([project_id], map: "idx_crm_activities_project_id")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -852,7 +872,7 @@ model crm_request_reads {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_support_tickets {
   id                  String                @id
-  tenant_id           String                @db.VarChar(255)
+  tenant_id           String?               @db.VarChar(255)
   contact_id          String?
   customer_id         String?               @db.VarChar(255)
   title               String                @db.VarChar(255)
@@ -867,10 +887,12 @@ model crm_support_tickets {
   updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
   sort_order          Int?                  @default(0)
   inquiry_id          String?               @db.VarChar(255)
+  project_id          String?               @db.VarChar(255)
   crm_activities      crm_activities[]
   crm_contacts        crm_contacts?         @relation(fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_crm_tickets_contact")
   customers           customers?            @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_crm_tickets_customer")
-  tenants             tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_tickets_tenant")
+  crm_projects        crm_projects?         @relation(fields: [project_id], references: [id], onUpdate: NoAction, map: "fk_crm_tickets_project")
+  tenants             tenants?              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_tickets_tenant")
   crm_ticket_messages crm_ticket_messages[]
 
   @@index([assigned_to, status], map: "idx_crm_tickets_assigned_status")
@@ -880,12 +902,13 @@ model crm_support_tickets {
   @@index([priority, status], map: "idx_crm_tickets_priority_status")
   @@index([tenant_id, status, sort_order], map: "idx_crm_tickets_sort_order")
   @@index([tenant_id, status], map: "idx_crm_tickets_tenant_status")
+  @@index([project_id], map: "idx_crm_tickets_project_id")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_tasks {
   id                String              @id
-  tenant_id         String              @db.VarChar(255)
+  tenant_id         String?             @db.VarChar(255)
   contact_id        String?
   title             String              @db.VarChar(255)
   description       String?
@@ -898,10 +921,12 @@ model crm_tasks {
   created_at        DateTime?           @default(now()) @db.Timestamptz(6)
   updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
   sort_order        Int?                @default(0)
+  project_id        String?             @db.VarChar(255)
   crm_activities    crm_activities[]
   crm_task_messages crm_task_messages[]
   crm_contacts      crm_contacts?       @relation(fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_crm_tasks_contact")
-  tenants           tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_tasks_tenant")
+  crm_projects      crm_projects?       @relation(fields: [project_id], references: [id], onUpdate: NoAction, map: "fk_crm_tasks_project")
+  tenants           tenants?            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_tasks_tenant")
 
   @@index([assigned_to, status], map: "idx_crm_tasks_assigned_status")
   @@index([contact_id], map: "idx_crm_tasks_contact_id")
@@ -909,6 +934,7 @@ model crm_tasks {
   @@index([due_date], map: "idx_crm_tasks_due_date")
   @@index([tenant_id, status, sort_order], map: "idx_crm_tasks_sort_order")
   @@index([tenant_id, status], map: "idx_crm_tasks_tenant_status")
+  @@index([project_id], map: "idx_crm_tasks_project_id")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -921,6 +947,7 @@ model crm_ticket_messages {
   content             String
   is_internal         Boolean?            @default(false)
   created_at          DateTime?           @default(now()) @db.Timestamptz(6)
+  content_blocks      Json?
   crm_support_tickets crm_support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_messages_ticket")
 
   @@index([ticket_id, created_at], map: "idx_crm_messages_ticket_created")
@@ -928,15 +955,16 @@ model crm_ticket_messages {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model crm_task_messages {
-  id          String    @id @db.VarChar(255)
-  task_id     String    @db.VarChar(255)
-  author_id   String    @db.VarChar(255)
-  author_type String    @default("platform") @db.VarChar(20)
-  author_name String    @db.VarChar(255)
-  content     String
-  is_internal Boolean   @default(false)
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-  crm_tasks   crm_tasks @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_task_messages_task")
+  id             String    @id @db.VarChar(255)
+  task_id        String    @db.VarChar(255)
+  author_id      String    @db.VarChar(255)
+  author_type    String    @default("platform") @db.VarChar(20)
+  author_name    String    @db.VarChar(255)
+  content        String
+  is_internal    Boolean   @default(false)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  content_blocks Json?
+  crm_tasks      crm_tasks @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_crm_task_messages_task")
 
   @@index([task_id, created_at], map: "idx_crm_task_messages_task_created")
 }

@@ -36,9 +36,10 @@ export class CrmActivityService extends BaseService {
   /**
    * List all activities globally (admin dashboard)
    */
-  async listGlobal(filters: { isInternal?: boolean; limit?: number } = {}) {
+  async listGlobal(filters: { isInternal?: boolean; projectId?: string; limit?: number } = {}) {
     const where: any = {};
     if (filters.isInternal === false) where.is_internal = false;
+    if (filters.projectId) where.project_id = filters.projectId;
     return prisma.crm_activities.findMany({
       where,
       orderBy: { created_at: 'desc' },
@@ -57,7 +58,7 @@ export class CrmActivityService extends BaseService {
     });
 
     const ticketIds = tickets.map(t => t.id);
-    const tenantIds = [...new Set(tickets.map(t => t.tenant_id))];
+    const tenantIds = [...new Set(tickets.map(t => t.tenant_id).filter((id): id is string => id !== null))];
 
     return prisma.crm_activities.findMany({
       where: {
@@ -70,11 +71,25 @@ export class CrmActivityService extends BaseService {
     });
   }
 
+  async listByProject(projectId: string, filters: { type?: string; ticketId?: string; taskId?: string; isInternal?: boolean; limit?: number } = {}) {
+    const where: any = { project_id: projectId };
+    if (filters.type) where.activity_type = filters.type;
+    if (filters.ticketId) where.ticket_id = filters.ticketId;
+    if (filters.taskId) where.task_id = filters.taskId;
+    if (filters.isInternal === false) where.is_internal = false;
+    return prisma.crm_activities.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      take: filters.limit || 50,
+    });
+  }
+
   /**
    * Create an activity/note (append-only)
    */
   async create(data: {
-    tenant_id: string;
+    tenant_id?: string;
+    project_id?: string;
     ticket_id?: string;
     task_id?: string;
     actor_id: string;
@@ -85,7 +100,8 @@ export class CrmActivityService extends BaseService {
     metadata?: any;
     is_internal?: boolean;
   }) {
-    return prisma.crm_activities.create({ data: { id: generateCrmActivityId(data.tenant_id), ...data } });
+    const idKey = data.tenant_id || 'project';
+    return prisma.crm_activities.create({ data: { id: generateCrmActivityId(idKey), ...data } });
   }
 
   /**

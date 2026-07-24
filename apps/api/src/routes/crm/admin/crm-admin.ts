@@ -18,6 +18,7 @@ import CrmInquiryService from '../../../services/CrmInquiryService';
 import CrmRequestReadService from '../../../services/CrmRequestReadService';
 import CrmRequestHubService from '../../../services/CrmRequestHubService';
 import CrmAlertService from '../../../services/CrmAlertService';
+import CrmProjectService from '../../../services/CrmProjectService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
 import { logger } from '../../../logger';
@@ -25,13 +26,13 @@ import { logger } from '../../../logger';
 interface RequestItem {
   id: string;
   type: 'ticket' | 'task' | 'inquiry';
-  tenant_id: string;
-  tenant_name: string;
+  tenant_id: string | null;
+  tenant_name: string | null;
   title: string | null;
   status: string | null;
   priority: string | null;
   assigned_to: string | null;
-  created_at: Date | null;
+  created_at: string | null;
   is_read: boolean;
 }
 
@@ -48,6 +49,7 @@ const inquiryService = CrmInquiryService.getInstance();
 const requestReadService = CrmRequestReadService.getInstance();
 const requestHubService = CrmRequestHubService.getInstance();
 const alertService = CrmAlertService.getInstance();
+const projectService = CrmProjectService.getInstance();
 
 // ====================
 // Dashboard Stats
@@ -199,6 +201,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
       status: req.query.status as string,
       priority: req.query.priority as string,
       category: req.query.category as string,
+      projectId: req.query.projectId as string,
     });
     res.json({ success: true, data: tickets });
   } catch (error) {
@@ -257,7 +260,7 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
     const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const ticket = await ticketService.update(req.params.ticketId, req.body, actorId, actorName, 'platform');
-    await audit({ tenantId: ticket.tenant_id, actor: actorId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
+    await audit({ tenantId: ticket.tenant_id || undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
     res.json({ success: true, data: ticket });
   } catch (error) {
     logger.error('[CRM Admin] Error updating ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
@@ -289,6 +292,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
       author_type: 'platform',
       author_name: actorName,
       content: req.body.content,
+      content_blocks: req.body.content_blocks,
       is_internal: req.body.is_internal ?? true, // Admin notes default to internal
     });
     res.json({ success: true, data: message });
@@ -309,6 +313,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
       assignedTo: req.query.assignedTo as string,
       status: req.query.status as string,
       tenantId: req.query.tenantId as string,
+      projectId: req.query.projectId as string,
     });
     res.json({ success: true, data: tasks });
   } catch (error) {
@@ -324,11 +329,12 @@ router.post('/tasks', async (req: Request, res: Response) => {
     const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const task = await taskService.create({ ...req.body, created_by: actorId });
-    await audit({ tenantId: req.body.tenant_id, actor: actorId, action: 'create', payload: { entity_type: 'crm_task', id: task.id } });
+    await audit({ tenantId: req.body.tenant_id || undefined, actor: actorId, action: 'create', payload: { entity_type: 'crm_task', id: task.id } });
 
     // Auto-log task creation as activity
     await activityService.create({
       tenant_id: req.body.tenant_id,
+      project_id: req.body.project_id,
       task_id: task.id,
       actor_id: actorId,
       actor_type: 'platform',
@@ -352,7 +358,7 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
     const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
 
     const task = await taskService.update(req.params.taskId, req.body, actorId, actorName, 'platform');
-    await audit({ tenantId: task.tenant_id, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
+    await audit({ tenantId: task.tenant_id || undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true, data: task });
   } catch (error) {
     logger.error('[CRM Admin] Error updating task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
@@ -383,6 +389,7 @@ router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
       author_type: 'platform',
       author_name: actorName,
       content: req.body.content,
+      content_blocks: req.body.content_blocks,
       is_internal: req.body.is_internal ?? true,
     });
     res.json({ success: true, data: message });
@@ -400,7 +407,7 @@ router.delete('/tasks/:taskId', async (req: Request, res: Response) => {
 
     const actorId = req.user?.userId || req.user?.user_id || 'unknown';
     await taskService.delete(req.params.taskId);
-    await audit({ tenantId: task.tenant_id, actor: actorId, action: 'delete', payload: { entity_type: 'crm_task', id: task.id } });
+    await audit({ tenantId: task.tenant_id || undefined, actor: actorId, action: 'delete', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true });
   } catch (error) {
     logger.error('[CRM Admin] Error deleting task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
@@ -697,6 +704,125 @@ router.patch('/tasks/reorder', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('[CRM Admin] Error reordering tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to reorder tasks' });
+  }
+});
+
+// ====================
+// Projects (internal cross-functional)
+// ====================
+
+// GET /api/admin/crm/projects
+router.get('/projects', async (req: Request, res: Response) => {
+  try {
+    const projects = await projectService.list({
+      status: req.query.status as string,
+    });
+    res.json({ success: true, data: projects });
+  } catch (error) {
+    logger.error('[CRM Admin] Error listing projects:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list projects' });
+  }
+});
+
+// POST /api/admin/crm/projects
+router.post('/projects', async (req: Request, res: Response) => {
+  try {
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'invalid_input', message: 'name is required' });
+
+    const project = await projectService.create({ name, description, created_by: actorId });
+    await audit({ tenantId: undefined, actor: actorId, action: 'create', payload: { entity_type: 'crm_project', id: project.id } });
+    res.json({ success: true, data: project });
+  } catch (error) {
+    logger.error('[CRM Admin] Error creating project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create project' });
+  }
+});
+
+// GET /api/admin/crm/projects/:projectId
+router.get('/projects/:projectId', async (req: Request, res: Response) => {
+  try {
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    const stats = await projectService.getStats(req.params.projectId);
+    res.json({ success: true, data: { ...project, stats } });
+  } catch (error) {
+    logger.error('[CRM Admin] Error fetching project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch project' });
+  }
+});
+
+// PUT /api/admin/crm/projects/:projectId
+router.put('/projects/:projectId', async (req: Request, res: Response) => {
+  try {
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const { name, description, status } = req.body;
+    const project = await projectService.update(req.params.projectId, { name, description, status });
+    await audit({ tenantId: undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_project', id: project.id } });
+    res.json({ success: true, data: project });
+  } catch (error) {
+    logger.error('[CRM Admin] Error updating project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update project' });
+  }
+});
+
+// DELETE /api/admin/crm/projects/:projectId
+router.delete('/projects/:projectId', async (req: Request, res: Response) => {
+  try {
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    await projectService.delete(req.params.projectId);
+    await audit({ tenantId: undefined, actor: actorId, action: 'delete', payload: { entity_type: 'crm_project', id: req.params.projectId } });
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[CRM Admin] Error deleting project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to delete project' });
+  }
+});
+
+// GET /api/admin/crm/projects/:projectId/tasks
+router.get('/projects/:projectId/tasks', async (req: Request, res: Response) => {
+  try {
+    const tasks = await taskService.listByProject(req.params.projectId, {
+      status: req.query.status as string,
+      assignedTo: req.query.assignedTo as string,
+    });
+    res.json({ success: true, data: tasks });
+  } catch (error) {
+    logger.error('[CRM Admin] Error listing project tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list project tasks' });
+  }
+});
+
+// GET /api/admin/crm/projects/:projectId/tickets
+router.get('/projects/:projectId/tickets', async (req: Request, res: Response) => {
+  try {
+    const tickets = await ticketService.listByProject(req.params.projectId, {
+      status: req.query.status as string,
+      priority: req.query.priority as string,
+      assignedTo: req.query.assignedTo as string,
+    });
+    res.json({ success: true, data: tickets });
+  } catch (error) {
+    logger.error('[CRM Admin] Error listing project tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list project tickets' });
+  }
+});
+
+// GET /api/admin/crm/projects/:projectId/activities
+router.get('/projects/:projectId/activities', async (req: Request, res: Response) => {
+  try {
+    const activities = await activityService.listByProject(req.params.projectId, {
+      type: req.query.type as string,
+      taskId: req.query.taskId as string,
+      ticketId: req.query.ticketId as string,
+      isInternal: req.query.internal === 'false' ? false : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+    });
+    res.json({ success: true, data: activities });
+  } catch (error) {
+    logger.error('[CRM Admin] Error listing project activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list project activities' });
   }
 });
 

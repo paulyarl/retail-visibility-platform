@@ -9,6 +9,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUTM } from "@/hooks/useUTM";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { tenantPublicService } from '@/services/TenantPublicService';
@@ -61,6 +62,7 @@ export default function PlatformHomePage() {
 
 function Home() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { withUTM } = useUTM();
 
   // Use consolidated platform dashboard hook
   const { loading } = usePlatformComplete({ isAuthenticated });
@@ -521,12 +523,12 @@ function Home() {
                 Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <a href="/auth/signup" className="w-full sm:w-auto">
+                <a href={withUTM('/auth/signup')} className="w-full sm:w-auto">
                   <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Start Free Trial →
                   </Button>
                 </a>
-                <Link href="/features" className="w-full sm:w-auto">
+                <Link href={withUTM('/features')} className="w-full sm:w-auto">
                   <Button variant="gradient" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Learn More
                   </Button>
@@ -954,7 +956,7 @@ function Home() {
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
-                    <a href="/auth/signup" className="block">
+                    <a href={withUTM('/auth/signup')} className="block">
                       <Button variant="gradient" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />

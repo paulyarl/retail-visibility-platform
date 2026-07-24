@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { onboardingStateService } from '@/services/OnboardingStateService';
+import { getUTMParamsFromUrl, storeUTMParams } from '@/lib/utm';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -52,6 +53,19 @@ export default function SignupWizardPage() {
         urlTier = tierParam;
       }
     }
+
+    // Capture UTM / ref attribution from the URL and store it for signup completion
+    const utmParams = getUTMParamsFromUrl();
+    storeUTMParams(utmParams);
+    const attribution = {
+      referral: utmParams.ref,
+      utmSource: utmParams.utm_source,
+      utmMedium: utmParams.utm_medium,
+      utmCampaign: utmParams.utm_campaign,
+      utmContent: utmParams.utm_content,
+      utmTerm: utmParams.utm_term,
+    };
+    onboardingStateService.savePhase1(attribution);
 
     if (existingState) {
       setFormData(prev => ({

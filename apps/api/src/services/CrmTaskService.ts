@@ -30,11 +30,22 @@ export class CrmTaskService extends BaseService {
   /**
    * Global task list (all tenants)
    */
-  async listGlobal(filters: { assignedTo?: string; status?: string; tenantId?: string } = {}) {
+  async listGlobal(filters: { assignedTo?: string; status?: string; tenantId?: string; projectId?: string } = {}) {
     const where: any = {};
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     if (filters.status) where.status = filters.status;
     if (filters.tenantId) where.tenant_id = filters.tenantId;
+    if (filters.projectId) where.project_id = filters.projectId;
+    return prisma.crm_tasks.findMany({ where, orderBy: [{ sort_order: 'asc' }, { due_date: 'asc' }] });
+  }
+
+  /**
+   * List tasks for a specific project
+   */
+  async listByProject(projectId: string, filters: { status?: string; assignedTo?: string } = {}) {
+    const where: any = { project_id: projectId };
+    if (filters.status) where.status = filters.status;
+    if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     return prisma.crm_tasks.findMany({ where, orderBy: [{ sort_order: 'asc' }, { due_date: 'asc' }] });
   }
 
@@ -43,7 +54,8 @@ export class CrmTaskService extends BaseService {
   }
 
   async create(data: {
-    tenant_id: string;
+    tenant_id?: string;
+    project_id?: string;
     contact_id?: string;
     title: string;
     description?: string;
@@ -52,11 +64,15 @@ export class CrmTaskService extends BaseService {
     assigned_to?: string;
     created_by: string;
   }) {
+    if (!data.tenant_id && !data.project_id) {
+      throw new Error('Either tenant_id or project_id is required');
+    }
     const createData: any = { ...data };
     if (createData.due_date && typeof createData.due_date === 'string') {
       createData.due_date = new Date(createData.due_date);
     }
-    return prisma.crm_tasks.create({ data: { id: generateCrmTaskId(data.tenant_id), ...createData } });
+    const idKey = data.tenant_id || 'project';
+    return prisma.crm_tasks.create({ data: { id: generateCrmTaskId(idKey), ...createData } });
   }
 
   async update(taskId: string, data: {
@@ -90,10 +106,12 @@ export class CrmTaskService extends BaseService {
 
     // Auto-log status change as activity
     if (data.status && data.status !== task.status) {
+      const activityIdKey = task.tenant_id || 'project';
       await prisma.crm_activities.create({
         data: {
-          id: generateCrmActivityId(task.tenant_id),
+          id: generateCrmActivityId(activityIdKey),
           tenant_id: task.tenant_id,
+          project_id: task.project_id,
           task_id: taskId,
           actor_id: actorId,
           actor_type: actorType,
@@ -110,10 +128,12 @@ export class CrmTaskService extends BaseService {
     if (data.assigned_to !== undefined && data.assigned_to !== task.assigned_to) {
       const fromName = task.assigned_to || 'Unassigned';
       const toName = data.assigned_to || 'Unassigned';
+      const activityIdKey = task.tenant_id || 'project';
       await prisma.crm_activities.create({
         data: {
-          id: generateCrmActivityId(task.tenant_id),
+          id: generateCrmActivityId(activityIdKey),
           tenant_id: task.tenant_id,
+          project_id: task.project_id,
           task_id: taskId,
           actor_id: actorId,
           actor_type: actorType,

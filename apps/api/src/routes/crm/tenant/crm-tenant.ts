@@ -267,6 +267,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
       author_type: 'tenant',
       author_name: actorName,
       content: req.body.content,
+      content_blocks: req.body.content_blocks,
       is_internal: req.body.is_internal || false,
     });
     res.json({ success: true, data: message });
@@ -369,6 +370,7 @@ router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
       author_type: 'tenant',
       author_name: actorName,
       content: req.body.content,
+      content_blocks: req.body.content_blocks,
       is_internal: req.body.is_internal || false,
     });
     res.json({ success: true, data: message });

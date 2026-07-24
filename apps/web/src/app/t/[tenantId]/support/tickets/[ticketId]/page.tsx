@@ -9,6 +9,9 @@ import { tenantUserService, User } from '@/services/TenantUserService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getContrastColor } from '@/lib/color-utils';
 import TenantCrmPageShell from '@/components/crm/TenantCrmPageShell';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -33,6 +36,8 @@ export default function TenantTicketDetailPage() {
   const [messages, setMessages] = useState<CrmTicketMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState('');
+  const [replyBlocks, setReplyBlocks] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [isInternal, setIsInternal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -71,15 +76,19 @@ export default function TenantTicketDetailPage() {
   }, [ticketId, tenantId]);
 
   async function handleReply() {
-    if (!reply.trim()) return;
+    if (isInternal ? !reply.trim() : replyBlocks.blocks.length === 0) return;
     setSubmitting(true);
     try {
-      const msg = await crmTenantCrmService.createTicketMessage(ticketId, {
-        content: reply.trim(),
-        is_internal: isInternal,
-      });
+      const msg = await crmTenantCrmService.createTicketMessage(
+        ticketId,
+        isInternal
+          ? { content: reply.trim(), is_internal: true }
+          : { content_blocks: replyBlocks, is_internal: false }
+      );
       setMessages(prev => [...prev, msg]);
       setReply('');
+      setReplyBlocks(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
       setIsInternal(false);
     } catch (err) {
       clientLogger.error('[Tenant Ticket Detail] Reply error:', { detail: err });
@@ -421,7 +430,11 @@ export default function TenantTicketDetailPage() {
               )}
               <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
             </div>
-            <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+            {m.content_blocks ? (
+              <RichContentRenderer content={m.content_blocks as ContentBlocks} />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+            )}
           </div>
           );
         })}
@@ -464,13 +477,23 @@ export default function TenantTicketDetailPage() {
       {ticket.status !== 'closed' && (
         <Card>
           <CardContent className="space-y-3">
-            <textarea
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="Type your reply..."
-              rows={3}
-              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-            />
+            {isInternal ? (
+              <textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="Type an internal note..."
+                rows={3}
+                className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+              />
+            ) : (
+              <RichContentEditor
+                key={replyKey}
+                value={replyBlocks}
+                onChange={setReplyBlocks}
+                tenantId={tenantId}
+                className="min-h-[160px]"
+              />
+            )}
             <div className="flex items-center justify-between">
               <label className="inline-flex items-center gap-2 text-xs text-neutral-500 cursor-pointer">
                 <input
@@ -483,7 +506,7 @@ export default function TenantTicketDetailPage() {
               </label>
               <button
                 onClick={handleReply}
-                disabled={!reply.trim() || submitting}
+                disabled={(isInternal ? !reply.trim() : replyBlocks.blocks.length === 0) || submitting}
                 className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Sending...' : 'Send Reply'}

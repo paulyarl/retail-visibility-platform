@@ -13,6 +13,9 @@ import type {
   PersonalCrmAlert, PersonalCrmActivity,
 } from '@/services/crm/PersonalCrmService';
 import type { CrmTicketMessage } from '@/types/crm';
+import { RichContentEditor } from '@/components/products/RichContentEditor';
+import { RichContentRenderer } from '@/components/products/RichContentRenderer';
+import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import { clientLogger } from '@/lib/client-logger';
 
 export const dynamic = 'force-dynamic';
@@ -54,7 +57,8 @@ export default function PersonalCrmPage() {
   // Ticket detail modal
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [ticketMessages, setTicketMessages] = useState<CrmTicketMessage[]>([]);
-  const [replyText, setReplyText] = useState('');
+  const [replyContent, setReplyContent] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [replyKey, setReplyKey] = useState(0);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
 
@@ -135,11 +139,12 @@ export default function PersonalCrmPage() {
   };
 
   const handleSendReply = async () => {
-    if (!selectedTicketId || !replyText.trim()) return;
+    if (!selectedTicketId || replyContent.blocks.length === 0) return;
     setSendingReply(true);
     try {
-      await personalCrmService.createTicketMessage(selectedTicketId, { content: replyText });
-      setReplyText('');
+      await personalCrmService.createTicketMessage(selectedTicketId, { content_blocks: replyContent, is_internal: false });
+      setReplyContent(DEFAULT_CONTENT_BLOCKS);
+      setReplyKey(prev => prev + 1);
       const msgs = await personalCrmService.listTicketMessages(selectedTicketId);
       setTicketMessages(msgs);
     } catch (e) {
@@ -432,7 +437,7 @@ export default function PersonalCrmPage() {
         {/* Ticket Detail Modal */}
         <Modal
           opened={!!selectedTicketId}
-          onClose={() => { setSelectedTicketId(null); setTicketMessages([]); setReplyText(''); }}
+          onClose={() => { setSelectedTicketId(null); setTicketMessages([]); setReplyContent(DEFAULT_CONTENT_BLOCKS); setReplyKey(prev => prev + 1); }}
           title="Ticket Conversation"
           size="lg"
         >
@@ -455,7 +460,11 @@ export default function PersonalCrmPage() {
                             <Text size="xs" c="dimmed">{new Date(msg.created_at).toLocaleString()}</Text>
                           </Group>
                         </Group>
-                        <Text size="sm">{msg.content}</Text>
+                        {msg.content_blocks ? (
+                          <RichContentRenderer content={msg.content_blocks as ContentBlocks} />
+                        ) : (
+                          <Text size="sm">{msg.content}</Text>
+                        )}
                       </div>
                     ))
                   )}
@@ -463,14 +472,14 @@ export default function PersonalCrmPage() {
               </ScrollArea.Autosize>
               <Divider />
               <div>
-                <Textarea
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Type your reply..."
-                  minRows={3}
+                <RichContentEditor
+                  key={replyKey}
+                  value={replyContent}
+                  onChange={setReplyContent}
+                  className="min-h-[160px]"
                 />
                 <Group justify="flex-end" mt="sm">
-                  <Button onClick={handleSendReply} loading={sendingReply} disabled={!replyText.trim()}>
+                  <Button onClick={handleSendReply} loading={sendingReply} disabled={replyContent.blocks.length === 0}>
                     Send Reply
                   </Button>
                 </Group>

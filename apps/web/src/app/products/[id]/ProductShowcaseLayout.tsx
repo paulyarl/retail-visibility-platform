@@ -11,6 +11,7 @@ import { ProductGalleryPanel } from '@/components/products/sections/ProductGalle
 import { ProductPurchasePanel } from '@/components/products/sections/ProductPurchasePanel';
 import { ProductBottomSections } from '@/components/products/sections/ProductBottomSections';
 import { ProductLayoutSkeleton } from '@/components/products/sections/ProductLayoutSkeleton';
+import { PinterestSaveButton } from '@/components/tracking/PinterestSaveButton';
 import CouponSpotlight from '@/components/storefront/CouponSpotlight';
 import { StorefrontOptionFlags, ProductOptionFlags } from '@/services/CapabilityResolutionService';
 
@@ -66,6 +67,14 @@ export function ProductShowcaseLayout({
           categorySlug={s.categorySlug}
           productTitle={s.productTitle}
         />
+
+        <div className="flex items-center justify-end mb-4">
+          <PinterestSaveButton
+            url={s.resolvedCurrentUrl}
+            description={s.productTitle || product.title}
+            imageUrl={product.images?.[0]?.url}
+          />
+        </div>
 
         <div className="mb-6">
           <ProductTrustBar

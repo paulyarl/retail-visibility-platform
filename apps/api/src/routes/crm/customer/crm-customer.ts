@@ -168,7 +168,7 @@ router.get('/tickets/:ticketId', async (req: Request, res: Response) => {
     if (ticket.customer_id !== customerId) {
       return res.status(403).json({ error: 'access_denied', message: 'You can only view your own tickets' });
     }
-    if (!(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
+    if (!ticket.tenant_id || !(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
 
     // Enrich with tenant name/logo from business profile
     const profile = await prisma.tenant_business_profiles_list.findUnique({
@@ -195,7 +195,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     if (ticket.customer_id !== customerId) {
       return res.status(403).json({ error: 'access_denied', message: 'You can only view your own tickets' });
     }
-    if (!(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
+    if (!ticket.tenant_id || !(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
 
     // Customer cannot see internal notes
     const messages = await messageService.listByTicket(req.params.ticketId, false);
@@ -218,7 +218,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
     if (ticket.customer_id !== customerId) {
       return res.status(403).json({ error: 'access_denied', message: 'You can only reply to your own tickets' });
     }
-    if (!(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
+    if (!ticket.tenant_id || !(await checkCrmCustomerEnabled(ticket.tenant_id, res))) return;
 
     const customerName = [req.customer?.first_name, req.customer?.last_name].filter(Boolean).join(' ') || req.customer?.email || 'Customer';
 
@@ -228,6 +228,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
       author_type: 'customer',
       author_name: customerName,
       content: req.body.content,
+      content_blocks: req.body.content_blocks,
       is_internal: false, // Customer messages are never internal
     });
 

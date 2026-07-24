@@ -17,6 +17,8 @@ import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { CommandPalette } from "@/components/app-shell/CommandPalette";
 import { Notifications } from "@mantine/notifications";
 import { Toaster } from "@/components/ui/Toaster";
+import { UTMTracker } from "@/components/tracking/UTMTracker";
+import { MetaPixel } from "@/components/tracking/MetaPixel";
 import type { ServerResolvedAuth } from "@/components/tenant/ServerResolvedContextProvider";
 
 const ThemeProvider = dynamic(
@@ -44,6 +46,8 @@ export function ClientRootLayout({ children, initialUser }: ClientRootLayoutProp
                         <Notifications position="top-right" />
                         <Toaster />
                         <GlobalErrorHandler />
+                        <UTMTracker />
+                        <MetaPixel />
                         <div key="error-boundary-wrapper">
                           <ErrorBoundary>
                             {children}
