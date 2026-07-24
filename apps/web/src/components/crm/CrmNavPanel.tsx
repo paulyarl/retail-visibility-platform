@@ -11,6 +11,7 @@ import {
   IconInbox,
   IconBroadcast,
   IconPalette,
+  IconFolder,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/crm/tenants', label: 'Tenants', icon: IconUsers, emoji: '🏢' },
   { href: '/settings/admin/crm/tickets', label: 'Tickets', icon: IconTicket, emoji: '🎫' },
   { href: '/settings/admin/crm/tasks', label: 'Tasks', icon: IconChecklist, emoji: '✅' },
+  { href: '/settings/admin/crm/projects', label: 'Projects', icon: IconFolder, emoji: '📁' },
   { href: '/settings/admin/crm/services', label: 'Services', icon: IconPalette, emoji: '🎨' },
   { href: '/settings/admin/crm/requests', label: 'Requests', icon: IconInbox, emoji: '📥' },
   { href: '/settings/admin/crm/broadcast', label: 'Broadcast', icon: IconBroadcast, emoji: '📢' },

@@ -105,7 +105,11 @@ export default function CrmServicesPage() {
                             </Link>
                           </td>
                           <td className="px-4 py-3 text-neutral-500 text-xs">
-                            <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_id}</Link>
+                            {t.tenant_id ? (
+                              <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_id}</Link>
+                            ) : (
+                              <span className="text-neutral-400">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[t.status] || STATUS_COLORS.open}`}>
@@ -145,7 +149,7 @@ export default function CrmServicesPage() {
                     <div key={task.id} className="flex items-center justify-between py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{task.title}</p>
-                        <p className="text-xs text-neutral-500">{task.tenant_id}</p>
+                        <p className="text-xs text-neutral-500">{task.tenant_id || 'No tenant'}</p>
                       </div>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
                         {task.due_date && (

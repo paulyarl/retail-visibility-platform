@@ -222,7 +222,13 @@ export default function CrmTicketDetailPage() {
               </div>
             </div>
             <div className="mt-4 text-sm text-neutral-500 space-y-1">
-              <p><span className="font-medium">Tenant:</span> <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_id}</Link></p>
+              <p><span className="font-medium">Scope:</span> {ticket.tenant_id ? (
+                <Link href={`/settings/admin/crm/tenants/${ticket.tenant_id}`} className="text-amber-600 hover:underline">{ticket.tenant_id}</Link>
+              ) : ticket.project_id ? (
+                <Link href={`/settings/admin/crm/projects/${ticket.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
+              ) : (
+                <span className="text-neutral-400">No scope</span>
+              )}</p>
               <p><span className="font-medium">Created:</span> {new Date(ticket.created_at).toLocaleString()}</p>
               {ticket.first_responded_at && <p><span className="font-medium">First Response:</span> {new Date(ticket.first_responded_at).toLocaleString()}</p>}
               {ticket.resolved_at && <p><span className="font-medium">Resolved:</span> {new Date(ticket.resolved_at).toLocaleString()}</p>}
@@ -286,7 +292,7 @@ export default function CrmTicketDetailPage() {
                   key={replyKey}
                   value={replyContent}
                   onChange={setReplyContent}
-                  tenantId={ticket?.tenant_id}
+                  tenantId={ticket?.tenant_id || undefined}
                   className="min-h-[160px]"
                 />
                 <div className="flex justify-end">

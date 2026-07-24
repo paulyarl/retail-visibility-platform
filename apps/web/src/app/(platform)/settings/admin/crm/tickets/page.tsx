@@ -123,7 +123,13 @@ export default function CrmGlobalTicketsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-neutral-500 text-xs">
-                    <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_id}</Link>
+                    {t.tenant_id ? (
+                      <Link href={`/settings/admin/crm/tenants/${t.tenant_id}`} className="hover:underline">{t.tenant_id}</Link>
+                    ) : t.project_id ? (
+                      <Link href={`/settings/admin/crm/projects/${t.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
+                    ) : (
+                      <span className="text-neutral-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {updatingId === t.id ? (

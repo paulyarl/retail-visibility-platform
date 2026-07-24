@@ -281,7 +281,13 @@ export default function CrmTaskDetailPage() {
               </div>
             )}
             <div className="mt-4 text-sm text-neutral-500 space-y-1">
-              <p><span className="font-medium">Tenant:</span> <Link href={`/settings/admin/crm/tenants/${task.tenant_id}`} className="text-amber-600 hover:underline">{tenantNameMap.get(task.tenant_id) || task.tenant_id}</Link></p>
+              <p><span className="font-medium">Scope:</span> {task.tenant_id ? (
+                <Link href={`/settings/admin/crm/tenants/${task.tenant_id}`} className="text-amber-600 hover:underline">{tenantNameMap.get(task.tenant_id) || task.tenant_id}</Link>
+              ) : task.project_id ? (
+                <Link href={`/settings/admin/crm/projects/${task.project_id}`} className="text-amber-600 hover:underline">📁 Project</Link>
+              ) : (
+                <span className="text-neutral-400">No scope</span>
+              )}</p>
               <p><span className="font-medium">Created:</span> {new Date(task.created_at).toLocaleString()}</p>
               {task.completed_at && <p><span className="font-medium">Completed:</span> {new Date(task.completed_at).toLocaleString()}</p>}
             </div>
@@ -345,7 +351,7 @@ export default function CrmTaskDetailPage() {
                     key={replyKey}
                     value={replyContent}
                     onChange={setReplyContent}
-                    tenantId={task?.tenant_id}
+                    tenantId={task?.tenant_id || undefined}
                     className="min-h-[160px]"
                   />
                   <div className="flex justify-end">

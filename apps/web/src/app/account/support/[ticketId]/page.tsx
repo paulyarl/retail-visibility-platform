@@ -113,9 +113,9 @@ export default function CustomerTicketDetailPage() {
               {ticket.tenant_logo ? (
                 <img src={ticket.tenant_logo} alt="" className="w-5 h-5 rounded object-cover" />
               ) : (
-                <span className="w-5 h-5 rounded bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[9px] font-bold text-neutral-500">{(ticket.tenant_name || ticket.tenant_id).charAt(0)}</span>
+                <span className="w-5 h-5 rounded bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[9px] font-bold text-neutral-500">{(ticket.tenant_name || ticket.tenant_id || '?').charAt(0)}</span>
               )}
-              {ticket.tenant_name || ticket.tenant_id}
+              {ticket.tenant_name || ticket.tenant_id || 'Unknown'}
             </span> · Created {new Date(ticket.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -174,7 +174,7 @@ export default function CustomerTicketDetailPage() {
               key={replyKey}
               value={reply}
               onChange={setReply}
-              tenantId={ticket?.tenant_id}
+              tenantId={ticket?.tenant_id || undefined}
               className="min-h-[160px]"
             />
             <div className="flex justify-end">

@@ -319,9 +319,9 @@ export default function CustomerSupportPage() {
                       {t.tenant_logo ? (
                         <img src={t.tenant_logo} alt="" className="w-4 h-4 rounded object-cover" />
                       ) : (
-                        <span className="w-4 h-4 rounded bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[8px] font-bold text-neutral-500">{(t.tenant_name || t.tenant_id).charAt(0)}</span>
+                        <span className="w-4 h-4 rounded bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[8px] font-bold text-neutral-500">{(t.tenant_name || t.tenant_id || '?').charAt(0)}</span>
                       )}
-                      {t.tenant_name || t.tenant_id}
+                      {t.tenant_name || t.tenant_id || 'Unknown'}
                     </span> · {new Date(t.created_at).toLocaleDateString()}
                   </p>
                 </div>
