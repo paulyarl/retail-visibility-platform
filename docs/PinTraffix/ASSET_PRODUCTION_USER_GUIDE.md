@@ -23,9 +23,12 @@ Each loop section contains: loop summary, visual assets required (with filenames
 
 - [ ] Pinterest Business account created and domain claimed
 - [ ] Pinterest tag deployed on key routes
-- [ ] Figma templates for 2:3 (1200x1800), 1:1 (1000x1000), 1.91:1 (1200x628)
+- [ ] Canva templates for 2:3 (1200x1800), 1:1 (1000x1000), 1.91:1 (1200x628)
 - [ ] Access to `apps/web/src/lib/pinterest/pinCampaigns.ts`
 - [ ] Access to `apps/web/public/images/pinterest/` for asset delivery
+- [ ] Demo tenant staged with populated storefront (products, orders, catalog) for real screenshots
+- [ ] Clover POS dashboard screenshots sourced (stock libraries, partner resources, or Clover marketing assets — verify licensing)
+- [ ] Brand logo assets exported (transparent PNG, SVG) and uploaded to Canva brand kit
 
 ### 2.2 Engineering Readiness Audit
 
@@ -67,10 +70,11 @@ Each loop section contains: loop summary, visual assets required (with filenames
 ### 2.4 Design System
 
 - [ ] Brand color palette and typography locked
-- [ ] 2:3 Pin template (1200x1800) in Figma
-- [ ] 1:1 Pin template (1000x1000) in Figma
-- [ ] Logo assets exported (transparent PNG, SVG)
+- [ ] 2:3 Pin template (1200x1800) in Canva
+- [ ] 1:1 Pin template (1000x1000) in Canva
+- [ ] Logo assets exported (transparent PNG, SVG) and uploaded to Canva brand kit
 - [ ] Screenshot capture environment staged (demo tenant with populated storefront)
+- [ ] Browser screenshot workflow ready (capture at 1200px+ width, crop/composite in Canva)
 
 ---
 
@@ -80,7 +84,7 @@ Every loop follows this 8-step cycle:
 
 1. **Confirm loop definition** — search phrase, Pin angle, destination, offer, CTA
 2. **Verify destination readiness** — check Section 2.2 audit; if not ready, stop and file engineering ticket
-3. **Produce visual assets** — design using Figma 2:3 template, export PNG + WebP to `apps/web/public/images/pinterest/`
+3. **Produce visual assets** — composite using Canva 2:3 template (real screenshots + stock images + headline overlays), export PNG + WebP to `apps/web/public/images/pinterest/`
 4. **Write Pin copy** — title (max 100 chars), description (search phrase + value + CTA + 2-5 hashtags), alt text, board name
 5. **Generate UTM URL** — use `buildPinUrl()` from `pinCampaigns.ts`
 6. **Validate destination** — paste UTM URL into Pinterest Rich Pins Validator; confirm unique title, description, hero image
@@ -115,6 +119,23 @@ Every loop follows this 8-step cycle:
 - Split 1: Clover inventory vs synced online catalog
 - Split 2: Clover order vs Visible Shelf fulfillment
 - Split 3: Clover items vs Google Shopping feed
+
+**Asset sourcing strategy:**
+
+| Asset side | Source | Priority |
+|---|---|---|
+| Visible Shelf storefront (right side) | Real screenshots from staged demo tenant | 1st choice |
+| Clover POS dashboard (left side) | Stock sources / credible screenshots (verify licensing) | 1st choice |
+| Either side | AI-generated illustration | Fallback only — if real screenshots can't be secured |
+
+**Production tool:** Canva (not Figma). Composite screenshots, add headline overlays, brand logo, and export at 1200x1800.
+
+**Pre-production action items for P-01:**
+- [ ] Stage demo tenant with populated storefront (products, orders, catalog) for clean screenshots
+- [ ] Source Clover POS dashboard screenshots (stock libraries, partner resources, or Clover marketing assets — check licensing)
+- [ ] Set up Canva template at 1200x1800 (2:3) with brand colors, logo, and headline text style
+- [ ] Capture VS screenshots at high resolution (browser at 1200px+ width, then crop/composite in Canva)
+- [ ] Headline overlay must match Pin angle exactly: "Turn Your Clover POS Into a Full Online Storefront in 14 Days"
 
 **Pin copy:**
 - Title: Turn Your Clover POS Into a Full Online Storefront in 14 Days
@@ -827,7 +848,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 |---|---|
 | Project | PinTraffix Asset Production |
 | Title | P-01: Clover hero + 3 split screens |
-| Description | Design 4 assets (1200x1800, PNG + WebP): `p01-clover-storefront-hero` (split-screen Clover POS vs Visible Shelf storefront), `clover-split-1` (inventory sync), `clover-split-2` (order fulfillment), `clover-split-3` (Google Shopping feed). Export to `apps/web/public/images/pinterest/`. See ASSET_PRODUCTION_USER_GUIDE.md Section 4 P-01 for creative direction. |
+| Description | Design 4 assets (1200x1800, PNG + WebP) in Canva: `p01-clover-storefront-hero` (split-screen Clover POS vs Visible Shelf storefront), `clover-split-1` (inventory sync), `clover-split-2` (order fulfillment), `clover-split-3` (Google Shopping feed). Use real VS storefront screenshots from demo tenant (right side) + Clover POS stock screenshots (left side). AI generation as fallback only. Export to `apps/web/public/images/pinterest/`. See ASSET_PRODUCTION_USER_GUIDE.md Section 4 P-01 for creative direction and asset sourcing strategy. |
 | Priority | High |
 | Due Date | [Week 1 date] |
 | Assigned To | [Designer] |
@@ -1044,7 +1065,7 @@ Create tickets from the project detail page (`/settings/admin/crm/projects/[proj
 2. Filter by "Assigned To" = me (or scan the Kanban columns)
 3. Click task title to open detail page
 4. Read description for creative direction
-5. Design assets in Figma
+5. Design assets in Canva
 6. Export PNG + WebP to `apps/web/public/images/pinterest/`
 7. Change task status to `completed` via inline dropdown on the Kanban board
 8. Add internal note: "Assets delivered to `apps/web/public/images/pinterest/` on [date]"
@@ -1108,7 +1129,7 @@ Each task detail page (accessible by clicking a task title from the project Kanb
 
 **Example conversation on a design task:**
 
-> **[Designer]** (public): Started on P-01 hero. Using split-screen layout with Clover dashboard left, storefront right. Will export 4 assets today.
+> **[Designer]** (public): Started on P-01 hero. Using split-screen layout in Canva with Clover dashboard screenshot left, real VS storefront screenshot right. Will export 4 assets today.
 >
 > **[Marketing]** (public): Make sure the headline overlay matches the Pin angle exactly: "Turn Your Clover POS Into a Full Online Storefront in 14 Days"
 >
