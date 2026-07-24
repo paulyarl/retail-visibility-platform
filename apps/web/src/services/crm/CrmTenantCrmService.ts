@@ -36,7 +36,9 @@ class CrmTenantCrmService extends TenantApiSingleton {
       'crm-tenant-contacts',
       'crm-tenant-contact-detail',
       'crm-tenant-tickets',
+      'crm-tenant-ticket-messages*',
       'crm-tenant-tasks',
+      'crm-tenant-task-messages*',
       'crm-tenant-activities',
       'crm-tenant-inquiries',
       'crm-tenant-alerts',
@@ -194,7 +196,8 @@ class CrmTenantCrmService extends TenantApiSingleton {
       `/api/tenant/crm/tickets/${ticketId}/messages`,
       { method: 'GET' },
       cacheKey,
-      2 * 60 * 1000
+      2 * 60 * 1000,
+      { context: this.defaultContext, isolation: this.defaultIsolation }
     );
     return this.unwrap<CrmTicketMessage[]>(result);
   }
@@ -250,7 +253,8 @@ class CrmTenantCrmService extends TenantApiSingleton {
       `/api/tenant/crm/tasks/${taskId}/messages`,
       { method: 'GET' },
       cacheKey,
-      2 * 60 * 1000
+      2 * 60 * 1000,
+      { context: this.defaultContext, isolation: this.defaultIsolation }
     );
     return this.unwrap<CrmTaskMessage[]>(result);
   }

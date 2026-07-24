@@ -40,9 +40,9 @@ class CrmAdminService extends AdminApiSingleton {
       'crm-tenant-transactions',
       'crm-contacts',
       'crm-tickets',
-      'crm-ticket-messages',
+      'crm-ticket-messages*',
       'crm-tasks',
-      'crm-task-messages',
+      'crm-task-messages*',
       'crm-activities',
       'crm-inquiries',
       'crm-requests',
@@ -213,7 +213,8 @@ class CrmAdminService extends AdminApiSingleton {
       `/api/admin/crm/tickets/${ticketId}/messages`,
       { method: 'GET' },
       cacheKey,
-      2 * 60 * 1000
+      2 * 60 * 1000,
+      { context: this.defaultContext, isolation: this.defaultIsolation }
     );
     return this.unwrap<CrmTicketMessage[]>(result);
   }
@@ -276,7 +277,8 @@ class CrmAdminService extends AdminApiSingleton {
       `/api/admin/crm/tasks/${taskId}/messages`,
       { method: 'GET' },
       cacheKey,
-      2 * 60 * 1000
+      2 * 60 * 1000,
+      { context: this.defaultContext, isolation: this.defaultIsolation }
     );
     return this.unwrap<CrmTaskMessage[]>(result);
   }
