@@ -122,7 +122,7 @@ export default function CrmTaskDetailPage() {
     try {
       await crmAdminService.updateTask(editTask.id, {
         title: editTask.title,
-        description: editTask.description || undefined,
+        description: editTask.description,
         priority: editTask.priority,
         due_date: editTask.due_date || undefined,
         assigned_to: editTask.assigned_to || undefined,
@@ -171,7 +171,7 @@ export default function CrmTaskDetailPage() {
     setDeleting(true);
     try {
       await crmAdminService.deleteTask(taskId);
-      window.location.href = '/settings/admin/crm/tasks';
+      window.location.href = task?.project_id ? `/settings/admin/crm/projects/${task.project_id}` : '/settings/admin/crm/tasks';
     } catch (err) {
       clientLogger.error('[Task Detail] Delete error:', { detail: err });
     } finally {
@@ -213,19 +213,30 @@ export default function CrmTaskDetailPage() {
           )}
         </span>
       }
-      breadcrumbs={[
-        { label: 'Settings', href: '/settings' },
-        { label: 'Admin' },
-        { label: 'CRM', href: '/settings/admin/crm' },
-        { label: 'Tasks', href: '/settings/admin/crm/tasks' },
-        { label: task.title },
-      ]}
+      breadcrumbs={
+        task.project_id
+          ? [
+              { label: 'Settings', href: '/settings' },
+              { label: 'Admin' },
+              { label: 'CRM', href: '/settings/admin/crm' },
+              { label: 'Projects', href: '/settings/admin/crm/projects' },
+              { label: 'Project', href: `/settings/admin/crm/projects/${task.project_id}` },
+              { label: task.title },
+            ]
+          : [
+              { label: 'Settings', href: '/settings' },
+              { label: 'Admin' },
+              { label: 'CRM', href: '/settings/admin/crm' },
+              { label: 'Tasks', href: '/settings/admin/crm/tasks' },
+              { label: task.title },
+            ]
+      }
       actions={
         <div className="flex gap-3 items-center">
           <Button size="sm" variant="outline" onClick={() => { setEditTask(task); setShowEdit(true); }}>Edit</Button>
           <Button size="sm" variant="ghost" onClick={() => setDeleteConfirm(true)} className="text-red-600 hover:text-red-700">Delete</Button>
-          <Link href="/settings/admin/crm/tasks" className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400">
-            Back to Tasks
+          <Link href={task.project_id ? `/settings/admin/crm/projects/${task.project_id}` : '/settings/admin/crm/tasks'} className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400">
+            {task.project_id ? 'Back to Project' : 'Back to Tasks'}
           </Link>
         </div>
       }

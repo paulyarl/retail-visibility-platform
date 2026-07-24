@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import validator from 'validator';
 import { logger } from '../logger';
 
 /**
@@ -49,9 +48,6 @@ function sanitizeString(input: string): string {
 
   // Remove null bytes
   let sanitized = input.replace(/\0/g, '');
-
-  // Escape HTML entities
-  sanitized = validator.escape(sanitized);
 
   // Remove potentially dangerous characters
   sanitized = sanitized.replace(/[<>'"&]/g, '');

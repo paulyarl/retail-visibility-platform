@@ -188,6 +188,15 @@ class CrmAdminService extends AdminApiSingleton {
     return this.unwrap<CrmTicket>(result);
   }
 
+  async createProjectTicket(projectId: string, data: CreateTicketInput): Promise<CrmTicket> {
+    const result = await this.makeDefaultRequest<CrmTicket>(
+      `/api/admin/crm/projects/${projectId}/tickets`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTicket>(result);
+  }
+
   async updateTicket(ticketId: string, data: UpdateTicketInput): Promise<CrmTicket> {
     const result = await this.makeDefaultRequest<CrmTicket>(
       `/api/admin/crm/tickets/${ticketId}`,

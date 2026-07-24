@@ -809,6 +809,35 @@ router.get('/projects/:projectId/tickets', async (req: Request, res: Response) =
   }
 });
 
+// POST /api/admin/crm/projects/:projectId/tickets
+router.post('/projects/:projectId/tickets', async (req: Request, res: Response) => {
+  try {
+    const projectId = req.params.projectId;
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const actorName = [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ') || req.user?.email || 'Platform Admin';
+
+    const ticket = await ticketService.create({ project_id: projectId, ...req.body });
+    await audit({ actor: actorId, action: 'create', payload: { entity_type: 'crm_ticket', id: ticket.id, project_id: projectId, ...req.body } });
+
+    // Auto-log ticket creation as activity
+    await activityService.create({
+      project_id: projectId,
+      ticket_id: ticket.id,
+      actor_id: actorId,
+      actor_type: 'platform',
+      actor_name: actorName,
+      activity_type: 'status_change',
+      content: `Ticket created: ${req.body.title}`,
+      is_internal: false,
+    });
+
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    logger.error('[CRM Admin] Error creating project ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket' });
+  }
+});
+
 // GET /api/admin/crm/projects/:projectId/activities
 router.get('/projects/:projectId/activities', async (req: Request, res: Response) => {
   try {

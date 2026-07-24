@@ -790,7 +790,7 @@ ORDER BY avg_ltv_cents DESC;
 
 ## 12. CRM-Driven Production Tracking
 
-The platform's built-in Admin CRM (`/settings/admin/crm`) serves as the operational tracking system for all asset production. No external project management tools are needed — the CRM's task and ticket system provides Kanban boards, priority, assignment, threaded conversation, and status tracking that map directly to the asset production workflow.
+The platform's built-in Admin CRM (`/settings/admin/crm`) serves as the operational tracking system for all asset production. No external project management tools are needed — the CRM's Projects feature provides project-scoped Kanban boards, priority, assignment, threaded conversation, and status tracking that map directly to the asset production workflow. Tasks and tickets are created inside a dedicated CRM Project (no tenant required), keeping internal work separate from tenant-facing support.
 
 ### 12.1 Why Use the CRM
 
@@ -809,11 +809,11 @@ The platform's built-in Admin CRM (`/settings/admin/crm`) serves as the operatio
 
 ### 12.2 Setup
 
-1. **Create or identify an internal tenant** (e.g., "PinTraffix" or "Platform Operations") to hold all production tasks and tickets
-2. **Navigate to** `/settings/admin/crm/tasks` for the global Kanban board
-3. **Create tasks** using the templates in Section 12.3 below
-4. **Create tickets** for engineering blockers using the templates in Section 12.4
-5. **Filter by status** to see what's pending, in progress, or completed
+1. **Create a CRM Project** — Navigate to `/settings/admin/crm/projects`, click "+ Create Project", name it "PinTraffix Asset Production", and set status to "Active". This project will hold all production tasks and tickets without needing a tenant.
+2. **Open the project** — Click the project name to open the detail page at `/settings/admin/crm/projects/[projectId]`. This is your project-scoped Kanban board with Tasks, Tickets, and Activities tabs.
+3. **Create tasks** using the "+ Add Task" button on the Tasks tab, using the templates in Section 12.3 below
+4. **Create tickets** for engineering blockers on the Tickets tab, using the templates in Section 12.4
+5. **Filter by status** using the Kanban columns (Pending, In Progress, Completed, Cancelled)
 
 ### 12.3 Task Creation Templates — Per Loop
 
@@ -825,7 +825,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix (or internal ops tenant) |
+| Project | PinTraffix Asset Production |
 | Title | P-01: Clover hero + 3 split screens |
 | Description | Design 4 assets (1200x1800, PNG + WebP): `p01-clover-storefront-hero` (split-screen Clover POS vs Visible Shelf storefront), `clover-split-1` (inventory sync), `clover-split-2` (order fulfillment), `clover-split-3` (Google Shopping feed). Export to `apps/web/public/images/pinterest/`. See ASSET_PRODUCTION_USER_GUIDE.md Section 4 P-01 for creative direction. |
 | Priority | High |
@@ -836,7 +836,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-01: Swap heroImage in clover-storefront page.tsx |
 | Description | Replace `placehold.co` placeholders in `apps/web/src/app/solutions/clover-storefront/page.tsx` with `/images/pinterest/p01-clover-storefront-hero.png` and `/images/pinterest/clover-split-{n}.png`. Run `pnpm checkweb`. See ASSET_PRODUCTION_USER_GUIDE.md Section 7. |
 | Priority | High |
@@ -847,7 +847,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-02: Google hero + 3 before/after mockups |
 | Description | Design 4 assets (1200x1800, PNG + WebP): `p02-google-visibility-hero` (Google search results mockup with local store in Search/Shopping/Maps), `google-before-after-1` (no Google vs Shopping carousel), `google-before-after-2` (no GBP vs complete GBP), `google-before-after-3` (no Maps vs store pin). Export to `apps/web/public/images/pinterest/`. See guide Section 4 P-02. |
 | Priority | High |
@@ -858,7 +858,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-02: Swap heroImage in google-visibility + checklist pages |
 | Description | Replace `placehold.co` in `apps/web/src/app/solutions/google-visibility/page.tsx` and `/guides/google-visibility-checklist/page.tsx` with local image paths. Run `pnpm checkweb`. See guide Section 7. |
 | Priority | High |
@@ -869,7 +869,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-03: Deposit hero + 2 reserve flow diagrams |
 | Description | Design 3 assets (1200x1800, PNG + WebP): `p03-deposit-commerce-hero` (product page with Reserve with Deposit button + phone pickup confirmation), `deposit-reserve-flow-1` (3-step: browse, deposit, pickup), `deposit-reserve-flow-2` (notification sequence). Export to `apps/web/public/images/pinterest/`. See guide Section 4 P-03. |
 | Priority | High |
@@ -880,7 +880,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-03: Swap heroImage in deposit-commerce page.tsx |
 | Description | Replace `placehold.co` in `apps/web/src/app/solutions/deposit-commerce/page.tsx` with `/images/pinterest/p03-deposit-commerce-hero.png` and `/images/pinterest/deposit-reserve-flow-{n}.png`. Run `pnpm checkweb`. See guide Section 7. |
 | Priority | High |
@@ -891,7 +891,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-04: Omnichannel hero + 2 split-path mockups |
 | Description | Design 3 assets (1200x1800, PNG + WebP): `p04-omnichannel-hero` (single product with two checkout buttons), `omnichannel-split-1` (pay in full path), `omnichannel-split-2` (reserve with deposit path). Export to `apps/web/public/images/pinterest/`. See guide Section 4 P-04. |
 | Priority | High |
@@ -902,7 +902,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P-04: Swap heroImage in omnichannel page.tsx |
 | Description | Replace `placehold.co` in `apps/web/src/app/solutions/omnichannel/page.tsx` with local image paths. Run `pnpm checkweb`. See guide Section 7. |
 | Priority | High |
@@ -915,7 +915,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P0 Pin 1: Write copy + publish P-03 Deposit Commerce Pin |
 | Description | Write Pin copy (title max 100 chars, description with search phrase + CTA + hashtags, alt text). Generate UTM URL via `buildPinUrl()`. Validate destination with Pinterest Rich Pins Validator. Upload to Pinterest, select board "Local Retail Growth", schedule for Day 1. See guide Sections 4 P-03 and 11. |
 | Priority | High |
@@ -926,7 +926,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P0 Pin 2: Write copy + publish P-01 Clover Storefront Pin |
 | Description | Write Pin copy. Generate UTM URL. Validate with Rich Pins Validator. Upload to Pinterest, select board "Clover POS Power Tips", schedule for Day 1. See guide Sections 4 P-01 and 11. |
 | Priority | High |
@@ -937,7 +937,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P0 Pin 3: Write copy + publish P-02 Google Visibility Pin |
 | Description | Write Pin copy. Generate UTM URL. Validate with Rich Pins Validator. Upload to Pinterest, select board "Get Found on Google", schedule for Day 2. See guide Sections 4 P-02 and 11. |
 | Priority | High |
@@ -948,7 +948,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P0 Pin 4: Write copy + publish P-04 Omnichannel Pin |
 | Description | Write Pin copy. Generate UTM URL. Validate with Rich Pins Validator. Upload to Pinterest, select board "Omnichannel Retail", schedule for Day 2. See guide Sections 4 P-04 and 11. |
 | Priority | High |
@@ -959,7 +959,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P0 Pin 5: Write copy + publish P-10 Why Not on Google Pin |
 | Description | Write Pin copy. Generate UTM URL. Validate with Rich Pins Validator. Upload to Pinterest, select board "Get Found on Google", schedule for Day 3. See guide Sections 5 P-10 and 11. |
 | Priority | High |
@@ -970,7 +970,7 @@ Each task is created via the "+ Create Task" button on the Kanban board. Use the
 
 | Field | Value |
 |---|---|
-| Tenant | PinTraffix |
+| Project | PinTraffix Asset Production |
 | Title | P0 Pin 6: Write copy + publish P-06 QR Code Marketing Pin |
 | Description | Write Pin copy. Generate UTM URL. Validate with Rich Pins Validator. Upload to Pinterest, select board "QR Code Marketing", schedule for Day 3. See guide Sections 5 P-06 and 11. |
 | Priority | High |
@@ -1013,7 +1013,7 @@ Create one design task and one engineering swap task per loop, following the sam
 
 ### 12.4 Ticket Templates — Engineering Blockers
 
-Create tickets at `/settings/admin/crm/tickets` for route readiness work that blocks asset production.
+Create tickets from the project detail page (`/settings/admin/crm/projects/[projectId]` → Tickets tab) for route readiness work that blocks asset production.
 
 **Ticket: Route Not Ready — [Route Name]**
 
@@ -1040,43 +1040,47 @@ Create tickets at `/settings/admin/crm/tickets` for route readiness work that bl
 ### 12.5 Workflow — How Design and Engineering Use the CRM
 
 **Designer workflow:**
-1. Open `/settings/admin/crm/tasks`, filter by "Assigned To" = me
-2. Click task title to open detail page
-3. Read description for creative direction
-4. Design assets in Figma
-5. Export PNG + WebP to `apps/web/public/images/pinterest/`
-6. Change task status to `completed` via inline dropdown
-7. Add internal note: "Assets delivered to `apps/web/public/images/pinterest/` on [date]"
-8. The corresponding engineering swap task (separate task) is now unblocked
+1. Open the PinTraffix project at `/settings/admin/crm/projects/[projectId]`, go to Tasks tab
+2. Filter by "Assigned To" = me (or scan the Kanban columns)
+3. Click task title to open detail page
+4. Read description for creative direction
+5. Design assets in Figma
+6. Export PNG + WebP to `apps/web/public/images/pinterest/`
+7. Change task status to `completed` via inline dropdown on the Kanban board
+8. Add internal note: "Assets delivered to `apps/web/public/images/pinterest/` on [date]"
+9. The corresponding engineering swap task (separate task) is now unblocked
 
 **Engineer workflow:**
-1. Open `/settings/admin/crm/tasks`, filter by "Assigned To" = me
-2. Find the engineering swap task for the loop
-3. Check that the designer's task is `completed` (check the internal note)
-4. Update `heroImage` const in `page.tsx` from `placehold.co` to local path
-5. Run `pnpm checkweb`
-6. Change task status to `completed`
-7. Add internal note: "Swap complete. `pnpm checkweb` passes. Ready for Rich Pins validation."
+1. Open the PinTraffix project at `/settings/admin/crm/projects/[projectId]`, go to Tasks tab
+2. Filter by "Assigned To" = me (or scan the Kanban columns)
+3. Find the engineering swap task for the loop
+4. Check that the designer's task is `completed` (check the internal note)
+5. Update `heroImage` const in `page.tsx` from `placehold.co` to local path
+6. Run `pnpm checkweb`
+7. Change task status to `completed`
+8. Add internal note: "Swap complete. `pnpm checkweb` passes. Ready for Rich Pins validation."
 
 **Marketing workflow:**
-1. Open the Pin publish task
-2. Verify both design and engineering tasks are `completed`
-3. Generate UTM URL via `buildPinUrl()` from `pinCampaigns.ts`
-4. Paste UTM URL into Pinterest Rich Pins Validator
-5. If validation passes: upload Pin to Pinterest with copy, board, URL
-6. Change task status to `completed`
-7. Add internal note: "Pin published on [date]. Pin URL: [URL]. Board: [board name]."
+1. Open the PinTraffix project, go to Tasks tab
+2. Find the Pin publish task
+3. Verify both design and engineering tasks are `completed`
+4. Generate UTM URL via `buildPinUrl()` from `pinCampaigns.ts`
+5. Paste UTM URL into Pinterest Rich Pins Validator
+6. If validation passes: upload Pin to Pinterest with copy, board, URL
+7. Change task status to `completed`
+8. Add internal note: "Pin published on [date]. Pin URL: [URL]. Board: [board name]."
 
 **Blocker workflow (tickets):**
-1. Engineer opens the ticket at `/settings/admin/crm/tickets/[ticketId]`
-2. Implements `generateMetadata` + `openGraph` on the route
-3. Changes ticket status to `resolved`
-4. Add reply: "Route ready. Rich Pins validator passes for [URL]."
-5. The corresponding design + publish tasks are now unblocked
+1. Open the PinTraffix project, go to Tickets tab
+2. Click the ticket to open its detail page
+3. Implement `generateMetadata` + `openGraph` on the route
+4. Change ticket status to `resolved`
+5. Add reply: "Route ready. Rich Pins validator passes for [URL]."
+6. The corresponding design + publish tasks are now unblocked
 
 ### 12.6 Kanban Board View
 
-The global tasks page at `/settings/admin/crm/tasks` displays a 4-column Kanban:
+The project detail page at `/settings/admin/crm/projects/[projectId]` displays a 4-column Kanban on the Tasks tab:
 
 ```
 | Pending          | In Progress      | Completed        | Cancelled |
@@ -1097,7 +1101,7 @@ The global tasks page at `/settings/admin/crm/tasks` displays a 4-column Kanban:
 
 ### 12.7 Conversation Thread Usage
 
-Each task detail page (`/settings/admin/crm/tasks/[taskId]`) has a threaded conversation with two input modes:
+Each task detail page (accessible by clicking a task title from the project Kanban) has a threaded conversation with two input modes:
 
 - **Public message** — visible to all task participants. Use for: design review feedback, creative direction questions, asset delivery confirmations
 - **Internal note** — admin-only, dashed amber border. Use for: QA validation results, Rich Pins validator pass/fail, engineering swap confirmation, publish date recording
@@ -1126,7 +1130,7 @@ Each task detail page (`/settings/admin/crm/tasks/[taskId]`) has a threaded conv
 
 ### 12.8 Activity Log
 
-The CRM automatically logs activities on the tenant detail page (`/settings/admin/crm/tenants/[tenantId]`):
+The CRM automatically logs activities on the project's Activities tab (`/settings/admin/crm/projects/[projectId]` → Activities tab):
 
 - Task created
 - Task status changed (from X to Y)

@@ -7,7 +7,7 @@ import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea
 import { crmAdminService } from '@/services/crm/CrmAdminService';
 import { adminOperationsService, type AdminTenant, type AdminUser } from '@/services/AdminOperationsService';
 import CrmPageShell from '@/components/crm/CrmPageShell';
-import type { CrmProject, CrmTask, CrmTicket, CrmActivity, TaskStatus, TaskPriority, ProjectStatus } from '@/types/crm';
+import type { CrmProject, CrmTask, CrmTicket, CrmActivity, TaskStatus, TaskPriority, ProjectStatus, TicketPriority } from '@/types/crm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -29,6 +29,7 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
 };
 
 const EMPTY_TASK = { title: '', description: '', priority: 'medium' as TaskPriority, due_date: '', assigned_to: '' };
+const EMPTY_TICKET = { title: '', description: '', priority: 'medium' as TicketPriority, category: 'technical', assigned_to: '' };
 
 type Tab = 'tasks' | 'tickets' | 'activities';
 
@@ -48,6 +49,10 @@ export default function CrmProjectDetailPage() {
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [newTask, setNewTask] = useState(EMPTY_TASK);
+
+  const [showCreateTicket, setShowCreateTicket] = useState(false);
+  const [creatingTicket, setCreatingTicket] = useState(false);
+  const [newTicket, setNewTicket] = useState(EMPTY_TICKET);
 
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deletingTask, setDeletingTask] = useState(false);
@@ -85,6 +90,8 @@ export default function CrmProjectDetailPage() {
   }, []);
 
   const assigneeOptions = staffUsers.map(u => ({ value: u.id, label: `${u.name || u.email} (${u.email})` }));
+  const userMap = new Map<string, string>();
+  staffUsers.forEach(u => userMap.set(u.id, u.name || u.email));
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -147,6 +154,29 @@ export default function CrmProjectDetailPage() {
       clientLogger.error('[CRM Project Detail] Create task error:', { detail: err });
     } finally {
       setCreatingTask(false);
+    }
+  }
+
+  async function handleCreateTicket(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTicket.title.trim()) return;
+    setCreatingTicket(true);
+    try {
+      await crmAdminService.createProjectTicket(projectId, {
+        title: newTicket.title.trim(),
+        description: newTicket.description.trim() || undefined,
+        priority: newTicket.priority,
+        category: newTicket.category || undefined,
+        assigned_to: newTicket.assigned_to || undefined,
+      });
+      setShowCreateTicket(false);
+      setNewTicket(EMPTY_TICKET);
+      await loadTabData('tickets');
+      await loadProject();
+    } catch (err) {
+      clientLogger.error('[CRM Project Detail] Create ticket error:', { detail: err });
+    } finally {
+      setCreatingTicket(false);
     }
   }
 
@@ -283,12 +313,17 @@ export default function CrmProjectDetailPage() {
                           <Link href={`/settings/admin/crm/tasks/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-amber-600 hover:underline">
                             {t.title}
                           </Link>
-                          <button
-                            onClick={() => setDeleteTaskId(t.id)}
-                            className="text-xs text-neutral-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            Del
-                          </button>
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Link href={`/settings/admin/crm/tasks/${t.id}`} className="text-xs text-neutral-400 hover:text-amber-600">
+                              Edit
+                            </Link>
+                            <button
+                              onClick={() => setDeleteTaskId(t.id)}
+                              className="text-xs text-neutral-400 hover:text-red-600"
+                            >
+                              Del
+                            </button>
+                          </div>
                         </div>
                         {t.priority && (
                           <Badge variant={t.priority === 'high' ? 'warning' : 'default'} className="mt-1">{t.priority}</Badge>
@@ -311,7 +346,7 @@ export default function CrmProjectDetailPage() {
                           <p className="text-xs text-neutral-400 mt-1">Due: {new Date(t.due_date).toLocaleDateString()}</p>
                         )}
                         {t.assigned_to && (
-                          <p className="text-xs text-neutral-400 mt-1">@{t.assigned_to}</p>
+                          <p className="text-xs text-neutral-400 mt-1">@{userMap.get(t.assigned_to) || t.assigned_to}</p>
                         )}
                       </div>
                     ))}
@@ -324,7 +359,11 @@ export default function CrmProjectDetailPage() {
           </div>
         </div>
       ) : activeTab === 'tickets' ? (
-        <div className="space-y-2">
+        <div>
+          <div className="flex justify-end mb-3">
+            <Button size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
+          </div>
+          <div className="space-y-2">
           {tickets.length === 0 ? (
             <Card><CardContent className="py-8 text-center"><p className="text-sm text-neutral-500">No tickets in this project.</p></CardContent></Card>
           ) : (
@@ -340,11 +379,12 @@ export default function CrmProjectDetailPage() {
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant={t.priority === 'urgent' ? 'warning' : 'default'}>{t.priority}</Badge>
-                  {t.assigned_to && <span className="text-xs text-neutral-400">@{t.assigned_to}</span>}
+                  {t.assigned_to && <span className="text-xs text-neutral-400">@{userMap.get(t.assigned_to) || t.assigned_to}</span>}
                 </div>
               </div>
             ))
           )}
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -424,6 +464,73 @@ export default function CrmProjectDetailPage() {
               <Button type="button" variant="ghost" onClick={() => setShowCreateTask(false)}>Cancel</Button>
               <Button type="submit" disabled={creatingTask || !newTask.title.trim()}>
                 {creatingTask ? <Spinner size="sm" /> : 'Add Task'}
+              </Button>
+            </ModalFooter>
+          </form>
+        </Modal>
+      )}
+
+      {/* Create Ticket Modal */}
+      {showCreateTicket && (
+        <Modal isOpen={showCreateTicket} onClose={() => setShowCreateTicket(false)} title="Add Ticket to Project" size="md">
+          <form onSubmit={handleCreateTicket} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Title</label>
+              <input
+                type="text"
+                required
+                value={newTicket.title}
+                onChange={(e) => setNewTicket(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="Ticket title..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Description</label>
+              <Textarea
+                value={newTicket.description}
+                onChange={(e) => setNewTicket(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Optional description..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Priority</label>
+                <select
+                  value={newTicket.priority}
+                  onChange={(e) => setNewTicket(prev => ({ ...prev, priority: e.target.value as TicketPriority }))}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Category</label>
+                <input
+                  type="text"
+                  value={newTicket.category}
+                  onChange={(e) => setNewTicket(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  placeholder="e.g. technical, design..."
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
+              <Select
+                value={newTicket.assigned_to}
+                onChange={(e) => setNewTicket(prev => ({ ...prev, assigned_to: e.target.value }))}
+                options={[{ value: '', label: '— Unassigned —' }, ...assigneeOptions]}
+                disabled={optionsLoading}
+              />
+            </div>
+            <ModalFooter>
+              <Button type="button" variant="ghost" onClick={() => setShowCreateTicket(false)}>Cancel</Button>
+              <Button type="submit" disabled={creatingTicket || !newTicket.title.trim()}>
+                {creatingTicket ? <Spinner size="sm" /> : 'Add Ticket'}
               </Button>
             </ModalFooter>
           </form>
