@@ -30,6 +30,7 @@ export class CrmTicketService extends BaseService {
 
   /**
    * Global ticket queue (all tenants)
+   * Enriches with tenant_name and assigned_to_name
    */
   async listGlobal(filters: { assignedTo?: string; status?: string; priority?: string; category?: string; projectId?: string } = {}) {
     const where: any = {};
@@ -38,7 +39,30 @@ export class CrmTicketService extends BaseService {
     if (filters.priority) where.priority = filters.priority;
     if (filters.category) where.category = filters.category;
     if (filters.projectId) where.project_id = filters.projectId;
-    return prisma.crm_support_tickets.findMany({ where, orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }] });
+
+    const tickets = await prisma.crm_support_tickets.findMany({
+      where,
+      include: { tenants: { select: { name: true } } },
+      orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
+    });
+
+    const assignedToIds = [...new Set(tickets.map(t => t.assigned_to).filter(Boolean))] as string[];
+    let userNameMap: Record<string, string> = {};
+    if (assignedToIds.length > 0) {
+      const users = await prisma.users.findMany({
+        where: { id: { in: assignedToIds } },
+        select: { id: true, first_name: true, last_name: true, email: true },
+      });
+      userNameMap = Object.fromEntries(
+        users.map(u => [u.id, [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email])
+      );
+    }
+
+    return tickets.map(t => ({
+      ...t,
+      tenant_name: t.tenants?.name ?? null,
+      assigned_to_name: t.assigned_to ? (userNameMap[t.assigned_to] ?? null) : null,
+    }));
   }
 
   /**

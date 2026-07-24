@@ -122,6 +122,7 @@ export interface CrmTicket {
   priority: TicketPriority;
   category: string | null;
   assigned_to: string | null;
+  assigned_to_name?: string | null;
   inquiry_id: string | null;
   faq_id: string | null;
   first_responded_at: string | null;
