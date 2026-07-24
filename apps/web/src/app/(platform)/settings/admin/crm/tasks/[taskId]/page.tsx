@@ -346,6 +346,10 @@ export default function CrmTaskDetailPage() {
                         </div>
                         <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
                       </div>
+                      {(() => {
+                        console.log('[Render Debug] m.content_blocks:', m.content_blocks, 'length:', m.content_blocks?.blocks?.length);
+                        return null;
+                      })()}
                       {m.content_blocks?.blocks?.length ? (
                         <RichContentRenderer content={m.content_blocks} />
                       ) : (
