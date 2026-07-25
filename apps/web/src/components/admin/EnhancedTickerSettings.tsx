@@ -161,7 +161,7 @@ export default function EnhancedTickerSettings({
   const handleAddMessage = async (message: Omit<TickerMessage, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
     const result = await tickerConfigService.addMessage(message);
     if (result.success) {
-      const newMessage = { ...message, ...result.data! };
+      const newMessage = { ...message, ...(result.data as any).data };
       setConfig(prev => ({
         ...prev,
         messages: [...prev.messages, newMessage]
@@ -617,7 +617,10 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
         label="Message"
         placeholder="Enter your notification message..."
         value={formData.message}
-        onChange={(e) => setFormData(prev => ({ ...prev, message: e.currentTarget.value }))}
+        onChange={(e) => {
+          const value = e.currentTarget.value;
+          setFormData(prev => ({ ...prev, message: value }));
+        }}
         required
       />
 
