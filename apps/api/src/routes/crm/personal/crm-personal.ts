@@ -278,8 +278,8 @@ router.get('/tasks', async (req: Request, res: Response) => {
       status: req.query.status as string,
     });
 
-    // Enrich with tenant names
-    const tenantIds = [...new Set(tasks.map((t: any) => t.tenant_id))];
+    // Enrich with tenant and project names
+    const tenantIds = [...new Set(tasks.map((t: any) => t.tenant_id).filter(Boolean))];
     const tenants = tenantIds.length > 0
       ? await prisma.tenants.findMany({
           where: { id: { in: tenantIds } },
@@ -288,9 +288,19 @@ router.get('/tasks', async (req: Request, res: Response) => {
       : [];
     const tenantMap = new Map(tenants.map((t: any) => [t.id, t.name]));
 
+    const projectIds = [...new Set(tasks.map((t: any) => t.project_id).filter(Boolean))];
+    const projects = projectIds.length > 0
+      ? await prisma.crm_projects.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const projectMap = new Map(projects.map((p: any) => [p.id, p.name]));
+
     const enriched = tasks.map((t: any) => ({
       ...t,
-      tenant_name: tenantMap.get(t.tenant_id) || t.tenant_id,
+      tenant_name: tenantMap.get(t.tenant_id) || null,
+      project_name: projectMap.get(t.project_id) || null,
     }));
 
     res.json({ success: true, data: enriched });
