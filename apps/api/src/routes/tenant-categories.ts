@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { StorageBuckets } from '../storage-config';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
+import { requestContextStorage } from '../context';
 
 console.log('🔥 TENANT CATEGORIES ROUTES MODULE LOADED');
 
@@ -60,7 +61,7 @@ async function refreshDirectoryMV(tenantId?: string) {
       }
     }
   } catch (error) {
-    logger.error('[MV Refresh] Failed to refresh materialized view:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[MV Refresh] Failed to refresh materialized view:', requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw error - this is non-critical
   }
 }

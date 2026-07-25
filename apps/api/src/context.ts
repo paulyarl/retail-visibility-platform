@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "async_hooks";
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "./prisma";
 import { getEffectivePlatform } from "./utils/effectiveFlags";
@@ -11,6 +12,8 @@ export type RequestCtx = {
   userId?: string;
   correlationId?: string;
 };
+
+export const requestContextStorage = new AsyncLocalStorage<RequestCtx>();
 
 export async function setRequestContext(req: Request, res: Response, next: NextFunction) {
   const ctx: RequestCtx = { region: "us-east-1" };
@@ -48,5 +51,5 @@ export async function setRequestContext(req: Request, res: Response, next: NextF
   }
 
   (req as any).ctx = ctx;
-  next();
+  requestContextStorage.run(ctx, () => next());
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Card,
@@ -18,6 +19,7 @@ import {
   Avatar,
   Box,
   Grid,
+  SimpleGrid,
   Radio,
   Spoiler,
   Loader,
@@ -612,6 +614,39 @@ export default function AccountPage() {
           </Grid.Col>
         </Grid>
       </Card>
+
+      {/* Quick Links */}
+      <Title order={4} mb="md">Quick Links</Title>
+      <SimpleGrid cols={{ base: 1, md: 4 }} spacing="md">
+        <Link
+          href="/settings/profile"
+          className="flex items-center gap-3 p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all"
+        >
+          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <div>
+            <Text fw={500}>My Profile</Text>
+            <Text size="sm" c="dimmed">View personal and business info</Text>
+          </div>
+        </Link>
+        <Link
+          href="/settings/crm"
+          className="flex items-center gap-3 p-4 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-amber-300 dark:hover:border-amber-600 hover:shadow-sm transition-all"
+        >
+          <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </div>
+          <div>
+            <Text fw={500}>CRM Hub</Text>
+            <Text size="sm" c="dimmed">Tickets, tasks, alerts</Text>
+          </div>
+        </Link>
+      </SimpleGrid>
 
     </Stack>
   );

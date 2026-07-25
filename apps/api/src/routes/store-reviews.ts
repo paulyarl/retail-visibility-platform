@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth';
 import { getDirectPool } from '../utils/db-pool';
 import { z } from 'zod';
 import { logger } from '../logger';
+import { requestContextStorage } from '../context';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ async function updateRatingSummary(pool: any, tenantId: string) {
     // TODO: Fix directory listing sync separately
     
   } catch (error) {
-    logger.error('Error updating rating summary:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating rating summary:', requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -107,7 +108,7 @@ async function updateDirectoryListingRatings(pool: any, tenantId: string) {
     
     await pool.query(updateQuery, [tenantId]);
   } catch (error) {
-    logger.error('Error updating directory listing ratings:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating directory listing ratings:', requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw here - directory update is secondary
   }
 }
