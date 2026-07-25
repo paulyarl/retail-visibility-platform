@@ -299,8 +299,13 @@ export default function PersonalCrmProjectDetailPage() {
                           {(taskColumns[col] || []).map(t => (
                             <div key={t.id} className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 group">
                               <div className="flex items-start justify-between gap-2">
-                                <Text size="sm" fw={500} className="flex-1 truncate">{t.title}</Text>
+                                <Link href={`/settings/crm/tasks/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-blue-600 hover:underline">
+                                  {t.title}
+                                </Link>
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Link href={`/settings/crm/tasks/${t.id}`} className="text-xs text-neutral-400 hover:text-blue-600">
+                                    View
+                                  </Link>
                                   <button
                                     onClick={() => setDeleteTaskId(t.id)}
                                     className="text-xs text-neutral-400 hover:text-red-600"
@@ -355,9 +360,11 @@ export default function PersonalCrmProjectDetailPage() {
               ) : (
                 <Stack gap="xs">
                   {tickets.map(t => (
-                    <div key={t.id} className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3">
+                    <div key={t.id} className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 group">
                       <div className="flex items-start justify-between gap-2">
-                        <Text size="sm" fw={500} className="flex-1 truncate">{t.title}</Text>
+                        <Link href={`/settings/crm/tickets/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-blue-600 hover:underline">
+                          {t.title}
+                        </Link>
                         <Badge size="xs" variant="light" color={STATUS_COLORS[t.status] || 'gray'}>
                           {t.status.replace('_', ' ')}
                         </Badge>

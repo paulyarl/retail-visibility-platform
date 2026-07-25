@@ -58,7 +58,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
     shipping_handling_days: 2,
     shipping_provider: null,
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -103,9 +103,9 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
     try {
       setSaving(true);
       setMessage(null);
-      
+
       const response = await platformHomeService.updateTenantFulfillmentSettings(tenantId, settings);
-      
+
       if (response) {
         setSettings(response);
         setMessage({ type: 'success', text: 'Settings saved successfully!' });
@@ -173,11 +173,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
 
       {/* Success/Error Message */}
       {message && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
+        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${message.type === 'success'
+            ? 'bg-green-50 text-green-800 border border-green-200'
             : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
+          }`}>
           <AlertCircle className="h-5 w-5" />
           <span>{message.text}</span>
         </div>
@@ -226,11 +225,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                           setSettings({ ...settings, pickup_ready_time_minutes: preset.minutes });
                           setCustomPickupTime(false);
                         }}
-                        className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                          settings.pickup_ready_time_minutes === preset.minutes && !customPickupTime
+                        className={`px-4 py-2 rounded-lg border-2 transition-all ${settings.pickup_ready_time_minutes === preset.minutes && !customPickupTime
                             ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
                             : 'border-neutral-300 bg-white text-neutral-700 hover:border-primary-400'
-                        }`}
+                          }`}
                       >
                         {preset.label}
                       </button>
@@ -238,11 +236,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <button
                       type="button"
                       onClick={() => setCustomPickupTime(true)}
-                      className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                        customPickupTime
+                      className={`px-4 py-2 rounded-lg border-2 transition-all ${customPickupTime
                           ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
                           : 'border-neutral-300 bg-white text-neutral-700 hover:border-primary-400'
-                      }`}
+                        }`}
                     >
                       Custom
                     </button>
@@ -277,11 +274,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                           setSettings({ ...settings, pickup_instructions: preset.value });
                           setCustomPickupInstructions(false);
                         }}
-                        className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                          settings.pickup_instructions === preset.value && !customPickupInstructions
+                        className={`px-4 py-2 rounded-lg border-2 transition-all ${settings.pickup_instructions === preset.value && !customPickupInstructions
                             ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
                             : 'border-neutral-300 bg-white text-neutral-700 hover:border-primary-400'
-                        }`}
+                          }`}
                       >
                         {preset.label}
                       </button>
@@ -289,11 +285,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <button
                       type="button"
                       onClick={() => setCustomPickupInstructions(true)}
-                      className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                        customPickupInstructions
+                      className={`px-4 py-2 rounded-lg border-2 transition-all ${customPickupInstructions
                           ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
                           : 'border-neutral-300 bg-white text-neutral-700 hover:border-primary-400'
-                      }`}
+                        }`}
                     >
                       Custom Instructions
                     </button>
@@ -527,6 +522,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
         {/* Save Button */}
         <div className="flex justify-end">
           <Button
+            variant='gradient' style={{ color: 'white' }}
             onClick={handleSave}
             disabled={saving}
             className="px-6 py-2"

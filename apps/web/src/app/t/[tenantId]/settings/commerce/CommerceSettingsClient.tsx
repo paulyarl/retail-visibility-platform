@@ -20,16 +20,16 @@ interface CommerceSettings {
   deposit_min_cents: number;
   deposit_max_cents: number;
   full_payment_enabled: boolean;
-  
+
   // Order Management
   auto_confirm_orders: boolean;
   order_confirmation_minutes: number;
-  
+
   // Customer Experience
   show_payment_options: boolean;
   require_payment_upfront: boolean;
   allow_payment_on_pickup: boolean;
-  
+
   // Notifications
   notify_on_payment: boolean;
   notify_on_deposit: boolean;
@@ -116,7 +116,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
     manual_tax_rate_percent: null,
     tax_shipping: false,
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -156,7 +156,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch tenant tier info for display (tier badge) using the same service as subscription page
       try {
         const tierData = await platformHomeService.getTenantTier(tenantId);
@@ -182,7 +182,7 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
         // Set default tier if fetch fails
         setCurrentTier('');
       }
-      
+
       // Fetch existing commerce settings
       const response = await platformHomeService.getTenantCommerceSettings(tenantId);
       if (response) {
@@ -200,9 +200,9 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
     try {
       setSaving(true);
       setMessage(null);
-      
+
       const response = await platformHomeService.updateTenantCommerceSettings(tenantId, settings);
-      
+
       if (response) {
         setSettings(response);
         setMessage({ type: 'success', text: 'Commerce settings saved successfully!' });
@@ -218,13 +218,13 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
 
   const getCommerceMode = () => {
     if (!commerceFeatures) return 'Unknown';
-    
+
     if (commerceFeatures.commerce_disabled) return '❌ Commerce Disabled';
-    
+
     // Check what merchant has enabled in their settings
     const hasDeposit = settings.deposit_enabled;
     const hasFullPayment = settings.full_payment_enabled;
-    
+
     if (hasDeposit && hasFullPayment) return '💳💰 Both Options Available';
     if (hasDeposit && !hasFullPayment) return '� Deposit Only';
     if (!hasDeposit && hasFullPayment) return '� Full Payment Only';
@@ -305,9 +305,9 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   <p className="text-sm text-yellow-700 mt-1">
                     Your current tier doesn't support commerce features. Upgrade your subscription to enable payment processing and checkout.
                   </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="mt-3"
                     onClick={() => router.push(`/t/${tenantId}/settings/subscription`)}
                   >
@@ -358,11 +358,10 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                           <button
                             key={preset.value}
                             onClick={() => setSettings({ ...settings, deposit_percentage: preset.value })}
-                            className={`px-3 py-1 rounded text-sm ${
-                              settings.deposit_percentage === preset.value
+                            className={`px-3 py-1 rounded text-sm ${settings.deposit_percentage === preset.value
                                 ? 'bg-blue-500 text-white'
                                 : 'bg-white border border-neutral-300'
-                            }`}
+                              }`}
                           >
                             {preset.label}
                           </button>
@@ -437,8 +436,8 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
                   <h4 className="font-medium text-blue-900">Both Payment Options Available</h4>
                 </div>
                 <p className="text-sm text-blue-800">
-                  When you enable both deposit and full payment options, customers will be able to choose 
-                  which payment method they prefer during checkout. This gives your customers maximum flexibility 
+                  When you enable both deposit and full payment options, customers will be able to choose
+                  which payment method they prefer during checkout. This gives your customers maximum flexibility
                   while you maintain control over the deposit percentage and limits.
                 </p>
               </div>
@@ -708,14 +707,15 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
 
       {/* Save Button */}
       <div className="flex justify-end gap-3">
-        <Button 
+        <Button
           variant="outline"
           onClick={() => router.push(`/t/${tenantId}/settings`)}
         >
           Cancel
         </Button>
-        <Button 
-          onClick={handleSave} 
+        <Button
+          variant='gradient' style={{ color: 'white' }}
+          onClick={handleSave}
           disabled={saving || commerceFeatures?.commerce_disabled}
           className="flex items-center gap-2"
         >
@@ -726,11 +726,10 @@ export default function CommerceSettingsClient({ tenantId }: CommerceSettingsCli
 
       {/* Message */}
       {message && (
-        <div className={`p-4 rounded-lg border ${
-          message.type === 'success'
+        <div className={`p-4 rounded-lg border ${message.type === 'success'
             ? 'bg-green-50 border-green-200 text-green-800'
             : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
+          }`}>
           {message.text}
         </div>
       )}

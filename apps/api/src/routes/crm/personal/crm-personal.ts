@@ -225,6 +225,32 @@ router.get('/tickets/:ticketId', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/personal/crm/tickets/:ticketId
+router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const actorName = getUserDisplayName(req);
+
+    const existing = await ticketService.getById(req.params.ticketId);
+    if (!existing) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
+
+    if (existing.assigned_to !== userId && existing.tenant_id !== PLATFORM_TENANT_ID) {
+      const tenantIds = getTenantIds(req);
+      if (!existing.tenant_id || !tenantIds.includes(existing.tenant_id)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
+      }
+    }
+
+    const ticket = await ticketService.update(req.params.ticketId, req.body, userId, actorName, 'platform');
+    await audit({ tenantId: ticket.tenant_id || undefined, actor: userId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id } });
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    logger.error('[CRM Personal] Error updating ticket:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update ticket' });
+  }
+});
+
 // PUT /api/personal/crm/tickets/:ticketId/messages/:messageId
 router.put('/tickets/:ticketId/messages/:messageId', async (req: Request, res: Response) => {
   try {
@@ -381,6 +407,57 @@ router.get('/tasks/:taskId', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('[CRM Personal] Error fetching task:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch task' });
+  }
+});
+
+// PUT /api/personal/crm/tasks/:taskId
+router.put('/tasks/:taskId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const actorName = getUserDisplayName(req);
+
+    const existing = await taskService.getById(req.params.taskId);
+    if (!existing) return res.status(404).json({ error: 'not_found', message: 'Task not found' });
+
+    if (existing.assigned_to !== userId) {
+      const tenantIds = getTenantIds(req);
+      if (existing.tenant_id && !tenantIds.includes(existing.tenant_id)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this task' });
+      }
+    }
+
+    const task = await taskService.update(req.params.taskId, req.body, userId, actorName, 'platform');
+    await audit({ tenantId: task.tenant_id || undefined, actor: userId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
+    res.json({ success: true, data: task });
+  } catch (error) {
+    logger.error('[CRM Personal] Error updating task:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update task' });
+  }
+});
+
+// DELETE /api/personal/crm/tasks/:taskId
+router.delete('/tasks/:taskId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const existing = await taskService.getById(req.params.taskId);
+    if (!existing) return res.status(404).json({ error: 'not_found', message: 'Task not found' });
+
+    if (existing.assigned_to !== userId) {
+      const tenantIds = getTenantIds(req);
+      if (existing.tenant_id && !tenantIds.includes(existing.tenant_id)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this task' });
+      }
+    }
+
+    await taskService.delete(req.params.taskId);
+    await audit({ tenantId: existing.tenant_id || undefined, actor: userId, action: 'delete', payload: { entity_type: 'crm_task', id: req.params.taskId } });
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[CRM Personal] Error deleting task:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to delete task' });
   }
 });
 

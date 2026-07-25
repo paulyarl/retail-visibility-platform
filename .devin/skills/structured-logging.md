@@ -184,6 +184,21 @@ For `req.ctx` to compile without TS2339, the `ctx` property must be declared on 
 
 ```typescript
 import { User } from '@prisma/client';
+import type { RequestCtx } from '../context';
+
+declare global {
+  namespace Express {
+    interface Request {
+      ctx?: RequestCtx;
+    }
+  }
+}
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    ctx?: RequestCtx;
+  }
+}
 
 declare module 'express' {
   interface Request {
@@ -191,7 +206,7 @@ declare module 'express' {
       tenantIds?: string[];
       role?: string;
     };
-    ctx?: Record<string, any>;
+    // Override Express 5.x parameter types to be string-based
     params: Record<string, string>;
   }
 }
@@ -199,7 +214,10 @@ declare module 'express' {
 export {};
 ```
 
-> **Avoid circular imports in `express.d.ts`.** Do not `import type { RequestCtx } from '../context'` — the `context.ts` file imports from express, creating a circular dependency that silently breaks module augmentation under `skipLibCheck: true`. Use `Record<string, any>` instead.
+- Use `RequestCtx` for `ctx` so `logger.error(..., req.ctx, ...)` type-checks. `Record<string, any>` no longer satisfies `RequestCtx` because `region` is required.
+- Augment the **global `Express.Request`** interface so `core.Request` (used by Express 5 router callbacks) inherits `ctx`.
+- Also augment **`express-serve-static-core`** to cover direct imports of core `Request` types.
+- The `import type { RequestCtx } from '../context'` is safe because it is type-only and is erased at compile time.
 
 If you're working in a new repo or the type is missing, add this declaration before using `req.ctx`.
 
