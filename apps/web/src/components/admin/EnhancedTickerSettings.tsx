@@ -161,7 +161,7 @@ export default function EnhancedTickerSettings({
   const handleAddMessage = async (message: Omit<TickerMessage, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
     const result = await tickerConfigService.addMessage(message);
     if (result.success) {
-      const newMessage = { ...message, ...result.data! };
+      const newMessage = { ...message, ...(result.data as any).data };
       setConfig(prev => ({
         ...prev,
         messages: [...prev.messages, newMessage]
