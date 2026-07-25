@@ -5,6 +5,7 @@ import { encryptToken, decryptToken, refreshAccessToken } from '../lib/google/oa
 import { isGBPSyncAllowed } from '../lib/google/capability-gate';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { logger } from '../logger';
+import { requestContextStorage } from '../context';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
 
           return credentials.access_token!;
         } catch (refreshError) {
-          logger.error(`[GBP] Legacy token refresh failed for tenant ${tenantId}:`, undefined, { error: { name: (refreshError as any)?.name || 'Error', message: (refreshError as any)?.message || String(refreshError), stack: (refreshError as any)?.stack } });
+          logger.error(`[GBP] Legacy token refresh failed for tenant ${tenantId}:`, requestContextStorage.getStore(), { error: { name: (refreshError as any)?.name || 'Error', message: (refreshError as any)?.message || String(refreshError), stack: (refreshError as any)?.stack } });
           return null;
         }
       }
@@ -95,7 +96,7 @@ async function getValidGBPToken(tenantId: string): Promise<string | null> {
 
     return tenant.google_business_access_token;
   } catch (error) {
-    logger.error(`[GBP] Error getting token for tenant ${tenantId}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error(`[GBP] Error getting token for tenant ${tenantId}:`, requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return null;
   }
 }

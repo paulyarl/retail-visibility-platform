@@ -11,7 +11,7 @@ import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import type {
   CrmTicket, CrmTicketMessage, CrmTask, CrmTaskMessage, CrmActivity, CrmAlert,
   CrmProject, CreateProjectInput, UpdateProjectInput,
-  CreateTaskInput, UpdateTaskInput, CreateTicketInput,
+  CreateTaskInput, UpdateTaskInput, CreateTicketInput, UpdateTicketInput,
   CreateTicketMessageInput, CreateTaskMessageInput,
 } from '@/types/crm';
 import type { ContentBlocks } from '@/components/products/content-blocks';
@@ -409,6 +409,35 @@ class PersonalCrmService extends AuthenticatedApiSingleton {
     const result = await this.makeDefaultRequest<CrmTicket>(
       `/api/personal/crm/projects/${projectId}/tickets`,
       { method: 'POST', body: JSON.stringify(data) },
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTicket>(result);
+  }
+
+  // --- Single Task / Ticket updates (GET already exists above) ---
+
+  async updateTask(taskId: string, data: UpdateTaskInput): Promise<CrmTask> {
+    const result = await this.makeDefaultRequest<CrmTask>(
+      `/api/personal/crm/tasks/${taskId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTask>(result);
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<void>(
+      `/api/personal/crm/tasks/${taskId}`,
+      { method: 'DELETE' },
+    );
+    await this.invalidateServiceCaches();
+    if (!result.success) throw new Error(getErrorMessage(result.error));
+  }
+
+  async updateTicket(ticketId: string, data: UpdateTicketInput): Promise<CrmTicket> {
+    const result = await this.makeDefaultRequest<CrmTicket>(
+      `/api/personal/crm/tickets/${ticketId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
     );
     await this.invalidateServiceCaches();
     return this.unwrap<CrmTicket>(result);

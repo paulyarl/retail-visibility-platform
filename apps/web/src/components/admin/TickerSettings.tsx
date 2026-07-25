@@ -17,10 +17,10 @@ import {
   Tooltip,
   Box
 } from '@mantine/core';
-import { 
-  IconInfoCircle, 
-  IconAlertTriangle, 
-  IconCheck, 
+import {
+  IconInfoCircle,
+  IconAlertTriangle,
+  IconCheck,
   IconBulb,
   IconSettings,
   IconEye,
@@ -46,9 +46,9 @@ interface TickerSettingsProps {
   availableTenants?: Array<{ id: string; name: string }>;
 }
 
-export default function TickerSettings({ 
-  onSave, 
-  initialConfig, 
+export default function TickerSettings({
+  onSave,
+  initialConfig,
   availableTiers = ['Free', 'Basic', 'Premium', 'Enterprise'],
   availableTenants = []
 }: TickerSettingsProps) {
@@ -72,7 +72,7 @@ export default function TickerSettings({
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       onSave?.(config);
       notifications.show({
         title: 'Settings Saved',
@@ -144,7 +144,7 @@ export default function TickerSettings({
           {/* Message Configuration */}
           <Stack gap="sm">
             <Text fw={500}>Message Configuration</Text>
-            
+
             <TextInput
               label="Message"
               placeholder="Enter your notification message..."
@@ -188,7 +188,7 @@ export default function TickerSettings({
           {/* Behavior Options */}
           <Stack gap="sm">
             <Text fw={500}>Behavior Options</Text>
-            
+
             <Group justify="space-between">
               <Text size="sm">Enable scrolling animation</Text>
               <Switch
@@ -213,7 +213,7 @@ export default function TickerSettings({
           {/* Target Audience */}
           <Stack gap="sm">
             <Text fw={500}>Target Audience</Text>
-            
+
             <Select
               label="Show to"
               data={[
@@ -279,7 +279,9 @@ export default function TickerSettings({
           )}
 
           <Group justify="flex-end" mt="md">
-            <Button onClick={handleSave} loading={loading} disabled={!config.enabled || !config.message}>
+            <Button
+              variant='gradient' style={{ color: 'white' }}
+              onClick={handleSave} loading={loading} disabled={!config.enabled || !config.message}>
               Save Settings
             </Button>
           </Group>

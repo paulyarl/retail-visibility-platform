@@ -50,11 +50,11 @@ interface OrganizationCommerceSettings {
 export default function OrganizationCommerceSettingsPage() {
   // Get tenantId from localStorage for access control
   const [tenantId, setTenantId] = useState<string | null>(null);
-  
+
   // Get organizationId from URL if provided
   const [urlOrgId, setUrlOrgId] = useState<string | null>(null);
   const [organizationId, setOrganizationId] = useState<string>('');
-  
+
   // Get user role directly for platform admin detection
   const [userRole, setUserRole] = useState<string | null>(null);
 
@@ -121,7 +121,7 @@ export default function OrganizationCommerceSettingsPage() {
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -147,7 +147,7 @@ export default function OrganizationCommerceSettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       if (!organizationId) return;
-      
+
       try {
         setLoading(true);
         const response = await organizationsService.getOrganizationCommerceSettings(organizationId);
@@ -169,7 +169,7 @@ export default function OrganizationCommerceSettingsPage() {
 
   const handleSave = async () => {
     if (!organizationId) return;
-    
+
     try {
       setSaving(true);
       await organizationsService.updateOrganizationCommerceSettings(organizationId, settings);
@@ -209,7 +209,7 @@ export default function OrganizationCommerceSettingsPage() {
             label: 'Back to Organization'
           }}
         />
-        
+
         <Card withBorder padding="lg" radius="md">
           <Stack gap="lg">
             {(userRole === 'PLATFORM_ADMIN' || tenantRole === 'PLATFORM_ADMIN') ? (
@@ -220,7 +220,7 @@ export default function OrganizationCommerceSettingsPage() {
                     As a Platform Admin, you can manage commerce settings for any organization in the system.
                   </Text>
                 </div>
-                
+
                 <Box bg="blue.0" p="lg" style={{ border: '1px solid var(--mantine-color-blue-2)', borderRadius: 'var(--mantine-radius-md)' }}>
                   <Title order={3} c="blue.9" mb="xs">
                     Select an Organization
@@ -315,7 +315,7 @@ export default function OrganizationCommerceSettingsPage() {
   const getCommerceMode = () => {
     const hasDeposit = settings.deposit_enabled;
     const hasFullPayment = settings.full_payment_enabled;
-    
+
     if (hasDeposit && hasFullPayment) return '💳💰 Both Options Available';
     if (hasDeposit && !hasFullPayment) return '💳 Deposit Only';
     if (!hasDeposit && hasFullPayment) return '💰 Full Payment Only';
@@ -364,7 +364,7 @@ export default function OrganizationCommerceSettingsPage() {
               <CreditCard size={20} />
               <Title order={3}>Payment Options</Title>
             </Group>
-            
+
             {/* Deposit Settings */}
             <Stack gap="md">
               <Group justify="space-between">
@@ -446,8 +446,8 @@ export default function OrganizationCommerceSettingsPage() {
                   <Text fw={500} c="blue.9">Both Payment Options Available</Text>
                 </Group>
                 <Text size="sm" c="blue.8">
-                  When you enable both deposit and full payment options, customers will be able to choose 
-                  which payment method they prefer during checkout. Individual locations can override these 
+                  When you enable both deposit and full payment options, customers will be able to choose
+                  which payment method they prefer during checkout. Individual locations can override these
                   organization settings if needed.
                 </Text>
               </Box>
@@ -565,7 +565,7 @@ export default function OrganizationCommerceSettingsPage() {
               <Package size={20} />
               <Title order={3}>Type-Specific Commerce Settings</Title>
             </Group>
-            
+
             {/* Physical Products Section */}
             <div className="border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden">
               <button
@@ -773,6 +773,7 @@ export default function OrganizationCommerceSettingsPage() {
           Cancel
         </Button>
         <Button
+          variant='gradient' style={{ color: 'white' }}
           onClick={handleSave}
           disabled={saving}
           leftSection={saving ? <Loader size={16} /> : <Settings size={16} />}

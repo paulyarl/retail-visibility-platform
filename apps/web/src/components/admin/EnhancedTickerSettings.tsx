@@ -21,10 +21,10 @@ import {
   Badge,
   Modal
 } from '@mantine/core';
-import { 
-  IconInfoCircle, 
-  IconAlertTriangle, 
-  IconCheck, 
+import {
+  IconInfoCircle,
+  IconAlertTriangle,
+  IconCheck,
   IconBulb,
   IconSettings,
   IconEye,
@@ -48,8 +48,8 @@ interface EnhancedTickerSettingsProps {
   availableTenants?: Array<{ id: string; name: string }>;
 }
 
-export default function EnhancedTickerSettings({ 
-  onSave, 
+export default function EnhancedTickerSettings({
+  onSave,
   availableTiers = ['Free', 'Basic', 'Premium', 'Enterprise'],
   availableTenants = []
 }: EnhancedTickerSettingsProps) {
@@ -81,7 +81,7 @@ export default function EnhancedTickerSettings({
       //console.log('[EnhancedTickerSettings] Loading config from API...');
       const result = await tickerConfigService.getTickerConfig();
       //console.log('[EnhancedTickerSettings] Page load API response:', result);
-      
+
       if (result.success && result.data) {
         // The API response is double-wrapped: { success: true, data: { success: true, data: TickerConfig } }
         // We need to access result.data.data to get the actual TickerConfig
@@ -90,10 +90,10 @@ export default function EnhancedTickerSettings({
         //console.log('[EnhancedTickerSettings] Messages in config:', actualConfig?.messages);
         //console.log('[EnhancedTickerSettings] Messages length:', actualConfig?.messages?.length);
         //console.log('[EnhancedTickerSettings] Config enabled:', actualConfig?.enabled);
-        
+
         // Set the actual config data
         setConfig(actualConfig);
-        
+
         // Log what we just set
         //console.log('[EnhancedTickerSettings] Config set to:', actualConfig);
         //console.log('[EnhancedTickerSettings] Current config state after set:', config);
@@ -113,29 +113,29 @@ export default function EnhancedTickerSettings({
         enabled: config?.enabled,
         ...config.globalSettings
       };
-      
+
       const result = await tickerConfigService.updateGlobalSettings(settingsPayload);
-      
+
       if (result.success) {
-       /*  console.log('[EnhancedTickerSettings] Save successful, API response:', result);
-        console.log('[EnhancedTickerSettings] Current config enabled state:', config.enabled); */
+        /*  console.log('[EnhancedTickerSettings] Save successful, API response:', result);
+         console.log('[EnhancedTickerSettings] Current config enabled state:', config.enabled); */
         // Update local config with the response data, preserving existing messages
         if (result.data) {
           // Extract only the TickerConfig data from the API response
           const apiResponseData = (result.data as any).data as TickerConfig;
-         /*  console.log('[EnhancedTickerSettings] API response data:', apiResponseData);
-          console.log('[EnhancedTickerSettings] API enabled state:', apiResponseData.enabled); */
+          /*  console.log('[EnhancedTickerSettings] API response data:', apiResponseData);
+           console.log('[EnhancedTickerSettings] API enabled state:', apiResponseData.enabled); */
           const tickerConfigData = {
             enabled: apiResponseData.enabled,
             messages: config.messages, // Preserve existing messages
             globalSettings: apiResponseData.globalSettings
           };
-         // console.log('[EnhancedTickerSettings] New config data:', tickerConfigData);
-          
+          // console.log('[EnhancedTickerSettings] New config data:', tickerConfigData);
+
           setConfig(tickerConfigData);
           onSave?.(tickerConfigData);
         }
-        
+
         notifications.show({
           title: 'Settings Saved',
           message: 'Platform ticker settings have been updated successfully.',
@@ -143,7 +143,7 @@ export default function EnhancedTickerSettings({
         });
 
         // Invalidate ticker config cache so ShellWithTicker gets updated immediately
-       // console.log('[EnhancedTickerSettings] Invalidating ticker config cache');
+        // console.log('[EnhancedTickerSettings] Invalidating ticker config cache');
         queryClient.invalidateQueries({ queryKey: ['ticker-config'] });
         queryClient.invalidateQueries({ queryKey: ['ticker-messages'] });
       }
@@ -176,10 +176,10 @@ export default function EnhancedTickerSettings({
   };
 
   const handleUpdateMessage = async (messageId: string, updates: Partial<TickerMessage>) => {
-   /*  console.log('[EnhancedTickerSettings] Updating message:', { messageId, updates });
-    console.log('[EnhancedTickerSettings] Updates targetAudience:', updates.targetAudience);
-    console.log('[EnhancedTickerSettings] Updates targetTiers:', updates.targetTiers);
-    console.log('[EnhancedTickerSettings] Updates targetTiers length:', updates.targetTiers?.length); */
+    /*  console.log('[EnhancedTickerSettings] Updating message:', { messageId, updates });
+     console.log('[EnhancedTickerSettings] Updates targetAudience:', updates.targetAudience);
+     console.log('[EnhancedTickerSettings] Updates targetTiers:', updates.targetTiers);
+     console.log('[EnhancedTickerSettings] Updates targetTiers length:', updates.targetTiers?.length); */
 
     if (!messageId) {
       clientLogger.error('[EnhancedTickerSettings] Cannot update message: missing ID');
@@ -196,13 +196,13 @@ export default function EnhancedTickerSettings({
       console.log('[EnhancedTickerSettings] Message updated successfully:', result.data);
       // The response is double-wrapped, so we need to access result.data.data
       const updatedMessage = (result.data as any).data;
-     /*  console.log('[EnhancedTickerSettings] Updated message targetAudience:', updatedMessage?.targetAudience);
-      console.log('[EnhancedTickerSettings] Updated message targetTiers:', updatedMessage?.targetTiers);
-      console.log('[EnhancedTickerSettings] Updated message targetTiers length:', updatedMessage?.targetTiers?.length);
-       */
+      /*  console.log('[EnhancedTickerSettings] Updated message targetAudience:', updatedMessage?.targetAudience);
+       console.log('[EnhancedTickerSettings] Updated message targetTiers:', updatedMessage?.targetTiers);
+       console.log('[EnhancedTickerSettings] Updated message targetTiers length:', updatedMessage?.targetTiers?.length);
+        */
       setConfig(prev => ({
         ...prev,
-        messages: prev.messages.map(msg => 
+        messages: prev.messages.map(msg =>
           msg.id === messageId ? updatedMessage : msg
         )
       }));
@@ -238,7 +238,7 @@ export default function EnhancedTickerSettings({
     if (result.success) {
       setConfig(prev => ({
         ...prev,
-        messages: prev.messages.map(msg => 
+        messages: prev.messages.map(msg =>
           msg.id === messageId ? { ...msg, isActive: true } : msg
         )
       }));
@@ -350,7 +350,7 @@ export default function EnhancedTickerSettings({
           {/* Global Settings */}
           <Stack gap="sm">
             <Text fw={500}>Global Settings</Text>
-            
+
             <Group grow>
               <NumberInput
                 label="Maximum Messages"
@@ -395,122 +395,124 @@ export default function EnhancedTickerSettings({
 
           <Divider />
 
-            {(config.messages || []).length === 0 ? (
-              <Alert color="gray" variant="light">
-                <Text size="sm">No messages configured. Click "Add Message" to create one.</Text>
-              </Alert>
-            ) : (
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Message</Table.Th>
-                    <Table.Th>Type</Table.Th>
-                    <Table.Th>Priority</Table.Th>
-                    <Table.Th>Target</Table.Th>
-                    <Table.Th>Schedule</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {(config.messages || []).map((message, index) => {
-                    const uniqueKey = message.id ||
-                      `${message.message}-${index}` ||
-                      `message-${index}-${Date.now()}`;
-                    return (
-                      <Table.Tr key={uniqueKey}>
-                        <Table.Td>
-                          <Text size="sm" lineClamp={1} title={message.message}>
-                            {message.message}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge
-                            size="sm"
-                            color={
-                              message.type === 'info' ? 'blue' :
+          {(config.messages || []).length === 0 ? (
+            <Alert color="gray" variant="light">
+              <Text size="sm">No messages configured. Click "Add Message" to create one.</Text>
+            </Alert>
+          ) : (
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Message</Table.Th>
+                  <Table.Th>Type</Table.Th>
+                  <Table.Th>Priority</Table.Th>
+                  <Table.Th>Target</Table.Th>
+                  <Table.Th>Schedule</Table.Th>
+                  <Table.Th>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {(config.messages || []).map((message, index) => {
+                  const uniqueKey = message.id ||
+                    `${message.message}-${index}` ||
+                    `message-${index}-${Date.now()}`;
+                  return (
+                    <Table.Tr key={uniqueKey}>
+                      <Table.Td>
+                        <Text size="sm" lineClamp={1} title={message.message}>
+                          {message.message}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge
+                          size="sm"
+                          color={
+                            message.type === 'info' ? 'blue' :
                               message.type === 'warning' ? 'yellow' :
-                              message.type === 'success' ? 'green' : 'red'
-                            }
-                          >
-                            {message.type}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge size="sm" variant="light">
-                            {message.priority}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">
-                            {message.targetAudience === 'all' ? 'All' :
-                             message.targetAudience === 'specific_tiers' ?
-                             `${message.targetTiers?.length || 0} tiers` :
-                             `${message.targetTenants?.length || 0} tenants`}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          {message.startDate && message.endDate ? (
-                            <Group gap={4}>
-                              <IconCalendar size={12} />
-                              <Text size="xs">
-                                {new Date(message.startDate).toLocaleDateString()} - {new Date(message.endDate).toLocaleDateString()}
-                              </Text>
-                            </Group>
-                          ) : (
-                            <Text size="xs" c="dimmed">No schedule</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
+                                message.type === 'success' ? 'green' : 'red'
+                          }
+                        >
+                          {message.type}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge size="sm" variant="light">
+                          {message.priority}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">
+                          {message.targetAudience === 'all' ? 'All' :
+                            message.targetAudience === 'specific_tiers' ?
+                              `${message.targetTiers?.length || 0} tiers` :
+                              `${message.targetTenants?.length || 0} tenants`}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        {message.startDate && message.endDate ? (
                           <Group gap={4}>
-                            {!message.isActive && (
-                              <ActionIcon
-                                size="sm"
-                                variant="subtle"
-                                color="green"
-                                onClick={() => handleActivateMessage(message.id)}
-                                title="Activate message"
-                              >
-                                <IconCheck size={12} />
-                              </ActionIcon>
-                            )}
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              onClick={() => {
-                                console.log('[EnhancedTickerSettings] Editing message:', message);
-                                setMessageModal({ open: true, message, mode: 'edit' });
-                              }}
-                            >
-                              <IconEdit size={12} />
-                            </ActionIcon>
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              color="red"
-                              onClick={() => handleDeleteMessage(message.id)}
-                            >
-                              <IconTrash size={12} />
-                            </ActionIcon>
+                            <IconCalendar size={12} />
+                            <Text size="xs">
+                              {new Date(message.startDate).toLocaleDateString()} - {new Date(message.endDate).toLocaleDateString()}
+                            </Text>
                           </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            )}
-          
+                        ) : (
+                          <Text size="xs" c="dimmed">No schedule</Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap={4}>
+                          {!message.isActive && (
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              color="green"
+                              onClick={() => handleActivateMessage(message.id)}
+                              title="Activate message"
+                            >
+                              <IconCheck size={12} />
+                            </ActionIcon>
+                          )}
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            onClick={() => {
+                              console.log('[EnhancedTickerSettings] Editing message:', message);
+                              setMessageModal({ open: true, message, mode: 'edit' });
+                            }}
+                          >
+                            <IconEdit size={12} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            color="red"
+                            onClick={() => handleDeleteMessage(message.id)}
+                          >
+                            <IconTrash size={12} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          )}
+
 
           <Group justify="flex-end" mt="md">
             <Button variant="light" onClick={() => setMessageModal({ open: true, mode: 'create' })}>
               Add Message
             </Button>
-            <Button onClick={handleSave} loading={loading}>
+            <Button variant='gradient'
+              style={{ color: 'white' }}
+              onClick={handleSave} loading={loading}>
               Save Settings
             </Button>
           </Group>
         </Stack>
-        
+
       </Card>
 
       {preview && (
@@ -615,7 +617,7 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
         label="Message"
         placeholder="Enter your notification message..."
         value={formData.message}
-        onChange={(e) => setFormData(prev => ({ ...prev, message: e?.currentTarget?.value || '' }))}
+        onChange={(e) => setFormData(prev => ({ ...prev, message: e.currentTarget.value }))}
         required
       />
 
@@ -701,7 +703,7 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
       <Stack gap="sm">
         <Text fw={500} size="sm">Schedule (Optional)</Text>
         <Text size="xs" c="dimmed">Set start and end times for automatic scheduling</Text>
-        
+
         <Group grow>
           <DateTimePicker
             label="Start Date & Time"
@@ -727,11 +729,11 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
             <Group gap="sm">
               <IconClock size={14} />
               <Text>
-                {formData.startDate && formData.endDate 
+                {formData.startDate && formData.endDate
                   ? `Message will show from ${new Date(formData.startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} to ${new Date(formData.endDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`
-                  : formData.startDate 
-                  ? `Message will start showing at ${new Date(formData.startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`
-                  : `Message will stop showing at ${new Date(formData.endDate!).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`}
+                  : formData.startDate
+                    ? `Message will start showing at ${new Date(formData.startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`
+                    : `Message will stop showing at ${new Date(formData.endDate!).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`}
               </Text>
             </Group>
           </Alert>

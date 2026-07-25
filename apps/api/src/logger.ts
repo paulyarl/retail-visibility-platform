@@ -10,7 +10,7 @@
  *   4. SentryTransport   — ERROR-level entries sent to Sentry (when DSN is configured)
  */
 import type { Request, Response, NextFunction } from "express";
-import type { RequestCtx } from "./context";
+import { requestContextStorage, type RequestCtx } from "./context";
 import * as fs from 'fs';
 import * as path from 'path';
 import { prisma } from "./prisma";
@@ -320,13 +320,16 @@ class Logger {
       ...meta,
     };
 
-    if (context) {
-      entry.tenantId = context.tenantId;
-      entry.region = context.region;
-      if (context.correlationId) entry.correlationId = context.correlationId;
-      if (context.userId) entry.userId = context.userId;
-      if (context.ip) entry.ip = context.ip;
-      if (context.userAgent) entry.userAgent = context.userAgent;
+    // Prefer explicitly passed context (e.g. req.ctx), fall back to AsyncLocalStorage
+    const effectiveCtx = context ?? requestContextStorage.getStore();
+
+    if (effectiveCtx) {
+      entry.tenantId = effectiveCtx.tenantId;
+      entry.region = effectiveCtx.region;
+      if (effectiveCtx.correlationId) entry.correlationId = effectiveCtx.correlationId;
+      if (effectiveCtx.userId) entry.userId = effectiveCtx.userId;
+      if (effectiveCtx.ip) entry.ip = effectiveCtx.ip;
+      if (effectiveCtx.userAgent) entry.userAgent = effectiveCtx.userAgent;
     }
 
     return entry;

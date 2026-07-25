@@ -33,6 +33,7 @@ import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId,
 // Import platform standard slug service
 import slugSingletonService from '../../services/SlugSingletonService';
 import { logger } from '../../logger';
+import { requestContextStorage } from '../../context';
 
 const router = Router();
 
@@ -1678,7 +1679,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
       return { categories, items };
       
     } catch (error) {
-      logger.error('[Clover Sync] Real API call failed, falling back to mock data:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+      logger.error('[Clover Sync] Real API call failed, falling back to mock data:', requestContextStorage.getStore(), { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 

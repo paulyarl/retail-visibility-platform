@@ -94,20 +94,43 @@ logger.error(message: string, ctx: RequestCtx | undefined, details?: { error?: {
 }
 ```
 
-### In services, jobs, middleware, and helper functions (req is NOT available)
+### In helper functions and services (use AsyncLocalStorage)
+
+Helper functions inside route files (e.g. `getValidToken(tenantId)`, `fetchCloverInventory(integration)`) and service classes don't receive `req` as a parameter. Instead of manually threading `ctx` through every function signature, use `requestContextStorage.getStore()` from `AsyncLocalStorage`:
+
+```typescript
+import { requestContextStorage } from '../context';
+
+// Helper function — no req parameter, no ctx parameter
+async function getValidGBPToken(tenantId: string): Promise<string | null> {
+  try {
+    // ...
+  } catch (error: any) {
+    logger.error('[GBP] Token refresh failed:', requestContextStorage.getStore(), {
+      error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack },
+    });
+    return null;
+  }
+}
+```
+
+`requestContextStorage.getStore()` returns the current request's `RequestCtx` if inside a request async chain, or `undefined` if outside (jobs, startup, tests). This mirrors the frontend singleton pattern where correlation context is injected automatically by infrastructure — no manual threading needed.
+
+> **Never use `(req as any).ctx` in non-route files.** Use `requestContextStorage.getStore()` instead.
+>
+> **Never manually add a `ctx` parameter to helper functions.** The ALS pattern makes it ambiently available.
+
+### In jobs and startup code (outside any request)
 
 ```typescript
 } catch (error: any) {
-  logger.error('[InventoryService] Sync failed:', undefined, {
+  logger.error('Job failed to start', undefined, {
     error: { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack },
-    tenantId,
   });
 }
 ```
 
-> **Never use `(req as any).ctx` in non-route files.** Pass `undefined` instead.
-
-> **Helper functions inside route files:** If a helper function (e.g. `getValidToken(tenantId)`) is defined within a route file but doesn't receive `req` as a parameter, it still falls in the "req is NOT available" category. Pass `undefined` — do not try to access `req.ctx` from the outer scope.
+`requestContextStorage.getStore()` returns `undefined` here, so passing `undefined` explicitly is equivalent and clearer for non-request code.
 
 ### The `_req` → `req` renaming gotcha
 
@@ -134,23 +157,67 @@ router.get('/stats', async (req, res) => {
 ```
 
 > **`noUnusedParameters` is disabled** in `apps/api/tsconfig.json`, so renaming `_req` to `req` is safe even if `req` is only used in the catch block (not in the handler body).
+>
+> **Alternative:** If the handler body truly doesn't use `req` at all (not even in the catch block), you can use `requestContextStorage.getStore()` and keep `_req`.
+
+### AsyncLocalStorage — how ctx propagates without threading
+
+The `setRequestContext` middleware in `apps/api/src/context.ts` wraps the entire request in `AsyncLocalStorage`:
+
+```typescript
+import { AsyncLocalStorage } from 'async_hooks';
+
+export const requestContextStorage = new AsyncLocalStorage<RequestCtx>();
+
+export async function setRequestContext(req, res, next) {
+  const ctx: RequestCtx = { correlationId: generateCorrelationId(tenantId), ... };
+  (req as any).ctx = ctx;
+  requestContextStorage.run(ctx, () => next());  // ← wraps entire async chain
+}
+```
+
+This means **any function** called within the request's async chain — helpers, services, deep call stacks — can access ctx via `requestContextStorage.getStore()` without receiving it as a parameter. This is the backend equivalent of the frontend singleton pattern that automatically injects correlation IDs into every API call.
 
 ### Express type declaration for `req.ctx`
 
-For `req.ctx` to compile without TS2339, the `ctx` property must be declared on the Express `Request` type. This is done in `apps/api/src/types/express.d.ts`:
+For `req.ctx` to compile without TS2339, the `ctx` property must be declared on the Express `Request` type via module augmentation in `apps/api/src/types/express.d.ts`:
 
 ```typescript
-declare namespace Express {
-  export interface Request {
-    user?: {
-      userId: string;
-      tenantId?: string;
-      permissions: string[];
-    };
-    ctx?: Record<string, any>; // Added for correlation ID and other context
+import { User } from '@prisma/client';
+import type { RequestCtx } from '../context';
+
+declare global {
+  namespace Express {
+    interface Request {
+      ctx?: RequestCtx;
+    }
   }
 }
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    ctx?: RequestCtx;
+  }
+}
+
+declare module 'express' {
+  interface Request {
+    user?: User & {
+      tenantIds?: string[];
+      role?: string;
+    };
+    // Override Express 5.x parameter types to be string-based
+    params: Record<string, string>;
+  }
+}
+
+export {};
 ```
+
+- Use `RequestCtx` for `ctx` so `logger.error(..., req.ctx, ...)` type-checks. `Record<string, any>` no longer satisfies `RequestCtx` because `region` is required.
+- Augment the **global `Express.Request`** interface so `core.Request` (used by Express 5 router callbacks) inherits `ctx`.
+- Also augment **`express-serve-static-core`** to cover direct imports of core `Request` types.
+- The `import type { RequestCtx } from '../context'` is safe because it is type-only and is erased at compile time.
 
 If you're working in a new repo or the type is missing, add this declaration before using `req.ctx`.
 
