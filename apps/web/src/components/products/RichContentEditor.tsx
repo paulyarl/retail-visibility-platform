@@ -263,6 +263,8 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
       return block.items.map((item) => ({ type: 'bulletListItem', props: { textAlignment: block.textAlign || 'left' }, content: textToInlineContent(item) }));
     case 'numbered_list':
       return block.items.map((item) => ({ type: 'numberedListItem', props: { textAlignment: block.textAlign || 'left' }, content: textToInlineContent(item) }));
+    case 'checklist':
+      return block.items.map((item) => ({ type: 'checkListItem', props: { checked: item.checked, textAlignment: block.textAlign || 'left' }, content: textToInlineContent(item.text) }));
     case 'image':
       return {
         type: 'image',
@@ -385,6 +387,8 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
       return { type: 'bullet_list', items: [inlineToString(block.content)], textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
     case 'numberedListItem':
       return { type: 'numbered_list', items: [inlineToString(block.content)], textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
+    case 'checkListItem':
+      return { type: 'checklist', items: [{ text: inlineToString(block.content), checked: (block.props?.checked as boolean) ?? false }], textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
     case 'image':
       return {
         type: 'image',
@@ -685,7 +689,7 @@ function CustomFormattingToolbar() {
   const block = editor?.getTextCursorPosition?.()?.block as { type: string; id: string } | undefined;
   const type = block?.type ?? 'paragraph';
   const blockId = block?.id;
-  const isText = ['paragraph', 'heading', 'bulletListItem', 'numberedListItem', 'callout'].includes(type);
+  const isText = ['paragraph', 'heading', 'bulletListItem', 'numberedListItem', 'checkListItem', 'callout'].includes(type);
   const isHeading = type === 'heading';
   const isImage = type === 'image';
   const isCallout = type === 'callout';

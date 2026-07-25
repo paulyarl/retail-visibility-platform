@@ -121,7 +121,7 @@ function Heading({
   }
 }
 
-function Block({ block }: { block: ContentBlock }) {
+function Block({ block, onBlockChange }: { block: ContentBlock; onBlockChange?: (newBlock: ContentBlock) => void }) {
   switch (block.type) {
     case 'paragraph':
       return <p className="mb-4 text-base leading-relaxed text-gray-900" style={{ textAlign: block.textAlign }}><RichText text={block.text} /></p>;
@@ -266,17 +266,55 @@ function Block({ block }: { block: ContentBlock }) {
       );
     }
 
+    case 'checklist': {
+      const toggleItem = (itemIndex: number) => {
+        if (!onBlockChange) return;
+        const newItems = block.items.map((item, i) =>
+          i === itemIndex ? { ...item, checked: !item.checked } : item
+        );
+        onBlockChange({ ...block, items: newItems });
+      };
+      return (
+        <ul className="mb-4 list-none space-y-1 pl-0 text-gray-900" style={{ textAlign: block.textAlign }}>
+          {block.items.map((item, itemIndex) => (
+            <li key={itemIndex} className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={item.checked}
+                disabled={!onBlockChange}
+                onChange={() => toggleItem(itemIndex)}
+                className="mt-1 h-4 w-4 accent-amber-600"
+              />
+              <span className={item.checked ? 'line-through text-neutral-400' : ''}>
+                <RichText text={item.text} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
     default:
       return null;
   }
 }
 
-export function RichContentRenderer({ content }: { content: ContentBlocks | null | undefined }) {
+export function RichContentRenderer({ content, onChange }: { content: ContentBlocks | null | undefined; onChange?: (content: ContentBlocks) => void }) {
   if (!content?.blocks?.length) return null;
+  const handleBlockChange = (index: number, newBlock: ContentBlock) => {
+    if (!onChange) return;
+    const newBlocks = [...content.blocks];
+    newBlocks[index] = newBlock;
+    onChange({ ...content, blocks: newBlocks });
+  };
   return (
     <div className="rich-content">
       {content.blocks.map((block, index) => (
-        <Block key={`${block.type}-${index}`} block={block} />
+        <Block
+          key={`${block.type}-${index}`}
+          block={block}
+          onBlockChange={onChange ? (newBlock) => handleBlockChange(index, newBlock) : undefined}
+        />
       ))}
     </div>
   );

@@ -399,6 +399,19 @@ router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/admin/crm/tasks/:taskId/messages/:messageId
+router.put('/tasks/:taskId/messages/:messageId', async (req: Request, res: Response) => {
+  try {
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+    const message = await taskMessageService.update(req.params.messageId, { content_blocks: req.body.content_blocks });
+    await audit({ tenantId: undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_task_message', id: message.id } });
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('[CRM Admin] Error updating task message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update task message' });
+  }
+});
+
 // DELETE /api/admin/crm/tasks/:taskId
 router.delete('/tasks/:taskId', async (req: Request, res: Response) => {
   try {
