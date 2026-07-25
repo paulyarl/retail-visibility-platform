@@ -86,7 +86,7 @@ async function updateRatingSummary(pool: any, tenantId: string) {
     // TODO: Fix directory listing sync separately
     
   } catch (error) {
-    logger.error('Error updating rating summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating rating summary:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     throw error;
   }
 }
@@ -107,7 +107,7 @@ async function updateDirectoryListingRatings(pool: any, tenantId: string) {
     
     await pool.query(updateQuery, [tenantId]);
   } catch (error) {
-    logger.error('Error updating directory listing ratings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating directory listing ratings:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw here - directory update is secondary
   }
 }
@@ -294,7 +294,7 @@ router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    logger.error('Error fetching store reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching store reviews:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch reviews'
@@ -373,7 +373,7 @@ router.post('/:tenantId/reviews/anonymous', async (req: Request, res: Response) 
     });
 
   } catch (error) {
-    logger.error('Error creating anonymous review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error creating anonymous review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -445,7 +445,7 @@ router.post('/:tenantId/reviews', authenticateToken, async (req: Request, res: R
     });
 
   } catch (error) {
-    logger.error('Error creating authenticated review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error creating authenticated review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -538,7 +538,7 @@ router.put('/:tenantId/reviews', authenticateToken, async (req: Request, res: Re
     });
 
   } catch (error) {
-    logger.error('Error updating review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -584,7 +584,7 @@ router.delete('/:tenantId/reviews', authenticateToken, async (req: Request, res:
     });
 
   } catch (error) {
-    logger.error('Error deleting review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error deleting review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete review'
@@ -668,7 +668,7 @@ router.post('/reviews/:reviewId/helpful', authenticateToken, async (req: Request
     });
 
   } catch (error) {
-    logger.error('Error voting on review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error voting on review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -727,7 +727,7 @@ router.get('/:tenantId/reviews/summary', async (req: Request, res: Response) => 
     });
 
   } catch (error) {
-    logger.error('Error fetching review summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching review summary:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch review summary'
@@ -766,7 +766,7 @@ router.get('/:tenantId/reviews/user', authenticateToken, async (req: Request, re
     });
 
   } catch (error) {
-    logger.error('Error fetching user review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching user review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch user review'
@@ -882,7 +882,7 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
     });
 
   } catch (error) {
-    logger.error('Error fetching pending reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching pending reviews:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch pending reviews'
@@ -942,7 +942,7 @@ router.post('/:tenantId/reviews/:reviewId/approve', authenticateToken, async (re
     });
 
   } catch (error) {
-    logger.error('Error approving review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error approving review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to approve review'
@@ -1000,7 +1000,7 @@ router.post('/:tenantId/reviews/:reviewId/reject', authenticateToken, async (req
     });
 
   } catch (error) {
-    logger.error('Error rejecting review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error rejecting review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to reject review'
@@ -1076,7 +1076,7 @@ router.post('/:tenantId/products/:productId/reviews/anonymous', async (req: Requ
     });
 
   } catch (error) {
-    logger.error('Error creating anonymous product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error creating anonymous product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -1135,7 +1135,7 @@ router.get('/:tenantId/products/:productId/reviews/summary', async (req: Request
     });
 
   } catch (error) {
-    logger.error('Error fetching product review summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching product review summary:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product review summary'
@@ -1200,7 +1200,7 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
     });
 
   } catch (error) {
-    logger.error('Error creating authenticated product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error creating authenticated product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -1209,7 +1209,7 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
         details: errors
       });
     }
-    logger.error('Database or other error:', undefined, { error: { name: 'Error', message: String((error as Error).message) } });
+    logger.error('Database or other error:', req.ctx, { error: { name: 'Error', message: String((error as Error).message) } });
     res.status(500).json({
       success: false,
       error: 'Failed to create product review'
@@ -1317,7 +1317,7 @@ router.get('/:tenantId/products/:productId/reviews', async (req: Request, res: R
     });
 
   } catch (error) {
-    logger.error('Error fetching product reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching product reviews:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product reviews'
@@ -1410,7 +1410,7 @@ router.put('/:tenantId/products/:productId/reviews', authenticateToken, async (r
     });
 
   } catch (error) {
-    logger.error('Error updating product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     if (error instanceof z.ZodError) {
       const errors = error.issues || [];
       return res.status(400).json({
@@ -1459,7 +1459,7 @@ router.delete('/:tenantId/products/:productId/reviews', authenticateToken, async
     });
 
   } catch (error) {
-    logger.error('Error deleting product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error deleting product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete product review'
@@ -1498,7 +1498,7 @@ router.get('/:tenantId/products/:productId/reviews/user', authenticateToken, asy
     });
 
   } catch (error) {
-    logger.error('Error fetching user product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching user product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch user product review'
@@ -1696,7 +1696,7 @@ router.get('/:tenantId/reviews/approved', authenticateToken, async (req: Request
     });
 
   } catch (error) {
-    logger.error('Error fetching approved store reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching approved store reviews:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch approved store reviews'
@@ -1802,7 +1802,7 @@ router.get('/products/:productId/reviews/pending', authenticateToken, async (req
     });
 
   } catch (error) {
-    logger.error('Error fetching pending product reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching pending product reviews:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch pending product reviews'
@@ -1912,7 +1912,7 @@ router.get('/products/:productId/reviews/approved', async (req: Request, res: Re
     });
 
   } catch (error) {
-    logger.error('Error fetching approved product reviews:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching approved product reviews:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch approved product reviews'
@@ -1987,7 +1987,7 @@ router.post('/products/:productId/reviews/:reviewId/approve', authenticateToken,
     });
 
   } catch (error) {
-    logger.error('Error approving product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error approving product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to approve product review'
@@ -2060,7 +2060,7 @@ router.post('/products/:productId/reviews/:reviewId/reject', authenticateToken, 
     });
 
   } catch (error) {
-    logger.error('Error rejecting product review:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error rejecting product review:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to reject product review'

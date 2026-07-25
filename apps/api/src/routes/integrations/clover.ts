@@ -207,7 +207,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, requireTierFeatu
         importedItems.push(createdItem);
         console.log(`Imported demo item: ${demoItem.sku}`);
       } catch (error) {
-        logger.error(`Failed to import demo item ${demoItem.sku}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+        logger.error(`Failed to import demo item ${demoItem.sku}:`, req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         // Continue with other items
       }
     }
@@ -236,7 +236,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, requireTierFeatu
     });
 
   } catch (error: any) {
-    logger.error('[POST /integrations/:tenantId/clover/demo/enable] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /integrations/:tenantId/clover/demo/enable] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'failed_to_enable_demo',
       message: error.message
@@ -331,7 +331,7 @@ router.post('/:tenantId/clover/demo/disable', authenticateToken, requireTierFeat
     });
 
   } catch (error: any) {
-    logger.error('[POST /integrations/:tenantId/clover/demo/disable] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /integrations/:tenantId/clover/demo/disable] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'failed_to_disable_demo',
       message: error.message
@@ -417,7 +417,7 @@ router.get('/:tenantId/clover/status', authenticateToken, async (req: Request, r
     });
 
   } catch (error: any) {
-    logger.error('[GET /integrations/:tenantId/clover/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /integrations/:tenantId/clover/status] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'failed_to_get_status',
       message: error.message
@@ -475,7 +475,7 @@ router.get('/:tenantId/clover/oauth/authorize', authenticateToken, requireTierFe
     });
 
   } catch (error: any) {
-    logger.error('[GET /integrations/:tenantId/clover/oauth/authorize] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /integrations/:tenantId/clover/oauth/authorize] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       error: 'failed_to_generate_auth_url',
       message: error.message
@@ -493,7 +493,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
 
     // Check for OAuth errors
     if (oauthError) {
-      logger.error('[OAuth Callback] OAuth error:', undefined, { error: { name: (oauthError as any)?.name || 'Error', message: (oauthError as any)?.message || String(oauthError), stack: (oauthError as any)?.stack } });
+      logger.error('[OAuth Callback] OAuth error:', req.ctx, { error: { name: (oauthError as any)?.name || 'Error', message: (oauthError as any)?.message || String(oauthError), stack: (oauthError as any)?.stack } });
       return res.redirect(`/settings/integrations?error=oauth_denied&message=${oauthError}`);
     }
 
@@ -583,7 +583,7 @@ router.get('/clover/oauth/callback', async (req: Request, res: Response) => {
     return res.redirect(`/t/${tenantId}/settings/integrations?success=connected`);
 
   } catch (error: any) {
-    logger.error('[OAuth Callback] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[OAuth Callback] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Try to redirect with error, fallback to error page
     const tenantId = req.query.state ? decodeState(req.query.state as string).tenantId : null;
     if (tenantId) {
@@ -631,7 +631,7 @@ router.get('/:tenantId/clover/demo/scenarios', authenticateToken, async (req: Re
     });
 
   } catch (error: any) {
-    logger.error('[GET /clover/demo/scenarios] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/demo/scenarios] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -696,7 +696,7 @@ router.post('/:tenantId/clover/demo/simulate', authenticateToken, async (req: Re
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/demo/simulate] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/demo/simulate] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -719,7 +719,7 @@ router.get('/:tenantId/clover/demo/simulate/:eventId/status', authenticateToken,
     return res.json({ event });
 
   } catch (error: any) {
-    logger.error('[GET /clover/demo/simulate/:eventId/status] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/demo/simulate/:eventId/status] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -1353,7 +1353,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/demo/simulate/:eventId/execute] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/demo/simulate/:eventId/execute] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -1382,7 +1382,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/cancel', authenticateToken
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/demo/simulate/:eventId/cancel] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/demo/simulate/:eventId/cancel] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -1451,7 +1451,7 @@ router.get('/:tenantId/clover/demo/mappings', authenticateToken, async (req: Req
     });
 
   } catch (error: any) {
-    logger.error('[GET /clover/demo/mappings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/demo/mappings] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -1555,7 +1555,7 @@ router.post('/:tenantId/clover/demo/mappings/:mappingId/resolve', authenticateTo
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/demo/mappings/:mappingId/resolve] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/demo/mappings/:mappingId/resolve] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -1588,7 +1588,7 @@ router.get('/:tenantId/clover/demo/sync-history', authenticateToken, async (req:
     });
 
   } catch (error: any) {
-    logger.error('[GET /clover/demo/sync-history] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/demo/sync-history] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -1678,7 +1678,7 @@ async function fetchCloverInventory(integration: any): Promise<{ categories: any
       return { categories, items };
       
     } catch (error) {
-      logger.error('[Clover Sync] Real API call failed, falling back to mock data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+      logger.error('[Clover Sync] Real API call failed, falling back to mock data:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     }
   }
 
@@ -1832,7 +1832,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
             categoriesMapped++;
           }
         } catch (catError) {
-          logger.error(`[Clover Sync] Failed to sync category ${cloverCat.name}:`, undefined, { error: { name: (catError as any)?.name || 'Error', message: (catError as any)?.message || String(catError), stack: (catError as any)?.stack } });
+          logger.error(`[Clover Sync] Failed to sync category ${cloverCat.name}:`, req.ctx, { error: { name: (catError as any)?.name || 'Error', message: (catError as any)?.message || String(catError), stack: (catError as any)?.stack } });
         }
       }
     }
@@ -1940,7 +1940,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
           console.log(`[Clover Sync] Created item: ${cloverItem.name}`);
         }
       } catch (itemError) {
-        logger.error(`[Clover Sync] Failed to sync item ${cloverItem.name}:`, undefined, { error: { name: (itemError as any)?.name || 'Error', message: (itemError as any)?.message || String(itemError), stack: (itemError as any)?.stack } });
+        logger.error(`[Clover Sync] Failed to sync item ${cloverItem.name}:`, req.ctx, { error: { name: (itemError as any)?.name || 'Error', message: (itemError as any)?.message || String(itemError), stack: (itemError as any)?.stack } });
         itemsFailed++;
       }
     }
@@ -1989,7 +1989,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, requireTierFeature('int
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/sync] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/sync] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -2035,7 +2035,7 @@ router.post('/:tenantId/clover/disconnect', authenticateToken, requireTierFeatur
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/disconnect] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/disconnect] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -2089,7 +2089,7 @@ router.get('/:tenantId/clover/mappings', authenticateToken, async (req: Request,
     });
 
   } catch (error: any) {
-    logger.error('[GET /clover/mappings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/mappings] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -2172,7 +2172,7 @@ router.post('/:tenantId/clover/mappings/:mappingId/resolve', authenticateToken, 
     });
 
   } catch (error: any) {
-    logger.error('[POST /clover/mappings/:mappingId/resolve] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /clover/mappings/:mappingId/resolve] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -2234,7 +2234,7 @@ router.get('/:tenantId/clover/category-mappings', authenticateToken, async (req:
     });
 
   } catch (error: any) {
-    logger.error('[GET /clover/category-mappings] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/category-mappings] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });
@@ -2267,7 +2267,7 @@ router.get('/:tenantId/clover/sync-history', authenticateToken, async (req: Requ
     });
 
   } catch (error: any) {
-    logger.error('[GET /clover/sync-history] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /clover/sync-history] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'internal_error', message: error.message });
   }
 });

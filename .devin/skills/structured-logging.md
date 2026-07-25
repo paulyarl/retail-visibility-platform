@@ -80,7 +80,7 @@ logger.error(message: string, ctx: RequestCtx | undefined, details?: { error?: {
 ```
 
 - **`message`** — Descriptive string (prefix with route/handler name, e.g. `'[GET /products] Error:'`)
-- **`ctx`** — Pass `req.ctx` in route handlers, `undefined` in services/jobs/middleware
+- **`ctx`** — Pass `req.ctx` in route handlers, `undefined` in services/jobs/middleware/helper functions
 - **`details`** — Optional object with `error` sub-object and arbitrary context fields
 
 ### In route handlers (req is available)
@@ -94,7 +94,7 @@ logger.error(message: string, ctx: RequestCtx | undefined, details?: { error?: {
 }
 ```
 
-### In services, jobs, and middleware (req is NOT available)
+### In services, jobs, middleware, and helper functions (req is NOT available)
 
 ```typescript
 } catch (error: any) {
@@ -106,6 +106,53 @@ logger.error(message: string, ctx: RequestCtx | undefined, details?: { error?: {
 ```
 
 > **Never use `(req as any).ctx` in non-route files.** Pass `undefined` instead.
+
+> **Helper functions inside route files:** If a helper function (e.g. `getValidToken(tenantId)`) is defined within a route file but doesn't receive `req` as a parameter, it still falls in the "req is NOT available" category. Pass `undefined` — do not try to access `req.ctx` from the outer scope.
+
+### The `_req` → `req` renaming gotcha
+
+Route handlers sometimes use `_req` (the TypeScript convention for an unused parameter) when the handler body doesn't reference the request object directly. However, if the catch block needs `req.ctx`, the parameter **must** be named `req`:
+
+```typescript
+// ❌ Bad — _req means req.ctx is inaccessible in the catch block
+router.get('/stats', async (_req, res) => {
+  try {
+    // ...
+  } catch (error: any) {
+    logger.error('Stats error:', req.ctx, { error: { ... } }); // TS error: _req is not req
+  }
+});
+
+// ✅ Good — rename _req to req so req.ctx is available
+router.get('/stats', async (req, res) => {
+  try {
+    // ...
+  } catch (error: any) {
+    logger.error('Stats error:', req.ctx, { error: { ... } });
+  }
+});
+```
+
+> **`noUnusedParameters` is disabled** in `apps/api/tsconfig.json`, so renaming `_req` to `req` is safe even if `req` is only used in the catch block (not in the handler body).
+
+### Express type declaration for `req.ctx`
+
+For `req.ctx` to compile without TS2339, the `ctx` property must be declared on the Express `Request` type. This is done in `apps/api/src/types/express.d.ts`:
+
+```typescript
+declare namespace Express {
+  export interface Request {
+    user?: {
+      userId: string;
+      tenantId?: string;
+      permissions: string[];
+    };
+    ctx?: Record<string, any>; // Added for correlation ID and other context
+  }
+}
+```
+
+If you're working in a new repo or the type is missing, add this declaration before using `req.ctx`.
 
 ### Error logging without tenant context (platform-level)
 
@@ -341,6 +388,8 @@ A scheduled job runs daily at 2 AM UTC:
 ## Migration Guide: console.* → logger.*
 
 > **Migration complete (July 2026):** All `console.error` calls in `apps/api/src/` have been replaced with `logger.error`. The migration covered routes, services, jobs, middleware, utils, and lib files — 839 files scanned, ~5,000+ replacements applied across 3 automated fix scripts.
+>
+> **`undefined` → `req.ctx` alignment (July 2026):** A second pass aligned ~300 `logger.error` calls across 20 high-traffic route files that were passing `undefined` as the ctx argument instead of `req.ctx`. Route handlers should **always** pass `req.ctx` (not `undefined`) in the ctx position — even if the handler doesn't otherwise reference `req` in its body. If the parameter is named `_req`, rename it to `req` first (see [the `_req` gotcha](#the-_req--req-renaming-gotcha) above).
 
 ### Mapping table
 

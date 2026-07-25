@@ -36,7 +36,7 @@ router.get('/categories', async (req, res) => {
       message: 'GBP categories retrieved successfully'
     });
   } catch (error) {
-    logger.error('[Get Categories Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Get Categories Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -70,7 +70,7 @@ router.put('/:tenantId/category', async (req, res) => {
       message: 'Shop category updated successfully'
     });
   } catch (error) {
-    logger.error('[Set Category Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Set Category Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -98,7 +98,7 @@ router.get('/:tenantId/limits', async (req, res) => {
       data: limitCheck
     });
   } catch (error) {
-    logger.error('[Check Limits Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Check Limits Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -134,7 +134,7 @@ router.get('/:tenantId', async (req, res) => {
       data: shop
     });
   } catch (error) {
-    logger.error('[Get Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Get Shop Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -163,7 +163,7 @@ router.post('/:tenantId', async (req, res) => {
       message: 'Shop data saved successfully'
     });
   } catch (error) {
-    logger.error('[Upsert Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Upsert Shop Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -192,7 +192,7 @@ router.put('/:tenantId', async (req, res) => {
       message: 'Shop updated successfully'
     });
   } catch (error) {
-    logger.error('[Update Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Update Shop Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -221,7 +221,7 @@ router.post('/:tenantId/publish', async (req, res) => {
       message: 'Shop published successfully'
     });
   } catch (error) {
-    logger.error('[Publish Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Publish Shop Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -246,7 +246,7 @@ router.post('/:tenantId/unpublish', async (req, res) => {
       message: 'Shop unpublished successfully'
     });
   } catch (error) {
-    logger.error('[Unpublish Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Unpublish Shop Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -284,7 +284,7 @@ router.put('/:tenantId/category', async (req, res) => {
       message: 'Shop category updated successfully'
     });
   } catch (error) {
-    logger.error('[Update Category Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Update Category Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -318,7 +318,7 @@ router.put('/:tenantId/branding', async (req, res) => {
       message: 'Shop branding updated successfully'
     });
   } catch (error) {
-    logger.error('[Update Branding Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Update Branding Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -364,7 +364,7 @@ router.put('/:tenantId/hours', async (req, res) => {
       message: 'Shop hours updated successfully'
     });
   } catch (error) {
-    logger.error('[Update Hours Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Update Hours Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -398,7 +398,7 @@ router.put('/:tenantId/social', async (req, res) => {
       message: 'Social links updated successfully'
     });
   } catch (error) {
-    logger.error('[Update Social Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Update Social Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -439,7 +439,7 @@ router.get('/:tenantId/seo', async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('[Get SEO Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Get SEO Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -502,7 +502,7 @@ router.put('/:tenantId/seo', async (req, res) => {
       message: 'SEO settings updated successfully',
     });
   } catch (error) {
-    logger.error('[Update SEO Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Update SEO Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -530,7 +530,7 @@ router.get('/:tenantId/analytics', async (req, res) => {
       data: analytics
     });
   } catch (error) {
-    logger.error('[Get Analytics Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Get Analytics Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -559,7 +559,7 @@ router.get('/tenant/:tenantId/shops', async (req, res) => {
       total: shops.length
     });
   } catch (error) {
-    logger.error('[Get Tenant Shops Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Get Tenant Shops Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -583,7 +583,7 @@ router.delete('/:tenantId', async (req, res) => {
       message: 'Shop deleted successfully'
     });
   } catch (error) {
-    logger.error('[Delete Shop Error]', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Delete Shop Error]', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',

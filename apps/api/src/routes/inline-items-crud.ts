@@ -133,7 +133,7 @@ const photoUploadHandler = async (req: any, res: any) => {
         });
 
         if (error) {
-          logger.error(`[Photo Upload] Supabase upload error:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+          logger.error(`[Photo Upload] Supabase upload error:`, req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           return res.status(500).json({ error: error.message, details: error });
         }
 
@@ -171,7 +171,7 @@ const photoUploadHandler = async (req: any, res: any) => {
       console.log(`[Photo Upload] Processing dataUrl upload`);
       const parsed = dataUrlSchema.safeParse(req.body || {});
       if (!parsed.success) {
-        logger.error(`[Photo Upload] Invalid dataUrl payload:`, undefined, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
+        logger.error(`[Photo Upload] Invalid dataUrl payload:`, req.ctx, { error: { name: 'Error', message: String(parsed.error.flatten()) } });
         return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
       }
 
@@ -200,7 +200,7 @@ const photoUploadHandler = async (req: any, res: any) => {
         });
 
         if (error) {
-          logger.error("[Photo Upload] Supabase dataUrl upload error:", undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+          logger.error("[Photo Upload] Supabase dataUrl upload error:", req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
           return res.status(500).json({ error: "supabase_upload_failed", details: error.message });
         }
 
@@ -300,7 +300,7 @@ router.get('/api/directory/store-types', async (req, res) => {
       data: { storeTypes, totalCount: storeTypes.length }
     });
   } catch (error: any) {
-    logger.error('[STORE-TYPES] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[STORE-TYPES] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch store types' });
   }
 });
@@ -396,7 +396,7 @@ router.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, asyn
       hasAccess = !!userTenant;
       console.log('[GET /api/items/stats] DB lookup result:', { userTenant, hasAccess });
     } catch (e) {
-      logger.error('[GET /api/items/stats] Error checking tenant membership:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+      logger.error('[GET /api/items/stats] Error checking tenant membership:', req.ctx, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     }
   }
 
@@ -426,7 +426,7 @@ router.get(["/api/items/stats", "/api/inventory/stats"], authenticateToken, asyn
       lowStock,
     });
   } catch (error) {
-    logger.error('[GET /api/items/stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /api/items/stats] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({ error: 'failed_to_get_stats' });
   }
 });
@@ -459,7 +459,7 @@ router.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) =
       });
       hasAccess = !!userTenant;
     } catch (e) {
-      logger.error('[GET /api/tenants/:tenantId/items] Error checking tenant membership:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+      logger.error('[GET /api/tenants/:tenantId/items] Error checking tenant membership:', req.ctx, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     }
   }
 
@@ -537,7 +537,7 @@ router.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) =
       },
     });
   } catch (e: any) {
-    logger.error('[GET /api/tenants/:tenantId/items] Error listing items:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    logger.error('[GET /api/tenants/:tenantId/items] Error listing items:', req.ctx, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ error: "failed_to_list_items", message: (e as any)?.message });
   }
 });
@@ -571,7 +571,7 @@ router.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticat
       });
       hasAccess = !!userTenant;
     } catch (e) {
-      logger.error('[GET /api/items] Error checking tenant membership:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+      logger.error('[GET /api/items] Error checking tenant membership:', req.ctx, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     }
   }
 
@@ -806,7 +806,7 @@ router.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticat
     });
 
   } catch (e: any) {
-    logger.error('[GET /items] Error listing items:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    logger.error('[GET /items] Error listing items:', req.ctx, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ error: "failed_to_list_items", message: (e as any)?.message });
   }
 });
@@ -969,7 +969,7 @@ router.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
       createdAt: photo.createdAt.toISOString()
     }));
   } catch (error) {
-    logger.error(`[GET /items/${itemId}] Error fetching photo gallery:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error(`[GET /items/${itemId}] Error fetching photo gallery:`, req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Continue without photos if there's an error
   }
 
@@ -1089,7 +1089,7 @@ router.get("/api/items/:id/photos", async (req, res) => {
 
     res.json({ photos: transformedPhotos });
   } catch (error) {
-    logger.error('[GET /api/items/:id/photos] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[GET /api/items/:id/photos] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_fetch_photos" });
   }
 });
@@ -1430,7 +1430,7 @@ router.post(["/api/items", "/api/inventory", "/items", "/inventory"], requireWri
             }
           });
         } catch (photoError) {
-          logger.error(`[POST /items] Failed to create photo_assets record for ${photoUrl}:`, undefined, { error: { name: (photoError as any)?.name || 'Error', message: (photoError as any)?.message || String(photoError), stack: (photoError as any)?.stack } });
+          logger.error(`[POST /items] Failed to create photo_assets record for ${photoUrl}:`, req.ctx, { error: { name: (photoError as any)?.name || 'Error', message: (photoError as any)?.message || String(photoError), stack: (photoError as any)?.stack } });
           // Continue with other photos even if one fails
         }
       }
@@ -1449,7 +1449,7 @@ router.post(["/api/items", "/api/inventory", "/items", "/inventory"], requireWri
     res.status(201).json(transformed);
   } catch (e: any) {
     if (e?.code === "P2002") return res.status(409).json({ error: "duplicate_sku" });
-    logger.error('[POST /items] Error creating item:', undefined, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
+    logger.error('[POST /items] Error creating item:', req.ctx, { error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e), stack: (e as any)?.stack } });
     res.status(500).json({ error: "failed_to_create_item", message: (e as any)?.message });
   }
 });
@@ -1458,7 +1458,7 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
   console.log('[PUT /items/:id] Received body:', JSON.stringify(req.body));
   const parsed = updateItemSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
-    logger.error('[PUT /items/:id] Validation failed:', undefined, { error: { name: 'Error', message: String(JSON.stringify(parsed.error.flatten(), null, 2)) } });
+    logger.error('[PUT /items/:id] Validation failed:', req.ctx, { error: { name: 'Error', message: String(JSON.stringify(parsed.error.flatten(), null, 2)) } });
     return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   }
   console.log('[PUT /items/:id] Validation passed, parsed data:', JSON.stringify(parsed.data));
@@ -1522,7 +1522,7 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
           console.warn('[PUT /items/:id] Category not found for tenantCategoryId:', tenantCategoryId);
         }
       } catch (error) {
-        logger.error('[PUT /items/:id] Error fetching category for tenantCategoryId:', undefined, { error: { name: 'Error', message: String(tenantCategoryId) +  + String({ error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } }) } });
+        logger.error('[PUT /items/:id] Error fetching category for tenantCategoryId:', req.ctx, { error: { name: 'Error', message: String(tenantCategoryId) +  + String({ error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } }) } });
       }
     } else if (directory_category_id !== undefined && directory_category_id !== null) {
       updateData.directory_category_id = directory_category_id;
@@ -1543,7 +1543,7 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
           console.log('[PUT /items/:id] Setting category_path from category slug:', category.slug);
         }
       } catch (error) {
-        logger.error('[PUT /items/:id] Error fetching category for directory_category_id:', undefined, { error: { name: 'Error', message: String(directory_category_id) +  + String({ error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } }) } });
+        logger.error('[PUT /items/:id] Error fetching category for directory_category_id:', req.ctx, { error: { name: 'Error', message: String(directory_category_id) +  + String({ error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } }) } });
       }
     }
 
@@ -1721,7 +1721,7 @@ router.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
 
     res.json(transformed);
   } catch (error) {
-    logger.error('[PUT /items/:id] Error updating item:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PUT /items/:id] Error updating item:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_update_item", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
@@ -1790,7 +1790,7 @@ router.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory
 
     res.json(updated);
   } catch (error) {
-    logger.error('[Delete Item] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Delete Item] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_trash_item" });
   }
 });
@@ -1820,7 +1820,7 @@ router.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async 
     const capacityInfo = getTrashCapacityInfo(trashCount, tenant.subscription_tier || 'starter');
     res.json(capacityInfo);
   } catch (error) {
-    logger.error('[Trash Capacity] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Trash Capacity] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_get_trash_capacity" });
   }
 });
@@ -1914,7 +1914,7 @@ router.patch("/api/v1/tenants/:tenant_id/items/:itemId/category", authenticateTo
 
     res.json(transformed);
   } catch (error: any) {
-    logger.error('[PATCH /api/v1/tenants/:tenant_id/items/:itemId/category] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PATCH /api/v1/tenants/:tenant_id/items/:itemId/category] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(error.statusCode || 500).json({ error: error.message || "failed_to_assign_category" });
   }
 });
@@ -1943,7 +1943,7 @@ router.patch(["/items/:id", "/inventory/:id"], authenticateToken, async (req, re
 
     res.json(transformed);
   } catch (error) {
-    logger.error('[PATCH Item] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PATCH Item] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_update_item" });
   }
 });
@@ -1985,7 +1985,7 @@ router.post("/items/sync-availability", authenticateToken, async (req, res) => {
       message: `Synced ${updates.length} out of ${items.length} items`,
     });
   } catch (error) {
-    logger.error('[Sync Availability] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Sync Availability] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: "failed_to_sync_availability" });
   }
 });

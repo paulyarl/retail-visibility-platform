@@ -56,12 +56,12 @@ const projectService = CrmProjectService.getInstance();
 // ====================
 
 // GET /api/admin/crm/dashboard-stats
-router.get('/dashboard-stats', async (_req: Request, res: Response) => {
+router.get('/dashboard-stats', async (req: Request, res: Response) => {
   try {
     const stats = await requestHubService.getDashboardStats();
     res.json({ success: true, data: stats });
   } catch (error) {
-    logger.error('[CRM Admin] Error fetching dashboard stats:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error fetching dashboard stats:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch dashboard stats' });
   }
 });
@@ -83,7 +83,7 @@ router.get('/tenants', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: result });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing tenants:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tenants' });
   }
 });
@@ -95,7 +95,7 @@ router.get('/tenants/:tenantId', async (req: Request, res: Response) => {
     if (!detail) return res.status(404).json({ error: 'tenant_not_found' });
     res.json({ success: true, data: detail });
   } catch (error) {
-    logger.error('[CRM Admin] Error fetching tenant detail:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error fetching tenant detail:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch tenant detail' });
   }
 });
@@ -110,7 +110,7 @@ router.get('/tenants/:tenantId/transactions', async (req: Request, res: Response
     );
     res.json({ success: true, data: result });
   } catch (error) {
-    logger.error('[CRM Admin] Error fetching transactions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error fetching transactions:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch transactions' });
   }
 });
@@ -128,7 +128,7 @@ router.get('/tenants/:tenantId/contacts', async (req: Request, res: Response) =>
     const contacts = await contactService.listByTenant(req.params.tenantId);
     res.json({ success: true, data: contacts });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing contacts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing contacts:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list contacts' });
   }
 });
@@ -143,7 +143,7 @@ router.post('/tenants/:tenantId/contacts', async (req: Request, res: Response) =
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_contact', id: contact.id, ...req.body } });
     res.json({ success: true, data: contact });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating contact:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating contact:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create contact' });
   }
 });
@@ -156,7 +156,7 @@ router.put('/contacts/:contactId', async (req: Request, res: Response) => {
     await audit({ tenantId: contact.tenant_id, actor: actorId, action: 'update', payload: { entity_type: 'crm_contact', id: contact.id } });
     res.json({ success: true, data: contact });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating contact:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating contact:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update contact' });
   }
 });
@@ -172,7 +172,7 @@ router.delete('/contacts/:contactId', async (req: Request, res: Response) => {
     await audit({ tenantId: contact.tenant_id, actor: actorId, action: 'delete', payload: { entity_type: 'crm_contact', id: contact.id } });
     res.json({ success: true });
   } catch (error) {
-    logger.error('[CRM Admin] Error deleting contact:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error deleting contact:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete contact' });
   }
 });
@@ -188,7 +188,7 @@ router.get('/tickets/:ticketId', async (req: Request, res: Response) => {
     if (!ticket) return res.status(404).json({ error: 'ticket_not_found' });
     res.json({ success: true, data: ticket });
   } catch (error) {
-    logger.error('[CRM Admin] Error fetching ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error fetching ticket:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch ticket' });
   }
 });
@@ -205,7 +205,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: tickets });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing global tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing global tickets:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tickets' });
   }
 });
@@ -219,7 +219,7 @@ router.get('/tenants/:tenantId/tickets', async (req: Request, res: Response) => 
     });
     res.json({ success: true, data: tickets });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing tenant tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing tenant tickets:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tickets' });
   }
 });
@@ -248,7 +248,7 @@ router.post('/tenants/:tenantId/tickets', async (req: Request, res: Response) =>
 
     res.json({ success: true, data: ticket });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating ticket:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket' });
   }
 });
@@ -263,7 +263,7 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
     await audit({ tenantId: ticket.tenant_id || undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_ticket', id: ticket.id, ...req.body } });
     res.json({ success: true, data: ticket });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating ticket:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update ticket' });
   }
 });
@@ -275,7 +275,7 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     const messages = await messageService.listByTicket(req.params.ticketId, true);
     res.json({ success: true, data: messages });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing ticket messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing ticket messages:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list messages' });
   }
 });
@@ -297,7 +297,7 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
     });
     res.json({ success: true, data: message });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating ticket message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating ticket message:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create message' });
   }
 });
@@ -317,7 +317,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: tasks });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing tasks:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list tasks' });
   }
 });
@@ -346,7 +346,7 @@ router.post('/tasks', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: task });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating task:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create task' });
   }
 });
@@ -361,7 +361,7 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
     await audit({ tenantId: task.tenant_id || undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true, data: task });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating task:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update task' });
   }
 });
@@ -372,7 +372,7 @@ router.get('/tasks/:taskId/messages', async (req: Request, res: Response) => {
     const messages = await taskMessageService.listByTask(req.params.taskId, true);
     res.json({ success: true, data: messages });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing task messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing task messages:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list task messages' });
   }
 });
@@ -394,7 +394,7 @@ router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: message });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating task message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating task message:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create task message' });
   }
 });
@@ -407,7 +407,7 @@ router.put('/tasks/:taskId/messages/:messageId', async (req: Request, res: Respo
     await audit({ tenantId: undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_task_message', id: message.id } });
     res.json({ success: true, data: message });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating task message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating task message:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update task message' });
   }
 });
@@ -423,7 +423,7 @@ router.delete('/tasks/:taskId', async (req: Request, res: Response) => {
     await audit({ tenantId: task.tenant_id || undefined, actor: actorId, action: 'delete', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true });
   } catch (error) {
-    logger.error('[CRM Admin] Error deleting task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error deleting task:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete task' });
   }
 });
@@ -440,7 +440,7 @@ router.get('/activities', async (req: Request, res: Response) => {
     const activities = await activityService.listGlobal({ limit, isInternal });
     res.json({ success: true, data: activities });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing global activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing global activities:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list activities' });
   }
 });
@@ -456,7 +456,7 @@ router.get('/tenants/:tenantId/activities', async (req: Request, res: Response) 
     });
     res.json({ success: true, data: activities });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing activities:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list activities' });
   }
 });
@@ -477,7 +477,7 @@ router.post('/tenants/:tenantId/activities', async (req: Request, res: Response)
     });
     res.json({ success: true, data: activity });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating activity:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating activity:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create activity' });
   }
 });
@@ -495,7 +495,7 @@ router.get('/inquiries', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: inquiries });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing inquiries:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing inquiries:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list inquiries' });
   }
 });
@@ -509,7 +509,7 @@ router.get('/tenants/:tenantId/inquiries', async (req: Request, res: Response) =
     });
     res.json({ success: true, data: inquiries });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing tenant inquiries:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing tenant inquiries:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list inquiries' });
   }
 });
@@ -524,7 +524,7 @@ router.post('/tenants/:tenantId/inquiries', async (req: Request, res: Response) 
     await audit({ tenantId, actor: actorId, action: 'create', payload: { entity_type: 'crm_inquiry', id: inquiry.id } });
     res.json({ success: true, data: inquiry });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating inquiry:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create inquiry' });
   }
 });
@@ -537,7 +537,7 @@ router.put('/inquiries/:inquiryId', async (req: Request, res: Response) => {
     await audit({ tenantId: inquiry.tenant_id, actor: actorId, action: 'update', payload: { entity_type: 'crm_inquiry', id: inquiry.id } });
     res.json({ success: true, data: inquiry });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating inquiry:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating inquiry:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update inquiry' });
   }
 });
@@ -561,7 +561,7 @@ router.get('/requests', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: requestItems });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing requests:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing requests:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list requests' });
   }
 });
@@ -586,7 +586,7 @@ router.patch('/requests/:requestId', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: result });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating request:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating request:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update request' });
   }
 });
@@ -601,7 +601,7 @@ router.post('/requests/:requestId/read', async (req: Request, res: Response) => 
     await requestReadService.markRead(userId, req.params.requestId, requestType);
     res.json({ success: true });
   } catch (error) {
-    logger.error('[CRM Admin] Error marking request read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error marking request read:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark request as read' });
   }
 });
@@ -627,7 +627,7 @@ router.post('/requests/read-all', async (req: Request, res: Response) => {
     await requestReadService.markAllRead(userId, allRequests);
     res.json({ success: true, marked: allRequests.length });
   } catch (error) {
-    logger.error('[CRM Admin] Error marking all requests read:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error marking all requests read:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to mark all requests as read' });
   }
 });
@@ -649,7 +649,7 @@ router.post('/alerts', async (req: Request, res: Response) => {
     await audit({ tenantId: tenant_id, actor: actorId, action: 'create', payload: { entity_type: 'crm_alert', id: alert.id, type, title } });
     res.json({ success: true, data: alert });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating alert:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating alert:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create alert' });
   }
 });
@@ -689,7 +689,7 @@ router.post('/alerts/broadcast', async (req: Request, res: Response) => {
     await audit({ tenantId: 'broadcast', actor: actorId, action: 'create', payload: { entity_type: 'crm_alert_broadcast', count: results.length, send_to_all: !!send_to_all, type, title } });
     res.json({ success: true, data: results, count: results.length });
   } catch (error) {
-    logger.error('[CRM Admin] Error broadcasting alerts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error broadcasting alerts:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to broadcast alerts' });
   }
 });
@@ -702,7 +702,7 @@ router.patch('/tickets/reorder', async (req: Request, res: Response) => {
     await ticketService.reorder(items);
     res.json({ success: true });
   } catch (error) {
-    logger.error('[CRM Admin] Error reordering tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error reordering tickets:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to reorder tickets' });
   }
 });
@@ -715,7 +715,7 @@ router.patch('/tasks/reorder', async (req: Request, res: Response) => {
     await taskService.reorder(items);
     res.json({ success: true });
   } catch (error) {
-    logger.error('[CRM Admin] Error reordering tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error reordering tasks:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to reorder tasks' });
   }
 });
@@ -732,7 +732,7 @@ router.get('/projects', async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: projects });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing projects:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing projects:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list projects' });
   }
 });
@@ -748,7 +748,7 @@ router.post('/projects', async (req: Request, res: Response) => {
     await audit({ tenantId: undefined, actor: actorId, action: 'create', payload: { entity_type: 'crm_project', id: project.id } });
     res.json({ success: true, data: project });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating project:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create project' });
   }
 });
@@ -761,7 +761,7 @@ router.get('/projects/:projectId', async (req: Request, res: Response) => {
     const stats = await projectService.getStats(req.params.projectId);
     res.json({ success: true, data: { ...project, stats } });
   } catch (error) {
-    logger.error('[CRM Admin] Error fetching project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error fetching project:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to fetch project' });
   }
 });
@@ -775,7 +775,7 @@ router.put('/projects/:projectId', async (req: Request, res: Response) => {
     await audit({ tenantId: undefined, actor: actorId, action: 'update', payload: { entity_type: 'crm_project', id: project.id } });
     res.json({ success: true, data: project });
   } catch (error) {
-    logger.error('[CRM Admin] Error updating project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error updating project:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to update project' });
   }
 });
@@ -788,7 +788,7 @@ router.delete('/projects/:projectId', async (req: Request, res: Response) => {
     await audit({ tenantId: undefined, actor: actorId, action: 'delete', payload: { entity_type: 'crm_project', id: req.params.projectId } });
     res.json({ success: true });
   } catch (error) {
-    logger.error('[CRM Admin] Error deleting project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error deleting project:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to delete project' });
   }
 });
@@ -802,7 +802,7 @@ router.get('/projects/:projectId/tasks', async (req: Request, res: Response) => 
     });
     res.json({ success: true, data: tasks });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing project tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing project tasks:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list project tasks' });
   }
 });
@@ -817,7 +817,7 @@ router.get('/projects/:projectId/tickets', async (req: Request, res: Response) =
     });
     res.json({ success: true, data: tickets });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing project tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing project tickets:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list project tickets' });
   }
 });
@@ -846,7 +846,7 @@ router.post('/projects/:projectId/tickets', async (req: Request, res: Response) 
 
     res.json({ success: true, data: ticket });
   } catch (error) {
-    logger.error('[CRM Admin] Error creating project ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error creating project ticket:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket' });
   }
 });
@@ -863,7 +863,7 @@ router.get('/projects/:projectId/activities', async (req: Request, res: Response
     });
     res.json({ success: true, data: activities });
   } catch (error) {
-    logger.error('[CRM Admin] Error listing project activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CRM Admin] Error listing project activities:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list project activities' });
   }
 });

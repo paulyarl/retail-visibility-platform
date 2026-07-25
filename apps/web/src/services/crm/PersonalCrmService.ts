@@ -14,6 +14,7 @@ import type {
   CreateTaskInput, UpdateTaskInput, CreateTicketInput,
   CreateTicketMessageInput, CreateTaskMessageInput,
 } from '@/types/crm';
+import type { ContentBlocks } from '@/components/products/content-blocks';
 
 export interface PersonalCrmDashboard {
   assigned_ticket_count: number;
@@ -32,6 +33,7 @@ export interface PersonalCrmTicket extends CrmTicket {
 export interface PersonalCrmTask extends CrmTask {
   tenant_name?: string;
   project_name?: string;
+  assigned_to_name?: string;
 }
 
 export interface PersonalCrmAlert extends CrmAlert {
@@ -93,6 +95,17 @@ class PersonalCrmService extends AuthenticatedApiSingleton {
 
   // --- Tickets ---
 
+  async getTicket(ticketId: string): Promise<PersonalCrmTicket> {
+    const cacheKey = `crm-personal-ticket-${ticketId}`;
+    const result = await this.makeDefaultRequest<PersonalCrmTicket>(
+      `/api/personal/crm/tickets/${ticketId}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000,
+    );
+    return this.unwrap<PersonalCrmTicket>(result);
+  }
+
   async listTickets(filters?: { status?: string; priority?: string }): Promise<PersonalCrmTicket[]> {
     const qs = filters
       ? new URLSearchParams(
@@ -134,6 +147,15 @@ class PersonalCrmService extends AuthenticatedApiSingleton {
     return this.unwrap<CrmTicketMessage[]>(result);
   }
 
+  async updateTicketMessage(ticketId: string, messageId: string, data: { content_blocks: ContentBlocks }): Promise<CrmTicketMessage> {
+    const result = await this.makeDefaultRequest<CrmTicketMessage>(
+      `/api/personal/crm/tickets/${ticketId}/messages/${messageId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    );
+    await this.invalidateCache(`crm-personal-ticket-messages-${ticketId}`);
+    return this.unwrap<CrmTicketMessage>(result);
+  }
+
   async createTicketMessage(ticketId: string, data: CreateTicketMessageInput): Promise<CrmTicketMessage> {
     const result = await this.makeDefaultRequest<CrmTicketMessage>(
       `/api/personal/crm/tickets/${ticketId}/messages`,
@@ -144,6 +166,17 @@ class PersonalCrmService extends AuthenticatedApiSingleton {
   }
 
   // --- Tasks ---
+
+  async getTask(taskId: string): Promise<PersonalCrmTask> {
+    const cacheKey = `crm-personal-task-${taskId}`;
+    const result = await this.makeDefaultRequest<PersonalCrmTask>(
+      `/api/personal/crm/tasks/${taskId}`,
+      { method: 'GET' },
+      cacheKey,
+      2 * 60 * 1000,
+    );
+    return this.unwrap<PersonalCrmTask>(result);
+  }
 
   async listTasks(filters?: { status?: string }): Promise<PersonalCrmTask[]> {
     const qs = filters
@@ -170,6 +203,15 @@ class PersonalCrmService extends AuthenticatedApiSingleton {
       2 * 60 * 1000,
     );
     return this.unwrap<CrmTaskMessage[]>(result);
+  }
+
+  async updateTaskMessage(taskId: string, messageId: string, data: { content_blocks: ContentBlocks }): Promise<CrmTaskMessage> {
+    const result = await this.makeDefaultRequest<CrmTaskMessage>(
+      `/api/personal/crm/tasks/${taskId}/messages/${messageId}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    );
+    await this.invalidateCache(`crm-personal-task-messages-${taskId}`);
+    return this.unwrap<CrmTaskMessage>(result);
   }
 
   async createTaskMessage(taskId: string, data: CreateTaskMessageInput): Promise<CrmTaskMessage> {

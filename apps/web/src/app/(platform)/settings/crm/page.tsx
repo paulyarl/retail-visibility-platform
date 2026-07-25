@@ -70,6 +70,12 @@ export default function PersonalCrmPage() {
   const [loadingTaskMessages, setLoadingTaskMessages] = useState(false);
   const [sendingTaskReply, setSendingTaskReply] = useState(false);
 
+  // Entity detail state
+  const [selectedTicket, setSelectedTicket] = useState<PersonalCrmTicket | null>(null);
+  const [selectedTask, setSelectedTask] = useState<PersonalCrmTask | null>(null);
+  const [ticketDetailTab, setTicketDetailTab] = useState<'details' | 'conversation'>('details');
+  const [taskDetailTab, setTaskDetailTab] = useState<'details' | 'conversation'>('details');
+
   const loadDashboard = useCallback(async () => {
     try {
       const data = await personalCrmService.getDashboard();
@@ -135,12 +141,18 @@ export default function PersonalCrmPage() {
 
   const handleOpenTicket = async (ticketId: string) => {
     setSelectedTicketId(ticketId);
+    setSelectedTicket(null);
+    setTicketDetailTab('details');
     setLoadingMessages(true);
     try {
-      const msgs = await personalCrmService.listTicketMessages(ticketId);
+      const [ticket, msgs] = await Promise.all([
+        personalCrmService.getTicket(ticketId),
+        personalCrmService.listTicketMessages(ticketId),
+      ]);
+      setSelectedTicket(ticket);
       setTicketMessages(msgs);
     } catch (e) {
-      clientLogger.error('Failed to load messages:', { detail: e });
+      clientLogger.error('Failed to load ticket:', { detail: e });
     } finally {
       setLoadingMessages(false);
     }
@@ -164,12 +176,18 @@ export default function PersonalCrmPage() {
 
   const handleOpenTask = async (taskId: string) => {
     setSelectedTaskId(taskId);
+    setSelectedTask(null);
+    setTaskDetailTab('details');
     setLoadingTaskMessages(true);
     try {
-      const msgs = await personalCrmService.listTaskMessages(taskId);
+      const [task, msgs] = await Promise.all([
+        personalCrmService.getTask(taskId),
+        personalCrmService.listTaskMessages(taskId),
+      ]);
+      setSelectedTask(task);
       setTaskMessages(msgs);
     } catch (e) {
-      clientLogger.error('Failed to load task messages:', { detail: e });
+      clientLogger.error('Failed to load task:', { detail: e });
     } finally {
       setLoadingTaskMessages(false);
     }
@@ -188,6 +206,26 @@ export default function PersonalCrmPage() {
       clientLogger.error('Failed to send task reply:', { detail: e });
     } finally {
       setSendingTaskReply(false);
+    }
+  };
+
+  const handleUpdateTicketMessage = async (messageId: string, content: ContentBlocks) => {
+    if (!selectedTicketId) return;
+    try {
+      await personalCrmService.updateTicketMessage(selectedTicketId, messageId, { content_blocks: content });
+      setTicketMessages(prev => prev.map(m => (m.id === messageId ? { ...m, content_blocks: content } : m)));
+    } catch (e) {
+      clientLogger.error('Failed to update ticket message:', { detail: e });
+    }
+  };
+
+  const handleUpdateTaskMessage = async (messageId: string, content: ContentBlocks) => {
+    if (!selectedTaskId) return;
+    try {
+      await personalCrmService.updateTaskMessage(selectedTaskId, messageId, { content_blocks: content });
+      setTaskMessages(prev => prev.map(m => (m.id === messageId ? { ...m, content_blocks: content } : m)));
+    } catch (e) {
+      clientLogger.error('Failed to update task message:', { detail: e });
     }
   };
 
@@ -210,6 +248,20 @@ export default function PersonalCrmPage() {
       await personalCrmService.markAllAlertsRead();
       await Promise.all([loadAlerts(), loadDashboard()]);
     } catch (e) { clientLogger.error('Failed to mark all alerts read:', { detail: e }); }
+  };
+
+  const getTicketOriginalUrl = (ticket: PersonalCrmTicket) => {
+    if (ticket.is_platform_ticket || !ticket.tenant_id) {
+      return `/settings/admin/crm/tickets/${ticket.id}`;
+    }
+    return `/t/${ticket.tenant_id}/support/tickets/${ticket.id}`;
+  };
+
+  const getTaskOriginalUrl = (task: PersonalCrmTask) => {
+    if (task.project_id || !task.tenant_id) {
+      return `/settings/admin/crm/tasks/${task.id}`;
+    }
+    return `/t/${task.tenant_id}/support/tasks/${task.id}`;
   };
 
   if (authLoading || loading) {
@@ -489,107 +541,181 @@ export default function PersonalCrmPage() {
         {/* Ticket Detail Modal */}
         <Modal
           opened={!!selectedTicketId}
-          onClose={() => { setSelectedTicketId(null); setTicketMessages([]); setReplyContent(DEFAULT_CONTENT_BLOCKS); setReplyKey(prev => prev + 1); }}
-          title="Ticket Conversation"
+          onClose={() => { setSelectedTicketId(null); setSelectedTicket(null); setTicketMessages([]); setReplyContent(DEFAULT_CONTENT_BLOCKS); setReplyKey(prev => prev + 1); }}
+          title={selectedTicket?.title || 'Ticket Details'}
           size="lg"
         >
-          {loadingMessages ? (
+          {loadingMessages || !selectedTicket ? (
             <div className="flex justify-center py-8"><Loader /></div>
           ) : (
-            <Stack gap="md">
-              <ScrollArea.Autosize mah={400}>
-                <Stack gap="sm">
-                  {ticketMessages.length === 0 ? (
-                    <Text c="dimmed" size="sm" py="md">No messages yet</Text>
-                  ) : (
-                    ticketMessages.map((msg) => (
-                      <div key={msg.id} className={`p-3 rounded-lg ${msg.is_internal ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
-                        <Group justify="space-between" mb={4}>
-                          <Text size="xs" fw={500}>{msg.author_name}</Text>
-                          <Group gap="xs">
-                            {msg.is_internal && <Badge size="xs" color="amber" variant="light">Internal</Badge>}
-                            <Badge size="xs" variant="light">{msg.author_type}</Badge>
-                            <Text size="xs" c="dimmed">{new Date(msg.created_at).toLocaleString()}</Text>
-                          </Group>
-                        </Group>
-                        {msg.content_blocks ? (
-                          <RichContentRenderer content={msg.content_blocks as ContentBlocks} />
-                        ) : (
-                          <Text size="sm">{msg.content}</Text>
-                        )}
-                      </div>
-                    ))
+            <Tabs value={ticketDetailTab} onChange={(v) => setTicketDetailTab(v as 'details' | 'conversation')}>
+              <Tabs.List>
+                <Tabs.Tab value="details">Details</Tabs.Tab>
+                <Tabs.Tab value="conversation">Conversation</Tabs.Tab>
+              </Tabs.List>
+
+              <Tabs.Panel value="details" pt="md">
+                <Stack gap="md">
+                  <Group gap="sm">
+                    <Badge color={STATUS_COLORS[selectedTicket.status || ''] || 'gray'}>{selectedTicket.status || '—'}</Badge>
+                    <Badge color={PRIORITY_COLORS[selectedTicket.priority || ''] || 'gray'}>{selectedTicket.priority || '—'}</Badge>
+                    {selectedTicket.tenant_name && <Badge variant="light" color="gray">{selectedTicket.tenant_name}</Badge>}
+                  </Group>
+                  <SimpleGrid cols={2} spacing="md">
+                    <Text size="sm"><Text span fw={500}>Category:</Text> {selectedTicket.category || '—'}</Text>
+                    <Text size="sm"><Text span fw={500}>Assigned to:</Text> {selectedTicket.assigned_to_name || selectedTicket.assigned_to || '—'}</Text>
+                    <Text size="sm"><Text span fw={500}>Created:</Text> {selectedTicket.created_at ? new Date(selectedTicket.created_at).toLocaleString() : '—'}</Text>
+                    {selectedTicket.first_responded_at && <Text size="sm"><Text span fw={500}>First responded:</Text> {new Date(selectedTicket.first_responded_at).toLocaleString()}</Text>}
+                    {selectedTicket.resolved_at && <Text size="sm"><Text span fw={500}>Resolved:</Text> {new Date(selectedTicket.resolved_at).toLocaleString()}</Text>}
+                  </SimpleGrid>
+                  {selectedTicket.description && (
+                    <div>
+                      <Text size="sm" fw={500} mb={4}>Description</Text>
+                      <Text size="sm" c="dimmed">{selectedTicket.description}</Text>
+                    </div>
                   )}
+                  <Group justify="flex-end">
+                    <Button component={Link} href={getTicketOriginalUrl(selectedTicket)} size="xs" variant="light" rightSection={<span>→</span>}>
+                      Open original
+                    </Button>
+                  </Group>
                 </Stack>
-              </ScrollArea.Autosize>
-              <Divider />
-              <div>
-                <RichContentEditor
-                  key={replyKey}
-                  value={replyContent}
-                  onChange={setReplyContent}
-                  className="min-h-[160px]"
-                />
-                <Group justify="flex-end" mt="sm">
-                  <Button onClick={handleSendReply} loading={sendingReply} disabled={replyContent.blocks.length === 0}>
-                    Send Reply
-                  </Button>
-                </Group>
-              </div>
-            </Stack>
+              </Tabs.Panel>
+
+              <Tabs.Panel value="conversation" pt="md">
+                <Stack gap="md">
+                  <ScrollArea.Autosize mah={400}>
+                    <Stack gap="sm">
+                      {ticketMessages.length === 0 ? (
+                        <Text c="dimmed" size="sm" py="md">No messages yet</Text>
+                      ) : (
+                        ticketMessages.map((msg) => (
+                          <div key={msg.id} className={`p-3 rounded-lg ${msg.is_internal ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
+                            <Group justify="space-between" mb={4}>
+                              <Text size="xs" fw={500}>{msg.author_name}</Text>
+                              <Group gap="xs">
+                                {msg.is_internal && <Badge size="xs" color="amber" variant="light">Internal</Badge>}
+                                <Badge size="xs" variant="light">{msg.author_type}</Badge>
+                                <Text size="xs" c="dimmed">{new Date(msg.created_at).toLocaleString()}</Text>
+                              </Group>
+                            </Group>
+                            {msg.content_blocks ? (
+                              <RichContentRenderer content={msg.content_blocks as ContentBlocks} onChange={(content) => handleUpdateTicketMessage(msg.id, content)} />
+                            ) : (
+                              <Text size="sm">{msg.content}</Text>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </Stack>
+                  </ScrollArea.Autosize>
+                  <Divider />
+                  <div>
+                    <RichContentEditor
+                      key={replyKey}
+                      value={replyContent}
+                      onChange={setReplyContent}
+                      className="min-h-[160px]"
+                    />
+                    <Group justify="flex-end" mt="sm">
+                      <Button onClick={handleSendReply} loading={sendingReply} disabled={replyContent.blocks.length === 0}>
+                        Send Reply
+                      </Button>
+                    </Group>
+                  </div>
+                </Stack>
+              </Tabs.Panel>
+            </Tabs>
           )}
         </Modal>
         {/* Task Detail Modal */}
         <Modal
           opened={!!selectedTaskId}
-          onClose={() => { setSelectedTaskId(null); setTaskMessages([]); setTaskReplyContent(DEFAULT_CONTENT_BLOCKS); setTaskReplyKey(prev => prev + 1); }}
-          title="Task Conversation"
+          onClose={() => { setSelectedTaskId(null); setSelectedTask(null); setTaskMessages([]); setTaskReplyContent(DEFAULT_CONTENT_BLOCKS); setTaskReplyKey(prev => prev + 1); }}
+          title={selectedTask?.title || 'Task Details'}
           size="lg"
         >
-          {loadingTaskMessages ? (
+          {loadingTaskMessages || !selectedTask ? (
             <div className="flex justify-center py-8"><Loader /></div>
           ) : (
-            <Stack gap="md">
-              <ScrollArea.Autosize mah={400}>
-                <Stack gap="sm">
-                  {taskMessages.length === 0 ? (
-                    <Text c="dimmed" size="sm" py="md">No messages yet</Text>
-                  ) : (
-                    taskMessages.map((msg) => (
-                      <div key={msg.id} className={`p-3 rounded-lg ${msg.is_internal ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
-                        <Group justify="space-between" mb={4}>
-                          <Text size="xs" fw={500}>{msg.author_name}</Text>
-                          <Group gap="xs">
-                            {msg.is_internal && <Badge size="xs" color="amber" variant="light">Internal</Badge>}
-                            <Badge size="xs" variant="light">{msg.author_type}</Badge>
-                            <Text size="xs" c="dimmed">{new Date(msg.created_at).toLocaleString()}</Text>
-                          </Group>
-                        </Group>
-                        {msg.content_blocks ? (
-                          <RichContentRenderer content={msg.content_blocks as ContentBlocks} />
-                        ) : (
-                          <Text size="sm">{msg.content}</Text>
-                        )}
-                      </div>
-                    ))
+            <Tabs value={taskDetailTab} onChange={(v) => setTaskDetailTab(v as 'details' | 'conversation')}>
+              <Tabs.List>
+                <Tabs.Tab value="details">Details</Tabs.Tab>
+                <Tabs.Tab value="conversation">Conversation</Tabs.Tab>
+              </Tabs.List>
+
+              <Tabs.Panel value="details" pt="md">
+                <Stack gap="md">
+                  <Group gap="sm">
+                    <Badge color={STATUS_COLORS[selectedTask.status || ''] || 'gray'}>{selectedTask.status || '—'}</Badge>
+                    <Badge color={PRIORITY_COLORS[selectedTask.priority || ''] || 'gray'}>{selectedTask.priority || '—'}</Badge>
+                    {selectedTask.tenant_name && <Badge variant="light" color="gray">{selectedTask.tenant_name}</Badge>}
+                    {selectedTask.project_name && <Badge variant="light" color="blue">{selectedTask.project_name}</Badge>}
+                  </Group>
+                  <SimpleGrid cols={2} spacing="md">
+                    <Text size="sm"><Text span fw={500}>Assigned to:</Text> {selectedTask.assigned_to_name || selectedTask.assigned_to || '—'}</Text>
+                    <Text size="sm"><Text span fw={500}>Due:</Text> {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleString() : '—'}</Text>
+                    <Text size="sm"><Text span fw={500}>Created:</Text> {selectedTask.created_at ? new Date(selectedTask.created_at).toLocaleString() : '—'}</Text>
+                    {selectedTask.completed_at && <Text size="sm"><Text span fw={500}>Completed:</Text> {new Date(selectedTask.completed_at).toLocaleString()}</Text>}
+                  </SimpleGrid>
+                  {selectedTask.description && (
+                    <div>
+                      <Text size="sm" fw={500} mb={4}>Description</Text>
+                      <Text size="sm" c="dimmed">{selectedTask.description}</Text>
+                    </div>
                   )}
+                  <Group justify="flex-end">
+                    <Button component={Link} href={getTaskOriginalUrl(selectedTask)} size="xs" variant="light" rightSection={<span>→</span>}>
+                      Open original
+                    </Button>
+                  </Group>
                 </Stack>
-              </ScrollArea.Autosize>
-              <Divider />
-              <div>
-                <RichContentEditor
-                  key={taskReplyKey}
-                  value={taskReplyContent}
-                  onChange={setTaskReplyContent}
-                  className="min-h-[160px]"
-                />
-                <Group justify="flex-end" mt="sm">
-                  <Button onClick={handleSendTaskReply} loading={sendingTaskReply} disabled={taskReplyContent.blocks.length === 0}>
-                    Send Update
-                  </Button>
-                </Group>
-              </div>
-            </Stack>
+              </Tabs.Panel>
+
+              <Tabs.Panel value="conversation" pt="md">
+                <Stack gap="md">
+                  <ScrollArea.Autosize mah={400}>
+                    <Stack gap="sm">
+                      {taskMessages.length === 0 ? (
+                        <Text c="dimmed" size="sm" py="md">No messages yet</Text>
+                      ) : (
+                        taskMessages.map((msg) => (
+                          <div key={msg.id} className={`p-3 rounded-lg ${msg.is_internal ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
+                            <Group justify="space-between" mb={4}>
+                              <Text size="xs" fw={500}>{msg.author_name}</Text>
+                              <Group gap="xs">
+                                {msg.is_internal && <Badge size="xs" color="amber" variant="light">Internal</Badge>}
+                                <Badge size="xs" variant="light">{msg.author_type}</Badge>
+                                <Text size="xs" c="dimmed">{new Date(msg.created_at).toLocaleString()}</Text>
+                              </Group>
+                            </Group>
+                            {msg.content_blocks ? (
+                              <RichContentRenderer content={msg.content_blocks as ContentBlocks} onChange={(content) => handleUpdateTaskMessage(msg.id, content)} />
+                            ) : (
+                              <Text size="sm">{msg.content}</Text>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </Stack>
+                  </ScrollArea.Autosize>
+                  <Divider />
+                  <div>
+                    <RichContentEditor
+                      key={taskReplyKey}
+                      value={taskReplyContent}
+                      onChange={setTaskReplyContent}
+                      className="min-h-[160px]"
+                    />
+                    <Group justify="flex-end" mt="sm">
+                      <Button onClick={handleSendTaskReply} loading={sendingTaskReply} disabled={taskReplyContent.blocks.length === 0}>
+                        Send Update
+                      </Button>
+                    </Group>
+                  </div>
+                </Stack>
+              </Tabs.Panel>
+            </Tabs>
           )}
         </Modal>
       </div>

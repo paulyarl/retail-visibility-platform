@@ -117,7 +117,7 @@ router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) 
       message: 'User created successfully',
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error creating users:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error creating users:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create user',
@@ -190,7 +190,7 @@ router.put('/users/:userId', requirePlatformAdmin, async (req: Request, res: Res
       user: updatedUser,
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error updating user:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error updating user:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update user',
@@ -252,7 +252,7 @@ router.put('/users/:userId/password', requirePlatformAdmin, async (req: Request,
       message: 'Password reset successfully',
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error resetting password:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error resetting password:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to reset password',
@@ -308,7 +308,7 @@ router.delete('/users/:userId', requirePlatformAdmin, async (req: Request, res: 
       message: 'User deleted successfully',
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error deleting users:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error deleting users:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete user',
@@ -385,7 +385,7 @@ router.delete('/invitations/:id', requirePlatformUser, async (req: Request, res:
       message: 'Invitation cancelled successfully',
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error deleting invitation:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error deleting invitation:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to cancel invitation',
@@ -452,7 +452,7 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
       tenants,
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error listing tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error listing tenant:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to list tenants',
@@ -497,7 +497,7 @@ router.get('/tenants/all', requirePlatformUser, async (req: Request, res: Respon
       tenants,
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error listing all tenants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error listing all tenants:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to list all tenants',
@@ -636,7 +636,7 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
       },
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error creating users:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error creating users:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create user',
@@ -756,7 +756,7 @@ router.post('/users/invite-by-email', requirePlatformUser, async (req: Request, 
       },
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error inviting user by email:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error inviting user by email:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to invite user',
@@ -902,12 +902,12 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
       });
 
       if (!emailResult.success) {
-        logger.error('[Admin Users] Failed to send invitation email:', undefined, { error: { name: 'Error', message: String(emailResult.error) } });
+        logger.error('[Admin Users] Failed to send invitation email:', req.ctx, { error: { name: 'Error', message: String(emailResult.error) } });
         // Don't fail the invitation creation if email fails
         // The invitation still exists and can be used
       }
     } catch (emailError) {
-      logger.error('[Admin Users] Email service error:', undefined, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
+      logger.error('[Admin Users] Email service error:', req.ctx, { error: { name: (emailError as any)?.name || 'Error', message: (emailError as any)?.message || String(emailError), stack: (emailError as any)?.stack } });
       // Don't fail the invitation creation if email service fails
     }
 
@@ -945,7 +945,7 @@ router.post('/users/send-invitation', requirePlatformUser, async (req: Request, 
       },
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error sending invitations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error sending invitations:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to send invitation',
@@ -1039,7 +1039,7 @@ router.get('/invitations', requirePlatformUser, async (req: Request, res: Respon
       invitations: formattedInvitations,
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error listing invitations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error listing invitations:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to list invitations',
@@ -1128,7 +1128,7 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error getting invitations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error getting invitations:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get invitation',
@@ -1302,7 +1302,7 @@ router.post('/invitations/:token/accept', async (req: Request, res: Response) =>
       userCreated,
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error accepting invitations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error accepting invitations:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to accept invitation',
@@ -1363,7 +1363,7 @@ router.get('/users/:userId/tenants', requirePlatformUser, async (req: Request, r
       tenant: formattedTenants,
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error getting user tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error getting user tenant:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to get user tenants',
@@ -1435,7 +1435,7 @@ router.post('/users/:userId/send-verification-email', requirePlatformAdmin, asyn
       verificationLink: unifiedConfig.isDevelopment ? verificationLink : undefined, // Only show in development
     });
   } catch (error: any) {
-    logger.error('[POST /users/:userId/send-verification-email] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[POST /users/:userId/send-verification-email] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to send verification email',
@@ -1569,7 +1569,7 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
       },
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error assigning user to tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error assigning user to tenant:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to assign user to tenant',
@@ -1657,7 +1657,7 @@ router.patch('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (re
       message: 'User role updated successfully',
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error updating user role:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error updating user role:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update user role',
@@ -1726,7 +1726,7 @@ router.delete('/users/:userId/tenants/:tenantId', requirePlatformAdmin, async (r
       message: 'User removed from tenant successfully',
     });
   } catch (error: any) {
-    logger.error('[Admin Users] Error removing user from tenant:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Admin Users] Error removing user from tenant:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to remove user from tenant',

@@ -96,7 +96,7 @@ router.get('/', checkTenantAccess, async (req: Request, res: Response) => {
     });
     res.json({ success: true, data: faqs });
   } catch (error) {
-    logger.error('[FAQ] Error listing FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error listing FAQs:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to list FAQs' });
   }
 });
@@ -117,7 +117,7 @@ router.post('/', checkTenantAccess, async (req: Request, res: Response) => {
     });
     res.status(201).json({ success: true, data: faq });
   } catch (error) {
-    logger.error('[FAQ] Error creating FAQ:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error creating FAQ:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to create FAQ' });
   }
 });
@@ -134,7 +134,7 @@ router.post('/reorder', checkTenantAccess, async (req: Request, res: Response) =
     await faqService.reorderFAQs(tenantId, orders);
     res.json({ success: true, message: 'FAQs reordered' });
   } catch (error) {
-    logger.error('[FAQ] Error reordering FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error reordering FAQs:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to reorder FAQs' });
   }
 });
@@ -151,7 +151,7 @@ router.post('/bulk-status', checkTenantAccess, async (req: Request, res: Respons
     const count = await faqService.bulkUpdateStatus(tenantId, faqIds, status);
     res.json({ success: true, data: { updated: count } });
   } catch (error) {
-    logger.error('[FAQ] Error bulk updating FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error bulk updating FAQs:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to update FAQs' });
   }
 });
@@ -168,7 +168,7 @@ router.post('/bulk-delete', checkTenantAccess, async (req: Request, res: Respons
     const count = await faqService.bulkDelete(tenantId, faqIds);
     res.json({ success: true, data: { deleted: count } });
   } catch (error) {
-    logger.error('[FAQ] Error bulk deleting FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error bulk deleting FAQs:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to delete FAQs' });
   }
 });
@@ -192,7 +192,7 @@ router.get('/categories', checkTenantAccess, async (req: Request, res: Response)
     const categories = await faqService.listCategories(tenantId);
     res.json({ success: true, data: categories });
   } catch (error) {
-    logger.error('[FAQ] Error listing categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error listing categories:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to list categories' });
   }
 });
@@ -212,7 +212,7 @@ router.post('/categories', checkTenantAccess, async (req: Request, res: Response
     });
     res.status(201).json({ success: true, data: category });
   } catch (error) {
-    logger.error('[FAQ] Error creating category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error creating category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to create category' });
   }
 });
@@ -225,7 +225,7 @@ router.put('/categories/:categoryId', checkTenantAccess, async (req: Request, re
     await faqService.updateCategory(categoryId, tenantId, { name, display_order });
     res.json({ success: true, message: 'Category updated' });
   } catch (error) {
-    logger.error('[FAQ] Error updating category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error updating category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to update category' });
   }
 });
@@ -241,7 +241,7 @@ router.delete('/categories/:categoryId', checkTenantAccess, async (req: Request,
     }
     res.json({ success: true, message: 'Category deleted' });
   } catch (error) {
-    logger.error('[FAQ] Error deleting category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error deleting category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to delete category' });
   }
 });
@@ -265,7 +265,7 @@ router.get('/products/:productId/faqs', checkTenantAccess, async (req: Request, 
     const faqs = await faqService.listProductFAQs(tenantId, productId);
     res.json({ success: true, data: faqs });
   } catch (error) {
-    logger.error('[FAQ] Error listing product FAQs:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error listing product FAQs:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to list product FAQs' });
   }
 });
@@ -275,12 +275,12 @@ router.get('/products/:productId/faqs', checkTenantAccess, async (req: Request, 
 // ====================
 
 // GET /api/tenants/:tenantId/faqs/templates
-router.get('/templates', authenticateToken, async (_req: Request, res: Response) => {
+router.get('/templates', authenticateToken, async (req: Request, res: Response) => {
   try {
     const templates = await faqService.listGlobalTemplates();
     res.json({ success: true, data: templates });
   } catch (error) {
-    logger.error('[FAQ] Error listing templates:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error listing templates:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to list templates' });
   }
 });
@@ -293,7 +293,7 @@ router.post('/templates/:templateId/apply', checkTenantAccess, async (req: Reque
     const result = await faqService.applyTemplate(tenantId, templateId, selectedPairs);
     res.json({ success: true, data: result });
   } catch (error) {
-    logger.error('[FAQ] Error applying template:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error applying template:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to apply template' });
   }
 });
@@ -309,7 +309,7 @@ router.get('/coverage', checkTenantAccess, async (req: Request, res: Response) =
     const metrics = await faqCoverageService.getTenantCoverage(tenantId);
     res.json({ success: true, data: metrics });
   } catch (error) {
-    logger.error('[FAQ] Error fetching coverage:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error fetching coverage:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to fetch coverage metrics' });
   }
 });
@@ -328,7 +328,7 @@ router.get('/:faqId', checkTenantAccess, async (req: Request, res: Response) => 
     }
     res.json({ success: true, data: faq });
   } catch (error) {
-    logger.error('[FAQ] Error getting FAQ:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error getting FAQ:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to get FAQ' });
   }
 });
@@ -350,7 +350,7 @@ router.put('/:faqId', checkTenantAccess, async (req: Request, res: Response) => 
     }
     res.json({ success: true, data: faq });
   } catch (error) {
-    logger.error('[FAQ] Error updating FAQ:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error updating FAQ:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to update FAQ' });
   }
 });
@@ -366,7 +366,7 @@ router.delete('/:faqId', checkTenantAccess, async (req: Request, res: Response) 
     }
     res.json({ success: true, message: 'FAQ deleted' });
   } catch (error) {
-    logger.error('[FAQ] Error deleting FAQ:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[FAQ] Error deleting FAQ:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to delete FAQ' });
   }
 });
