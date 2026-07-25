@@ -12,7 +12,7 @@ import type {
   PersonalCrmDashboard, PersonalCrmTicket, PersonalCrmTask,
   PersonalCrmAlert, PersonalCrmActivity,
 } from '@/services/crm/PersonalCrmService';
-import type { CrmTicketMessage } from '@/types/crm';
+import type { CrmTicketMessage, CrmTaskMessage } from '@/types/crm';
 import { RichContentEditor } from '@/components/products/RichContentEditor';
 import { RichContentRenderer } from '@/components/products/RichContentRenderer';
 import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
@@ -61,6 +61,14 @@ export default function PersonalCrmPage() {
   const [replyKey, setReplyKey] = useState(0);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
+
+  // Task detail modal
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskMessages, setTaskMessages] = useState<CrmTaskMessage[]>([]);
+  const [taskReplyContent, setTaskReplyContent] = useState<ContentBlocks>(DEFAULT_CONTENT_BLOCKS);
+  const [taskReplyKey, setTaskReplyKey] = useState(0);
+  const [loadingTaskMessages, setLoadingTaskMessages] = useState(false);
+  const [sendingTaskReply, setSendingTaskReply] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -154,6 +162,35 @@ export default function PersonalCrmPage() {
     }
   };
 
+  const handleOpenTask = async (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setLoadingTaskMessages(true);
+    try {
+      const msgs = await personalCrmService.listTaskMessages(taskId);
+      setTaskMessages(msgs);
+    } catch (e) {
+      clientLogger.error('Failed to load task messages:', { detail: e });
+    } finally {
+      setLoadingTaskMessages(false);
+    }
+  };
+
+  const handleSendTaskReply = async () => {
+    if (!selectedTaskId || taskReplyContent.blocks.length === 0) return;
+    setSendingTaskReply(true);
+    try {
+      await personalCrmService.createTaskMessage(selectedTaskId, { content_blocks: taskReplyContent, is_internal: false });
+      setTaskReplyContent(DEFAULT_CONTENT_BLOCKS);
+      setTaskReplyKey(prev => prev + 1);
+      const msgs = await personalCrmService.listTaskMessages(selectedTaskId);
+      setTaskMessages(msgs);
+    } catch (e) {
+      clientLogger.error('Failed to send task reply:', { detail: e });
+    } finally {
+      setSendingTaskReply(false);
+    }
+  };
+
   const handleMarkAlertRead = async (alertId: string) => {
     try {
       await personalCrmService.markAlertRead(alertId);
@@ -200,9 +237,16 @@ export default function PersonalCrmPage() {
               <Title order={1}>My CRM Hub</Title>
               <Text c="dimmed" mt="xs">Your tickets, tasks, alerts, and activities across all locations</Text>
             </div>
-            <Button leftSection={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>} onClick={() => setShowNewTicket(true)}>
-              New Support Ticket
-            </Button>
+            <Group gap="sm">
+              <Link href="/settings/crm/projects">
+                <Button variant="subtle" leftSection={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l2-4h14l2 4" /></svg>}>
+                  My Projects
+                </Button>
+              </Link>
+              <Button leftSection={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>} onClick={() => setShowNewTicket(true)}>
+                New Support Ticket
+              </Button>
+            </Group>
           </Group>
         </div>
 
@@ -321,7 +365,11 @@ export default function PersonalCrmPage() {
               ) : (
                 <Stack gap="xs">
                   {tasks.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg">
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-700/50 transition-colors"
+                      onClick={() => handleOpenTask(t.id)}
+                    >
                       <div className="flex-1 min-w-0">
                         <Text fw={500} size="sm" truncate>{t.title}</Text>
                         <Group gap="xs" mt={4}>
@@ -332,9 +380,13 @@ export default function PersonalCrmPage() {
                             {t.priority}
                           </Badge>
                           {t.tenant_name && <Text size="xs" c="dimmed">{t.tenant_name}</Text>}
+                          {t.project_name && <Text size="xs" c="dimmed">📁 {t.project_name}</Text>}
                           {t.due_date && <Text size="xs" c="dimmed">Due: {new Date(t.due_date).toLocaleDateString()}</Text>}
                         </Group>
                       </div>
+                      <svg className="w-5 h-5 text-neutral-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
                   ))}
                 </Stack>
@@ -481,6 +533,59 @@ export default function PersonalCrmPage() {
                 <Group justify="flex-end" mt="sm">
                   <Button onClick={handleSendReply} loading={sendingReply} disabled={replyContent.blocks.length === 0}>
                     Send Reply
+                  </Button>
+                </Group>
+              </div>
+            </Stack>
+          )}
+        </Modal>
+        {/* Task Detail Modal */}
+        <Modal
+          opened={!!selectedTaskId}
+          onClose={() => { setSelectedTaskId(null); setTaskMessages([]); setTaskReplyContent(DEFAULT_CONTENT_BLOCKS); setTaskReplyKey(prev => prev + 1); }}
+          title="Task Conversation"
+          size="lg"
+        >
+          {loadingTaskMessages ? (
+            <div className="flex justify-center py-8"><Loader /></div>
+          ) : (
+            <Stack gap="md">
+              <ScrollArea.Autosize mah={400}>
+                <Stack gap="sm">
+                  {taskMessages.length === 0 ? (
+                    <Text c="dimmed" size="sm" py="md">No messages yet</Text>
+                  ) : (
+                    taskMessages.map((msg) => (
+                      <div key={msg.id} className={`p-3 rounded-lg ${msg.is_internal ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
+                        <Group justify="space-between" mb={4}>
+                          <Text size="xs" fw={500}>{msg.author_name}</Text>
+                          <Group gap="xs">
+                            {msg.is_internal && <Badge size="xs" color="amber" variant="light">Internal</Badge>}
+                            <Badge size="xs" variant="light">{msg.author_type}</Badge>
+                            <Text size="xs" c="dimmed">{new Date(msg.created_at).toLocaleString()}</Text>
+                          </Group>
+                        </Group>
+                        {msg.content_blocks ? (
+                          <RichContentRenderer content={msg.content_blocks as ContentBlocks} />
+                        ) : (
+                          <Text size="sm">{msg.content}</Text>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </Stack>
+              </ScrollArea.Autosize>
+              <Divider />
+              <div>
+                <RichContentEditor
+                  key={taskReplyKey}
+                  value={taskReplyContent}
+                  onChange={setTaskReplyContent}
+                  className="min-h-[160px]"
+                />
+                <Group justify="flex-end" mt="sm">
+                  <Button onClick={handleSendTaskReply} loading={sendingTaskReply} disabled={taskReplyContent.blocks.length === 0}>
+                    Send Update
                   </Button>
                 </Group>
               </div>

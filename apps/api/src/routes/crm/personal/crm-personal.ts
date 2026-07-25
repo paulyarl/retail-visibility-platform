@@ -13,8 +13,10 @@ import { Router, Request, Response } from 'express';
 import CrmTicketService from '../../../services/CrmTicketService';
 import CrmTicketMessageService from '../../../services/CrmTicketMessageService';
 import CrmTaskService from '../../../services/CrmTaskService';
+import CrmTaskMessageService from '../../../services/CrmTaskMessageService';
 import CrmActivityService from '../../../services/CrmActivityService';
 import CrmAlertService from '../../../services/CrmAlertService';
+import CrmProjectService from '../../../services/CrmProjectService';
 import { prisma } from '../../../prisma';
 import { audit } from '../../../audit';
 import { logger } from '../../../logger';
@@ -24,8 +26,10 @@ const router = Router({ mergeParams: true });
 const ticketService = CrmTicketService.getInstance();
 const messageService = CrmTicketMessageService.getInstance();
 const taskService = CrmTaskService.getInstance();
+const taskMessageService = CrmTaskMessageService.getInstance();
 const activityService = CrmActivityService.getInstance();
 const alertService = CrmAlertService.getInstance();
+const projectService = CrmProjectService.getInstance();
 
 const PLATFORM_TENANT_ID = 'platform';
 
@@ -310,6 +314,69 @@ router.get('/tasks', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/personal/crm/tasks/:taskId/messages
+router.get('/tasks/:taskId/messages', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const task = await taskService.getById(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'not_found', message: 'Task not found' });
+
+    // User can only see tasks assigned to them or from their tenants
+    if (task.assigned_to !== userId) {
+      const tenantIds = getTenantIds(req);
+      if (task.tenant_id && !tenantIds.includes(task.tenant_id)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this task' });
+      }
+    }
+
+    const messages = await taskMessageService.listByTask(req.params.taskId, true);
+    res.json({ success: true, data: messages });
+  } catch (error) {
+    logger.error('[CRM Personal] Error listing task messages:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list task messages' });
+  }
+});
+
+// POST /api/personal/crm/tasks/:taskId/messages
+router.post('/tasks/:taskId/messages', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const actorName = getUserDisplayName(req);
+
+    const task = await taskService.getById(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'not_found', message: 'Task not found' });
+
+    if (task.assigned_to !== userId) {
+      const tenantIds = getTenantIds(req);
+      if (task.tenant_id && !tenantIds.includes(task.tenant_id)) {
+        return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this task' });
+      }
+    }
+
+    if (task.status === 'cancelled') {
+      return res.status(403).json({ error: 'task_cancelled', message: 'Task is cancelled' });
+    }
+
+    const message = await taskMessageService.create({
+      task_id: req.params.taskId,
+      author_id: userId,
+      author_type: 'platform',
+      author_name: actorName,
+      content: req.body.content,
+      content_blocks: req.body.content_blocks,
+      is_internal: req.body.is_internal || false,
+    });
+
+    res.json({ success: true, data: message });
+  } catch (error) {
+    logger.error('[CRM Personal] Error creating task message:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create task message' });
+  }
+});
+
 // ====================
 // Alerts (cross-tenant, from user's tenants)
 // ====================
@@ -462,6 +529,282 @@ router.get('/activities', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('[CRM Personal] Error listing activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ error: 'internal_error', message: 'Failed to list activities' });
+  }
+});
+
+// ====================
+// Projects (user-scoped, created_by = userId)
+// ====================
+
+// GET /api/personal/crm/projects
+router.get('/projects', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const projects = await prisma.crm_projects.findMany({
+      where: {
+        created_by: userId,
+        ...(req.query.status ? { status: req.query.status as string } : {}),
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const projectsWithStats = await Promise.all(
+      projects.map(async (p: any) => {
+        const stats = await projectService.getStats(p.id);
+        return { ...p, stats };
+      })
+    );
+
+    res.json({ success: true, data: projectsWithStats });
+  } catch (error) {
+    logger.error('[CRM Personal] Error listing projects:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list projects' });
+  }
+});
+
+// POST /api/personal/crm/projects
+router.post('/projects', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'invalid_input', message: 'name is required' });
+
+    const project = await projectService.create({ name, description, created_by: userId });
+    await audit({ tenantId: undefined, actor: userId, action: 'create', payload: { entity_type: 'crm_project', id: project.id } });
+    res.json({ success: true, data: project });
+  } catch (error) {
+    logger.error('[CRM Personal] Error creating project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create project' });
+  }
+});
+
+// GET /api/personal/crm/projects/:projectId
+router.get('/projects/:projectId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
+
+    const stats = await projectService.getStats(req.params.projectId);
+    res.json({ success: true, data: { ...project, stats } });
+  } catch (error) {
+    logger.error('[CRM Personal] Error fetching project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to fetch project' });
+  }
+});
+
+// PUT /api/personal/crm/projects/:projectId
+router.put('/projects/:projectId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const existing = await projectService.getById(req.params.projectId);
+    if (!existing) return res.status(404).json({ error: 'project_not_found' });
+    if (existing.created_by !== userId) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
+
+    const { name, description, status } = req.body;
+    const project = await projectService.update(req.params.projectId, { name, description, status });
+    await audit({ tenantId: undefined, actor: userId, action: 'update', payload: { entity_type: 'crm_project', id: project.id } });
+    res.json({ success: true, data: project });
+  } catch (error) {
+    logger.error('[CRM Personal] Error updating project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update project' });
+  }
+});
+
+// DELETE /api/personal/crm/projects/:projectId
+router.delete('/projects/:projectId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const existing = await projectService.getById(req.params.projectId);
+    if (!existing) return res.status(404).json({ error: 'project_not_found' });
+    if (existing.created_by !== userId) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
+
+    await projectService.delete(req.params.projectId);
+    await audit({ tenantId: undefined, actor: userId, action: 'delete', payload: { entity_type: 'crm_project', id: req.params.projectId } });
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[CRM Personal] Error deleting project:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to delete project' });
+  }
+});
+
+// GET /api/personal/crm/projects/:projectId/tasks
+router.get('/projects/:projectId/tasks', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    const tasks = await taskService.listByProject(req.params.projectId, {
+      status: req.query.status as string,
+      assignedTo: req.query.assignedTo as string,
+    });
+    res.json({ success: true, data: tasks });
+  } catch (error) {
+    logger.error('[CRM Personal] Error listing project tasks:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list project tasks' });
+  }
+});
+
+// POST /api/personal/crm/projects/:projectId/tasks
+router.post('/projects/:projectId/tasks', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const actorName = getUserDisplayName(req);
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    const task = await taskService.create({ ...req.body, project_id: req.params.projectId, created_by: userId });
+    await audit({ tenantId: undefined, actor: userId, action: 'create', payload: { entity_type: 'crm_task', id: task.id, project_id: req.params.projectId } });
+
+    await activityService.create({
+      project_id: req.params.projectId,
+      task_id: task.id,
+      actor_id: userId,
+      actor_type: 'platform',
+      actor_name: actorName,
+      activity_type: 'task_created',
+      content: `Task created: ${req.body.title}`,
+      is_internal: false,
+    });
+
+    res.json({ success: true, data: task });
+  } catch (error) {
+    logger.error('[CRM Personal] Error creating project task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create task' });
+  }
+});
+
+// PUT /api/personal/crm/projects/:projectId/tasks/:taskId
+router.put('/projects/:projectId/tasks/:taskId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const actorName = getUserDisplayName(req);
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    const task = await taskService.update(req.params.taskId, req.body, userId, actorName, 'platform');
+    await audit({ tenantId: task.tenant_id || undefined, actor: userId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
+    res.json({ success: true, data: task });
+  } catch (error) {
+    logger.error('[CRM Personal] Error updating project task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to update task' });
+  }
+});
+
+// DELETE /api/personal/crm/projects/:projectId/tasks/:taskId
+router.delete('/projects/:projectId/tasks/:taskId', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    await taskService.delete(req.params.taskId);
+    await audit({ tenantId: undefined, actor: userId, action: 'delete', payload: { entity_type: 'crm_task', id: req.params.taskId } });
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[CRM Personal] Error deleting project task:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to delete task' });
+  }
+});
+
+// GET /api/personal/crm/projects/:projectId/tickets
+router.get('/projects/:projectId/tickets', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    const tickets = await ticketService.listByProject(req.params.projectId, {
+      status: req.query.status as string,
+      priority: req.query.priority as string,
+      assignedTo: req.query.assignedTo as string,
+    });
+    res.json({ success: true, data: tickets });
+  } catch (error) {
+    logger.error('[CRM Personal] Error listing project tickets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list project tickets' });
+  }
+});
+
+// POST /api/personal/crm/projects/:projectId/tickets
+router.post('/projects/:projectId/tickets', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+    const actorName = getUserDisplayName(req);
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    const ticket = await ticketService.create({ project_id: req.params.projectId, ...req.body });
+    await audit({ actor: userId, action: 'create', payload: { entity_type: 'crm_ticket', id: ticket.id, project_id: req.params.projectId, ...req.body } });
+
+    await activityService.create({
+      project_id: req.params.projectId,
+      ticket_id: ticket.id,
+      actor_id: userId,
+      actor_type: 'platform',
+      actor_name: actorName,
+      activity_type: 'status_change',
+      content: `Ticket created: ${req.body.title}`,
+      is_internal: false,
+    });
+
+    res.json({ success: true, data: ticket });
+  } catch (error) {
+    logger.error('[CRM Personal] Error creating project ticket:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to create ticket' });
+  }
+});
+
+// GET /api/personal/crm/projects/:projectId/activities
+router.get('/projects/:projectId/activities', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ error: 'authentication_required' });
+
+    const project = await projectService.getById(req.params.projectId);
+    if (!project) return res.status(404).json({ error: 'project_not_found' });
+    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+
+    const activities = await activityService.listByProject(req.params.projectId, {
+      type: req.query.type as string,
+      taskId: req.query.taskId as string,
+      ticketId: req.query.ticketId as string,
+      isInternal: req.query.internal === 'false' ? false : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+    });
+    res.json({ success: true, data: activities });
+  } catch (error) {
+    logger.error('[CRM Personal] Error listing project activities:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({ error: 'internal_error', message: 'Failed to list project activities' });
   }
 });
 
