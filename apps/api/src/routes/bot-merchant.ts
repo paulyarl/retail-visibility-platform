@@ -101,7 +101,7 @@ router.get('/config', authenticateToken, async (req, res) => {
     const config = await configService.getOrCreate(tenantId);
     res.json({ success: true, config });
   } catch (error) {
-    logger.error('Error fetching bot config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching bot config:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch bot config' });
   }
 });
@@ -118,7 +118,7 @@ router.put('/config', authenticateToken, requireTenantAdmin, async (req, res) =>
     const config = await configService.update(tenantId, validation.data);
     res.json({ success: true, config });
   } catch (error) {
-    logger.error('Error updating bot config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating bot config:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update bot config' });
   }
 });
@@ -134,7 +134,7 @@ router.get('/conversations', authenticateToken, async (req, res) => {
     const result = await conversationService.listConversations(tenantId, { page, limit, status });
     res.json({ success: true, ...result });
   } catch (error) {
-    logger.error('Error listing conversations:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error listing conversations:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to list conversations' });
   }
 });
@@ -175,7 +175,7 @@ router.get('/conversations/:id', authenticateToken, async (req, res) => {
     const messages = await conversationService.getMessages(conv.id);
     res.json({ success: true, conversation: conv, messages });
   } catch (error) {
-    logger.error('Error fetching conversation:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching conversation:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch conversation' });
   }
 });
@@ -200,7 +200,7 @@ router.put('/conversations/:id/status', authenticateToken, async (req, res) => {
     const updated = await conversationService.updateStatus(id, status);
     res.json({ success: true, conversation: updated });
   } catch (error) {
-    logger.error('Error updating conversation status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating conversation status:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update conversation status' });
   }
 });
@@ -240,7 +240,7 @@ router.post('/conversations/:id/escalate', authenticateToken, async (req, res) =
 
     res.json({ success: true, ticketId: result.ticketId, ticketTitle: result.ticketTitle });
   } catch (error) {
-    logger.error('Error escalating conversation:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error escalating conversation:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to escalate conversation' });
   }
 });
@@ -252,7 +252,7 @@ router.get('/skills', authenticateToken, async (req, res) => {
     const skills = await skillService.listSkills(tenantId);
     res.json({ success: true, skills });
   } catch (error) {
-    logger.error('Error listing skills:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error listing skills:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to list skills' });
   }
 });
@@ -269,7 +269,7 @@ router.put('/skills/:skillId', authenticateToken, async (req, res) => {
     await skillService.updateSkillConfig(tenantId, skillId, validation.data);
     res.json({ success: true });
   } catch (error) {
-    logger.error('Error updating skill config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating skill config:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to update skill config' });
   }
 });
@@ -281,7 +281,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     const stats = await conversationService.getDashboardStats(tenantId);
     res.json({ success: true, stats });
   } catch (error) {
-    logger.error('Error fetching dashboard:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching dashboard:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch dashboard stats' });
   }
 });
@@ -300,7 +300,7 @@ router.get('/analytics', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('Error fetching analytics:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching analytics:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch analytics' });
   }
 });
@@ -318,7 +318,7 @@ router.post('/gdpr-erase', authenticateToken, async (req, res) => {
     const count = await conversationService.eraseCustomerData(tenantId, { email, phone });
     res.json({ success: true, erasedCount: count });
   } catch (error) {
-    logger.error('Error erasing customer data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error erasing customer data:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to erase customer data' });
   }
 });
@@ -331,7 +331,7 @@ router.post('/retention', authenticateToken, async (req, res) => {
     const deleted = await conversationService.deleteOldConversations(tenantId);
     res.json({ success: true, archived, deleted });
   } catch (error) {
-    logger.error('Error running retention:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error running retention:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to run retention policy' });
   }
 });
@@ -355,7 +355,7 @@ router.post('/faq-webhook', authenticateToken, async (req, res) => {
 
     res.json({ success: true, message: 'FAQ webhook processed — embeddings refreshed', action, faqId, tenantId });
   } catch (error) {
-    logger.error('Error processing FAQ webhook:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error processing FAQ webhook:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to process webhook' });
   }
 });
@@ -367,7 +367,7 @@ router.post('/embeddings/refresh', authenticateToken, async (req, res) => {
     const result = await ragService.refreshEmbeddings(tenantId);
     res.json({ success: true, ...result });
   } catch (error) {
-    logger.error('Error refreshing embeddings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error refreshing embeddings:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to refresh embeddings' });
   }
 });
@@ -403,7 +403,7 @@ router.get('/embeddings/status', authenticateToken, async (req, res) => {
       knowledgeEmbeddingCounts,
     });
   } catch (error) {
-    logger.error('Error checking embedding status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error checking embedding status:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to check embedding status' });
   }
 });
@@ -415,7 +415,7 @@ router.post('/product-embeddings/refresh', authenticateToken, async (req, res) =
     const result = await ragService.refreshProductEmbeddings(tenantId);
     res.json({ success: true, ...result });
   } catch (error) {
-    logger.error('Error refreshing product embeddings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error refreshing product embeddings:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to refresh product embeddings' });
   }
 });
@@ -429,7 +429,7 @@ router.post('/embeddings/knowledge/refresh', authenticateToken, async (req, res)
     const result = await knowledgeService.refreshKnowledgeEmbeddings(tenantId, sourceType);
     res.json({ success: true, ...result });
   } catch (error) {
-    logger.error('Error refreshing knowledge embeddings:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error refreshing knowledge embeddings:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to refresh knowledge embeddings' });
   }
 });
@@ -441,7 +441,7 @@ router.get('/product-embeddings/status', authenticateToken, async (req, res) => 
     const hasProductEmbeddings = await ragService.hasProductEmbeddings(tenantId);
     res.json({ success: true, hasProductEmbeddings });
   } catch (error) {
-    logger.error('Error checking product embedding status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error checking product embedding status:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to check product embedding status' });
   }
 });
@@ -464,7 +464,7 @@ router.post('/dashboard-chat/start', authenticateToken, async (req, res) => {
       greeting: result.greeting,
     });
   } catch (error) {
-    logger.error('Error starting dashboard chat:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error starting dashboard chat:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to start dashboard chat' });
   }
 });
@@ -597,7 +597,7 @@ router.post('/dashboard-chat/message', authenticateToken, async (req, res) => {
       messageId: botMsg.id,
     });
   } catch (error) {
-    logger.error('Error in dashboard chat:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error in dashboard chat:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to process dashboard chat message' });
   }
 });
@@ -609,7 +609,7 @@ router.get('/platform-guide', authenticateToken, async (req, res) => {
     const ctx = await platformGuideService.buildContext(tenantId, 'dashboard');
     res.json({ success: true, guide: ctx });
   } catch (error) {
-    logger.error('Error fetching platform guide:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching platform guide:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to fetch platform guide' });
   }
 });
@@ -661,7 +661,7 @@ router.post('/avatar', authenticateToken, async (req, res) => {
       });
 
     if (uploadError) {
-      logger.error('[BotMerchant] Avatar upload error:', undefined, { error: { name: 'Error', message: String(uploadError.message) } });
+      logger.error('[BotMerchant] Avatar upload error:', req.ctx, { error: { name: 'Error', message: String(uploadError.message) } });
       return res.status(500).json({
         success: false,
         error: 'upload_failed',
@@ -679,7 +679,7 @@ router.post('/avatar', authenticateToken, async (req, res) => {
 
     res.json({ success: true, url: avatarUrl });
   } catch (error) {
-    logger.error('[BotMerchant] Avatar upload error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[BotMerchant] Avatar upload error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'internal_error', message: 'Failed to upload avatar' });
   }
 });

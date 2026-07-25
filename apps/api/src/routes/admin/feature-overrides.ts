@@ -231,7 +231,7 @@ router.get('/', authenticateToken, requirePlatformAdmin, async (req: Request, re
       cached: false,
     });
   } catch (error: any) {
-    logger.error('[Feature Overrides] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] List error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'list_failed',
       message: 'Failed to list feature overrides',
@@ -277,7 +277,7 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
 
     res.json({ override: enriched });
   } catch (error: any) {
-    logger.error('[Feature Overrides] Get error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] Get error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'get_failed',
       message: 'Failed to get feature override',
@@ -384,7 +384,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
       });
     }
 
-    logger.error('[Feature Overrides] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] Create error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'create_failed',
       message: 'Failed to create feature override',
@@ -472,7 +472,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
       });
     }
 
-    logger.error('[Feature Overrides] Update error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] Update error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'update_failed',
       message: 'Failed to update feature override',
@@ -523,7 +523,7 @@ router.delete('/:id', authenticateToken, requirePlatformAdmin, async (req: Reque
       message: 'Feature override deleted successfully',
     });
   } catch (error: any) {
-    logger.error('[Feature Overrides] Delete error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] Delete error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'delete_failed',
       message: 'Failed to delete feature override',
@@ -567,7 +567,7 @@ router.get('/tenant/:tenantId', authenticateToken, requirePlatformAdmin, async (
       count: enrichedOverrides.length,
     });
   } catch (error: any) {
-    logger.error('[Feature Overrides] Get tenant overrides error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] Get tenant overrides error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'get_failed',
       message: 'Failed to get tenant overrides',
@@ -598,7 +598,7 @@ router.post('/cleanup-expired', authenticateToken, requirePlatformAdmin, async (
       message: `Removed ${result.count} expired override(s)`,
     });
   } catch (error: any) {
-    logger.error('[Feature Overrides] Cleanup error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Feature Overrides] Cleanup error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'cleanup_failed',
       message: 'Failed to cleanup expired overrides',
@@ -695,7 +695,7 @@ router.post('/pricing', authenticateToken, requirePlatformAdmin, async (req: Req
       });
     }
 
-    logger.error('[Pricing Override] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Pricing Override] Create error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'create_failed',
       message: 'Failed to create pricing override',
@@ -789,7 +789,7 @@ router.post('/limits', authenticateToken, requirePlatformAdmin, async (req: Requ
       });
     }
 
-    logger.error('[Limits Override] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Limits Override] Create error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'create_failed',
       message: 'Failed to create limits override',
@@ -882,7 +882,7 @@ router.post('/featured', authenticateToken, requirePlatformAdmin, async (req: Re
       });
     }
 
-    logger.error('[Featured Override] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Featured Override] Create error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'create_failed',
       message: 'Failed to create featured products override',
@@ -992,7 +992,7 @@ router.post('/bulk', authenticateToken, requirePlatformAdmin, async (req: Reques
     });
 
   } catch (error: any) {
-    logger.error('[Bulk Operation] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Bulk Operation] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'bulk_operation_failed',
       message: 'Failed to execute bulk operation',
@@ -1098,7 +1098,7 @@ router.post('/bulk-import', authenticateToken, requirePlatformAdmin, async (req:
     });
 
   } catch (error: any) {
-    logger.error('[Bulk Import] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Bulk Import] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'bulk_import_failed',
       message: 'Failed to execute bulk import',
@@ -1359,7 +1359,7 @@ router.post('/approval-requests', authenticateToken, requirePlatformAdmin, async
       });
     }
 
-    logger.error('[Approval Request] Create error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Approval Request] Create error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'create_failed',
       message: 'Failed to create approval request',
@@ -1433,7 +1433,7 @@ router.get('/approval-requests', authenticateToken, requirePlatformAdmin, async 
       count: filteredRequests.length,
     });
   } catch (error: any) {
-    logger.error('[Approval Requests] List error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Approval Requests] List error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'list_failed',
       message: 'Failed to list approval requests',
@@ -1586,7 +1586,7 @@ router.post('/approval-requests/:id/approve', authenticateToken, requirePlatform
       });
     }
 
-    logger.error('[Approval] Process error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Approval] Process error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'approval_failed',
       message: 'Failed to process approval',
@@ -1765,7 +1765,7 @@ router.get('/cache/stats', authenticateToken, requirePlatformAdmin, async (req: 
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Cache Stats] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Cache Stats] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'stats_failed',
       message: 'Failed to get cache statistics',
@@ -1789,7 +1789,7 @@ router.post('/cache/clear', authenticateToken, requirePlatformAdmin, async (req:
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Cache Clear] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Cache Clear] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'clear_failed',
       message: 'Failed to clear cache',
@@ -1823,7 +1823,7 @@ router.post('/cache/warm', authenticateToken, requirePlatformAdmin, async (req: 
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Cache Warm] Error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Cache Warm] Error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'warm_failed',
       message: 'Failed to warm cache',
@@ -1853,7 +1853,7 @@ router.get('/analytics', authenticateToken, requirePlatformAdmin, async (req: Re
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Analytics] Get analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Analytics] Get analytics error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'analytics_failed',
       message: 'Failed to get analytics',
@@ -1883,7 +1883,7 @@ router.get('/analytics/trends', authenticateToken, requirePlatformAdmin, async (
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Analytics] Get trends error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Analytics] Get trends error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'trends_failed',
       message: 'Failed to get usage trends',
@@ -1911,7 +1911,7 @@ router.get('/analytics/approvals', authenticateToken, requirePlatformAdmin, asyn
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Analytics] Get approval analytics error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Analytics] Get approval analytics error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'approval_analytics_failed',
       message: 'Failed to get approval analytics',
@@ -1948,7 +1948,7 @@ router.get('/analytics/export', authenticateToken, requirePlatformAdmin, async (
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(exportData);
   } catch (error: any) {
-    logger.error('[Analytics] Export error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Analytics] Export error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'export_failed',
       message: 'Failed to export analytics',
@@ -1981,7 +1981,7 @@ router.post('/analytics/refresh', authenticateToken, requirePlatformAdmin, async
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('[Analytics] Refresh error:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[Analytics] Refresh error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ 
       error: 'refresh_failed',
       message: 'Failed to refresh analytics',

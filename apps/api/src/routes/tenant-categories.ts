@@ -60,7 +60,7 @@ async function refreshDirectoryMV(tenantId?: string) {
       }
     }
   } catch (error) {
-    logger.error('[MV Refresh] Failed to refresh materialized view:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[MV Refresh] Failed to refresh materialized view:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     // Don't throw error - this is non-critical
   }
 }
@@ -142,7 +142,7 @@ async function requireTenantManagement(req: Request, res: Response, next: NextFu
       message: 'Tenant member access required for this operation',
     });
   } catch (error) {
-    logger.error('[requireTenantManagement] Error checking permissions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[requireTenantManagement] Error checking permissions:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     return res.status(500).json({
       success: false,
       error: 'Failed to check permissions',
@@ -268,7 +268,7 @@ router.get('/:tenantId/categories', authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('Error fetching categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching categories:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch categories',
@@ -335,7 +335,7 @@ router.get('/:tenantId/categories/:id', async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('Error fetching category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch category',
@@ -410,7 +410,7 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
       });
     }
 
-    logger.error('Error creating category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error creating category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create category',
@@ -515,7 +515,7 @@ router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, as
       });
     }
 
-    logger.error('Error creating category from enrichment:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error creating category from enrichment:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to create category',
@@ -606,7 +606,7 @@ router.put('/:tenantId/categories/:id', requireTenantManagement, async (req, res
       });
     }
 
-    logger.error('Error updating category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update category',
@@ -680,7 +680,7 @@ router.delete('/:tenantId/categories/:id', requireTenantManagement, async (req, 
       message: 'Category deleted successfully',
     });
   } catch (error) {
-    logger.error('Error deleting category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error deleting category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to delete category',
@@ -743,7 +743,7 @@ router.post('/:tenantId/categories/:id/align', requireTenantManagement, async (r
       });
     }
 
-    logger.error('Error aligning category:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error aligning category:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to align category',
@@ -774,7 +774,7 @@ router.get('/:tenantId/categories-unmapped', async (req, res) => {
       count: unmapped.length,
     });
   } catch (error) {
-    logger.error('Error fetching unmapped categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching unmapped categories:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch unmapped categories',
@@ -832,7 +832,7 @@ router.get('/:tenantId/categories-alignment-status', authenticateToken, async (r
       data: alignmentStatus,
     });
   } catch (error) {
-    logger.error('Error fetching alignment status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error fetching alignment status:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch alignment status',
@@ -1012,7 +1012,7 @@ router.get('/:tenantId/categories/complete', authenticateToken, async (req: Requ
 
     res.json(consolidatedResponse);
   } catch (error: any) {
-    logger.error('[CATEGORIES] Error fetching complete categories data:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[CATEGORIES] Error fetching complete categories data:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'internal_error',
@@ -1162,7 +1162,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
         // Trigger revalidate for this location
         triggerRevalidate(location.id).catch(() => {});
       } catch (error: any) {
-        logger.error(`Error propagating to tenant ${location.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+        logger.error(`Error propagating to tenant ${location.id}:`, req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.errors.push({
           tenantId: location.id,
           tenantName: location.name,
@@ -1180,7 +1180,7 @@ router.post('/:tenantId/categories/propagate', requireTenantAdmin, requirePropag
       data: results,
     });
   } catch (error) {
-    logger.error('Error propagating categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error propagating categories:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to propagate categories',
@@ -1303,7 +1303,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
           }
         }
       } catch (error: any) {
-        logger.error(`Error propagating to tenant ${location.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+        logger.error(`Error propagating to tenant ${location.id}:`, req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.errors.push({
           tenantId: location.id,
           tenantName: location.name,
@@ -1318,7 +1318,7 @@ router.post('/:tenantId/feature-flags/propagate', requirePlatformAdmin, async (r
       data: results,
     });
   } catch (error) {
-    logger.error('Error propagating feature flags:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error propagating feature flags:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to propagate feature flags' });
   }
 });
@@ -1485,7 +1485,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
           }
         }
       } catch (error: any) {
-        logger.error(`Error propagating to tenant ${location.id}:`, undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+        logger.error(`Error propagating to tenant ${location.id}:`, req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
         results.errors.push({
           tenantId: location.id,
           tenantName: location.name,
@@ -1500,7 +1500,7 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
       data: results,
     });
   } catch (error) {
-    logger.error('Error propagating business hours:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error propagating business hours:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to propagate business hours',
@@ -1617,7 +1617,7 @@ router.post('/:tenantId/user-roles/propagate', requireTenantAdmin, requirePropag
 
     res.json({ success: true, message: 'User roles propagated successfully', data: results });
   } catch (error) {
-    logger.error('Error propagating user roles:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error propagating user roles:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to propagate user roles' });
   }
 });
@@ -1704,7 +1704,7 @@ router.post('/:tenantId/brand-assets/propagate', requireTenantAdmin, requireProp
 
     res.json({ success: true, message: 'Brand assets propagated successfully', data: results });
   } catch (error) {
-    logger.error('Error propagating brand assets:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error propagating brand assets:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to propagate brand assets' });
   }
 });
@@ -1800,7 +1800,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
 
     res.json({ success: true, message: 'Business profile propagated successfully', data: results });
   } catch (error) {
-    logger.error('Error propagating business profile:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error propagating business profile:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({ success: false, error: 'Failed to propagate business profile' });
   }
 });
@@ -1910,7 +1910,7 @@ router.put('/gbp-category', async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Error updating GBP categories:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('Error updating GBP categories:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'Failed to update GBP categories'
@@ -1978,7 +1978,7 @@ router.post('/:tenantId/logo', authenticateToken, checkTenantAccess, async (req:
       });
 
     if (uploadError) {
-      logger.error('[TENANTS] Supabase upload error:', undefined, { error: { name: 'Error', message: String(uploadError.message) } });
+      logger.error('[TENANTS] Supabase upload error:', req.ctx, { error: { name: 'Error', message: String(uploadError.message) } });
       return res.status(500).json({
         success: false,
         error: 'upload_failed',
@@ -2025,7 +2025,7 @@ router.post('/:tenantId/logo', authenticateToken, checkTenantAccess, async (req:
     });
 
   } catch (error: any) {
-    logger.error('[TENANTS] Error uploading logo:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[TENANTS] Error uploading logo:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'upload_failed',

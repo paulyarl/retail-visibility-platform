@@ -112,7 +112,7 @@ router.get('/config', requireAuth, requireAdmin, async (req: Request, res: Respo
       config: safeConfig,
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting config:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'config_fetch_failed',
@@ -196,7 +196,7 @@ router.put('/config', requireAuth, requireAdmin, async (req: Request, res: Respo
       config: safeConfig,
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error updating config:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error updating config:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'config_update_failed',
@@ -243,7 +243,7 @@ router.post('/onboarding/init', requireAuth, requireAdmin, async (req: Request, 
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error initializing onboarding:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error initializing onboarding:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'onboarding_init_failed',
@@ -304,7 +304,7 @@ router.get('/merchants', requireAuth, requireAdmin, async (req: Request, res: Re
       connections: serializeBigInt(result),
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting merchants:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting merchants:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'merchants_fetch_failed',
@@ -349,7 +349,7 @@ router.get('/merchants/:tenantId', requireAuth, requireAdmin, async (req: Reques
       },
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting merchant connection:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting merchant connection:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'connection_fetch_failed',
@@ -443,7 +443,7 @@ router.post('/merchants/:tenantId/onboarding', requireAuth, requireAdmin, async 
       expires_at: expiresAt.toISOString(),
     });
   } catch (error: any) {
-    logger.error('[PlatformRevenue] Error creating onboarding link:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error creating onboarding link:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'onboarding_link_failed',
@@ -485,7 +485,7 @@ router.put('/merchants/:tenantId/fee', requireAuth, requireAdmin, async (req: Re
       connection: updated,
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error updating merchant fee:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error updating merchant fee:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'fee_update_failed',
@@ -546,7 +546,7 @@ router.post('/merchants/:tenantId/refresh', requireAuth, requireAdmin, async (re
       connection: updated,
     });
   } catch (error: any) {
-    logger.error('[PlatformRevenue] Error refreshing merchant status:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error refreshing merchant status:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'refresh_failed',
@@ -621,7 +621,7 @@ router.get('/summary', requireAuth, requireAdmin, async (req: Request, res: Resp
       summary,
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting summary:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting summary:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'summary_fetch_failed',
@@ -679,7 +679,7 @@ router.get('/transactions', requireAuth, requireAdmin, async (req: Request, res:
       total: total?.toString(),
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting transactions:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting transactions:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'transactions_fetch_failed',
@@ -739,7 +739,7 @@ router.get('/tenants/:tenantId/revenue', requireAuth, requireAdmin, async (req: 
       revenue,
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting tenant revenue:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting tenant revenue:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'tenant_revenue_failed',
@@ -803,7 +803,7 @@ router.get('/payouts/pending', requireAuth, requireAdmin, async (req: Request, r
       merchant_pending: merchantPendingList,
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting pending payouts:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting pending payouts:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'pending_payouts_failed',
@@ -915,7 +915,7 @@ router.post('/payouts/trigger', requireAuth, requireAdmin, async (req: Request, 
       amount_cents: amountCents,
     });
   } catch (error: any) {
-    logger.error('[PlatformRevenue] Error triggering payout:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error triggering payout:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'payout_failed',
@@ -948,7 +948,7 @@ router.get('/fee-tiers', requireAuth, requireAdmin, async (req: Request, res: Re
       })),
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting fee tiers:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting fee tiers:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'tiers_fetch_failed',
@@ -1006,7 +1006,7 @@ router.post('/fee-tiers', requireAuth, requireAdmin, async (req: Request, res: R
       },
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error creating fee tier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error creating fee tier:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'tier_create_failed',
@@ -1056,7 +1056,7 @@ router.put('/fee-tiers/:id', requireAuth, requireAdmin, async (req: Request, res
       },
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error updating fee tier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error updating fee tier:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'tier_update_failed',
@@ -1082,7 +1082,7 @@ router.delete('/fee-tiers/:id', requireAuth, requireAdmin, async (req: Request, 
       message: 'Fee tier deleted',
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error deleting fee tier:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error deleting fee tier:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'tier_delete_failed',
@@ -1131,7 +1131,7 @@ router.get('/fee-overrides', requireAuth, requireAdmin, async (req: Request, res
       })),
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error getting fee overrides:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error getting fee overrides:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'overrides_fetch_failed',
@@ -1192,7 +1192,7 @@ router.post('/fee-overrides', requireAuth, requireAdmin, async (req: Request, re
       },
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error creating fee override:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error creating fee override:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'override_create_failed',
@@ -1220,7 +1220,7 @@ router.delete('/fee-overrides/:id', requireAuth, requireAdmin, async (req: Reque
       message: 'Fee override deactivated',
     });
   } catch (error) {
-    logger.error('[PlatformRevenue] Error deleting fee override:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    logger.error('[PlatformRevenue] Error deleting fee override:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
     res.status(500).json({
       success: false,
       error: 'override_delete_failed',

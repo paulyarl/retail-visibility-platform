@@ -50,7 +50,32 @@ export class CrmTaskService extends BaseService {
   }
 
   async getById(taskId: string) {
-    return prisma.crm_tasks.findUnique({ where: { id: taskId } });
+    const task = await prisma.crm_tasks.findUnique({
+      where: { id: taskId },
+      include: {
+        tenants: { select: { name: true } },
+        crm_projects: { select: { name: true } },
+      },
+    });
+    if (!task) return null;
+
+    let assigned_to_name: string | null = null;
+    if (task.assigned_to) {
+      const user = await prisma.users.findUnique({
+        where: { id: task.assigned_to },
+        select: { first_name: true, last_name: true, email: true },
+      });
+      if (user) {
+        assigned_to_name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
+      }
+    }
+
+    return {
+      ...task,
+      tenant_name: task.tenants?.name ?? null,
+      project_name: task.crm_projects?.name ?? null,
+      assigned_to_name,
+    };
   }
 
   async create(data: {
