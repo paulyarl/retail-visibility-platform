@@ -52,6 +52,7 @@ export default function CrmTaskDetailPage() {
   const [noteContent, setNoteContent] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [savingMessageId, setSavingMessageId] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [editTask, setEditTask] = useState<CrmTask | null>(null);
   const [editing, setEditing] = useState(false);
@@ -164,6 +165,21 @@ export default function CrmTaskDetailPage() {
       clientLogger.error('[Task Detail] Note error:', { detail: err });
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleUpdateMessageContent(messageId: string, newContent: ContentBlocks) {
+    const previousMessages = messages;
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content_blocks: newContent } : m));
+    setSavingMessageId(messageId);
+    try {
+      const updated = await crmAdminService.updateTaskMessage(taskId, messageId, { content_blocks: newContent });
+      setMessages(prev => prev.map(m => m.id === messageId ? updated : m));
+    } catch (err) {
+      setMessages(previousMessages);
+      clientLogger.error('[Task Detail] Update message content error:', { detail: err });
+    } finally {
+      setSavingMessageId(null);
     }
   }
 
@@ -344,7 +360,10 @@ export default function CrmTaskDetailPage() {
                         <span className="text-xs text-neutral-400">{new Date(m.created_at).toLocaleString()}</span>
                       </div>
                       {m.content_blocks?.blocks?.length ? (
-                        <RichContentRenderer content={m.content_blocks} />
+                        <RichContentRenderer
+                          content={m.content_blocks}
+                          onChange={!isCompleted && savingMessageId !== m.id ? (newContent) => handleUpdateMessageContent(m.id, newContent) : undefined}
+                        />
                       ) : (
                         <p className="text-sm whitespace-pre-wrap">{m.content}</p>
                       )}

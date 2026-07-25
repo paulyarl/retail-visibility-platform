@@ -25,6 +25,17 @@ export const numberedListBlockSchema = z.object({
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
+export const checklistItemSchema = z.object({
+  text: z.string(),
+  checked: z.boolean().default(false),
+});
+
+export const checklistBlockSchema = z.object({
+  type: z.literal('checklist'),
+  items: z.array(checklistItemSchema),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+});
+
 export const imageBlockSchema = z.object({
   type: z.literal('image'),
   src: z.string().min(1),
@@ -101,6 +112,7 @@ export const contentBlockSchema = z.union([
   headingBlockSchema,
   bulletListBlockSchema,
   numberedListBlockSchema,
+  checklistBlockSchema,
   imageBlockSchema,
   videoEmbedBlockSchema,
   buttonBlockSchema,
@@ -134,6 +146,8 @@ function collectTextFromBlock(block: ContentBlock): string[] {
     case 'bullet_list':
     case 'numbered_list':
       return block.items;
+    case 'checklist':
+      return block.items.map((item: { text: string; checked?: boolean }) => item.text);
     case 'image':
       return [block.caption, block.alt].filter((s): s is string => typeof s === 'string');
     case 'video_embed':

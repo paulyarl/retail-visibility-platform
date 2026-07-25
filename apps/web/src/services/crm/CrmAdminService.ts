@@ -5,6 +5,7 @@
  */
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import type { ContentBlocks } from '@/components/products/content-blocks';
 import type {
   PaginatedResult, CrmTenantListParams, CrmTenantSummary, CrmTenantDetail,
   CrmContact, CreateContactInput, UpdateContactInput,
@@ -287,6 +288,15 @@ class CrmAdminService extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<CrmTaskMessage>(
       `/api/admin/crm/tasks/${taskId}/messages`,
       { method: 'POST', body: JSON.stringify(data) }
+    );
+    await this.invalidateServiceCaches();
+    return this.unwrap<CrmTaskMessage>(result);
+  }
+
+  async updateTaskMessage(taskId: string, messageId: string, data: { content_blocks: ContentBlocks }): Promise<CrmTaskMessage> {
+    const result = await this.makeDefaultRequest<CrmTaskMessage>(
+      `/api/admin/crm/tasks/${taskId}/messages/${messageId}`,
+      { method: 'PUT', body: JSON.stringify(data) }
     );
     await this.invalidateServiceCaches();
     return this.unwrap<CrmTaskMessage>(result);

@@ -34,6 +34,31 @@ export class CrmTaskMessageService extends BaseService {
   }
 
   /**
+   * Update an existing task message (only content_blocks / content is mutable)
+   */
+  async update(messageId: string, data: { content_blocks?: unknown }) {
+    let contentBlocks: any = undefined;
+    let content = '';
+
+    if (data.content_blocks) {
+      const parsed = validateContentBlocks(data.content_blocks);
+      if (!parsed) {
+        throw new Error('Invalid content_blocks');
+      }
+      content = contentBlocksToPlainText(parsed);
+      contentBlocks = parsed;
+    }
+
+    return prisma.crm_task_messages.update({
+      where: { id: messageId },
+      data: {
+        content_blocks: contentBlocks as any,
+        content,
+      },
+    });
+  }
+
+  /**
    * Add a message to a task
    */
   async create(data: {
