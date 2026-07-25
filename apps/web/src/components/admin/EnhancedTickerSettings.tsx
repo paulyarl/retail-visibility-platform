@@ -617,7 +617,10 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
         label="Message"
         placeholder="Enter your notification message..."
         value={formData.message}
-        onChange={(e) => setFormData(prev => ({ ...prev, message: e.currentTarget.value }))}
+        onChange={(e) => {
+          const value = e.currentTarget.value;
+          setFormData(prev => ({ ...prev, message: value }));
+        }}
         required
       />
 
