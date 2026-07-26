@@ -5,6 +5,7 @@ import { botService } from '@/services/BotService';
 import { useChatbotOptionsCapability } from '@/hooks/tenant-access/useCapabilityAccess';
 import { MessageSquare, Send, Sparkles, X, Loader2 } from 'lucide-react';
 import SkillCardRenderer from './SkillCardRenderer';
+import { Button } from '@mantine/core';
 
 interface BotDashboardChatProps {
   tenantId: string;
@@ -151,13 +152,12 @@ export default function BotDashboardChat({ tenantId }: BotDashboardChatProps) {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                    msg.role === 'user'
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${msg.role === 'user'
                       ? 'rounded-br-sm'
                       : msg.responseType === 'fallback'
-                      ? 'bg-gray-100 text-gray-600 rounded-bl-sm'
-                      : 'bg-gray-100 text-gray-900 rounded-bl-sm'
-                  }`}
+                        ? 'bg-gray-100 text-gray-600 rounded-bl-sm'
+                        : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                    }`}
                   style={msg.role === 'user' ? {
                     background: '#4F46E5' + '1A',
                     border: '1px solid #4F46E540',
@@ -214,14 +214,14 @@ export default function BotDashboardChat({ tenantId }: BotDashboardChatProps) {
                 style={{ maxHeight: '100px' }}
                 disabled={sending}
               />
-              <button variant='gradient' style={{ color: 'white' }}
+              <Button variant='gradient' style={{ color: 'white' }}
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || sending}
                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 aria-label="Send message"
               >
                 <Send className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>

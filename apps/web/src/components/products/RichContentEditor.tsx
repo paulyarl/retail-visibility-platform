@@ -336,6 +336,14 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
         },
         content: (block.content && (block.content as unknown[]).length ? block.content : textToInlineContent(block.text || '')) as unknown[],
       };
+    case 'code':
+      return {
+        type: 'codeBlock',
+        props: {
+          language: block.language || 'text',
+        },
+        content: block.text || '',
+      };
     default:
       return null;
   }
@@ -362,9 +370,12 @@ function inlineToString(content: unknown): string {
     return content
       .map((node) => {
         if (typeof node === 'string') return node;
-        const n = node as { type?: string; text?: string; props?: { name?: string; color?: string } };
+        const n = node as { type?: string; text?: string; content?: unknown; props?: { name?: string; color?: string } };
         if (n.type === 'icon') {
           return `{{icon:${n.props?.name ?? 'help'}:${n.props?.color ?? ''}}}`;
+        }
+        if (n.type === 'link') {
+          return inlineToString(n.content);
         }
         return n.text ?? '';
       })
@@ -460,6 +471,12 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         text: inlineToString(block.content),
         content: (block.content ?? undefined) as unknown[] | undefined,
         textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
+      };
+    case 'codeBlock':
+      return {
+        type: 'code',
+        language: (block.props?.language as string) || 'text',
+        text: inlineToString(block.content),
       };
     default:
       return null;

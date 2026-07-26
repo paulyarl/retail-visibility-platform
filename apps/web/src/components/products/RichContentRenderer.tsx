@@ -294,6 +294,15 @@ function Block({ block, onBlockChange }: { block: ContentBlock; onBlockChange?: 
       );
     }
 
+    case 'code':
+      return (
+        <pre className="mb-4 overflow-x-auto rounded-lg bg-neutral-900 p-4 dark:bg-neutral-950">
+          <code className={`language-${block.language || 'text'} text-sm font-mono text-neutral-100`} style={{ whiteSpace: 'pre' }}>
+            {block.text}
+          </code>
+        </pre>
+      );
+
     default:
       return null;
   }

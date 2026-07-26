@@ -97,6 +97,12 @@ export const calloutBlockSchema = z.object({
   textSize: z.enum(['paragraph', 'h1', 'h2', 'h3']).optional(),
 });
 
+export const codeBlockSchema = z.object({
+  type: z.literal('code'),
+  language: z.string().default('text'),
+  text: z.string(),
+});
+
 export const sideBySideBlockSchema = z.object({
   type: z.literal('side_by_side'),
   imagePosition: z.enum(['left', 'right']).default('left'),
@@ -120,6 +126,7 @@ export const contentBlockSchema = z.union([
   iconButtonBlockSchema,
   iconBlockSchema,
   calloutBlockSchema,
+  codeBlockSchema,
   sideBySideBlockSchema,
 ]);
 
@@ -161,6 +168,8 @@ function collectTextFromBlock(block: ContentBlock): string[] {
       return [block.name];
     case 'side_by_side':
       return [block.text, block.imageAlt].filter((s): s is string => typeof s === 'string');
+    case 'code':
+      return [block.text];
     default:
       return [];
   }
