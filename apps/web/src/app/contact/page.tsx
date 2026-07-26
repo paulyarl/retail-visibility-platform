@@ -174,7 +174,8 @@ export default function ContactPage() {
                     />
                   </div>
 
-                  <Button type="submit" disabled={submitting} loading={submitting} className="w-full">
+                  <Button variant='gradient' style={{ color: 'white' }}
+                  type="submit" disabled={submitting} loading={submitting} className="w-full">
                     {submitting ? 'Sending...' : 'Send Message'}
                   </Button>
                 </form>

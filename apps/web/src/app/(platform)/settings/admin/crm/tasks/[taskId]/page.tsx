@@ -232,20 +232,20 @@ export default function CrmTaskDetailPage() {
       breadcrumbs={
         task.project_id
           ? [
-              { label: 'Settings', href: '/settings' },
-              { label: 'Admin' },
-              { label: 'CRM', href: '/settings/admin/crm' },
-              { label: 'Projects', href: '/settings/admin/crm/projects' },
-              { label: 'Project', href: `/settings/admin/crm/projects/${task.project_id}` },
-              { label: task.title },
-            ]
+            { label: 'Settings', href: '/settings' },
+            { label: 'Admin' },
+            { label: 'CRM', href: '/settings/admin/crm' },
+            { label: 'Projects', href: '/settings/admin/crm/projects' },
+            { label: 'Project', href: `/settings/admin/crm/projects/${task.project_id}` },
+            { label: task.title },
+          ]
           : [
-              { label: 'Settings', href: '/settings' },
-              { label: 'Admin' },
-              { label: 'CRM', href: '/settings/admin/crm' },
-              { label: 'Tasks', href: '/settings/admin/crm/tasks' },
-              { label: task.title },
-            ]
+            { label: 'Settings', href: '/settings' },
+            { label: 'Admin' },
+            { label: 'CRM', href: '/settings/admin/crm' },
+            { label: 'Tasks', href: '/settings/admin/crm/tasks' },
+            { label: task.title },
+          ]
       }
       actions={
         <div className="flex gap-3 items-center">
@@ -338,11 +338,10 @@ export default function CrmTaskDetailPage() {
                   return (
                     <div
                       key={m.id}
-                      className={`rounded-lg p-4 ${
-                        isInternal
+                      className={`rounded-lg p-4 ${isInternal
                           ? 'bg-amber-50 dark:bg-amber-900/10 border border-dashed border-amber-200 dark:border-amber-800'
                           : isTenant ? 'mr-8' : 'ml-8'
-                      }`}
+                        }`}
                       style={useTintedBubble ? {
                         background: accentColor + '1A',
                         border: `1px solid ${accentColor}40`,
@@ -385,7 +384,8 @@ export default function CrmTaskDetailPage() {
                     className="min-h-[160px]"
                   />
                   <div className="flex justify-end">
-                    <Button onClick={handleSendReply} disabled={sending || replyContent.blocks.length === 0}>
+                    <Button variant='gradient' style={{ color: 'white' }}
+                      onClick={handleSendReply} disabled={sending || replyContent.blocks.length === 0}>
                       {sending ? <Spinner size="sm" /> : 'Send Message'}
                     </Button>
                   </div>

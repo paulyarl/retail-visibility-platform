@@ -246,7 +246,7 @@ export default function ContactPage() {
 
               {/* Actions */}
               <Group gap="sm">
-                <Button
+                <Button variant='gradient' style={{ color: 'white' }}
                   onClick={handleSendMessage}
                   disabled={!message.trim()}
                   style={{ flex: 1 }}

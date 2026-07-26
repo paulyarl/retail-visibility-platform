@@ -193,8 +193,8 @@ export default function ShopActions({ shop }: ShopActionsProps) {
         </div>
 
         {/* Message Button */}
-        <Button
-          variant="outline"
+        <Button variant='gradient' style={{ color: 'white' }}
+           
           className="w-full justify-start"
         >
           <MessageCircle className="w-4 h-4 mr-2" />

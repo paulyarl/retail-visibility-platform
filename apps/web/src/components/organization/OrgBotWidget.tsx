@@ -240,14 +240,14 @@ export default function OrgBotWidget({ organizationId, orgName, enabled = true, 
                 style={{ maxHeight: "100px" }}
                 disabled={sending}
               />
-              <button
+              <Button variant='gradient' style={{ color: 'white' }}
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || sending}
                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 aria-label="Send message"
               >
                 <Send className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
