@@ -618,7 +618,7 @@ export default function PaymentMethodsTab() {
               <Button variant="light" onClick={() => setEditModalOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="filled" style={{ color: 'white' }}>
+              <Button type="submit" variant="variant" style={{ color: 'white' }}>
                 Save Changes
               </Button>
             </Group>

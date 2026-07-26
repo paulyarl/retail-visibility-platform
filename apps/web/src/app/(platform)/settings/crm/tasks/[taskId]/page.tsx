@@ -59,6 +59,7 @@ export default function PersonalCrmTaskDetailPage() {
   const [savingMessageId, setSavingMessageId] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [editTask, setEditTask] = useState<CrmTask | null>(null);
+  const [editAssigneeEmail, setEditAssigneeEmail] = useState('');
   const [editing, setEditing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -111,9 +112,11 @@ export default function PersonalCrmTaskDetailPage() {
         priority: editTask.priority,
         due_date: editTask.due_date || undefined,
         status: editTask.status,
+        assigned_to_email: editAssigneeEmail.trim() || undefined,
       });
       setShowEdit(false);
       setEditTask(null);
+      setEditAssigneeEmail('');
       await load();
     } catch (err) {
       clientLogger.error('[Personal CRM Task Detail] Edit error:', { detail: err });
@@ -234,7 +237,7 @@ export default function PersonalCrmTaskDetailPage() {
             </Group>
           </div>
           <Group gap="sm">
-            <Button variant="subtle" size="sm" onClick={() => { setEditTask(task); setShowEdit(true); }}>Edit</Button>
+            <Button variant="subtle" size="sm" onClick={() => { setEditTask(task); setEditAssigneeEmail(''); setShowEdit(true); }}>Edit</Button>
             <Button variant="subtle" size="sm" color="red" onClick={() => setDeleteConfirm(true)}>Delete</Button>
             <Link href={backUrl} className="text-sm text-blue-600 hover:underline">Back</Link>
           </Group>
@@ -243,7 +246,7 @@ export default function PersonalCrmTaskDetailPage() {
         {/* Task Details Card */}
         <Card withBorder p="lg" mb="md">
           <Title order={3} mb="md">Task Details</Title>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <Text size="xs" c="dimmed" mb={4}>Status</Text>
               <MantineSelect
@@ -277,6 +280,10 @@ export default function PersonalCrmTaskDetailPage() {
             <div>
               <Text size="xs" c="dimmed" mb={4}>Created</Text>
               <Text size="sm">{new Date(task.created_at).toLocaleDateString()}</Text>
+            </div>
+            <div>
+              <Text size="xs" c="dimmed" mb={4}>Assigned</Text>
+              <Text size="sm">{task.assigned_to || 'Unassigned'}</Text>
             </div>
           </div>
           {task.description && (
@@ -431,9 +438,20 @@ export default function PersonalCrmTaskDetailPage() {
                 className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
               />
             </div>
+            <div>
+              <Text size="sm" fw={500} mb={4}>Assign To (email)</Text>
+              <input
+                type="email"
+                value={editAssigneeEmail}
+                onChange={(e) => setEditAssigneeEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
+                placeholder="leave blank to keep current assignee"
+              />
+            </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => { setShowEdit(false); setEditTask(null); }}>Cancel</Button>
-              <Button onClick={handleEditSubmit} loading={editing} disabled={!editTask.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+              onClick={handleEditSubmit} loading={editing} disabled={!editTask.title.trim()}>
                 Save Changes
               </Button>
             </Group>

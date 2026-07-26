@@ -472,7 +472,7 @@ export function CategoryEditModal({
         <Button variant="ghost" onClick={onClose} disabled={saving}>
           Cancel
         </Button>
-        <Button 
+        <Button variant='gradient' style={{ color: 'white' }}
           onClick={handleSave} 
           disabled={!formName.trim() || saving}
         >

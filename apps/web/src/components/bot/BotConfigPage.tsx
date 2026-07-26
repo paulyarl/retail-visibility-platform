@@ -123,7 +123,8 @@ export default function BotConfigPage({ tenantId }: BotConfigPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        <Button onClick={handleSave} disabled={saving}>
+        <Button variant='gradient' style={{ color: 'white' }}
+         onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>

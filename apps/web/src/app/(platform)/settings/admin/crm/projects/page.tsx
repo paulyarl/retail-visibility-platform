@@ -264,7 +264,8 @@ export default function CrmProjectsPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => { setShowEdit(false); setEditProject(null); }}>Cancel</Button>
-              <Button type="submit" disabled={editing || !editProject.name.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+              type="submit" disabled={editing || !editProject.name.trim()}>
                 {editing ? <Spinner size="sm" /> : 'Save Changes'}
               </Button>
             </ModalFooter>

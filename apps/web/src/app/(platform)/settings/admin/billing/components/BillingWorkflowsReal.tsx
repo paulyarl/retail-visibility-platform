@@ -694,7 +694,8 @@ export function BillingWorkflowsReal({
             <Button variant="outline" onClick={() => setEditModalOpened(false)}>
               Cancel
             </Button>
-            <Button onClick={handleEditWorkflow} disabled={!editWorkflow.name || !editWorkflow.trigger} variant="filled" style={{ color: 'white' }}>
+            <Button variant='gradient' style={{ color: 'white' }}
+            onClick={handleEditWorkflow} disabled={!editWorkflow.name || !editWorkflow.trigger} >
               Save Changes
             </Button>
           </Group>

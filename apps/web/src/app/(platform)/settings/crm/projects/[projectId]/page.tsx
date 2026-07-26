@@ -42,7 +42,7 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
   archived: 'gray',
 };
 
-const EMPTY_TASK = { title: '', description: '', priority: 'medium' as TaskPriority, due_date: '' };
+const EMPTY_TASK = { title: '', description: '', priority: 'medium' as TaskPriority, due_date: '', assigned_to_email: '' };
 const EMPTY_TICKET = { title: '', description: '', priority: 'medium' as TicketPriority, category: 'general' };
 
 type Tab = 'tasks' | 'tickets' | 'activities';
@@ -132,6 +132,7 @@ export default function PersonalCrmProjectDetailPage() {
         description: newTask.description.trim() || undefined,
         priority: newTask.priority,
         due_date: newTask.due_date || undefined,
+        assigned_to_email: newTask.assigned_to_email?.trim() || undefined,
       });
       setShowCreateTask(false);
       setNewTask(EMPTY_TASK);
@@ -451,6 +452,16 @@ export default function PersonalCrmProjectDetailPage() {
                   className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
                 />
               </div>
+            </div>
+            <div>
+              <Text size="sm" fw={500} mb={4}>Assign To (email)</Text>
+              <input
+                type="email"
+                value={newTask.assigned_to_email}
+                onChange={(e) => setNewTask(prev => ({ ...prev, assigned_to_email: e.target.value }))}
+                className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
+                placeholder="leave blank to assign to yourself"
+              />
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowCreateTask(false)}>Cancel</Button>

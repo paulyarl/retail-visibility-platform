@@ -1115,7 +1115,8 @@ export default function CapabilityManagement() {
                     <Button variant="outline" size="sm" onClick={() => { setSelectedTier(''); setTierCapabilities([]); }}>
                       Deselect
                     </Button>
-                    <Button size="sm" onClick={handleTierSave} disabled={saving}>
+                    <Button variant='gradient' style={{ color: 'white' }}
+                    size="sm" onClick={handleTierSave} disabled={saving}>
                       {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>

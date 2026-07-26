@@ -285,7 +285,8 @@ export default function PersonalCrmProjectsPage() {
               </div>
               <Group justify="flex-end">
                 <Button variant="subtle" onClick={() => { setShowEdit(false); setEditProject(null); }}>Cancel</Button>
-                <Button onClick={handleEdit} loading={editing} disabled={!editProject.name.trim()}>
+                <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleEdit} loading={editing} disabled={!editProject.name.trim()}>
                   Save Changes
                 </Button>
               </Group>

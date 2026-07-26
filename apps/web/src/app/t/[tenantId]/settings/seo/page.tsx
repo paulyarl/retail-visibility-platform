@@ -323,8 +323,7 @@ export default function SeoSettingsPage() {
               </Button>
               <Button
                 onClick={handleSave}
-                variant="filled"
-                style={{ color: 'white' }}
+                variant='gradient' style={{ color: 'white' }}
                 disabled={loading || saving}
               >
                 {saving ? 'Saving...' : 'Save Changes'}

@@ -45,6 +45,34 @@ function getTenantIds(req: Request): string[] {
   return req.user?.tenantIds || [];
 }
 
+async function resolveAssignee(req: Request): Promise<{ assigned_to?: string; error?: string }> {
+  const userId = req.body.assigned_to;
+  const email = req.body.assigned_to_email;
+  if (userId) return { assigned_to: userId };
+  if (email) {
+    const user = await prisma.users.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      select: { id: true },
+    });
+    if (!user) return { error: 'assignee_not_found' };
+    return { assigned_to: user.id };
+  }
+  return {};
+}
+
+function buildTaskCreateData(req: Request, extra: any = {}) {
+  const createData: any = { ...req.body, ...extra };
+  delete createData.assigned_to_email;
+  return createData;
+}
+
+function buildTaskUpdateData(req: Request, assignee: { assigned_to?: string; error?: string }) {
+  const updateData: any = { ...req.body };
+  delete updateData.assigned_to_email;
+  if (assignee.assigned_to !== undefined) updateData.assigned_to = assignee.assigned_to;
+  return updateData;
+}
+
 // ====================
 // Dashboard
 // ====================
@@ -427,7 +455,11 @@ router.put('/tasks/:taskId', async (req: Request, res: Response) => {
       }
     }
 
-    const task = await taskService.update(req.params.taskId, req.body, userId, actorName, 'platform');
+    const assignee = await resolveAssignee(req);
+    if (assignee.error) return res.status(400).json({ error: 'assignee_not_found', message: 'Assignee not found' });
+
+    const updateData = buildTaskUpdateData(req, assignee);
+    const task = await taskService.update(req.params.taskId, updateData, userId, actorName, 'platform');
     await audit({ tenantId: task.tenant_id || undefined, actor: userId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true, data: task });
   } catch (error) {
@@ -713,12 +745,8 @@ router.get('/projects', async (req: Request, res: Response) => {
     const userId = getUserId(req);
     if (!userId) return res.status(401).json({ error: 'authentication_required' });
 
-    const projects = await prisma.crm_projects.findMany({
-      where: {
-        created_by: userId,
-        ...(req.query.status ? { status: req.query.status as string } : {}),
-      },
-      orderBy: { created_at: 'desc' },
+    const projects = await projectService.listForUser(userId, {
+      status: req.query.status as string,
     });
 
     const projectsWithStats = await Promise.all(
@@ -760,7 +788,7 @@ router.get('/projects/:projectId', async (req: Request, res: Response) => {
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
+    if (!(await projectService.hasAccess(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this project' });
 
     const stats = await projectService.getStats(req.params.projectId);
     res.json({ success: true, data: { ...project, stats } });
@@ -778,7 +806,7 @@ router.put('/projects/:projectId', async (req: Request, res: Response) => {
 
     const existing = await projectService.getById(req.params.projectId);
     if (!existing) return res.status(404).json({ error: 'project_not_found' });
-    if (existing.created_by !== userId) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
+    if (!(await projectService.isCreator(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
 
     const { name, description, status } = req.body;
     const project = await projectService.update(req.params.projectId, { name, description, status });
@@ -798,7 +826,7 @@ router.delete('/projects/:projectId', async (req: Request, res: Response) => {
 
     const existing = await projectService.getById(req.params.projectId);
     if (!existing) return res.status(404).json({ error: 'project_not_found' });
-    if (existing.created_by !== userId) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
+    if (!(await projectService.isCreator(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not own this project' });
 
     await projectService.delete(req.params.projectId);
     await audit({ tenantId: undefined, actor: userId, action: 'delete', payload: { entity_type: 'crm_project', id: req.params.projectId } });
@@ -817,7 +845,7 @@ router.get('/projects/:projectId/tasks', async (req: Request, res: Response) => 
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.hasAccess(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this project' });
 
     const tasks = await taskService.listByProject(req.params.projectId, {
       status: req.query.status as string,
@@ -839,9 +867,14 @@ router.post('/projects/:projectId/tasks', async (req: Request, res: Response) =>
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.isCreator(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'Only the project creator can add tasks' });
 
-    const task = await taskService.create({ ...req.body, project_id: req.params.projectId, created_by: userId });
+    const assignee = await resolveAssignee(req);
+    if (assignee.error) return res.status(400).json({ error: 'assignee_not_found', message: 'Assignee not found' });
+
+    const createData = buildTaskCreateData(req, { project_id: req.params.projectId, created_by: userId });
+    if (assignee.assigned_to !== undefined) createData.assigned_to = assignee.assigned_to;
+    const task = await taskService.create(createData);
     await audit({ tenantId: undefined, actor: userId, action: 'create', payload: { entity_type: 'crm_task', id: task.id, project_id: req.params.projectId } });
 
     await activityService.create({
@@ -871,9 +904,13 @@ router.put('/projects/:projectId/tasks/:taskId', async (req: Request, res: Respo
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.hasAccess(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this project' });
 
-    const task = await taskService.update(req.params.taskId, req.body, userId, actorName, 'platform');
+    const assignee = await resolveAssignee(req);
+    if (assignee.error) return res.status(400).json({ error: 'assignee_not_found', message: 'Assignee not found' });
+
+    const updateData = buildTaskUpdateData(req, assignee);
+    const task = await taskService.update(req.params.taskId, updateData, userId, actorName, 'platform');
     await audit({ tenantId: task.tenant_id || undefined, actor: userId, action: 'update', payload: { entity_type: 'crm_task', id: task.id } });
     res.json({ success: true, data: task });
   } catch (error) {
@@ -890,7 +927,7 @@ router.delete('/projects/:projectId/tasks/:taskId', async (req: Request, res: Re
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.isCreator(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'Only the project creator can delete tasks' });
 
     await taskService.delete(req.params.taskId);
     await audit({ tenantId: undefined, actor: userId, action: 'delete', payload: { entity_type: 'crm_task', id: req.params.taskId } });
@@ -909,7 +946,7 @@ router.get('/projects/:projectId/tickets', async (req: Request, res: Response) =
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.hasAccess(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this project' });
 
     const tickets = await ticketService.listByProject(req.params.projectId, {
       status: req.query.status as string,
@@ -932,7 +969,7 @@ router.post('/projects/:projectId/tickets', async (req: Request, res: Response) 
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.isCreator(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'Only the project creator can add tickets' });
 
     const ticket = await ticketService.create({ project_id: req.params.projectId, ...req.body });
     await audit({ actor: userId, action: 'create', payload: { entity_type: 'crm_ticket', id: ticket.id, project_id: req.params.projectId, ...req.body } });
@@ -963,7 +1000,7 @@ router.get('/projects/:projectId/activities', async (req: Request, res: Response
 
     const project = await projectService.getById(req.params.projectId);
     if (!project) return res.status(404).json({ error: 'project_not_found' });
-    if (project.created_by !== userId) return res.status(403).json({ error: 'forbidden' });
+    if (!(await projectService.hasAccess(req.params.projectId, userId))) return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this project' });
 
     const activities = await activityService.listByProject(req.params.projectId, {
       type: req.query.type as string,
