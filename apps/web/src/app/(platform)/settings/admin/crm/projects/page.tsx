@@ -124,7 +124,8 @@ export default function CrmProjectsPage() {
       ]}
       actions={
         <div className="flex flex-wrap gap-3 items-center">
-          <Button size="sm" onClick={() => setShowCreate(true)}>+ Create Project</Button>
+          <Button variant='gradient' style={{ color: 'white' }}
+          size="sm" onClick={() => setShowCreate(true)}>+ Create Project</Button>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}

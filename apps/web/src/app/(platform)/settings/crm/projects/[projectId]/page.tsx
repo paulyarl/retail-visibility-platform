@@ -452,7 +452,8 @@ export default function PersonalCrmProjectDetailPage() {
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowCreateTask(false)}>Cancel</Button>
-              <Button onClick={handleCreateTask} loading={creatingTask} disabled={!newTask.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleCreateTask} loading={creatingTask} disabled={!newTask.title.trim()}>
                 Add Task
               </Button>
             </Group>
@@ -508,7 +509,8 @@ export default function PersonalCrmProjectDetailPage() {
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowCreateTicket(false)}>Cancel</Button>
-              <Button onClick={handleCreateTicket} loading={creatingTicket} disabled={!newTicket.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleCreateTicket} loading={creatingTicket} disabled={!newTicket.title.trim()}>
                 Add Ticket
               </Button>
             </Group>

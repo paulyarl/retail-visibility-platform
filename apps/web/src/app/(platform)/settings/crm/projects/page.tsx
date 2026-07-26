@@ -159,7 +159,8 @@ export default function PersonalCrmProjectsPage() {
                   <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                 ))}
               </select>
-              <Button onClick={() => setShowCreate(true)}>+ Create Project</Button>
+              <Button variant='gradient' style={{ color: 'white' }}
+              onClick={() => setShowCreate(true)}>+ Create Project</Button>
             </Group>
           </Group>
         </div>
