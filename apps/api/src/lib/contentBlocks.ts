@@ -191,6 +191,7 @@ function collectTextFromBlock(block: ContentBlock): string[] {
     case 'code':
       return [block.text];
     case 'quote':
+      return [block.text];
     case 'toggle_list': {
       const childText = block.children?.length
         ? contentBlocksToPlainText({ version: '1', blocks: block.children as ContentBlock[] })
