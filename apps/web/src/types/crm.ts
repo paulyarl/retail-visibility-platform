@@ -220,6 +220,7 @@ export interface CreateTaskInput {
   priority?: TaskPriority;
   due_date?: string;
   assigned_to?: string;
+  assigned_to_email?: string;
   contact_id?: string;
 }
 
@@ -230,6 +231,7 @@ export interface UpdateTaskInput {
   priority?: TaskPriority;
   due_date?: string;
   assigned_to?: string;
+  assigned_to_email?: string;
   contact_id?: string;
 }
 

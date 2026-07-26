@@ -216,7 +216,8 @@ export default function BotOptionsPage({ tenantId }: BotOptionsPageProps) {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
+        <Button variant='gradient' style={{ color: 'white' }}
+        onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>

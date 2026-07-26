@@ -200,7 +200,8 @@ export default function EditItemForm({
         <Button variant="ghost" onClick={() => form.handleClose(onClose)} disabled={form.saving}>
           Cancel
         </Button>
-        <Button onClick={handleSave} loading={form.saving} disabled={form.saving}>
+        <Button variant='gradient' style={{ color: 'white' }}
+        onClick={handleSave} loading={form.saving} disabled={form.saving}>
           {form.saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>

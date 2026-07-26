@@ -64,6 +64,61 @@ export class CrmProjectService extends BaseService {
     return prisma.crm_projects.delete({ where: { id: projectId } });
   }
 
+  async listForUser(userId: string, filters: { status?: string } = {}) {
+    const [assignedTaskProjects, assignedTicketProjects] = await Promise.all([
+      prisma.crm_tasks.groupBy({
+        by: ['project_id'],
+        where: { assigned_to: userId, project_id: { not: null } },
+      }),
+      prisma.crm_support_tickets.groupBy({
+        by: ['project_id'],
+        where: { assigned_to: userId, project_id: { not: null } },
+      }),
+    ]);
+
+    const assignedIds = new Set([
+      ...assignedTaskProjects.map((t: any) => t.project_id),
+      ...assignedTicketProjects.map((t: any) => t.project_id),
+    ].filter(Boolean));
+
+    const where: any = {
+      OR: [
+        { created_by: userId },
+        { id: { in: Array.from(assignedIds) } },
+      ],
+    };
+    if (filters.status) {
+      where.AND = { status: filters.status };
+    }
+
+    return prisma.crm_projects.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async hasAccess(projectId: string, userId: string) {
+    const project = await prisma.crm_projects.findUnique({
+      where: { id: projectId },
+      select: { created_by: true },
+    });
+    if (!project) return false;
+    if (project.created_by === userId) return true;
+    const [taskCount, ticketCount] = await Promise.all([
+      prisma.crm_tasks.count({ where: { project_id: projectId, assigned_to: userId } }),
+      prisma.crm_support_tickets.count({ where: { project_id: projectId, assigned_to: userId } }),
+    ]);
+    return taskCount > 0 || ticketCount > 0;
+  }
+
+  async isCreator(projectId: string, userId: string) {
+    const project = await prisma.crm_projects.findUnique({
+      where: { id: projectId },
+      select: { created_by: true },
+    });
+    return project?.created_by === userId;
+  }
+
   async getStats(projectId: string) {
     const [totalTasks, pendingTasks, inProgressTasks, completedTasks, totalTickets, openTickets] = await Promise.all([
       prisma.crm_tasks.count({ where: { project_id: projectId } }),

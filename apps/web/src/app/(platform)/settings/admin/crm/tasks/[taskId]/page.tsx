@@ -492,7 +492,8 @@ export default function CrmTaskDetailPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => { setShowEdit(false); setEditTask(null); }}>Cancel</Button>
-              <Button type="submit" disabled={editing || !editTask.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+              type="submit" disabled={editing || !editTask.title.trim()}>
                 {editing ? <Spinner size="sm" /> : 'Save Changes'}
               </Button>
             </ModalFooter>

@@ -10,6 +10,7 @@ import {
 import { BadgeTypeMeta } from '@/services/BadgeRegistryService';
 import { Tag, Plus, Pencil, Trash2, X, AlertCircle, Check, BarChart3, Sparkles, ShoppingBag, ArrowUpCircle } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@mantine/core';
 
 interface CustomBadgeManagerClientProps {
   tenantId: string;
@@ -281,18 +282,16 @@ export default function CustomBadgeManagerClient({ tenantId }: CustomBadgeManage
                 <p className="text-xs text-gray-500 mt-2">{badge.description}</p>
               )}
               <div className="flex items-center gap-2 mt-3">
-                <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${
-                  COLOR_OPTIONS.find(c => c.value === badge.color)?.class ?? 'bg-gray-100 text-gray-700 border-gray-300'
-                }`}>
+                <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${COLOR_OPTIONS.find(c => c.value === badge.color)?.class ?? 'bg-gray-100 text-gray-700 border-gray-300'
+                  }`}>
                   {badge.label}
                 </span>
                 <button
                   onClick={() => handleToggleActive(badge)}
-                  className={`ml-auto text-xs px-2 py-0.5 rounded ${
-                    badge.isActive
-                      ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                      : 'text-gray-500 bg-gray-50 hover:bg-gray-100'
-                  }`}
+                  className={`ml-auto text-xs px-2 py-0.5 rounded ${badge.isActive
+                    ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                    : 'text-gray-500 bg-gray-50 hover:bg-gray-100'
+                    }`}
                 >
                   {badge.isActive ? (
                     <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Active</span>
@@ -398,9 +397,8 @@ export default function CustomBadgeManagerClient({ tenantId }: CustomBadgeManage
                       key={color.value}
                       type="button"
                       onClick={() => setFormData({ ...formData, color: color.value })}
-                      className={`px-3 py-1 text-xs rounded-full border-2 transition-all ${
-                        color.class
-                      } ${formData.color === color.value ? 'ring-2 ring-offset-1 ring-gray-400 border-transparent' : 'border-transparent'}`}
+                      className={`px-3 py-1 text-xs rounded-full border-2 transition-all ${color.class
+                        } ${formData.color === color.value ? 'ring-2 ring-offset-1 ring-gray-400 border-transparent' : 'border-transparent'}`}
                     >
                       {color.label}
                     </button>
@@ -411,9 +409,8 @@ export default function CustomBadgeManagerClient({ tenantId }: CustomBadgeManage
               {/* Preview */}
               <div className="pt-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Preview</label>
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border ${
-                  COLOR_OPTIONS.find(c => c.value === formData.color)?.class ?? 'bg-gray-100 text-gray-700 border-gray-300'
-                }`}>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border ${COLOR_OPTIONS.find(c => c.value === formData.color)?.class ?? 'bg-gray-100 text-gray-700 border-gray-300'
+                  }`}>
                   {formData.icon && <span>{formData.icon}</span>}
                   <span>{formData.label || 'Badge Label'}</span>
                 </span>
@@ -427,13 +424,13 @@ export default function CustomBadgeManagerClient({ tenantId }: CustomBadgeManage
                 >
                   Cancel
                 </button>
-                <button
+                <Button variant='gradient' style={{ color: 'white' }}
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
                 >
                   {editingBadge ? 'Save Changes' : 'Create Badge'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

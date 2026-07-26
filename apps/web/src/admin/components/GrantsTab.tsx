@@ -563,7 +563,8 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                 <Button variant="outline" onClick={() => setEditingComp(null)} size="sm">
                   Cancel
                 </Button>
-                <Button onClick={handleSaveComp} disabled={savingComp} size="sm">
+                <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleSaveComp} disabled={savingComp} size="sm">
                   {savingComp ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
@@ -619,7 +620,8 @@ export default function GrantsTab({ onError, onSuccess }: Props) {
                 <Button variant="outline" onClick={() => setEditingGrant(null)} size="sm">
                   Cancel
                 </Button>
-                <Button onClick={handleSaveEdit} disabled={savingEdit} size="sm">
+                <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleSaveEdit} disabled={savingEdit} size="sm">
                   {savingEdit ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>

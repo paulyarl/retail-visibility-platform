@@ -813,7 +813,8 @@ export function AdvancedNotificationsReal({
             <Button variant="outline" onClick={() => setEditModalOpened(false)}>
               Cancel
             </Button>
-            <Button onClick={handleEditRule} disabled={!editRule.name || !editRule.trigger} variant="filled" style={{ color: 'white' }}>
+            <Button variant='gradient' style={{ color: 'white' }}
+            onClick={handleEditRule} disabled={!editRule.name || !editRule.trigger} >
               Save Changes
             </Button>
           </Group>

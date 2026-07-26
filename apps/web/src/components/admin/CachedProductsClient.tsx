@@ -729,14 +729,14 @@ function EditCachedProductModal({
           >
             Cancel
           </button>
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save Changes
-          </button>
+          </Button>
         </div>
       </div>
     </div>

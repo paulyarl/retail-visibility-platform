@@ -523,7 +523,8 @@ export default function TenantSettingsPage() {
               {/* Admin Edit Controls */}
               {user && isPlatformAdmin(user) && editingOrg && (
                 <div className="flex items-center gap-2 pt-2">
-                  <button
+                  <Button
+                  variant='gradient' style={{ color: 'white' }}
                     onClick={async () => {
                       setSavingOrg(true);
                       try {
@@ -549,7 +550,7 @@ export default function TenantSettingsPage() {
                     className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
                   >
                     {savingOrg ? 'Saving...' : 'Save Changes'}
-                  </button>
+                  </Button>
                   <button
                     onClick={() => {
                       setSelectedOrgId(tenant.organization?.id || '');
