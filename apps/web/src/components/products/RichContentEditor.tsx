@@ -24,6 +24,7 @@ import '@blocknote/mantine/style.css';
 import '@blocknote/core/fonts/inter.css';
 
 import { contentBlocksSchema, ContentBlock, ContentBlocks, DEFAULT_CONTENT_BLOCKS } from './content-blocks';
+import { Button } from '@mantine/core';
 
 const BUTTON_VARIANTS = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700',
@@ -520,7 +521,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
 
   return (
     <div className="mb-2 flex flex-wrap gap-2 rounded-md border bg-white p-2 shadow-sm dark:bg-gray-900">
-      <button
+      <Button variant='gradient' style={{ color: 'white' }}
         type="button"
         onClick={() => {
           const label = window.prompt('Button label');
@@ -532,8 +533,8 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
       >
         + Button
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={() => {
           const label = window.prompt('Pill label');
@@ -543,7 +544,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="rounded bg-blue-100 px-2 py-1 text-sm text-blue-800 hover:bg-blue-200"
       >
         + Pill
-      </button>
+      </Button>
       <select
         defaultValue=""
         onChange={(e) => {
@@ -588,7 +589,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
           </option>
         ))}
       </select>
-      <button
+      <Button
         type="button"
         onClick={() => {
           const style = window.prompt('Callout style (info, warning, success, error)', 'info');
@@ -597,14 +598,14 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="rounded bg-amber-100 px-2 py-1 text-sm text-amber-800 hover:bg-amber-200"
       >
         + Callout
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={() => fileInputRef.current?.click()}
         className="rounded bg-green-100 px-2 py-1 text-sm text-green-800 hover:bg-green-200"
       >
         + Image
-      </button>
+      </Button>
       <input
         ref={fileInputRef}
         type="file"
@@ -612,20 +613,20 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="hidden"
         onChange={handleImageSelect}
       />
-      <button
+      <Button
         type="button"
         onClick={() => insert('side_by_side', { imageSrc: 'https://placehold.co/200x150', text: 'Text next to image', imagePosition: 'left' })}
         className="rounded bg-purple-100 px-2 py-1 text-sm text-purple-800 hover:bg-purple-200"
       >
         + Side-by-side
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={handleVideoInsert}
         className="rounded bg-red-100 px-2 py-1 text-sm text-red-800 hover:bg-red-200"
       >
         + Video
-      </button>
+      </Button>
     </div>
   );
 }
