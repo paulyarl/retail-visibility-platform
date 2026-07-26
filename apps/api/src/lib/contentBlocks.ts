@@ -103,6 +103,22 @@ export const codeBlockSchema = z.object({
   text: z.string(),
 });
 
+export const quoteBlockSchema = z.object({
+  type: z.literal('quote'),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+});
+
+export const toggleListBlockSchema = z.object({
+  type: z.literal('toggle_list'),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+});
+
+export const dividerBlockSchema = z.object({
+  type: z.literal('divider'),
+});
+
 export const sideBySideBlockSchema = z.object({
   type: z.literal('side_by_side'),
   imagePosition: z.enum(['left', 'right']).default('left'),
@@ -127,6 +143,9 @@ export const contentBlockSchema = z.union([
   iconBlockSchema,
   calloutBlockSchema,
   codeBlockSchema,
+  quoteBlockSchema,
+  toggleListBlockSchema,
+  dividerBlockSchema,
   sideBySideBlockSchema,
 ]);
 
@@ -170,6 +189,11 @@ function collectTextFromBlock(block: ContentBlock): string[] {
       return [block.text, block.imageAlt].filter((s): s is string => typeof s === 'string');
     case 'code':
       return [block.text];
+    case 'quote':
+    case 'toggle_list':
+      return [block.text];
+    case 'divider':
+      return [];
     default:
       return [];
   }

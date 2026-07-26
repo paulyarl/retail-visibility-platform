@@ -344,6 +344,27 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
         },
         content: block.text || '',
       };
+    case 'quote':
+      return {
+        type: 'quote',
+        props: {
+          textAlignment: block.textAlign || 'left',
+        },
+        content: block.text || '',
+      };
+    case 'toggle_list':
+      return {
+        type: 'toggleListItem',
+        props: {
+          textAlignment: block.textAlign || 'left',
+        },
+        content: block.text || '',
+      };
+    case 'divider':
+      return {
+        type: 'divider',
+        props: {},
+      };
     default:
       return null;
   }
@@ -478,6 +499,20 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         language: (block.props?.language as string) || 'text',
         text: inlineToString(block.content),
       };
+    case 'quote':
+      return {
+        type: 'quote',
+        text: inlineToString(block.content),
+        textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined,
+      };
+    case 'toggleListItem':
+      return {
+        type: 'toggle_list',
+        text: inlineToString(block.content),
+        textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined,
+      };
+    case 'divider':
+      return { type: 'divider' };
     default:
       return null;
   }

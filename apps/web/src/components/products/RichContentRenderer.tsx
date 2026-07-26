@@ -303,6 +303,23 @@ function Block({ block, onBlockChange }: { block: ContentBlock; onBlockChange?: 
         </pre>
       );
 
+    case 'quote':
+      return (
+        <blockquote className="mb-4 border-l-4 border-neutral-400 pl-4 italic text-neutral-700 dark:border-neutral-600 dark:text-neutral-300" style={{ textAlign: block.textAlign }}>
+          {block.text}
+        </blockquote>
+      );
+
+    case 'toggle_list':
+      return (
+        <details className="mb-4" style={{ textAlign: block.textAlign }}>
+          <summary className="cursor-pointer font-medium">{block.text}</summary>
+        </details>
+      );
+
+    case 'divider':
+      return <hr className="mb-4 border-neutral-300 dark:border-neutral-700" />;
+
     default:
       return null;
   }
