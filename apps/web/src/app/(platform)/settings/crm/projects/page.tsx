@@ -159,7 +159,8 @@ export default function PersonalCrmProjectsPage() {
                   <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                 ))}
               </select>
-              <Button onClick={() => setShowCreate(true)}>+ Create Project</Button>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={() => setShowCreate(true)}>+ Create Project</Button>
             </Group>
           </Group>
         </div>
@@ -240,7 +241,8 @@ export default function PersonalCrmProjectsPage() {
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button onClick={handleCreate} loading={creating} disabled={!newProject.name.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleCreate} loading={creating} disabled={!newProject.name.trim()}>
                 Create Project
               </Button>
             </Group>

@@ -5,9 +5,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Button, Spinner, Badge, Tooltip } from '@/components/ui';
+import { Spinner, Badge, Tooltip } from '@/components/ui';
 import { tenantTierService, TierFeature as TierSystemFeature } from '@/services/TenantTierService';
 import { clientLogger } from '@/lib/client-logger';
+import { Button } from '@mantine/core';
 
 interface TierFeature {
   id: string;
@@ -890,13 +891,13 @@ export function AddFeatureModal({ isOpen, tier, onClose, onSubmit, submitting }:
                   )}
                 </div>
                 
-                <button
+                <Button variant='gradient' style={{ color: 'white' }}
                   type="button"
                   onClick={handleCustomFeature}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   + Create a new custom feature
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">

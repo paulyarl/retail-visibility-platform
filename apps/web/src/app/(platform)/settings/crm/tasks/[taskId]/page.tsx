@@ -346,7 +346,8 @@ export default function PersonalCrmTaskDetailPage() {
                   className="min-h-[160px]"
                 />
                 <Group justify="flex-end">
-                  <Button onClick={handleSendReply} loading={sending} disabled={replyContent.blocks.length === 0}>
+                  <Button variant='gradient' style={{ color: 'white' }}
+                  onClick={handleSendReply} loading={sending} disabled={replyContent.blocks.length === 0}>
                     Send Message
                   </Button>
                 </Group>

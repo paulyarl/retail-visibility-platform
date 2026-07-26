@@ -279,7 +279,8 @@ export default function PersonalCrmProjectDetailPage() {
             {/* Tasks Tab */}
             <Tabs.Panel value="tasks">
               <Group justify="flex-end" mb="sm">
-                <Button size="sm" onClick={() => setShowCreateTask(true)}>+ Add Task</Button>
+                <Button variant='gradient' style={{ color: 'white' }}
+                  size="sm" onClick={() => setShowCreateTask(true)}>+ Add Task</Button>
               </Group>
               {tabLoading ? (
                 <div className="flex justify-center py-8"><Loader /></div>
@@ -351,7 +352,8 @@ export default function PersonalCrmProjectDetailPage() {
             {/* Tickets Tab */}
             <Tabs.Panel value="tickets">
               <Group justify="flex-end" mb="sm">
-                <Button size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
+                <Button  variant='gradient' style={{ color: 'white' }}
+                size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
               </Group>
               {tabLoading ? (
                 <div className="flex justify-center py-8"><Loader /></div>
@@ -452,7 +454,8 @@ export default function PersonalCrmProjectDetailPage() {
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowCreateTask(false)}>Cancel</Button>
-              <Button onClick={handleCreateTask} loading={creatingTask} disabled={!newTask.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleCreateTask} loading={creatingTask} disabled={!newTask.title.trim()}>
                 Add Task
               </Button>
             </Group>
@@ -508,7 +511,8 @@ export default function PersonalCrmProjectDetailPage() {
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowCreateTicket(false)}>Cancel</Button>
-              <Button onClick={handleCreateTicket} loading={creatingTicket} disabled={!newTicket.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleCreateTicket} loading={creatingTicket} disabled={!newTicket.title.trim()}>
                 Add Ticket
               </Button>
             </Group>

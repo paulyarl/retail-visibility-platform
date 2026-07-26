@@ -24,6 +24,7 @@ import '@blocknote/mantine/style.css';
 import '@blocknote/core/fonts/inter.css';
 
 import { contentBlocksSchema, ContentBlock, ContentBlocks, DEFAULT_CONTENT_BLOCKS } from './content-blocks';
+import { Button } from '@mantine/core';
 
 const BUTTON_VARIANTS = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700',
@@ -335,6 +336,36 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
         },
         content: (block.content && (block.content as unknown[]).length ? block.content : textToInlineContent(block.text || '')) as unknown[],
       };
+    case 'code':
+      return {
+        type: 'codeBlock',
+        props: {
+          language: block.language || 'text',
+        },
+        content: block.text || '',
+      };
+    case 'quote':
+      return {
+        type: 'quote',
+        props: {
+          textAlignment: block.textAlign || 'left',
+        },
+        content: block.text || '',
+      };
+    case 'toggle_list':
+      return {
+        type: 'toggleListItem',
+        props: {
+          textAlignment: block.textAlign || 'left',
+        },
+        content: block.text || '',
+        children: contentBlocksToBlockNote((block.children as ContentBlock[]) || []),
+      };
+    case 'divider':
+      return {
+        type: 'divider',
+        props: {},
+      };
     default:
       return null;
   }
@@ -361,9 +392,12 @@ function inlineToString(content: unknown): string {
     return content
       .map((node) => {
         if (typeof node === 'string') return node;
-        const n = node as { type?: string; text?: string; props?: { name?: string; color?: string } };
+        const n = node as { type?: string; text?: string; content?: unknown; props?: { name?: string; color?: string } };
         if (n.type === 'icon') {
           return `{{icon:${n.props?.name ?? 'help'}:${n.props?.color ?? ''}}}`;
+        }
+        if (n.type === 'link') {
+          return inlineToString(n.content);
         }
         return n.text ?? '';
       })
@@ -372,7 +406,7 @@ function inlineToString(content: unknown): string {
   return '';
 }
 
-function blockNoteToContentBlock(block: { type: string; props?: Record<string, unknown>; content?: unknown }): ContentBlock | ContentBlock[] | null {
+function blockNoteToContentBlock(block: { type: string; props?: Record<string, unknown>; content?: unknown; children?: unknown[] }): ContentBlock | ContentBlock[] | null {
   switch (block.type) {
     case 'paragraph':
       return { type: 'paragraph', text: inlineToString(block.content), textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
@@ -460,6 +494,27 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         content: (block.content ?? undefined) as unknown[] | undefined,
         textAlign: (block.props?.textAlign as 'left' | 'center' | 'right' | 'justify') || undefined,
       };
+    case 'codeBlock':
+      return {
+        type: 'code',
+        language: (block.props?.language as string) || 'text',
+        text: inlineToString(block.content),
+      };
+    case 'quote':
+      return {
+        type: 'quote',
+        text: inlineToString(block.content),
+        textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined,
+      };
+    case 'toggleListItem':
+      return {
+        type: 'toggle_list',
+        text: inlineToString(block.content),
+        textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined,
+        children: blockNoteToContentBlocks((block.children as { type: string; props?: Record<string, unknown>; content?: unknown; children?: unknown[] }[]) || []),
+      };
+    case 'divider':
+      return { type: 'divider' };
     default:
       return null;
   }
@@ -520,7 +575,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
 
   return (
     <div className="mb-2 flex flex-wrap gap-2 rounded-md border bg-white p-2 shadow-sm dark:bg-gray-900">
-      <button
+      <Button variant='gradient' style={{ color: 'white' }}
         type="button"
         onClick={() => {
           const label = window.prompt('Button label');
@@ -532,8 +587,8 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
       >
         + Button
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={() => {
           const label = window.prompt('Pill label');
@@ -543,7 +598,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="rounded bg-blue-100 px-2 py-1 text-sm text-blue-800 hover:bg-blue-200"
       >
         + Pill
-      </button>
+      </Button>
       <select
         defaultValue=""
         onChange={(e) => {
@@ -588,7 +643,7 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
           </option>
         ))}
       </select>
-      <button
+      <Button
         type="button"
         onClick={() => {
           const style = window.prompt('Callout style (info, warning, success, error)', 'info');
@@ -597,14 +652,14 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="rounded bg-amber-100 px-2 py-1 text-sm text-amber-800 hover:bg-amber-200"
       >
         + Callout
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={() => fileInputRef.current?.click()}
         className="rounded bg-green-100 px-2 py-1 text-sm text-green-800 hover:bg-green-200"
       >
         + Image
-      </button>
+      </Button>
       <input
         ref={fileInputRef}
         type="file"
@@ -612,20 +667,20 @@ function CustomBlockToolbar({ editor, tenantId }: { editor: any; tenantId?: stri
         className="hidden"
         onChange={handleImageSelect}
       />
-      <button
+      <Button
         type="button"
         onClick={() => insert('side_by_side', { imageSrc: 'https://placehold.co/200x150', text: 'Text next to image', imagePosition: 'left' })}
         className="rounded bg-purple-100 px-2 py-1 text-sm text-purple-800 hover:bg-purple-200"
       >
         + Side-by-side
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={handleVideoInsert}
         className="rounded bg-red-100 px-2 py-1 text-sm text-red-800 hover:bg-red-200"
       >
         + Video
-      </button>
+      </Button>
     </div>
   );
 }

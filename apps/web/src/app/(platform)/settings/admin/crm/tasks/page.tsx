@@ -210,7 +210,8 @@ export default function CrmGlobalTasksPage() {
       ]}
       actions={
         <div className="flex flex-wrap gap-3 items-center">
-          <Button size="sm" onClick={() => setShowCreate(true)}>+ Create Task</Button>
+          <Button variant='gradient' style={{ color: 'white' }}
+          size="sm" onClick={() => setShowCreate(true)}>+ Create Task</Button>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -389,7 +390,8 @@ export default function CrmGlobalTasksPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button type="submit" disabled={creating || !newTask.title.trim() || !newTask.tenant_id.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+              type="submit" disabled={creating || !newTask.title.trim() || !newTask.tenant_id.trim()}>
                 {creating ? <Spinner size="sm" /> : 'Create Task'}
               </Button>
             </ModalFooter>

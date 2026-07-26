@@ -385,7 +385,8 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={() => setShowCreate(true)}>+ Create Ticket</Button>
+        <Button variant='gradient' style={{ color: 'white' }}
+        onClick={() => setShowCreate(true)}>+ Create Ticket</Button>
       </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700">
         <table className="w-full text-sm">
@@ -578,7 +579,8 @@ function TasksTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button onClick={() => setShowCreate(true)}>+ Create Task</Button>
+        <Button variant='gradient' style={{ color: 'white' }}
+        onClick={() => setShowCreate(true)}>+ Create Task</Button>
       </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700">
         <table className="w-full text-sm">
@@ -703,7 +705,8 @@ function TasksTab({ tenantId }: { tenantId: string }) {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button type="submit" disabled={creating || !newTask.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+              type="submit" disabled={creating || !newTask.title.trim()}>
                 {creating ? <Spinner size="sm" /> : 'Create Task'}
               </Button>
             </ModalFooter>

@@ -97,6 +97,29 @@ export const calloutBlockSchema = z.object({
   textSize: z.enum(['paragraph', 'h1', 'h2', 'h3']).optional(),
 });
 
+export const codeBlockSchema = z.object({
+  type: z.literal('code'),
+  language: z.string().default('text'),
+  text: z.string(),
+});
+
+export const quoteBlockSchema = z.object({
+  type: z.literal('quote'),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+});
+
+export const toggleListBlockSchema = z.object({
+  type: z.literal('toggle_list'),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+  children: z.array(z.unknown()).optional(),
+});
+
+export const dividerBlockSchema = z.object({
+  type: z.literal('divider'),
+});
+
 export const sideBySideBlockSchema = z.object({
   type: z.literal('side_by_side'),
   imagePosition: z.enum(['left', 'right']).default('left'),
@@ -120,6 +143,10 @@ export const contentBlockSchema = z.union([
   iconButtonBlockSchema,
   iconBlockSchema,
   calloutBlockSchema,
+  codeBlockSchema,
+  quoteBlockSchema,
+  toggleListBlockSchema,
+  dividerBlockSchema,
   sideBySideBlockSchema,
 ]);
 
@@ -161,6 +188,18 @@ function collectTextFromBlock(block: ContentBlock): string[] {
       return [block.name];
     case 'side_by_side':
       return [block.text, block.imageAlt].filter((s): s is string => typeof s === 'string');
+    case 'code':
+      return [block.text];
+    case 'quote':
+      return [block.text];
+    case 'toggle_list': {
+      const childText = block.children?.length
+        ? contentBlocksToPlainText({ version: '1', blocks: block.children as ContentBlock[] })
+        : '';
+      return childText ? [block.text, childText] : [block.text];
+    }
+    case 'divider':
+      return [];
     default:
       return [];
   }

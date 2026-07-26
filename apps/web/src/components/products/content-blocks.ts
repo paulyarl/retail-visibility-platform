@@ -97,6 +97,29 @@ export const calloutBlockSchema = z.object({
   textSize: z.enum(['paragraph', 'h1', 'h2', 'h3']).optional(),
 });
 
+export const codeBlockSchema = z.object({
+  type: z.literal('code'),
+  language: z.string().default('text'),
+  text: z.string(),
+});
+
+export const quoteBlockSchema = z.object({
+  type: z.literal('quote'),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+});
+
+export const toggleListBlockSchema = z.object({
+  type: z.literal('toggle_list'),
+  text: z.string(),
+  textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+  children: z.array(z.unknown()).optional(),
+});
+
+export const dividerBlockSchema = z.object({
+  type: z.literal('divider'),
+});
+
 export const sideBySideBlockSchema = z.object({
   type: z.literal('side_by_side'),
   imagePosition: z.enum(['left', 'right']).default('left'),
@@ -120,6 +143,10 @@ export const contentBlockSchema = z.union([
   iconButtonBlockSchema,
   iconBlockSchema,
   calloutBlockSchema,
+  codeBlockSchema,
+  quoteBlockSchema,
+  toggleListBlockSchema,
+  dividerBlockSchema,
   sideBySideBlockSchema,
 ]);
 

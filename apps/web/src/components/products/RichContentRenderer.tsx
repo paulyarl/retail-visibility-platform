@@ -294,6 +294,37 @@ function Block({ block, onBlockChange }: { block: ContentBlock; onBlockChange?: 
       );
     }
 
+    case 'code':
+      return (
+        <pre className="mb-4 overflow-x-auto rounded-lg bg-neutral-900 p-4 dark:bg-neutral-950">
+          <code className={`language-${block.language || 'text'} text-sm font-mono text-neutral-100`} style={{ whiteSpace: 'pre' }}>
+            {block.text}
+          </code>
+        </pre>
+      );
+
+    case 'quote':
+      return (
+        <blockquote className="mb-4 border-l-4 border-neutral-400 pl-4 italic text-neutral-700 dark:border-neutral-600 dark:text-neutral-300" style={{ textAlign: block.textAlign }}>
+          {block.text}
+        </blockquote>
+      );
+
+    case 'toggle_list':
+      return (
+        <details className="mb-4" style={{ textAlign: block.textAlign }}>
+          <summary className="cursor-pointer font-medium">{block.text}</summary>
+          {block.children && block.children.length > 0 && (
+            <div className="mt-2 pl-4">
+              <RichContentRenderer content={{ version: '1', blocks: block.children as ContentBlock[] }} />
+            </div>
+          )}
+        </details>
+      );
+
+    case 'divider':
+      return <hr className="mb-4 border-neutral-300 dark:border-neutral-700" />;
+
     default:
       return null;
   }

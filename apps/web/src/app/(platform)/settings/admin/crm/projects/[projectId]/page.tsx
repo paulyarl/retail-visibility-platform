@@ -278,11 +278,10 @@ export default function CrmProjectDetailPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${
-              activeTab === tab
-                ? 'text-amber-600 border-b-2 border-amber-500'
-                : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
-            }`}
+            className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${activeTab === tab
+              ? 'text-amber-600 border-b-2 border-amber-500'
+              : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+              }`}
           >
             {tab}
           </button>
@@ -295,7 +294,8 @@ export default function CrmProjectDetailPage() {
       ) : activeTab === 'tasks' ? (
         <div>
           <div className="flex justify-end mb-3">
-            <Button size="sm" onClick={() => setShowCreateTask(true)}>+ Add Task</Button>
+            <Button variant='gradient' style={{ color: 'white' }}
+              size="sm" onClick={() => setShowCreateTask(true)}>+ Add Task</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {columnOrder
@@ -361,29 +361,30 @@ export default function CrmProjectDetailPage() {
       ) : activeTab === 'tickets' ? (
         <div>
           <div className="flex justify-end mb-3">
-            <Button size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
+            <Button  variant='gradient' style={{ color: 'white' }}
+            size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
           </div>
           <div className="space-y-2">
-          {tickets.length === 0 ? (
-            <Card><CardContent className="py-8 text-center"><p className="text-sm text-neutral-500">No tickets in this project.</p></CardContent></Card>
-          ) : (
-            tickets.map(t => (
-              <div key={t.id} className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <Link href={`/settings/admin/crm/tickets/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-amber-600 hover:underline">
-                    {t.title}
-                  </Link>
-                  <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
-                    {t.status.replace('_', ' ')}
-                  </span>
+            {tickets.length === 0 ? (
+              <Card><CardContent className="py-8 text-center"><p className="text-sm text-neutral-500">No tickets in this project.</p></CardContent></Card>
+            ) : (
+              tickets.map(t => (
+                <div key={t.id} className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/settings/admin/crm/tickets/${t.id}`} className="text-sm font-medium truncate flex-1 hover:text-amber-600 hover:underline">
+                      {t.title}
+                    </Link>
+                    <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[t.status] || 'bg-gray-100 text-gray-800'}`}>
+                      {t.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant={t.priority === 'urgent' ? 'warning' : 'default'}>{t.priority}</Badge>
+                    {t.assigned_to && <span className="text-xs text-neutral-400">@{userMap.get(t.assigned_to) || t.assigned_to}</span>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant={t.priority === 'urgent' ? 'warning' : 'default'}>{t.priority}</Badge>
-                  {t.assigned_to && <span className="text-xs text-neutral-400">@{userMap.get(t.assigned_to) || t.assigned_to}</span>}
-                </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
           </div>
         </div>
       ) : (
@@ -462,7 +463,8 @@ export default function CrmProjectDetailPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreateTask(false)}>Cancel</Button>
-              <Button type="submit" disabled={creatingTask || !newTask.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                type="submit" disabled={creatingTask || !newTask.title.trim()}>
                 {creatingTask ? <Spinner size="sm" /> : 'Add Task'}
               </Button>
             </ModalFooter>
@@ -529,7 +531,8 @@ export default function CrmProjectDetailPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreateTicket(false)}>Cancel</Button>
-              <Button type="submit" disabled={creatingTicket || !newTicket.title.trim()}>
+              <Button  variant='gradient' style={{ color: 'white' }}
+              type="submit" disabled={creatingTicket || !newTicket.title.trim()}>
                 {creatingTicket ? <Spinner size="sm" /> : 'Add Ticket'}
               </Button>
             </ModalFooter>
