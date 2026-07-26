@@ -279,7 +279,8 @@ export default function PersonalCrmProjectDetailPage() {
             {/* Tasks Tab */}
             <Tabs.Panel value="tasks">
               <Group justify="flex-end" mb="sm">
-                <Button size="sm" onClick={() => setShowCreateTask(true)}>+ Add Task</Button>
+                <Button variant='gradient' style={{ color: 'white' }}
+                  size="sm" onClick={() => setShowCreateTask(true)}>+ Add Task</Button>
               </Group>
               {tabLoading ? (
                 <div className="flex justify-center py-8"><Loader /></div>
