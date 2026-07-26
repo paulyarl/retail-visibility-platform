@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   Card, Title, Text, Badge, Group, SimpleGrid, Loader, Tabs,
-  Button, Textarea, Stack, Modal,
+  Button, Textarea, Stack, Modal, Select as MantineSelect,
 } from '@mantine/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { personalCrmService } from '@/services/crm/PersonalCrmService';
+import UsersSingleton from '@/providers/platform/UsersSingleton';
 import type {
   CrmProject, CrmTask, CrmTicket, CrmActivity,
   TaskStatus, TaskPriority, TicketPriority,
@@ -42,7 +43,7 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
   archived: 'gray',
 };
 
-const EMPTY_TASK = { title: '', description: '', priority: 'medium' as TaskPriority, due_date: '', assigned_to_email: '' };
+const EMPTY_TASK = { title: '', description: '', priority: 'medium' as TaskPriority, due_date: '', assigned_to: undefined as string | undefined };
 const EMPTY_TICKET = { title: '', description: '', priority: 'medium' as TicketPriority, category: 'general' };
 
 type Tab = 'tasks' | 'tickets' | 'activities';
@@ -72,6 +73,9 @@ export default function PersonalCrmProjectDetailPage() {
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deletingTask, setDeletingTask] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+
+  const [assignableUsers, setAssignableUsers] = useState<{ value: string; label: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -118,6 +122,16 @@ export default function PersonalCrmProjectDetailPage() {
   }, [authLoading, isAuthenticated, loadProject]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+    setUsersLoading(true);
+    UsersSingleton.getInstance()
+      .listUsers({ roles: ['admin', 'support', 'platform_admin'], status: 'active', limit: 500 })
+      .then(({ users }) => setAssignableUsers(users.map(u => ({ value: u.id, label: `${u.name} (${u.email})` }))))
+      .catch(err => clientLogger.error('[Personal CRM Project Detail] Load assignable users error:', { detail: err }))
+      .finally(() => setUsersLoading(false));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     if (isAuthenticated && project) {
       loadTabData(activeTab);
     }
@@ -132,7 +146,7 @@ export default function PersonalCrmProjectDetailPage() {
         description: newTask.description.trim() || undefined,
         priority: newTask.priority,
         due_date: newTask.due_date || undefined,
-        assigned_to_email: newTask.assigned_to_email?.trim() || undefined,
+        assigned_to: newTask.assigned_to?.trim() || undefined,
       });
       setShowCreateTask(false);
       setNewTask(EMPTY_TASK);
@@ -454,13 +468,15 @@ export default function PersonalCrmProjectDetailPage() {
               </div>
             </div>
             <div>
-              <Text size="sm" fw={500} mb={4}>Assign To (email)</Text>
-              <input
-                type="email"
-                value={newTask.assigned_to_email}
-                onChange={(e) => setNewTask(prev => ({ ...prev, assigned_to_email: e.target.value }))}
-                className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
-                placeholder="leave blank to assign to yourself"
+              <Text size="sm" fw={500} mb={4}>Assign To</Text>
+              <MantineSelect
+                data={assignableUsers}
+                value={newTask.assigned_to || null}
+                onChange={(v) => setNewTask(prev => ({ ...prev, assigned_to: v || undefined }))}
+                placeholder={usersLoading ? 'Loading users...' : 'Select a user'}
+                clearable
+                searchable
+                disabled={usersLoading}
               />
             </div>
             <Group justify="flex-end">

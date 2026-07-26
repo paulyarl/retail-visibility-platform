@@ -258,6 +258,7 @@ class UserService extends UniversalSingleton {
    */
   async listUsers(filters: {
     role?: User['role'];
+    roles?: User['role'][];
     status?: User['status'];
     tenantId?: string;
     limit?: number;
@@ -500,12 +501,23 @@ class UserService extends UniversalSingleton {
 
   private async queryUsers(filters: any): Promise<User[]> {
     console.log('Querying users with filters:', filters);
-    return Array.from(this.userCache.values());
+    let users = Array.from(this.userCache.values());
+    const allowedRoles = filters.roles || (filters.role ? [filters.role] : undefined);
+    if (allowedRoles?.length) {
+      users = users.filter(u => allowedRoles.includes(u.role));
+    }
+    if (filters.status) {
+      users = users.filter(u => u.status === filters.status);
+    }
+    if (filters.tenantId) {
+      users = users.filter(u => u.tenantIds.includes(filters.tenantId));
+    }
+    return users;
   }
 
   private async countUsers(filters: any): Promise<number> {
     console.log('Counting users with filters:', filters);
-    return this.userCache.size;
+    return (await this.queryUsers(filters)).length;
   }
 
   private async storeActivity(activity: UserActivity): Promise<void> {

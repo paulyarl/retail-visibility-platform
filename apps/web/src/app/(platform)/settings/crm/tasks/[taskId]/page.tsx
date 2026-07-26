@@ -9,6 +9,7 @@ import {
 } from '@mantine/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { personalCrmService } from '@/services/crm/PersonalCrmService';
+import UsersSingleton from '@/providers/platform/UsersSingleton';
 import { RichContentEditor } from '@/components/products/RichContentEditor';
 import { RichContentRenderer } from '@/components/products/RichContentRenderer';
 import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
@@ -59,8 +60,10 @@ export default function PersonalCrmTaskDetailPage() {
   const [savingMessageId, setSavingMessageId] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [editTask, setEditTask] = useState<CrmTask | null>(null);
-  const [editAssigneeEmail, setEditAssigneeEmail] = useState('');
+  const [editAssignee, setEditAssignee] = useState('');
   const [editing, setEditing] = useState(false);
+  const [assignableUsers, setAssignableUsers] = useState<{ value: string; label: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const isCompleted = task?.status === 'completed' || task?.status === 'cancelled';
@@ -89,6 +92,16 @@ export default function PersonalCrmTaskDetailPage() {
     if (isAuthenticated) load();
   }, [authLoading, isAuthenticated, load]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setUsersLoading(true);
+    UsersSingleton.getInstance()
+      .listUsers({ roles: ['admin', 'support', 'platform_admin'], status: 'active', limit: 500 })
+      .then(({ users }) => setAssignableUsers(users.map(u => ({ value: u.id, label: `${u.name} (${u.email})` }))))
+      .catch(err => clientLogger.error('[Personal CRM Task Detail] Load assignable users error:', { detail: err }))
+      .finally(() => setUsersLoading(false));
+  }, [isAuthenticated]);
+
   async function handleUpdateTask(data: Partial<{ status: TaskStatus; priority: TaskPriority; due_date: string; title: string; description: string }>) {
     if (!task) return;
     setUpdating(true);
@@ -112,11 +125,11 @@ export default function PersonalCrmTaskDetailPage() {
         priority: editTask.priority,
         due_date: editTask.due_date || undefined,
         status: editTask.status,
-        assigned_to_email: editAssigneeEmail.trim() || undefined,
+        assigned_to: editAssignee || undefined,
       });
       setShowEdit(false);
       setEditTask(null);
-      setEditAssigneeEmail('');
+      setEditAssignee('');
       await load();
     } catch (err) {
       clientLogger.error('[Personal CRM Task Detail] Edit error:', { detail: err });
@@ -237,7 +250,7 @@ export default function PersonalCrmTaskDetailPage() {
             </Group>
           </div>
           <Group gap="sm">
-            <Button variant="subtle" size="sm" onClick={() => { setEditTask(task); setEditAssigneeEmail(''); setShowEdit(true); }}>Edit</Button>
+            <Button variant="subtle" size="sm" onClick={() => { setEditTask(task); setEditAssignee(task.assigned_to || ''); setShowEdit(true); }}>Edit</Button>
             <Button variant="subtle" size="sm" color="red" onClick={() => setDeleteConfirm(true)}>Delete</Button>
             <Link href={backUrl} className="text-sm text-blue-600 hover:underline">Back</Link>
           </Group>
@@ -439,13 +452,15 @@ export default function PersonalCrmTaskDetailPage() {
               />
             </div>
             <div>
-              <Text size="sm" fw={500} mb={4}>Assign To (email)</Text>
-              <input
-                type="email"
-                value={editAssigneeEmail}
-                onChange={(e) => setEditAssigneeEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
-                placeholder="leave blank to keep current assignee"
+              <Text size="sm" fw={500} mb={4}>Assign To</Text>
+              <MantineSelect
+                data={assignableUsers}
+                value={editAssignee || null}
+                onChange={(v) => setEditAssignee(v || '')}
+                placeholder={usersLoading ? 'Loading users...' : 'Select a user'}
+                clearable
+                searchable
+                disabled={usersLoading}
               />
             </div>
             <Group justify="flex-end">

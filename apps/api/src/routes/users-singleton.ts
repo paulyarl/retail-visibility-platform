@@ -247,8 +247,15 @@ router.get('/', async (req, res) => {
       });
     }
     
+    const rawRoles = req.query.roles ?? req.query.role;
+    const roleFilter: string[] | undefined = (() => {
+      if (!rawRoles) return undefined;
+      if (Array.isArray(rawRoles)) return rawRoles.map(r => String(r).trim()).filter(Boolean);
+      return String(rawRoles).split(',').map(r => r.trim()).filter(Boolean);
+    })();
+
     const filters = {
-      role: req.query.role as 'user' | 'admin' | 'platform_admin' | 'support' | 'tenant_admin' | undefined,
+      roles: roleFilter as any,
       status: req.query.status as 'pending' | 'active' | 'inactive' | 'suspended' | undefined,
       tenantId: req.query.tenantId as string,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
