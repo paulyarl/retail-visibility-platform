@@ -224,6 +224,7 @@ class UsersSingleton extends TenantApiSingleton {
    */
   async listUsers(filters: {
     role?: User['role'];
+    roles?: User['role'][];
     status?: User['status'];
     tenantId?: string;
     limit?: number;
@@ -232,6 +233,7 @@ class UsersSingleton extends TenantApiSingleton {
     try {
       const params = new URLSearchParams();
       if (filters.role) params.append('role', filters.role);
+      if (filters.roles) filters.roles.forEach(r => params.append('roles', r));
       if (filters.status) params.append('status', filters.status);
       if (filters.tenantId) params.append('tenantId', filters.tenantId);
       if (filters.limit) params.append('limit', filters.limit.toString());
