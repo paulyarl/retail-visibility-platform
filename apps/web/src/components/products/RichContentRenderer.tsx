@@ -314,6 +314,11 @@ function Block({ block, onBlockChange }: { block: ContentBlock; onBlockChange?: 
       return (
         <details className="mb-4" style={{ textAlign: block.textAlign }}>
           <summary className="cursor-pointer font-medium">{block.text}</summary>
+          {block.children && block.children.length > 0 && (
+            <div className="mt-2 pl-4">
+              <RichContentRenderer content={{ version: '1', blocks: block.children as ContentBlock[] }} />
+            </div>
+          )}
         </details>
       );
 

@@ -361,7 +361,8 @@ export default function CrmProjectDetailPage() {
       ) : activeTab === 'tickets' ? (
         <div>
           <div className="flex justify-end mb-3">
-            <Button size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
+            <Button  variant='gradient' style={{ color: 'white' }}
+            size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
           </div>
           <div className="space-y-2">
             {tickets.length === 0 ? (
@@ -530,7 +531,8 @@ export default function CrmProjectDetailPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreateTicket(false)}>Cancel</Button>
-              <Button type="submit" disabled={creatingTicket || !newTicket.title.trim()}>
+              <Button  variant='gradient' style={{ color: 'white' }}
+              type="submit" disabled={creatingTicket || !newTicket.title.trim()}>
                 {creatingTicket ? <Spinner size="sm" /> : 'Add Ticket'}
               </Button>
             </ModalFooter>

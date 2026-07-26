@@ -113,6 +113,7 @@ export const toggleListBlockSchema = z.object({
   type: z.literal('toggle_list'),
   text: z.string(),
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+  children: z.array(z.unknown()).optional(),
 });
 
 export const dividerBlockSchema = z.object({

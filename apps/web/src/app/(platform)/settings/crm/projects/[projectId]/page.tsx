@@ -352,7 +352,8 @@ export default function PersonalCrmProjectDetailPage() {
             {/* Tickets Tab */}
             <Tabs.Panel value="tickets">
               <Group justify="flex-end" mb="sm">
-                <Button size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
+                <Button  variant='gradient' style={{ color: 'white' }}
+                size="sm" onClick={() => setShowCreateTicket(true)}>+ Add Ticket</Button>
               </Group>
               {tabLoading ? (
                 <div className="flex justify-center py-8"><Loader /></div>

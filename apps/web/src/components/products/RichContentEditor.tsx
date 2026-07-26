@@ -359,6 +359,7 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
           textAlignment: block.textAlign || 'left',
         },
         content: block.text || '',
+        children: contentBlocksToBlockNote((block.children as ContentBlock[]) || []),
       };
     case 'divider':
       return {
@@ -405,7 +406,7 @@ function inlineToString(content: unknown): string {
   return '';
 }
 
-function blockNoteToContentBlock(block: { type: string; props?: Record<string, unknown>; content?: unknown }): ContentBlock | ContentBlock[] | null {
+function blockNoteToContentBlock(block: { type: string; props?: Record<string, unknown>; content?: unknown; children?: unknown[] }): ContentBlock | ContentBlock[] | null {
   switch (block.type) {
     case 'paragraph':
       return { type: 'paragraph', text: inlineToString(block.content), textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined };
@@ -510,6 +511,7 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
         type: 'toggle_list',
         text: inlineToString(block.content),
         textAlign: (block.props?.textAlignment as 'left' | 'center' | 'right' | 'justify') || undefined,
+        children: blockNoteToContentBlocks((block.children as { type: string; props?: Record<string, unknown>; content?: unknown; children?: unknown[] }[]) || []),
       };
     case 'divider':
       return { type: 'divider' };

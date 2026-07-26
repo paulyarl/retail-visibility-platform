@@ -113,6 +113,7 @@ export const toggleListBlockSchema = z.object({
   type: z.literal('toggle_list'),
   text: z.string(),
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
+  children: z.array(z.unknown()).optional(),
 });
 
 export const dividerBlockSchema = z.object({
@@ -190,8 +191,12 @@ function collectTextFromBlock(block: ContentBlock): string[] {
     case 'code':
       return [block.text];
     case 'quote':
-    case 'toggle_list':
-      return [block.text];
+    case 'toggle_list': {
+      const childText = block.children?.length
+        ? contentBlocksToPlainText({ version: '1', blocks: block.children as ContentBlock[] })
+        : '';
+      return childText ? [block.text, childText] : [block.text];
+    }
     case 'divider':
       return [];
     default:
