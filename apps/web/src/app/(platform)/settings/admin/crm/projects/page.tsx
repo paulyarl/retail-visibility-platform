@@ -125,7 +125,7 @@ export default function CrmProjectsPage() {
       actions={
         <div className="flex flex-wrap gap-3 items-center">
           <Button variant='gradient' style={{ color: 'white' }}
-          size="sm" onClick={() => setShowCreate(true)}>+ Create Project</Button>
+            size="sm" onClick={() => setShowCreate(true)}>+ Create Project</Button>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -220,7 +220,8 @@ export default function CrmProjectsPage() {
             </div>
             <ModalFooter>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button type="submit" disabled={creating || !newProject.name.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                type="submit" disabled={creating || !newProject.name.trim()}>
                 {creating ? <Spinner size="sm" /> : 'Create Project'}
               </Button>
             </ModalFooter>
