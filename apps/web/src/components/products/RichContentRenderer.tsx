@@ -325,6 +325,44 @@ function Block({ block, onBlockChange }: { block: ContentBlock; onBlockChange?: 
     case 'divider':
       return <hr className="mb-4 border-neutral-300 dark:border-neutral-700" />;
 
+    case 'table': {
+      const rows = block.rows || [];
+      const headerRows = block.headerRows ?? 0;
+      const headerCols = block.headerCols ?? 0;
+      const columnWidths = block.columnWidths || [];
+      return (
+        <table className="mb-4 w-full border-collapse border border-neutral-300 dark:border-neutral-700">
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={r} className="border-b border-neutral-300 dark:border-neutral-700">
+                {row.cells.map((cell, c) => {
+                  const isHeader = r < headerRows || c < headerCols;
+                  const Cell = isHeader ? 'th' : 'td';
+                  const width = columnWidths[c] !== undefined ? `${columnWidths[c]}px` : undefined;
+                  return (
+                    <Cell
+                      key={c}
+                      colSpan={cell.props?.colspan}
+                      rowSpan={cell.props?.rowspan}
+                      className={`border border-neutral-300 dark:border-neutral-700 px-2 py-1 ${isHeader ? 'bg-neutral-100 dark:bg-neutral-800 font-semibold' : ''}`}
+                      style={{
+                        textAlign: cell.props?.textAlignment || 'left',
+                        backgroundColor: cell.props?.backgroundColor,
+                        color: cell.props?.textColor,
+                        width,
+                      }}
+                    >
+                      <RichInlineContent content={cell.content as unknown[]} />
+                    </Cell>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
     default:
       return null;
   }
