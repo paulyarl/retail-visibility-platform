@@ -295,7 +295,8 @@ export default function PersonalCrmPage() {
                   My Projects
                 </Button>
               </Link>
-              <Button leftSection={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>} onClick={() => setShowNewTicket(true)}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                leftSection={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>} onClick={() => setShowNewTicket(true)}>
                 New Support Ticket
               </Button>
             </Group>
@@ -531,7 +532,8 @@ export default function PersonalCrmPage() {
             </div>
             <Group justify="flex-end">
               <Button variant="subtle" onClick={() => setShowNewTicket(false)}>Cancel</Button>
-              <Button onClick={handleCreateTicket} loading={creatingTicket} disabled={!newTicket.title.trim()}>
+              <Button variant='gradient' style={{ color: 'white' }}
+                onClick={handleCreateTicket} loading={creatingTicket} disabled={!newTicket.title.trim()}>
                 Create Ticket
               </Button>
             </Group>
@@ -618,7 +620,8 @@ export default function PersonalCrmPage() {
                       className="min-h-[160px]"
                     />
                     <Group justify="flex-end" mt="sm">
-                      <Button onClick={handleSendReply} loading={sendingReply} disabled={replyContent.blocks.length === 0}>
+                      <Button variant='gradient' style={{ color: 'white' }}
+                        onClick={handleSendReply} loading={sendingReply} disabled={replyContent.blocks.length === 0}>
                         Send Reply
                       </Button>
                     </Group>
@@ -708,7 +711,8 @@ export default function PersonalCrmPage() {
                       className="min-h-[160px]"
                     />
                     <Group justify="flex-end" mt="sm">
-                      <Button onClick={handleSendTaskReply} loading={sendingTaskReply} disabled={taskReplyContent.blocks.length === 0}>
+                      <Button variant='gradient' style={{ color: 'white' }}
+                        onClick={handleSendTaskReply} loading={sendingTaskReply} disabled={taskReplyContent.blocks.length === 0}>
                         Send Update
                       </Button>
                     </Group>
