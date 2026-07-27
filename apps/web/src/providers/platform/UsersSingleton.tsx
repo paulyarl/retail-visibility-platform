@@ -134,7 +134,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Get user by ID
    */
   async getUser(userId: string): Promise<User | null> {
-    const result = await this.makeDefaultRequest<{ user: User }>(
+    const result = await this.makeDefaultRequest<{ data: { user: User } }>(
       `/api/users-singleton/${userId}`,
       {},
       `user-${userId}`
@@ -155,7 +155,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Create new user
    */
   async createUser(request: CreateUserRequest): Promise<User> {
-    const result = await this.makeDefaultRequest<{ user: User }>(
+    const result = await this.makeDefaultRequest<{ data: { user: User } }>(
       '/api/users-singleton',
       {
         method: 'POST',
@@ -178,7 +178,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Update user
    */
   async updateUser(userId: string, updates: UpdateUserRequest): Promise<User> {
-    const result = await this.makeDefaultRequest<{ user: User }>(
+    const result = await this.makeDefaultRequest<{ data: { user: User } }>(
       `/api/users-singleton/${userId}`,
       {
         method: 'PUT',
@@ -239,7 +239,7 @@ class UsersSingleton extends TenantApiSingleton {
 
       const cacheKey = `users-list-${params.toString()}`;
 
-      const result = await this.makeDefaultRequest<{ users: User[]; total: number }>(
+      const result = await this.makeDefaultRequest<{ data: { users: User[]; pagination: { total: number } } }>(
         `/api/users-singleton?${params}`,
         {},
         cacheKey
@@ -266,7 +266,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Get user activity
    */
   async getUserActivity(userId: string, limit: number = 50): Promise<UserActivity[]> {
-    const result = await this.makeDefaultRequest<{ activities: UserActivity[] }>(
+    const result = await this.makeDefaultRequest<{ data: { activities: UserActivity[] } }>(
       `/api/users-singleton/${userId}/activity?limit=${limit}`,
       {},
       `user-activity-${userId}-${limit}`
@@ -284,7 +284,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Record user activity
    */
   async recordActivity(userId: string, activity: Omit<UserActivity, 'id' | 'timestamp'>): Promise<UserActivity> {
-    const result = await this.makeDefaultRequest<{ activity: UserActivity }>(
+    const result = await this.makeDefaultRequest<{ data: { activity: UserActivity } }>(
       `/api/users-singleton/${userId}/activity`,
       {
         method: 'POST',
@@ -311,7 +311,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Get user statistics
    */
   async getUserStats(): Promise<UserStats> {
-    const result = await this.makeDefaultRequest<{ stats: UserStats }>(
+    const result = await this.makeDefaultRequest<{ data: { stats: UserStats } }>(
       '/api/users-singleton/stats',
       {},
       'user-stats'
@@ -344,7 +344,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Search users
    */
   async searchUsers(query: string, limit: number = 20): Promise<User[]> {
-    const result = await this.makeDefaultRequest<{ users: User[] }>(
+    const result = await this.makeDefaultRequest<{ data: { users: User[] } }>(
       `/api/users-singleton?limit=${limit}&search=${encodeURIComponent(query)}`,
       {},
       `user-search-${query}-${limit}`
