@@ -96,7 +96,7 @@ export default function PersonalCrmTaskDetailPage() {
     if (!isAuthenticated) return;
     setUsersLoading(true);
     UsersSingleton.getInstance()
-      .listUsers({ roles: ['admin', 'support', 'platform_admin'], status: 'active', limit: 500 })
+      .listUsers({ roles: ['ADMIN', 'PLATFORM_ADMIN', 'PLATFORM_SUPPORT'], status: 'active', limit: 500 })
       .then(({ users }) => setAssignableUsers(users.map(u => ({ value: u.id, label: `${u.name} (${u.email})` }))))
       .catch(err => clientLogger.error('[Personal CRM Task Detail] Load assignable users error:', { detail: err }))
       .finally(() => setUsersLoading(false));

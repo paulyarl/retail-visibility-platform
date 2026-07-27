@@ -223,8 +223,8 @@ class UsersSingleton extends TenantApiSingleton {
    * List users
    */
   async listUsers(filters: {
-    role?: User['role'];
-    roles?: User['role'][];
+    role?: string;
+    roles?: string[];
     status?: User['status'];
     tenantId?: string;
     limit?: number;

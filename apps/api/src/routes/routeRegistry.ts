@@ -133,6 +133,7 @@ import barcodeEnrichmentSingletonRoutes from '../routes/barcode-enrichment-singl
 import digitalAssetSingletonRoutes from '../routes/digital-asset-singleton';
 import aiImageSingletonRoutes from '../routes/ai-image-singleton';
 import reviewsSingletonRoutes from '../routes/reviews-singleton';
+import usersSingletonRoutes from '../routes/users-singleton';
 
 // Settings
 import fulfillmentSettingsRoutes from '../routes/fulfillment-settings';
@@ -1429,6 +1430,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'singleton',
     authLevel: 'public',
     comment: 'Reviews singleton',
+  },
+  {
+    path: '/api/users-singleton',
+    router: usersSingletonRoutes,
+    domain: 'singleton',
+    authLevel: 'public',
+    comment: 'Users singleton',
   },
 
   // ── Inline handler routes (extracted from index.ts) ──────────────────
