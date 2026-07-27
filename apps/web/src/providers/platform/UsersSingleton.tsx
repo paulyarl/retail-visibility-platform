@@ -134,7 +134,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Get user by ID
    */
   async getUser(userId: string): Promise<User | null> {
-    const result = await this.makeDefaultRequest<{ user: User }>(
+    const result = await this.makeDefaultRequest<{ data: { user: User } }>(
       `/api/users-singleton/${userId}`,
       {},
       `user-${userId}`
@@ -148,14 +148,14 @@ class UsersSingleton extends TenantApiSingleton {
       return null;
     }
     
-    return result.data?.user || null;
+    return result.data?.data?.user || null;
   }
 
   /**
    * Create new user
    */
   async createUser(request: CreateUserRequest): Promise<User> {
-    const result = await this.makeDefaultRequest<{ user: User }>(
+    const result = await this.makeDefaultRequest<{ data: { user: User } }>(
       '/api/users-singleton',
       {
         method: 'POST',
@@ -169,8 +169,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to create user');
     }
 
-    console.log('User created successfully', { userId: result.data?.user.id });
-    return result.data?.user || (() => { 
+    return result.data?.data?.user || (() => { 
       throw new Error('No user data received'); 
     })();
   }
@@ -179,7 +178,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Update user
    */
   async updateUser(userId: string, updates: UpdateUserRequest): Promise<User> {
-    const result = await this.makeDefaultRequest<{ user: User }>(
+    const result = await this.makeDefaultRequest<{ data: { user: User } }>(
       `/api/users-singleton/${userId}`,
       {
         method: 'PUT',
@@ -193,8 +192,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to update user');
     }
 
-    console.log('User updated successfully', { userId });
-    return result.data?.user || (() => { 
+    return result.data?.data?.user || (() => { 
       throw new Error('No user data received'); 
     })();
   }
@@ -241,7 +239,7 @@ class UsersSingleton extends TenantApiSingleton {
 
       const cacheKey = `users-list-${params.toString()}`;
 
-      const result = await this.makeDefaultRequest<{ users: User[]; total: number }>(
+      const result = await this.makeDefaultRequest<{ data: { users: User[]; pagination: { total: number } } }>(
         `/api/users-singleton?${params}`,
         {},
         cacheKey
@@ -252,7 +250,8 @@ class UsersSingleton extends TenantApiSingleton {
         return { users: [], total: 0 };
       }
 
-      return result.data || { users: [], total: 0 };
+      const responseData = result.data?.data;
+      return { users: responseData?.users || [], total: responseData?.pagination?.total ?? responseData?.users?.length ?? 0 };
     } catch (error) {
       clientLogger.error('Error listing users', { detail: error });
       throw error;
@@ -267,7 +266,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Get user activity
    */
   async getUserActivity(userId: string, limit: number = 50): Promise<UserActivity[]> {
-    const result = await this.makeDefaultRequest<{ activities: UserActivity[] }>(
+    const result = await this.makeDefaultRequest<{ data: { activities: UserActivity[] } }>(
       `/api/users-singleton/${userId}/activity?limit=${limit}`,
       {},
       `user-activity-${userId}-${limit}`
@@ -278,14 +277,14 @@ class UsersSingleton extends TenantApiSingleton {
       return [];
     }
 
-    return result.data?.activities || [];
+    return result.data?.data?.activities || [];
   }
 
   /**
    * Record user activity
    */
   async recordActivity(userId: string, activity: Omit<UserActivity, 'id' | 'timestamp'>): Promise<UserActivity> {
-    const result = await this.makeDefaultRequest<{ activity: UserActivity }>(
+    const result = await this.makeDefaultRequest<{ data: { activity: UserActivity } }>(
       `/api/users-singleton/${userId}/activity`,
       {
         method: 'POST',
@@ -299,8 +298,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to record activity');
     }
 
-    console.log('User activity recorded', { userId, type: activity.type });
-    return result.data?.activity || (() => { 
+    return result.data?.data?.activity || (() => { 
       throw new Error('No activity data received'); 
     })();
   }
@@ -313,7 +311,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Get user statistics
    */
   async getUserStats(): Promise<UserStats> {
-    const result = await this.makeDefaultRequest<{ stats: UserStats }>(
+    const result = await this.makeDefaultRequest<{ data: { stats: UserStats } }>(
       '/api/users-singleton/stats',
       {},
       'user-stats'
@@ -324,7 +322,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch user stats');
     }
 
-    return result.data?.stats || (() => { 
+    return result.data?.data?.stats || (() => { 
       throw new Error('No user stats data received'); 
     })();
   }
@@ -346,7 +344,7 @@ class UsersSingleton extends TenantApiSingleton {
    * Search users
    */
   async searchUsers(query: string, limit: number = 20): Promise<User[]> {
-    const result = await this.makeDefaultRequest<{ users: User[] }>(
+    const result = await this.makeDefaultRequest<{ data: { users: User[] } }>(
       `/api/users-singleton?limit=${limit}&search=${encodeURIComponent(query)}`,
       {},
       `user-search-${query}-${limit}`
@@ -357,7 +355,7 @@ class UsersSingleton extends TenantApiSingleton {
       return [];
     }
 
-    return result.data?.users || [];
+    return result.data?.data?.users || [];
   }
 
   // ====================

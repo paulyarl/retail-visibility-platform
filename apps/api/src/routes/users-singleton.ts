@@ -4,10 +4,13 @@
  */
 
 import { Router } from 'express';
+import { authenticateToken } from '../middleware/auth';
 import UserService from '../services/UserService';
 import { logger } from '../logger';
 
 const router = Router();
+
+router.use(authenticateToken);
 
 // Get singleton instance
 const userService = UserService.getInstance();
