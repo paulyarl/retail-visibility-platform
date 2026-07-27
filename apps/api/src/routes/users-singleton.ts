@@ -240,7 +240,7 @@ router.get('/', async (req, res) => {
   try {
     // Check if user has permission to list users
     const userRole = req.user?.role;
-    if (!['admin', 'platform_admin', 'PLATFORM_ADMIN', 'support'].includes(userRole || '')) {
+    if (!['admin', 'platform_admin', 'support', 'ADMIN', 'PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'SUPPORT'].includes(userRole || '')) {
       return res.status(403).json({
         success: false,
         message: 'Access denied: insufficient permissions to list users'

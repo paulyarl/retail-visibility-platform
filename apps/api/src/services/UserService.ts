@@ -257,8 +257,8 @@ class UserService extends UniversalSingleton {
    * List users with filters
    */
   async listUsers(filters: {
-    role?: User['role'];
-    roles?: User['role'][];
+    role?: string;
+    roles?: string[];
     status?: User['status'];
     tenantId?: string;
     limit?: number;
@@ -504,7 +504,8 @@ class UserService extends UniversalSingleton {
     let users = Array.from(this.userCache.values());
     const allowedRoles = filters.roles || (filters.role ? [filters.role] : undefined);
     if (allowedRoles?.length) {
-      users = users.filter(u => allowedRoles.includes(u.role));
+      const normalized = allowedRoles.map((r: any) => String(r).toLowerCase());
+      users = users.filter(u => normalized.includes(String(u.role).toLowerCase()));
     }
     if (filters.status) {
       users = users.filter(u => u.status === filters.status);
