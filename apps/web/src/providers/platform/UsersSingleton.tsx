@@ -148,7 +148,7 @@ class UsersSingleton extends TenantApiSingleton {
       return null;
     }
     
-    return result.data?.user || null;
+    return result.data?.data?.user || null;
   }
 
   /**
@@ -169,8 +169,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to create user');
     }
 
-    console.log('User created successfully', { userId: result.data?.user.id });
-    return result.data?.user || (() => { 
+    return result.data?.data?.user || (() => { 
       throw new Error('No user data received'); 
     })();
   }
@@ -193,8 +192,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to update user');
     }
 
-    console.log('User updated successfully', { userId });
-    return result.data?.user || (() => { 
+    return result.data?.data?.user || (() => { 
       throw new Error('No user data received'); 
     })();
   }
@@ -252,7 +250,8 @@ class UsersSingleton extends TenantApiSingleton {
         return { users: [], total: 0 };
       }
 
-      return result.data || { users: [], total: 0 };
+      const responseData = result.data?.data;
+      return { users: responseData?.users || [], total: responseData?.pagination?.total ?? responseData?.users?.length ?? 0 };
     } catch (error) {
       clientLogger.error('Error listing users', { detail: error });
       throw error;
@@ -278,7 +277,7 @@ class UsersSingleton extends TenantApiSingleton {
       return [];
     }
 
-    return result.data?.activities || [];
+    return result.data?.data?.activities || [];
   }
 
   /**
@@ -299,8 +298,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to record activity');
     }
 
-    console.log('User activity recorded', { userId, type: activity.type });
-    return result.data?.activity || (() => { 
+    return result.data?.data?.activity || (() => { 
       throw new Error('No activity data received'); 
     })();
   }
@@ -324,7 +322,7 @@ class UsersSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch user stats');
     }
 
-    return result.data?.stats || (() => { 
+    return result.data?.data?.stats || (() => { 
       throw new Error('No user stats data received'); 
     })();
   }
@@ -357,7 +355,7 @@ class UsersSingleton extends TenantApiSingleton {
       return [];
     }
 
-    return result.data?.users || [];
+    return result.data?.data?.users || [];
   }
 
   // ====================
