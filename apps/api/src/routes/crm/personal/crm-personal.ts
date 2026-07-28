@@ -239,9 +239,9 @@ router.get('/tickets/:ticketId', async (req: Request, res: Response) => {
     const ticket = await ticketService.getById(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
 
-    if (ticket.assigned_to !== userId && ticket.tenant_id !== PLATFORM_TENANT_ID) {
+    if (ticket.assigned_to !== userId) {
       const tenantIds = getTenantIds(req);
-      if (!ticket.tenant_id || !tenantIds.includes(ticket.tenant_id)) {
+      if (ticket.tenant_id && !tenantIds.includes(ticket.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
@@ -263,9 +263,9 @@ router.put('/tickets/:ticketId', async (req: Request, res: Response) => {
     const existing = await ticketService.getById(req.params.ticketId);
     if (!existing) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
 
-    if (existing.assigned_to !== userId && existing.tenant_id !== PLATFORM_TENANT_ID) {
+    if (existing.assigned_to !== userId) {
       const tenantIds = getTenantIds(req);
-      if (!existing.tenant_id || !tenantIds.includes(existing.tenant_id)) {
+      if (existing.tenant_id && !tenantIds.includes(existing.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
@@ -288,9 +288,9 @@ router.put('/tickets/:ticketId/messages/:messageId', async (req: Request, res: R
     const ticket = await ticketService.getById(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
 
-    if (ticket.assigned_to !== userId && ticket.tenant_id !== PLATFORM_TENANT_ID) {
+    if (ticket.assigned_to !== userId) {
       const tenantIds = getTenantIds(req);
-      if (!ticket.tenant_id || !tenantIds.includes(ticket.tenant_id)) {
+      if (ticket.tenant_id && !tenantIds.includes(ticket.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
@@ -312,11 +312,10 @@ router.get('/tickets/:ticketId/messages', async (req: Request, res: Response) =>
     const ticket = await ticketService.getById(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
 
-    // User can only see their own tickets (assigned or platform tickets they created)
-    if (ticket.assigned_to !== userId && ticket.tenant_id !== PLATFORM_TENANT_ID) {
-      // Also allow if ticket is from one of their tenants
+    // User can only see their own tickets or tickets from their tenants
+    if (ticket.assigned_to !== userId) {
       const tenantIds = getTenantIds(req);
-      if (!ticket.tenant_id || !tenantIds.includes(ticket.tenant_id)) {
+      if (ticket.tenant_id && !tenantIds.includes(ticket.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
@@ -340,9 +339,9 @@ router.post('/tickets/:ticketId/messages', async (req: Request, res: Response) =
     const ticket = await ticketService.getById(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'not_found', message: 'Ticket not found' });
 
-    if (ticket.assigned_to !== userId && ticket.tenant_id !== PLATFORM_TENANT_ID) {
+    if (ticket.assigned_to !== userId) {
       const tenantIds = getTenantIds(req);
-      if (!ticket.tenant_id || !tenantIds.includes(ticket.tenant_id)) {
+      if (ticket.tenant_id && !tenantIds.includes(ticket.tenant_id)) {
         return res.status(403).json({ error: 'access_denied', message: 'You do not have access to this ticket' });
       }
     }
