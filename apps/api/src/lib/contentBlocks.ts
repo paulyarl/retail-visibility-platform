@@ -130,6 +130,33 @@ export const sideBySideBlockSchema = z.object({
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
+const tableCellSchema = z.object({
+  type: z.literal('tableCell'),
+  props: z.object({
+    backgroundColor: z.string().optional(),
+    textColor: z.string().optional(),
+    textAlignment: z.enum(['left', 'center', 'right', 'justify']).optional(),
+    colspan: z.number().int().optional(),
+    rowspan: z.number().int().optional(),
+  }).optional(),
+  content: z.array(z.unknown()).default([]),
+});
+
+const tableRowSchema = z.object({
+  cells: z.array(tableCellSchema),
+});
+
+const tableBlockSchema = z.object({
+  type: z.literal('table'),
+  props: z.object({
+    textColor: z.string().optional(),
+  }).optional(),
+  columnWidths: z.array(z.union([z.number(), z.null(), z.undefined()])).optional(),
+  headerRows: z.number().int().optional(),
+  headerCols: z.number().int().optional(),
+  rows: z.array(tableRowSchema),
+});
+
 export const contentBlockSchema = z.union([
   paragraphBlockSchema,
   headingBlockSchema,
@@ -148,6 +175,7 @@ export const contentBlockSchema = z.union([
   toggleListBlockSchema,
   dividerBlockSchema,
   sideBySideBlockSchema,
+  tableBlockSchema,
 ]);
 
 export const contentBlocksSchema = z.object({
@@ -161,6 +189,20 @@ export type ContentBlocks = z.infer<typeof contentBlocksSchema>;
 export function validateContentBlocks(value: unknown): ContentBlocks | null {
   const parsed = contentBlocksSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
+}
+
+function inlineContentToText(content: unknown): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content.map(inlineContentToText).join('');
+  }
+  const node = content as any;
+  if (node?.type === 'link' && Array.isArray(node.content)) {
+    return inlineContentToText(node.content);
+  }
+  if (typeof node?.text === 'string') return node.text;
+  return '';
 }
 
 function collectTextFromBlock(block: ContentBlock): string[] {
@@ -200,6 +242,10 @@ function collectTextFromBlock(block: ContentBlock): string[] {
     }
     case 'divider':
       return [];
+    case 'table':
+      return (block.rows || []).flatMap((row) =>
+        row.cells.map((cell) => inlineContentToText(cell.content))
+      );
     default:
       return [];
   }
