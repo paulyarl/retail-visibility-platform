@@ -130,6 +130,33 @@ export const sideBySideBlockSchema = z.object({
   textAlign: z.enum(['left', 'center', 'right', 'justify']).optional(),
 });
 
+export const tableCellSchema = z.object({
+  type: z.literal('tableCell'),
+  props: z.object({
+    backgroundColor: z.string().optional(),
+    textColor: z.string().optional(),
+    textAlignment: z.enum(['left', 'center', 'right', 'justify']).optional(),
+    colspan: z.number().int().optional(),
+    rowspan: z.number().int().optional(),
+  }).optional(),
+  content: z.array(z.unknown()).default([]),
+});
+
+export const tableRowSchema = z.object({
+  cells: z.array(tableCellSchema),
+});
+
+export const tableBlockSchema = z.object({
+  type: z.literal('table'),
+  props: z.object({
+    textColor: z.string().optional(),
+  }).optional(),
+  columnWidths: z.array(z.union([z.number(), z.undefined()])).optional(),
+  headerRows: z.number().int().optional(),
+  headerCols: z.number().int().optional(),
+  rows: z.array(tableRowSchema),
+});
+
 export const contentBlockSchema = z.union([
   paragraphBlockSchema,
   headingBlockSchema,
@@ -148,6 +175,7 @@ export const contentBlockSchema = z.union([
   toggleListBlockSchema,
   dividerBlockSchema,
   sideBySideBlockSchema,
+  tableBlockSchema,
 ]);
 
 export const contentBlocksSchema = z.object({

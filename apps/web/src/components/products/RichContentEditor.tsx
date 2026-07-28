@@ -366,6 +366,24 @@ function contentBlockToBlockNote(block: ContentBlock): unknown | unknown[] | nul
         type: 'divider',
         props: {},
       };
+    case 'table':
+      return {
+        type: 'table',
+        props: { textColor: block.props?.textColor || 'default' },
+        content: {
+          type: 'tableContent',
+          columnWidths: block.columnWidths ?? [],
+          headerRows: block.headerRows,
+          headerCols: block.headerCols,
+          rows: (block.rows || []).map((row) => ({
+            cells: row.cells.map((cell) => ({
+              type: 'tableCell',
+              props: { ...cell.props } as any,
+              content: cell.content ?? [],
+            })),
+          })),
+        },
+      };
     default:
       return null;
   }
@@ -515,6 +533,23 @@ function blockNoteToContentBlock(block: { type: string; props?: Record<string, u
       };
     case 'divider':
       return { type: 'divider' };
+    case 'table': {
+      const tc = block.content as any;
+      return {
+        type: 'table',
+        props: (block.props || {}) as { textColor?: string },
+        columnWidths: tc?.columnWidths,
+        headerRows: tc?.headerRows,
+        headerCols: tc?.headerCols,
+        rows: (tc?.rows || []).map((row: any) => ({
+          cells: (row.cells || []).map((cell: any) => ({
+            type: 'tableCell' as const,
+            props: cell.props || {},
+            content: cell.content || [],
+          })),
+        })),
+      };
+    }
     default:
       return null;
   }
