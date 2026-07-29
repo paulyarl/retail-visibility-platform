@@ -1710,3 +1710,22 @@ export function generateBrandingConfigId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `mbcfg-${nanoid()}`;
 }
+
+/**
+ * Generate deliverable preview token record ID
+ * Format: mdpt-{nanoid} (13 chars)
+ * NOTE: prefix is mdpt- (not mpt-) — mpt- is taken by generatePromptTemplateId
+ */
+export function generatePreviewTokenId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdpt-${nanoid()}`;
+}
+
+/**
+ * Generate public preview token value (URL-safe, 32-char entropy)
+ * Used in public URLs: /p/deliverable/{token}
+ */
+export function generatePreviewToken(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 32);
+  return nanoid();
+}

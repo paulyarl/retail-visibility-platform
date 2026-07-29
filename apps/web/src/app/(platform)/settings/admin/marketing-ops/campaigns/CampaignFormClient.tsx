@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import marketingOpsService, { Campaign, CampaignStage, RetainerStatus, CampaignCreateInput, CampaignUpdateInput } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 
-const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead'];
+const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
 
 interface FormState {

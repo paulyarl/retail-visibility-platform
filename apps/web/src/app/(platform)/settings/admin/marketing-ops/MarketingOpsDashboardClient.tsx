@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, RefreshCw, TrendingUp, DollarSign, Target, Trophy, Download, Activity, Eye, Package } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { DashboardStats, CampaignStage } from '@/services/MarketingOpsService';
+import marketingOpsService, { DashboardStats, ConversionStats, CampaignStage } from '@/services/MarketingOpsService';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
   seek: 'Seek',
@@ -15,6 +15,7 @@ const STAGE_LABELS: Record<CampaignStage, string> = {
   retainer_won: 'Retainer Won',
   lost: 'Lost',
   dead: 'Dead',
+  tenant_onboarded: 'Tenant Onboarded',
 };
 
 const STAGE_COLORS: Record<CampaignStage, string> = {
@@ -27,12 +28,35 @@ const STAGE_COLORS: Record<CampaignStage, string> = {
   retainer_won: 'bg-purple-100 text-purple-800',
   lost: 'bg-red-100 text-red-800',
   dead: 'bg-gray-300 text-gray-800',
+  tenant_onboarded: 'bg-teal-100 text-teal-800',
 };
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'tenant_onboarded'];
+
+function SourceBreakdown({ title, data }: { title: string; data: Record<string, number> }) {
+  const entries = Object.entries(data || {});
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{title}</p>
+      {entries.length === 0 ? (
+        <p className="text-xs text-gray-400 dark:text-gray-500">No conversions yet</p>
+      ) : (
+        <div className="space-y-1">
+          {entries.map(([source, count]) => (
+            <div key={source} className="flex items-center justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300 capitalize">{source.replace(/_/g, ' ')}</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MarketingOpsDashboardClient() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [convStats, setConvStats] = useState<ConversionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -41,8 +65,12 @@ export default function MarketingOpsDashboardClient() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const data = await marketingOpsService.getDashboard();
+      const [data, conv] = await Promise.all([
+        marketingOpsService.getDashboard(),
+        marketingOpsService.getConversionStats().catch(() => null),
+      ]);
       setStats(data);
+      setConvStats(conv);
       setLastUpdated(new Date());
       setError(null);
     } catch (err: any) {
@@ -203,6 +231,51 @@ export default function MarketingOpsDashboardClient() {
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.weeklyRevenueCents)}</p>
               </div>
             </div>
+
+            {/* Tenant Conversion */}
+            {convStats && (
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Conversion</h2>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">Prospecting channel performance</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-5">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Conversions</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">{convStats.totalConversions}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Conversion Rate</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">{(convStats.conversionRate * 100).toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Resurrected</p>
+                    <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{convStats.resurrectedConversions}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">QR View → Conv.</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      {(convStats.qrViewRate * 100).toFixed(0)}% → {(convStats.qrConversionRate * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{convStats.tokensViewed}/{convStats.tokensIssued} tokens viewed</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Demo Claim Rate</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">{(convStats.demoClaimRate * 100).toFixed(0)}%</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{convStats.demoTokensIssued} demos issued</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg Days to Convert</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">{convStats.avgDaysToConvert}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 border-t border-gray-100 dark:border-neutral-700 pt-4">
+                  <SourceBreakdown title="Closed by (last touch)" data={convStats.byLastTouchSource} />
+                  <SourceBreakdown title="Opened by (first touch)" data={convStats.byFirstTouchSource} />
+                  <SourceBreakdown title="Prospect vs. Upsell" data={convStats.byOrigin} />
+                </div>
+              </div>
+            )}
 
             {/* Pipeline Breakdown */}
             <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6 mb-8">

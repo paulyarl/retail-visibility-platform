@@ -363,6 +363,10 @@ export class CrmTicketService extends BaseService {
 
 12. **React `<select>` boolean value prop.** When binding a `boolean | ''` state field to a `<select>` element's `value` prop, React requires `string | number | readonly string[] | undefined`. Passing `false` causes `TS2322: Type 'boolean | ""' is not assignable to type 'string | number | readonly string[] | undefined'`. Convert booleans to string literals: `value={form.field === true ? 'true' : form.field === false ? 'false' : ''}` and parse back in the `onChange` handler: `e.target.value === '' ? '' : e.target.value === 'true'`.
 
+13. **React 19 `useRef` requires an initial value.** With `@types/react@19`, `useRef<T>()` with no arguments causes `TS2554: Expected 1 arguments, but got 0`. The type signature `function useRef<T>(initialValue: T): RefObject<T>` no longer allows zero-arg calls. Fix: pass `null` and widen the type to include `null`: `useRef<(() => Promise<void>) | null>(null)`. This is common when storing a mutable callback reference for polling intervals.
+
+14. **Prisma model name verification before querying.** Always grep `schema.prisma` for the exact model name before using it in service code. Guessed names (e.g., `mkt_campaign_stage_history` vs actual `mkt_stage_history_list`) cause `TS2551: Property does not exist on type PrismaClient`. Also verify relation field names in `include`/`select` — they match the Prisma model's relation field name (e.g., `mkt_campaigns_list`, not `campaign`). Check field names too: `changed_at` vs `created_at` can differ from what you expect.
+
 ### 3.1 Backend route pattern for public tenant-scoped endpoints
 
 When a frontend service extends `PublicApiSingleton` and calls a tenant-scoped endpoint, the backend route **must** be mounted at `/api/public/tenants/:tenantId/*`:

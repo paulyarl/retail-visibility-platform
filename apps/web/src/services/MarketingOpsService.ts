@@ -23,7 +23,18 @@ export type CampaignStage =
   | 'retainer_pitched'
   | 'retainer_won'
   | 'lost'
-  | 'dead';
+  | 'dead'
+  | 'tenant_onboarded';
+
+export type ConversionSource =
+  | 'qr_deliverable'
+  | 'demo_storefront'
+  | 'gbp_enhancer'
+  | 'directory_preview'
+  | 'manual'
+  | 'external';
+
+export type CampaignOrigin = 'prospect' | 'upsell';
 
 export type RetainerStatus = 'not_pitched' | 'pitched' | 'won' | 'declined';
 
@@ -86,6 +97,12 @@ export interface Campaign {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  tenant_id?: string | null;
+  date_tenant_onboarded?: string | null;
+  first_touch_source?: ConversionSource | null;
+  last_touch_source?: ConversionSource | null;
+  campaign_origin?: CampaignOrigin;
+  demo_tenant_id?: string | null;
 }
 
 export interface CampaignDetail extends Campaign {
@@ -261,6 +278,35 @@ export interface DashboardStats {
   weeklyPreviews: number;
   weeklyDelivered: number;
   recentTransitions?: StageHistory[];
+  totalConversions?: number;
+  resurrectedConversions?: number;
+}
+
+export interface ConversionStats {
+  totalConversions: number;
+  conversionRate: number;
+  byLastTouchSource: Record<string, number>;
+  byFirstTouchSource: Record<string, number>;
+  byOrigin: Record<string, number>;
+  resurrectedConversions: number;
+  tokensIssued: number;
+  tokensViewed: number;
+  tokensConverted: number;
+  qrViewRate: number;
+  qrConversionRate: number;
+  demoTokensIssued: number;
+  demoClaimRate: number;
+  avgDaysToConvert: number;
+}
+
+export interface DemoStorefrontResult {
+  demoTenantId: string;
+  slug: string;
+  template: string;
+  expiresAt: string;
+  previewToken: string;
+  previewUrl: string;
+  demoUrl: string;
 }
 
 // ====================
@@ -294,6 +340,7 @@ export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
   retainer_start_date?: string;
   amount_paid_cents?: number;
   package_delivered?: string;
+  campaign_origin?: CampaignOrigin;
 }
 
 export interface StageTransitionInput {
@@ -531,6 +578,47 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data;
+  }
+
+  async linkTenant(id: string, tenantId: string): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/link-tenant`,
+      { method: 'POST', body: JSON.stringify({ tenant_id: tenantId }) },
+      `mkt-ops-campaign-link-tenant-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to link tenant');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data;
+  }
+
+  async generateDemoStorefront(id: string): Promise<DemoStorefrontResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/demo-storefront`,
+      {},
+      `mkt-ops-campaign-demo-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate demo storefront');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${id}`);
+    return result.data;
+  }
+
+  async getConversionStats(): Promise<ConversionStats> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/conversion-stats`,
+      {},
+      'mkt-ops-conversion-stats',
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch conversion stats');
+    }
     return result.data;
   }
 

@@ -119,18 +119,23 @@ const campaignCreateSchema = z.object({
 });
 
 const campaignUpdateSchema = campaignCreateSchema.partial().extend({
-  stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead']).optional(),
+  stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
   retainer_status: z.enum(['not_pitched', 'pitched', 'won', 'declined']).optional(),
   retainer_amount_cents: z.number().int().optional(),
   retainer_start_date: z.string().datetime().optional(),
   amount_paid_cents: z.number().int().optional(),
   package_delivered: z.string().optional(),
+  campaign_origin: z.enum(['prospect', 'upsell']).optional(),
 });
 
 const stageTransitionSchema = z.object({
-  to_stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead']),
+  to_stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']),
   notes: z.string().optional(),
   trigger_type: z.enum(['manual', 'automated', 'system']).optional(),
+});
+
+const linkTenantSchema = z.object({
+  tenant_id: z.string().min(1),
 });
 
 const auditCreateSchema = z.object({
@@ -330,6 +335,16 @@ router.get('/export', async (req: any, res: Response) => {
   }
 });
 
+// NOTE: /conversion-stats must be registered BEFORE /:id (single-segment catch-all)
+router.get('/conversion-stats', async (req: any, res: Response) => {
+  try {
+    const stats = await MarketingCampaignService.getConversionStats(getCtx(req));
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.get('/:id', async (req: any, res: Response) => {
   try {
     const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
@@ -399,6 +414,7 @@ router.put('/:id', async (req: any, res: Response) => {
       retainerStartDate: parsed.retainer_start_date ? new Date(parsed.retainer_start_date) : undefined,
       amountPaidCents: parsed.amount_paid_cents,
       packageDelivered: parsed.package_delivered,
+      campaignOrigin: parsed.campaign_origin,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
   } catch (error) {
@@ -433,6 +449,35 @@ router.post('/:id/transition', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Manual campaign→tenant link (sets last_touch_source='manual', fires conversion notification)
+router.post('/:id/link-tenant', async (req: any, res: Response) => {
+  try {
+    const parsed = linkTenantSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.linkTenant({
+      campaignId: req.params.id,
+      tenantId: parsed.tenant_id,
+      conversionSource: 'manual',
+      changedBy: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Generate or retrieve demo storefront for a campaign (idempotent — reuses live demo)
+router.get('/:id/demo-storefront', async (req: any, res: Response) => {
+  try {
+    const result = await MarketingCampaignService.generateDemoStorefront(req.params.id, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

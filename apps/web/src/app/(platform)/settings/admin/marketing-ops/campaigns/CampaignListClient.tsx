@@ -6,7 +6,7 @@ import Link from 'next/link';
 import marketingOpsService, { Campaign, CampaignStage } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
 export default function CampaignListClient() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -136,6 +136,7 @@ export default function CampaignListClient() {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">City</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Stage</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tenant</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Est. Fee</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Paid</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Assigned</th>
@@ -144,7 +145,7 @@ export default function CampaignListClient() {
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
                   {campaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={8} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                         No campaigns found. Create one to get started.
                       </td>
                     </tr>
@@ -162,6 +163,18 @@ export default function CampaignListClient() {
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.category}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.city}{c.neighborhood ? ` (${c.neighborhood})` : ''}</td>
                         <td className="px-4 py-3"><StageBadge stage={c.stage} /></td>
+                        <td className="px-4 py-3">
+                          {c.tenant_id ? (
+                            <Link
+                              href={`/t/${c.tenant_id}/settings/tenant`}
+                              className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:underline"
+                            >
+                              Linked
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-gray-400 dark:text-gray-500">Unlinked</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.amount_paid_cents)}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.assigned_to ?? '—'}</td>

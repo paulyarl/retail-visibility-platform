@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history';
 
-const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead'];
+const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
 export default function CampaignDetailClient({ campaignId }: { campaignId: string }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
@@ -20,6 +20,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [deliverableTemplates, setDeliverableTemplates] = useState<DeliverableTemplate[]>([]);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generatingDemo, setGeneratingDemo] = useState(false);
+  const [demoResult, setDemoResult] = useState<DemoStorefrontResult | null>(null);
+  const [linkingTenant, setLinkingTenant] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
     templateId: '',
     deliverableType: 'review_responses',
@@ -75,6 +79,44 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     }
   };
 
+  const handleGenerateDemo = async () => {
+    setGeneratingDemo(true);
+    try {
+      const result = await marketingOpsService.generateDemoStorefront(campaignId);
+      setDemoResult(result);
+      await fetchCampaign();
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate demo storefront');
+    } finally {
+      setGeneratingDemo(false);
+    }
+  };
+
+  const handleLinkTenant = async () => {
+    const tenantId = prompt('Enter the tenant ID to link this campaign to:');
+    if (!tenantId?.trim()) return;
+    setLinkingTenant(true);
+    try {
+      await marketingOpsService.linkTenant(campaignId, tenantId.trim());
+      await fetchCampaign();
+    } catch (err: any) {
+      setError(err.message || 'Failed to link tenant');
+    } finally {
+      setLinkingTenant(false);
+    }
+  };
+
+  const handleCopyDemoUrl = async () => {
+    if (!demoResult) return;
+    try {
+      await navigator.clipboard.writeText(demoResult.demoUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
@@ -125,6 +167,12 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.business_name}</h1>
                   <StageBadge stage={campaign.stage} size="md" />
+                  {campaign.demo_tenant_id && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
+                      <Store className="w-3 h-3" />
+                      Demo Active
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
@@ -132,6 +180,24 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGenerateDemo}
+                  disabled={generatingDemo}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-teal-700 bg-white border border-teal-300 rounded-lg hover:bg-teal-50 dark:bg-neutral-800 dark:text-teal-400 dark:border-teal-800 dark:hover:bg-teal-900/20 disabled:opacity-50"
+                >
+                  <Store className={`w-4 h-4 ${generatingDemo ? 'animate-pulse' : ''}`} />
+                  {generatingDemo ? 'Generating...' : campaign.demo_tenant_id ? 'Get Demo Link' : 'Demo Storefront'}
+                </button>
+                {!campaign.tenant_id && (
+                  <button
+                    onClick={handleLinkTenant}
+                    disabled={linkingTenant}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700 disabled:opacity-50"
+                  >
+                    <Link2 className="w-4 h-4" />
+                    {linkingTenant ? 'Linking...' : 'Link Tenant'}
+                  </button>
+                )}
                 <Link
                   href={`/settings/admin/marketing-ops/campaigns/${campaignId}/edit`}
                   className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
@@ -155,6 +221,46 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 </button>
               </div>
             </div>
+
+            {/* Demo Storefront Result */}
+            {demoResult && (
+              <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800 p-4 mb-6">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-teal-900 dark:text-teal-300">
+                      Demo Storefront Active — {demoResult.template.replace(/_/g, ' ')} template
+                    </p>
+                    <p className="text-xs text-teal-700 dark:text-teal-400 mt-0.5">
+                      Expires {new Date(demoResult.expiresAt).toLocaleDateString()} · share the demo URL with the prospect
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyDemoUrl}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-800 bg-white border border-teal-300 rounded-lg hover:bg-teal-100 dark:bg-neutral-800 dark:text-teal-300 dark:border-teal-700"
+                    >
+                      <Copy className="w-3 h-3" />
+                      {copied ? 'Copied!' : 'Copy Demo URL'}
+                    </button>
+                    <a
+                      href={demoResult.demoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Open Demo
+                    </a>
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${campaignId}/demo`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-800 bg-white border border-teal-300 rounded-lg hover:bg-teal-100 dark:bg-neutral-800 dark:text-teal-300 dark:border-teal-700"
+                    >
+                      Preview
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Stage Pipeline */}
             <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-4 mb-6">
@@ -229,6 +335,30 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   <DetailField label="Package Delivered" value={campaign.package_delivered} />
                   <DetailField label="Date Entered" value={formatDate(campaign.date_entered)} />
                   <DetailField label="Date Paid" value={formatDate(campaign.date_paid)} />
+                </div>
+
+                {/* Conversion (Tenant Prospecting Channel) */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Conversion</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <DetailField label="Campaign Origin" value={campaign.campaign_origin ?? 'prospect'} />
+                    <DetailField label="First Touch" value={campaign.first_touch_source?.replace(/_/g, ' ')} />
+                    <DetailField label="Last Touch" value={campaign.last_touch_source?.replace(/_/g, ' ')} />
+                    <DetailField label="Tenant Onboarded" value={formatDate(campaign.date_tenant_onboarded ?? null)} />
+                    <div>
+                      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Linked Tenant</dt>
+                      <dd className="text-sm mt-0.5">
+                        {campaign.tenant_id ? (
+                          <Link href={`/t/${campaign.tenant_id}/settings/tenant`} className="text-teal-600 dark:text-teal-400 hover:underline">
+                            {campaign.tenant_id}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-900 dark:text-white">—</span>
+                        )}
+                      </dd>
+                    </div>
+                    <DetailField label="Demo Tenant" value={campaign.demo_tenant_id ?? null} />
+                  </div>
                 </div>
                 {campaign.notes && (
                   <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">

@@ -12,6 +12,7 @@ const STAGE_LABELS: Record<CampaignStage, string> = {
   retainer_won: 'Retainer Won',
   lost: 'Lost',
   dead: 'Dead',
+  tenant_onboarded: 'Tenant Onboarded',
 };
 
 const STAGE_COLORS: Record<CampaignStage, string> = {
@@ -24,6 +25,7 @@ const STAGE_COLORS: Record<CampaignStage, string> = {
   retainer_won: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   lost: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   dead: 'bg-gray-300 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+  tenant_onboarded: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
 };
 
 export function StageBadge({ stage, size = 'sm' }: { stage: CampaignStage; size?: 'sm' | 'md' }) {

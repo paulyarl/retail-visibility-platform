@@ -11,10 +11,10 @@
 
 import { logger } from '../logger';
 import MarketingCampaignService from '../services/MarketingCampaignService';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 const STARTUP_DELAY_MS = 60 * 1000; // 1 minute
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const STALE_SHOWN_DAYS = 7;
 
 let autoAdvanceIntervalId: NodeJS.Timeout | null = null;
 
@@ -22,8 +22,9 @@ async function runMarketingOpsAutoAdvance(): Promise<void> {
   logger.info('[MarketingOpsAutoAdvance] Starting stale shown campaign auto-advance...');
 
   try {
-    const count = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(STALE_SHOWN_DAYS);
-    logger.info(`[MarketingOpsAutoAdvance] Completed: ${count} campaigns advanced from 'shown' to 'lost'`);
+    const staleDays = unifiedConfig.marketingOpsShownStaleDays;
+    const { advanced, skipped } = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(staleDays);
+    logger.info(`[MarketingOpsAutoAdvance] Completed: ${advanced} campaigns advanced from 'shown' to 'lost', ${skipped} skipped (live preview tokens)`, undefined, { advanced, skipped, staleDays });
   } catch (error) {
     logger.error('[MarketingOpsAutoAdvance] Failed:', undefined, {
       error: {

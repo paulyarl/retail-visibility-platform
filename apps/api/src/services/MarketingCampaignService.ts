@@ -13,6 +13,9 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateCampaignId, generateStageHistoryId } from '../lib/id-generator';
+import DemoTenantService from './DemoTenantService';
+import { unifiedConfig } from '../config/unifiedConfig';
+import { getBillingNotificationService } from './subscription/BillingNotificationService';
 
 // ====================
 // TYPES
@@ -27,21 +30,34 @@ export type CampaignStage =
   | 'retainer_pitched'
   | 'retainer_won'
   | 'lost'
-  | 'dead';
+  | 'dead'
+  | 'tenant_onboarded';
 
 export type RetainerStatus = 'not_pitched' | 'pitched' | 'won' | 'declined';
+
+export type ConversionSource =
+  | 'qr_deliverable'
+  | 'demo_storefront'
+  | 'gbp_enhancer'
+  | 'directory_preview'
+  | 'manual'
+  | 'external';
+
+export type CampaignOrigin = 'prospect' | 'upsell';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   seek:           ['preview_built', 'dead'],
   preview_built:  ['shown', 'dead'],
-  shown:          ['paid', 'lost'],
-  paid:           ['delivered'],
-  delivered:      ['retainer_pitched', 'closed'],
+  shown:          ['paid', 'lost', 'tenant_onboarded'],
+  paid:           ['delivered', 'tenant_onboarded'],
+  delivered:      ['retainer_pitched', 'closed', 'tenant_onboarded'],
   retainer_pitched: ['retainer_won', 'closed'],
-  retainer_won:   ['lost'],
-  lost:           ['seek'],
-  dead:           ['seek'],
+  retainer_won:   ['lost', 'tenant_onboarded'],
+  lost:           ['seek', 'tenant_onboarded'],   // resurrection: late QR/demo conversion (G1)
+  dead:           ['seek', 'tenant_onboarded'],   // resurrection: re-engaged prospect converts (G1)
 };
+
+const RESURRECTION_STAGES = ['lost', 'dead'];
 
 const STAGE_DATE_FIELDS: Record<string, string> = {
   preview_built:    'date_preview_built',
@@ -50,6 +66,7 @@ const STAGE_DATE_FIELDS: Record<string, string> = {
   delivered:        'date_delivered',
   retainer_pitched: 'date_retainer_pitched',
   retainer_won:     'date_retainer_won',
+  tenant_onboarded: 'date_tenant_onboarded',
 };
 
 export interface CampaignInput {
@@ -95,6 +112,24 @@ export interface CampaignUpdateInput {
   retainerStartDate?: Date | null;
   amountPaidCents?: number;
   packageDelivered?: string;
+  campaignOrigin?: CampaignOrigin;
+}
+
+export interface LinkTenantInput {
+  campaignId: string;
+  tenantId: string;
+  conversionSource: ConversionSource;
+  changedBy?: string;
+}
+
+export interface DemoStorefrontResult {
+  demoTenantId: string;
+  slug: string;
+  template: string;
+  expiresAt: Date;
+  previewToken: string;
+  previewUrl: string;
+  demoUrl: string;
 }
 
 export interface StageTransitionInput {
@@ -279,6 +314,7 @@ export class MarketingCampaignService extends BaseService {
     if (input.retainerStartDate !== undefined) data.retainer_start_date = input.retainerStartDate;
     if (input.amountPaidCents !== undefined) data.amount_paid_cents = input.amountPaidCents;
     if (input.packageDelivered !== undefined) data.package_delivered = input.packageDelivered;
+    if (input.campaignOrigin !== undefined) data.campaign_origin = input.campaignOrigin;
 
     try {
       return await this.prisma.mkt_campaigns_list.update({ where: { id }, data });
@@ -446,6 +482,14 @@ export class MarketingCampaignService extends BaseService {
         include: { mkt_campaigns_list: { select: { business_name: true, display_id: true } } },
       });
 
+      const totalConversions = await this.prisma.mkt_campaigns_list.count({
+        where: { tenant_id: { not: null } },
+      });
+
+      const resurrectedConversions = await this.prisma.mkt_stage_history_list.count({
+        where: { to_stage: 'tenant_onboarded', from_stage: { in: RESURRECTION_STAGES } },
+      });
+
       const stageMap: Record<string, number> = {};
       stageCounts.forEach((s: any) => { stageMap[s.stage] = s._count.id; });
 
@@ -461,6 +505,8 @@ export class MarketingCampaignService extends BaseService {
         weeklyPreviews,
         weeklyDelivered,
         recentTransitions,
+        totalConversions,
+        resurrectedConversions,
       };
     } catch (error) {
       logger.error('Failed to get dashboard stats', ctx, { error: (error as Error).message });
@@ -472,7 +518,7 @@ export class MarketingCampaignService extends BaseService {
   // AUTO-ADVANCE (called by scheduled job)
   // ====================
 
-  async autoAdvanceStaleShownCampaigns(days: number = 7, ctx?: RequestCtx): Promise<number> {
+  async autoAdvanceStaleShownCampaigns(days: number = 7, ctx?: RequestCtx): Promise<{ advanced: number; skipped: number }> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     try {
       const stale = await this.prisma.mkt_campaigns_list.findMany({
@@ -483,8 +529,31 @@ export class MarketingCampaignService extends BaseService {
         select: { id: true },
       });
 
-      let count = 0;
+      // G1 guard: skip campaigns with live unconverted preview tokens —
+      // 30-day tokens outlive the 7-day stale window; late QR conversions
+      // must not land on a 'lost' campaign (resurrection transitions are the safety net)
+      const staleIds = stale.map((c: any) => c.id);
+      const liveTokenCampaigns = staleIds.length > 0
+        ? await this.prisma.mkt_deliverable_preview_tokens.findMany({
+            where: {
+              campaign_id: { in: staleIds },
+              converted_at: null,
+              expires_at: { gt: new Date() },
+            },
+            select: { campaign_id: true },
+            distinct: ['campaign_id'],
+          })
+        : [];
+      const guardedIds = new Set(liveTokenCampaigns.map((t: any) => t.campaign_id));
+
+      let advanced = 0;
+      let skipped = 0;
       for (const campaign of stale) {
+        if (guardedIds.has(campaign.id)) {
+          skipped++;
+          logger.info('Auto-advance skipped: campaign has live unconverted preview tokens', ctx, { campaignId: campaign.id });
+          continue;
+        }
         try {
           await this.transitionStage({
             campaignId: campaign.id,
@@ -492,16 +561,244 @@ export class MarketingCampaignService extends BaseService {
             triggerType: 'automated',
             notes: `Auto-advanced: no response after ${days} days`,
           });
-          count++;
+          advanced++;
         } catch (error) {
           logger.error('Failed to auto-advance campaign', ctx, { error: (error as Error).message, campaignId: campaign.id });
         }
       }
 
-      logger.info(`Auto-advanced ${count} stale shown campaigns to lost`, ctx, { count, days });
-      return count;
+      logger.info(`Auto-advanced ${advanced} stale shown campaigns to lost (${skipped} skipped — live tokens)`, ctx, { advanced, skipped, days });
+      return { advanced, skipped };
     } catch (error) {
       logger.error('Failed to auto-advance stale campaigns', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // TENANT CONVERSION (Tenant Prospecting Channel — Sprint 5A)
+  // ====================
+
+  mapCategoryToDemoTemplate(category: string): 'grocery' | 'convenience' | 'specialty_retail' {
+    const c = (category || '').toLowerCase();
+    if (c.includes('grocery') || c.includes('supermarket') || c.includes('food')) return 'grocery';
+    if (c.includes('convenience') || c.includes('corner') || c.includes('bodega')) return 'convenience';
+    return 'specialty_retail';
+  }
+
+  async linkTenant(input: LinkTenantInput, ctx?: RequestCtx): Promise<any> {
+    const { campaignId, tenantId, conversionSource, changedBy } = input;
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+      if (!campaign) {
+        throw new Error(`Campaign ${campaignId} not found`);
+      }
+
+      const fromStage = campaign.stage as string;
+      if (fromStage !== 'tenant_onboarded' && !this.isValidTransition(fromStage, 'tenant_onboarded')) {
+        throw new Error(`Invalid stage transition: ${fromStage} → tenant_onboarded`);
+      }
+
+      const resurrected = RESURRECTION_STAGES.includes(fromStage);
+      const notes = resurrected
+        ? `Resurrected: converted via ${conversionSource} after ${fromStage}`
+        : `Converted via ${conversionSource}`;
+
+      const updateData: any = {
+        tenant_id: tenantId,
+        last_touch_source: conversionSource,
+        stage: 'tenant_onboarded',
+        stage_entered_at: new Date(),
+        date_tenant_onboarded: new Date(),
+      };
+      if (!campaign.first_touch_source) {
+        updateData.first_touch_source = conversionSource;
+      }
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: updateData,
+      });
+
+      if (fromStage !== 'tenant_onboarded') {
+        await this.logStageTransition({
+          campaignId,
+          fromStage,
+          toStage: 'tenant_onboarded',
+          notes,
+          triggerType: conversionSource === 'manual' ? 'manual' : 'system',
+          changedBy,
+        });
+      }
+
+      this.fireConversionNotification(updated, tenantId, conversionSource, resurrected, ctx);
+
+      logger.info('Campaign linked to tenant', ctx, { campaignId, tenantId, conversionSource, resurrected });
+      return updated;
+    } catch (error) {
+      logger.error('Failed to link campaign to tenant', ctx, { error: (error as Error).message, campaignId, tenantId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  private fireConversionNotification(campaign: any, tenantId: string, conversionSource: ConversionSource, resurrected: boolean, ctx?: RequestCtx): void {
+    (async () => {
+      try {
+        await getBillingNotificationService().sendNotification({
+          tenantId,
+          type: 'marketing_campaign_converted',
+          metadata: {
+            campaignId: campaign.id,
+            displayId: campaign.display_id,
+            businessName: campaign.business_name,
+            conversionSource,
+            resurrected,
+          },
+        });
+      } catch (error) {
+        logger.error('Failed to fire conversion notification', ctx, { error: (error as Error).message, campaignId: campaign.id, tenantId });
+      }
+    })();
+  }
+
+  async generateDemoStorefront(campaignId: string, ctx?: RequestCtx): Promise<DemoStorefrontResult> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+      if (!campaign) {
+        throw new Error(`Campaign ${campaignId} not found`);
+      }
+
+      const { default: deliverableService } = await import('./MarketingDeliverableService');
+
+      // Reuse existing active demo if still live
+      if (campaign.demo_tenant_id) {
+        const existingDemo = await this.prisma.tenants.findUnique({
+          where: { id: campaign.demo_tenant_id },
+          select: { id: true, slug: true, is_demo: true, location_status: true, demo_expires_at: true, demo_template: true },
+        });
+        if (existingDemo?.is_demo && existingDemo.location_status === 'active'
+          && existingDemo.demo_expires_at && existingDemo.demo_expires_at > new Date()) {
+          const token = await deliverableService.generateCampaignToken(campaignId, 'demo_storefront');
+          return {
+            demoTenantId: existingDemo.id,
+            slug: existingDemo.slug || '',
+            template: existingDemo.demo_template || 'specialty_retail',
+            expiresAt: existingDemo.demo_expires_at,
+            previewToken: token.token,
+            previewUrl: `${unifiedConfig.webUrl}/p/deliverable/${token.token}`,
+            demoUrl: `${unifiedConfig.webUrl}/t/${existingDemo.slug}?ptoken=${token.token}`,
+          };
+        }
+      }
+
+      const template = this.mapCategoryToDemoTemplate(campaign.category);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const demo = await DemoTenantService.createDemoTenant({
+        template,
+        businessName: campaign.business_name,
+        expiresAt,
+      });
+
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: { demo_tenant_id: demo.tenantId },
+      });
+
+      const token = await deliverableService.generateCampaignToken(campaignId, 'demo_storefront');
+
+      logger.info('Demo storefront generated for campaign', ctx, { campaignId, demoTenantId: demo.tenantId, template });
+
+      return {
+        demoTenantId: demo.tenantId,
+        slug: demo.slug,
+        template: demo.template,
+        expiresAt: demo.expiresAt,
+        previewToken: token.token,
+        previewUrl: `${unifiedConfig.webUrl}/p/deliverable/${token.token}`,
+        demoUrl: `${unifiedConfig.webUrl}/t/${demo.slug}?ptoken=${token.token}`,
+      };
+    } catch (error) {
+      logger.error('Failed to generate demo storefront', ctx, { error: (error as Error).message, campaignId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  async getConversionStats(ctx?: RequestCtx): Promise<any> {
+    try {
+      const totalConversions = await this.prisma.mkt_campaigns_list.count({
+        where: { tenant_id: { not: null } },
+      });
+
+      const lastTouchGroups = await this.prisma.mkt_campaigns_list.groupBy({
+        by: ['last_touch_source'],
+        where: { tenant_id: { not: null } },
+        _count: { id: true },
+      });
+
+      const firstTouchGroups = await this.prisma.mkt_campaigns_list.groupBy({
+        by: ['first_touch_source'],
+        where: { tenant_id: { not: null } },
+        _count: { id: true },
+      });
+
+      const originGroups = await this.prisma.mkt_campaigns_list.groupBy({
+        by: ['campaign_origin'],
+        where: { tenant_id: { not: null } },
+        _count: { id: true },
+      });
+
+      const resurrectedConversions = await this.prisma.mkt_stage_history_list.count({
+        where: { to_stage: 'tenant_onboarded', from_stage: { in: RESURRECTION_STAGES } },
+      });
+
+      const funnelStages = ['shown', 'paid', 'delivered', 'retainer_won', 'tenant_onboarded'];
+      const funnelCount = await this.prisma.mkt_campaigns_list.count({
+        where: { stage: { in: funnelStages } },
+      });
+      const conversionRate = funnelCount > 0 ? totalConversions / funnelCount : 0;
+
+      const tokensIssued = await this.prisma.mkt_deliverable_preview_tokens.count();
+      const tokensViewed = await this.prisma.mkt_deliverable_preview_tokens.count({ where: { viewed_at: { not: null } } });
+      const tokensConverted = await this.prisma.mkt_deliverable_preview_tokens.count({ where: { converted_at: { not: null } } });
+      const demoTokensIssued = await this.prisma.mkt_deliverable_preview_tokens.count({ where: { token_type: 'demo_storefront' } });
+      const demoTokensConverted = await this.prisma.mkt_deliverable_preview_tokens.count({ where: { token_type: 'demo_storefront', converted_at: { not: null } } });
+
+      const converted = await this.prisma.mkt_campaigns_list.findMany({
+        where: { tenant_id: { not: null }, date_tenant_onboarded: { not: null } },
+        select: { date_entered: true, date_tenant_onboarded: true },
+      });
+      let avgDaysToConvert = 0;
+      if (converted.length > 0) {
+        const totalMs = converted.reduce((sum: number, c: any) =>
+          sum + (c.date_tenant_onboarded.getTime() - c.date_entered.getTime()), 0);
+        avgDaysToConvert = totalMs / converted.length / (24 * 60 * 60 * 1000);
+      }
+
+      const toMap = (groups: any[], key: string) => {
+        const map: Record<string, number> = {};
+        groups.forEach((g: any) => { map[g[key] || 'unknown'] = g._count.id; });
+        return map;
+      };
+
+      return {
+        totalConversions,
+        conversionRate,
+        byLastTouchSource: toMap(lastTouchGroups, 'last_touch_source'),
+        byFirstTouchSource: toMap(firstTouchGroups, 'first_touch_source'),
+        byOrigin: toMap(originGroups, 'campaign_origin'),
+        resurrectedConversions,
+        tokensIssued,
+        tokensViewed,
+        tokensConverted,
+        qrViewRate: tokensIssued > 0 ? tokensViewed / tokensIssued : 0,
+        qrConversionRate: tokensViewed > 0 ? tokensConverted / tokensViewed : 0,
+        demoTokensIssued,
+        demoClaimRate: demoTokensIssued > 0 ? demoTokensConverted / demoTokensIssued : 0,
+        avgDaysToConvert: Math.round(avgDaysToConvert * 10) / 10,
+      };
+    } catch (error) {
+      logger.error('Failed to get conversion stats', ctx, { error: (error as Error).message });
       throw this.handleError(error, ctx);
     }
   }

@@ -12,7 +12,7 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { generateDeliverableTemplateId, generateDeliverableId } from '../lib/id-generator';
+import { generateDeliverableTemplateId, generateDeliverableId, generatePreviewTokenId, generatePreviewToken } from '../lib/id-generator';
 import { jsPDF } from 'jspdf';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -525,6 +525,54 @@ export class MarketingDeliverableService extends BaseService {
     } catch {
       return '';
     }
+  }
+
+  // ====================
+  // PREVIEW TOKENS (Tenant Prospecting Channel — G2)
+  // ====================
+
+  /**
+   * Shared token factory — single issuance path for ALL public CTAs
+   * (QR deliverable links and demo storefront banners). The campaign_id is
+   * the trust anchor: public pages carry only the token; campaign + source
+   * are always resolved server-side.
+   */
+  async generateCampaignToken(
+    campaignId: string,
+    tokenType: 'deliverable' | 'demo_storefront',
+    deliverableId?: string,
+    expiryDays: number = 30,
+    ctx?: RequestCtx
+  ): Promise<any> {
+    try {
+      const token = await this.prisma.mkt_deliverable_preview_tokens.create({
+        data: {
+          id: generatePreviewTokenId(),
+          campaign_id: campaignId,
+          deliverable_id: deliverableId || null,
+          token_type: tokenType,
+          token: generatePreviewToken(),
+          expires_at: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      logger.info('Preview token generated', ctx, { campaignId, tokenType, deliverableId, expiresAt: token.expires_at });
+      return token;
+    } catch (error) {
+      logger.error('Failed to generate preview token', ctx, { error: (error as Error).message, campaignId, tokenType });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  async hasLiveTokens(campaignId: string): Promise<boolean> {
+    const count = await this.prisma.mkt_deliverable_preview_tokens.count({
+      where: {
+        campaign_id: campaignId,
+        converted_at: null,
+        expires_at: { gt: new Date() },
+      },
+    });
+    return count > 0;
   }
 }
 

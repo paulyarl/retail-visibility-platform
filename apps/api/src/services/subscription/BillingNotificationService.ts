@@ -51,7 +51,8 @@ export type BillingNotificationType =
   | 'funnel_builder_renewal_success'
   | 'funnel_builder_renewal_failed'
   | 'funnel_builder_expired'
-  | 'funnel_step_conversion';
+  | 'funnel_step_conversion'
+  | 'marketing_campaign_converted';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -426,6 +427,14 @@ class BillingNotificationService {
           text: this.buildFunnelStepConversionText(ownerName, businessName, data),
         };
 
+      case 'marketing_campaign_converted':
+        return {
+          to: toEmail,
+          subject: `Welcome aboard - ${businessName} is live`,
+          html: this.buildMarketingCampaignConvertedHtml(ownerName, businessName, data),
+          text: this.buildMarketingCampaignConvertedText(ownerName, businessName, data),
+        };
+
       default:
         return {
           to: toEmail,
@@ -688,6 +697,38 @@ New Plan: ${data.tier || 'N/A'}
 ${data.amount ? `Amount: $${(data.amount / 100).toFixed(2)}/${data.billingCycle === 'annual' ? 'year' : data.billingCycle === 'weekly' ? 'week' : 'month'}` : ''}
 
 Your new plan is now active.`;
+  }
+
+  // Email templates - Marketing Campaign Converted (Tenant Prospecting Channel)
+  private buildMarketingCampaignConvertedHtml(name: string, business: string, data: BillingNotificationData): string {
+    const source = data.metadata?.conversionSource || 'external';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Welcome aboard!</h2>
+        <p>Hi ${name},</p>
+        <p><strong>${business}</strong> is now live on the platform.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Signup source:</strong> ${source}</p>
+        </div>
+        <p>Your storefront is ready to customize. Add your products, set your hours, and make it yours.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/tenant" style="background: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Open Your Dashboard</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildMarketingCampaignConvertedText(name: string, business: string, data: BillingNotificationData): string {
+    const source = data.metadata?.conversionSource || 'external';
+    return `Hi ${name},
+
+Welcome aboard! ${business} is now live on the platform.
+
+Signup source: ${source}
+
+Your storefront is ready to customize. Add your products, set your hours, and make it yours.
+
+Open your dashboard at: ${process.env.WEB_URL}/settings/tenant`;
   }
 
   /**
@@ -1273,6 +1314,12 @@ Your new plan is now active.`;
           title: 'Funnel conversion',
           body: `A customer accepted a ${data.metadata?.stepType || 'funnel'} offer in "${data.metadata?.funnelName || 'Funnel'}" for ${tenantName}. Additional revenue: $${((data.amount || 0) / 100).toFixed(2)}.`,
           icon: '💰',
+        };
+      case 'marketing_campaign_converted':
+        return {
+          title: 'Welcome aboard',
+          body: `${tenantName} is now live on the platform (source: ${data.metadata?.conversionSource || 'external'}). Your storefront is ready to customize.`,
+          icon: '🎉',
         };
       default:
         return {
