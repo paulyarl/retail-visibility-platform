@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, Palette, Check } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { BrandingConfig, BrandingCreateInput } from '@/services/MarketingOpsService';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
+
+const BASE_FONTS = ['helvetica', 'times', 'courier'];
 
 export default function BrandingConfigClient() {
   const [configs, setConfigs] = useState<BrandingConfig[]>([]);
@@ -12,6 +15,7 @@ export default function BrandingConfigClient() {
   const [showModal, setShowModal] = useState(false);
   const [editingConfig, setEditingConfig] = useState<BrandingConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const [vocab, setVocab] = useState({ fonts: [] as string[] });
 
   const [form, setForm] = useState<BrandingCreateInput>({
     operator_name: '',
@@ -30,6 +34,7 @@ export default function BrandingConfigClient() {
     try {
       const data = await marketingOpsService.listBrandingConfigs();
       setConfigs(data);
+      setVocab({ fonts: [...new Set([...BASE_FONTS, ...distinctValues(data, (c) => c.font_family)])].sort() });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load branding configs');
     } finally {
@@ -292,15 +297,15 @@ export default function BrandingConfigClient() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Font Family</label>
-                <select
+                <SuggestiveSelect
                   value={form.font_family || 'helvetica'}
-                  onChange={(e) => setForm({ ...form, font_family: e.target.value })}
+                  onChange={(v) => setForm({ ...form, font_family: v })}
+                  options={vocab.fonts}
+                  emptyLabel="-- Select font --"
+                  newLabel="+ New font..."
+                  newInputPlaceholder="Enter new font family"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="helvetica">Helvetica</option>
-                  <option value="times">Times</option>
-                  <option value="courier">Courier</option>
-                </select>
+                />
               </div>
 
               <div>

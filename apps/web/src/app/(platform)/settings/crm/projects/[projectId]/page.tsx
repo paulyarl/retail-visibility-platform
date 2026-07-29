@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -15,6 +15,7 @@ import type {
   TaskStatus, TaskPriority, TicketPriority,
 } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
+import SuggestiveSelect from '@/components/marketing-ops/SuggestiveSelect';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +77,7 @@ export default function PersonalCrmProjectDetailPage() {
 
   const [assignableUsers, setAssignableUsers] = useState<{ value: string; label: string }[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const categoryOptions = useMemo(() => [...new Set([...tickets.map(t => t.category).filter((c): c is string => Boolean(c)), 'general'])].sort(), [tickets]);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -527,12 +529,14 @@ export default function PersonalCrmProjectDetailPage() {
               </div>
               <div>
                 <Text size="sm" fw={500} mb={4}>Category</Text>
-                <input
-                  type="text"
+                <SuggestiveSelect
                   value={newTicket.category}
-                  onChange={(e) => setNewTicket(prev => ({ ...prev, category: e.target.value }))}
+                  onChange={(v) => setNewTicket(prev => ({ ...prev, category: v }))}
+                  options={categoryOptions}
+                  emptyLabel="-- Select category --"
+                  newLabel="+ New category..."
+                  newInputPlaceholder="Enter new category"
                   className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
-                  placeholder="e.g. general, technical..."
                 />
               </div>
             </div>

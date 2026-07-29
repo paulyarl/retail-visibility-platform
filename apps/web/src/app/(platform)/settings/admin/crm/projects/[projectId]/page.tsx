@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, Badge, Spinner, Button, Modal, ModalFooter, Textarea, Select, SearchableSelect } from '@/components/ui';
@@ -10,6 +10,7 @@ import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmProject, CrmTask, CrmTicket, CrmActivity, TaskStatus, TaskPriority, ProjectStatus, TicketPriority } from '@/types/crm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { clientLogger } from '@/lib/client-logger';
+import SuggestiveSelect from '@/components/marketing-ops/SuggestiveSelect';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
@@ -90,6 +91,7 @@ export default function CrmProjectDetailPage() {
   }, []);
 
   const assigneeOptions = staffUsers.map(u => ({ value: u.id, label: `${u.name || u.email} (${u.email})` }));
+  const categoryOptions = useMemo(() => [...new Set([...tickets.map(t => t.category).filter((c): c is string => Boolean(c)), 'technical'])].sort(), [tickets]);
   const userMap = new Map<string, string>();
   staffUsers.forEach(u => userMap.set(u.id, u.name || u.email));
 
@@ -511,12 +513,14 @@ export default function CrmProjectDetailPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Category</label>
-                <input
-                  type="text"
+                <SuggestiveSelect
                   value={newTicket.category}
-                  onChange={(e) => setNewTicket(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                  placeholder="e.g. technical, design..."
+                  onChange={(v) => setNewTicket(prev => ({ ...prev, category: v }))}
+                  options={categoryOptions}
+                  emptyLabel="-- Select category --"
+                  newLabel="+ New category..."
+                  newInputPlaceholder="Enter new category"
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
                 />
               </div>
             </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, FileText, Layout } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { DeliverableTemplate, DeliverableType, DeliverableTemplateCreateInput } from '@/services/MarketingOpsService';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   review_responses: 'Review Responses',
@@ -35,10 +36,12 @@ export default function DeliverableTemplateLibraryClient() {
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<DeliverableTemplate | null>(null);
   const [saving, setSaving] = useState(false);
+  const [vocab, setVocab] = useState({ categories: [] as string[] });
 
   const [form, setForm] = useState<DeliverableTemplateCreateInput>({
     name: '',
     deliverable_type: 'review_responses',
+    category: '',
     layout_spec: { sections: [{ type: 'heading', text: 'New Deliverable' }, { type: 'body', text: 'Content here...' }] },
     page_size: 'letter',
     orientation: 'portrait',
@@ -54,6 +57,7 @@ export default function DeliverableTemplateLibraryClient() {
         ...(filterType !== 'all' ? { deliverable_type: filterType } : {}),
       });
       setTemplates(data);
+      setVocab({ categories: distinctValues(data, (t) => t.category) });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load templates');
     } finally {
@@ -70,7 +74,7 @@ export default function DeliverableTemplateLibraryClient() {
     setForm({
       name: template.name,
       deliverable_type: template.deliverable_type,
-      category: template.category || undefined,
+      category: template.category || '',
       layout_spec: template.layout_spec,
       page_size: template.page_size || 'letter',
       orientation: template.orientation || 'portrait',
@@ -84,6 +88,7 @@ export default function DeliverableTemplateLibraryClient() {
     setForm({
       name: '',
       deliverable_type: 'review_responses',
+      category: '',
       layout_spec: { sections: [{ type: 'heading', text: 'New Deliverable' }, { type: 'body', text: 'Content here...' }] },
       page_size: 'letter',
       orientation: 'portrait',
@@ -308,12 +313,14 @@ export default function DeliverableTemplateLibraryClient() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category (optional)</label>
-                <input
-                  type="text"
+                <SuggestiveSelect
                   value={form.category || ''}
-                  onChange={(e) => setForm({ ...form, category: e.target.value || undefined })}
+                  onChange={(v) => setForm({ ...form, category: v || undefined })}
+                  options={vocab.categories}
+                  emptyLabel="-- Select category --"
+                  newLabel="+ New category..."
+                  newInputPlaceholder="Enter new category"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="e.g. Restaurant, Retail"
                 />
               </div>
 

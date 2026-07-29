@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Card, Title, Text, Badge, Stack, Group, SimpleGrid, Loader, Tabs,
@@ -17,6 +17,7 @@ import { RichContentEditor } from '@/components/products/RichContentEditor';
 import { RichContentRenderer } from '@/components/products/RichContentRenderer';
 import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import { clientLogger } from '@/lib/client-logger';
+import SuggestiveSelect from '@/components/marketing-ops/SuggestiveSelect';
 
 export const dynamic = 'force-dynamic';
 
@@ -242,6 +243,8 @@ export default function PersonalCrmPage() {
       await Promise.all([loadAlerts(), loadDashboard()]);
     } catch (e) { clientLogger.error('Failed to dismiss alert:', { detail: e }); }
   };
+
+  const categoryOptions = useMemo(() => [...new Set(tickets.map(t => t.category).filter((c): c is string => Boolean(c)))].sort(), [tickets]);
 
   const handleMarkAllAlertsRead = async () => {
     try {
@@ -496,16 +499,14 @@ export default function PersonalCrmPage() {
             </div>
             <div>
               <Text size="sm" fw={500} mb={4}>Category</Text>
-              <Select
+              <SuggestiveSelect
                 value={newTicket.category}
                 onChange={(v) => setNewTicket({ ...newTicket, category: v || 'general' })}
-                data={[
-                  { value: 'general', label: 'General' },
-                  { value: 'billing', label: 'Billing' },
-                  { value: 'technical', label: 'Technical' },
-                  { value: 'feature_request', label: 'Feature Request' },
-                  { value: 'bug', label: 'Bug Report' },
-                ]}
+                options={categoryOptions}
+                emptyLabel="-- Select category --"
+                newLabel="+ New category..."
+                newInputPlaceholder="Enter new category"
+                className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm"
               />
             </div>
             <div>

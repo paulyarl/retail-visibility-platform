@@ -34,6 +34,18 @@ const {
   mockSetCouponTargets,
   mockChargePaymentMethod,
   mockInvalidateEffectiveCapabilities,
+  mockMktCampaigns,
+  mockMktStageHistory,
+  mockMktPreviewTokens,
+  mockMktPromptTemplates,
+  mockMktPromptExecutions,
+  mockMktFilterFlags,
+  mockMktDeliverableTemplates,
+  mockMktDeliverables,
+  mockMktScorecards,
+  mockMktFiles,
+  mockMktBrandingConfig,
+  mockMktAudits,
 } = vi.hoisted(() => ({
   mockPrismaProductSuppliers: {
     findMany: vi.fn(),
@@ -1649,5 +1661,487 @@ describe('Sprint 6 — Funnel analytics preview metrics', () => {
       checkout_views: 0,
       preview_to_checkout_rate: 0,
     });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// MARKETING OPS — 11 Critical User Journeys (CUJs)
+// Sprint Plan v3 §10.2
+// ────────────────────────────────────────────────────────────────────────
+
+describe('Marketing Ops — Critical User Journeys', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // CUJ 1: Admin creates campaign → fills audit form → views pain score → saves
+  it('CUJ-1: creates campaign with audit data and pain score', async () => {
+    const campaignData = {
+      id: 'mkt-camp-test-001',
+      business_name: 'Joe Pizza',
+      category: 'restaurant',
+      city: 'Austin',
+      stage: 'seek',
+      pain_score: 8,
+      gbp_claimed: false,
+      unaddressed_reviews: 12,
+      has_website: 'none',
+      nap_consistent: false,
+      estimated_tier: 'tier_1',
+      estimated_fee_cents: 150000,
+      stage_entered_at: new Date(),
+    };
+    mockMktCampaigns.create.mockResolvedValue(campaignData);
+    mockMktStageHistory.create.mockResolvedValue({});
+
+    const result = await MarketingCampaignService.createCampaign({
+      businessName: 'Joe Pizza',
+      category: 'restaurant',
+      city: 'Austin',
+      gbpClaimed: false,
+      unaddressedReviews: 12,
+      hasWebsite: 'none',
+      napConsistent: false,
+      estimatedTier: 'tier_1',
+      estimatedFeeCents: 150000,
+      painScore: 8,
+    });
+
+    expect(result.business_name).toBe('Joe Pizza');
+    expect(result.pain_score).toBe(8);
+    expect(result.stage).toBe('seek');
+    expect(mockMktCampaigns.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          business_name: 'Joe Pizza',
+          pain_score: 8,
+          stage: 'seek',
+        }),
+      })
+    );
+    expect(mockMktStageHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          from_stage: null,
+          to_stage: 'seek',
+        }),
+      })
+    );
+  });
+
+  // CUJ 2: Admin selects prompt template → runs seek → saves audit output
+  it('CUJ-2: creates seek prompt execution and saves output', async () => {
+    const template = {
+      id: 'mpt-seek-001',
+      name: 'Seek: Business Audit',
+      prompt_type: 'seek',
+      body: 'Audit {{business_name}}',
+      variables: ['business_name', 'city', 'category'],
+      is_default: true,
+    };
+    mockMktPromptTemplates.findUnique.mockResolvedValue(template);
+    mockMktPromptExecutions.create.mockResolvedValue({
+      id: 'mpe-test-001',
+      campaign_id: 'mkt-camp-test-001',
+      template_id: 'mpt-seek-001',
+      status: 'pending',
+    });
+    mockMktPromptExecutions.update.mockResolvedValue({
+      id: '{"id":"mpe-test-001","status":"completed","raw_output":"Audit result JSON"}',
+    });
+
+    const execution = await MarketingPromptService.createExecution({
+      campaignId: 'mkt-camp-test-001',
+      templateId: 'mpt-seek-001',
+      variablesUsed: { business_name: 'Joe Pizza', city: 'Austin', category: 'restaurant' },
+    });
+
+    expect(execution.campaign_id).toBe('mkt-camp-test-001');
+    expect(execution.template_id).toBe('mpt-seek-001');
+    expect(execution.status).toBe('pending');
+
+    const updated = await MarketingPromptService.updateExecution('mpe-test-001', {
+      rawOutput: 'Audit result JSON',
+      status: 'completed',
+    });
+
+    expect(mockMktPromptExecutions.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mpe-test-001' },
+        data: expect.objectContaining({
+          raw_output: 'Audit result JSON',
+          status: 'completed',
+        }),
+      })
+    );
+  });
+
+  // CUJ 3: Admin runs fulfill prompt → receives AI output → runs filter → reviews flags
+  it('CUJ-3: runs fulfill, creates filter flags, and reviews them', async () => {
+    mockMktPromptExecutions.create.mockResolvedValue({
+      id: 'mpe-fulfill-001',
+      campaign_id: 'mkt-camp-test-001',
+      status: 'pending',
+    });
+    mockMktFilterFlags.create.mockResolvedValue({
+      id: 'mff-001',
+      execution_id: 'mpe-fulfill-001',
+      response_number: 3,
+      failed_checks: { name_usage: false, length_compliance: true },
+      suggested_fix: 'Shorten response to ≤75 words',
+      status: 'pending',
+    });
+    mockMktFilterFlags.findMany.mockResolvedValue([
+      { id: 'mff-001', execution_id: 'mpe-fulfill-001', status: 'pending' },
+    ]);
+
+    const execution = await MarketingPromptService.createExecution({
+      campaignId: 'mkt-camp-test-001',
+      templateId: 'mpt-fulfill-001',
+    });
+    await MarketingPromptService.updateExecution(execution.id, {
+      rawOutput: 'Response 1... Response 2... Response 3...',
+      status: 'completed',
+    });
+
+    const flag = await MarketingPromptService.createFilterFlag({
+      executionId: execution.id,
+      responseNumber: 3,
+      failedChecks: { name_usage: false, length_compliance: true },
+      suggestedFix: 'Shorten response to ≤75 words',
+    });
+
+    expect(flag.execution_id).toBe('mpe-fulfill-001');
+    expect(flag.failed_checks).toEqual({ name_usage: false, length_compliance: true });
+
+    const flags = await MarketingPromptService.listFilterFlags(execution.id);
+    expect(flags).toHaveLength(1);
+    expect(flags[0].id).toBe('mff-001');
+  });
+
+  // CUJ 4: Admin selects deliverable template → generates branded PDF → previews → saves
+  it('CUJ-4: generates a watermarked preview deliverable', async () => {
+    const campaign = {
+      id: 'mkt-camp-test-001',
+      business_name: 'Joe Pizza',
+      category: 'restaurant',
+      city: 'Austin',
+      display_id: 'AUS_RE_001',
+      stage: 'seek',
+    };
+    const template = {
+      id: 'mdt-test-001',
+      name: 'Review Responses PDF',
+      deliverable_type: 'review_responses',
+      layout_spec: { sections: [{ type: 'heading', text: 'Review Responses' }, { type: 'body', text: '' }] },
+      page_size: 'letter',
+      orientation: 'portrait',
+    };
+    mockMktCampaigns.findUnique.mockResolvedValue(campaign);
+    mockMktDeliverableTemplates.findUnique.mockResolvedValue(template);
+    mockMktDeliverables.create.mockResolvedValue({
+      id: 'mdel-test-001',
+      campaign_id: 'mkt-camp-test-001',
+      deliverable_type: 'review_responses',
+      status: 'preview',
+      is_watermarked: true,
+      file_name: 'AUS_RE_001_preview_2024-01-15.pdf',
+      storage_path: '/uploads/marketing-ops/mkt-camp-test-001/AUS_RE_001_preview_2024-01-15.pdf',
+    });
+
+    const result = await MarketingDeliverableService.generateDeliverable({
+      campaignId: 'mkt-camp-test-001',
+      templateId: 'mdt-test-001',
+      deliverableType: 'review_responses',
+      isPreview: true,
+      content: 'Sample review response content',
+    });
+
+    expect(result.status).toBe('preview');
+    expect(result.is_watermarked).toBe(true);
+    expect(mockMktDeliverables.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'preview',
+          is_watermarked: true,
+        }),
+      })
+    );
+  });
+
+  // CUJ 5: Admin marks deliverable as "preview" → sends to business → marks campaign "Shown"
+  it('CUJ-5: sends preview deliverable and transitions campaign to shown', async () => {
+    const campaign = {
+      id: 'mkt-camp-test-001',
+      stage: 'preview_built',
+      business_name: 'Joe Pizza',
+    };
+    mockMktCampaigns.findUnique.mockResolvedValue(campaign);
+    mockMktCampaigns.update.mockResolvedValue({ ...campaign, stage: 'shown' });
+    mockMktStageHistory.create.mockResolvedValue({});
+    mockMktDeliverables.update.mockResolvedValue({
+      id: 'mdel-test-001',
+      sent_at: new Date(),
+      sent_method: 'email',
+    });
+
+    await MarketingDeliverableService.markAsSent('mdel-test-001', 'email');
+
+    const transitioned = await MarketingCampaignService.transitionStage({
+      campaignId: 'mkt-camp-test-001',
+      toStage: 'shown',
+      notes: 'Preview sent to business owner',
+      triggerType: 'manual',
+    });
+
+    expect(transitioned.stage).toBe('shown');
+    expect(mockMktDeliverables.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sent_method: 'email',
+        }),
+      })
+    );
+    expect(mockMktCampaigns.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mkt-camp-test-001' },
+        data: expect.objectContaining({ stage: 'shown' }),
+      })
+    );
+    expect(mockMktStageHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          from_stage: 'preview_built',
+          to_stage: 'shown',
+          trigger_type: 'manual',
+        }),
+      })
+    );
+  });
+
+  // CUJ 6: Admin marks campaign "Paid" → generates paid deliverable (no watermark) → sends
+  it('CUJ-6: transitions to paid and generates non-watermarked deliverable', async () => {
+    const campaign = {
+      id: 'mkt-camp-test-001',
+      business_name: 'Joe Pizza',
+      category: 'restaurant',
+      city: 'Austin',
+      display_id: 'AUS_RE_001',
+      stage: 'shown',
+    };
+    const template = {
+      id: 'mdt-test-001',
+      name: 'Review Responses PDF',
+      deliverable_type: 'review_responses',
+      layout_spec: { sections: [{ type: 'heading', text: 'Review Responses' }] },
+      page_size: 'letter',
+      orientation: 'portrait',
+    };
+    mockMktCampaigns.findUnique.mockResolvedValue(campaign);
+    mockMktCampaigns.update.mockResolvedValue({ ...campaign, stage: 'paid' });
+    mockMktStageHistory.create.mockResolvedValue({});
+    mockMktDeliverableTemplates.findUnique.mockResolvedValue(template);
+    mockMktDeliverables.create.mockResolvedValue({
+      id: 'mdel-paid-001',
+      campaign_id: 'mkt-camp-test-001',
+      status: 'paid',
+      is_watermarked: false,
+      file_name: 'AUS_RE_001_paid_2024-01-16.pdf',
+    });
+    mockMktDeliverables.update.mockResolvedValue({});
+
+    const transitioned = await MarketingCampaignService.transitionStage({
+      campaignId: 'mkt-camp-test-001',
+      toStage: 'paid',
+      notes: 'Business paid $1500',
+      triggerType: 'manual',
+    });
+
+    expect(transitioned.stage).toBe('paid');
+
+    const deliverable = await MarketingDeliverableService.generateDeliverable({
+      campaignId: 'mkt-camp-test-001',
+      templateId: 'mdt-test-001',
+      deliverableType: 'review_responses',
+      isPreview: false,
+      content: 'Final review responses content',
+    });
+
+    expect(deliverable.status).toBe('paid');
+    expect(deliverable.is_watermarked).toBe(false);
+    expect(mockMktDeliverables.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'paid',
+          is_watermarked: false,
+        }),
+      })
+    );
+  });
+
+  // CUJ 7: Admin marks campaign "Delivered" → pitches retainer
+  it('CUJ-7: transitions to delivered and pitches retainer', async () => {
+    const campaign = {
+      id: 'mkt-camp-test-001',
+      stage: 'paid',
+      business_name: 'Joe Pizza',
+    };
+    mockMktCampaigns.findUnique.mockResolvedValue(campaign);
+    mockMktCampaigns.update.mockResolvedValue({ ...campaign, stage: 'delivered' });
+    mockMktStageHistory.create.mockResolvedValue({});
+
+    const transitioned = await MarketingCampaignService.transitionStage({
+      campaignId: 'mkt-camp-test-001',
+      toStage: 'delivered',
+      notes: 'Package delivered to business',
+      triggerType: 'manual',
+    });
+
+    expect(transitioned.stage).toBe('delivered');
+
+    const updated = await MarketingCampaignService.updateCampaign('mkt-camp-test-001', {
+      retainerStatus: 'pitched',
+    });
+
+    expect(mockMktCampaigns.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mkt-camp-test-001' },
+        data: expect.objectContaining({ retainer_status: 'pitched' }),
+      })
+    );
+  });
+
+  // CUJ 8: Admin submits daily scorecard → views updated dashboard metrics
+  it('CUJ-8: submits daily scorecard and retrieves it', async () => {
+    const scorecardData = {
+      id: 'msc-test-001',
+      user_id: 'admin-001',
+      date: new Date('2024-01-15'),
+      previews_built: 5,
+      previews_shown: 3,
+      packages_paid: 1,
+      packages_delivered: 1,
+      revenue_collected_cents: 150000,
+      retainers_pitched: 1,
+      retainers_won: 0,
+    };
+    mockMktScorecards.findFirst.mockResolvedValue(null);
+    mockMktScorecards.create.mockResolvedValue(scorecardData);
+    mockMktScorecards.findMany.mockResolvedValue([scorecardData]);
+
+    const saved = await MarketingScorecardService.upsertScorecard({
+      userId: 'admin-001',
+      date: new Date('2024-01-15'),
+      previewsBuilt: 5,
+      previewsShown: 3,
+      packagesPaid: 1,
+      packagesDelivered: 1,
+      revenueCollectedCents: 150000,
+      retainersPitched: 1,
+      retainersWon: 0,
+    });
+
+    expect(saved.previews_built).toBe(5);
+    expect(saved.revenue_collected_cents).toBe(150000);
+
+    const list = await MarketingScorecardService.listScorecards({ userId: 'admin-001' });
+    expect(list).toHaveLength(1);
+    expect(list[0].previews_built).toBe(5);
+  });
+
+  // CUJ 9: Admin filters tracker by category + stage → exports CSV
+  it('CUJ-9: filters campaigns by category and stage', async () => {
+    const filteredCampaigns = [
+      { id: 'mkt-1', business_name: 'Joe Pizza', category: 'restaurant', city: 'Austin', stage: 'shown' },
+      { id: 'mkt-2', business_name: 'Sushi Bar', category: 'restaurant', city: 'Austin', stage: 'shown' },
+    ];
+    mockMktCampaigns.findMany.mockResolvedValue(filteredCampaigns);
+    mockMktCampaigns.count.mockResolvedValue(2);
+
+    const result = await MarketingCampaignService.listCampaigns({
+      category: 'restaurant',
+      stage: 'shown',
+      page: 1,
+      limit: 50,
+    });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.total).toBe(2);
+    expect(result.items.every((c: any) => c.category === 'restaurant')).toBe(true);
+    expect(mockMktCampaigns.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          category: 'restaurant',
+          stage: 'shown',
+        }),
+      })
+    );
+  });
+
+  // CUJ 10: Admin edits prompt template → creates new version → sets as default
+  it('CUJ-10: edits prompt template and sets as default', async () => {
+    const existingTemplate = {
+      id: 'mpt-seek-001',
+      name: 'Seek: Business Audit',
+      prompt_type: 'seek',
+      category: null,
+      body: 'Old body',
+      is_default: false,
+    };
+    mockMktPromptTemplates.findUnique.mockResolvedValue(existingTemplate);
+    mockMktPromptTemplates.updateMany.mockResolvedValue({ count: 0 });
+    mockMktPromptTemplates.update.mockResolvedValue({
+      ...existingTemplate,
+      body: 'New improved body',
+      is_default: true,
+    });
+
+    const updated = await MarketingPromptService.updateTemplate('mpt-seek-001', {
+      body: 'New improved body',
+      isDefault: true,
+    });
+
+    expect(updated.body).toBe('New improved body');
+    expect(updated.is_default).toBe(true);
+    expect(mockMktPromptTemplates.updateMany).toHaveBeenCalled();
+    expect(mockMktPromptTemplates.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mpt-seek-001' },
+        data: expect.objectContaining({
+          body: 'New improved body',
+          is_default: true,
+        }),
+      })
+    );
+  });
+
+  // CUJ 11: Admin edits deliverable template → previews HTML → publishes
+  it('CUJ-11: edits deliverable template and publishes', async () => {
+    mockMktDeliverableTemplates.update.mockResolvedValue({
+      id: 'mdt-test-001',
+      name: 'Updated Review Responses',
+      deliverable_type: 'review_responses',
+      layout_spec: { sections: [{ type: 'heading', text: 'Updated Title' }, { type: 'body', text: '' }] },
+      is_active: true,
+      is_default: true,
+    });
+
+    const updated = await MarketingDeliverableService.updateTemplate('mdt-test-001', {
+      name: 'Updated Review Responses',
+      layoutSpec: { sections: [{ type: 'heading', text: 'Updated Title' }, { type: 'body', text: '' }] },
+      isDefault: true,
+    });
+
+    expect(updated.name).toBe('Updated Review Responses');
+    expect(updated.is_active).toBe(true);
+    expect(mockMktDeliverableTemplates.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mdt-test-001' },
+        data: expect.objectContaining({
+          name: 'Updated Review Responses',
+          is_default: true,
+        }),
+      })
+    );
   });
 });

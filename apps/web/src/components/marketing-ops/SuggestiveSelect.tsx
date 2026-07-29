@@ -12,6 +12,7 @@ interface SuggestiveSelectProps {
   newLabel?: string;
   newInputPlaceholder?: string;
   required?: boolean;
+  disabled?: boolean;
   className?: string;
 }
 
@@ -27,6 +28,7 @@ export default function SuggestiveSelect({
   newLabel = '+ New...',
   newInputPlaceholder = 'Enter new value',
   required,
+  disabled,
   className,
 }: SuggestiveSelectProps) {
   const [isNew, setIsNew] = useState(false);
@@ -41,6 +43,7 @@ export default function SuggestiveSelect({
       <select
         value={isNew ? NEW_VALUE : value}
         required={required && !isNew}
+        disabled={disabled}
         onChange={(e) => {
           const v = e.target.value;
           if (v === NEW_VALUE) {
@@ -63,6 +66,7 @@ export default function SuggestiveSelect({
         <input
           type="text"
           required={required}
+          disabled={disabled}
           autoFocus
           value={value}
           onChange={(e) => onChange(e.target.value)}
