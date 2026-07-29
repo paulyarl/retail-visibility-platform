@@ -509,8 +509,8 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch campaigns');
     }
-    const data = result.data;
-    return data?.items ? data : { items: data ?? [], total: data?.length ?? 0 };
+    const data = result.data?.data ?? result.data;
+    return data?.items ? data : { items: Array.isArray(data) ? data : [], total: data?.length ?? 0 };
   }
 
   async getCampaign(id: string): Promise<CampaignDetail> {
@@ -523,7 +523,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch campaign');
     }
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async createCampaign(input: CampaignCreateInput): Promise<Campaign> {
@@ -537,7 +537,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create campaign');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateCampaign(id: string, input: CampaignUpdateInput): Promise<Campaign> {
@@ -551,7 +551,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update campaign');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteCampaign(id: string): Promise<void> {
@@ -578,7 +578,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async linkTenant(id: string, tenantId: string): Promise<Campaign> {
@@ -592,7 +592,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to link tenant');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async generateDemoStorefront(id: string): Promise<DemoStorefrontResult> {
@@ -606,7 +606,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate demo storefront');
     }
     await this.invalidateCachePattern(`mkt-ops-campaign-${id}`);
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async getConversionStats(): Promise<ConversionStats> {
@@ -619,7 +619,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch conversion stats');
     }
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Dashboard ──────────────────────────────────────────────
@@ -634,7 +634,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch dashboard');
     }
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Export ─────────────────────────────────────────────────
@@ -655,7 +655,8 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to export campaigns');
     }
-    return typeof result.data === 'string' ? result.data : '';
+    const data = result.data?.data ?? result.data;
+    return typeof data === 'string' ? data : '';
   }
 
   // ─── Audits ─────────────────────────────────────────────────
@@ -670,7 +671,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch audits');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -686,7 +687,7 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern(`mkt-ops-audits-${campaignId}`);
     await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateAudit(id: string, input: Partial<AuditCreateInput>): Promise<Audit> {
@@ -701,7 +702,7 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-audits');
     await this.invalidateCachePattern('mkt-ops-campaign');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteAudit(id: string): Promise<void> {
@@ -730,7 +731,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch files');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -746,7 +747,7 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern(`mkt-ops-files-${campaignId}`);
     await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteFile(id: string): Promise<void> {
@@ -781,7 +782,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch prompt templates');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -796,7 +797,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create prompt template');
     }
     await this.invalidateCachePattern('mkt-ops-prompt-templates');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async updatePromptTemplate(id: string, input: Partial<PromptTemplateCreateInput>): Promise<PromptTemplate> {
@@ -810,7 +811,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update prompt template');
     }
     await this.invalidateCachePattern('mkt-ops-prompt-templates');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deletePromptTemplate(id: string): Promise<void> {
@@ -838,7 +839,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch executions');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -852,7 +853,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch execution');
     }
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async createExecution(input: ExecutionCreateInput): Promise<PromptExecution> {
@@ -866,7 +867,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create execution');
     }
     await this.invalidateCachePattern('mkt-ops-executions');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async batchExecution(input: BatchExecutionInput): Promise<{ campaignId: string; success: boolean; error?: string }[]> {
@@ -880,7 +881,8 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to batch execute');
     }
     await this.invalidateCachePattern('mkt-ops-executions');
-    return Array.isArray(result.data) ? result.data : [];
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
   }
 
   async updateExecution(id: string, input: ExecutionUpdateInput): Promise<PromptExecution> {
@@ -895,7 +897,7 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern('mkt-ops-executions');
     await this.invalidateCachePattern(`mkt-ops-execution-${id}`);
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Filter Flags ───────────────────────────────────────────
@@ -914,7 +916,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch filter flags');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -929,7 +931,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update filter flag');
     }
     await this.invalidateCachePattern('mkt-ops-filter-flags');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Scorecards ─────────────────────────────────────────────
@@ -950,7 +952,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch scorecards');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -965,7 +967,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save scorecard');
     }
     await this.invalidateCachePattern('mkt-ops-scorecards');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteScorecard(id: string): Promise<void> {
@@ -999,7 +1001,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch deliverable templates');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -1014,7 +1016,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create deliverable template');
     }
     await this.invalidateCachePattern('mkt-ops-deliverable-templates');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateDeliverableTemplate(id: string, input: Partial<DeliverableTemplateCreateInput>): Promise<DeliverableTemplate> {
@@ -1028,7 +1030,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update deliverable template');
     }
     await this.invalidateCachePattern('mkt-ops-deliverable-templates');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteDeliverableTemplate(id: string): Promise<void> {
@@ -1060,7 +1062,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch deliverables');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -1076,7 +1078,7 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern(`mkt-ops-deliverables-${campaignId}`);
     await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateDeliverable(id: string, input: DeliverableUpdateInput): Promise<Deliverable> {
@@ -1090,7 +1092,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update deliverable');
     }
     await this.invalidateCachePattern('mkt-ops-deliverables');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteDeliverable(id: string): Promise<void> {
@@ -1133,7 +1135,7 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern(`mkt-ops-deliverables-${campaignId}`);
     await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   getDeliverableDownloadUrl(deliverableId: string): string {
@@ -1151,7 +1153,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to mark deliverable as sent');
     }
     await this.invalidateCachePattern('mkt-ops-deliverables');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   // ─── Branding ───────────────────────────────────────────────
@@ -1166,7 +1168,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch branding configs');
     }
-    const data = result.data;
+    const data = result.data?.data ?? result.data;
     return Array.isArray(data) ? data : [];
   }
 
@@ -1180,7 +1182,7 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch active branding config');
     }
-    return result.data ?? null;
+    return result.data?.data ?? null;
   }
 
   async createBrandingConfig(input: BrandingCreateInput): Promise<BrandingConfig> {
@@ -1194,7 +1196,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create branding config');
     }
     await this.invalidateCachePattern('mkt-ops-branding');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async updateBrandingConfig(id: string, input: Partial<BrandingCreateInput>): Promise<BrandingConfig> {
@@ -1208,7 +1210,7 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update branding config');
     }
     await this.invalidateCachePattern('mkt-ops-branding');
-    return result.data;
+    return result.data?.data ?? result.data;
   }
 
   async deleteBrandingConfig(id: string): Promise<void> {

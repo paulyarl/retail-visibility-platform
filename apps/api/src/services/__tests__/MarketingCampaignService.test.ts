@@ -3,17 +3,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockCampaignsList,
   mockStageHistory,
-  mockHasLiveTokens,
+  mockPreviewTokens,
 } = vi.hoisted(() => ({
   mockCampaignsList: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   mockStageHistory: { create: vi.fn() },
-  mockHasLiveTokens: vi.fn(),
+  mockPreviewTokens: { findMany: vi.fn() },
 }));
 
 vi.mock('../../prisma', () => ({
   prisma: {
     mkt_campaigns_list: mockCampaignsList,
     mkt_stage_history_list: mockStageHistory,
+    mkt_deliverable_preview_tokens: mockPreviewTokens,
   },
 }));
 
@@ -24,10 +25,6 @@ vi.mock('../../logger', () => ({
 vi.mock('../../lib/id-generator', () => ({
   generateCampaignId: () => 'mkt-test-001',
   generateStageHistoryId: () => 'msh-test-001',
-}));
-
-vi.mock('../MarketingDeliverableService', () => ({
-  default: { hasLiveTokens: mockHasLiveTokens },
 }));
 
 import MarketingCampaignService from '../MarketingCampaignService';
@@ -51,9 +48,9 @@ describe('autoAdvanceStaleShownCampaigns', () => {
 
   it('advances stale shown campaigns to lost when no live preview tokens', async () => {
     mockCampaignsList.findMany.mockResolvedValue([staleShownCampaign('mkt-1')]);
-    mockHasLiveTokens.mockResolvedValue(false);
+    mockPreviewTokens.findMany.mockResolvedValue([]);
 
-    const result = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
+    const result = await MarketingCampaignService.getInstance().autoAdvanceStaleShownCampaigns(7);
 
     expect(result).toEqual({ advanced: 1, skipped: 0 });
     expect(mockCampaignsList.update).toHaveBeenCalledWith(
@@ -75,7 +72,7 @@ describe('autoAdvanceStaleShownCampaigns', () => {
 
   it('skips campaigns with live preview tokens', async () => {
     mockCampaignsList.findMany.mockResolvedValue([staleShownCampaign('mkt-2')]);
-    mockHasLiveTokens.mockResolvedValue(true);
+    mockPreviewTokens.findMany.mockResolvedValue([{ campaign_id: 'mkt-2' }]);
 
     const result = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
 
@@ -90,6 +87,6 @@ describe('autoAdvanceStaleShownCampaigns', () => {
     const result = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
 
     expect(result).toEqual({ advanced: 0, skipped: 0 });
-    expect(mockHasLiveTokens).not.toHaveBeenCalled();
+    expect(mockPreviewTokens.findMany).not.toHaveBeenCalled();
   });
 });
