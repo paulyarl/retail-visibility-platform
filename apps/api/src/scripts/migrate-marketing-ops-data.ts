@@ -26,7 +26,7 @@ import fs from 'fs';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { generateCampaignId, generateStageHistoryId } from '../lib/id-generator';
-import { logger } from '../utils/logger';
+import { logger } from '../logger';
 
 const prisma = new PrismaClient();
 

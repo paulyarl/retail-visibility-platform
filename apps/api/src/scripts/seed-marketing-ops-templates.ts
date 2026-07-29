@@ -12,7 +12,7 @@
  */
 
 import { MarketingPromptService } from '../services/MarketingPromptService';
-import { logger } from '../utils/logger';
+import { logger } from '../logger';
 
 const SEED_TEMPLATES = [
   {

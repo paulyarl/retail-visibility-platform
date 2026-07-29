@@ -22,7 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { generateMarketingFileId } from '../lib/id-generator';
-import { logger } from '../utils/logger';
+import { logger } from '../logger';
 
 const prisma = new PrismaClient();
 
@@ -54,7 +54,7 @@ interface MigrationResult {
   unmatched: string[];
 }
 
-async function findCampaignByDirName(dirName: string): Promise<{ id: string; displayId: string | null } | null> {
+async function findCampaignByDirName(dirName: string): Promise<{ id: string; display_id: string | null } | null> {
   // Try matching by display_id first (e.g., "AUS_AD_001")
   const byDisplayId = await prisma.mkt_campaigns_list.findFirst({
     where: { display_id: dirName },
@@ -232,13 +232,13 @@ async function main() {
       continue;
     }
 
-    logger.info(`Processing directory: ${entry.name} → campaign ${campaign.displayId || campaign.id}`);
+    logger.info(`Processing directory: ${entry.name} → campaign ${campaign.display_id || campaign.id}`);
 
     const files = scanDirectory(campaignDir);
 
     for (const file of files) {
       if (dryRun) {
-        logger.info(`[DRY RUN] Would migrate: ${file.fileName} (${file.fileType}) → ${campaign.displayId}`);
+        logger.info(`[DRY RUN] Would migrate: ${file.fileName} (${file.fileType}) → ${campaign.display_id}`);
         result.migrated++;
         continue;
       }
