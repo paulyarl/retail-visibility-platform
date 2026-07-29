@@ -42,6 +42,7 @@ import {
   resolvePlatformServices,
   resolveFunnelOptions,
   resolveCouponOptions,
+  resolveMarketingOps,
   applyCrossCapabilityConstraints,
 } from './resolvers';
 import type {
@@ -253,6 +254,9 @@ export async function resolveEffectiveCapabilities(
       rawCaps.capabilities.coupon_options?.features || {},
       merchantBundle.couponOptions
     ),
+    resolveMarketingOps(
+      rawCaps.capabilities.marketing_ops?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -293,6 +297,7 @@ export async function resolveEffectiveCapabilities(
       storefront_maps: effective[24],
       funnel: effective[25],
       coupon_options: effective[26],
+      marketing_ops: effective[27],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -367,6 +372,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
+    result.effective.marketing_ops.enabled = false;
 
     // Read-only capabilities — keep enabled=true so UI shows them (read-only mode)
     // Frontend checks subscription_context.writable to lock write operations
@@ -397,6 +403,7 @@ export async function resolveEffectiveCapabilities(
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
+    result.effective.marketing_ops.enabled = false;
     // Payment Gateway stays active in maintenance
     // CRM stays active in maintenance
     // FAQ stays active in maintenance
@@ -745,6 +752,9 @@ export async function resolveEffectiveCapabilitiesFromMV(
       rawCaps.capabilities.coupon_options?.features || {},
       merchantBundle.couponOptions
     ),
+    resolveMarketingOps(
+      rawCaps.capabilities.marketing_ops?.features || {}
+    ),
   ]);
 
   const result: EffectiveCapabilities = {
@@ -785,6 +795,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
       storefront_maps: effective[24],
       funnel: effective[25],
       coupon_options: effective[26],
+      marketing_ops: effective[27],
     },
     constraint_violations: [],
     constraint_status: {},
@@ -853,6 +864,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
+    result.effective.marketing_ops.enabled = false;
   }
 
   if (isLimited) {
@@ -865,6 +877,7 @@ export async function resolveEffectiveCapabilitiesFromMV(
     result.effective.platform_services.enabled = false;
     result.effective.funnel.enabled = false;
     result.effective.coupon_options.enabled = false;
+    result.effective.marketing_ops.enabled = false;
   }
 
   // Org-level subscription status check

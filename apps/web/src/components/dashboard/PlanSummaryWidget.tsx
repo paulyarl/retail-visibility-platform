@@ -51,6 +51,7 @@ const CAPABILITY_META: Array<{ key: string; label: string; icon: string; prefix:
   { key: 'platform_services', label: 'Platform Services', icon: '🔧', prefix: 'platform_service_', settingsPath: '/settings/feature-store' },
   { key: 'funnel_options', label: 'Sales Funnels', icon: '⚡', prefix: 'funnel_options_', settingsPath: '/settings/funnels' },
   { key: 'coupon_options', label: 'Coupons', icon: '🏷️', prefix: 'coupon_', settingsPath: '/settings/coupon-options' },
+  { key: 'marketing_ops', label: 'Marketing Ops', icon: '📣', prefix: 'marketing_ops_', settingsPath: '/settings/admin/marketing-ops' },
 ];
 
 const COLOR_CLASSES: Record<CapabilityStatusColor, { text: string; dot: string; hover: string }> = {
@@ -110,6 +111,7 @@ function getCapabilityEnabled(caps: AllCapabilitiesState, capKey: string): boole
     case 'platform_services': return !!caps.platformServices?.enabled;
     case 'funnel_options': return !!caps.funnel?.enabled;
     case 'coupon_options': return !!caps.couponOptions?.enabled;
+    case 'marketing_ops': return !!caps.marketingOps?.enabled;
     default: return false;
   }
 }

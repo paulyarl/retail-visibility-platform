@@ -919,6 +919,19 @@ export interface EffectiveDirectoryPromotion {
 }
 
 // ====================
+// MARKETING OPS
+// ====================
+
+export interface EffectiveMarketingOps {
+  enabled: boolean;
+  can_use_prompt_execution: boolean;
+  can_use_filter_review: boolean;
+  can_use_batch_execution: boolean;
+  can_use_revenue_tracking: boolean;
+  is_flexible: boolean;
+}
+
+// ====================
 // SALES FUNNELS
 // ====================
 
@@ -1027,6 +1040,7 @@ export interface EffectiveCapabilities {
     platform_services: EffectivePlatformServices;
     funnel: EffectiveFunnel;
     coupon_options: EffectiveCouponOptions;
+    marketing_ops: EffectiveMarketingOps;
   };
   constraint_violations: ConstraintViolation[];
   constraint_status: ConstraintStatusMap;

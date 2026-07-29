@@ -214,6 +214,7 @@ import funnelCheckoutRoutes from '../routes/funnel-checkout';
 import funnelOptionsSettingsRoutes from '../routes/funnel-options-settings';
 import couponsRoutes from '../routes/coupons';
 import couponAnalyticsRoutes from '../routes/coupon-analytics';
+import marketingOpsRoutes from '../routes/marketing-ops';
 
 // Inline handler route files (extracted from index.ts)
 import inlineAuthRbacRoutes from '../routes/inline-auth-rbac';
@@ -1296,6 +1297,14 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Coupon analytics at /api/tenants/:tenantId/coupon-analytics, /api/public/coupon-events, /api/public/tenants/:tenantId/coupons/validate, /api/public/tenants/:tenantId/coupons/spotlight, and /api/admin/coupon-analytics',
+  },
+
+  {
+    path: '/api/admin/marketing-ops',
+    router: marketingOpsRoutes,
+    domain: 'admin',
+    authLevel: 'admin',
+    comment: 'Marketing Ops admin routes — campaigns, audits, files, prompts, executions, filter flags, scorecards, deliverables, branding',
   },
 
   // ── Permissions ──────────────────────────────────────────────────────

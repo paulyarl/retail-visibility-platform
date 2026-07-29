@@ -6042,6 +6042,270 @@ model customer_saved_coupons {
   @@index([customer_id, tenant_id], map: "idx_customer_saved_coupons_customer_tenant")
 }
 
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_audits_list {
+  id                  String             @id @db.VarChar(255)
+  campaign_id         String             @db.VarChar(255)
+  platform            String             @db.VarChar(50)
+  review_count        Int                @default(0)
+  average_rating      Decimal?           @db.Decimal(2, 1)
+  unaddressed_reviews Int                @default(0)
+  owner_response_rate Int                @default(0)
+  photo_count         Int                @default(0)
+  claimed             Boolean            @default(false)
+  active_page         Boolean            @default(false)
+  has_booking         Boolean            @default(false)
+  has_contact_form    Boolean            @default(false)
+  mobile_friendly     Boolean?
+  audit_data          Json?
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime           @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list  mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_audits_campaign")
+
+  @@index([campaign_id], map: "idx_mkt_audits_campaign")
+  @@index([campaign_id, platform], map: "idx_mkt_audits_platform")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_branding_config {
+  id                String   @id @db.VarChar(255)
+  operator_name     String   @db.VarChar(255)
+  operator_logo_url String?
+  primary_color     String   @default("#111827") @db.VarChar(20)
+  accent_color      String   @default("#3B82F6") @db.VarChar(20)
+  text_color        String   @default("#1F2937") @db.VarChar(20)
+  font_family       String?  @db.VarChar(100)
+  footer_disclaimer String?
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_campaigns_list {
+  id                         String                       @id @db.VarChar(255)
+  display_id                 String?                      @unique @db.VarChar(20)
+  business_name              String                       @db.VarChar(255)
+  category                   String                       @db.VarChar(100)
+  city                       String                       @db.VarChar(100)
+  neighborhood               String?                      @db.VarChar(100)
+  contact_method             String?                      @db.VarChar(50)
+  contact_info               String?                      @db.VarChar(255)
+  gbp_claimed                Boolean                      @default(false)
+  unaddressed_reviews        Int                          @default(0)
+  last_review_date           DateTime?                    @db.Date
+  has_website                String?                      @db.VarChar(20)
+  nap_consistent             Boolean?
+  estimated_tier             String?                      @db.VarChar(20)
+  estimated_fee_cents        Int                          @default(0)
+  pain_score                 Int                          @default(0)
+  stage                      String                       @default("seek") @db.VarChar(50)
+  stage_entered_at           DateTime                     @default(now()) @db.Timestamptz(6)
+  date_entered               DateTime                     @default(now()) @db.Timestamptz(6)
+  date_preview_built         DateTime?                    @db.Timestamptz(6)
+  date_shown                 DateTime?                    @db.Timestamptz(6)
+  date_paid                  DateTime?                    @db.Timestamptz(6)
+  date_delivered             DateTime?                    @db.Timestamptz(6)
+  date_retainer_pitched      DateTime?                    @db.Timestamptz(6)
+  date_retainer_won          DateTime?                    @db.Timestamptz(6)
+  package_delivered          String?
+  amount_paid_cents          Int                          @default(0)
+  retainer_status            String                       @default("not_pitched") @db.VarChar(50)
+  retainer_amount_cents      Int                          @default(0)
+  retainer_start_date        DateTime?                    @db.Date
+  notes                      String?
+  assigned_to                String?
+  created_by                 String?
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  mkt_audits_list            mkt_audits_list[]
+  mkt_deliverables_list      mkt_deliverables_list[]
+  mkt_files_list             mkt_files_list[]
+  mkt_prompt_executions_list mkt_prompt_executions_list[]
+  mkt_stage_history_list     mkt_stage_history_list[]
+
+  @@index([assigned_to], map: "idx_mkt_campaigns_assigned")
+  @@index([category], map: "idx_mkt_campaigns_category")
+  @@index([city], map: "idx_mkt_campaigns_city")
+  @@index([date_entered, date_paid], map: "idx_mkt_campaigns_dates")
+  @@index([display_id], map: "idx_mkt_campaigns_display_id")
+  @@index([stage], map: "idx_mkt_campaigns_stage")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_deliverable_templates_list {
+  id                    String                  @id @db.VarChar(255)
+  name                  String                  @db.VarChar(100)
+  deliverable_type      String                  @db.VarChar(50)
+  category              String?                 @db.VarChar(100)
+  version               Int                     @default(1)
+  layout_spec           Json
+  page_size             String                  @default("letter") @db.VarChar(20)
+  orientation           String                  @default("portrait") @db.VarChar(20)
+  is_active             Boolean                 @default(true)
+  is_default            Boolean                 @default(false)
+  created_by            String?
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  mkt_deliverables_list mkt_deliverables_list[]
+
+  @@index([deliverable_type, is_active], map: "idx_mkt_deliverable_templates_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_deliverables_list {
+  id                             String                          @id @db.VarChar(255)
+  campaign_id                    String                          @db.VarChar(255)
+  execution_id                   String?                         @db.VarChar(255)
+  template_id                    String?                         @db.VarChar(255)
+  deliverable_type               String                          @db.VarChar(50)
+  status                         String                          @db.VarChar(50)
+  file_name                      String                          @db.VarChar(255)
+  storage_path                   String                          @db.VarChar(500)
+  file_size                      Int?
+  mime_type                      String                          @default("application/pdf") @db.VarChar(100)
+  is_watermarked                 Boolean                         @default(false)
+  branding_applied               Json?
+  generated_by                   String?
+  generated_at                   DateTime                        @default(now()) @db.Timestamptz(6)
+  sent_at                        DateTime?                       @db.Timestamptz(6)
+  sent_method                    String?                         @db.VarChar(50)
+  created_at                     DateTime                        @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                        @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list             mkt_campaigns_list              @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_deliverables_campaign")
+  mkt_prompt_executions_list     mkt_prompt_executions_list?     @relation(fields: [execution_id], references: [id], onUpdate: NoAction, map: "fk_mkt_deliverables_execution")
+  mkt_deliverable_templates_list mkt_deliverable_templates_list? @relation(fields: [template_id], references: [id], onUpdate: NoAction, map: "fk_mkt_deliverables_template")
+
+  @@index([campaign_id], map: "idx_mkt_deliverables_campaign")
+  @@index([status], map: "idx_mkt_deliverables_status")
+  @@index([deliverable_type], map: "idx_mkt_deliverables_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_files_list {
+  id                 String             @id @db.VarChar(255)
+  campaign_id        String             @db.VarChar(255)
+  file_type          String             @db.VarChar(50)
+  file_name          String             @db.VarChar(255)
+  storage_path       String             @db.VarChar(500)
+  file_size          Int?
+  mime_type          String?            @db.VarChar(100)
+  uploaded_by        String?
+  uploaded_at        DateTime           @default(now()) @db.Timestamptz(6)
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime           @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_files_campaign")
+
+  @@index([campaign_id], map: "idx_mkt_files_campaign")
+  @@index([campaign_id, file_type], map: "idx_mkt_files_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_filter_flags_list {
+  id                         String                     @id @db.VarChar(255)
+  execution_id               String                     @db.VarChar(255)
+  response_number            Int?
+  failed_checks              Json?
+  suggested_fix              String?
+  human_override             String?
+  reviewed_by                String?
+  reviewed_at                DateTime?                  @db.Timestamptz(6)
+  status                     String                     @default("pending") @db.VarChar(50)
+  created_at                 DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                   @default(now()) @db.Timestamptz(6)
+  mkt_prompt_executions_list mkt_prompt_executions_list @relation(fields: [execution_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_filter_flags_execution")
+
+  @@index([execution_id], map: "idx_mkt_filter_flags_execution")
+  @@index([status, created_at(sort: Desc)], map: "idx_mkt_filter_flags_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_prompt_executions_list {
+  id                        String                     @id @db.VarChar(255)
+  campaign_id               String                     @db.VarChar(255)
+  template_id               String?                    @db.VarChar(255)
+  variables_used            Json?
+  raw_output                String?
+  filtered_output           String?
+  pass_rate                 Int?
+  flagged_count             Int                        @default(0)
+  status                    String                     @default("pending") @db.VarChar(50)
+  executed_by               String?
+  executed_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  ai_provider               String?                    @db.VarChar(50)
+  ai_model                  String?                    @db.VarChar(50)
+  tokens_used               Int                        @default(0)
+  cost_cents                Int                        @default(0)
+  created_at                DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                   @default(now()) @db.Timestamptz(6)
+  mkt_deliverables_list     mkt_deliverables_list[]
+  mkt_filter_flags_list     mkt_filter_flags_list[]
+  mkt_campaigns_list        mkt_campaigns_list         @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_executions_campaign")
+  mkt_prompt_templates_list mkt_prompt_templates_list? @relation(fields: [template_id], references: [id], onUpdate: NoAction, map: "fk_mkt_executions_template")
+
+  @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_executions_campaign")
+  @@index([status], map: "idx_mkt_executions_status")
+  @@index([template_id], map: "idx_mkt_executions_template")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_prompt_templates_list {
+  id                         String                       @id @db.VarChar(255)
+  name                       String                       @db.VarChar(100)
+  prompt_type                String                       @db.VarChar(50)
+  category                   String?                      @db.VarChar(100)
+  version                    Int                          @default(1)
+  body                       String
+  variables                  Json?
+  is_active                  Boolean                      @default(true)
+  is_default                 Boolean                      @default(false)
+  created_by                 String?
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  mkt_prompt_executions_list mkt_prompt_executions_list[]
+
+  @@index([category, is_active], map: "idx_mkt_prompt_templates_category")
+  @@index([prompt_type, is_active], map: "idx_mkt_prompt_templates_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_scorecards_list {
+  id                      String   @id @db.VarChar(255)
+  user_id                 String?
+  date                    DateTime @db.Date
+  category_focus          String?  @db.VarChar(100)
+  neighborhood_focus      String?  @db.VarChar(100)
+  previews_built          Int      @default(0)
+  previews_shown          Int      @default(0)
+  packages_paid           Int      @default(0)
+  packages_delivered      Int      @default(0)
+  revenue_collected_cents Int      @default(0)
+  retainers_pitched       Int      @default(0)
+  retainers_won           Int      @default(0)
+  notes                   String?
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([user_id, date])
+  @@index([date(sort: Desc)], map: "idx_mkt_scorecards_date")
+  @@index([user_id, date(sort: Desc)], map: "idx_mkt_scorecards_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_stage_history_list {
+  id                 String             @id @db.VarChar(255)
+  campaign_id        String             @db.VarChar(255)
+  from_stage         String?            @db.VarChar(50)
+  to_stage           String             @db.VarChar(50)
+  changed_by         String?
+  changed_at         DateTime           @default(now()) @db.Timestamptz(6)
+  notes              String?
+  trigger_type       String             @default("manual") @db.VarChar(50)
+  mkt_campaigns_list mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_stage_history_campaign")
+
+  @@index([campaign_id, changed_at(sort: Desc)], map: "idx_mkt_stage_history_campaign")
+}
+
 enum action {
   create
   update

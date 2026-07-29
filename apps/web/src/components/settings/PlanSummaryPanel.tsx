@@ -269,6 +269,7 @@ const CAPABILITY_DISPLAY: Record<string, { label: string; icon: string; settings
   platform_services: { label: 'Platform Services', icon: '🔧', settingsPath: '/settings/feature-store' },
   funnel_options: { label: 'Sales Funnels', icon: '⚡', settingsPath: '/settings/funnels' },
   coupon_options: { label: 'Coupons', icon: '🏷️', settingsPath: '/settings/coupon-options' },
+  marketing_ops: { label: 'Marketing Ops', icon: '📣', settingsPath: '/settings/admin/marketing-ops' },
 };
 
 // --- Resolved feature extraction per capability ---
@@ -1048,6 +1049,28 @@ function resolveCapabilitySummaries(caps: AllCapabilitiesState, highlight?: stri
       featureStatuses: statuses,
       isHighlighted: highlight === 'coupon_options',
       settingsPath: CAPABILITY_DISPLAY.coupon_options.settingsPath ?? null,
+    });
+  }
+
+  // Marketing Ops
+  const mo = caps.marketingOps;
+  if (mo && mo.enabled) {
+    const specifics: string[] = [];
+    const statuses: FeatureItem[] = [];
+    if (mo.canUsePromptExecution) { specifics.push('Prompt Execution'); statuses.push({ label: 'Prompt Execution', status: 'enabled' }); }
+    if (mo.canUseFilterReview) { specifics.push('Filter Review'); statuses.push({ label: 'Filter Review', status: 'enabled' }); }
+    if (mo.canUseBatchExecution) { specifics.push('Batch Execution'); statuses.push({ label: 'Batch Execution', status: 'enabled' }); }
+    if (mo.canUseRevenueTracking) { specifics.push('Revenue Tracking'); statuses.push({ label: 'Revenue Tracking', status: 'enabled' }); }
+    summaries.push({
+      key: 'marketing_ops',
+      label: CAPABILITY_DISPLAY.marketing_ops.label,
+      icon: CAPABILITY_DISPLAY.marketing_ops.icon,
+      enabled: mo.enabled,
+      merchantGated: false,
+      specificFeatures: specifics,
+      featureStatuses: statuses,
+      isHighlighted: highlight === 'marketing_ops',
+      settingsPath: CAPABILITY_DISPLAY.marketing_ops.settingsPath ?? null,
     });
   }
 

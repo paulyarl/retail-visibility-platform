@@ -415,6 +415,18 @@ const CONSTRAINT_METADATA: ConstraintMetadata = {
         { field: 'is_flexible', label: 'Is Flexible', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
       ],
     },
+    {
+      key: 'marketing_ops',
+      label: 'Marketing Ops',
+      fields: [
+        { field: 'enabled', label: 'Enabled', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_prompt_execution', label: 'Can Use Prompt Execution', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_filter_review', label: 'Can Use Filter Review', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_batch_execution', label: 'Can Use Batch Execution', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'can_use_revenue_tracking', label: 'Can Use Revenue Tracking', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+        { field: 'is_flexible', label: 'Is Flexible', value_type: 'boolean', operators: BOOL_OPS, values: ['true', 'false'] },
+      ],
+    },
   ],
   operators: ['equals', 'includes', 'not_includes', 'is_true', 'is_false'],
   types: ['requires', 'recommends', 'excludes', 'implies'],

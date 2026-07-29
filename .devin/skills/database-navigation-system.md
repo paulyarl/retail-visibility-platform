@@ -335,6 +335,8 @@ FROM navigation_links GROUP BY sort_order, targets HAVING count(*) > 1;
 
 17. **File-based fallbacks should stay in sync with database** — Even though the DB is the active system, keeping `buildAdminNavItems()`, `buildNavItems()`, and `buildTenantNav()` updated ensures: (a) fallback works correctly if API is down, (b) serves as a reference for what the DB structure should look like, (c) new agents can read the fallback to understand intended nav structure. When restructuring the DB, update the fallback arrays too.
 
+18. **`badge_variant` CHECK constraint rejects empty strings and NULL** — The `navigation_links_badge_variant_check` constraint only allows specific values: `'default'`, `'success'`, `'warning'`, `'error'`, `'new'`. An empty string `''` or NULL will violate the constraint. When inserting a link without a prominent badge, use `badge = ''` (empty string, satisfies NOT NULL) and `badge_variant = 'default'` (satisfies CHECK constraint). Do NOT use `badge_variant = ''` or `badge_variant = NULL`.
+
 ---
 
 ## Architecture Diagram
