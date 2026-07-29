@@ -403,14 +403,64 @@ export class MarketingCampaignService extends BaseService {
 
       const totalCampaigns = await this.prisma.mkt_campaigns_list.count();
 
+      const activeStages = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched'];
+      const activeCampaigns = await this.prisma.mkt_campaigns_list.count({
+        where: { stage: { in: activeStages } },
+      });
+
+      const retainersWon = await this.prisma.mkt_campaigns_list.count({
+        where: { retainer_status: 'won' },
+      });
+
+      const paidCount = await this.prisma.mkt_campaigns_list.count({
+        where: { stage: { in: ['paid', 'delivered', 'retainer_pitched', 'retainer_won'] } },
+      });
+      const shownCount = await this.prisma.mkt_campaigns_list.count({
+        where: { stage: { in: ['shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won'] } },
+      });
+      const conversionRate = shownCount > 0 ? paidCount / shownCount : 0;
+
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const weeklyRevenue = await this.prisma.mkt_campaigns_list.aggregate({
+        _sum: { amount_paid_cents: true },
+        where: { date_paid: { gte: weekAgo } },
+      });
+
+      const weeklyPreviews = await this.prisma.mkt_campaigns_list.count({
+        where: {
+          stage: { in: ['preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won'] },
+          date_entered: { gte: weekAgo },
+        },
+      });
+
+      const weeklyDelivered = await this.prisma.mkt_campaigns_list.count({
+        where: {
+          stage: { in: ['delivered', 'retainer_pitched', 'retainer_won'] },
+          date_entered: { gte: weekAgo },
+        },
+      });
+
+      const recentTransitions = await this.prisma.mkt_stage_history_list.findMany({
+        take: 10,
+        orderBy: { changed_at: 'desc' },
+        include: { mkt_campaigns_list: { select: { business_name: true, display_id: true } } },
+      });
+
       const stageMap: Record<string, number> = {};
       stageCounts.forEach((s: any) => { stageMap[s.stage] = s._count.id; });
 
       return {
         totalCampaigns,
+        activeCampaigns,
         stageCounts: stageMap,
         totalRevenueCents: totalRevenue._sum.amount_paid_cents || 0,
         totalRetainerRevenueCents: totalRetainerRevenue._sum.retainer_amount_cents || 0,
+        totalRetainersWon: retainersWon,
+        conversionRate,
+        weeklyRevenueCents: weeklyRevenue._sum.amount_paid_cents || 0,
+        weeklyPreviews,
+        weeklyDelivered,
+        recentTransitions,
       };
     } catch (error) {
       logger.error('Failed to get dashboard stats', ctx, { error: (error as Error).message });

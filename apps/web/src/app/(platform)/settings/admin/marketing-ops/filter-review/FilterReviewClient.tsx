@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Check, X, AlertCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Check, X, AlertCircle, CheckCircle, Wrench, Edit3, Save } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { FilterFlag, FilterFlagStatus } from '@/services/MarketingOpsService';
 
@@ -23,6 +23,9 @@ export default function FilterReviewClient() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterFlagStatus | ''>('pending');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const fetchFlags = useCallback(async () => {
     setLoading(true);
@@ -55,7 +58,52 @@ export default function FilterReviewClient() {
     }
   };
 
+  const handleBatchAction = async (status: FilterFlagStatus) => {
+    const pendingFlags = flags.filter((f) => f.status === 'pending');
+    if (pendingFlags.length === 0) return;
+    setBatchProcessing(true);
+    setError(null);
+    try {
+      await Promise.all(
+        pendingFlags.map((f) =>
+          marketingOpsService.updateFilterFlag(f.id, { status })
+        )
+      );
+      await fetchFlags();
+    } catch (err: any) {
+      setError(err.message || 'Failed to batch update flags');
+    } finally {
+      setBatchProcessing(false);
+    }
+  };
+
+  const handleStartEdit = (flag: FilterFlag) => {
+    setEditingId(flag.id);
+    setEditValue(flag.human_override || flag.suggested_fix || '');
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    setUpdating(id);
+    try {
+      await marketingOpsService.updateFilterFlag(id, {
+        status: 'fixed',
+        human_override: editValue,
+      });
+      setEditingId(null);
+      await fetchFlags();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save override');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const pendingCount = flags.filter((f) => f.status === 'pending').length;
+  const fixedCount = flags.filter((f) => f.status === 'fixed').length;
+  const approvedCount = flags.filter((f) => f.status === 'approved_as_is').length;
+  const passRate = flags.length > 0
+    ? ((fixedCount + approvedCount) / flags.length) * 100
+    : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
@@ -72,7 +120,7 @@ export default function FilterReviewClient() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Filter Review</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {pendingCount} pending review{pendingCount !== 1 ? 's' : ''}
+              {pendingCount} pending review{pendingCount !== 1 ? 's' : ''} · {flags.length} total · {passRate.toFixed(0)}% pass rate
             </p>
           </div>
           <button
@@ -84,6 +132,32 @@ export default function FilterReviewClient() {
             Refresh
           </button>
         </div>
+
+        {/* Batch Actions */}
+        {pendingCount > 0 && (
+          <div className="flex items-center gap-3 mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-400">
+              {pendingCount} pending flag{pendingCount !== 1 ? 's' : ''} awaiting review
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={() => handleBatchAction('fixed')}
+              disabled={batchProcessing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              Fix All
+            </button>
+            <button
+              onClick={() => handleBatchAction('approved_as_is')}
+              disabled={batchProcessing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              Approve All
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-6">
           <select
@@ -157,23 +231,62 @@ export default function FilterReviewClient() {
                 )}
 
                 {flag.status === 'pending' && (
-                  <div className="flex items-center gap-2 mt-3">
-                    <button
-                      onClick={() => handleUpdate(flag.id, 'fixed')}
-                      disabled={updating === flag.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Mark Fixed
-                    </button>
-                    <button
-                      onClick={() => handleUpdate(flag.id, 'approved_as_is')}
-                      disabled={updating === flag.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Approve As-Is
-                    </button>
+                  <div className="mt-3">
+                    {editingId === flag.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          rows={3}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter corrected output..."
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleSaveEdit(flag.id)}
+                            disabled={updating === flag.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            Save & Mark Fixed
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleUpdate(flag.id, 'fixed')}
+                          disabled={updating === flag.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Mark Fixed
+                        </button>
+                        <button
+                          onClick={() => handleUpdate(flag.id, 'approved_as_is')}
+                          disabled={updating === flag.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Approve As-Is
+                        </button>
+                        <button
+                          onClick={() => handleStartEdit(flag)}
+                          disabled={updating === flag.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          Edit Override
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

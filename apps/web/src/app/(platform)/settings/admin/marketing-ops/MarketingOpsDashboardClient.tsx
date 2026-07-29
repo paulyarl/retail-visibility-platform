@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, TrendingUp, DollarSign, Target, Trophy } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, RefreshCw, TrendingUp, DollarSign, Target, Trophy, Download, Activity, Eye, Package } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { DashboardStats, CampaignStage } from '@/services/MarketingOpsService';
 
@@ -35,13 +35,16 @@ export default function MarketingOpsDashboardClient() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const fetchRef = useRef<(() => Promise<void>) | null>(null);
 
   const fetchDashboard = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const data = await marketingOpsService.getDashboard();
       setStats(data);
+      setLastUpdated(new Date());
+      setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard');
     } finally {
@@ -51,7 +54,32 @@ export default function MarketingOpsDashboardClient() {
 
   useEffect(() => {
     fetchDashboard();
+    fetchRef.current = fetchDashboard;
+    const interval = setInterval(() => {
+      fetchRef.current?.();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [fetchDashboard]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const csv = await marketingOpsService.exportCsv();
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'marketing-campaigns.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'Failed to export CSV');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toLocaleString()}`;
 
@@ -71,16 +99,31 @@ export default function MarketingOpsDashboardClient() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Marketing Ops Dashboard</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Campaign pipeline health, conversion metrics, and revenue tracking
+              {lastUpdated && (
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                  · Updated {lastUpdated.toLocaleTimeString()}
+                </span>
+              )}
             </p>
           </div>
-          <button
-            onClick={fetchDashboard}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
+            >
+              <Download className="w-4 h-4" />
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button
+              onClick={fetchDashboard}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -103,6 +146,7 @@ export default function MarketingOpsDashboardClient() {
                   <Target className="w-5 h-5 text-blue-500" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCampaigns}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{stats.activeCampaigns} active</p>
               </div>
 
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
@@ -111,6 +155,7 @@ export default function MarketingOpsDashboardClient() {
                   <DollarSign className="w-5 h-5 text-green-500" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.totalRevenueCents)}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.weeklyRevenueCents)} this week</p>
               </div>
 
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
@@ -119,6 +164,7 @@ export default function MarketingOpsDashboardClient() {
                   <Trophy className="w-5 h-5 text-purple-500" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalRetainersWon}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.totalRetainerRevenueCents)} retainer revenue</p>
               </div>
 
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
@@ -127,6 +173,34 @@ export default function MarketingOpsDashboardClient() {
                   <TrendingUp className="w-5 h-5 text-amber-500" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{(stats.conversionRate * 100).toFixed(1)}%</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">shown → paid</p>
+              </div>
+            </div>
+
+            {/* Weekly Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Previews</span>
+                  <Eye className="w-5 h-5 text-indigo-500" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.weeklyPreviews}</p>
+              </div>
+
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Delivered</span>
+                  <Package className="w-5 h-5 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.weeklyDelivered}</p>
+              </div>
+
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Weekly Revenue</span>
+                  <Activity className="w-5 h-5 text-green-500" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.weeklyRevenueCents)}</p>
               </div>
             </div>
 
@@ -135,8 +209,8 @@ export default function MarketingOpsDashboardClient() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pipeline by Stage</h2>
               <div className="space-y-3">
                 {PIPELINE_STAGES.map((stage) => {
-                  const count = stats.byStage?.[stage] ?? 0;
-                  const maxCount = Math.max(...PIPELINE_STAGES.map((s) => stats.byStage?.[s] ?? 0), 1);
+                  const count = stats.stageCounts?.[stage] ?? stats.byStage?.[stage] ?? 0;
+                  const maxCount = Math.max(...PIPELINE_STAGES.map((s) => stats.stageCounts?.[s] ?? stats.byStage?.[s] ?? 0), 1);
                   const widthPct = (count / maxCount) * 100;
                   return (
                     <div key={stage} className="flex items-center gap-3">

@@ -250,10 +250,16 @@ export interface BrandingConfig {
 
 export interface DashboardStats {
   totalCampaigns: number;
-  byStage: Record<CampaignStage, number>;
+  activeCampaigns: number;
+  stageCounts: Record<string, number>;
+  byStage?: Record<CampaignStage, number>;
   totalRevenueCents: number;
+  totalRetainerRevenueCents: number;
   totalRetainersWon: number;
   conversionRate: number;
+  weeklyRevenueCents: number;
+  weeklyPreviews: number;
+  weeklyDelivered: number;
   recentTransitions?: StageHistory[];
 }
 
