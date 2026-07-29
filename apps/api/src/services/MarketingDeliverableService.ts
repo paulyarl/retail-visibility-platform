@@ -16,7 +16,7 @@ import { generateDeliverableTemplateId, generateDeliverableId } from '../lib/id-
 import { jsPDF } from 'jspdf';
 import * as fs from 'fs';
 import * as path from 'path';
-import MarketingBrandingService from './MarketingBrandingService';
+import { MarketingBrandingService } from './MarketingBrandingService';
 import MarketingCampaignService from './MarketingCampaignService';
 
 export type DeliverableType =
@@ -291,7 +291,7 @@ export class MarketingDeliverableService extends BaseService {
         }
       }
 
-      const brandingConfig = await MarketingBrandingService.getActiveConfig(ctx);
+      const brandingConfig = await MarketingBrandingService.getInstance().getActiveConfig(ctx);
 
       const orientation = template?.orientation || 'portrait';
       const pageSize = template?.page_size || 'letter';

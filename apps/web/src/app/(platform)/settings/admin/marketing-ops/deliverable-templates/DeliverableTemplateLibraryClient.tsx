@@ -242,7 +242,7 @@ export default function DeliverableTemplateLibraryClient() {
               </div>
 
               <div className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-                {template.page_size || 'letter'} - {template.orientation || 'portrait'} - v{template.version}
+                {template.page_size || 'letter'} - {template.orientation || 'portrait'}
               </div>
 
               <div className="flex items-center gap-2">
