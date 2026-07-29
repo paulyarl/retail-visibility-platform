@@ -345,18 +345,6 @@ router.get('/conversion-stats', async (req: any, res: Response) => {
   }
 });
 
-router.get('/:id', async (req: any, res: Response) => {
-  try {
-    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
-    if (!campaign) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    res.json({ success: true, data: campaign });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
 router.post('/', async (req: any, res: Response) => {
   try {
     const parsed = campaignCreateSchema.parse(req.body);
@@ -1095,6 +1083,20 @@ router.post('/deliverables/:id/send', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// NOTE: /:id must be registered AFTER all static single-segment GET routes
+// (e.g. /scorecards, /deliverable-templates, /branding) to avoid being shadowed
+router.get('/:id', async (req: any, res: Response) => {
+  try {
+    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    res.json({ success: true, data: campaign });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

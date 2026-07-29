@@ -5,6 +5,7 @@ import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download,
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history';
 
@@ -12,6 +13,7 @@ const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'pai
 
 export default function CampaignDetailClient({ campaignId }: { campaignId: string }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
+  const staffUsers = useStaffUsers();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -319,7 +321,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <DetailField label="Contact Method" value={campaign.contact_method} />
                   <DetailField label="Contact Info" value={campaign.contact_info} />
-                  <DetailField label="Assigned To" value={campaign.assigned_to} />
+                  <DetailField label="Assigned To" value={staffDisplayName(staffUsers, campaign.assigned_to)} />
                   <DetailField label="GBP Claimed" value={campaign.gbp_claimed != null ? (campaign.gbp_claimed ? 'Yes' : 'No') : null} />
                   <DetailField label="Unaddressed Reviews" value={campaign.unaddressed_reviews?.toString()} />
                   <DetailField label="Last Review Date" value={formatDate(campaign.last_review_date)} />

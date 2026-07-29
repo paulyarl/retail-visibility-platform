@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import marketingOpsService, { Campaign, CampaignStage, RetainerStatus, CampaignCreateInput, CampaignUpdateInput } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
+import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
@@ -68,6 +70,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vocab, setVocab] = useState({
+    categories: [] as string[],
+    cities: [] as string[],
+    neighborhoods: [] as string[],
+    contactMethods: [] as string[],
+    estimatedTiers: [] as string[],
+  });
+
+  useEffect(() => {
+    marketingOpsService.listCampaigns({ limit: 1000 })
+      .then(({ items }) => {
+        setVocab({
+          categories: distinctValues(items, (c) => c.category),
+          cities: distinctValues(items, (c) => c.city),
+          neighborhoods: distinctValues(items, (c) => c.neighborhood),
+          contactMethods: distinctValues(items, (c) => c.contact_method),
+          estimatedTiers: distinctValues(items, (c) => c.estimated_tier),
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchCampaign = useCallback(async () => {
     if (mode !== 'edit' || !campaignId) return;
@@ -217,32 +240,35 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 className={inputClass} />
             </FormField>
             <FormField label="Category" required>
-              <input type="text" required value={form.category} onChange={(e) => handleChange('category', e.target.value)}
-                className={inputClass} />
+              <SuggestiveSelect required value={form.category} onChange={(v) => handleChange('category', v)}
+                options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
+                newInputPlaceholder="Enter new category" className={inputClass} />
             </FormField>
             <FormField label="City" required>
-              <input type="text" required value={form.city} onChange={(e) => handleChange('city', e.target.value)}
-                className={inputClass} />
+              <SuggestiveSelect required value={form.city} onChange={(v) => handleChange('city', v)}
+                options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
+                newInputPlaceholder="Enter new city" className={inputClass} />
             </FormField>
             <FormField label="Neighborhood">
-              <input type="text" value={form.neighborhood} onChange={(e) => handleChange('neighborhood', e.target.value)}
-                className={inputClass} />
+              <SuggestiveSelect value={form.neighborhood} onChange={(v) => handleChange('neighborhood', v)}
+                options={vocab.neighborhoods} emptyLabel="-- Select neighborhood --" newLabel="+ New neighborhood..."
+                newInputPlaceholder="Enter new neighborhood" className={inputClass} />
             </FormField>
             <FormField label="Display ID">
               <input type="text" value={form.display_id} onChange={(e) => handleChange('display_id', e.target.value)}
                 className={inputClass} />
             </FormField>
             <FormField label="Assigned To">
-              <input type="text" value={form.assigned_to} onChange={(e) => handleChange('assigned_to', e.target.value)}
-                className={inputClass} />
+              <PlatformUserSelect value={form.assigned_to} onChange={(v) => handleChange('assigned_to', v)}
+                emptyLabel="-- Unassigned --" className={inputClass} />
             </FormField>
           </FormSection>
 
           {/* Contact & Audit Info */}
           <FormSection title="Contact & GBP Audit">
             <FormField label="Contact Method">
-              <input type="text" value={form.contact_method} onChange={(e) => handleChange('contact_method', e.target.value)}
-                className={inputClass} placeholder="phone, email, walk-in..." />
+              <ContactMethodChecklist value={form.contact_method} options={vocab.contactMethods}
+                onChange={(v) => handleChange('contact_method', v)} className={inputClass} />
             </FormField>
             <FormField label="Contact Info">
               <input type="text" value={form.contact_info} onChange={(e) => handleChange('contact_info', e.target.value)}
@@ -285,8 +311,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           {/* Pricing & Stage */}
           <FormSection title="Pricing & Stage">
             <FormField label="Estimated Tier">
-              <input type="text" value={form.estimated_tier} onChange={(e) => handleChange('estimated_tier', e.target.value)}
-                className={inputClass} placeholder="basic, standard, premium..." />
+              <SuggestiveSelect value={form.estimated_tier} onChange={(v) => handleChange('estimated_tier', v)}
+                options={vocab.estimatedTiers} emptyLabel="-- Select tier --" newLabel="+ New tier..."
+                newInputPlaceholder="Enter new tier" className={inputClass} />
             </FormField>
             <FormField label="Estimated Fee (cents)">
               <input type="number" value={form.estimated_fee_cents} onChange={(e) => handleChange('estimated_fee_cents', e.target.value === '' ? '' : parseInt(e.target.value))}
@@ -379,6 +406,77 @@ function FormField({ label, required, children }: { label: string; required?: bo
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
+    </div>
+  );
+}
+
+function ContactMethodChecklist({ value, options, onChange, className }: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newMethod, setNewMethod] = useState('');
+
+  const selected = value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const allOptions = [...new Set([...options, ...selected])].sort((a, b) => a.localeCompare(b));
+
+  const toggle = (method: string, checked: boolean) => {
+    const next = checked ? [...selected, method] : selected.filter((m) => m !== method);
+    onChange([...new Set(next)].join(', '));
+  };
+
+  const addNew = () => {
+    const m = newMethod.trim();
+    if (m && !selected.includes(m)) {
+      onChange([...selected, m].join(', '));
+    }
+    setNewMethod('');
+    setAdding(false);
+  };
+
+  return (
+    <div className="space-y-2">
+      {allOptions.length === 0 && !adding && (
+        <p className="text-xs text-gray-400 dark:text-gray-500">No contact methods yet. Add one below.</p>
+      )}
+      {allOptions.map((m) => (
+        <label key={m} className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={selected.includes(m)}
+            onChange={(e) => toggle(m, e.target.checked)}
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">{m}</span>
+        </label>
+      ))}
+      {adding ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            autoFocus
+            value={newMethod}
+            onChange={(e) => setNewMethod(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addNew(); } }}
+            placeholder="Enter new method"
+            className={className}
+          />
+          <button type="button" onClick={addNew}
+            className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+            Add
+          </button>
+          <button type="button" onClick={() => { setAdding(false); setNewMethod(''); }}
+            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700">
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)}
+          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+          + Add new method...
+        </button>
+      )}
     </div>
   );
 }

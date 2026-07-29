@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptType } from '@/services/MarketingOpsService';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   seek: 'Seek',
@@ -173,6 +174,7 @@ export default function PromptLibraryClient() {
       {showCreateModal && (
         <PromptTemplateModal
           template={editingTemplate}
+          categoryOptions={distinctValues(templates, (t) => t.category)}
           onClose={() => setShowCreateModal(false)}
           onSaved={async () => { setShowCreateModal(false); await fetchTemplates(); }}
         />
@@ -181,8 +183,9 @@ export default function PromptLibraryClient() {
   );
 }
 
-function PromptTemplateModal({ template, onClose, onSaved }: {
+function PromptTemplateModal({ template, categoryOptions, onClose, onSaved }: {
   template: PromptTemplate | null;
+  categoryOptions: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -243,7 +246,9 @@ function PromptTemplateModal({ template, onClose, onSaved }: {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Category (optional)</label>
-              <input type="text" value={category} onChange={(e) => setCategory(e.target.value)}
+              <SuggestiveSelect value={category} onChange={setCategory}
+                options={categoryOptions} emptyLabel="-- Select category --" newLabel="+ New category..."
+                newInputPlaceholder="Enter new category"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>

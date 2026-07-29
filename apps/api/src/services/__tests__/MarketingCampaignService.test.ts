@@ -74,7 +74,7 @@ describe('autoAdvanceStaleShownCampaigns', () => {
     mockCampaignsList.findMany.mockResolvedValue([staleShownCampaign('mkt-2')]);
     mockPreviewTokens.findMany.mockResolvedValue([{ campaign_id: 'mkt-2' }]);
 
-    const result = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
+    const result = await MarketingCampaignService.getInstance().autoAdvanceStaleShownCampaigns(7);
 
     expect(result).toEqual({ advanced: 0, skipped: 1 });
     expect(mockCampaignsList.update).not.toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe('autoAdvanceStaleShownCampaigns', () => {
   it('returns zeros when no stale campaigns exist', async () => {
     mockCampaignsList.findMany.mockResolvedValue([]);
 
-    const result = await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
+    const result = await MarketingCampaignService.getInstance().autoAdvanceStaleShownCampaigns(7);
 
     expect(result).toEqual({ advanced: 0, skipped: 0 });
     expect(mockPreviewTokens.findMany).not.toHaveBeenCalled();

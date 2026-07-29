@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, Save, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { Scorecard } from '@/services/MarketingOpsService';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
+import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 export default function ScorecardClient() {
   const [scorecards, setScorecards] = useState<Scorecard[]>([]);
@@ -28,6 +30,20 @@ export default function ScorecardClient() {
     retainers_won: 0,
     notes: '',
   });
+
+  const [vocab, setVocab] = useState({ categories: [] as string[], neighborhoods: [] as string[] });
+
+  useEffect(() => {
+    Promise.all([
+      marketingOpsService.listCampaigns({ limit: 1000 }).catch(() => ({ items: [], total: 0 })),
+      marketingOpsService.listScorecards().catch(() => [] as Scorecard[]),
+    ]).then(([{ items }, cards]) => {
+      setVocab({
+        categories: [...new Set([...distinctValues(items, (c) => c.category), ...distinctValues(cards, (s) => s.category_focus)])].sort((a, b) => a.localeCompare(b)),
+        neighborhoods: [...new Set([...distinctValues(items, (c) => c.neighborhood), ...distinctValues(cards, (s) => s.neighborhood_focus)])].sort((a, b) => a.localeCompare(b)),
+      });
+    });
+  }, []);
 
   const fetchScorecards = useCallback(async () => {
     setLoading(true);
@@ -134,8 +150,8 @@ export default function ScorecardClient() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">User ID</label>
-                <input type="text" value={form.user_id} onChange={(e) => setForm((p) => ({ ...p, user_id: e.target.value }))}
-                  className={inputClass} placeholder="auth0|..." />
+                <PlatformUserSelect required value={form.user_id} onChange={(v) => setForm((p) => ({ ...p, user_id: v }))}
+                  emptyLabel="-- Select user --" className={inputClass} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Date</label>
@@ -144,13 +160,15 @@ export default function ScorecardClient() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Category Focus</label>
-                <input type="text" value={form.category_focus} onChange={(e) => setForm((p) => ({ ...p, category_focus: e.target.value }))}
-                  className={inputClass} />
+                <SuggestiveSelect value={form.category_focus} onChange={(v) => setForm((p) => ({ ...p, category_focus: v }))}
+                  options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
+                  newInputPlaceholder="Enter new category" className={inputClass} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Neighborhood Focus</label>
-                <input type="text" value={form.neighborhood_focus} onChange={(e) => setForm((p) => ({ ...p, neighborhood_focus: e.target.value }))}
-                  className={inputClass} />
+                <SuggestiveSelect value={form.neighborhood_focus} onChange={(v) => setForm((p) => ({ ...p, neighborhood_focus: v }))}
+                  options={vocab.neighborhoods} emptyLabel="-- Select neighborhood --" newLabel="+ New neighborhood..."
+                  newInputPlaceholder="Enter new neighborhood" className={inputClass} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Previews Built</label>

@@ -5,6 +5,7 @@ import { ArrowLeft, RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon } fr
 import Link from 'next/link';
 import marketingOpsService, { Campaign, CampaignStage } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
+import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -15,6 +16,7 @@ export default function CampaignListClient() {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<CampaignStage | ''>('');
+  const staffUsers = useStaffUsers();
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -177,7 +179,7 @@ export default function CampaignListClient() {
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.amount_paid_cents)}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.assigned_to ?? '—'}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{staffDisplayName(staffUsers, c.assigned_to) ?? '—'}</td>
                       </tr>
                     ))
                   )}
@@ -211,7 +213,7 @@ export default function CampaignListClient() {
                             <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{c.business_name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{c.category} · {c.city}</p>
                             <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-gray-400">{c.assigned_to ?? 'Unassigned'}</span>
+                              <span className="text-xs text-gray-400">{staffDisplayName(staffUsers, c.assigned_to) ?? 'Unassigned'}</span>
                               {c.estimated_fee_cents != null && (
                                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</span>
                               )}

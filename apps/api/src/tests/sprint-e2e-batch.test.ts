@@ -87,6 +87,18 @@ const {
   mockSetCouponTargets: vi.fn(),
   mockChargePaymentMethod: vi.fn(),
   mockInvalidateEffectiveCapabilities: vi.fn(),
+  mockMktCampaigns: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
+  mockMktStageHistory: { create: vi.fn() },
+  mockMktPreviewTokens: { findMany: vi.fn() },
+  mockMktPromptTemplates: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() },
+  mockMktPromptExecutions: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  mockMktFilterFlags: { create: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  mockMktDeliverableTemplates: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() },
+  mockMktDeliverables: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  mockMktScorecards: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  mockMktFiles: { create: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
+  mockMktBrandingConfig: { create: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  mockMktAudits: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
 }));
 
 // ── Mock prisma ────────────────────────────────────────────────────────
@@ -102,6 +114,18 @@ vi.mock('../prisma', () => ({
     tenant_feature_purchases: mockPrismaTenantFeaturePurchases,
     bsaas_bundles: mockPrismaBsaasBundles,
     funnel_events: mockPrismaFunnelEvents,
+    mkt_campaigns_list: mockMktCampaigns,
+    mkt_stage_history_list: mockMktStageHistory,
+    mkt_deliverable_preview_tokens: mockMktPreviewTokens,
+    mkt_prompt_templates_list: mockMktPromptTemplates,
+    mkt_prompt_executions_list: mockMktPromptExecutions,
+    mkt_filter_flags_list: mockMktFilterFlags,
+    mkt_deliverable_templates_list: mockMktDeliverableTemplates,
+    mkt_deliverables_list: mockMktDeliverables,
+    mkt_scorecards_list: mockMktScorecards,
+    mkt_files_list: mockMktFiles,
+    mkt_branding_config: mockMktBrandingConfig,
+    mkt_audits_list: mockMktAudits,
   },
 }));
 
@@ -153,6 +177,61 @@ vi.mock('../services/subscription/BillingNotificationService', () => ({
   }),
 }));
 
+vi.mock('../services/MarketingBrandingService', () => ({
+  MarketingBrandingService: {
+    getInstance: () => ({
+      getActiveConfig: vi.fn().mockResolvedValue(null),
+    }),
+    applyBrandingToDoc: vi.fn().mockReturnValue(25),
+    applyWatermark: vi.fn(),
+  },
+}));
+
+vi.mock('../services/DemoTenantService', () => ({
+  default: {
+    createDemoTenant: vi.fn().mockResolvedValue({ id: 'demo-test-001', slug: 'test-slug', template: 'specialty_retail' }),
+  },
+}));
+
+vi.mock('../lib/id-generator', () => ({
+  generateCampaignId: () => 'mkt-camp-test-001',
+  generateStageHistoryId: () => 'msh-test-001',
+  generatePromptTemplateId: () => 'mpt-test-001',
+  generatePromptExecutionId: () => 'mpe-test-001',
+  generateFilterFlagId: () => 'mff-test-001',
+  generateDeliverableTemplateId: () => 'mdt-test-001',
+  generateDeliverableId: () => 'mdel-test-001',
+  generatePreviewTokenId: () => 'mpt-token-001',
+  generatePreviewToken: () => 'preview-token-abc123',
+  generateScorecardId: () => 'msc-test-001',
+  generateMarketingFileId: () => 'mkf-test-001',
+  generateBrandingConfigId: () => 'mbc-test-001',
+  generateMarketingAuditId: () => 'mau-test-001',
+}));
+
+vi.mock('jspdf', () => ({
+  jsPDF: vi.fn().mockImplementation(() => ({
+    internal: { pageSize: { getWidth: () => 216, getHeight: () => 279 } },
+    setFontSize: vi.fn(),
+    setTextColor: vi.fn(),
+    setFont: vi.fn(),
+    setDrawColor: vi.fn(),
+    text: vi.fn(),
+    line: vi.fn(),
+    splitTextToSize: vi.fn().mockReturnValue(['line']),
+    output: vi.fn().mockReturnValue(new ArrayBuffer(64)),
+    getNumberOfPages: vi.fn().mockReturnValue(1),
+    setPage: vi.fn(),
+    addPage: vi.fn(),
+  })),
+}));
+
+vi.mock('fs', () => ({
+  existsSync: vi.fn().mockReturnValue(false),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+}));
+
 // ── Imports (after mocks) ──────────────────────────────────────────────
 
 import wholesaleMatchingService from '../services/WholesaleMatchingService';
@@ -161,6 +240,11 @@ import { calculateRenewalCharge } from '../jobs/bsaas-renewal';
 import { validatePromoCode } from '../routes/bsaas-purchases';
 import { processClickExpiry } from '../jobs/affiliate-click-expiry';
 import FunnelAnalyticsService from '../services/FunnelAnalyticsService';
+import MarketingCampaignService from '../services/MarketingCampaignService';
+import MarketingPromptService from '../services/MarketingPromptService';
+import MarketingDeliverableService from '../services/MarketingDeliverableService';
+import MarketingScorecardService from '../services/MarketingScorecardService';
+import MarketingFileService from '../services/MarketingFileService';
 
 // ── Test data fixtures ─────────────────────────────────────────────────
 
