@@ -1012,6 +1012,54 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-deliverables');
   }
 
+  async generateDeliverable(campaignId: string, input: {
+    templateId?: string;
+    executionId?: string;
+    deliverableType: DeliverableType;
+    isPreview: boolean;
+    content?: string;
+  }): Promise<Deliverable> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/deliverables/generate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          template_id: input.templateId,
+          execution_id: input.executionId,
+          deliverable_type: input.deliverableType,
+          is_preview: input.isPreview,
+          content: input.content,
+        }),
+      },
+      `mkt-ops-deliverable-generate-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate deliverable');
+    }
+    await this.invalidateCachePattern(`mkt-ops-deliverables-${campaignId}`);
+    await this.invalidateCachePattern(`mkt-ops-campaign-${campaignId}`);
+    return result.data;
+  }
+
+  getDeliverableDownloadUrl(deliverableId: string): string {
+    return `${BASE_URL}/deliverables/${deliverableId}/download`;
+  }
+
+  async sendDeliverable(deliverableId: string, sentMethod: string): Promise<Deliverable> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverables/${deliverableId}/send`,
+      { method: 'POST', body: JSON.stringify({ sent_method: sentMethod }) },
+      `mkt-ops-deliverable-send-${deliverableId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to mark deliverable as sent');
+    }
+    await this.invalidateCachePattern('mkt-ops-deliverables');
+    return result.data;
+  }
+
   // ─── Branding ───────────────────────────────────────────────
 
   async listBrandingConfigs(): Promise<BrandingConfig[]> {

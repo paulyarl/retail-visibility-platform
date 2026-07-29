@@ -56,6 +56,9 @@
  *   Deliverables:
  *     GET    /:campaignId/deliverables      — list deliverables for campaign
  *     POST   /:campaignId/deliverables      — create deliverable
+ *     POST   /:campaignId/deliverables/generate — generate PDF deliverable
+ *     GET    /deliverables/:id/download     — download deliverable PDF
+ *     POST   /deliverables/:id/send         — mark deliverable as sent
  *     PUT    /deliverables/:id              — update deliverable
  *     DELETE /deliverables/:id              — delete deliverable
  *
@@ -72,6 +75,7 @@
 
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import * as fs from 'fs';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
@@ -980,6 +984,72 @@ router.delete('/branding/:id', async (req: any, res: Response) => {
     await MarketingBrandingService.deleteConfig(req.params.id, getCtx(req));
     res.json({ success: true });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// DELIVERABLE GENERATION ROUTES
+// ====================
+
+const deliverableGenerateSchema = z.object({
+  template_id: z.string().optional(),
+  execution_id: z.string().optional(),
+  deliverable_type: z.enum(['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet']),
+  is_preview: z.boolean().default(true),
+  content: z.string().optional(),
+});
+
+const deliverableSendSchema = z.object({
+  sent_method: z.enum(['email', 'sms', 'hand_delivery', 'portal_download', 'other']),
+});
+
+router.post('/:campaignId/deliverables/generate', async (req: any, res: Response) => {
+  try {
+    const parsed = deliverableGenerateSchema.parse(req.body);
+    const deliverable = await MarketingDeliverableService.generateDeliverable({
+      campaignId: req.params.campaignId,
+      templateId: parsed.template_id,
+      executionId: parsed.execution_id,
+      deliverableType: parsed.deliverable_type,
+      isPreview: parsed.is_preview,
+      content: parsed.content,
+      generatedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: deliverable });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/deliverables/:id/download', async (req: any, res: Response) => {
+  try {
+    const fileInfo = await MarketingDeliverableService.getDeliverableFilePath(req.params.id, getCtx(req));
+    if (!fileInfo) {
+      return res.status(404).json({ success: false, error: 'Deliverable file not found' });
+    }
+    const pdfBuffer = fs.readFileSync(fileInfo.filePath);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileInfo.fileName)}`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/deliverables/:id/send', async (req: any, res: Response) => {
+  try {
+    const parsed = deliverableSendSchema.parse(req.body);
+    const deliverable = await MarketingDeliverableService.markAsSent(req.params.id, parsed.sent_method, getCtx(req));
+    res.json({ success: true, data: deliverable });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

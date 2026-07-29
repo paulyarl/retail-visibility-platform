@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 
-type Tab = 'overview' | 'audits' | 'files' | 'history';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead'];
 
@@ -16,6 +16,16 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [transitioning, setTransitioning] = useState(false);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [deliverableTemplates, setDeliverableTemplates] = useState<DeliverableTemplate[]>([]);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
+    templateId: '',
+    deliverableType: 'review_responses',
+    isPreview: true,
+    content: '',
+  });
 
   const fetchCampaign = useCallback(async () => {
     setLoading(true);
@@ -33,6 +43,25 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   useEffect(() => {
     fetchCampaign();
   }, [fetchCampaign]);
+
+  const fetchDeliverables = useCallback(async () => {
+    try {
+      const [delivs, templates] = await Promise.all([
+        marketingOpsService.listDeliverables(campaignId),
+        marketingOpsService.listDeliverableTemplates({ is_active: true }),
+      ]);
+      setDeliverables(delivs);
+      setDeliverableTemplates(templates);
+    } catch {
+      // silent fail — deliverables tab will show empty state
+    }
+  }, [campaignId]);
+
+  useEffect(() => {
+    if (activeTab === 'deliverables') {
+      fetchDeliverables();
+    }
+  }, [activeTab, fetchDeliverables]);
 
   const handleTransition = async (toStage: CampaignStage) => {
     setTransitioning(true);
@@ -63,6 +92,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'overview', label: 'Overview' },
     { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
     { key: 'files', label: 'Files', count: campaign?.files?.length },
+    { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
   ];
 
@@ -254,6 +284,80 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
               </div>
             )}
 
+            {activeTab === 'deliverables' && (
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Generated Deliverables</h3>
+                  <button
+                    onClick={() => setShowGenerateModal(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Generate New
+                  </button>
+                </div>
+
+                {deliverables.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <FileText className="w-10 h-10 text-gray-300 mb-2" />
+                    <p className="text-sm text-gray-400">No deliverables generated yet.</p>
+                    <button
+                      onClick={() => setShowGenerateModal(true)}
+                      className="mt-3 flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Generate First Deliverable
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {deliverables.map((deliv) => (
+                      <div key={deliv.id} className="flex items-center justify-between border border-gray-200 dark:border-neutral-700 rounded-lg p-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{deliv.file_name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {deliv.deliverable_type.replace(/_/g, ' ')} · {deliv.status}
+                              {deliv.is_watermarked && ' · watermarked'}
+                              {deliv.sent_at && ` · sent via ${deliv.sent_method}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={marketingOpsService.getDeliverableDownloadUrl(deliv.id)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                          >
+                            <Download className="w-3 h-3" />
+                            Download
+                          </a>
+                          {!deliv.sent_at && (
+                            <button
+                              onClick={async () => {
+                                const method = prompt('Send method (email, sms, hand_delivery, portal_download, other):', 'email');
+                                if (!method) return;
+                                try {
+                                  await marketingOpsService.sendDeliverable(deliv.id, method);
+                                  await fetchDeliverables();
+                                } catch (err: any) {
+                                  setError(err.message || 'Failed to mark as sent');
+                                }
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                            >
+                              <Send className="w-3 h-3" />
+                              Mark Sent
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'history' && (
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
                 {(campaign.stage_history ?? []).length === 0 ? (
@@ -282,6 +386,111 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
           </div>
         )}
       </div>
+
+      {showGenerateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Generate Deliverable</h2>
+              <button
+                onClick={() => setShowGenerateModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Template (optional)</label>
+                <select
+                  value={genForm.templateId}
+                  onChange={(e) => setGenForm({ ...genForm, templateId: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">No template (use default layout)</option>
+                  {deliverableTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deliverable Type</label>
+                <select
+                  value={genForm.deliverableType}
+                  onChange={(e) => setGenForm({ ...genForm, deliverableType: e.target.value as DeliverableType })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="review_responses">Review Responses</option>
+                  <option value="service_menu">Service Menu</option>
+                  <option value="gbp_audit">GBP Audit Report</option>
+                  <option value="testimonial_cards">Testimonial Cards</option>
+                  <option value="nap_report">NAP Consistency Report</option>
+                  <option value="seo_content">SEO Content</option>
+                  <option value="lead_magnet">Lead Magnet</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content (optional)</label>
+                <textarea
+                  rows={4}
+                  value={genForm.content}
+                  onChange={(e) => setGenForm({ ...genForm, content: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  placeholder="Custom content for the deliverable. Leave empty to use execution output."
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_preview"
+                  checked={genForm.isPreview}
+                  onChange={(e) => setGenForm({ ...genForm, isPreview: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="is_preview" className="text-sm text-gray-700 dark:text-gray-300">
+                  Generate as preview (watermarked)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setShowGenerateModal(false)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setGenerating(true);
+                  try {
+                    await marketingOpsService.generateDeliverable(campaignId, {
+                      templateId: genForm.templateId || undefined,
+                      deliverableType: genForm.deliverableType,
+                      isPreview: genForm.isPreview,
+                      content: genForm.content || undefined,
+                    });
+                    setShowGenerateModal(false);
+                    await fetchDeliverables();
+                  } catch (err: any) {
+                    setError(err.message || 'Failed to generate deliverable');
+                  } finally {
+                    setGenerating(false);
+                  }
+                }}
+                disabled={generating}
+                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {generating ? 'Generating...' : 'Generate PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

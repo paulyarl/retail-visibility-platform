@@ -13,6 +13,7 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateBrandingConfigId } from '../lib/id-generator';
+import { jsPDF } from 'jspdf';
 
 export interface BrandingConfigInput {
   operatorName: string;
@@ -136,6 +137,71 @@ export class MarketingBrandingService extends BaseService {
       where: { is_active: true },
       data: { is_active: false },
     });
+  }
+
+  // ====================
+  // STATIC PDF HELPERS
+  // ====================
+
+  static applyBrandingToDoc(
+    doc: jsPDF,
+    config: any,
+    opts: { pageWidth: number; margin: number; startY: number },
+  ): number {
+    let yPos = opts.startY;
+
+    if (config.operator_logo_url) {
+      try {
+        doc.addImage(config.operator_logo_url, 'PNG', opts.margin, yPos, 30, 15);
+        yPos += 18;
+      } catch {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(config.primary_color || '#111827');
+        doc.text(config.operator_name || 'Operator', opts.margin, yPos);
+        yPos += 8;
+      }
+    } else {
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      const hex = config.primary_color || '#111827';
+      const rgb = MarketingBrandingService.hexToRgb(hex);
+      doc.setTextColor(rgb.r, rgb.g, rgb.b);
+      doc.text(config.operator_name || 'Operator', opts.margin, yPos);
+      yPos += 8;
+    }
+
+    if (config.accent_color) {
+      const accentRgb = MarketingBrandingService.hexToRgb(config.accent_color);
+      doc.setDrawColor(accentRgb.r, accentRgb.g, accentRgb.b);
+      doc.setLineWidth(0.5);
+      doc.line(opts.margin, yPos, opts.pageWidth - opts.margin, yPos);
+      yPos += 5;
+    }
+
+    doc.setTextColor(0, 0, 0);
+    return yPos;
+  }
+
+  static applyWatermark(doc: jsPDF, pageWidth: number, pageHeight: number): void {
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.saveGraphicsState();
+      doc.setFontSize(50);
+      doc.setTextColor(200, 200, 200);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PREVIEW', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
+      doc.restoreGraphicsState();
+    }
+  }
+
+  private static hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const cleaned = hex.replace('#', '');
+    const r = parseInt(cleaned.substring(0, 2), 16) || 0;
+    const g = parseInt(cleaned.substring(2, 4), 16) || 0;
+    const b = parseInt(cleaned.substring(4, 6), 16) || 0;
+    return { r, g, b };
   }
 }
 

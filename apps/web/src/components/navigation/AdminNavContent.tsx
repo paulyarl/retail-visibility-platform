@@ -332,11 +332,13 @@ const buildAdminNavItems = (): NavItem[] => [
     href: '/settings/admin/marketing-ops',
     prefetch: false,
     children: [
-      { label: 'Dashboard',       href: '/settings/admin/marketing-ops' },
-      { label: 'Campaigns',       href: '/settings/admin/marketing-ops/campaigns' },
-      { label: 'Prompt Library',  href: '/settings/admin/marketing-ops/prompts' },
-      { label: 'Filter Review',   href: '/settings/admin/marketing-ops/filter-review' },
-      { label: 'Scorecards',      href: '/settings/admin/marketing-ops/scorecards' },
+      { label: 'Dashboard',            href: '/settings/admin/marketing-ops' },
+      { label: 'Campaigns',            href: '/settings/admin/marketing-ops/campaigns' },
+      { label: 'Prompt Library',       href: '/settings/admin/marketing-ops/prompts' },
+      { label: 'Deliverable Templates', href: '/settings/admin/marketing-ops/deliverable-templates' },
+      { label: 'Branding',             href: '/settings/admin/marketing-ops/branding' },
+      { label: 'Filter Review',        href: '/settings/admin/marketing-ops/filter-review' },
+      { label: 'Scorecards',           href: '/settings/admin/marketing-ops/scorecards' },
     ],
   },
   {

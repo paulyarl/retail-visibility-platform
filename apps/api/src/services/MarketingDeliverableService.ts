@@ -13,6 +13,11 @@ import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateDeliverableTemplateId, generateDeliverableId } from '../lib/id-generator';
+import { jsPDF } from 'jspdf';
+import * as fs from 'fs';
+import * as path from 'path';
+import MarketingBrandingService from './MarketingBrandingService';
+import MarketingCampaignService from './MarketingCampaignService';
 
 export type DeliverableType =
   | 'review_responses'
@@ -256,6 +261,269 @@ export class MarketingDeliverableService extends BaseService {
     } catch (error) {
       logger.error('Failed to delete deliverable', ctx, { error: (error as Error).message, deliverableId: id });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // PDF GENERATION
+  // ====================
+
+  async generateDeliverable(input: {
+    campaignId: string;
+    templateId?: string;
+    executionId?: string;
+    deliverableType: DeliverableType;
+    isPreview: boolean;
+    content?: string;
+    generatedBy?: string;
+  }, ctx?: RequestCtx): Promise<any> {
+    try {
+      const campaign = await MarketingCampaignService.getCampaign(input.campaignId, ctx);
+      if (!campaign) {
+        throw new Error(`Campaign ${input.campaignId} not found`);
+      }
+
+      let template: any = null;
+      if (input.templateId) {
+        template = await this.getTemplate(input.templateId, ctx);
+        if (!template) {
+          throw new Error(`Template ${input.templateId} not found`);
+        }
+      }
+
+      const brandingConfig = await MarketingBrandingService.getActiveConfig(ctx);
+
+      const orientation = template?.orientation || 'portrait';
+      const pageSize = template?.page_size || 'letter';
+      const doc = new jsPDF({ orientation: orientation as 'portrait' | 'landscape', unit: 'mm', format: pageSize });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      let yPos = 25;
+
+      if (brandingConfig) {
+        yPos = MarketingBrandingService.applyBrandingToDoc(doc, brandingConfig, {
+          pageWidth,
+          margin,
+          startY: yPos,
+        });
+      }
+
+      doc.setFontSize(18);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.text(template?.name || this.formatDeliverableType(input.deliverableType), margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Campaign: ${campaign.business_name}`, margin, yPos);
+      yPos += 5;
+      doc.text(`${campaign.category} - ${campaign.city}`, margin, yPos);
+      yPos += 5;
+      const dateStr = new Date().toLocaleDateString();
+      doc.text(`Generated: ${dateStr}${input.isPreview ? ' (PREVIEW)' : ''}`, margin, yPos);
+      yPos += 10;
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+
+      const content = input.content || await this.extractContentFromExecution(input.executionId, ctx);
+      const layoutSpec = template?.layout_spec || this.getDefaultLayoutSpec(input.deliverableType);
+
+      yPos = this.renderLayoutSections(doc, layoutSpec, content, {
+        margin,
+        pageWidth,
+        pageHeight,
+        yPos,
+        isPreview: input.isPreview,
+      });
+
+      if (brandingConfig?.footer_disclaimer) {
+        yPos = pageHeight - 25;
+        doc.setFontSize(7);
+        doc.setTextColor(150, 150, 150);
+        const footerLines = doc.splitTextToSize(brandingConfig.footer_disclaimer, pageWidth - 2 * margin);
+        doc.text(footerLines, margin, yPos);
+      }
+
+      if (input.isPreview) {
+        MarketingBrandingService.applyWatermark(doc, pageWidth, pageHeight);
+      }
+
+      const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+
+      const displayId = campaign.display_id || campaign.id.substring(0, 8);
+      const fileType = input.isPreview ? 'preview' : 'paid';
+      const fileName = `${displayId}_${fileType}_${dateStr.replace(/\//g, '-')}.pdf`;
+
+      const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+      const deliverableDir = path.join(uploadDir, 'marketing-ops', input.campaignId);
+      if (!fs.existsSync(deliverableDir)) {
+        fs.mkdirSync(deliverableDir, { recursive: true });
+      }
+      const filePath = path.join(deliverableDir, fileName);
+      fs.writeFileSync(filePath, pdfBuffer);
+
+      const deliverable = await this.createDeliverable({
+        campaignId: input.campaignId,
+        executionId: input.executionId,
+        templateId: input.templateId,
+        deliverableType: input.deliverableType,
+        status: input.isPreview ? 'preview' : 'paid',
+        fileName,
+        storagePath: `/uploads/marketing-ops/${input.campaignId}/${fileName}`,
+        fileSize: pdfBuffer.length,
+        mimeType: 'application/pdf',
+        isWatermarked: input.isPreview,
+        brandingApplied: brandingConfig ? { operatorName: brandingConfig.operator_name, primaryColor: brandingConfig.primary_color } : null,
+        generatedBy: input.generatedBy,
+      }, ctx);
+
+      logger.info('Deliverable generated', ctx, {
+        deliverableId: deliverable.id,
+        campaignId: input.campaignId,
+        type: input.deliverableType,
+        isPreview: input.isPreview,
+        fileSize: pdfBuffer.length,
+      });
+
+      return deliverable;
+    } catch (error) {
+      logger.error('Failed to generate deliverable', ctx, { error: (error as Error).message, campaignId: input.campaignId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  async getDeliverableFilePath(deliverableId: string, ctx?: RequestCtx): Promise<{ filePath: string; fileName: string; mimeType: string } | null> {
+    try {
+      const deliverable = await this.getDeliverable(deliverableId, ctx);
+      if (!deliverable) return null;
+
+      const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+      const fullPath = path.join(uploadDir, deliverable.storage_path.replace('/uploads/', ''));
+      if (!fs.existsSync(fullPath)) return null;
+
+      return {
+        filePath: fullPath,
+        fileName: deliverable.file_name,
+        mimeType: deliverable.mime_type || 'application/pdf',
+      };
+    } catch (error) {
+      logger.error('Failed to get deliverable file path', ctx, { error: (error as Error).message, deliverableId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  async markAsSent(deliverableId: string, sentMethod: string, ctx?: RequestCtx): Promise<any> {
+    try {
+      return await this.updateDeliverable(deliverableId, {
+        sentAt: new Date(),
+        sentMethod,
+      }, ctx);
+    } catch (error) {
+      logger.error('Failed to mark deliverable as sent', ctx, { error: (error as Error).message, deliverableId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  private formatDeliverableType(type: DeliverableType): string {
+    const labels: Record<DeliverableType, string> = {
+      review_responses: 'Review Responses',
+      service_menu: 'Service Menu',
+      gbp_audit: 'GBP Audit Report',
+      testimonial_cards: 'Testimonial Cards',
+      nap_report: 'NAP Consistency Report',
+      seo_content: 'SEO Content',
+      lead_magnet: 'Lead Magnet',
+    };
+    return labels[type] || type;
+  }
+
+  private getDefaultLayoutSpec(type: DeliverableType): any {
+    return {
+      sections: [
+        { type: 'heading', text: this.formatDeliverableType(type) },
+        { type: 'body', text: 'Content will be populated from AI execution output.' },
+      ],
+    };
+  }
+
+  private renderLayoutSections(
+    doc: jsPDF,
+    layoutSpec: any,
+    content: string,
+    opts: { margin: number; pageWidth: number; pageHeight: number; yPos: number; isPreview: boolean },
+  ): number {
+    const { margin, pageWidth, pageHeight } = opts;
+    let yPos = opts.yPos;
+    const sections = layoutSpec?.sections || [];
+
+    for (const section of sections) {
+      if (yPos > pageHeight - 40) {
+        doc.addPage();
+        yPos = 25;
+      }
+
+      const text = section.text || (section.type === 'body' ? String(content) : '');
+
+      switch (section.type) {
+        case 'heading':
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text(text, margin, yPos);
+          yPos += 8;
+          break;
+        case 'subheading':
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(50, 50, 50);
+          doc.text(text, margin, yPos);
+          yPos += 6;
+          break;
+        case 'body':
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(60, 60, 60);
+          const lines = doc.splitTextToSize(text, pageWidth - 2 * margin);
+          for (const line of lines) {
+            if (yPos > pageHeight - 30) {
+              doc.addPage();
+              yPos = 25;
+            }
+            doc.text(line, margin, yPos);
+            yPos += 5;
+          }
+          yPos += 3;
+          break;
+        case 'divider':
+          doc.setDrawColor(200, 200, 200);
+          doc.line(margin, yPos, pageWidth - margin, yPos);
+          yPos += 8;
+          break;
+        case 'spacing':
+          yPos += section.height || 5;
+          break;
+      }
+    }
+
+    return yPos;
+  }
+
+  private async extractContentFromExecution(executionId: string | undefined, ctx?: RequestCtx): Promise<string> {
+    if (!executionId) return '';
+    try {
+      const execution = await this.prisma.mkt_prompt_executions_list.findUnique({
+        where: { id: executionId },
+        select: { filtered_output: true, raw_output: true },
+      });
+      return execution?.filtered_output || execution?.raw_output || '';
+    } catch {
+      return '';
     }
   }
 }
