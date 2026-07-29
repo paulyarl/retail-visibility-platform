@@ -206,6 +206,9 @@ vi.mock('../services/DemoTenantService', () => ({
 }));
 
 vi.mock('../lib/id-generator', () => ({
+  generateAffiliateClickId: (tenantId: string) => `aclick_${tenantId}_abc123`,
+  generateBrandPartnerClaimId: () => 'bpc_abc123def456',
+  generateProductSupplierId: () => 'psup_test_001',
   generateCampaignId: () => 'mkt-camp-test-001',
   generateStageHistoryId: () => 'msh-test-001',
   generatePromptTemplateId: () => 'mpt-test-001',
@@ -221,22 +224,23 @@ vi.mock('../lib/id-generator', () => ({
   generateMarketingAuditId: () => 'mau-test-001',
 }));
 
-vi.mock('jspdf', () => ({
-  jsPDF: vi.fn().mockImplementation(() => ({
-    internal: { pageSize: { getWidth: () => 216, getHeight: () => 279 } },
-    setFontSize: vi.fn(),
-    setTextColor: vi.fn(),
-    setFont: vi.fn(),
-    setDrawColor: vi.fn(),
-    text: vi.fn(),
-    line: vi.fn(),
-    splitTextToSize: vi.fn().mockReturnValue(['line']),
-    output: vi.fn().mockReturnValue(new ArrayBuffer(64)),
-    getNumberOfPages: vi.fn().mockReturnValue(1),
-    setPage: vi.fn(),
-    addPage: vi.fn(),
-  })),
-}));
+vi.mock('jspdf', () => {
+  class MockJsPDF {
+    internal = { pageSize: { getWidth: () => 216, getHeight: () => 279 } };
+    setFontSize = vi.fn();
+    setTextColor = vi.fn();
+    setFont = vi.fn();
+    setDrawColor = vi.fn();
+    text = vi.fn();
+    line = vi.fn();
+    splitTextToSize = vi.fn().mockReturnValue(['line']);
+    output = vi.fn().mockReturnValue(new ArrayBuffer(64));
+    getNumberOfPages = vi.fn().mockReturnValue(1);
+    setPage = vi.fn();
+    addPage = vi.fn();
+  }
+  return { jsPDF: MockJsPDF };
+});
 
 vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),

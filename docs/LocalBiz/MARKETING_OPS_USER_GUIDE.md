@@ -614,7 +614,58 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 
 ---
 
-## 23. References
+## 23. Best Practices, Use Cases, and Known Frictions
+
+### Use Case: From First Contact to Retainer
+
+1. **Prospecting** — use a `seek` prompt to find a local business and capture category, GBP status, reviews, and pain points in the campaign form.
+2. **Preview** — run a `fulfill` prompt to generate a deliverable (review responses, service menu, GBP audit). Use **Filter Review** to catch compliance issues.
+3. **Presentation** — generate a **watermarked preview** deliverable and share the QR code or demo storefront with the prospect.
+4. **Conversion** — when the prospect pays, transition to `paid` and generate the unmarked paid deliverable.
+5. **Retention** — transition to `retainer_pitched` and `retainer_won` using a `retainer` prompt.
+6. **Attribution** — `first_touch_source` and `last_touch_source` track which deliverable or demo drove the conversion.
+
+### Advice for Prompts
+
+- Start with the **Copy-Paste Bridge** when testing a new AI provider or prompt wording; switch to **Direct API** once the template is stable and you want execution history.
+- Use `{{variable_name}}` placeholders for anything that changes per campaign (business name, city, category).
+- Set a **default template per prompt type** so the workspace pre-selects the right one.
+- Keep prompts concise — long prompts cost more tokens and take longer to execute.
+
+### Advice for Campaigns
+
+- Update the stage immediately after the real-world event happens (e.g., `shown` only after the business has actually seen the preview).
+- Add notes on every stage transition; the **Stage History** becomes your source of truth.
+- Use **Demo Storefront** for high-value prospects who need to see the product live.
+- Use **Link Tenant** as soon as the prospect signs a paid agreement so data flows into the platform.
+
+### Advice for Deliverables and Branding
+
+- Always keep an **active branding config**; otherwise deliverable generation may fail.
+- Use **preview** mode for prospecting; use **paid** mode only after payment is collected.
+- Regenerate the preview token / QR if it expires (default 30 days).
+- Match brand colors and logo to the operator's identity; the paid deliverable should look like it came from the sales rep.
+
+### Advice for Scorecards
+
+- Enter scorecards daily, even on zero-activity days, so the dashboard and conversion metrics stay current.
+- Use **Category Focus** and **Neighborhood Focus** to spot which verticals and territories convert best.
+- Align scorecard numbers with real campaign stage transitions so pipeline math stays honest.
+
+### Known Gaps and Potential Frictions
+
+- **Cost tracking is backend-only.** `cost_cents` and `tokens_used` are recorded for every execution, but there is no UI dashboard for per-prompt or per-campaign spend yet.
+- **Prompt version rollbacks are not in the UI.** The database stores versions, but the library does not yet let you view or restore an older version.
+- **Batch prompt execution is planned for v1.1.** For now, prompts are run one campaign at a time.
+- **Filter Review requires an active `filter` prompt.** If no filter template is configured, no flags are generated and the review queue stays empty.
+- **Demo Storefront and Public Preview depend on demo-tenant infrastructure.** If the demo storefront service or templates are not configured, these actions may fail.
+- **Link Tenant uses a raw tenant ID prompt.** There is no search or autocomplete, so you need the exact tenant ID.
+- **Attribution is only captured through the public preview or demo flow.** Manual signups must be linked manually with **Link Tenant**.
+- **Route coverage warnings** in the test suite (duplicate mount paths) are a pre-existing platform-wide concern and not specific to Marketing Ops.
+
+---
+
+## 24. References
 
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`

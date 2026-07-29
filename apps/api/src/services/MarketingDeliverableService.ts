@@ -574,6 +574,59 @@ export class MarketingDeliverableService extends BaseService {
     });
     return count > 0;
   }
+
+  async upgradeDeliverableToPaid(campaignId: string, deliverableId?: string, ctx?: RequestCtx): Promise<any> {
+    try {
+      const where: any = { campaign_id: campaignId, status: 'preview' };
+      if (deliverableId) {
+        where.id = deliverableId;
+      }
+
+      const previewDeliverables = await this.prisma.mkt_deliverables_list.findMany({ where });
+
+      if (previewDeliverables.length === 0) {
+        logger.info('No preview deliverables to upgrade for campaign', ctx, { campaignId, deliverableId });
+        return null;
+      }
+
+      const updated = await this.prisma.mkt_deliverables_list.updateMany({
+        where,
+        data: {
+          status: 'paid',
+          is_watermarked: false,
+          sent_at: new Date(),
+          sent_method: 'paid_download',
+        },
+      });
+
+      const tokens = await this.prisma.mkt_deliverable_preview_tokens.findMany({
+        where: {
+          campaign_id: campaignId,
+          converted_at: null,
+          ...(deliverableId ? { deliverable_id: deliverableId } : {}),
+        },
+      });
+
+      if (tokens.length > 0) {
+        await this.prisma.mkt_deliverable_preview_tokens.updateMany({
+          where: { id: { in: tokens.map((t: any) => t.id) } },
+          data: { converted_at: new Date() },
+        });
+      }
+
+      logger.info('Deliverable(s) upgraded to paid', ctx, {
+        campaignId,
+        deliverableId,
+        upgradedCount: updated.count,
+        tokensConverted: tokens.length,
+      });
+
+      return { upgradedCount: updated.count, tokensConverted: tokens.length };
+    } catch (error) {
+      logger.error('Failed to upgrade deliverable to paid', ctx, { error: (error as Error).message, campaignId, deliverableId });
+      throw this.handleError(error, ctx);
+    }
+  }
 }
 
 export default MarketingDeliverableService.getInstance();

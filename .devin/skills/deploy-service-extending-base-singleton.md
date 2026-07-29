@@ -406,3 +406,69 @@ app.use('/api/public/tenants/:tenantId', myPublicRouter); // public tenant-scope
 | Third-party API wrapper (Google, weather, etc.) | `ExternalApiSingleton` | N/A |
 | Capability-gated feature | `TenantApiSingleton` + client-side tier check | `PermissionEnhancedBaseService` |
 | Dual-scope (public summary + private full) | `PublicApiSingleton` + `TenantApiSingleton` (two services, e.g., `PublicUnifiedCapabilityService` + `UnifiedCapabilityService`) | `BaseService` / `UniversalSingleton` |
+
+---
+
+## 5. Testing pitfalls for singleton services
+
+### 5.1 `vi.hoisted()` destructuring — both sides must match
+
+When adding new mock variables to an existing `vi.hoisted()` block, you must add them to **both** the destructuring pattern (left side) **and** the object literal (right side). Adding only to the object literal causes `ReferenceError: <variable> is not defined` because the variable is never declared in scope.
+
+```ts
+// WRONG — mockMktCampaigns is in the object but not destructured
+const { mockExisting } = vi.hoisted(() => ({
+  mockExisting: vi.fn(),
+  mockMktCampaigns: vi.fn(),  // ← will be undefined in mock factories
+}));
+
+// CORRECT — added to both sides
+const { mockExisting, mockMktCampaigns } = vi.hoisted(() => ({
+  mockExisting: vi.fn(),
+  mockMktCampaigns: vi.fn(),
+}));
+```
+
+### 5.2 Overriding `id-generator` mock breaks existing tests
+
+When adding new `generateXxxId` functions to the `vi.mock('../lib/id-generator', ...)` factory, you must **also include all existing exports** that other tests in the same file depend on. Vitest replaces the entire module mock — any previously-mocked exports that are omitted will cause `No "generateXxx" export is defined` errors in pre-existing tests.
+
+**Before adding your exports**, grep the test file for all `generate` usages and include every one in the mock factory.
+
+### 5.3 jsPDF mock must be a class, not `vi.fn().mockImplementation()`
+
+`new jsPDF()` requires a constructor. `vi.fn().mockImplementation(() => ({...}))` is **not** a constructor — calling `new` on it throws `is not a constructor`. Use a proper class-based mock instead:
+
+```ts
+// WRONG — vi.fn() is not a constructor
+vi.mock('jspdf', () => ({
+  jsPDF: vi.fn().mockImplementation(() => ({ text: vi.fn(), ... })),
+}));
+
+// CORRECT — class-based mock works with `new jsPDF()`
+vi.mock('jspdf', () => {
+  class MockJsPDF {
+    internal = { pageSize: { getWidth: () => 216, getHeight: () => 279 } };
+    setFontSize = vi.fn();
+    text = vi.fn();
+    output = vi.fn().mockReturnValue(new ArrayBuffer(64));
+    addPage = vi.fn();
+    // ... add all methods used by the service
+  }
+  return { jsPDF: MockJsPDF };
+});
+```
+
+### 5.4 Singleton default export — call methods directly, not via `getInstance()`
+
+When a service exports its singleton instance as the default export (`export default MarketingCampaignService.getInstance()`), tests must call methods directly on the import, not via `.getInstance()`:
+
+```ts
+// WRONG — default export is already the instance, no getInstance() exists
+import MarketingCampaignService from '../MarketingCampaignService';
+await MarketingCampaignService.getInstance().autoAdvanceStaleShownCampaigns(7); // TypeError
+
+// CORRECT — call directly on the default export
+import MarketingCampaignService from '../MarketingCampaignService';
+await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
+```

@@ -1539,6 +1539,72 @@ export class SubscriptionBillingService {
       })),
     };
   }
+
+  /**
+   * Create a Stripe PaymentIntent for a one-time Marketing Ops payment.
+   * Returns the client_secret for frontend Stripe Elements confirmation.
+   * This reuses the platform's Stripe key (same as subscription billing).
+   */
+  async createOneTimePaymentIntent(params: {
+    amountCents: number;
+    description: string;
+    campaignId: string;
+    serviceCategory?: string;
+    couponCode?: string;
+    metadata?: Record<string, string>;
+  }): Promise<{ clientSecret: string; paymentIntentId: string } | { error: string }> {
+    if (!this.stripe) {
+      return { error: 'Stripe not configured' };
+    }
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: params.amountCents,
+        currency: 'usd',
+        description: params.description,
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          type: 'marketing_ops_payment',
+          campaignId: params.campaignId,
+          serviceCategory: params.serviceCategory || 'N/A',
+          couponCode: params.couponCode || 'N/A',
+          ...params.metadata,
+        },
+      });
+      return {
+        clientSecret: paymentIntent.client_secret!,
+        paymentIntentId: paymentIntent.id,
+      };
+    } catch (e: any) {
+      logger.error('[SubscriptionBilling] Failed to create one-time payment intent', undefined, {
+        error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e) },
+        campaignId: params.campaignId,
+        amountCents: params.amountCents,
+      });
+      return { error: e.message || 'Failed to create payment intent' };
+    }
+  }
+
+  /**
+   * Retrieve a Stripe PaymentIntent to check its status.
+   */
+  async getPaymentIntentStatus(paymentIntentId: string): Promise<{ status: string; charges?: any[] } | { error: string }> {
+    if (!this.stripe) {
+      return { error: 'Stripe not configured' };
+    }
+    try {
+      const pi = await this.stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['charges.data'] });
+      return {
+        status: pi.status,
+        charges: (pi as any).charges?.data || [],
+      };
+    } catch (e: any) {
+      logger.error('[SubscriptionBilling] Failed to retrieve payment intent', undefined, {
+        error: { name: (e as any)?.name || 'Error', message: (e as any)?.message || String(e) },
+        paymentIntentId,
+      });
+      return { error: e.message || 'Failed to retrieve payment intent' };
+    }
+  }
 }
 
 // Singleton instance

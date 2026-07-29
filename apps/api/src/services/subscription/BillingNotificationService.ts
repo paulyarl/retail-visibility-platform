@@ -52,7 +52,8 @@ export type BillingNotificationType =
   | 'funnel_builder_renewal_failed'
   | 'funnel_builder_expired'
   | 'funnel_step_conversion'
-  | 'marketing_campaign_converted';
+  | 'marketing_campaign_converted'
+  | 'marketing_package_paid';
 
 export interface BillingNotificationData {
   tenantId: string;
@@ -433,6 +434,14 @@ class BillingNotificationService {
           subject: `Welcome aboard - ${businessName} is live`,
           html: this.buildMarketingCampaignConvertedHtml(ownerName, businessName, data),
           text: this.buildMarketingCampaignConvertedText(ownerName, businessName, data),
+        };
+
+      case 'marketing_package_paid':
+        return {
+          to: toEmail,
+          subject: `Payment Received - ${businessName} Marketing Package`,
+          html: this.buildMarketingPackagePaidHtml(ownerName, businessName, data),
+          text: this.buildMarketingPackagePaidText(ownerName, businessName, data),
         };
 
       default:

@@ -1729,3 +1729,12 @@ export function generatePreviewToken(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 32);
   return nanoid();
 }
+
+/**
+ * Generate marketing revenue record ID
+ * Format: mrev-{nanoid} (13 chars)
+ */
+export function generateMarketingRevenueId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mrev-${nanoid()}`;
+}

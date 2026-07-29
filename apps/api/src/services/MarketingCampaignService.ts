@@ -12,10 +12,11 @@ import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { generateCampaignId, generateStageHistoryId } from '../lib/id-generator';
+import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId } from '../lib/id-generator';
 import DemoTenantService from './DemoTenantService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { getBillingNotificationService } from './subscription/BillingNotificationService';
+import { MarketingScorecardService } from './MarketingScorecardService';
 
 // ====================
 // TYPES
@@ -148,6 +149,20 @@ export interface CampaignListFilters {
   search?: string;
   page?: number;
   limit?: number;
+}
+
+export interface MarkCampaignPaidInput {
+  campaignId: string;
+  amountCents: number;
+  discountCents: number;
+  orderId?: string;
+  gatewayType: string;
+  gatewayTransactionId?: string;
+  source: ConversionSource;
+  couponCode?: string;
+  subscriptionTierId?: string;
+  serviceCategory?: string;
+  changedBy?: string;
 }
 
 // ====================
@@ -799,6 +814,189 @@ export class MarketingCampaignService extends BaseService {
       };
     } catch (error) {
       logger.error('Failed to get conversion stats', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // PAYMENT COLLECTION (Payment Collection Sprint)
+  // ====================
+
+  async markCampaignPaid(input: MarkCampaignPaidInput, ctx?: RequestCtx): Promise<any> {
+    const {
+      campaignId,
+      amountCents,
+      discountCents,
+      orderId,
+      gatewayType,
+      gatewayTransactionId,
+      source,
+      couponCode,
+      subscriptionTierId,
+      serviceCategory,
+      changedBy,
+    } = input;
+
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+      if (!campaign) {
+        throw new Error(`Campaign ${campaignId} not found`);
+      }
+
+      const fromStage = campaign.stage as string;
+      const validPaidTransitions = ['shown', 'preview_built', 'paid', 'delivered', 'lost', 'dead'];
+      if (!validPaidTransitions.includes(fromStage)) {
+        throw new Error(`Cannot mark campaign paid from stage: ${fromStage}`);
+      }
+
+      const isResurrection = fromStage === 'lost' || fromStage === 'dead';
+      const updateData: any = {
+        stage: 'paid',
+        stage_entered_at: new Date(),
+        date_paid: new Date(),
+        amount_paid_cents: amountCents,
+        last_touch_source: source,
+      };
+      if (!campaign.first_touch_source) {
+        updateData.first_touch_source = source;
+      }
+      if (couponCode) {
+        updateData.coupon_code = couponCode;
+      }
+      if (subscriptionTierId) {
+        updateData.subscription_tier_id = subscriptionTierId;
+      }
+      if (serviceCategory) {
+        updateData.service_category = serviceCategory;
+      }
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: campaignId },
+        data: updateData,
+      });
+
+      await this.logStageTransition({
+        campaignId,
+        fromStage,
+        toStage: 'paid',
+        notes: isResurrection
+          ? `Resurrected: paid via ${source} after ${fromStage} (${gatewayType})`
+          : `Paid via ${source} (${gatewayType})`,
+        triggerType: source === 'manual' ? 'manual' : 'system',
+        changedBy,
+      });
+
+      await this.recordMarketingRevenue({
+        campaignId,
+        amountCents,
+        discountCents,
+        orderId,
+        gatewayType,
+        gatewayTransactionId,
+        source,
+        subscriptionTierId,
+        serviceCategory: serviceCategory || campaign.service_category || undefined,
+      }, ctx);
+
+      this.firePaymentNotification(updated, gatewayType, amountCents, source, ctx);
+
+      const scorecardService = MarketingScorecardService.getInstance();
+      const today = new Date();
+      const existingScorecard = await scorecardService.getScorecard(campaign.assigned_to || 'system', today, ctx);
+      await scorecardService.upsertScorecard({
+        userId: campaign.assigned_to || 'system',
+        date: today,
+        packagesPaid: (existingScorecard?.packages_paid || 0) + 1,
+        revenueCollectedCents: (existingScorecard?.revenue_collected_cents || 0) + amountCents,
+      }, ctx);
+
+      logger.info('Campaign marked paid', ctx, {
+        campaignId,
+        amountCents,
+        gatewayType,
+        source,
+        fromStage,
+        isResurrection,
+      });
+      return updated;
+    } catch (error) {
+      logger.error('Failed to mark campaign paid', ctx, { error: (error as Error).message, campaignId, amountCents });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  async recordMarketingRevenue(params: {
+    campaignId: string;
+    amountCents: number;
+    discountCents: number;
+    orderId?: string;
+    gatewayType: string;
+    gatewayTransactionId?: string;
+    source: string;
+    subscriptionTierId?: string;
+    serviceCategory?: string;
+  }, ctx?: RequestCtx): Promise<any> {
+    try {
+      const revenue = await this.prisma.marketing_revenue.create({
+        data: {
+          id: generateMarketingRevenueId(),
+          campaign_id: params.campaignId,
+          order_id: params.orderId || null,
+          amount_cents: params.amountCents,
+          discount_cents: params.discountCents,
+          gateway_type: params.gatewayType,
+          gateway_transaction_id: params.gatewayTransactionId || null,
+          source: params.source,
+          subscription_tier_id: params.subscriptionTierId || null,
+          service_category: params.serviceCategory || null,
+        },
+      });
+      logger.info('Marketing revenue recorded', ctx, {
+        campaignId: params.campaignId,
+        amountCents: params.amountCents,
+        gatewayType: params.gatewayType,
+        source: params.source,
+      });
+      return revenue;
+    } catch (error) {
+      logger.error('Failed to record marketing revenue', ctx, { error: (error as Error).message, campaignId: params.campaignId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  private firePaymentNotification(campaign: any, gatewayType: string, amountCents: number, source: string, ctx?: RequestCtx): void {
+    (async () => {
+      try {
+        const tenantId = campaign.tenant_id || campaign.demo_tenant_id;
+        if (tenantId) {
+          await getBillingNotificationService().sendNotification({
+            tenantId,
+            type: 'marketing_package_paid' as any,
+            metadata: {
+              campaignId: campaign.id,
+              displayId: campaign.display_id,
+              businessName: campaign.business_name,
+              amountCents,
+              gatewayType,
+              source,
+              serviceCategory: campaign.service_category,
+            },
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to fire payment notification', ctx, { error: (error as Error).message, campaignId: campaign.id });
+      }
+    })();
+  }
+
+  async getCampaignRevenue(campaignId: string, ctx?: RequestCtx): Promise<any[]> {
+    try {
+      return await this.prisma.marketing_revenue.findMany({
+        where: { campaign_id: campaignId },
+        orderBy: { recorded_at: 'desc' },
+      });
+    } catch (error) {
+      logger.error('Failed to get campaign revenue', ctx, { error: (error as Error).message, campaignId });
       throw this.handleError(error, ctx);
     }
   }
