@@ -13,6 +13,7 @@
 
 import { MarketingPromptService } from '../services/MarketingPromptService';
 import { logger } from '../logger';
+import { MARKET_ANALYSIS_SCHEMA_NAME } from '../validators/market-analysis.schema';
 
 const SEED_TEMPLATES = [
   {
@@ -56,6 +57,10 @@ Provide:
 
 Format as structured JSON.`,
     variables: ['category', 'city'],
+    outputSchema: {
+      name: MARKET_ANALYSIS_SCHEMA_NAME,
+      description: 'Category- or city-level market analysis with GBP metrics, top competitors, pain points, opportunity gaps, and a recommended outreach angle.',
+    },
     isDefault: false,
   },
   {
@@ -221,6 +226,7 @@ async function main() {
             prompt_type: template.promptType,
             body: template.body,
             variables: template.variables,
+            output_schema: (template as any).outputSchema ?? null,
             is_active: true,
             is_default: template.isDefault,
             updated_at: new Date(),
@@ -236,6 +242,7 @@ async function main() {
             prompt_type: template.promptType,
             body: template.body,
             variables: template.variables,
+            output_schema: (template as any).outputSchema ?? null,
             is_active: true,
             is_default: template.isDefault,
             created_by: 'system',

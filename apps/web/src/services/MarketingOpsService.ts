@@ -36,6 +36,8 @@ export type ConversionSource =
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
+export type CampaignScope = 'business' | 'category' | 'city';
+
 export type RetainerStatus = 'not_pitched' | 'pitched' | 'won' | 'declined';
 
 export type PromptType =
@@ -46,7 +48,7 @@ export type PromptType =
   | 'category_analysis'
   | 'city_analysis';
 
-export type ExecutionStatus = 'pending' | 'filtered' | 'reviewed' | 'delivered' | 'archived';
+export type ExecutionStatus = 'pending' | 'completed' | 'failed' | 'filtered' | 'reviewed' | 'delivered' | 'archived';
 
 export type FilterFlagStatus = 'pending' | 'fixed' | 'approved_as_is';
 
@@ -64,7 +66,8 @@ export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 export interface Campaign {
   id: string;
   display_id: string | null;
-  business_name: string;
+  scope: CampaignScope;
+  business_name: string | null;
   category: string;
   city: string;
   neighborhood: string | null;
@@ -164,11 +167,13 @@ export interface PromptTemplate {
   id: string;
   name: string;
   prompt_type: PromptType;
+  scope: CampaignScope;
   category: string | null;
   tone: string | null;
   version: number;
   body: string;
   variables: any;
+  output_schema: { name: string; description?: string; schema?: any } | null;
   is_active: boolean;
   is_default: boolean;
   created_by: string | null;
@@ -376,7 +381,8 @@ export interface ServiceCategory {
 // ====================
 
 export interface CampaignCreateInput {
-  business_name: string;
+  scope?: CampaignScope;
+  business_name?: string;
   category: string;
   city: string;
   neighborhood?: string;
@@ -445,10 +451,12 @@ export interface FileCreateInput {
 export interface PromptTemplateCreateInput {
   name: string;
   prompt_type: PromptType;
+  scope?: CampaignScope;
   category?: string;
   tone?: string;
   body: string;
   variables?: any;
+  output_schema?: { name: string; description?: string; schema?: any } | null;
   is_default?: boolean;
 }
 
@@ -456,6 +464,19 @@ export interface ExecutionCreateInput {
   campaign_id: string;
   template_id?: string;
   variables_used?: any;
+}
+
+export interface ExternalExecutionCreateInput {
+  campaign_id: string;
+  template_id: string;
+  raw_output: string;
+  source?: string;
+  cost_cents?: number;
+}
+
+export interface ExternalExecutionResult {
+  execution: PromptExecution;
+  audit: any | null;
 }
 
 export interface ExecutionUpdateInput {
@@ -558,6 +579,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async listCampaigns(filters?: {
     stage?: CampaignStage;
+    scope?: CampaignScope;
     category?: string;
     city?: string;
     assignedTo?: string;
@@ -570,6 +592,7 @@ class MarketingOpsService extends AdminApiSingleton {
   }): Promise<{ items: Campaign[]; total: number }> {
     const params = new URLSearchParams();
     if (filters?.stage) params.set('stage', filters.stage);
+    if (filters?.scope) params.set('scope', filters.scope);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.city) params.set('city', filters.city);
     if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo);
@@ -845,12 +868,14 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async listPromptTemplates(filters?: {
     prompt_type?: PromptType;
+    scope?: CampaignScope;
     category?: string;
     tone?: string;
     is_active?: boolean;
   }): Promise<PromptTemplate[]> {
     const params = new URLSearchParams();
     if (filters?.prompt_type) params.set('prompt_type', filters.prompt_type);
+    if (filters?.scope) params.set('scope', filters.scope);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.tone) params.set('tone', filters.tone);
     if (filters?.is_active !== undefined) params.set('is_active', String(filters.is_active));
@@ -979,6 +1004,25 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create execution');
     }
     await this.invalidateCachePattern('mkt-ops-executions');
+    return result.data?.data ?? result.data;
+  }
+
+  async createExternalExecution(input: ExternalExecutionCreateInput): Promise<ExternalExecutionResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prompts/executions/external`,
+      { method: 'POST', body: JSON.stringify(input) },
+      'mkt-ops-execution-external',
+      0,
+    );
+    if (!result.success) {
+      const msg = typeof result.error === 'string'
+        ? result.error
+        : (result.error?.message ?? 'Failed to import external result');
+      throw new Error(msg);
+    }
+    await this.invalidateCachePattern('mkt-ops-executions');
+    await this.invalidateCachePattern(`mkt-ops-audits-${input.campaign_id}`);
+    await this.invalidateCachePattern(`mkt-ops-campaign-${input.campaign_id}`);
     return result.data?.data ?? result.data;
   }
 

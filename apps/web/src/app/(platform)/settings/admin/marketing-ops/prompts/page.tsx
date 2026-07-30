@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import PromptLibraryClient from './PromptLibraryClient';
 
@@ -13,7 +14,9 @@ export default function PromptLibraryPage() {
         { label: 'Prompts' },
       ]}
     >
-      <PromptLibraryClient />
+      <Suspense fallback={null}>
+        <PromptLibraryClient />
+      </Suspense>
     </MarketingOpsPageShell>
   );
 }

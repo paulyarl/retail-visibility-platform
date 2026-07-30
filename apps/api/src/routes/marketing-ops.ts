@@ -101,8 +101,9 @@ router.use(requirePlatformAdmin);
 // ZOD SCHEMAS
 // ====================
 
-const campaignCreateSchema = z.object({
-  business_name: z.string().min(1).max(255),
+const campaignBaseSchema = z.object({
+  scope: z.enum(['business', 'category', 'city']).optional(),
+  business_name: z.string().max(255).optional(),
   category: z.string().min(1).max(100),
   city: z.string().min(1).max(100),
   neighborhood: z.string().max(100).optional(),
@@ -124,7 +125,12 @@ const campaignCreateSchema = z.object({
   notes: z.string().optional(),
 });
 
-const campaignUpdateSchema = campaignCreateSchema.partial().extend({
+const campaignCreateSchema = campaignBaseSchema.refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
+  message: 'business_name is required for business-scoped campaigns',
+  path: ['business_name'],
+});
+
+const campaignUpdateSchema = campaignBaseSchema.partial().extend({
   stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
   tone: z.string().max(50).optional(),
   retainer: z.enum(['Fast', 'Medium', 'Slow']).optional(),
@@ -135,6 +141,9 @@ const campaignUpdateSchema = campaignCreateSchema.partial().extend({
   amount_paid_cents: z.number().int().optional(),
   package_delivered: z.string().optional(),
   campaign_origin: z.enum(['prospect', 'upsell']).optional(),
+}).refine((data) => !data.scope || data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
+  message: 'business_name is required for business-scoped campaigns',
+  path: ['business_name'],
 });
 
 const stageTransitionSchema = z.object({
@@ -175,10 +184,12 @@ const fileCreateSchema = z.object({
 const promptTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
   prompt_type: z.enum(['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis']),
+  scope: z.enum(['business', 'category', 'city']).optional(),
   category: z.string().max(100).optional(),
   tone: z.string().max(50).optional(),
   body: z.string().min(1),
   variables: z.any().optional(),
+  output_schema: z.any().optional(),
   is_default: z.boolean().optional(),
 });
 
@@ -210,6 +221,14 @@ const batchExecutionSchema = z.object({
   campaign_ids: z.array(z.string().min(1)).min(1),
   template_id: z.string().min(1),
   variables: z.any().optional(),
+});
+
+const externalExecutionCreateSchema = z.object({
+  campaign_id: z.string().min(1),
+  template_id: z.string().min(1),
+  raw_output: z.string().min(1),
+  source: z.string().max(100).optional(),
+  cost_cents: z.number().int().optional(),
 });
 
 const filterFlagUpdateSchema = z.object({
@@ -305,6 +324,7 @@ router.get('/', async (req: any, res: Response) => {
   try {
     const result = await MarketingCampaignService.listCampaigns({
       stage: req.query.stage,
+      scope: req.query.scope,
       category: req.query.category,
       city: req.query.city,
       assignedTo: req.query.assignedTo,
@@ -334,14 +354,15 @@ router.get('/export', async (req: any, res: Response) => {
   try {
     const result = await MarketingCampaignService.listCampaigns({
       stage: req.query.stage,
+      scope: req.query.scope,
       category: req.query.category,
       city: req.query.city,
       limit: 10000,
     }, getCtx(req));
 
-    const headers = 'id,display_id,business_name,category,city,stage,date_entered,date_paid,amount_paid_cents,retainer_status\n';
+    const headers = 'id,display_id,scope,business_name,category,city,stage,date_entered,date_paid,amount_paid_cents,retainer_status\n';
     const rows = result.items.map((c: any) =>
-      `${c.id},${c.display_id || ''},${c.business_name},${c.category},${c.city},${c.stage},${c.date_entered?.toISOString() || ''},${c.date_paid?.toISOString() || ''},${c.amount_paid_cents},${c.retainer_status}`
+      `${c.id},${c.display_id || ''},${c.scope},${c.business_name || ''},${c.category},${c.city},${c.stage},${c.date_entered?.toISOString() || ''},${c.date_paid?.toISOString() || ''},${c.amount_paid_cents},${c.retainer_status}`
     ).join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
@@ -366,6 +387,7 @@ router.post('/', async (req: any, res: Response) => {
   try {
     const parsed = campaignCreateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.createCampaign({
+      scope: parsed.scope,
       businessName: parsed.business_name,
       category: parsed.category,
       city: parsed.city,
@@ -400,6 +422,7 @@ router.put('/:id', async (req: any, res: Response) => {
   try {
     const parsed = campaignUpdateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.updateCampaign(req.params.id, {
+      scope: parsed.scope,
       businessName: parsed.business_name,
       category: parsed.category,
       city: parsed.city,
@@ -595,6 +618,7 @@ router.get('/prompts/templates', async (req: any, res: Response) => {
   try {
     const templates = await MarketingPromptService.listTemplates({
       promptType: req.query.prompt_type,
+      scope: req.query.scope,
       category: req.query.category,
       isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
     }, getCtx(req));
@@ -610,10 +634,12 @@ router.post('/prompts/templates', async (req: any, res: Response) => {
     const template = await MarketingPromptService.createTemplate({
       name: parsed.name,
       promptType: parsed.prompt_type,
+      scope: parsed.scope,
       category: parsed.category,
       tone: parsed.tone,
       body: parsed.body,
       variables: parsed.variables,
+      outputSchema: parsed.output_schema,
       isDefault: parsed.is_default,
       createdBy: req.user?.id,
     }, getCtx(req));
@@ -632,10 +658,12 @@ router.put('/prompts/templates/:id', async (req: any, res: Response) => {
     const template = await MarketingPromptService.updateTemplate(req.params.id, {
       name: parsed.name,
       promptType: parsed.prompt_type,
+      scope: parsed.scope,
       category: parsed.category,
       tone: parsed.tone,
       body: parsed.body,
       variables: parsed.variables,
+      outputSchema: parsed.output_schema,
       isDefault: parsed.is_default,
     }, getCtx(req));
     res.json({ success: true, data: template });
@@ -706,6 +734,36 @@ router.get('/prompts/executions', async (req: any, res: Response) => {
     const executions = await MarketingPromptService.listExecutions(req.query.campaign_id, getCtx(req));
     res.json({ success: true, data: executions });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /prompts/executions/external — import an external agent's JSON result
+// Must be registered BEFORE /:id to avoid the catch-all.
+router.post('/prompts/executions/external', async (req: any, res: Response) => {
+  try {
+    const parsed = externalExecutionCreateSchema.parse(req.body);
+    const result = await MarketingPromptService.importExternalResult({
+      campaignId: parsed.campaign_id,
+      templateId: parsed.template_id,
+      rawOutput: parsed.raw_output,
+      source: parsed.source,
+      costCents: parsed.cost_cents,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    // Scope mismatches and validation failures are 400s, not 500s.
+    const msg = (error as Error).message || '';
+    if (/scope .* is not compatible/i.test(msg) || /out-of-scope variables/i.test(msg)) {
+      return res.status(400).json({ success: false, error: 'scope_mismatch', message: msg });
+    }
+    if (/not valid JSON/i.test(msg) || /does not match .* output schema/i.test(msg) || /does not declare a recognized output_schema/i.test(msg)) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: msg });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

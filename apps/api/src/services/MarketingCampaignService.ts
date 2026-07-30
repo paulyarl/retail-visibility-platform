@@ -48,6 +48,8 @@ export type ConversionSource =
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
+export type CampaignScope = 'business' | 'category' | 'city';
+
 const VALID_TRANSITIONS: Record<string, string[]> = {
   seek:           ['preview_built', 'dead'],
   preview_built:  ['shown', 'dead'],
@@ -73,7 +75,8 @@ const STAGE_DATE_FIELDS: Record<string, string> = {
 };
 
 export interface CampaignInput {
-  businessName: string;
+  scope?: CampaignScope;
+  businessName?: string;
   category: string;
   city: string;
   neighborhood?: string;
@@ -96,6 +99,7 @@ export interface CampaignInput {
 }
 
 export interface CampaignUpdateInput {
+  scope?: CampaignScope;
   businessName?: string;
   category?: string;
   city?: string;
@@ -155,6 +159,7 @@ export interface StageTransitionInput {
 
 export interface CampaignListFilters {
   stage?: CampaignStage;
+  scope?: CampaignScope;
   category?: string;
   city?: string;
   assignedTo?: string;
@@ -225,7 +230,8 @@ export class MarketingCampaignService extends BaseService {
         data: {
           id,
           display_id: input.displayId || null,
-          business_name: input.businessName,
+          scope: input.scope ?? 'business',
+          business_name: input.businessName || null,
           category: input.category,
           city: input.city,
           neighborhood: input.neighborhood || null,
@@ -299,6 +305,7 @@ export class MarketingCampaignService extends BaseService {
 
     const where: any = {};
     if (filters.stage) where.stage = filters.stage;
+    if (filters.scope) where.scope = filters.scope;
     if (filters.category) where.category = filters.category;
     if (filters.city) where.city = filters.city;
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
@@ -344,7 +351,8 @@ export class MarketingCampaignService extends BaseService {
 
   async updateCampaign(id: string, input: CampaignUpdateInput, ctx?: RequestCtx): Promise<any> {
     const data: any = {};
-    if (input.businessName !== undefined) data.business_name = input.businessName;
+    if (input.scope !== undefined) data.scope = input.scope;
+    if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
     if (input.city !== undefined) data.city = input.city;
     if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood;
@@ -768,7 +776,7 @@ export class MarketingCampaignService extends BaseService {
 
       const demo = await DemoTenantService.createDemoTenant({
         template,
-        businessName: campaign.business_name,
+        businessName: campaign.business_name ?? undefined,
         expiresAt,
       });
 

@@ -11,17 +11,24 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId } from '../lib/id-generator';
+import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
+import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
+import MarketingCampaignService from './MarketingCampaignService';
 
 export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis';
+
+export type PromptScope = 'business' | 'category' | 'city';
 
 export interface PromptTemplateInput {
   name: string;
   promptType: PromptType;
+  scope?: PromptScope;
   category?: string;
   tone?: string;
   body: string;
   variables?: any;
+  outputSchema?: any;
   isDefault?: boolean;
   createdBy?: string;
 }
@@ -53,20 +60,23 @@ export class MarketingPromptService extends BaseService {
 
   async createTemplate(input: PromptTemplateInput, ctx?: RequestCtx): Promise<any> {
     const id = generatePromptTemplateId();
+    const scope = input.scope ?? (input.promptType === 'category_analysis' ? 'category' : input.promptType === 'city_analysis' ? 'city' : 'business');
     try {
       if (input.isDefault) {
-        await this.clearDefaultForType(input.promptType, input.category, input.tone);
+        await this.clearDefaultForType(input.promptType, scope, input.category, input.tone);
       }
       const template = await this.prisma.mkt_prompt_templates_list.create({
         data: {
           id,
           name: input.name,
           prompt_type: input.promptType,
+          scope,
           category: input.category || null,
           tone: input.tone || null,
           version: 1,
           body: input.body,
           variables: input.variables || null,
+          output_schema: input.outputSchema ?? null,
           is_active: true,
           is_default: input.isDefault || false,
           created_by: input.createdBy || null,
@@ -89,9 +99,10 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  async listTemplates(filters: { promptType?: PromptType; category?: string; tone?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
+  async listTemplates(filters: { promptType?: PromptType; scope?: PromptScope; category?: string; tone?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
     const where: any = {};
     if (filters.promptType) where.prompt_type = filters.promptType;
+    if (filters.scope) where.scope = filters.scope;
     if (filters.category) where.category = filters.category;
     if (filters.tone) where.tone = filters.tone;
     if (filters.isActive !== undefined) where.is_active = filters.isActive;
@@ -110,15 +121,19 @@ export class MarketingPromptService extends BaseService {
     const data: any = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.promptType !== undefined) data.prompt_type = input.promptType;
+    if (input.scope !== undefined) data.scope = input.scope;
     if (input.category !== undefined) data.category = input.category;
     if (input.tone !== undefined) data.tone = input.tone;
     if (input.body !== undefined) data.body = input.body;
     if (input.variables !== undefined) data.variables = input.variables;
+    if (input.outputSchema !== undefined) data.output_schema = input.outputSchema;
     if (input.isDefault !== undefined) {
       if (input.isDefault) {
-        const template = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
-        if (template) {
-          await this.clearDefaultForType(template.prompt_type, template.category, template.tone);
+        const current = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
+        if (current) {
+          const targetScope = (input.scope ?? current.scope) as PromptScope;
+          const targetPromptType = (input.promptType ?? current.prompt_type) as PromptType;
+          await this.clearDefaultForType(targetPromptType, targetScope, input.category ?? current.category, input.tone ?? current.tone);
         }
       }
       data.is_default = input.isDefault;
@@ -151,19 +166,22 @@ export class MarketingPromptService extends BaseService {
     return this.createTemplate({
       name: cloneName,
       promptType: original.prompt_type as PromptType,
+      scope: original.scope as PromptScope,
       category: original.category,
       tone: original.tone,
       body: original.body,
       variables: original.variables,
+      outputSchema: original.output_schema,
       isDefault: false,
       createdBy: overrides.createdBy,
     }, ctx);
   }
 
-  private async clearDefaultForType(promptType: string, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
+  private async clearDefaultForType(promptType: string, scope: PromptScope, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
     await this.prisma.mkt_prompt_templates_list.updateMany({
       where: {
         prompt_type: promptType,
+        scope,
         is_default: true,
         ...(category ? { category } : {}),
         ...(tone ? { tone } : {}),
@@ -252,6 +270,132 @@ export class MarketingPromptService extends BaseService {
       });
     } catch (error) {
       logger.error('Failed to list prompt executions', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // EXTERNAL RESULT IMPORT
+  // ====================
+
+  /**
+   * Import an external agent's JSON result as a prompt execution + optional audit.
+   *
+   * Flow:
+   *   1. Load template + campaign; assert scope compatibility (S0b).
+   *   2. Parse raw_output as JSON; validate against the template's declared
+   *      output_schema (via OUTPUT_SCHEMA_REGISTRY). Throws on invalid JSON
+   *      or schema mismatch with field-level Zod issues.
+   *   3. Transactionally create:
+   *      a. mkt_prompt_executions_list record (status='completed', source='external')
+   *      b. mkt_audits_list record IF the output_schema's auditPlatform is set
+   *         (keyed off output_schema->>'name', NOT prompt_type — fixes G18).
+   *
+   * Returns { execution, audit }.
+   */
+  async importExternalResult(input: {
+    campaignId: string;
+    templateId: string;
+    rawOutput: string;
+    source?: string;
+    costCents?: number;
+    executedBy?: string;
+  }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null }> {
+    try {
+      // 1. Load template + campaign
+      const template = await this.getTemplate(input.templateId, ctx);
+      if (!template) {
+        throw new Error(`Template ${input.templateId} not found`);
+      }
+      const campaign = await MarketingCampaignService.getCampaign(input.campaignId, ctx);
+      if (!campaign) {
+        throw new Error(`Campaign ${input.campaignId} not found`);
+      }
+
+      // 2. Scope check (S0b)
+      assertScopeCompatible(template, campaign);
+
+      // 3. Parse + validate JSON against the template's output_schema
+      let parsedJson: any;
+      try {
+        parsedJson = JSON.parse(input.rawOutput);
+      } catch (e) {
+        throw new Error('raw_output is not valid JSON');
+      }
+
+      const schemaName = template.output_schema?.name ?? null;
+      const resolved = resolveOutputSchema(schemaName);
+      if (!resolved) {
+        throw new Error(
+          `Template "${template.name}" does not declare a recognized output_schema (got "${schemaName ?? 'none'}"). ` +
+          `Cannot validate external result. Add an output_schema to the template first.`,
+        );
+      }
+
+      const validationResult = resolved.validator.safeParse(parsedJson);
+      if (!validationResult.success) {
+        const issues = validationResult.error.issues
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ');
+        throw new Error(`External result does not match the "${schemaName}" output schema: ${issues}`);
+      }
+
+      // 4. Transactionally create execution + audit
+      const executionId = generatePromptExecutionId();
+      const result = await this.prisma.$transaction(async (tx) => {
+        const execution = await tx.mkt_prompt_executions_list.create({
+          data: {
+            id: executionId,
+            campaign_id: input.campaignId,
+            template_id: input.templateId,
+            executed_by: input.executedBy || undefined,
+            status: 'completed',
+            raw_output: input.rawOutput,
+            filtered_output: input.rawOutput,
+            ai_provider: input.source || 'external',
+            cost_cents: input.costCents ?? undefined,
+          },
+        });
+
+        let audit: any = null;
+        if (resolved.auditPlatform) {
+          const auditId = generateMarketingAuditId();
+          // For market_analysis, extract audit-relevant fields from the validated JSON.
+          const ma = parsedJson.market_analysis;
+          audit = await tx.mkt_audits_list.create({
+            data: {
+              id: auditId,
+              campaign_id: input.campaignId,
+              platform: resolved.auditPlatform,
+              review_count: ma?.average_gbp_metrics?.average_review_count ?? 0,
+              average_rating: ma?.average_gbp_metrics?.average_rating ?? undefined,
+              unaddressed_reviews: 0,
+              owner_response_rate: 0,
+              photo_count: 0,
+              mobile_friendly: undefined,
+              audit_data: parsedJson,
+            },
+          });
+        }
+
+        return { execution, audit };
+      });
+
+      logger.info('External result imported', ctx, {
+        executionId,
+        campaignId: input.campaignId,
+        templateId: input.templateId,
+        schemaName,
+        auditCreated: !!result.audit,
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof ScopeMismatchError) {
+        logger.warn('External import scope mismatch', ctx, { error: error.message });
+      } else {
+        logger.error('Failed to import external result', ctx, { error: (error as Error).message });
+      }
       throw this.handleError(error, ctx);
     }
   }

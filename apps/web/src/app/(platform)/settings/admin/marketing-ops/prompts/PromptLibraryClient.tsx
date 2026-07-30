@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, Copy, FileText } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { RefreshCw, Plus, Pencil, Trash2, Copy, FileText, Sparkles, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptType } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptType, CampaignScope } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import { useMemo } from 'react';
 
@@ -26,16 +27,27 @@ const PROMPT_TYPE_COLORS: Record<PromptType, string> = {
 };
 
 const ALL_TYPES: PromptType[] = ['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
 
 export default function PromptLibraryClient() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<PromptType | ''>('');
+  const [scopeFilter, setScopeFilter] = useState<CampaignScope | ''>('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [toneFilter, setToneFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
+
+  // S3b: deep-link from campaign detail (?campaignId=&angle=)
+  const searchParams = useSearchParams();
+  const deepLinkCampaignId = searchParams.get('campaignId');
+  const deepLinkAngle = searchParams.get('angle');
+  const hasDeepLink = !!(deepLinkCampaignId && deepLinkAngle);
+  const [deepLinkDismissed, setDeepLinkDismissed] = useState(false);
+  // Pre-fill the create modal with the outreach angle when opened from the deep-link banner.
+  const [deepLinkPrefill, setDeepLinkPrefill] = useState<string | null>(null);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -43,6 +55,7 @@ export default function PromptLibraryClient() {
     try {
       const data = await marketingOpsService.listPromptTemplates({
         prompt_type: typeFilter || undefined,
+        scope: scopeFilter || undefined,
         category: categoryFilter || undefined,
         tone: toneFilter || undefined,
       });
@@ -52,7 +65,7 @@ export default function PromptLibraryClient() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, categoryFilter, toneFilter]);
+  }, [typeFilter, scopeFilter, categoryFilter, toneFilter]);
 
   useEffect(() => {
     fetchTemplates();
@@ -83,13 +96,6 @@ export default function PromptLibraryClient() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/settings/admin/marketing-ops"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Marketing Ops
-        </Link>
 
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -116,6 +122,54 @@ export default function PromptLibraryClient() {
           </div>
         </div>
 
+        {/* S3b: Deep-link banner from campaign detail */}
+        {hasDeepLink && !deepLinkDismissed && (
+          <div className="mb-6 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-violet-900 dark:text-violet-300">
+                    Create a seek prompt from campaign
+                  </p>
+                  <p className="text-xs text-violet-700 dark:text-violet-400 mt-1">
+                    Campaign: <code className="font-mono">{deepLinkCampaignId}</code>
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    <span className="font-medium">Outreach angle:</span> {deepLinkAngle}
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() => {
+                        setEditingTemplate(null);
+                        setDeepLinkPrefill(deepLinkAngle);
+                        setShowCreateModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      New seek prompt with this angle
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${deepLinkCampaignId}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-400 bg-white dark:bg-neutral-800 border border-violet-300 dark:border-violet-800 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                    >
+                      Back to campaign
+                    </Link>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setDeepLinkDismissed(true)}
+                className="p-1 text-violet-400 hover:text-violet-600 dark:hover:text-violet-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Filter */}
         <div className="flex items-center gap-3 mb-6">
           <select
@@ -125,6 +179,14 @@ export default function PromptLibraryClient() {
           >
             <option value="">All Types</option>
             {ALL_TYPES.map((t) => <option key={t} value={t}>{PROMPT_TYPE_LABELS[t]}</option>)}
+          </select>
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as CampaignScope | '')}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Scopes</option>
+            {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <SuggestiveSelect
             value={categoryFilter}
@@ -168,9 +230,14 @@ export default function PromptLibraryClient() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">{t.name}</h3>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${PROMPT_TYPE_COLORS[t.prompt_type]}`}>
-                      {PROMPT_TYPE_LABELS[t.prompt_type]}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PROMPT_TYPE_COLORS[t.prompt_type]}`}>
+                        {PROMPT_TYPE_LABELS[t.prompt_type]}
+                      </span>
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
+                        {t.scope}
+                      </span>
+                    </div>
                   </div>
                   {t.is_default && (
                     <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Default</span>
@@ -221,29 +288,50 @@ export default function PromptLibraryClient() {
           template={editingTemplate}
           categoryOptions={categoryOptions}
           toneOptions={toneOptions}
-          onClose={() => setShowCreateModal(false)}
-          onSaved={async () => { setShowCreateModal(false); await fetchTemplates(); }}
+          prefillAngle={deepLinkPrefill}
+          onClose={() => { setShowCreateModal(false); setDeepLinkPrefill(null); }}
+          onSaved={async () => { setShowCreateModal(false); setDeepLinkPrefill(null); await fetchTemplates(); }}
         />
       )}
     </div>
   );
 }
 
-function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, onSaved }: {
+function PromptTemplateModal({ template, categoryOptions, toneOptions, prefillAngle, onClose, onSaved }: {
   template: PromptTemplate | null;
   categoryOptions: string[];
   toneOptions: string[];
+  prefillAngle?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState(template?.name ?? '');
+  const [name, setName] = useState(template?.name ?? (prefillAngle ? 'Seek: Outreach from Category Analysis' : ''));
   const [promptType, setPromptType] = useState<PromptType>(template?.prompt_type ?? 'seek');
+  const [scope, setScope] = useState<CampaignScope>(template?.scope ?? 'business');
   const [category, setCategory] = useState(template?.category ?? '');
   const [tone, setTone] = useState(template?.tone ?? '');
-  const [body, setBody] = useState(template?.body ?? '');
+  const [body, setBody] = useState(template?.body ?? (prefillAngle
+    ? `You are a local business outreach specialist. Use the following market analysis outreach angle to craft a personalized cold outreach message.
+
+Outreach angle: ${prefillAngle}
+
+Instructions:
+1. Write a concise, personalized outreach message (3-4 sentences)
+2. Reference the prospect's category and location
+3. Lead with the pain point identified in the market analysis
+4. End with a clear call-to-action (free audit, demo, or quick call)
+
+Format the output as plain text, ready to paste into an email or DM.`
+    : ''));
   const [isDefault, setIsDefault] = useState(template?.is_default ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (promptType === 'category_analysis') setScope('category');
+    else if (promptType === 'city_analysis') setScope('city');
+    else if (!template) setScope('business');
+  }, [promptType, template]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -252,6 +340,7 @@ function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, 
       const input = {
         name,
         prompt_type: promptType,
+        scope,
         category: category || undefined,
         tone: tone || undefined,
         body,
@@ -291,6 +380,13 @@ function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, 
               <select value={promptType} onChange={(e) => setPromptType(e.target.value as PromptType)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 {ALL_TYPES.map((t) => <option key={t} value={t}>{PROMPT_TYPE_LABELS[t]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Scope</label>
+              <select value={scope} onChange={(e) => setScope(e.target.value as CampaignScope)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>

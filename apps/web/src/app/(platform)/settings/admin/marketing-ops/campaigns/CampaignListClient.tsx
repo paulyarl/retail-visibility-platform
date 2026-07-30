@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { Campaign, CampaignStage } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
@@ -11,6 +11,7 @@ import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/Sug
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
 
 export default function CampaignListClient() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -19,6 +20,7 @@ export default function CampaignListClient() {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<CampaignStage | ''>('');
+  const [scopeFilter, setScopeFilter] = useState<CampaignScope | ''>('');
   const [toneFilter, setToneFilter] = useState('');
   const [retainerFilter, setRetainerFilter] = useState<'Fast' | 'Medium' | 'Slow' | ''>('');
   const [attributeFilter, setAttributeFilter] = useState('');
@@ -31,6 +33,7 @@ export default function CampaignListClient() {
       const result = await marketingOpsService.listCampaigns({
         search: search || undefined,
         stage: stageFilter || undefined,
+        scope: scopeFilter || undefined,
         tone: toneFilter || undefined,
         retainer: retainerFilter || undefined,
         attributes: attributeFilter ? [attributeFilter] : undefined,
@@ -42,7 +45,7 @@ export default function CampaignListClient() {
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter, toneFilter, retainerFilter, attributeFilter]);
+  }, [search, stageFilter, scopeFilter, toneFilter, retainerFilter, attributeFilter]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -57,13 +60,6 @@ export default function CampaignListClient() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/settings/admin/marketing-ops"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Marketing Ops
-        </Link>
 
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -112,6 +108,14 @@ export default function CampaignListClient() {
             {PIPELINE_STAGES.map((s) => (
               <option key={s} value={s}>{STAGE_LABELS[s]}</option>
             ))}
+          </select>
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as CampaignScope | '')}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Scopes</option>
+            {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <SuggestiveSelect
             value={toneFilter}
@@ -170,6 +174,7 @@ export default function CampaignListClient() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-neutral-700/50">
                   <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Scope</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Business</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tone</th>
@@ -181,21 +186,23 @@ export default function CampaignListClient() {
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Est. Fee</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Paid</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Assigned</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Open</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
                   {campaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={13} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                         No campaigns found. Create one to get started.
                       </td>
                     </tr>
                   ) : (
                     campaigns.map((c) => (
                       <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-neutral-700/30">
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.scope}</td>
                         <td className="px-4 py-3">
                           <Link href={`/settings/admin/marketing-ops/campaigns/${c.id}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
-                            {c.business_name}
+                            {c.business_name ?? '—'}
                           </Link>
                           {c.display_id && (
                             <span className="ml-2 text-xs text-gray-400">{c.display_id}</span>
@@ -222,6 +229,14 @@ export default function CampaignListClient() {
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.amount_paid_cents)}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{staffDisplayName(staffUsers, c.assigned_to) ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            Open
+                          </Link>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -252,8 +267,8 @@ export default function CampaignListClient() {
                             href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
                             className="block bg-white dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-neutral-700 p-3 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
                           >
-                            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{c.business_name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{c.category} · {c.city}</p>
+                            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{c.business_name ?? c.category ?? c.city}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1"><span className="uppercase text-[10px] tracking-wider text-gray-400">{c.scope}</span> · {c.category} · {c.city}</p>
                             {(c.tone || c.retainer || c.attributes?.length) && (
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                 {c.tone}{c.tone && c.retainer ? ' · ' : ''}{c.retainer}
