@@ -30,6 +30,7 @@
  *     POST   /prompts/templates         — create template
  *     PUT    /prompts/templates/:id     — update template
  *     DELETE /prompts/templates/:id     — delete template
+ *     GET    /prompts/templates/:id/render — resolve template against campaign (no AI call)
  *
  *   Prompt Executions:
  *     GET    /prompts/executions        — list executions (filter: campaignId)
@@ -646,6 +647,31 @@ router.delete('/prompts/templates/:id', async (req: any, res: Response) => {
   try {
     await MarketingPromptService.deleteTemplate(req.params.id, getCtx(req));
     res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/prompts/templates/:id/render', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    let variables: Record<string, any> | undefined;
+    if (req.query.variables) {
+      try {
+        variables = JSON.parse(req.query.variables as string);
+      } catch {
+        return res.status(400).json({ success: false, error: 'Invalid variables JSON' });
+      }
+    }
+    const rendered = await MarketingExecutionService.renderPrompt({
+      templateId: req.params.id,
+      campaignId,
+      variables,
+    }, getCtx(req));
+    res.json({ success: true, data: { rendered_prompt: rendered } });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

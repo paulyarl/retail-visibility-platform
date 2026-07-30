@@ -906,6 +906,25 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-prompt-templates');
   }
 
+  async renderPrompt(templateId: string, campaignId: string, variables?: Record<string, string>): Promise<string> {
+    const params = new URLSearchParams();
+    params.set('campaignId', campaignId);
+    if (variables && Object.keys(variables).length > 0) {
+      params.set('variables', JSON.stringify(variables));
+    }
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prompts/templates/${templateId}/render?${params.toString()}`,
+      {},
+      `mkt-ops-prompt-render-${templateId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render prompt');
+    }
+    const data = result.data?.data ?? result.data;
+    return data?.rendered_prompt ?? '';
+  }
+
   // ─── Prompt Executions ──────────────────────────────────────
 
   async listExecutions(campaignId?: string): Promise<PromptExecution[]> {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, RefreshCw, Play, Copy } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Play, Copy, FileSearch } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptExecution, Campaign } from '@/services/MarketingOpsService';
 
@@ -19,6 +19,9 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   [campaigns, selectedCampaignId]);
   const [executing, setExecuting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [serverRendered, setServerRendered] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   const fetchTemplate = useCallback(async () => {
     setLoading(true);
@@ -63,16 +66,32 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
       tone: selectedCampaign.tone || '',
       attributes: (selectedCampaign.attributes || []).join(', '),
     }));
+    setServerRendered(null);
   }, [selectedCampaign]);
 
   const renderedPrompt = useMemo(() => {
+    if (serverRendered !== null) return serverRendered;
     if (!template?.body) return '';
     let result = template.body;
     for (const [key, value] of Object.entries(variables)) {
       result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value || `{{${key}}}`);
     }
     return result;
-  }, [template, variables]);
+  }, [template, variables, serverRendered]);
+
+  const handleRenderFromServer = async () => {
+    if (!selectedCampaignId) return;
+    setRendering(true);
+    setRenderError(null);
+    try {
+      const rendered = await marketingOpsService.renderPrompt(templateId, selectedCampaignId, variables);
+      setServerRendered(rendered);
+    } catch (err: any) {
+      setRenderError(err.message || 'Failed to render prompt from server');
+    } finally {
+      setRendering(false);
+    }
+  };
 
   const handleExecute = async () => {
     if (!selectedCampaignId) return;
@@ -96,6 +115,16 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
     navigator.clipboard.writeText(renderedPrompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([renderedPrompt], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${template?.name?.replace(/\s+/g, '_') ?? 'prompt'}_resolved.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -193,14 +222,24 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
                     ))}
                   </select>
                 </div>
-                <button
-                  onClick={handleExecute}
-                  disabled={executing || !selectedCampaignId}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <Play className="w-4 h-4" />
-                  {executing ? 'Executing...' : 'Execute Prompt'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleExecute}
+                    disabled={executing || !selectedCampaignId}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Play className="w-4 h-4" />
+                    {executing ? 'Executing...' : 'Execute Prompt'}
+                  </button>
+                  <button
+                    onClick={handleRenderFromServer}
+                    disabled={rendering || !selectedCampaignId}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700 disabled:opacity-50"
+                  >
+                    <FileSearch className="w-4 h-4" />
+                    {rendering ? 'Resolving...' : 'Get Resolved Prompt'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -210,14 +249,28 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
             <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Rendered Output</h2>
-                <button
-                  onClick={handleCopy}
-                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
+                <div className="flex items-center gap-3">
+                  {serverRendered !== null && (
+                    <span className="text-xs text-green-600 dark:text-green-400 font-medium">Server-resolved</span>
+                  )}
+                  <button
+                    onClick={handleDownload}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    Download
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
               </div>
+              {renderError && (
+                <div className="mb-3 text-xs text-red-600 dark:text-red-400">{renderError}</div>
+              )}
               <pre className="text-sm text-gray-600 dark:text-gray-400 font-mono whitespace-pre-wrap bg-gray-50 dark:bg-neutral-900/50 rounded-lg p-3 max-h-64 overflow-y-auto">
                 {renderedPrompt}
               </pre>

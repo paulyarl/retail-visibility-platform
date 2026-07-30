@@ -173,7 +173,28 @@ export class MarketingExecutionService extends BaseService {
     }
   }
 
-  private renderTemplate(body: string, variables: Record<string, any> | undefined, campaign: any): string {
+  /**
+   * Resolve a prompt template against a campaign without executing AI.
+   * Returns the fully substituted prompt string for external use.
+   */
+  async renderPrompt(input: {
+    templateId: string;
+    campaignId: string;
+    variables?: Record<string, any>;
+  }, ctx?: RequestCtx): Promise<string> {
+    const promptService = MarketingPromptService.getInstance();
+    const template = await promptService.getTemplate(input.templateId, ctx);
+    if (!template) {
+      throw new Error(`Template ${input.templateId} not found`);
+    }
+    const campaign = await MarketingCampaignService.getCampaign(input.campaignId, ctx);
+    if (!campaign) {
+      throw new Error(`Campaign ${input.campaignId} not found`);
+    }
+    return this.renderTemplate(template.body, input.variables, campaign);
+  }
+
+  renderTemplate(body: string, variables: Record<string, any> | undefined, campaign: any): string {
     let rendered = body;
 
     const allVars: Record<string, string> = {
