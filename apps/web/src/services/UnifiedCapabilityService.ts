@@ -96,6 +96,7 @@ import {
   FunnelStepType,
   CouponOptionsState,
   CouponDiscountType,
+  MarketingOpsState,
 } from './CapabilityResolutionService';
 import { clientLogger } from '@/lib/client-logger';
 
@@ -161,6 +162,7 @@ export interface BackendEffectiveCapabilities {
     platform_services: BackendEffectivePlatformServices;
     funnel: BackendEffectiveFunnel;
     coupon_options: BackendEffectiveCouponOptions;
+    marketing_ops: BackendEffectiveMarketingOps;
   };
   constraint_violations: BackendConstraintViolation[];
   constraint_status: Record<string, BackendConstraintStatus>;
@@ -1129,6 +1131,15 @@ interface BackendEffectiveCouponOptions {
   merchant_preferences: { coupon_enabled?: boolean | null; spotlight_enabled?: boolean | null; percent_off_enabled?: boolean | null; fixed_amount_enabled?: boolean | null; free_shipping_enabled?: boolean | null; bogo_enabled?: boolean | null; target_products_enabled?: boolean | null; qr_sharing_enabled?: boolean | null } | null;
 }
 
+interface BackendEffectiveMarketingOps {
+  enabled: boolean;
+  can_use_prompt_execution: boolean;
+  can_use_filter_review: boolean;
+  can_use_batch_execution: boolean;
+  can_use_revenue_tracking: boolean;
+  is_flexible: boolean;
+}
+
 function mapFunnel(b: BackendEffectiveFunnel): FunnelState {
   return {
     enabled: b.enabled,
@@ -1160,6 +1171,17 @@ function mapCouponOptions(b: BackendEffectiveCouponOptions): CouponOptionsState 
     allowedDiscountTypes: (b.allowed_discount_types || []) as CouponDiscountType[],
     isFlexible: b.is_flexible,
     merchantPreferences: b.merchant_preferences ?? null,
+  };
+}
+
+function mapMarketingOps(b: BackendEffectiveMarketingOps): MarketingOpsState {
+  return {
+    enabled: b.enabled,
+    canUsePromptExecution: b.can_use_prompt_execution,
+    canUseFilterReview: b.can_use_filter_review,
+    canUseBatchExecution: b.can_use_batch_execution,
+    canUseRevenueTracking: b.can_use_revenue_tracking,
+    isFlexible: b.is_flexible,
   };
 }
 
@@ -1221,6 +1243,7 @@ export function mapAll(b: BackendEffectiveCapabilities): AllCapabilitiesState {
     platformServices: mapPlatformServices(b.effective.platform_services),
     funnel: mapFunnel(b.effective.funnel),
     couponOptions: mapCouponOptions(b.effective.coupon_options),
+    marketingOps: mapMarketingOps(b.effective.marketing_ops),
     constraintViolations: mapConstraintViolations(b.constraint_violations),
     constraintStatus: mapConstraintStatus(b.constraint_status),
     uncategorizedFeatures: b.uncategorized_features,

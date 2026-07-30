@@ -131,6 +131,13 @@ class UnifiedConfig {
     return this.env.AUTH0_MFA_CLIENT_SECRET;
   }
 
+  // ─── Marketing Ops ────────────────────────────────────────────────────
+
+  get marketingOpsShownStaleDays(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_SHOWN_STALE_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+  }
+
   // ─── Sentry ───────────────────────────────────────────────────────────
 
   get sentryDsn(): string | undefined {

@@ -13,6 +13,7 @@ import { RichContentRenderer } from '@/components/products/RichContentRenderer';
 import { DEFAULT_CONTENT_BLOCKS, type ContentBlocks } from '@/components/products/content-blocks';
 import type { CrmTicket, CrmTicketMessage, TicketStatus, TicketPriority } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
   { value: 'open', label: 'Open' },
@@ -56,6 +57,7 @@ export default function CrmTicketDetailPage() {
   const [noteContent, setNoteContent] = useState('');
   const [sending, setSending] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const isClosed = ticket?.status === 'closed';
 
   const load = useCallback(async () => {
@@ -83,6 +85,10 @@ export default function CrmTicketDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    crmAdminService.listGlobalTickets().then((t) => setCategoryOptions(distinctValues(t, (x) => x.category))).catch(() => {});
+  }, []);
 
   async function handleUpdateTicket(data: Partial<{ status: TicketStatus; priority: TicketPriority; assigned_to: string; category: string }>) {
     if (!ticket) return;
@@ -210,14 +216,15 @@ export default function CrmTicketDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-neutral-500 mb-1">Category</label>
-                <input
-                  type="text"
+                <SuggestiveSelect
                   value={ticket.category || ''}
-                  onChange={(e) => !isClosed && handleUpdateTicket({ category: e.target.value || undefined })}
-                  onBlur={(e) => !isClosed && handleUpdateTicket({ category: e.target.value || undefined })}
+                  onChange={(v) => !isClosed && handleUpdateTicket({ category: v || undefined })}
+                  options={categoryOptions}
+                  emptyLabel="— No category —"
+                  newLabel="+ New category..."
+                  newInputPlaceholder="Enter new category"
                   disabled={isClosed}
                   className={`w-full px-3 py-2 border rounded-lg text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${isClosed ? 'bg-neutral-100 cursor-not-allowed' : 'bg-white'}`}
-                  placeholder="Category"
                 />
               </div>
             </div>

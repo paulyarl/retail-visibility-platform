@@ -10,6 +10,7 @@ import { adminOperationsService, type AdminUser } from '@/services/AdminOperatio
 import CrmPageShell from '@/components/crm/CrmPageShell';
 import type { CrmTenantDetail, TicketPriority, TaskPriority, TaskStatus } from '@/types/crm';
 import { clientLogger } from '@/lib/client-logger';
+import SuggestiveSelect from '@/components/marketing-ops/SuggestiveSelect';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -334,7 +335,7 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newTicket, setNewTicket] = useState({ title: '', description: '', priority: 'medium' as TicketPriority });
+  const [newTicket, setNewTicket] = useState({ title: '', description: '', priority: 'medium' as TicketPriority, category: 'general' });
 
   async function load() {
     setLoading(true);
@@ -361,9 +362,10 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
         title: newTicket.title.trim(),
         description: newTicket.description.trim() || undefined,
         priority: newTicket.priority,
+        category: newTicket.category || undefined,
       });
       setShowCreate(false);
-      setNewTicket({ title: '', description: '', priority: 'medium' });
+      setNewTicket({ title: '', description: '', priority: 'medium', category: 'general' });
       await load();
     } catch (err) {
       clientLogger.error('[Tickets Tab] Create error:', { detail: err });
@@ -371,6 +373,8 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
       setCreating(false);
     }
   }
+
+  const categoryOptions = useMemo(() => [...new Set(tickets.map(t => t.category).filter(Boolean))].sort(), [tickets]);
 
   if (loading) return <div className="py-8 text-center"><Spinner /></div>;
 
@@ -453,6 +457,18 @@ function TicketsTab({ tenantId }: { tenantId: string }) {
                   { value: 'high', label: 'High' },
                   { value: 'urgent', label: 'Urgent' },
                 ]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Category (new)</label>
+              <SuggestiveSelect
+                value={newTicket.category}
+                onChange={(v) => setNewTicket(prev => ({ ...prev, category: v }))}
+                options={categoryOptions}
+                emptyLabel="-- Select category --"
+                newLabel="+ New category..."
+                newInputPlaceholder="Enter new category"
+                className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
               />
             </div>
             <ModalFooter>
@@ -737,6 +753,7 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [editContact, setEditContact] = useState<any>(null);
   const [newContact, setNewContact] = useState({ first_name: '', last_name: '', email: '', phone: '', role: '', is_primary: false });
+  const roleOptions = useMemo(() => [...new Set(contacts.map(c => c.role).filter(Boolean))].sort(), [contacts]);
 
   async function load() {
     setLoading(true);
@@ -886,7 +903,15 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Role</label>
-                <input type="text" value={newContact.role} onChange={e => setNewContact(p => ({ ...p, role: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="e.g. Owner" />
+                <SuggestiveSelect
+                  value={newContact.role}
+                  onChange={(v) => setNewContact(p => ({ ...p, role: v }))}
+                  options={roleOptions}
+                  emptyLabel="-- Select role --"
+                  newLabel="+ New role..."
+                  newInputPlaceholder="Enter new role"
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                />
               </div>
             </div>
             <label className="flex items-center gap-2 text-sm">
@@ -928,7 +953,15 @@ function ContactsTab({ tenantId }: { tenantId: string }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Role</label>
-                <input type="text" value={editContact.role || ''} onChange={e => setEditContact((p: any) => ({ ...p, role: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                <SuggestiveSelect
+                  value={editContact.role || ''}
+                  onChange={(v) => setEditContact((p: any) => ({ ...p, role: v }))}
+                  options={roleOptions}
+                  emptyLabel="-- Select role --"
+                  newLabel="+ New role..."
+                  newInputPlaceholder="Enter new role"
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                />
               </div>
             </div>
             <label className="flex items-center gap-2 text-sm">

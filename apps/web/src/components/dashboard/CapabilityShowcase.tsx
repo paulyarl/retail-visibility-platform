@@ -36,6 +36,7 @@ import {
   Filter,
   Tag,
   Building2,
+  Megaphone,
 } from "lucide-react";
 import { AllCapabilitiesState } from "@/services/CapabilityResolutionService";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
@@ -337,6 +338,15 @@ export default function CapabilityShowcase({
     if (cp?.canUseBogo) cpDetailParts.push('BOGO');
     if (cp?.canTargetProducts) cpDetailParts.push('Targeted');
     if (cp?.canSetLimits) cpDetailParts.push('Limits');
+
+    // --- Marketing Ops ---
+    const mo = cap.marketingOps;
+    const moTier = mo?.enabled ?? false;
+    const moDetailParts: string[] = [];
+    if (mo?.canUsePromptExecution) moDetailParts.push('Prompt Execution');
+    if (mo?.canUseFilterReview) moDetailParts.push('Filter Review');
+    if (mo?.canUseBatchExecution) moDetailParts.push('Batch Execution');
+    if (mo?.canUseRevenueTracking) moDetailParts.push('Revenue Tracking');
     if (cp?.canViewAnalytics) cpDetailParts.push('Analytics');
     if (cp?.canUseQrSharing) cpDetailParts.push('QR Sharing');
     if (cp?.canUseSpotlight) cpDetailParts.push('Spotlight');
@@ -670,6 +680,18 @@ export default function CapabilityShowcase({
           : "Not available",
         settingsLink: `/t/${tenantId}/settings/coupon-options`,
         constraintWarning: getConstraintWarning('coupon_options'),
+      },
+      {
+        key: "marketingOps",
+        label: "Marketing Ops",
+        icon: <Megaphone className="w-4 h-4" />,
+        enabled: moTier,
+        status: getStatus(moTier, false),
+        detail: moTier
+          ? (moDetailParts.length > 0 ? moDetailParts.join(', ') : 'Available')
+          : "Not available",
+        settingsLink: `/settings/admin/marketing-ops`,
+        constraintWarning: getConstraintWarning('marketing_ops'),
       },
     ];
   }, [capabilities, tenantId]);

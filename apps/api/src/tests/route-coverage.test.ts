@@ -117,4 +117,12 @@ describe('Route Registry Coverage', () => {
       }
     }
   });
+
+  test('marketing-ops route is registered with admin auth level', () => {
+    const mktEntry = routeRegistry.find((e) => e.path === '/api/admin/marketing-ops');
+    expect(mktEntry, 'Marketing Ops route not found in registry').toBeDefined();
+    expect(mktEntry!.domain).toBe('admin');
+    expect(mktEntry!.authLevel).toBe('admin');
+    expect(mktEntry!.router, 'Marketing Ops route has no router').toBeDefined();
+  });
 });

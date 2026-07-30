@@ -175,6 +175,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   ),
+  Megaphone: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+    </svg>
+  ),
 };
 
 // ─── Nav definition (only real pages) ────────────────────────────────────────
@@ -319,6 +324,21 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Tenants',       href: '/settings/admin/crm/tenants' },
       { label: 'Tickets',       href: '/settings/admin/crm/tickets' },
       { label: 'Tasks',         href: '/settings/admin/crm/tasks' },
+    ],
+  },
+  {
+    label: 'Marketing Ops',
+    icon: <Icon.Megaphone />,
+    href: '/settings/admin/marketing-ops',
+    prefetch: false,
+    children: [
+      { label: 'Dashboard',            href: '/settings/admin/marketing-ops' },
+      { label: 'Campaigns',            href: '/settings/admin/marketing-ops/campaigns' },
+      { label: 'Prompt Library',       href: '/settings/admin/marketing-ops/prompts' },
+      { label: 'Deliverable Templates', href: '/settings/admin/marketing-ops/deliverable-templates' },
+      { label: 'Branding',             href: '/settings/admin/marketing-ops/branding' },
+      { label: 'Filter Review',        href: '/settings/admin/marketing-ops/filter-review' },
+      { label: 'Scorecards',           href: '/settings/admin/marketing-ops/scorecards' },
     ],
   },
   {

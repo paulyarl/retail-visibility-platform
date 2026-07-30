@@ -93,6 +93,18 @@ Some IDs are **global** (not tenant-scoped) and omit the tenant key:
 | `generateAuditId()` | `audit-{nanoid}` | Audit logs are platform-level |
 | `generateTierId()` | `tier-{nanoid}` | Tiers are platform-level |
 | `generateFeatureId()` | `feature-{nanoid}` | Features are platform-level |
+| `generateCampaignId()` | `mcamp-{nanoid}` | Marketing campaigns (admin-scoped) |
+| `generateMarketingAuditId()` | `maud-{nanoid}` | Marketing campaign audits |
+| `generateStageHistoryId()` | `msh-{nanoid}` | Marketing stage transition history |
+| `generateMarketingFileId()` | `mfile-{nanoid}` | Marketing campaign files |
+| `generatePromptTemplateId()` | `mpt-{nanoid}` | Marketing prompt templates |
+| `generatePromptExecutionId()` | `mpe-{nanoid}` | Marketing prompt executions |
+| `generateFilterFlagId()` | `mff-{nanoid}` | Marketing filter flags |
+| `generateScorecardId()` | `msc-{nanoid}` | Marketing daily scorecards |
+| `generateDeliverableTemplateId()` | `mdt-{nanoid}` | Marketing deliverable templates |
+| `generateDeliverableId()` | `mdlv-{nanoid}` | Marketing deliverables |
+| `generateBrandingConfigId()` | `mbcfg-{nanoid}` | Marketing branding configs |
+| `generatePreviewTokenId()` | `mdpt-{nanoid}` | Marketing deliverable preview tokens |
 
 ### Multi-Entity Correlation IDs
 
@@ -216,6 +228,25 @@ Added during merchant gate table correlation key audit (June 2026). These replac
 | `generateFeedPushJobId()` | `feed` | `feed-{nanoid}` | Feed push jobs |
 | `generateAccessToken()` | `atok` | `atok-{nanoid}` | Download access tokens |
 | `generateLicenseKey()` | — | `XXXX-XXXX-XXXX-XXXX` | Product license keys |
+
+### Marketing Ops IDs (global, admin-scoped)
+
+Added during Marketing Ops Sprint 1. These are global (no tenant key) because marketing campaigns are admin-managed, not tenant-scoped.
+
+| Generator | Prefix | Format | Use Case |
+|---|---|---|---|
+| `generateCampaignId()` | `mcamp` | `mcamp-{nanoid}` | Marketing campaigns |
+| `generateMarketingAuditId()` | `maud` | `maud-{nanoid}` | Marketing campaign audits |
+| `generateStageHistoryId()` | `msh` | `msh-{nanoid}` | Marketing stage transition history |
+| `generateMarketingFileId()` | `mfile` | `mfile-{nanoid}` | Marketing campaign files |
+| `generatePromptTemplateId()` | `mpt` | `mpt-{nanoid}` | Marketing prompt templates |
+| `generatePromptExecutionId()` | `mpe` | `mpe-{nanoid}` | Marketing prompt executions |
+| `generateFilterFlagId()` | `mff` | `mff-{nanoid}` | Marketing filter flags |
+| `generateScorecardId()` | `msc` | `msc-{nanoid}` | Marketing daily scorecards |
+| `generateDeliverableTemplateId()` | `mdt` | `mdt-{nanoid}` | Marketing deliverable templates |
+| `generateDeliverableId()` | `mdlv` | `mdlv-{nanoid}` | Marketing deliverables |
+| `generateBrandingConfigId()` | `mbcfg` | `mbcfg-{nanoid}` | Marketing branding configs |
+| `generatePreviewTokenId()` | `mdpt` | `mdpt-{nanoid}` | Marketing deliverable preview tokens |
 
 ---
 

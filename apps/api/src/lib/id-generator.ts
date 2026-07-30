@@ -1608,3 +1608,142 @@ export function generateCouponReminderId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `crmd-${generateTenantKey(tenantId)}-${nanoid()}`;
 }
+
+// ─── Marketing Ops ID Generators ────────────────────────────────────────────
+// Admin-only module — no tenant key in prefix (global admin entities)
+
+/**
+ * Generate marketing campaign ID
+ * Format: mcamp-{nanoid} (14 chars)
+ */
+export function generateCampaignId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mcamp-${nanoid()}`;
+}
+
+/**
+ * Generate marketing audit ID
+ * Format: maud-{nanoid} (13 chars)
+ */
+export function generateMarketingAuditId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `maud-${nanoid()}`;
+}
+
+/**
+ * Generate marketing stage history ID
+ * Format: msh-{nanoid} (12 chars)
+ */
+export function generateStageHistoryId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `msh-${nanoid()}`;
+}
+
+/**
+ * Generate marketing file ID
+ * Format: mfile-{nanoid} (14 chars)
+ */
+export function generateMarketingFileId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mfile-${nanoid()}`;
+}
+
+/**
+ * Generate marketing prompt template ID
+ * Format: mpt-{nanoid} (12 chars)
+ */
+export function generatePromptTemplateId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mpt-${nanoid()}`;
+}
+
+/**
+ * Generate marketing prompt execution ID
+ * Format: mpe-{nanoid} (12 chars)
+ */
+export function generatePromptExecutionId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mpe-${nanoid()}`;
+}
+
+/**
+ * Generate marketing filter flag ID
+ * Format: mff-{nanoid} (12 chars)
+ */
+export function generateFilterFlagId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mff-${nanoid()}`;
+}
+
+/**
+ * Generate marketing scorecard ID
+ * Format: msc-{nanoid} (12 chars)
+ */
+export function generateScorecardId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `msc-${nanoid()}`;
+}
+
+/**
+ * Generate marketing deliverable template ID
+ * Format: mdt-{nanoid} (12 chars)
+ */
+export function generateDeliverableTemplateId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdt-${nanoid()}`;
+}
+
+/**
+ * Generate marketing deliverable ID
+ * Format: mdlv-{nanoid} (13 chars)
+ */
+export function generateDeliverableId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdlv-${nanoid()}`;
+}
+
+/**
+ * Generate marketing branding config ID
+ * Format: mbcfg-{nanoid} (14 chars)
+ */
+export function generateBrandingConfigId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mbcfg-${nanoid()}`;
+}
+
+/**
+ * Generate deliverable preview token record ID
+ * Format: mdpt-{nanoid} (13 chars)
+ * NOTE: prefix is mdpt- (not mpt-) — mpt- is taken by generatePromptTemplateId
+ */
+export function generatePreviewTokenId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdpt-${nanoid()}`;
+}
+
+/**
+ * Generate public preview token value (URL-safe, 32-char entropy)
+ * Used in public URLs: /p/deliverable/{token}
+ */
+export function generatePreviewToken(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 32);
+  return nanoid();
+}
+
+/**
+ * Generate category-tone preset ID
+ * Format: mctp-{nanoid} (13 chars)
+ */
+export function generateCategoryTonePresetId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mctp-${nanoid()}`;
+}
+
+/**
+ * Generate marketing revenue record ID
+ * Format: mrev-{nanoid} (13 chars)
+ */
+export function generateMarketingRevenueId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mrev-${nanoid()}`;
+}

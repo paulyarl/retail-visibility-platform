@@ -355,6 +355,18 @@ export class CrmTicketService extends BaseService {
 
 8. **Dual-scope pattern.**  When a route serves both public and private consumers (e.g., `effective-capabilities`), create two endpoints: a public summary at `/api/public/tenants/:tenantId/*` (no auth, `detail=full` ignored) and a private full-detail endpoint at `/api/tenants/:tenantId/*` (auth required, `?detail=full` returns raw gates).  Use the **two-service pattern**: a `PublicApiSingleton` service calls the public endpoint; a separate `TenantApiSingleton` service calls the private endpoint. Example: `PublicUnifiedCapabilityService` (public, extends `PublicApiSingleton`) and `UnifiedCapabilityService` (private, extends `TenantApiSingleton`). Both share the same mapping functions and return types. The public service uses `makeDefaultRequest` which `FlexibleApiSingleton` automatically routes to `/api/public/...` based on `defaultRequestType = PUBLIC`. See `docs/AUTH_SCOPE_ISOLATION_SPEC.md` FR-2 for the dual-scope pattern.
 
+9. **Default export singleton pitfall (API routes).** When a backend service exports both the class and a default singleton instance (e.g., `export default MyService.getInstance()`), route files that import the default export already have the singleton instance — calling `.getInstance()` on it causes `TS2576: Property 'getInstance' does not exist on type 'MyService'`. Either: (a) import the default export and call methods directly (`MyService.listItems(...)`), or (b) import the class itself (`import { MyService } from '...'`) and call `MyService.getInstance().listItems(...)`. Do not mix the two patterns. The Marketing Ops sprint established pattern (a) as the convention for new admin-only modules.
+
+10. **Zod snake_case → service camelCase mapping.** Zod schemas in route files typically use snake_case keys (matching API request body conventions), but service interfaces use camelCase (TypeScript convention). When spreading `...parsed` into a service method call, TypeScript will error with `TS2345: Argument of type '{ snake_case: ... }' is not assignable to parameter of type '{ camelCase: ... }'`. Always explicitly map each field: `{ userId: parsed.user_id, campaignId: parsed.campaign_id, ... }` instead of `{ ...parsed }`. This is the most common source of TS errors when wiring routes to services. Additionally, Zod v3+ uses `error.issues` (not `error.errors`) for validation error details — accessing `error.errors` causes `TS2339: Property 'errors' does not exist on type 'ZodError<unknown>'`.
+
+11. **Next.js dynamic route page wrapper import paths.** When a client component (e.g., `CampaignFormClient.tsx`) lives in a parent directory and page wrappers in subdirectories import it (e.g., `campaigns/new/page.tsx` and `campaigns/[id]/edit/page.tsx`), the relative import path must account for the nesting depth. `new/page.tsx` uses `../CampaignFormClient`, `[id]/edit/page.tsx` uses `../../CampaignFormClient`. Using `./CampaignFormClient` (same directory) causes `TS2307: Cannot find module`. Always verify relative paths from the page file's actual filesystem location, not the URL path.
+
+12. **React `<select>` boolean value prop.** When binding a `boolean | ''` state field to a `<select>` element's `value` prop, React requires `string | number | readonly string[] | undefined`. Passing `false` causes `TS2322: Type 'boolean | ""' is not assignable to type 'string | number | readonly string[] | undefined'`. Convert booleans to string literals: `value={form.field === true ? 'true' : form.field === false ? 'false' : ''}` and parse back in the `onChange` handler: `e.target.value === '' ? '' : e.target.value === 'true'`.
+
+13. **React 19 `useRef` requires an initial value.** With `@types/react@19`, `useRef<T>()` with no arguments causes `TS2554: Expected 1 arguments, but got 0`. The type signature `function useRef<T>(initialValue: T): RefObject<T>` no longer allows zero-arg calls. Fix: pass `null` and widen the type to include `null`: `useRef<(() => Promise<void>) | null>(null)`. This is common when storing a mutable callback reference for polling intervals.
+
+14. **Prisma model name verification before querying.** Always grep `schema.prisma` for the exact model name before using it in service code. Guessed names (e.g., `mkt_campaign_stage_history` vs actual `mkt_stage_history_list`) cause `TS2551: Property does not exist on type PrismaClient`. Also verify relation field names in `include`/`select` — they match the Prisma model's relation field name (e.g., `mkt_campaigns_list`, not `campaign`). Check field names too: `changed_at` vs `created_at` can differ from what you expect.
+
 ### 3.1 Backend route pattern for public tenant-scoped endpoints
 
 When a frontend service extends `PublicApiSingleton` and calls a tenant-scoped endpoint, the backend route **must** be mounted at `/api/public/tenants/:tenantId/*`:
@@ -394,3 +406,69 @@ app.use('/api/public/tenants/:tenantId', myPublicRouter); // public tenant-scope
 | Third-party API wrapper (Google, weather, etc.) | `ExternalApiSingleton` | N/A |
 | Capability-gated feature | `TenantApiSingleton` + client-side tier check | `PermissionEnhancedBaseService` |
 | Dual-scope (public summary + private full) | `PublicApiSingleton` + `TenantApiSingleton` (two services, e.g., `PublicUnifiedCapabilityService` + `UnifiedCapabilityService`) | `BaseService` / `UniversalSingleton` |
+
+---
+
+## 5. Testing pitfalls for singleton services
+
+### 5.1 `vi.hoisted()` destructuring — both sides must match
+
+When adding new mock variables to an existing `vi.hoisted()` block, you must add them to **both** the destructuring pattern (left side) **and** the object literal (right side). Adding only to the object literal causes `ReferenceError: <variable> is not defined` because the variable is never declared in scope.
+
+```ts
+// WRONG — mockMktCampaigns is in the object but not destructured
+const { mockExisting } = vi.hoisted(() => ({
+  mockExisting: vi.fn(),
+  mockMktCampaigns: vi.fn(),  // ← will be undefined in mock factories
+}));
+
+// CORRECT — added to both sides
+const { mockExisting, mockMktCampaigns } = vi.hoisted(() => ({
+  mockExisting: vi.fn(),
+  mockMktCampaigns: vi.fn(),
+}));
+```
+
+### 5.2 Overriding `id-generator` mock breaks existing tests
+
+When adding new `generateXxxId` functions to the `vi.mock('../lib/id-generator', ...)` factory, you must **also include all existing exports** that other tests in the same file depend on. Vitest replaces the entire module mock — any previously-mocked exports that are omitted will cause `No "generateXxx" export is defined` errors in pre-existing tests.
+
+**Before adding your exports**, grep the test file for all `generate` usages and include every one in the mock factory.
+
+### 5.3 jsPDF mock must be a class, not `vi.fn().mockImplementation()`
+
+`new jsPDF()` requires a constructor. `vi.fn().mockImplementation(() => ({...}))` is **not** a constructor — calling `new` on it throws `is not a constructor`. Use a proper class-based mock instead:
+
+```ts
+// WRONG — vi.fn() is not a constructor
+vi.mock('jspdf', () => ({
+  jsPDF: vi.fn().mockImplementation(() => ({ text: vi.fn(), ... })),
+}));
+
+// CORRECT — class-based mock works with `new jsPDF()`
+vi.mock('jspdf', () => {
+  class MockJsPDF {
+    internal = { pageSize: { getWidth: () => 216, getHeight: () => 279 } };
+    setFontSize = vi.fn();
+    text = vi.fn();
+    output = vi.fn().mockReturnValue(new ArrayBuffer(64));
+    addPage = vi.fn();
+    // ... add all methods used by the service
+  }
+  return { jsPDF: MockJsPDF };
+});
+```
+
+### 5.4 Singleton default export — call methods directly, not via `getInstance()`
+
+When a service exports its singleton instance as the default export (`export default MarketingCampaignService.getInstance()`), tests must call methods directly on the import, not via `.getInstance()`:
+
+```ts
+// WRONG — default export is already the instance, no getInstance() exists
+import MarketingCampaignService from '../MarketingCampaignService';
+await MarketingCampaignService.getInstance().autoAdvanceStaleShownCampaigns(7); // TypeError
+
+// CORRECT — call directly on the default export
+import MarketingCampaignService from '../MarketingCampaignService';
+await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
+```

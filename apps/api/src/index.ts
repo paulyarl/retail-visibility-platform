@@ -349,6 +349,15 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         logger.error('Failed to start affiliate click expiry job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
+
+      // Start marketing ops stage auto-advance job (daily) — advances stale 'shown' campaigns to 'lost'
+      try {
+        const { startMarketingOpsAutoAdvance } = await import('./jobs/marketing-ops-stage-autoadvance');
+        startMarketingOpsAutoAdvance();
+        logger.info('Marketing ops stage auto-advance job started (daily)');
+      } catch (err) {
+        logger.error('Failed to start marketing ops auto-advance job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
     });
 
     // Handle server errors

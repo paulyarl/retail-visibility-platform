@@ -826,6 +826,15 @@ export interface PlatformServicesState {
 
 export type CouponDiscountType = 'percent_off' | 'fixed_amount' | 'free_shipping' | 'bogo';
 
+export interface MarketingOpsState {
+  enabled: boolean;
+  canUsePromptExecution: boolean;
+  canUseFilterReview: boolean;
+  canUseBatchExecution: boolean;
+  canUseRevenueTracking: boolean;
+  isFlexible: boolean;
+}
+
 export interface CouponOptionsState {
   enabled: boolean;
   canCreateCoupons: boolean;
@@ -1115,6 +1124,7 @@ export interface AllCapabilitiesState {
   platformServices: PlatformServicesState;
   funnel: FunnelState;
   couponOptions: CouponOptionsState;
+  marketingOps: MarketingOpsState;
   constraintViolations: ConstraintViolationState[];
   constraintStatus: ConstraintStatusMapState;
   uncategorizedFeatures: string[];
@@ -1157,6 +1167,8 @@ const CAPABILITY_FEATURE_PREFIXES: Record<string, string> = {
   funnel_options_: 'funnel_options',
   funnel_: 'funnel_options',
   coupon_: 'coupon_options',
+  marketing_ops_: 'marketing_ops',
+  marketing_ops: 'marketing_ops',
 };
 
 /**
@@ -3004,6 +3016,27 @@ export function resolveDirectoryPromotionState(
     enabled: enabled && !disabled,
     isFlexible: flexible,
     allowedTiers,
+  };
+}
+
+/**
+ * Resolve marketing ops state from raw capability features.
+ * Feature prefix: marketing_ops_
+ */
+export function resolveMarketingOpsState(
+  features: Record<string, boolean>,
+): MarketingOpsState {
+  const disabled = !!features.marketing_ops_disabled;
+  const enabled = !disabled && !!features.marketing_ops_enabled;
+  const flexible = !!features.marketing_ops_flexible;
+
+  return {
+    enabled,
+    canUsePromptExecution: enabled && (flexible || !!features.marketing_ops_prompt_execution),
+    canUseFilterReview: enabled && (flexible || !!features.marketing_ops_filter_review),
+    canUseBatchExecution: enabled && (flexible || !!features.marketing_ops_batch_execution),
+    canUseRevenueTracking: enabled && (flexible || !!features.marketing_ops_revenue_tracking),
+    isFlexible: flexible,
   };
 }
 // UnifiedCapabilityService is the single service entry-point now.
