@@ -230,6 +230,7 @@ export class MarketingExecutionService extends BaseService {
       business_name: campaign.business_name || '',
       category: campaign.category || '',
       city: campaign.city || '',
+      state: campaign.state || '',
       neighborhood: campaign.neighborhood || '',
       contact_method: campaign.contact_method || '',
       contact_info: campaign.contact_info || '',

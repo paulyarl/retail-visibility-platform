@@ -7,6 +7,8 @@ import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFil
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
+import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
+import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history';
 
@@ -324,28 +326,36 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
             {/* Tab Content */}
             {activeTab === 'overview' && (
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <DetailField label="Contact Method" value={campaign.contact_method} />
-                  <DetailField label="Contact Info" value={campaign.contact_info} />
-                  <DetailField label="Assigned To" value={staffDisplayName(staffUsers, campaign.assigned_to)} />
-                  <DetailField label="GBP Claimed" value={campaign.gbp_claimed != null ? (campaign.gbp_claimed ? 'Yes' : 'No') : null} />
-                  <DetailField label="Unaddressed Reviews" value={campaign.unaddressed_reviews?.toString()} />
-                  <DetailField label="Last Review Date" value={formatDate(campaign.last_review_date)} />
-                  <DetailField label="Has Website" value={campaign.has_website} />
-                  <DetailField label="NAP Consistent" value={campaign.nap_consistent != null ? (campaign.nap_consistent ? 'Yes' : 'No') : null} />
-                  <DetailField label="Pain Score" value={campaign.pain_score?.toString()} />
-                  <DetailField label="Estimated Tier" value={campaign.estimated_tier} />
-                  <DetailField label="Estimated Fee" value={formatCurrency(campaign.estimated_fee_cents)} />
-                  <DetailField label="Amount Paid" value={formatCurrency(campaign.amount_paid_cents)} />
-                  <DetailField label="Retainer Status" value={campaign.retainer_status} />
-                  <DetailField label="Retainer Amount" value={formatCurrency(campaign.retainer_amount_cents)} />
-                  <DetailField label="Retainer Start" value={formatDate(campaign.retainer_start_date)} />
-                  <DetailField label="Package Delivered" value={campaign.package_delivered} />
-                  <DetailField label="Date Entered" value={formatDate(campaign.date_entered)} />
-                  <DetailField label="Date Paid" value={formatDate(campaign.date_paid)} />
-                </div>
+                {/* Scope-conditional primary content */}
+                {campaign.scope === 'category' ? (
+                  <CategoryOverviewSection campaign={campaign} />
+                ) : campaign.scope === 'city' ? (
+                  <CityOverviewSection campaign={campaign} />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <DetailField label="Contact Method" value={campaign.contact_method} />
+                    <DetailField label="Contact Info" value={campaign.contact_info} />
+                    <DetailField label="Assigned To" value={staffDisplayName(staffUsers, campaign.assigned_to)} />
+                    <DetailField label="GBP Claimed" value={campaign.gbp_claimed != null ? (campaign.gbp_claimed ? 'Yes' : 'No') : null} />
+                    <DetailField label="Unaddressed Reviews" value={campaign.unaddressed_reviews?.toString()} />
+                    <DetailField label="Last Review Date" value={formatDate(campaign.last_review_date)} />
+                    <DetailField label="Has Website" value={campaign.has_website} />
+                    <DetailField label="NAP Consistent" value={campaign.nap_consistent != null ? (campaign.nap_consistent ? 'Yes' : 'No') : null} />
+                    <DetailField label="Pain Score" value={campaign.pain_score?.toString()} />
+                    <DetailField label="Estimated Tier" value={campaign.estimated_tier} />
+                    <DetailField label="Estimated Fee" value={formatCurrency(campaign.estimated_fee_cents)} />
+                    <DetailField label="Amount Paid" value={formatCurrency(campaign.amount_paid_cents)} />
+                    <DetailField label="Retainer Status" value={campaign.retainer_status} />
+                    <DetailField label="Retainer Amount" value={formatCurrency(campaign.retainer_amount_cents)} />
+                    <DetailField label="Retainer Start" value={formatDate(campaign.retainer_start_date)} />
+                    <DetailField label="Package Delivered" value={campaign.package_delivered} />
+                    <DetailField label="Date Entered" value={formatDate(campaign.date_entered)} />
+                    <DetailField label="Date Paid" value={formatDate(campaign.date_paid)} />
+                  </div>
+                )}
 
-                {/* Pricing & Payment */}
+                {/* Pricing & Payment — business scope always; non-business only when tenant-linked */}
+                {(campaign.scope === 'business' || campaign.tenant_id) && (
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Pricing & Payment</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -388,6 +398,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Conversion (Tenant Prospecting Channel) */}
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">

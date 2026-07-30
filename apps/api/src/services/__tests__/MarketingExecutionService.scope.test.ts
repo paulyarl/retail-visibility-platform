@@ -61,6 +61,7 @@ describe('renderTemplate — scope-aware variable injection', () => {
     business_name: 'Acme HVAC',
     category: 'HVAC',
     city: 'Plainfield',
+    state: 'IL',
     neighborhood: 'Downtown',
     contact_method: 'phone',
     contact_info: '555-1234',
@@ -78,6 +79,18 @@ describe('renderTemplate — scope-aware variable injection', () => {
 
   const categoryCampaign = { ...businessCampaign, scope: 'category', business_name: null };
   const cityCampaign = { ...businessCampaign, scope: 'city', business_name: null, category: '' };
+
+  it('injects state for category scope', () => {
+    const body = 'Category: {{category}} in {{city}}, {{state}}';
+    const rendered = service.renderTemplate(body, undefined, categoryCampaign);
+    expect(rendered).toBe('Category: HVAC in Plainfield, IL');
+  });
+
+  it('injects state for city scope', () => {
+    const body = 'City: {{city}}, {{state}}';
+    const rendered = service.renderTemplate(body, undefined, cityCampaign);
+    expect(rendered).toBe('City: Plainfield, IL');
+  });
 
   it('injects all variables for business scope', () => {
     const body = 'Business: {{business_name}} in {{city}}, {{category}}. Pain: {{pain_score}}';

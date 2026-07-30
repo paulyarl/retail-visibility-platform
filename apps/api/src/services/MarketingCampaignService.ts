@@ -291,7 +291,25 @@ export class MarketingCampaignService extends BaseService {
         campaign.service_category || '',
         ctx,
       );
-      return { ...campaign, service_category_label };
+      // Normalize Prisma relation keys to the client-expected names so the
+      // campaign detail page's Audits / Files / Stage History tabs render.
+      // Without this, the raw `mkt_audits_list` / `mkt_files_list` /
+      // `mkt_stage_history_list` keys are dropped at the web client boundary
+      // (which expects `audits` / `files` / `stage_history`) and the tabs
+      // appear empty for every campaign.
+      const {
+        mkt_audits_list,
+        mkt_files_list,
+        mkt_stage_history_list,
+        ...rest
+      } = campaign as any;
+      return {
+        ...rest,
+        audits: mkt_audits_list ?? [],
+        files: mkt_files_list ?? [],
+        stage_history: mkt_stage_history_list ?? [],
+        service_category_label,
+      };
     } catch (error) {
       logger.error('Failed to get campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
