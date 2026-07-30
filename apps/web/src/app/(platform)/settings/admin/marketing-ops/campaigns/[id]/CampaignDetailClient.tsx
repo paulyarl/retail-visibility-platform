@@ -192,6 +192,13 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   <Store className={`w-4 h-4 ${generatingDemo ? 'animate-pulse' : ''}`} />
                   {generatingDemo ? 'Generating...' : campaign.demo_tenant_id ? 'Get Demo Link' : 'Demo Storefront'}
                 </button>
+                <Link
+                  href="/settings/admin/marketing-ops/prompts"
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-50 dark:bg-neutral-800 dark:text-indigo-400 dark:border-indigo-800 dark:hover:bg-indigo-900/20"
+                >
+                  <FileText className="w-4 h-4" />
+                  Prompt Library
+                </Link>
                 {!campaign.tenant_id && (
                   <button
                     onClick={handleLinkTenant}
