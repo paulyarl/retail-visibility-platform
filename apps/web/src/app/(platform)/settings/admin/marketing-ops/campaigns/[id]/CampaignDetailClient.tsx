@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
@@ -145,13 +145,6 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/settings/admin/marketing-ops/campaigns"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Campaigns
-        </Link>
 
         {error && (
           <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
@@ -169,7 +162,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.business_name}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.business_name ?? campaign.category ?? campaign.city}</h1>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
+                    {campaign.scope}
+                  </span>
                   <StageBadge stage={campaign.stage} size="md" />
                   {campaign.demo_tenant_id && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
@@ -179,7 +175,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   )}
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
+                  {campaign.scope} · {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
                   {campaign.display_id && ` · ${campaign.display_id}`}
                 </p>
               </div>

@@ -1,9 +1,17 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, RefreshCw, Play, Copy, FileSearch } from 'lucide-react';
-import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptExecution, Campaign } from '@/services/MarketingOpsService';
+import { RefreshCw, Play, Copy, FileSearch } from 'lucide-react';
+import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, PromptType } from '@/services/MarketingOpsService';
+
+const SCOPE_BY_PROMPT_TYPE: Record<PromptType, Campaign['scope'] | 'all'> = {
+  seek: 'all',
+  fulfill: 'business',
+  filter: 'business',
+  retainer: 'business',
+  category_analysis: 'category',
+  city_analysis: 'city',
+};
 
 export default function PromptWorkspaceClient({ templateId }: { templateId: string }) {
   const [template, setTemplate] = useState<PromptTemplate | null>(null);
@@ -17,6 +25,14 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   const selectedCampaign = useMemo(() =>
     campaigns.find((c) => c.id === selectedCampaignId) || null,
   [campaigns, selectedCampaignId]);
+
+  const compatibleCampaigns = useMemo(() => {
+    if (!template) return campaigns;
+    const preferred = SCOPE_BY_PROMPT_TYPE[template.prompt_type as PromptType];
+    if (preferred === 'all') return campaigns;
+    return campaigns.filter((c) => c.scope === preferred);
+  }, [campaigns, template]);
+
   const [executing, setExecuting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [serverRendered, setServerRendered] = useState<string | null>(null);
@@ -60,7 +76,8 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
     if (!selectedCampaign) return;
     setVariables((prev) => ({
       ...prev,
-      business_name: selectedCampaign.business_name,
+      scope: selectedCampaign.scope,
+      business_name: selectedCampaign.business_name ?? '',
       category: selectedCampaign.category,
       city: selectedCampaign.city,
       tone: selectedCampaign.tone || '',
@@ -146,13 +163,6 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/settings/admin/marketing-ops/prompts"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Prompt Library
-        </Link>
 
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -217,8 +227,8 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">— Select a campaign —</option>
-                    {campaigns.map((c) => (
-                      <option key={c.id} value={c.id}>{c.business_name} ({c.category}, {c.tone || '—'}, {c.city})</option>
+                    {compatibleCampaigns.map((c) => (
+                      <option key={c.id} value={c.id}>{c.business_name ?? `${c.category} · ${c.city}`} ({c.scope}, {c.city})</option>
                     ))}
                   </select>
                 </div>
@@ -286,7 +296,7 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
                     <div key={e.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {campaigns.find((c) => c.id === e.campaign_id)?.business_name ?? e.campaign_id}
+                          {campaigns.find((c) => c.id === e.campaign_id)?.business_name ?? campaigns.find((c) => c.id === e.campaign_id)?.category ?? e.campaign_id}
                         </span>
                         <span className="text-xs text-gray-400">{new Date(e.executed_at).toLocaleString()}</span>
                       </div>

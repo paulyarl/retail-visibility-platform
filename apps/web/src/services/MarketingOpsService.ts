@@ -36,6 +36,8 @@ export type ConversionSource =
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
+export type CampaignScope = 'business' | 'category' | 'city';
+
 export type RetainerStatus = 'not_pitched' | 'pitched' | 'won' | 'declined';
 
 export type PromptType =
@@ -64,7 +66,8 @@ export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 export interface Campaign {
   id: string;
   display_id: string | null;
-  business_name: string;
+  scope: CampaignScope;
+  business_name: string | null;
   category: string;
   city: string;
   neighborhood: string | null;
@@ -376,7 +379,8 @@ export interface ServiceCategory {
 // ====================
 
 export interface CampaignCreateInput {
-  business_name: string;
+  scope?: CampaignScope;
+  business_name?: string;
   category: string;
   city: string;
   neighborhood?: string;
@@ -558,6 +562,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async listCampaigns(filters?: {
     stage?: CampaignStage;
+    scope?: CampaignScope;
     category?: string;
     city?: string;
     assignedTo?: string;
@@ -570,6 +575,7 @@ class MarketingOpsService extends AdminApiSingleton {
   }): Promise<{ items: Campaign[]; total: number }> {
     const params = new URLSearchParams();
     if (filters?.stage) params.set('stage', filters.stage);
+    if (filters?.scope) params.set('scope', filters.scope);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.city) params.set('city', filters.city);
     if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo);

@@ -6088,7 +6088,7 @@ model mkt_branding_config {
 model mkt_campaigns_list {
   id                                                 String                           @id @db.VarChar(255)
   display_id                                         String?                          @unique @db.VarChar(20)
-  business_name                                      String                           @db.VarChar(255)
+  business_name                                      String?                          @db.VarChar(255)
   category                                           String                           @db.VarChar(100)
   city                                               String                           @db.VarChar(100)
   neighborhood                                       String?                          @db.VarChar(100)
@@ -6136,6 +6136,7 @@ model mkt_campaigns_list {
   tone                                               String?                          @db.VarChar(50)
   retainer                                           String?                          @db.VarChar(20)
   attributes                                         Json?                            @default("[]")
+  scope                                              String                           @default("business") @db.VarChar(20)
   marketing_revenue                                  marketing_revenue[]
   mkt_audits_list                                    mkt_audits_list[]
   tenants_mkt_campaigns_list_demo_tenant_idTotenants tenants?                         @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
@@ -6158,6 +6159,7 @@ model mkt_campaigns_list {
   @@index([attributes], map: "idx_mkt_campaigns_attributes", type: Gin)
   @@index([retainer], map: "idx_mkt_campaigns_retainer")
   @@index([tone], map: "idx_mkt_campaigns_tone")
+  @@index([scope], map: "idx_mkt_campaigns_scope")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

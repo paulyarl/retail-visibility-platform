@@ -412,7 +412,7 @@ router.get('/public/marketing/receipt/:campaignId', async (req, res) => {
     doc.text('Bill To:', toX, yPos);
     doc.setFont('helvetica', 'normal');
     yPos += 5;
-    doc.text(campaign.business_name, toX, yPos);
+    doc.text(campaign.business_name ?? '', toX, yPos);
 
     yPos = Math.max(yPos, 75) + 10;
     doc.setDrawColor(200, 200, 200);
@@ -433,7 +433,7 @@ router.get('/public/marketing/receipt/:campaignId', async (req, res) => {
     const infoRows: [string, string][] = [
       ['Receipt ID:', revenue.id],
       ['Campaign ID:', campaign.id],
-      ['Business:', campaign.business_name],
+      ['Business:', campaign.business_name ?? ''],
       ['Service:', serviceCategoryLabel],
       ['Payment Date:', formatDate(revenue.recorded_at)],
       ['Payment Method:', revenue.gateway_type || 'N/A'],

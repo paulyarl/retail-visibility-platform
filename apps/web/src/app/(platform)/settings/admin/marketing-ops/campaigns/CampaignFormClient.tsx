@@ -1,20 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const CAMPAIGN_ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 
 interface FormState {
+  scope: CampaignScope;
   business_name: string;
   category: string;
   city: string;
@@ -49,6 +51,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
+  scope: 'business',
   business_name: '',
   category: '',
   city: '',
@@ -122,6 +125,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     try {
       const c = await marketingOpsService.getCampaign(campaignId);
       setForm({
+        scope: (c.scope as CampaignScope) ?? 'business',
         business_name: c.business_name ?? '',
         category: c.category ?? '',
         city: c.city ?? '',
@@ -190,7 +194,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
       if (mode === 'create') {
         const input: CampaignCreateInput = {
-          business_name: form.business_name,
+          scope: form.scope,
+          business_name: strOrUndef(form.business_name),
           category: form.category,
           city: form.city,
           neighborhood: strOrUndef(form.neighborhood),
@@ -216,7 +221,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
       } else if (mode === 'edit' && campaignId) {
         const input: CampaignUpdateInput = {
-          business_name: form.business_name,
+          scope: form.scope,
+          business_name: strOrUndef(form.business_name),
           category: form.category,
           city: form.city,
           neighborhood: strOrUndef(form.neighborhood),
@@ -267,13 +273,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/settings/admin/marketing-ops/campaigns"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Campaigns
-        </Link>
 
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           {mode === 'create' ? 'New Campaign' : 'Edit Campaign'}
@@ -288,8 +287,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Core Fields */}
           <FormSection title="Business Information">
-            <FormField label="Business Name" required>
-              <input type="text" required value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
+            <FormField label="Scope" required>
+              <select value={form.scope} onChange={(e) => handleChange('scope', e.target.value as CampaignScope)}
+                className={inputClass}>
+                {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Business Name" required={form.scope === 'business'}>
+              <input type="text" required={form.scope === 'business'} value={form.business_name} onChange={(e) => handleChange('business_name', e.target.value)}
                 className={inputClass} />
             </FormField>
             <FormField label="Category" required>

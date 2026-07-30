@@ -101,8 +101,9 @@ router.use(requirePlatformAdmin);
 // ZOD SCHEMAS
 // ====================
 
-const campaignCreateSchema = z.object({
-  business_name: z.string().min(1).max(255),
+const campaignBaseSchema = z.object({
+  scope: z.enum(['business', 'category', 'city']).optional(),
+  business_name: z.string().max(255).optional(),
   category: z.string().min(1).max(100),
   city: z.string().min(1).max(100),
   neighborhood: z.string().max(100).optional(),
@@ -124,7 +125,12 @@ const campaignCreateSchema = z.object({
   notes: z.string().optional(),
 });
 
-const campaignUpdateSchema = campaignCreateSchema.partial().extend({
+const campaignCreateSchema = campaignBaseSchema.refine((data) => data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
+  message: 'business_name is required for business-scoped campaigns',
+  path: ['business_name'],
+});
+
+const campaignUpdateSchema = campaignBaseSchema.partial().extend({
   stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
   tone: z.string().max(50).optional(),
   retainer: z.enum(['Fast', 'Medium', 'Slow']).optional(),
@@ -135,6 +141,9 @@ const campaignUpdateSchema = campaignCreateSchema.partial().extend({
   amount_paid_cents: z.number().int().optional(),
   package_delivered: z.string().optional(),
   campaign_origin: z.enum(['prospect', 'upsell']).optional(),
+}).refine((data) => !data.scope || data.scope !== 'business' || (data.business_name && data.business_name.trim().length > 0), {
+  message: 'business_name is required for business-scoped campaigns',
+  path: ['business_name'],
 });
 
 const stageTransitionSchema = z.object({
@@ -305,6 +314,7 @@ router.get('/', async (req: any, res: Response) => {
   try {
     const result = await MarketingCampaignService.listCampaigns({
       stage: req.query.stage,
+      scope: req.query.scope,
       category: req.query.category,
       city: req.query.city,
       assignedTo: req.query.assignedTo,
@@ -334,14 +344,15 @@ router.get('/export', async (req: any, res: Response) => {
   try {
     const result = await MarketingCampaignService.listCampaigns({
       stage: req.query.stage,
+      scope: req.query.scope,
       category: req.query.category,
       city: req.query.city,
       limit: 10000,
     }, getCtx(req));
 
-    const headers = 'id,display_id,business_name,category,city,stage,date_entered,date_paid,amount_paid_cents,retainer_status\n';
+    const headers = 'id,display_id,scope,business_name,category,city,stage,date_entered,date_paid,amount_paid_cents,retainer_status\n';
     const rows = result.items.map((c: any) =>
-      `${c.id},${c.display_id || ''},${c.business_name},${c.category},${c.city},${c.stage},${c.date_entered?.toISOString() || ''},${c.date_paid?.toISOString() || ''},${c.amount_paid_cents},${c.retainer_status}`
+      `${c.id},${c.display_id || ''},${c.scope},${c.business_name || ''},${c.category},${c.city},${c.stage},${c.date_entered?.toISOString() || ''},${c.date_paid?.toISOString() || ''},${c.amount_paid_cents},${c.retainer_status}`
     ).join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
@@ -366,6 +377,7 @@ router.post('/', async (req: any, res: Response) => {
   try {
     const parsed = campaignCreateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.createCampaign({
+      scope: parsed.scope,
       businessName: parsed.business_name,
       category: parsed.category,
       city: parsed.city,
@@ -400,6 +412,7 @@ router.put('/:id', async (req: any, res: Response) => {
   try {
     const parsed = campaignUpdateSchema.parse(req.body);
     const campaign = await MarketingCampaignService.updateCampaign(req.params.id, {
+      scope: parsed.scope,
       businessName: parsed.business_name,
       category: parsed.category,
       city: parsed.city,
