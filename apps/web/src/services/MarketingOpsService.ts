@@ -173,6 +173,7 @@ export interface PromptTemplate {
   version: number;
   body: string;
   variables: any;
+  output_schema: { name: string; description?: string; schema?: any } | null;
   is_active: boolean;
   is_default: boolean;
   created_by: string | null;
@@ -455,6 +456,7 @@ export interface PromptTemplateCreateInput {
   tone?: string;
   body: string;
   variables?: any;
+  output_schema?: { name: string; description?: string; schema?: any } | null;
   is_default?: boolean;
 }
 
