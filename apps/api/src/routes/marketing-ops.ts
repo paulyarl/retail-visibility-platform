@@ -88,6 +88,7 @@ import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
+import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 
 const router = Router();
 
@@ -1113,18 +1114,34 @@ router.post('/deliverables/:id/send', async (req: any, res: Response) => {
 // PRICING (Payment Collection Sprint)
 // ====================
 
-const SERVICE_CATEGORIES = [
-  { value: 'gbp_optimization', label: 'Google Business Profile Optimization' },
-  { value: 'review_management', label: 'Review Management Setup' },
-  { value: 'website_audit', label: 'Website Audit & Report' },
-  { value: 'local_seo', label: 'Local SEO Package' },
-  { value: 'social_media_setup', label: 'Social Media Setup' },
-  { value: 'branding_package', label: 'Branding Package' },
-  { value: 'content_creation', label: 'Content Creation Package' },
-];
-
 router.get('/pricing/service-categories', async (req: any, res: Response) => {
-  res.json({ success: true, data: SERVICE_CATEGORIES });
+  try {
+    const categories = await MarketingServiceCategoryService.listCategories(req.ctx);
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    logger.error('Failed to list service categories', req.ctx, { error: (error as Error).message });
+    res.status(500).json({ success: false, error: 'failed_to_list_service_categories' });
+  }
+});
+
+const createServiceCategorySchema = z.object({
+  value: z.string().min(1, 'value is required'),
+  label: z.string().min(1, 'label is required'),
+  isActive: z.boolean().optional(),
+});
+
+router.post('/pricing/service-categories', async (req: any, res: Response) => {
+  try {
+    const parsed = createServiceCategorySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+    const category = await MarketingServiceCategoryService.upsertCategory(parsed.data, req.ctx);
+    res.status(201).json({ success: true, data: category });
+  } catch (error) {
+    logger.error('Failed to create service category', req.ctx, { error: (error as Error).message });
+    res.status(500).json({ success: false, error: 'failed_to_create_service_category' });
+  }
 });
 
 const updatePricingSchema = z.object({

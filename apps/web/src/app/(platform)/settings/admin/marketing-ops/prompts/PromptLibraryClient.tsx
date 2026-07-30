@@ -32,6 +32,7 @@ export default function PromptLibraryClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<PromptType | ''>('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [toneFilter, setToneFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
@@ -42,6 +43,7 @@ export default function PromptLibraryClient() {
     try {
       const data = await marketingOpsService.listPromptTemplates({
         prompt_type: typeFilter || undefined,
+        category: categoryFilter || undefined,
         tone: toneFilter || undefined,
       });
       setTemplates(data);
@@ -50,12 +52,13 @@ export default function PromptLibraryClient() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, toneFilter]);
+  }, [typeFilter, categoryFilter, toneFilter]);
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  const categoryOptions = useMemo(() => distinctValues(templates, (t) => t.category), [templates]);
   const toneOptions = useMemo(() => distinctValues(templates, (t) => t.tone), [templates]);
 
   const handleDelete = async (id: string) => {
@@ -114,6 +117,15 @@ export default function PromptLibraryClient() {
             <option value="">All Types</option>
             {ALL_TYPES.map((t) => <option key={t} value={t}>{PROMPT_TYPE_LABELS[t]}</option>)}
           </select>
+          <SuggestiveSelect
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            options={categoryOptions}
+            emptyLabel="All Categories"
+            newLabel="+ Category..."
+            newInputPlaceholder="Filter by category"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <SuggestiveSelect
             value={toneFilter}
             onChange={setToneFilter}
@@ -189,7 +201,7 @@ export default function PromptLibraryClient() {
       {showCreateModal && (
         <PromptTemplateModal
           template={editingTemplate}
-          categoryOptions={distinctValues(templates, (t) => t.category)}
+          categoryOptions={categoryOptions}
           toneOptions={toneOptions}
           onClose={() => setShowCreateModal(false)}
           onSaved={async () => { setShowCreateModal(false); await fetchTemplates(); }}

@@ -6,7 +6,7 @@ export default async function TenantScopedDemoStorefront({ params }: { params: P
   return (
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      <DemoStorefrontPage params={{ id }} />
+      <DemoStorefrontPage params={Promise.resolve({ id })} />
     </>
   );
 }

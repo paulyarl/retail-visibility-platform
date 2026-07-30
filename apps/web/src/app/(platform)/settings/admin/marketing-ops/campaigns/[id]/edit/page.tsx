@@ -1,5 +1,6 @@
 import CampaignFormClient from '../../CampaignFormClient';
 
-export default function EditCampaignPage({ params }: { params: { id: string } }) {
-  return <CampaignFormClient mode="edit" campaignId={params.id} />;
+export default async function EditCampaignPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <CampaignFormClient mode="edit" campaignId={id} />;
 }

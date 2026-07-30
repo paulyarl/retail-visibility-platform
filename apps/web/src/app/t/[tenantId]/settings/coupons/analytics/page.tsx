@@ -1,6 +1,7 @@
 import React from 'react';
 import CouponAnalyticsClient from './CouponAnalyticsClient';
 
-export default function CouponAnalyticsPage({ params }: { params: { tenantId: string } }) {
-  return <CouponAnalyticsClient tenantId={params.tenantId} />;
+export default async function CouponAnalyticsPage({ params }: { params: Promise<{ tenantId: string }> }) {
+  const { tenantId } = await params;
+  return <CouponAnalyticsClient tenantId={tenantId} />;
 }

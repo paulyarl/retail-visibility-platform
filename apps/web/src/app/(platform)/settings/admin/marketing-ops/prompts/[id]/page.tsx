@@ -1,5 +1,6 @@
 import PromptWorkspaceClient from './PromptWorkspaceClient';
 
-export default function PromptWorkspacePage({ params }: { params: { id: string } }) {
-  return <PromptWorkspaceClient templateId={params.id} />;
+export default async function PromptWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <PromptWorkspaceClient templateId={id} />;
 }

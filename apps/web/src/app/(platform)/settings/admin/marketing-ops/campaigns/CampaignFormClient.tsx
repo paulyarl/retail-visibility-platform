@@ -45,6 +45,7 @@ interface FormState {
   subscription_tier_id: string;
   coupon_code: string;
   service_category: string;
+  service_category_label: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -78,6 +79,7 @@ const EMPTY_FORM: FormState = {
   subscription_tier_id: '',
   coupon_code: '',
   service_category: '',
+  service_category_label: '',
 };
 
 export default function CampaignFormClient({ mode, campaignId }: { mode: 'create' | 'edit'; campaignId?: string }) {
@@ -150,6 +152,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         subscription_tier_id: c.subscription_tier_id ?? '',
         coupon_code: c.coupon_code ?? '',
         service_category: c.service_category ?? '',
+        service_category_label: c.service_category_label ?? '',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
@@ -164,6 +167,16 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
   const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateServiceCategory = async (value: string, label: string) => {
+    try {
+      const cat = await marketingOpsService.createServiceCategory(value, label);
+      setServiceCategories((prev) => [...prev, cat]);
+      setForm((prev) => ({ ...prev, service_category: cat.value, service_category_label: cat.label }));
+    } catch (err: any) {
+      setError(err.message || 'Failed to save service category');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -197,6 +210,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           attributes: form.attributes,
           assigned_to: strOrUndef(form.assigned_to),
           notes: strOrUndef(form.notes),
+          service_category: strOrUndef(form.service_category),
         };
         const created = await marketingOpsService.createCampaign(input);
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
@@ -397,11 +411,14 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 className={inputClass} placeholder="e.g. 49900 for $499" />
             </FormField>
             <FormField label="Service Category">
-              <select value={form.service_category} onChange={(e) => handleChange('service_category', e.target.value)}
-                className={inputClass}>
-                <option value="">-- Select category --</option>
-                {serviceCategories.map((sc) => <option key={sc.value} value={sc.value}>{sc.label}</option>)}
-              </select>
+              <ServiceCategorySelect
+                value={form.service_category}
+                label={form.service_category_label}
+                options={serviceCategories}
+                onChange={(v) => handleChange('service_category', v)}
+                onCreate={handleCreateServiceCategory}
+                className={inputClass}
+              />
             </FormField>
             <FormField label="Coupon Code">
               <input type="text" value={form.coupon_code} onChange={(e) => handleChange('coupon_code', e.target.value)}
@@ -499,6 +516,89 @@ function FormField({ label, required, className, children }: { label: string; re
       </label>
       {children}
     </div>
+  );
+}
+
+function ServiceCategorySelect({ value, label, options, onChange, onCreate, className }: {
+  value: string;
+  label?: string;
+  options: ServiceCategory[];
+  onChange: (value: string) => void;
+  onCreate: (value: string, label: string) => void;
+  className?: string;
+}) {
+  const [isNew, setIsNew] = useState(false);
+  const [newValue, setNewValue] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const NEW_ITEM = '__new__';
+  const matched = options.find((o) => o.value === value);
+  const allOptions = value && !isNew && !matched
+    ? [...options, { value, label: label || value }]
+    : options;
+
+  const handleAdd = () => {
+    const v = newValue.trim();
+    const l = newLabel.trim();
+    if (v && l && onCreate) {
+      onCreate(v, l);
+      setNewValue('');
+      setNewLabel('');
+      setIsNew(false);
+    }
+  };
+
+  return (
+    <>
+      <select
+        value={isNew ? NEW_ITEM : value}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === NEW_ITEM) {
+            setIsNew(true);
+            setNewValue('');
+            setNewLabel('');
+            onChange('');
+          } else {
+            setIsNew(false);
+            onChange(v);
+          }
+        }}
+        className={className}
+      >
+        <option value="">-- Select category --</option>
+        {allOptions.map((sc) => (
+          <option key={sc.value} value={sc.value}>{sc.label}</option>
+        ))}
+        <option value={NEW_ITEM}>+ New service category...</option>
+      </select>
+      {isNew && (
+        <div className="mt-2 space-y-2">
+          <input
+            type="text"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            placeholder="Category code (e.g. local_seo)"
+            className={className}
+            autoFocus
+          />
+          <input
+            type="text"
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            placeholder="Display label (e.g. Local SEO Package)"
+            className={className}
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!newValue.trim() || !newLabel.trim()}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            Add service category
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

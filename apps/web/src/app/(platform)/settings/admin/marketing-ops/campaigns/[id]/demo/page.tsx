@@ -1,5 +1,6 @@
 import DemoStorefrontClient from './DemoStorefrontClient';
 
-export default function DemoStorefrontPage({ params }: { params: { id: string } }) {
-  return <DemoStorefrontClient campaignId={params.id} />;
+export default async function DemoStorefrontPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <DemoStorefrontClient campaignId={id} />;
 }

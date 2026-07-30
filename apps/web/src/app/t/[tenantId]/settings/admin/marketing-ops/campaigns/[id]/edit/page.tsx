@@ -6,7 +6,7 @@ export default async function TenantScopedEditCampaign({ params }: { params: Pro
   return (
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      <EditCampaignPage params={{ id }} />
+      <EditCampaignPage params={Promise.resolve({ id })} />
     </>
   );
 }

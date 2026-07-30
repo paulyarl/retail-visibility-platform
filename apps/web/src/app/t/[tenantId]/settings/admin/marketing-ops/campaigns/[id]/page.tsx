@@ -6,7 +6,7 @@ export default async function TenantScopedCampaignDetail({ params }: { params: P
   return (
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      <CampaignDetailPage params={{ id }} />
+      <CampaignDetailPage params={Promise.resolve({ id })} />
     </>
   );
 }

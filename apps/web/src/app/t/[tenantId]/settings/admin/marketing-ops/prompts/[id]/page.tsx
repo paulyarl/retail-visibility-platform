@@ -6,7 +6,7 @@ export default async function TenantScopedPromptWorkspace({ params }: { params: 
   return (
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
-      <PromptWorkspacePage params={{ id }} />
+      <PromptWorkspacePage params={Promise.resolve({ id })} />
     </>
   );
 }

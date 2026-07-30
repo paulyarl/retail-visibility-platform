@@ -110,6 +110,7 @@ export interface Campaign {
   subscription_tier_id?: string | null;
   coupon_code?: string | null;
   service_category?: string | null;
+  service_category_label?: string | null;
 }
 
 export interface CampaignDetail extends Campaign {
@@ -395,6 +396,7 @@ export interface CampaignCreateInput {
   attributes?: string[];
   assigned_to?: string;
   notes?: string;
+  service_category?: string;
 }
 
 export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
@@ -1351,6 +1353,22 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch service categories');
     }
     return result.data?.data ?? [];
+  }
+
+  async createServiceCategory(value: string, label: string): Promise<ServiceCategory> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/pricing/service-categories`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ value, label }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create service category');
+    }
+    return result.data?.data;
   }
 
   // ====================

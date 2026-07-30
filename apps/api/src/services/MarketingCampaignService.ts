@@ -18,6 +18,7 @@ import DemoTenantService from './DemoTenantService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { getBillingNotificationService } from './subscription/BillingNotificationService';
 import { MarketingScorecardService } from './MarketingScorecardService';
+import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 
 // ====================
 // TYPES
@@ -270,7 +271,7 @@ export class MarketingCampaignService extends BaseService {
 
   async getCampaign(id: string, ctx?: RequestCtx): Promise<any | null> {
     try {
-      return await this.prisma.mkt_campaigns_list.findUnique({
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id },
         include: {
           mkt_audits_list: true,
@@ -278,6 +279,13 @@ export class MarketingCampaignService extends BaseService {
           mkt_stage_history_list: { orderBy: { changed_at: 'desc' }, take: 20 },
         },
       });
+      if (!campaign) return null;
+
+      const service_category_label = await MarketingServiceCategoryService.getLabel(
+        campaign.service_category || '',
+        ctx,
+      );
+      return { ...campaign, service_category_label };
     } catch (error) {
       logger.error('Failed to get campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
@@ -1016,6 +1024,10 @@ export class MarketingCampaignService extends BaseService {
   private firePaymentNotification(campaign: any, gatewayType: string, amountCents: number, source: string, ctx?: RequestCtx): void {
     (async () => {
       try {
+        const serviceCategoryLabel = await MarketingServiceCategoryService.getLabel(
+          campaign.service_category || '',
+          ctx,
+        );
         const tenantId = campaign.tenant_id || campaign.demo_tenant_id;
         if (tenantId) {
           await getBillingNotificationService().sendNotification({
@@ -1028,7 +1040,7 @@ export class MarketingCampaignService extends BaseService {
               amountCents,
               gatewayType,
               source,
-              serviceCategory: campaign.service_category,
+              serviceCategory: serviceCategoryLabel,
             },
           });
         }

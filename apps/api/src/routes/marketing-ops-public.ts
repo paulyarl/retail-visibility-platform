@@ -20,18 +20,9 @@ import { getSubscriptionBillingService } from '../services/subscription/Subscrip
 import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { CouponService } from '../services/CouponService';
+import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 
 const router = express.Router();
-
-const SERVICE_CATEGORY_LABELS: Record<string, string> = {
-  gbp_optimization: 'Google Business Profile Optimization',
-  review_management: 'Review Management Setup',
-  website_audit: 'Website Audit & Report',
-  local_seo: 'Local SEO Package',
-  social_media_setup: 'Social Media Setup',
-  branding_package: 'Branding Package',
-  content_creation: 'Content Creation Package',
-};
 
 const checkoutSchema = z.object({
   ptoken: z.string().min(1, 'ptoken is required'),
@@ -98,9 +89,10 @@ router.get('/public/marketing/pay', async (req, res) => {
 
     const packagePriceCents = campaign.package_price_cents || 0;
     const serviceCategory = campaign.service_category || null;
-    const serviceCategoryLabel = serviceCategory
-      ? SERVICE_CATEGORY_LABELS[serviceCategory] || serviceCategory
-      : 'Marketing Package';
+    const serviceCategoryLabel = await MarketingServiceCategoryService.getLabel(
+      serviceCategory || '',
+      req.ctx,
+    );
 
     return res.json({
       success: true,
@@ -173,9 +165,10 @@ router.post('/public/marketing/checkout', async (req, res) => {
       }
     }
 
-    const serviceCategoryLabel = campaign.service_category
-      ? SERVICE_CATEGORY_LABELS[campaign.service_category] || campaign.service_category
-      : 'Marketing Package';
+    const serviceCategoryLabel = await MarketingServiceCategoryService.getLabel(
+      campaign.service_category || '',
+      req.ctx,
+    );
 
     const billingService = getSubscriptionBillingService();
     const result = await billingService.createOneTimePaymentIntent({
@@ -432,9 +425,10 @@ router.get('/public/marketing/receipt/:campaignId', async (req, res) => {
     };
     const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-    const serviceCategoryLabel = revenue.service_category
-      ? SERVICE_CATEGORY_LABELS[revenue.service_category] || revenue.service_category
-      : 'Marketing Package';
+    const serviceCategoryLabel = await MarketingServiceCategoryService.getLabel(
+      revenue.service_category || '',
+      req.ctx,
+    );
 
     const infoRows: [string, string][] = [
       ['Receipt ID:', revenue.id],
