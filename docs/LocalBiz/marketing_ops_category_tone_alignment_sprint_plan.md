@@ -180,7 +180,7 @@ const DEFAULT_TONES = [
 
 ## 6. Migration
 
-`database/migrations/130_marketing_ops_category_tone.sql`:
+`database/migrations/132_marketing_ops_category_tone.sql`:
 - Creates `mkt_category_tone_presets_list`.
 - Adds `tone`, `retainer`, and `attributes` to `mkt_campaigns_list`.
 - Adds `tone` to `mkt_prompt_templates_list`.
@@ -202,23 +202,23 @@ const DEFAULT_TONES = [
 
 ## 8. Exit criteria
 
-- [ ] Migration `130_marketing_ops_category_tone.sql` applies cleanly with `IF NOT EXISTS` guards.
-- [ ] `npx prisma db pull && npx prisma generate` completes.
-- [ ] `pnpm checkapi` passes with zero TS errors.
-- [ ] `pnpm checkweb` passes with zero TS errors.
-- [ ] Admin can set a default tone for any category.
-- [ ] Creating a campaign with a category auto-fills the tone preset; user can override.
-- [ ] Campaign attributes (Fast Retainers, High Ticket, Upscale, Friendly, Professional) are selectable and filterable.
-- [ ] Retainer (Fast/Medium/Slow) is selectable on the campaign form and filterable in the campaign list; it is never injected into prompts.
-- [ ] Prompt templates can be filtered and saved by `category` + `tone`.
-- [ ] `{{tone}}` and `{{attributes}}` render in the prompt workspace and AI output.
-- [ ] Existing Marketing Ops CUJs still pass.
+- [x] Migration `132_marketing_ops_category_tone.sql` applies cleanly with `IF NOT EXISTS` guards.
+- [x] `npx prisma db pull && npx prisma generate` completes.
+- [x] `pnpm checkapi` passes with zero TS errors.
+- [x] `pnpm checkweb` passes with zero TS errors.
+- [x] Admin can set a default tone for any category.
+- [x] Creating a campaign with a category auto-fills the tone preset; user can override.
+- [x] Campaign attributes (Fast Retainers, High Ticket, Upscale, Friendly, Professional) are selectable and filterable.
+- [x] Retainer (Fast/Medium/Slow) is selectable on the campaign form and filterable in the campaign list; it is never injected into prompts.
+- [x] Prompt templates can be filtered and saved by `category` + `tone`.
+- [x] `{{tone}}` and `{{attributes}}` render in the prompt workspace and AI output.
+- [x] Existing Marketing Ops CUJs still pass.
 
 ## 9. Key files
 
 | File | Change |
 |------|--------|
-| `database/migrations/130_marketing_ops_category_tone.sql` | DB schema + seed presets |
+| `database/migrations/132_marketing_ops_category_tone.sql` | DB schema + seed presets |
 | `apps/api/src/lib/id-generator.ts` | `generateCategoryTonePresetId` |
 | `apps/api/src/services/MarketingCategoryToneService.ts` | New singleton |
 | `apps/api/src/services/MarketingCampaignService.ts` | Tone/attributes fields + filters |

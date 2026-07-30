@@ -96,8 +96,10 @@ Stage transitions are validated; some moves are irreversible and all transitions
 Columns include:
 
 - Business name (click to open campaign detail)
-- Category, City
+- Category, Tone, City
 - Stage badge
+- Retainer (Fast / Medium / Slow)
+- Attributes (e.g., High Ticket, Upscale, Friendly, Professional, Fast Retainers)
 - Tenant link status (`Linked` / `Unlinked`)
 - Estimated fee and amount paid
 - Assigned operator
@@ -106,12 +108,12 @@ Columns include:
 
 - Toggle the **table / kanban** buttons in the top right.
 - Each column represents a pipeline stage.
-- Cards show business name, category, city, assigned user, and estimated fee.
+- Cards show business name, category, city, tone, retainer, attributes, assigned user, and estimated fee.
 
 ### Filtering and Search
 
 - Search by business name, category, or city.
-- Filter by stage.
+- Filter by stage, tone, retainer, and attribute.
 - Click **New Campaign** to create a campaign.
 
 ---
@@ -188,6 +190,7 @@ Prompts are grouped by type:
   - Default status
   - A snippet of the prompt body
   - Category (if set)
+  - Tone (if set)
 - Click **Open Workspace** to run or edit the template in `PromptWorkspaceClient.tsx`.
 - Click the pencil icon to edit or the trash icon to delete.
 
@@ -198,9 +201,10 @@ In the modal:
 1. Enter a **Name**.
 2. Choose a **Prompt Type** from the dropdown.
 3. Select an optional **Category** from the dropdown, or choose `+ New category...` and enter a new one.
-4. Write the **Prompt Body** using `{{variable_name}}` placeholders.
-5. Check **Set as default for this type** if this should be the default.
-6. Click **Save**.
+4. Select an optional **Tone** from the dropdown, or choose `+ New tone...` and enter a new one.
+5. Write the **Prompt Body** using `{{variable_name}}` placeholders. `{{tone}}` and `{{attributes}}` are auto-filled from the selected campaign when run.
+6. Check **Set as default for this type** if this should be the default.
+7. Click **Save**.
 
 ### Running a Prompt
 
