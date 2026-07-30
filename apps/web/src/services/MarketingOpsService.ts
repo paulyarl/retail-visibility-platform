@@ -167,6 +167,7 @@ export interface PromptTemplate {
   id: string;
   name: string;
   prompt_type: PromptType;
+  scope: CampaignScope;
   category: string | null;
   tone: string | null;
   version: number;
@@ -449,6 +450,7 @@ export interface FileCreateInput {
 export interface PromptTemplateCreateInput {
   name: string;
   prompt_type: PromptType;
+  scope?: CampaignScope;
   category?: string;
   tone?: string;
   body: string;
@@ -851,12 +853,14 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async listPromptTemplates(filters?: {
     prompt_type?: PromptType;
+    scope?: CampaignScope;
     category?: string;
     tone?: string;
     is_active?: boolean;
   }): Promise<PromptTemplate[]> {
     const params = new URLSearchParams();
     if (filters?.prompt_type) params.set('prompt_type', filters.prompt_type);
+    if (filters?.scope) params.set('scope', filters.scope);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.tone) params.set('tone', filters.tone);
     if (filters?.is_active !== undefined) params.set('is_active', String(filters.is_active));

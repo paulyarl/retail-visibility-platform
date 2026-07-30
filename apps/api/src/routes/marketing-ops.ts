@@ -184,6 +184,7 @@ const fileCreateSchema = z.object({
 const promptTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
   prompt_type: z.enum(['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis']),
+  scope: z.enum(['business', 'category', 'city']).optional(),
   category: z.string().max(100).optional(),
   tone: z.string().max(50).optional(),
   body: z.string().min(1),
@@ -608,6 +609,7 @@ router.get('/prompts/templates', async (req: any, res: Response) => {
   try {
     const templates = await MarketingPromptService.listTemplates({
       promptType: req.query.prompt_type,
+      scope: req.query.scope,
       category: req.query.category,
       isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
     }, getCtx(req));
@@ -623,6 +625,7 @@ router.post('/prompts/templates', async (req: any, res: Response) => {
     const template = await MarketingPromptService.createTemplate({
       name: parsed.name,
       promptType: parsed.prompt_type,
+      scope: parsed.scope,
       category: parsed.category,
       tone: parsed.tone,
       body: parsed.body,
@@ -645,6 +648,7 @@ router.put('/prompts/templates/:id', async (req: any, res: Response) => {
     const template = await MarketingPromptService.updateTemplate(req.params.id, {
       name: parsed.name,
       promptType: parsed.prompt_type,
+      scope: parsed.scope,
       category: parsed.category,
       tone: parsed.tone,
       body: parsed.body,

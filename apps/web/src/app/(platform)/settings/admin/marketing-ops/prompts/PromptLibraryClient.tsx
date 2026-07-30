@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Plus, Pencil, Trash2, Copy, FileText } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptType } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptType, CampaignScope } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import { useMemo } from 'react';
 
@@ -26,12 +26,14 @@ const PROMPT_TYPE_COLORS: Record<PromptType, string> = {
 };
 
 const ALL_TYPES: PromptType[] = ['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis'];
+const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
 
 export default function PromptLibraryClient() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<PromptType | ''>('');
+  const [scopeFilter, setScopeFilter] = useState<CampaignScope | ''>('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [toneFilter, setToneFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -43,6 +45,7 @@ export default function PromptLibraryClient() {
     try {
       const data = await marketingOpsService.listPromptTemplates({
         prompt_type: typeFilter || undefined,
+        scope: scopeFilter || undefined,
         category: categoryFilter || undefined,
         tone: toneFilter || undefined,
       });
@@ -52,7 +55,7 @@ export default function PromptLibraryClient() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, categoryFilter, toneFilter]);
+  }, [typeFilter, scopeFilter, categoryFilter, toneFilter]);
 
   useEffect(() => {
     fetchTemplates();
@@ -119,6 +122,14 @@ export default function PromptLibraryClient() {
             <option value="">All Types</option>
             {ALL_TYPES.map((t) => <option key={t} value={t}>{PROMPT_TYPE_LABELS[t]}</option>)}
           </select>
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as CampaignScope | '')}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Scopes</option>
+            {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
           <SuggestiveSelect
             value={categoryFilter}
             onChange={setCategoryFilter}
@@ -161,9 +172,14 @@ export default function PromptLibraryClient() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">{t.name}</h3>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${PROMPT_TYPE_COLORS[t.prompt_type]}`}>
-                      {PROMPT_TYPE_LABELS[t.prompt_type]}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PROMPT_TYPE_COLORS[t.prompt_type]}`}>
+                        {PROMPT_TYPE_LABELS[t.prompt_type]}
+                      </span>
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300 uppercase">
+                        {t.scope}
+                      </span>
+                    </div>
                   </div>
                   {t.is_default && (
                     <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Default</span>
@@ -231,12 +247,19 @@ function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, 
 }) {
   const [name, setName] = useState(template?.name ?? '');
   const [promptType, setPromptType] = useState<PromptType>(template?.prompt_type ?? 'seek');
+  const [scope, setScope] = useState<CampaignScope>(template?.scope ?? 'business');
   const [category, setCategory] = useState(template?.category ?? '');
   const [tone, setTone] = useState(template?.tone ?? '');
   const [body, setBody] = useState(template?.body ?? '');
   const [isDefault, setIsDefault] = useState(template?.is_default ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (promptType === 'category_analysis') setScope('category');
+    else if (promptType === 'city_analysis') setScope('city');
+    else if (!template) setScope('business');
+  }, [promptType, template]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -245,6 +268,7 @@ function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, 
       const input = {
         name,
         prompt_type: promptType,
+        scope,
         category: category || undefined,
         tone: tone || undefined,
         body,
@@ -284,6 +308,13 @@ function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, 
               <select value={promptType} onChange={(e) => setPromptType(e.target.value as PromptType)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 {ALL_TYPES.map((t) => <option key={t} value={t}>{PROMPT_TYPE_LABELS[t]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Scope</label>
+              <select value={scope} onChange={(e) => setScope(e.target.value as CampaignScope)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>

@@ -15,9 +15,12 @@ import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlag
 
 export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis';
 
+export type PromptScope = 'business' | 'category' | 'city';
+
 export interface PromptTemplateInput {
   name: string;
   promptType: PromptType;
+  scope?: PromptScope;
   category?: string;
   tone?: string;
   body: string;
@@ -53,15 +56,17 @@ export class MarketingPromptService extends BaseService {
 
   async createTemplate(input: PromptTemplateInput, ctx?: RequestCtx): Promise<any> {
     const id = generatePromptTemplateId();
+    const scope = input.scope ?? (input.promptType === 'category_analysis' ? 'category' : input.promptType === 'city_analysis' ? 'city' : 'business');
     try {
       if (input.isDefault) {
-        await this.clearDefaultForType(input.promptType, input.category, input.tone);
+        await this.clearDefaultForType(input.promptType, scope, input.category, input.tone);
       }
       const template = await this.prisma.mkt_prompt_templates_list.create({
         data: {
           id,
           name: input.name,
           prompt_type: input.promptType,
+          scope,
           category: input.category || null,
           tone: input.tone || null,
           version: 1,
@@ -89,9 +94,10 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  async listTemplates(filters: { promptType?: PromptType; category?: string; tone?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
+  async listTemplates(filters: { promptType?: PromptType; scope?: PromptScope; category?: string; tone?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
     const where: any = {};
     if (filters.promptType) where.prompt_type = filters.promptType;
+    if (filters.scope) where.scope = filters.scope;
     if (filters.category) where.category = filters.category;
     if (filters.tone) where.tone = filters.tone;
     if (filters.isActive !== undefined) where.is_active = filters.isActive;
@@ -110,15 +116,18 @@ export class MarketingPromptService extends BaseService {
     const data: any = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.promptType !== undefined) data.prompt_type = input.promptType;
+    if (input.scope !== undefined) data.scope = input.scope;
     if (input.category !== undefined) data.category = input.category;
     if (input.tone !== undefined) data.tone = input.tone;
     if (input.body !== undefined) data.body = input.body;
     if (input.variables !== undefined) data.variables = input.variables;
     if (input.isDefault !== undefined) {
       if (input.isDefault) {
-        const template = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
-        if (template) {
-          await this.clearDefaultForType(template.prompt_type, template.category, template.tone);
+        const current = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
+        if (current) {
+          const targetScope = (input.scope ?? current.scope) as PromptScope;
+          const targetPromptType = (input.promptType ?? current.prompt_type) as PromptType;
+          await this.clearDefaultForType(targetPromptType, targetScope, input.category ?? current.category, input.tone ?? current.tone);
         }
       }
       data.is_default = input.isDefault;
@@ -151,6 +160,7 @@ export class MarketingPromptService extends BaseService {
     return this.createTemplate({
       name: cloneName,
       promptType: original.prompt_type as PromptType,
+      scope: original.scope as PromptScope,
       category: original.category,
       tone: original.tone,
       body: original.body,
@@ -160,10 +170,11 @@ export class MarketingPromptService extends BaseService {
     }, ctx);
   }
 
-  private async clearDefaultForType(promptType: string, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
+  private async clearDefaultForType(promptType: string, scope: PromptScope, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
     await this.prisma.mkt_prompt_templates_list.updateMany({
       where: {
         prompt_type: promptType,
+        scope,
         is_default: true,
         ...(category ? { category } : {}),
         ...(tone ? { tone } : {}),

@@ -186,12 +186,13 @@ export default function CampaignListClient() {
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Est. Fee</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Paid</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Assigned</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Open</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
                   {campaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={13} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                         No campaigns found. Create one to get started.
                       </td>
                     </tr>
@@ -228,6 +229,14 @@ export default function CampaignListClient() {
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.estimated_fee_cents)}</td>
                         <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{formatCurrency(c.amount_paid_cents)}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{staffDisplayName(staffUsers, c.assigned_to) ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
+                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            Open
+                          </Link>
+                        </td>
                       </tr>
                     ))
                   )}

@@ -2,16 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Play, Copy, FileSearch } from 'lucide-react';
-import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, PromptType } from '@/services/MarketingOpsService';
-
-const SCOPE_BY_PROMPT_TYPE: Record<PromptType, Campaign['scope'] | 'all'> = {
-  seek: 'all',
-  fulfill: 'business',
-  filter: 'business',
-  retainer: 'business',
-  category_analysis: 'category',
-  city_analysis: 'city',
-};
+import marketingOpsService, { PromptTemplate, PromptExecution, Campaign } from '@/services/MarketingOpsService';
 
 export default function PromptWorkspaceClient({ templateId }: { templateId: string }) {
   const [template, setTemplate] = useState<PromptTemplate | null>(null);
@@ -27,10 +18,8 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   [campaigns, selectedCampaignId]);
 
   const compatibleCampaigns = useMemo(() => {
-    if (!template) return campaigns;
-    const preferred = SCOPE_BY_PROMPT_TYPE[template.prompt_type as PromptType];
-    if (preferred === 'all') return campaigns;
-    return campaigns.filter((c) => c.scope === preferred);
+    if (!template?.scope) return campaigns;
+    return campaigns.filter((c) => c.scope === template.scope);
   }, [campaigns, template]);
 
   const [executing, setExecuting] = useState(false);
