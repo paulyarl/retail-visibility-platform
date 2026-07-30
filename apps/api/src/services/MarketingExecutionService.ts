@@ -16,6 +16,57 @@ import { MarketingPromptService } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import aiProviderFactory from './ai-providers';
 
+/**
+ * ScopeMismatchError — thrown when a prompt template's scope does not match
+ * the campaign's scope. Surfaces as a 400 with a field-level message.
+ */
+export class ScopeMismatchError extends Error {
+  readonly templateScope: string;
+  readonly campaignScope: string;
+  constructor(templateScope: string, campaignScope: string) {
+    super(`template scope "${templateScope}" is not compatible with campaign scope "${campaignScope}"`);
+    this.name = 'ScopeMismatchError';
+    this.templateScope = templateScope;
+    this.campaignScope = campaignScope;
+  }
+}
+
+/**
+ * Scope → variable mapping.
+ * Determines which campaign variables `renderTemplate` injects for a given scope.
+ *   - business: all variables (full business context)
+ *   - category: category/city/neighborhood/tone/attributes (no business_name,
+ *     no business-specific GBP/website fields)
+ *   - city: city/neighborhood only (no business_name, no category-specific fields)
+ *
+ * Templates referencing out-of-scope variables are rejected at render time
+ * to prevent silently producing broken prompts with empty substitutions.
+ */
+const SCOPE_VARIABLES: Record<string, string[]> = {
+  business: [
+    'business_name', 'category', 'city', 'neighborhood', 'contact_method',
+    'contact_info', 'unaddressed_reviews', 'last_review_date', 'gbp_claimed',
+    'has_website', 'nap_consistent', 'pain_score', 'estimated_tier', 'notes',
+    'tone', 'attributes',
+  ],
+  category: ['category', 'city', 'neighborhood', 'tone', 'attributes'],
+  city: ['city', 'neighborhood'],
+};
+
+/**
+ * Assert that a prompt template's scope is compatible with a campaign's scope.
+ * Throws ScopeMismatchError (→ 400) on mismatch.
+ *
+ * Exported so the external-import endpoint can reuse the same check.
+ */
+export function assertScopeCompatible(template: { scope?: string | null }, campaign: { scope?: string | null }): void {
+  const templateScope = (template.scope ?? 'business').toLowerCase();
+  const campaignScope = (campaign.scope ?? 'business').toLowerCase();
+  if (templateScope !== campaignScope) {
+    throw new ScopeMismatchError(templateScope, campaignScope);
+  }
+}
+
 export interface BatchExecutionInput {
   campaignIds: string[];
   templateId: string;
@@ -120,6 +171,8 @@ export class MarketingExecutionService extends BaseService {
         throw new Error(`Campaign ${input.campaignId} not found`);
       }
 
+      assertScopeCompatible(template, campaign);
+
       const execution = await promptService.createExecution({
         campaignId: input.campaignId,
         templateId: input.templateId,
@@ -191,13 +244,36 @@ export class MarketingExecutionService extends BaseService {
     if (!campaign) {
       throw new Error(`Campaign ${input.campaignId} not found`);
     }
+    assertScopeCompatible(template, campaign);
     return this.renderTemplate(template.body, input.variables, campaign);
   }
 
+  /**
+   * Render a prompt template body against a campaign, substituting only
+   * scope-relevant variables. References to out-of-scope variables are
+   * rejected (throw) to prevent silently producing broken prompts with
+   * empty substitutions.
+   *
+   * Caller-supplied `variables` (e.g. from the workspace UI) are always
+   * injected regardless of scope — they are explicit user overrides.
+   */
   renderTemplate(body: string, variables: Record<string, any> | undefined, campaign: any): string {
-    let rendered = body;
+    const scope = (campaign.scope ?? 'business').toLowerCase() as keyof typeof SCOPE_VARIABLES;
+    const allowed = SCOPE_VARIABLES[scope] ?? SCOPE_VARIABLES.business;
 
-    const allVars: Record<string, string> = {
+    // Detect out-of-scope variable references in the template body.
+    const referenced = new Set<string>();
+    for (const m of body.matchAll(/\{\{(\w+)\}\}/g)) referenced.add(m[1]);
+    const outOfScope = Array.from(referenced).filter((v) => !allowed.includes(v) && !(variables && v in variables));
+    if (outOfScope.length > 0) {
+      throw new Error(
+        `Template references out-of-scope variables for scope "${scope}": ${outOfScope.join(', ')}. ` +
+        `Allowed variables for this scope: ${allowed.join(', ')}.`,
+      );
+    }
+
+    // Build the full set of candidate values, then filter to allowed + overrides.
+    const candidate: Record<string, string> = {
       business_name: campaign.business_name || '',
       category: campaign.category || '',
       city: campaign.city || '',
@@ -214,10 +290,21 @@ export class MarketingExecutionService extends BaseService {
       notes: campaign.notes || '',
       tone: campaign.tone || '',
       attributes: (campaign.attributes || []).join(', '),
-      ...(variables || {}),
     };
+
+    const allVars: Record<string, string> = {};
+    for (const key of allowed) {
+      if (key in candidate) allVars[key] = candidate[key];
+    }
+    // Caller overrides always win, even if not in the scope's allowed list.
+    if (variables) {
+      for (const [k, v] of Object.entries(variables)) {
+        allVars[k] = typeof v === 'string' ? v : String(v ?? '');
+      }
+    }
     // retainer is intentionally not injected: it's a campaign filter-only field.
 
+    let rendered = body;
     for (const [key, value] of Object.entries(allVars)) {
       rendered = rendered.replace(new RegExp(`\{\{${key}\}\}`, 'g'), value);
     }

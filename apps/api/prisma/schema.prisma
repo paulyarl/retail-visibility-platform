@@ -6295,6 +6295,7 @@ model mkt_prompt_templates_list {
   updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
   tone                       String?                      @db.VarChar(50)
   scope                      String                       @default("business") @db.VarChar(20)
+  output_schema              Json?
   mkt_prompt_executions_list mkt_prompt_executions_list[]
 
   @@index([category, is_active], map: "idx_mkt_prompt_templates_category")

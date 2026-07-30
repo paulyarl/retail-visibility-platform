@@ -189,6 +189,7 @@ const promptTemplateCreateSchema = z.object({
   tone: z.string().max(50).optional(),
   body: z.string().min(1),
   variables: z.any().optional(),
+  output_schema: z.any().optional(),
   is_default: z.boolean().optional(),
 });
 
@@ -630,6 +631,7 @@ router.post('/prompts/templates', async (req: any, res: Response) => {
       tone: parsed.tone,
       body: parsed.body,
       variables: parsed.variables,
+      outputSchema: parsed.output_schema,
       isDefault: parsed.is_default,
       createdBy: req.user?.id,
     }, getCtx(req));
@@ -653,6 +655,7 @@ router.put('/prompts/templates/:id', async (req: any, res: Response) => {
       tone: parsed.tone,
       body: parsed.body,
       variables: parsed.variables,
+      outputSchema: parsed.output_schema,
       isDefault: parsed.is_default,
     }, getCtx(req));
     res.json({ success: true, data: template });

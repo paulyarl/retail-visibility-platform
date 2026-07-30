@@ -25,6 +25,7 @@ export interface PromptTemplateInput {
   tone?: string;
   body: string;
   variables?: any;
+  outputSchema?: any;
   isDefault?: boolean;
   createdBy?: string;
 }
@@ -72,6 +73,7 @@ export class MarketingPromptService extends BaseService {
           version: 1,
           body: input.body,
           variables: input.variables || null,
+          output_schema: input.outputSchema ?? null,
           is_active: true,
           is_default: input.isDefault || false,
           created_by: input.createdBy || null,
@@ -121,6 +123,7 @@ export class MarketingPromptService extends BaseService {
     if (input.tone !== undefined) data.tone = input.tone;
     if (input.body !== undefined) data.body = input.body;
     if (input.variables !== undefined) data.variables = input.variables;
+    if (input.outputSchema !== undefined) data.output_schema = input.outputSchema;
     if (input.isDefault !== undefined) {
       if (input.isDefault) {
         const current = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
@@ -165,6 +168,7 @@ export class MarketingPromptService extends BaseService {
       tone: original.tone,
       body: original.body,
       variables: original.variables,
+      outputSchema: original.output_schema,
       isDefault: false,
       createdBy: overrides.createdBy,
     }, ctx);
