@@ -11,7 +11,10 @@
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
-import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId } from '../lib/id-generator';
+import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlagId, generateMarketingAuditId } from '../lib/id-generator';
+import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
+import MarketingCampaignService from './MarketingCampaignService';
 
 export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis';
 
@@ -267,6 +270,132 @@ export class MarketingPromptService extends BaseService {
       });
     } catch (error) {
       logger.error('Failed to list prompt executions', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // EXTERNAL RESULT IMPORT
+  // ====================
+
+  /**
+   * Import an external agent's JSON result as a prompt execution + optional audit.
+   *
+   * Flow:
+   *   1. Load template + campaign; assert scope compatibility (S0b).
+   *   2. Parse raw_output as JSON; validate against the template's declared
+   *      output_schema (via OUTPUT_SCHEMA_REGISTRY). Throws on invalid JSON
+   *      or schema mismatch with field-level Zod issues.
+   *   3. Transactionally create:
+   *      a. mkt_prompt_executions_list record (status='completed', source='external')
+   *      b. mkt_audits_list record IF the output_schema's auditPlatform is set
+   *         (keyed off output_schema->>'name', NOT prompt_type — fixes G18).
+   *
+   * Returns { execution, audit }.
+   */
+  async importExternalResult(input: {
+    campaignId: string;
+    templateId: string;
+    rawOutput: string;
+    source?: string;
+    costCents?: number;
+    executedBy?: string;
+  }, ctx?: RequestCtx): Promise<{ execution: any; audit: any | null }> {
+    try {
+      // 1. Load template + campaign
+      const template = await this.getTemplate(input.templateId, ctx);
+      if (!template) {
+        throw new Error(`Template ${input.templateId} not found`);
+      }
+      const campaign = await MarketingCampaignService.getCampaign(input.campaignId, ctx);
+      if (!campaign) {
+        throw new Error(`Campaign ${input.campaignId} not found`);
+      }
+
+      // 2. Scope check (S0b)
+      assertScopeCompatible(template, campaign);
+
+      // 3. Parse + validate JSON against the template's output_schema
+      let parsedJson: any;
+      try {
+        parsedJson = JSON.parse(input.rawOutput);
+      } catch (e) {
+        throw new Error('raw_output is not valid JSON');
+      }
+
+      const schemaName = template.output_schema?.name ?? null;
+      const resolved = resolveOutputSchema(schemaName);
+      if (!resolved) {
+        throw new Error(
+          `Template "${template.name}" does not declare a recognized output_schema (got "${schemaName ?? 'none'}"). ` +
+          `Cannot validate external result. Add an output_schema to the template first.`,
+        );
+      }
+
+      const validationResult = resolved.validator.safeParse(parsedJson);
+      if (!validationResult.success) {
+        const issues = validationResult.error.issues
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ');
+        throw new Error(`External result does not match the "${schemaName}" output schema: ${issues}`);
+      }
+
+      // 4. Transactionally create execution + audit
+      const executionId = generatePromptExecutionId();
+      const result = await this.prisma.$transaction(async (tx) => {
+        const execution = await tx.mkt_prompt_executions_list.create({
+          data: {
+            id: executionId,
+            campaign_id: input.campaignId,
+            template_id: input.templateId,
+            executed_by: input.executedBy || undefined,
+            status: 'completed',
+            raw_output: input.rawOutput,
+            filtered_output: input.rawOutput,
+            ai_provider: input.source || 'external',
+            cost_cents: input.costCents ?? undefined,
+          },
+        });
+
+        let audit: any = null;
+        if (resolved.auditPlatform) {
+          const auditId = generateMarketingAuditId();
+          // For market_analysis, extract audit-relevant fields from the validated JSON.
+          const ma = parsedJson.market_analysis;
+          audit = await tx.mkt_audits_list.create({
+            data: {
+              id: auditId,
+              campaign_id: input.campaignId,
+              platform: resolved.auditPlatform,
+              review_count: ma?.average_gbp_metrics?.average_review_count ?? 0,
+              average_rating: ma?.average_gbp_metrics?.average_rating ?? undefined,
+              unaddressed_reviews: 0,
+              owner_response_rate: 0,
+              photo_count: 0,
+              mobile_friendly: undefined,
+              audit_data: parsedJson,
+            },
+          });
+        }
+
+        return { execution, audit };
+      });
+
+      logger.info('External result imported', ctx, {
+        executionId,
+        campaignId: input.campaignId,
+        templateId: input.templateId,
+        schemaName,
+        auditCreated: !!result.audit,
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof ScopeMismatchError) {
+        logger.warn('External import scope mismatch', ctx, { error: error.message });
+      } else {
+        logger.error('Failed to import external result', ctx, { error: (error as Error).message });
+      }
       throw this.handleError(error, ctx);
     }
   }

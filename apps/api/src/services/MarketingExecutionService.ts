@@ -15,57 +15,10 @@ import type { RequestCtx } from '../context';
 import { MarketingPromptService } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import aiProviderFactory from './ai-providers';
+import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
 
-/**
- * ScopeMismatchError — thrown when a prompt template's scope does not match
- * the campaign's scope. Surfaces as a 400 with a field-level message.
- */
-export class ScopeMismatchError extends Error {
-  readonly templateScope: string;
-  readonly campaignScope: string;
-  constructor(templateScope: string, campaignScope: string) {
-    super(`template scope "${templateScope}" is not compatible with campaign scope "${campaignScope}"`);
-    this.name = 'ScopeMismatchError';
-    this.templateScope = templateScope;
-    this.campaignScope = campaignScope;
-  }
-}
-
-/**
- * Scope → variable mapping.
- * Determines which campaign variables `renderTemplate` injects for a given scope.
- *   - business: all variables (full business context)
- *   - category: category/city/neighborhood/tone/attributes (no business_name,
- *     no business-specific GBP/website fields)
- *   - city: city/neighborhood only (no business_name, no category-specific fields)
- *
- * Templates referencing out-of-scope variables are rejected at render time
- * to prevent silently producing broken prompts with empty substitutions.
- */
-const SCOPE_VARIABLES: Record<string, string[]> = {
-  business: [
-    'business_name', 'category', 'city', 'neighborhood', 'contact_method',
-    'contact_info', 'unaddressed_reviews', 'last_review_date', 'gbp_claimed',
-    'has_website', 'nap_consistent', 'pain_score', 'estimated_tier', 'notes',
-    'tone', 'attributes',
-  ],
-  category: ['category', 'city', 'neighborhood', 'tone', 'attributes'],
-  city: ['city', 'neighborhood'],
-};
-
-/**
- * Assert that a prompt template's scope is compatible with a campaign's scope.
- * Throws ScopeMismatchError (→ 400) on mismatch.
- *
- * Exported so the external-import endpoint can reuse the same check.
- */
-export function assertScopeCompatible(template: { scope?: string | null }, campaign: { scope?: string | null }): void {
-  const templateScope = (template.scope ?? 'business').toLowerCase();
-  const campaignScope = (campaign.scope ?? 'business').toLowerCase();
-  if (templateScope !== campaignScope) {
-    throw new ScopeMismatchError(templateScope, campaignScope);
-  }
-}
+// Re-export for backward compatibility (tests + existing imports).
+export { ScopeMismatchError, assertScopeCompatible };
 
 export interface BatchExecutionInput {
   campaignIds: string[];

@@ -223,6 +223,14 @@ const batchExecutionSchema = z.object({
   variables: z.any().optional(),
 });
 
+const externalExecutionCreateSchema = z.object({
+  campaign_id: z.string().min(1),
+  template_id: z.string().min(1),
+  raw_output: z.string().min(1),
+  source: z.string().max(100).optional(),
+  cost_cents: z.number().int().optional(),
+});
+
 const filterFlagUpdateSchema = z.object({
   human_override: z.string().optional(),
   status: z.enum(['pending', 'fixed', 'approved_as_is']).optional(),
@@ -726,6 +734,36 @@ router.get('/prompts/executions', async (req: any, res: Response) => {
     const executions = await MarketingPromptService.listExecutions(req.query.campaign_id, getCtx(req));
     res.json({ success: true, data: executions });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /prompts/executions/external — import an external agent's JSON result
+// Must be registered BEFORE /:id to avoid the catch-all.
+router.post('/prompts/executions/external', async (req: any, res: Response) => {
+  try {
+    const parsed = externalExecutionCreateSchema.parse(req.body);
+    const result = await MarketingPromptService.importExternalResult({
+      campaignId: parsed.campaign_id,
+      templateId: parsed.template_id,
+      rawOutput: parsed.raw_output,
+      source: parsed.source,
+      costCents: parsed.cost_cents,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    // Scope mismatches and validation failures are 400s, not 500s.
+    const msg = (error as Error).message || '';
+    if (/scope .* is not compatible/i.test(msg) || /out-of-scope variables/i.test(msg)) {
+      return res.status(400).json({ success: false, error: 'scope_mismatch', message: msg });
+    }
+    if (/not valid JSON/i.test(msg) || /does not match .* output schema/i.test(msg) || /does not declare a recognized output_schema/i.test(msg)) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: msg });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });
