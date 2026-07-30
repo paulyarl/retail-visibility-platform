@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, Copy, FileText } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptType } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
@@ -68,6 +68,15 @@ export default function PromptLibraryClient() {
       await fetchTemplates();
     } catch (err: any) {
       setError(err.message || 'Failed to delete template');
+    }
+  };
+
+  const handleClone = async (id: string) => {
+    try {
+      await marketingOpsService.clonePromptTemplate(id);
+      await fetchTemplates();
+    } catch (err: any) {
+      setError(err.message || 'Failed to clone template');
     }
   };
 
@@ -182,12 +191,21 @@ export default function PromptLibraryClient() {
                   <button
                     onClick={() => { setEditingTemplate(t); setShowCreateModal(true); }}
                     className="ml-auto p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    title="Edit"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
+                    onClick={() => handleClone(t.id)}
+                    className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    title="Clone"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => handleDelete(t.id)}
                     className="p-1.5 text-gray-400 hover:text-red-600"
+                    title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

@@ -906,6 +906,20 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-prompt-templates');
   }
 
+  async clonePromptTemplate(id: string, name?: string): Promise<PromptTemplate> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prompts/templates/${id}/clone`,
+      { method: 'POST', body: JSON.stringify({ name }) },
+      `mkt-ops-prompt-template-clone-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to clone prompt template');
+    }
+    await this.invalidateCachePattern('mkt-ops-prompt-templates');
+    return result.data?.data ?? result.data;
+  }
+
   async renderPrompt(templateId: string, campaignId: string, variables?: Record<string, string>): Promise<string> {
     const params = new URLSearchParams();
     params.set('campaignId', campaignId);

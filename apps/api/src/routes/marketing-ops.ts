@@ -184,6 +184,10 @@ const promptTemplateCreateSchema = z.object({
 
 const promptTemplateUpdateSchema = promptTemplateCreateSchema.partial();
 
+const promptTemplateCloneSchema = z.object({
+  name: z.string().max(100).optional(),
+});
+
 const executionCreateSchema = z.object({
   campaign_id: z.string().min(1),
   template_id: z.string().optional(),
@@ -648,6 +652,22 @@ router.delete('/prompts/templates/:id', async (req: any, res: Response) => {
     await MarketingPromptService.deleteTemplate(req.params.id, getCtx(req));
     res.json({ success: true });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/prompts/templates/:id/clone', async (req: any, res: Response) => {
+  try {
+    const parsed = promptTemplateCloneSchema.parse(req.body);
+    const template = await MarketingPromptService.cloneTemplate(req.params.id, {
+      name: parsed.name,
+      createdBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: template });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

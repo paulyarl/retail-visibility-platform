@@ -142,6 +142,24 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
+  async cloneTemplate(id: string, overrides: { name?: string; createdBy?: string } = {}, ctx?: RequestCtx): Promise<any> {
+    const original = await this.getTemplate(id, ctx);
+    if (!original) {
+      throw new Error('Prompt template not found');
+    }
+    const cloneName = (overrides.name || `Copy of ${original.name}`).slice(0, 100);
+    return this.createTemplate({
+      name: cloneName,
+      promptType: original.prompt_type as PromptType,
+      category: original.category,
+      tone: original.tone,
+      body: original.body,
+      variables: original.variables,
+      isDefault: false,
+      createdBy: overrides.createdBy,
+    }, ctx);
+  }
+
   private async clearDefaultForType(promptType: string, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
     await this.prisma.mkt_prompt_templates_list.updateMany({
       where: {
