@@ -740,6 +740,48 @@ Your storefront is ready to customize. Add your products, set your hours, and ma
 Open your dashboard at: ${process.env.WEB_URL}/settings/tenant`;
   }
 
+  // Email templates - Marketing Package Paid (Payment Collection Sprint)
+  private buildMarketingPackagePaidHtml(name: string, business: string, data: BillingNotificationData): string {
+    const amount = ((data.metadata?.amountCents || 0) / 100).toFixed(2);
+    const gateway = data.metadata?.gatewayType || 'N/A';
+    const source = data.metadata?.source || 'N/A';
+    const serviceCategory = data.metadata?.serviceCategory || 'Marketing Package';
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Payment Received</h2>
+        <p>Hi ${name},</p>
+        <p>Your payment for <strong>${business}</strong> has been received.</p>
+        <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Package:</strong> ${serviceCategory}</p>
+          <p style="margin: 8px 0 0;"><strong>Amount:</strong> $${amount}</p>
+          <p style="margin: 8px 0 0;"><strong>Payment Method:</strong> ${gateway}</p>
+          <p style="margin: 8px 0 0;"><strong>Source:</strong> ${source}</p>
+        </div>
+        <p>Your marketing package is now being processed. We'll be in touch with next steps shortly.</p>
+        <p style="margin-top: 24px;">Thank you for your business!</p>
+      </div>
+    `;
+  }
+
+  private buildMarketingPackagePaidText(name: string, business: string, data: BillingNotificationData): string {
+    const amount = ((data.metadata?.amountCents || 0) / 100).toFixed(2);
+    const gateway = data.metadata?.gatewayType || 'N/A';
+    const source = data.metadata?.source || 'N/A';
+    const serviceCategory = data.metadata?.serviceCategory || 'Marketing Package';
+    return `Hi ${name},
+
+Payment Received for ${business}.
+
+Package: ${serviceCategory}
+Amount: $${amount}
+Payment Method: ${gateway}
+Source: ${source}
+
+Your marketing package is now being processed. We'll be in touch with next steps shortly.
+
+Thank you for your business!`;
+  }
+
   /**
    * Send email via configured email service
    */
@@ -1329,6 +1371,12 @@ Open your dashboard at: ${process.env.WEB_URL}/settings/tenant`;
           title: 'Welcome aboard',
           body: `${tenantName} is now live on the platform (source: ${data.metadata?.conversionSource || 'external'}). Your storefront is ready to customize.`,
           icon: '🎉',
+        };
+      case 'marketing_package_paid':
+        return {
+          title: 'Marketing package paid',
+          body: `${tenantName} paid $${((data.metadata?.amountCents || 0) / 100).toFixed(2)} for a ${data.metadata?.serviceCategory || 'marketing'} package via ${data.metadata?.gatewayType || 'N/A'} (source: ${data.metadata?.source || 'N/A'}).`,
+          icon: '💰',
         };
       default:
         return {

@@ -114,6 +114,10 @@ export interface CampaignUpdateInput {
   amountPaidCents?: number;
   packageDelivered?: string;
   campaignOrigin?: CampaignOrigin;
+  packagePriceCents?: number;
+  subscriptionTierId?: string;
+  couponCode?: string;
+  serviceCategory?: string;
 }
 
 export interface LinkTenantInput {
@@ -330,6 +334,10 @@ export class MarketingCampaignService extends BaseService {
     if (input.amountPaidCents !== undefined) data.amount_paid_cents = input.amountPaidCents;
     if (input.packageDelivered !== undefined) data.package_delivered = input.packageDelivered;
     if (input.campaignOrigin !== undefined) data.campaign_origin = input.campaignOrigin;
+    if (input.packagePriceCents !== undefined) data.package_price_cents = input.packagePriceCents;
+    if (input.subscriptionTierId !== undefined) data.subscription_tier_id = input.subscriptionTierId;
+    if (input.couponCode !== undefined) data.coupon_code = input.couponCode;
+    if (input.serviceCategory !== undefined) data.service_category = input.serviceCategory;
 
     try {
       return await this.prisma.mkt_campaigns_list.update({ where: { id }, data });

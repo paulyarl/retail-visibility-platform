@@ -1089,6 +1089,54 @@ router.post('/deliverables/:id/send', async (req: any, res: Response) => {
 
 // NOTE: /:id must be registered AFTER all static single-segment GET routes
 // (e.g. /scorecards, /deliverable-templates, /branding) to avoid being shadowed
+
+// ====================
+// PRICING (Payment Collection Sprint)
+// ====================
+
+const SERVICE_CATEGORIES = [
+  { value: 'gbp_optimization', label: 'Google Business Profile Optimization' },
+  { value: 'review_management', label: 'Review Management Setup' },
+  { value: 'website_audit', label: 'Website Audit & Report' },
+  { value: 'local_seo', label: 'Local SEO Package' },
+  { value: 'social_media_setup', label: 'Social Media Setup' },
+  { value: 'branding_package', label: 'Branding Package' },
+  { value: 'content_creation', label: 'Content Creation Package' },
+];
+
+router.get('/pricing/service-categories', async (req: any, res: Response) => {
+  res.json({ success: true, data: SERVICE_CATEGORIES });
+});
+
+const updatePricingSchema = z.object({
+  packagePriceCents: z.number().int().min(0).optional(),
+  subscriptionTierId: z.string().optional(),
+  couponCode: z.string().optional(),
+  serviceCategory: z.string().optional(),
+});
+
+router.put('/:id/pricing', async (req: any, res: Response) => {
+  try {
+    const parsed = updatePricingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+    const updated = await MarketingCampaignService.updateCampaign(req.params.id, parsed.data, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/:id/revenue', async (req: any, res: Response) => {
+  try {
+    const revenue = await MarketingCampaignService.getCampaignRevenue(req.params.id, getCtx(req));
+    res.json({ success: true, data: revenue });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.get('/:id', async (req: any, res: Response) => {
   try {
     const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));

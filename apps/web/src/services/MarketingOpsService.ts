@@ -103,6 +103,10 @@ export interface Campaign {
   last_touch_source?: ConversionSource | null;
   campaign_origin?: CampaignOrigin;
   demo_tenant_id?: string | null;
+  package_price_cents?: number | null;
+  subscription_tier_id?: string | null;
+  coupon_code?: string | null;
+  service_category?: string | null;
 }
 
 export interface CampaignDetail extends Campaign {
@@ -309,6 +313,56 @@ export interface DemoStorefrontResult {
   demoUrl: string;
 }
 
+export interface PayPageData {
+  campaignId: string;
+  businessName: string;
+  category: string;
+  city: string;
+  serviceCategory: string | null;
+  serviceCategoryLabel: string;
+  packagePriceCents: number;
+  subscriptionTierId: string | null;
+  couponCode: string | null;
+  tokenType: string;
+  deliverableId: string | null;
+  alreadyPaid: boolean;
+}
+
+export interface CheckoutResult {
+  clientSecret: string;
+  paymentIntentId: string;
+  amountCents: number;
+  discountCents: number;
+  originalPriceCents: number;
+}
+
+export interface PayConfirmResult {
+  campaignId: string;
+  stage: string;
+  amountCents: number;
+  gatewayTransactionId: string;
+  receiptUrl: string;
+}
+
+export interface MarketingRevenue {
+  id: string;
+  campaign_id: string;
+  order_id: string | null;
+  amount_cents: number;
+  discount_cents: number;
+  gateway_type: string;
+  gateway_transaction_id: string | null;
+  source: string;
+  subscription_tier_id: string | null;
+  service_category: string | null;
+  recorded_at: string;
+}
+
+export interface ServiceCategory {
+  value: string;
+  label: string;
+}
+
 // ====================
 // INPUT TYPES
 // ====================
@@ -341,6 +395,10 @@ export interface CampaignUpdateInput extends Partial<CampaignCreateInput> {
   amount_paid_cents?: number;
   package_delivered?: string;
   campaign_origin?: CampaignOrigin;
+  package_price_cents?: number;
+  subscription_tier_id?: string;
+  coupon_code?: string;
+  service_category?: string;
 }
 
 export interface StageTransitionInput {
@@ -1224,6 +1282,116 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete branding config');
     }
     await this.invalidateCachePattern('mkt-ops-branding');
+  }
+
+  // ====================
+  // PRICING & REVENUE (Payment Collection Sprint)
+  // ====================
+
+  async updatePricing(id: string, input: {
+    packagePriceCents?: number;
+    subscriptionTierId?: string;
+    couponCode?: string;
+    serviceCategory?: string;
+  }): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/pricing`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `mkt-ops-campaign-pricing-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update pricing');
+    }
+    await this.invalidateCachePattern(`mkt-ops-campaign-${id}`);
+    return result.data?.data ?? result.data;
+  }
+
+  async getCampaignRevenue(id: string): Promise<MarketingRevenue[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/revenue`,
+      {},
+      `mkt-ops-campaign-revenue-${id}`,
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch revenue');
+    }
+    const data = result.data?.data ?? result.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getServiceCategories(): Promise<ServiceCategory[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/pricing/service-categories`,
+      {},
+      'mkt-ops-service-categories',
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch service categories');
+    }
+    return result.data?.data ?? [];
+  }
+
+  // ====================
+  // PUBLIC PAYMENT (no auth — ptoken gated)
+  // ====================
+
+  async getPayPageData(ptoken: string): Promise<PayPageData> {
+    const res = await fetch(`/api/public/marketing/pay?ptoken=${encodeURIComponent(ptoken)}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to load pay page');
+    }
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to load pay page');
+    }
+    return json.data;
+  }
+
+  async createCheckout(ptoken: string, couponCode?: string): Promise<CheckoutResult> {
+    const res = await fetch('/api/public/marketing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ptoken, couponCode }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to create checkout session');
+    }
+    return json.data;
+  }
+
+  async validateCoupon(ptoken: string, couponCode: string, amountCents: number): Promise<any> {
+    const res = await fetch('/api/public/marketing/coupons/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ptoken, couponCode, amountCents }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || 'Invalid coupon code');
+    }
+    return json.data;
+  }
+
+  async confirmPayment(ptoken: string, paymentIntentId: string, couponCode?: string, subscriptionTierId?: string): Promise<PayConfirmResult> {
+    const res = await fetch('/api/public/marketing/pay/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ptoken, paymentIntentId, couponCode, subscriptionTierId }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to confirm payment');
+    }
+    return json.data;
+  }
+
+  getReceiptUrl(campaignId: string): string {
+    return `/api/public/marketing/receipt/${campaignId}`;
   }
 }
 
