@@ -48,7 +48,7 @@ export type PromptType =
   | 'category_analysis'
   | 'city_analysis';
 
-export type ExecutionStatus = 'pending' | 'filtered' | 'reviewed' | 'delivered' | 'archived';
+export type ExecutionStatus = 'pending' | 'completed' | 'failed' | 'filtered' | 'reviewed' | 'delivered' | 'archived';
 
 export type FilterFlagStatus = 'pending' | 'fixed' | 'approved_as_is';
 
