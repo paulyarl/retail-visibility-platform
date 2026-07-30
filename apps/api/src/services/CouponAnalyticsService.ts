@@ -254,11 +254,16 @@ export async function aggregateCouponAnalyticsForTenant(
       const uniqueCoupons = row.coupon_id ? 1 : 0;
 
       try {
+        // coupon_id is part of a compound unique constraint. Prisma does not allow
+        // null in the `where` of an upsert for compound unique keys, even when the
+        // column is nullable. The raw query already coerces NULL -> '' via COALESCE,
+        // so we keep that sentinel here instead of converting '' back to null.
+        const couponIdForRow = row.coupon_id || '';
         await prisma.coupon_analytics.upsert({
           where: {
             tenant_id_coupon_id_event_type_surface_period_start_period_type: {
               tenant_id: tenantId,
-              coupon_id: row.coupon_id || null,
+              coupon_id: couponIdForRow,
               event_type: 'view',
               surface: row.surface,
               period_start: periodStart,
@@ -268,7 +273,7 @@ export async function aggregateCouponAnalyticsForTenant(
           create: {
             id: generateCouponAnalyticsId(tenantId),
             tenant_id: tenantId,
-            coupon_id: row.coupon_id || null,
+            coupon_id: couponIdForRow,
             event_type: 'view',
             surface: row.surface,
             period_start: periodStart,
