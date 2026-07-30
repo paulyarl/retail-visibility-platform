@@ -466,6 +466,19 @@ export interface ExecutionCreateInput {
   variables_used?: any;
 }
 
+export interface ExternalExecutionCreateInput {
+  campaign_id: string;
+  template_id: string;
+  raw_output: string;
+  source?: string;
+  cost_cents?: number;
+}
+
+export interface ExternalExecutionResult {
+  execution: PromptExecution;
+  audit: any | null;
+}
+
 export interface ExecutionUpdateInput {
   raw_output?: string;
   filtered_output?: string;
@@ -991,6 +1004,25 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create execution');
     }
     await this.invalidateCachePattern('mkt-ops-executions');
+    return result.data?.data ?? result.data;
+  }
+
+  async createExternalExecution(input: ExternalExecutionCreateInput): Promise<ExternalExecutionResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prompts/executions/external`,
+      { method: 'POST', body: JSON.stringify(input) },
+      'mkt-ops-execution-external',
+      0,
+    );
+    if (!result.success) {
+      const msg = typeof result.error === 'string'
+        ? result.error
+        : (result.error?.message ?? 'Failed to import external result');
+      throw new Error(msg);
+    }
+    await this.invalidateCachePattern('mkt-ops-executions');
+    await this.invalidateCachePattern(`mkt-ops-audits-${input.campaign_id}`);
+    await this.invalidateCachePattern(`mkt-ops-campaign-${input.campaign_id}`);
     return result.data?.data ?? result.data;
   }
 

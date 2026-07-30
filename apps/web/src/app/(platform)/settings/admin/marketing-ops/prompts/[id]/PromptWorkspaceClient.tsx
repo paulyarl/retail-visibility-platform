@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalLink, Flag, ArrowRight, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalLink, Flag, ArrowRight, AlertTriangle, Upload } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { PromptTemplate, PromptExecution, Campaign } from '@/services/MarketingOpsService';
+import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 
 /**
@@ -75,6 +75,12 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   const [renderError, setRenderError] = useState<string | null>(null);
   const [resultOpen, setResultOpen] = useState(true);
   const [lastExecution, setLastExecution] = useState<PromptExecution | null>(null);
+
+  // External import state (S2b)
+  const [importJson, setImportJson] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
   const fetchTemplate = useCallback(async () => {
     setLoading(true);
@@ -190,6 +196,32 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
     a.download = `${template?.name?.replace(/\s+/g, '_') ?? 'prompt'}_resolved.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleImportExternal = async () => {
+    if (!selectedCampaignId || !importJson.trim()) return;
+    setImporting(true);
+    setImportError(null);
+    setImportSuccess(null);
+    try {
+      const result: ExternalExecutionResult = await marketingOpsService.createExternalExecution({
+        campaign_id: selectedCampaignId,
+        template_id: templateId,
+        raw_output: importJson.trim(),
+      });
+      setLastExecution(result.execution);
+      setResultOpen(true);
+      setImportSuccess(
+        `Imported execution ${result.execution.id}` +
+        (result.audit ? ` + created ${result.audit.platform} audit` : ''),
+      );
+      setImportJson('');
+      await fetchTemplate();
+    } catch (err: any) {
+      setImportError(err.message || 'Failed to import external result');
+    } finally {
+      setImporting(false);
+    }
   };
 
   if (loading) {
@@ -424,6 +456,51 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
                 )}
               </div>
             )}
+          </div>
+
+          {/* Import External Result card (S2b) */}
+          <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Import External Result
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Paste the JSON returned by an external agent (e.g. ChatGPT, Claude) after running this prompt.
+              {hasOutputSchema
+                ? ` It will be validated against the "${template.output_schema!.name}" schema and an audit will be created automatically.`
+                : ' The template has no output_schema declared — add one to enable validation.'}
+            </p>
+            {!selectedCampaignId && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+                Select a campaign first to associate the imported result with.
+              </p>
+            )}
+            {importError && (
+              <div className="mb-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+                <p className="text-xs text-red-700 dark:text-red-400">{importError}</p>
+              </div>
+            )}
+            {importSuccess && (
+              <div className="mb-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3">
+                <p className="text-xs text-green-700 dark:text-green-400">{importSuccess}</p>
+              </div>
+            )}
+            <textarea
+              value={importJson}
+              onChange={(e) => setImportJson(e.target.value)}
+              placeholder='{"market_analysis": { ... }}'
+              rows={6}
+              disabled={!selectedCampaignId}
+              className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 max-h-48 overflow-y-auto"
+            />
+            <button
+              onClick={handleImportExternal}
+              disabled={importing || !selectedCampaignId || !importJson.trim()}
+              className="mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4" />
+              {importing ? 'Importing...' : 'Import Result'}
+            </button>
           </div>
 
           {/* Next Steps card — campaign launchpad */}
