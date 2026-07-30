@@ -6,6 +6,7 @@ import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
+import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history';
 
@@ -426,20 +427,24 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   <p className="text-center text-gray-400 py-8">No audits recorded yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {(campaign.audits ?? []).map((audit: Audit) => (
-                      <div key={audit.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-gray-900 dark:text-white">{audit.platform}</span>
-                          <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                    {(campaign.audits ?? []).map((audit: Audit) =>
+                      audit.platform === 'category_analysis' && audit.audit_data ? (
+                        <CategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : (
+                        <div key={audit.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-gray-900 dark:text-white">{audit.platform}</span>
+                            <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                            {audit.review_count != null && <DetailField label="Reviews" value={audit.review_count.toString()} />}
+                            {audit.average_rating != null && <DetailField label="Avg Rating" value={audit.average_rating.toString()} />}
+                            {audit.unaddressed_reviews != null && <DetailField label="Unaddressed" value={audit.unaddressed_reviews.toString()} />}
+                            {audit.photo_count != null && <DetailField label="Photos" value={audit.photo_count.toString()} />}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                          {audit.review_count != null && <DetailField label="Reviews" value={audit.review_count.toString()} />}
-                          {audit.average_rating != null && <DetailField label="Avg Rating" value={audit.average_rating.toString()} />}
-                          {audit.unaddressed_reviews != null && <DetailField label="Unaddressed" value={audit.unaddressed_reviews.toString()} />}
-                          {audit.photo_count != null && <DetailField label="Photos" value={audit.photo_count.toString()} />}
-                        </div>
-                      </div>
-                    ))}
+                      ),
+                    )}
                   </div>
                 )}
               </div>
