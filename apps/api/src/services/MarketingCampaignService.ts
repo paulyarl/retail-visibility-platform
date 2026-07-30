@@ -13,6 +13,7 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId } from '../lib/id-generator';
+import MarketingCategoryToneService from './MarketingCategoryToneService';
 import DemoTenantService from './DemoTenantService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { getBillingNotificationService } from './subscription/BillingNotificationService';
@@ -86,6 +87,9 @@ export interface CampaignInput {
   estimatedTier?: string;
   estimatedFeeCents?: number;
   painScore?: number;
+  tone?: string;
+  retainer?: 'Fast' | 'Medium' | 'Slow';
+  attributes?: string[];
   assignedTo?: string;
   notes?: string;
 }
@@ -107,6 +111,9 @@ export interface CampaignUpdateInput {
   painScore?: number;
   assignedTo?: string;
   notes?: string;
+  tone?: string;
+  retainer?: 'Fast' | 'Medium' | 'Slow';
+  attributes?: string[];
   stage?: CampaignStage;
   retainerStatus?: RetainerStatus;
   retainerAmountCents?: number;
@@ -150,6 +157,9 @@ export interface CampaignListFilters {
   category?: string;
   city?: string;
   assignedTo?: string;
+  tone?: string;
+  retainer?: 'Fast' | 'Medium' | 'Slow';
+  attributes?: string[];
   search?: string;
   page?: number;
   limit?: number;
@@ -204,6 +214,12 @@ export class MarketingCampaignService extends BaseService {
   async createCampaign(input: CampaignInput, ctx?: RequestCtx): Promise<any> {
     const id = generateCampaignId();
     try {
+      let tone = input.tone;
+      if (!tone) {
+        const preset = await MarketingCategoryToneService.getPresetByCategory(input.category);
+        tone = preset?.tone || undefined;
+      }
+
       const campaign = await this.prisma.mkt_campaigns_list.create({
         data: {
           id,
@@ -222,6 +238,9 @@ export class MarketingCampaignService extends BaseService {
           estimated_tier: input.estimatedTier || null,
           estimated_fee_cents: input.estimatedFeeCents || 0,
           pain_score: input.painScore || 0,
+          tone: tone || null,
+          retainer: input.retainer || null,
+          attributes: input.attributes || [],
           assigned_to: input.assignedTo || null,
           notes: input.notes || null,
           stage: 'seek',
@@ -275,6 +294,11 @@ export class MarketingCampaignService extends BaseService {
     if (filters.category) where.category = filters.category;
     if (filters.city) where.city = filters.city;
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
+    if (filters.tone) where.tone = filters.tone;
+    if (filters.retainer) where.retainer = filters.retainer;
+    if (filters.attributes && filters.attributes.length > 0) {
+      where.attributes = { hasEvery: filters.attributes };
+    }
     if (filters.search) {
       where.OR = [
         { business_name: { contains: filters.search, mode: 'insensitive' } },
@@ -328,6 +352,9 @@ export class MarketingCampaignService extends BaseService {
     if (input.painScore !== undefined) data.pain_score = input.painScore;
     if (input.assignedTo !== undefined) data.assigned_to = input.assignedTo;
     if (input.notes !== undefined) data.notes = input.notes;
+    if (input.tone !== undefined) data.tone = input.tone;
+    if (input.retainer !== undefined) data.retainer = input.retainer;
+    if (input.attributes !== undefined) data.attributes = input.attributes;
     if (input.retainerStatus !== undefined) data.retainer_status = input.retainerStatus;
     if (input.retainerAmountCents !== undefined) data.retainer_amount_cents = input.retainerAmountCents;
     if (input.retainerStartDate !== undefined) data.retainer_start_date = input.retainerStartDate;
@@ -485,6 +512,17 @@ export class MarketingCampaignService extends BaseService {
         where: { date_paid: { gte: weekAgo } },
       });
 
+      // Also aggregate from marketing_revenue table for payment-confirmed revenue
+      const marketingRevenueAgg = await (this.prisma as any).marketing_revenue.aggregate({
+        _sum: { amount_cents: true },
+        _count: { id: true },
+      }).catch(() => ({ _sum: { amount_cents: 0 }, _count: { id: 0 } }));
+
+      const weeklyMarketingRevenue = await (this.prisma as any).marketing_revenue.aggregate({
+        _sum: { amount_cents: true },
+        where: { recorded_at: { gte: weekAgo } },
+      }).catch(() => ({ _sum: { amount_cents: 0 } }));
+
       const weeklyPreviews = await this.prisma.mkt_campaigns_list.count({
         where: {
           stage: { in: ['preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won'] },
@@ -521,10 +559,13 @@ export class MarketingCampaignService extends BaseService {
         activeCampaigns,
         stageCounts: stageMap,
         totalRevenueCents: totalRevenue._sum.amount_paid_cents || 0,
+        marketingRevenueCents: marketingRevenueAgg._sum.amount_cents || 0,
+        marketingRevenueCount: marketingRevenueAgg._count.id || 0,
         totalRetainerRevenueCents: totalRetainerRevenue._sum.retainer_amount_cents || 0,
         totalRetainersWon: retainersWon,
         conversionRate,
         weeklyRevenueCents: weeklyRevenue._sum.amount_paid_cents || 0,
+        weeklyMarketingRevenueCents: weeklyMarketingRevenue._sum.amount_cents || 0,
         weeklyPreviews,
         weeklyDelivered,
         recentTransitions,

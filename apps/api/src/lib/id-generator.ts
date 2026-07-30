@@ -1731,6 +1731,15 @@ export function generatePreviewToken(): string {
 }
 
 /**
+ * Generate category-tone preset ID
+ * Format: mctp-{nanoid} (13 chars)
+ */
+export function generateCategoryTonePresetId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mctp-${nanoid()}`;
+}
+
+/**
  * Generate marketing revenue record ID
  * Format: mrev-{nanoid} (13 chars)
  */

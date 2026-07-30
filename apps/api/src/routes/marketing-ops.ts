@@ -87,6 +87,7 @@ import MarketingScorecardService from '../services/MarketingScorecardService';
 import MarketingFileService from '../services/MarketingFileService';
 import MarketingDeliverableService from '../services/MarketingDeliverableService';
 import MarketingBrandingService from '../services/MarketingBrandingService';
+import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 
 const router = Router();
 
@@ -114,12 +115,18 @@ const campaignCreateSchema = z.object({
   estimated_tier: z.string().max(20).optional(),
   estimated_fee_cents: z.number().int().optional(),
   pain_score: z.number().int().optional(),
+  tone: z.string().max(50).optional(),
+  retainer: z.enum(['Fast', 'Medium', 'Slow']).optional(),
+  attributes: z.array(z.string()).optional(),
   assigned_to: z.string().optional(),
   notes: z.string().optional(),
 });
 
 const campaignUpdateSchema = campaignCreateSchema.partial().extend({
   stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']).optional(),
+  tone: z.string().max(50).optional(),
+  retainer: z.enum(['Fast', 'Medium', 'Slow']).optional(),
+  attributes: z.array(z.string()).optional(),
   retainer_status: z.enum(['not_pitched', 'pitched', 'won', 'declined']).optional(),
   retainer_amount_cents: z.number().int().optional(),
   retainer_start_date: z.string().datetime().optional(),
@@ -167,6 +174,7 @@ const promptTemplateCreateSchema = z.object({
   name: z.string().min(1).max(100),
   prompt_type: z.enum(['seek', 'fulfill', 'filter', 'retainer', 'category_analysis', 'city_analysis']),
   category: z.string().max(100).optional(),
+  tone: z.string().max(50).optional(),
   body: z.string().min(1),
   variables: z.any().optional(),
   is_default: z.boolean().optional(),
@@ -294,6 +302,9 @@ router.get('/', async (req: any, res: Response) => {
       category: req.query.category,
       city: req.query.city,
       assignedTo: req.query.assignedTo,
+      tone: req.query.tone,
+      retainer: req.query.retainer,
+      attributes: req.query.attributes ? String(req.query.attributes).split(',') : undefined,
       search: req.query.search,
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 50,
@@ -364,6 +375,9 @@ router.post('/', async (req: any, res: Response) => {
       estimatedTier: parsed.estimated_tier,
       estimatedFeeCents: parsed.estimated_fee_cents,
       painScore: parsed.pain_score,
+      tone: parsed.tone,
+      retainer: parsed.retainer,
+      attributes: parsed.attributes,
       assignedTo: parsed.assigned_to,
       notes: parsed.notes,
     }, getCtx(req));
@@ -394,6 +408,9 @@ router.put('/:id', async (req: any, res: Response) => {
       estimatedTier: parsed.estimated_tier,
       estimatedFeeCents: parsed.estimated_fee_cents,
       painScore: parsed.pain_score,
+      tone: parsed.tone,
+      retainer: parsed.retainer,
+      attributes: parsed.attributes,
       assignedTo: parsed.assigned_to,
       notes: parsed.notes,
       stage: parsed.stage,
@@ -588,6 +605,7 @@ router.post('/prompts/templates', async (req: any, res: Response) => {
       name: parsed.name,
       promptType: parsed.prompt_type,
       category: parsed.category,
+      tone: parsed.tone,
       body: parsed.body,
       variables: parsed.variables,
       isDefault: parsed.is_default,
@@ -609,6 +627,7 @@ router.put('/prompts/templates/:id', async (req: any, res: Response) => {
       name: parsed.name,
       promptType: parsed.prompt_type,
       category: parsed.category,
+      tone: parsed.tone,
       body: parsed.body,
       variables: parsed.variables,
       isDefault: parsed.is_default,
@@ -1144,6 +1163,75 @@ router.get('/:id', async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
     res.json({ success: true, data: campaign });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// CATEGORY-TONE PRESET ROUTES
+// ====================
+
+const categoryTonePresetCreateSchema = z.object({
+  category: z.string().min(1).max(100),
+  tone: z.string().min(1).max(50),
+  description: z.string().optional(),
+  is_active: z.boolean().optional(),
+});
+
+const categoryTonePresetUpdateSchema = categoryTonePresetCreateSchema.partial();
+
+router.get('/category-tone-presets', async (req: any, res: Response) => {
+  try {
+    const presets = await MarketingCategoryToneService.listPresets(getCtx(req));
+    res.json({ success: true, data: presets });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/category-tone-presets', async (req: any, res: Response) => {
+  try {
+    const parsed = categoryTonePresetCreateSchema.parse(req.body);
+    const preset = await MarketingCategoryToneService.upsertPreset({
+      category: parsed.category,
+      tone: parsed.tone,
+      description: parsed.description,
+      isActive: parsed.is_active,
+      createdBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: preset });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/category-tone-presets/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = categoryTonePresetUpdateSchema.parse(req.body);
+    const preset = await MarketingCategoryToneService.upsertPreset({
+      category: parsed.category || '',
+      tone: parsed.tone || '',
+      description: parsed.description,
+      isActive: parsed.is_active,
+      createdBy: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: preset });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.delete('/category-tone-presets/:id', async (req: any, res: Response) => {
+  try {
+    await MarketingCategoryToneService.deletePreset(req.params.id, getCtx(req));
+    res.json({ success: true });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

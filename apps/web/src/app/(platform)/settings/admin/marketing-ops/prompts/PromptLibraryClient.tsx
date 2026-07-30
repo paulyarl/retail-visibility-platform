@@ -5,6 +5,7 @@ import { ArrowLeft, RefreshCw, Plus, Pencil, Trash2, FileText } from 'lucide-rea
 import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptType } from '@/services/MarketingOpsService';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
+import { useMemo } from 'react';
 
 const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
   seek: 'Seek',
@@ -31,6 +32,7 @@ export default function PromptLibraryClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<PromptType | ''>('');
+  const [toneFilter, setToneFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
 
@@ -40,6 +42,7 @@ export default function PromptLibraryClient() {
     try {
       const data = await marketingOpsService.listPromptTemplates({
         prompt_type: typeFilter || undefined,
+        tone: toneFilter || undefined,
       });
       setTemplates(data);
     } catch (err: any) {
@@ -47,11 +50,13 @@ export default function PromptLibraryClient() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
+  }, [typeFilter, toneFilter]);
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  const toneOptions = useMemo(() => distinctValues(templates, (t) => t.tone), [templates]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this prompt template?')) return;
@@ -109,6 +114,15 @@ export default function PromptLibraryClient() {
             <option value="">All Types</option>
             {ALL_TYPES.map((t) => <option key={t} value={t}>{PROMPT_TYPE_LABELS[t]}</option>)}
           </select>
+          <SuggestiveSelect
+            value={toneFilter}
+            onChange={setToneFilter}
+            options={toneOptions}
+            emptyLabel="All Tones"
+            newLabel="+ Tone..."
+            newInputPlaceholder="Filter by tone"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         {error && (
@@ -145,6 +159,7 @@ export default function PromptLibraryClient() {
                   {t.body.slice(0, 200)}{t.body.length > 200 ? '...' : ''}
                 </p>
                 {t.category && <p className="text-xs text-gray-400 mb-3">Category: {t.category}</p>}
+                {t.tone && <p className="text-xs text-gray-400 mb-3">Tone: {t.tone}</p>}
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/settings/admin/marketing-ops/prompts/${t.id}`}
@@ -175,6 +190,7 @@ export default function PromptLibraryClient() {
         <PromptTemplateModal
           template={editingTemplate}
           categoryOptions={distinctValues(templates, (t) => t.category)}
+          toneOptions={toneOptions}
           onClose={() => setShowCreateModal(false)}
           onSaved={async () => { setShowCreateModal(false); await fetchTemplates(); }}
         />
@@ -183,15 +199,17 @@ export default function PromptLibraryClient() {
   );
 }
 
-function PromptTemplateModal({ template, categoryOptions, onClose, onSaved }: {
+function PromptTemplateModal({ template, categoryOptions, toneOptions, onClose, onSaved }: {
   template: PromptTemplate | null;
   categoryOptions: string[];
+  toneOptions: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(template?.name ?? '');
   const [promptType, setPromptType] = useState<PromptType>(template?.prompt_type ?? 'seek');
   const [category, setCategory] = useState(template?.category ?? '');
+  const [tone, setTone] = useState(template?.tone ?? '');
   const [body, setBody] = useState(template?.body ?? '');
   const [isDefault, setIsDefault] = useState(template?.is_default ?? false);
   const [saving, setSaving] = useState(false);
@@ -205,6 +223,7 @@ function PromptTemplateModal({ template, categoryOptions, onClose, onSaved }: {
         name,
         prompt_type: promptType,
         category: category || undefined,
+        tone: tone || undefined,
         body,
         is_default: isDefault,
       };
@@ -249,6 +268,13 @@ function PromptTemplateModal({ template, categoryOptions, onClose, onSaved }: {
               <SuggestiveSelect value={category} onChange={setCategory}
                 options={categoryOptions} emptyLabel="-- Select category --" newLabel="+ New category..."
                 newInputPlaceholder="Enter new category"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tone (optional)</label>
+              <SuggestiveSelect value={tone} onChange={setTone}
+                options={toneOptions} emptyLabel="-- Select tone --" newLabel="+ New tone..."
+                newInputPlaceholder="Enter new tone"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>

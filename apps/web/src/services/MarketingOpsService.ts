@@ -78,6 +78,9 @@ export interface Campaign {
   estimated_tier: string | null;
   estimated_fee_cents: number | null;
   pain_score: number | null;
+  tone: string | null;
+  retainer: 'Fast' | 'Medium' | 'Slow' | null;
+  attributes: string[];
   stage: CampaignStage;
   stage_entered_at: string | null;
   date_entered: string | null;
@@ -161,6 +164,7 @@ export interface PromptTemplate {
   name: string;
   prompt_type: PromptType;
   category: string | null;
+  tone: string | null;
   version: number;
   body: string;
   variables: any;
@@ -275,10 +279,13 @@ export interface DashboardStats {
   stageCounts: Record<string, number>;
   byStage?: Record<CampaignStage, number>;
   totalRevenueCents: number;
+  marketingRevenueCents?: number;
+  marketingRevenueCount?: number;
   totalRetainerRevenueCents: number;
   totalRetainersWon: number;
   conversionRate: number;
   weeklyRevenueCents: number;
+  weeklyMarketingRevenueCents?: number;
   weeklyPreviews: number;
   weeklyDelivered: number;
   recentTransitions?: StageHistory[];
@@ -383,6 +390,9 @@ export interface CampaignCreateInput {
   estimated_tier?: string;
   estimated_fee_cents?: number;
   pain_score?: number;
+  tone?: string;
+  retainer?: 'Fast' | 'Medium' | 'Slow';
+  attributes?: string[];
   assigned_to?: string;
   notes?: string;
 }
@@ -434,6 +444,7 @@ export interface PromptTemplateCreateInput {
   name: string;
   prompt_type: PromptType;
   category?: string;
+  tone?: string;
   body: string;
   variables?: any;
   is_default?: boolean;
@@ -548,6 +559,9 @@ class MarketingOpsService extends AdminApiSingleton {
     category?: string;
     city?: string;
     assignedTo?: string;
+    tone?: string;
+    retainer?: 'Fast' | 'Medium' | 'Slow';
+    attributes?: string[];
     search?: string;
     page?: number;
     limit?: number;
@@ -557,6 +571,9 @@ class MarketingOpsService extends AdminApiSingleton {
     if (filters?.category) params.set('category', filters.category);
     if (filters?.city) params.set('city', filters.city);
     if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo);
+    if (filters?.tone) params.set('tone', filters.tone);
+    if (filters?.retainer) params.set('retainer', filters.retainer);
+    if (filters?.attributes && filters.attributes.length > 0) params.set('attributes', filters.attributes.join(','));
     if (filters?.search) params.set('search', filters.search);
     if (filters?.page) params.set('page', String(filters.page));
     if (filters?.limit) params.set('limit', String(filters.limit));
@@ -827,11 +844,13 @@ class MarketingOpsService extends AdminApiSingleton {
   async listPromptTemplates(filters?: {
     prompt_type?: PromptType;
     category?: string;
+    tone?: string;
     is_active?: boolean;
   }): Promise<PromptTemplate[]> {
     const params = new URLSearchParams();
     if (filters?.prompt_type) params.set('prompt_type', filters.prompt_type);
     if (filters?.category) params.set('category', filters.category);
+    if (filters?.tone) params.set('tone', filters.tone);
     if (filters?.is_active !== undefined) params.set('is_active', String(filters.is_active));
     const query = params.toString();
     const url = `${BASE_URL}/prompts/templates${query ? `?${query}` : ''}`;

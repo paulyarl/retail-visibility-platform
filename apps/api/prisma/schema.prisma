@@ -5385,6 +5385,7 @@ model users {
   inventory_transfers_inventory_transfers_shipped_byTousers   inventory_transfers[]              @relation("inventory_transfers_shipped_byTousers")
   invitations                                                 invitations[]
   login_attempts                                              login_attempts[]
+  mkt_category_tone_presets_list                              mkt_category_tone_presets_list[]
   order_status_history                                        order_status_history[]
   security_alerts                                             security_alerts[]
   security_threats                                            security_threats[]
@@ -6132,6 +6133,9 @@ model mkt_campaigns_list {
   subscription_tier_id                               String?                          @db.VarChar(255)
   coupon_code                                        String?                          @db.VarChar(100)
   service_category                                   String?                          @db.VarChar(100)
+  tone                                               String?                          @db.VarChar(50)
+  retainer                                           String?                          @db.VarChar(20)
+  attributes                                         Json?                            @default("[]")
   marketing_revenue                                  marketing_revenue[]
   mkt_audits_list                                    mkt_audits_list[]
   tenants_mkt_campaigns_list_demo_tenant_idTotenants tenants?                         @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
@@ -6151,6 +6155,9 @@ model mkt_campaigns_list {
   @@index([demo_tenant_id], map: "idx_mkt_campaigns_demo_tenant")
   @@index([tenant_id], map: "idx_mkt_campaigns_tenant")
   @@index([service_category], map: "idx_mkt_campaigns_service_category")
+  @@index([attributes], map: "idx_mkt_campaigns_attributes", type: Gin)
+  @@index([retainer], map: "idx_mkt_campaigns_retainer")
+  @@index([tone], map: "idx_mkt_campaigns_tone")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -6284,13 +6291,32 @@ model mkt_prompt_templates_list {
   created_by                 String?
   created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  tone                       String?                      @db.VarChar(50)
   mkt_prompt_executions_list mkt_prompt_executions_list[]
 
   @@index([category, is_active], map: "idx_mkt_prompt_templates_category")
   @@index([prompt_type, is_active], map: "idx_mkt_prompt_templates_type")
+  @@index([prompt_type, category, tone, is_active], map: "idx_mkt_prompt_templates_tone")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_category_tone_presets_list {
+  id          String   @id @db.VarChar(255)
+  category    String   @db.VarChar(100)
+  tone        String   @db.VarChar(50)
+  description String?
+  is_active   Boolean  @default(true)
+  created_by  String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  users       users?   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([category, tone])
+  @@index([category, is_active], map: "idx_mkt_category_tone_category")
+  @@index([tone], map: "idx_mkt_category_tone_tone")
+}
+
 model mkt_scorecards_list {
   id                      String   @id @db.VarChar(255)
   user_id                 String?

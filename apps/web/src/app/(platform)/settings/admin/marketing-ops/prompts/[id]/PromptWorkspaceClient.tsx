@@ -13,6 +13,10 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
+
+  const selectedCampaign = useMemo(() =>
+    campaigns.find((c) => c.id === selectedCampaignId) || null,
+  [campaigns, selectedCampaignId]);
   const [executing, setExecuting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -48,6 +52,18 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
     for (const m of matches) vars.add(m[1]);
     return Array.from(vars);
   }, [template]);
+
+  useEffect(() => {
+    if (!selectedCampaign) return;
+    setVariables((prev) => ({
+      ...prev,
+      business_name: selectedCampaign.business_name,
+      category: selectedCampaign.category,
+      city: selectedCampaign.city,
+      tone: selectedCampaign.tone || '',
+      attributes: (selectedCampaign.attributes || []).join(', '),
+    }));
+  }, [selectedCampaign]);
 
   const renderedPrompt = useMemo(() => {
     if (!template?.body) return '';
@@ -113,7 +129,7 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{template.name}</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Type: {template.prompt_type} · v{template.version}
+              Type: {template.prompt_type}{template.tone ? ` · Tone: ${template.tone}` : ''} · v{template.version}
             </p>
           </div>
           <button
@@ -173,7 +189,7 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
                   >
                     <option value="">— Select a campaign —</option>
                     {campaigns.map((c) => (
-                      <option key={c.id} value={c.id}>{c.business_name} ({c.category}, {c.city})</option>
+                      <option key={c.id} value={c.id}>{c.business_name} ({c.category}, {c.tone || '—'}, {c.city})</option>
                     ))}
                   </select>
                 </div>

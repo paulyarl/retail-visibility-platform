@@ -6,6 +6,7 @@
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
 - `docs/LocalBiz/tenant_prospecting_channel_sprint_plan.md`
+- `docs/LocalBiz/local_marketing_ops_payment_collection_sprint_plan.md`
 
 ---
 
@@ -63,13 +64,13 @@ Stage transitions are validated; some moves are irreversible and all transitions
 
 - **Metric cards:**
   - Total campaigns
-  - Total revenue
+  - Total revenue (with sub-line showing marketing revenue from online payments and payment count)
   - Retainers won
   - Conversion rate (shown → paid)
 - **Weekly summary:**
   - Previews built
   - Packages delivered
-  - Weekly revenue
+  - Weekly revenue (with sub-line showing online payment revenue when available)
 - **Tenant Conversion widget** (if the Tenant Prospecting Channel is enabled): total conversions, conversion rate, resurrected conversions, QR view-to-conversion rate, demo claim rate, and average days to convert.
 - **Pipeline by Stage:** horizontal bars showing campaign count per stage.
 - **Quick action cards:**
@@ -121,16 +122,22 @@ Columns include:
 
 ### What to Enter
 
-The form is split into three cards:
+The form is split into four cards:
 
 #### Business Information
 
 - **Business Name** (required)
 - **Category** (required) — select an existing category or choose `+ New category...` and enter a new one
+- **Tone** (optional) — select an existing tone or choose `+ New tone...` and enter a new one
 - **City** (required) — select an existing city or choose `+ New city...` and enter a new one
 - **Neighborhood** (optional) — select an existing neighborhood or choose `+ New neighborhood...` and enter a new one
 - **Display ID** (optional human-readable ID)
 - **Assigned To** (optional) — select a platform staff user from the dropdown
+
+#### Classification
+
+- **Retainer** (optional) — select `Fast`, `Medium`, or `Slow` to classify the prospect's retainer timeline
+- **Attributes** (optional) — checkbox list of campaign attributes: High Ticket, Upscale, Friendly, Professional, Fast Retainers
 
 #### Contact & GBP Audit
 
@@ -147,6 +154,10 @@ The form is split into three cards:
 
 - **Estimated Tier** — select an existing tier or choose `+ New tier...` and enter a new one
 - **Estimated Fee (cents)**
+- **Package Price (cents)** — the one-time price for the Marketing Ops package (e.g., `49900` for $499)
+- **Service Category** — dropdown of service categories (e.g., review_responses, service_menu, gbp_audit). Used to validate coupons dynamically per category.
+- **Coupon Code** (optional) — a coupon code to apply at checkout for the prospect
+- **Subscription Tier ID** (optional) — a platform tier ID for recurring billing after the one-time payment
 
 Click **Create Campaign** to save. You are redirected to the new campaign detail page.
 
@@ -436,6 +447,13 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 | `has_website` | Website status/technology |
 | `nap_consistent` | Name/Address/Phone consistency across platforms |
 | `estimated_tier` / `estimated_fee_cents` | Pricing estimate |
+| `package_price_cents` | One-time package price for the Marketing Ops package |
+| `service_category` | Service category for coupon validation (e.g., review_responses, service_menu) |
+| `coupon_code` | Optional coupon code applied at checkout |
+| `subscription_tier_id` | Optional platform tier ID for recurring billing after one-time payment |
+| `tone` | Optional tone classification for the campaign |
+| `retainer` | Retainer timeline classification: Fast, Medium, or Slow |
+| `attributes` | Array of campaign attribute tags (High Ticket, Upscale, Friendly, Professional, Fast Retainers) |
 | `pain_score` | 1–10 sales qualification score |
 | `stage` | Current pipeline stage |
 | `amount_paid_cents` | Money collected |
@@ -496,7 +514,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ### Tabs
 
-- **Overview** — campaign summary, conversion attribution, retainer details, and notes.
+- **Overview** — campaign summary, pricing & payment details (package price, service category, coupon code, subscription tier), revenue records with receipt download links, conversion attribution, retainer details, and notes.
 - **Audits** — `marketing_audits` records (e.g., GBP scores, pain score).
 - **Files** — attached campaign files.
 - **Deliverables** — generate, download, and mark deliverables as sent.
@@ -621,9 +639,10 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 1. **Prospecting** — use a `seek` prompt to find a local business and capture category, GBP status, reviews, and pain points in the campaign form.
 2. **Preview** — run a `fulfill` prompt to generate a deliverable (review responses, service menu, GBP audit). Use **Filter Review** to catch compliance issues.
 3. **Presentation** — generate a **watermarked preview** deliverable and share the QR code or demo storefront with the prospect.
-4. **Conversion** — when the prospect pays, transition to `paid` and generate the unmarked paid deliverable.
-5. **Retention** — transition to `retainer_pitched` and `retainer_won` using a `retainer` prompt.
-6. **Attribution** — `first_touch_source` and `last_touch_source` track which deliverable or demo drove the conversion.
+4. **Payment** — set the **Package Price** and optional **Coupon Code** on the campaign. The prospect pays via the public pay page (QR code, demo storefront, or direct link). Payment is processed through Stripe; the campaign automatically transitions to `paid` and revenue is recorded.
+5. **Delivery** — once paid, deliverables are automatically upgraded from preview to paid (watermarks removed). Generate the unmarked paid deliverable.
+6. **Retention** — transition to `retainer_pitched` and `retainer_won` using a `retainer` prompt.
+7. **Attribution** — `first_touch_source` and `last_touch_source` track which deliverable or demo drove the conversion.
 
 ### Advice for Prompts
 
@@ -662,20 +681,50 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 - **Link Tenant uses a raw tenant ID prompt.** There is no search or autocomplete, so you need the exact tenant ID.
 - **Attribution is only captured through the public preview or demo flow.** Manual signups must be linked manually with **Link Tenant**.
 - **Route coverage warnings** in the test suite (duplicate mount paths) are a pre-existing platform-wide concern and not specific to Marketing Ops.
+- **Payment receipts require a completed payment.** The receipt PDF download link only appears on the campaign detail when revenue records exist.
+- **Coupon validation is server-side only.** The public pay page validates coupons via the backend; client-side total mismatches are rejected.
 
 ---
 
-## 24. References
+## 24. Public Pay Page — `/marketing/pay`
+
+`PayPageClient.tsx` is the public-facing payment page for Marketing Ops packages.
+
+### How It Works
+
+1. The prospect receives a pay link (via QR code, demo storefront, or direct URL) containing a `ptoken`.
+2. The page resolves the token server-side to load campaign details, package price, and service category.
+3. The prospect can optionally enter a **coupon code** — the page validates it server-side and shows the discounted total.
+4. The prospect enters payment details via Stripe Elements and clicks **Pay**.
+5. The backend creates a Stripe PaymentIntent, confirms the payment, and transitions the campaign to `paid`.
+6. On success, the page shows a confirmation with a **Download Receipt** button (PDF receipt generated server-side).
+7. Deliverables are automatically upgraded from preview to paid (watermarks removed).
+
+### Admin Setup
+
+To enable payment collection on a campaign:
+1. Set the **Package Price** on the campaign form (in cents, e.g., `49900` for $499).
+2. Optionally set a **Service Category** (for coupon validation) and **Coupon Code**.
+3. Optionally set a **Subscription Tier ID** for recurring billing after the one-time payment.
+4. Share the pay link with the prospect via QR code, demo storefront, or direct URL.
+
+---
+
+## 25. References
 
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
 - `docs/LocalBiz/tenant_prospecting_channel_sprint_plan.md`
+- `docs/LocalBiz/local_marketing_ops_payment_collection_sprint_plan.md`
 - `docs/LocalBiz/MARKETING_OPS_USER_GUIDE_GAP_CLOSE_SPRINT.md`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/filter-review/FilterReviewClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/prompts/PromptLibraryClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/prompts/[id]/PromptWorkspaceClient.tsx`
+- `apps/web/src/app/marketing/pay/PayPageClient.tsx`
 - `apps/web/src/services/MarketingOpsService.ts`
 - `apps/web/src/components/marketing-ops/StageBadge.tsx`
 - `apps/api/src/services/MarketingCampaignService.ts`
+- `apps/api/src/routes/marketing-ops-public.ts`
+- `apps/api/src/services/subscription/SubscriptionBillingService.ts`

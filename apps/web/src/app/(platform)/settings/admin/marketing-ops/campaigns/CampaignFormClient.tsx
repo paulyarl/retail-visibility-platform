@@ -4,13 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, RetainerStatus, CampaignCreateInput, CampaignUpdateInput } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
+const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
+const CAMPAIGN_ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 
 interface FormState {
   business_name: string;
@@ -28,6 +30,9 @@ interface FormState {
   estimated_tier: string;
   estimated_fee_cents: number | '';
   pain_score: number | '';
+  tone: string;
+  retainer: 'Fast' | 'Medium' | 'Slow' | '';
+  attributes: string[];
   assigned_to: string;
   notes: string;
   stage: CampaignStage;
@@ -36,6 +41,10 @@ interface FormState {
   retainer_start_date: string;
   amount_paid_cents: number | '';
   package_delivered: string;
+  package_price_cents: number | '';
+  subscription_tier_id: string;
+  coupon_code: string;
+  service_category: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -54,6 +63,9 @@ const EMPTY_FORM: FormState = {
   estimated_tier: '',
   estimated_fee_cents: '',
   pain_score: '',
+  tone: '',
+  retainer: '',
+  attributes: [],
   assigned_to: '',
   notes: '',
   stage: 'seek',
@@ -62,6 +74,10 @@ const EMPTY_FORM: FormState = {
   retainer_start_date: '',
   amount_paid_cents: '',
   package_delivered: '',
+  package_price_cents: '',
+  subscription_tier_id: '',
+  coupon_code: '',
+  service_category: '',
 };
 
 export default function CampaignFormClient({ mode, campaignId }: { mode: 'create' | 'edit'; campaignId?: string }) {
@@ -76,7 +92,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     neighborhoods: [] as string[],
     contactMethods: [] as string[],
     estimatedTiers: [] as string[],
+    tones: [] as string[],
   });
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
 
   useEffect(() => {
     marketingOpsService.listCampaigns({ limit: 1000 })
@@ -87,8 +105,12 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           neighborhoods: distinctValues(items, (c) => c.neighborhood),
           contactMethods: distinctValues(items, (c) => c.contact_method),
           estimatedTiers: distinctValues(items, (c) => c.estimated_tier),
+          tones: distinctValues(items, (c) => c.tone),
         });
       })
+      .catch(() => {});
+    marketingOpsService.getServiceCategories()
+      .then(setServiceCategories)
       .catch(() => {});
   }, []);
 
@@ -113,6 +135,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         estimated_tier: c.estimated_tier ?? '',
         estimated_fee_cents: c.estimated_fee_cents ?? '',
         pain_score: c.pain_score ?? '',
+        tone: c.tone ?? '',
+        retainer: c.retainer ?? '',
+        attributes: c.attributes ?? [],
         assigned_to: c.assigned_to ?? '',
         notes: c.notes ?? '',
         stage: c.stage,
@@ -121,6 +146,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         retainer_start_date: c.retainer_start_date ? c.retainer_start_date.split('T')[0] : '',
         amount_paid_cents: c.amount_paid_cents ?? '',
         package_delivered: c.package_delivered ?? '',
+        package_price_cents: c.package_price_cents ?? '',
+        subscription_tier_id: c.subscription_tier_id ?? '',
+        coupon_code: c.coupon_code ?? '',
+        service_category: c.service_category ?? '',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
@@ -133,7 +162,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     fetchCampaign();
   }, [fetchCampaign]);
 
-  const handleChange = (field: keyof FormState, value: string | number | boolean | '') => {
+  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -163,6 +192,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           estimated_tier: strOrUndef(form.estimated_tier),
           estimated_fee_cents: numOrUndef(form.estimated_fee_cents),
           pain_score: numOrUndef(form.pain_score),
+          tone: strOrUndef(form.tone),
+          retainer: form.retainer || undefined,
+          attributes: form.attributes,
           assigned_to: strOrUndef(form.assigned_to),
           notes: strOrUndef(form.notes),
         };
@@ -184,6 +216,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           estimated_tier: strOrUndef(form.estimated_tier),
           estimated_fee_cents: numOrUndef(form.estimated_fee_cents),
           pain_score: numOrUndef(form.pain_score),
+          tone: strOrUndef(form.tone),
+          retainer: form.retainer || undefined,
+          attributes: form.attributes,
           assigned_to: strOrUndef(form.assigned_to),
           notes: strOrUndef(form.notes),
           stage: form.stage,
@@ -192,6 +227,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           retainer_start_date: form.retainer_start_date ? new Date(form.retainer_start_date).toISOString() : undefined,
           amount_paid_cents: numOrUndef(form.amount_paid_cents),
           package_delivered: strOrUndef(form.package_delivered),
+          package_price_cents: numOrUndef(form.package_price_cents),
+          subscription_tier_id: strOrUndef(form.subscription_tier_id),
+          coupon_code: strOrUndef(form.coupon_code),
+          service_category: strOrUndef(form.service_category),
         };
         await marketingOpsService.updateCampaign(campaignId, input);
         router.push(`/settings/admin/marketing-ops/campaigns/${campaignId}`);
@@ -244,6 +283,11 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 options={vocab.categories} emptyLabel="-- Select category --" newLabel="+ New category..."
                 newInputPlaceholder="Enter new category" className={inputClass} />
             </FormField>
+            <FormField label="Tone">
+              <SuggestiveSelect value={form.tone} onChange={(v) => handleChange('tone', v)}
+                options={vocab.tones} emptyLabel="-- Select tone --" newLabel="+ New tone..."
+                newInputPlaceholder="Enter new tone" className={inputClass} />
+            </FormField>
             <FormField label="City" required>
               <SuggestiveSelect required value={form.city} onChange={(v) => handleChange('city', v)}
                 options={vocab.cities} emptyLabel="-- Select city --" newLabel="+ New city..."
@@ -261,6 +305,35 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Assigned To">
               <PlatformUserSelect value={form.assigned_to} onChange={(v) => handleChange('assigned_to', v)}
                 emptyLabel="-- Unassigned --" className={inputClass} />
+            </FormField>
+          </FormSection>
+
+          <FormSection title="Classification">
+            <FormField label="Retainer">
+              <select value={form.retainer} onChange={(e) => handleChange('retainer', e.target.value as 'Fast' | 'Medium' | 'Slow' | '')}
+                className={inputClass}>
+                <option value="">—</option>
+                {RETAINER_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Attributes" className="sm:col-span-2">
+              <div className="grid grid-cols-2 gap-2">
+                {CAMPAIGN_ATTRIBUTE_OPTIONS.map((attr) => (
+                  <label key={attr} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.attributes.includes(attr)}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...form.attributes, attr]
+                          : form.attributes.filter((a) => a !== attr);
+                        handleChange('attributes', next);
+                      }}
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{attr}</span>
+                  </label>
+                ))}
+              </div>
             </FormField>
           </FormSection>
 
@@ -318,6 +391,25 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Estimated Fee (cents)">
               <input type="number" value={form.estimated_fee_cents} onChange={(e) => handleChange('estimated_fee_cents', e.target.value === '' ? '' : parseInt(e.target.value))}
                 className={inputClass} />
+            </FormField>
+            <FormField label="Package Price (cents)">
+              <input type="number" value={form.package_price_cents} onChange={(e) => handleChange('package_price_cents', e.target.value === '' ? '' : parseInt(e.target.value))}
+                className={inputClass} placeholder="e.g. 49900 for $499" />
+            </FormField>
+            <FormField label="Service Category">
+              <select value={form.service_category} onChange={(e) => handleChange('service_category', e.target.value)}
+                className={inputClass}>
+                <option value="">-- Select category --</option>
+                {serviceCategories.map((sc) => <option key={sc.value} value={sc.value}>{sc.label}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Coupon Code">
+              <input type="text" value={form.coupon_code} onChange={(e) => handleChange('coupon_code', e.target.value)}
+                className={inputClass} placeholder="Optional coupon code" />
+            </FormField>
+            <FormField label="Subscription Tier ID">
+              <input type="text" value={form.subscription_tier_id} onChange={(e) => handleChange('subscription_tier_id', e.target.value)}
+                className={inputClass} placeholder="Optional tier ID for recurring billing" />
             </FormField>
             {mode === 'edit' && (
               <>
@@ -399,9 +491,9 @@ function FormSection({ title, children }: { title: string; children: React.React
   );
 }
 
-function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function FormField({ label, required, className, children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className={className}>
       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>

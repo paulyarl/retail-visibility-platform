@@ -184,6 +184,11 @@ export default function MarketingOpsDashboardClient() {
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.totalRevenueCents)}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatCurrency(stats.weeklyRevenueCents)} this week</p>
+                {stats.marketingRevenueCents != null && stats.marketingRevenueCents > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                    {formatCurrency(stats.marketingRevenueCents)} from {stats.marketingRevenueCount ?? 0} payment{stats.marketingRevenueCount === 1 ? '' : 's'}
+                  </p>
+                )}
               </div>
 
               <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
@@ -229,6 +234,11 @@ export default function MarketingOpsDashboardClient() {
                   <Activity className="w-5 h-5 text-green-500" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.weeklyRevenueCents)}</p>
+                {stats.weeklyMarketingRevenueCents != null && stats.weeklyMarketingRevenueCents > 0 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {formatCurrency(stats.weeklyMarketingRevenueCents)} from online payments
+                  </p>
+                )}
               </div>
             </div>
 

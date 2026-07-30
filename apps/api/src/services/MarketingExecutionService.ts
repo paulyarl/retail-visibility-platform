@@ -191,8 +191,11 @@ export class MarketingExecutionService extends BaseService {
       pain_score: String(campaign.pain_score ?? ''),
       estimated_tier: campaign.estimated_tier || '',
       notes: campaign.notes || '',
+      tone: campaign.tone || '',
+      attributes: (campaign.attributes || []).join(', '),
       ...(variables || {}),
     };
+    // retainer is intentionally not injected: it's a campaign filter-only field.
 
     for (const [key, value] of Object.entries(allVars)) {
       rendered = rendered.replace(new RegExp(`\{\{${key}\}\}`, 'g'), value);

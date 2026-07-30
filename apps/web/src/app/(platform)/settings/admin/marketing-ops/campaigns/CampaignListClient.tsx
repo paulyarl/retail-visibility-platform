@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { Campaign, CampaignStage } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
+import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
+const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 
 export default function CampaignListClient() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -16,6 +19,9 @@ export default function CampaignListClient() {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<CampaignStage | ''>('');
+  const [toneFilter, setToneFilter] = useState('');
+  const [retainerFilter, setRetainerFilter] = useState<'Fast' | 'Medium' | 'Slow' | ''>('');
+  const [attributeFilter, setAttributeFilter] = useState('');
   const staffUsers = useStaffUsers();
 
   const fetchCampaigns = useCallback(async () => {
@@ -25,6 +31,9 @@ export default function CampaignListClient() {
       const result = await marketingOpsService.listCampaigns({
         search: search || undefined,
         stage: stageFilter || undefined,
+        tone: toneFilter || undefined,
+        retainer: retainerFilter || undefined,
+        attributes: attributeFilter ? [attributeFilter] : undefined,
         limit: 200,
       });
       setCampaigns(result.items);
@@ -33,13 +42,15 @@ export default function CampaignListClient() {
     } finally {
       setLoading(false);
     }
-  }, [search, stageFilter]);
+  }, [search, stageFilter, toneFilter, retainerFilter, attributeFilter]);
 
   useEffect(() => {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
   const formatCurrency = (cents: number | null) => cents != null ? `$${(cents / 100).toLocaleString()}` : '—';
+
+  const toneOptions = useMemo(() => distinctValues(campaigns, (c) => c.tone), [campaigns]);
 
   const campaignsByStage = (stage: CampaignStage) => campaigns.filter((c) => c.stage === stage);
 
@@ -102,6 +113,31 @@ export default function CampaignListClient() {
               <option key={s} value={s}>{STAGE_LABELS[s]}</option>
             ))}
           </select>
+          <SuggestiveSelect
+            value={toneFilter}
+            onChange={setToneFilter}
+            options={toneOptions}
+            emptyLabel="All Tones"
+            newLabel="+ Tone..."
+            newInputPlaceholder="Filter by tone"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={retainerFilter}
+            onChange={(e) => setRetainerFilter(e.target.value as 'Fast' | 'Medium' | 'Slow' | '')}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Retainers</option>
+            {RETAINER_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select
+            value={attributeFilter}
+            onChange={(e) => setAttributeFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Attributes</option>
+            {ATTRIBUTE_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
           <div className="flex items-center rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
             <button
               onClick={() => setView('table')}
@@ -136,8 +172,11 @@ export default function CampaignListClient() {
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Business</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tone</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">City</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Stage</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Retainer</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Attributes</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tenant</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Est. Fee</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Paid</th>
@@ -147,7 +186,7 @@ export default function CampaignListClient() {
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
                   {campaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={11} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                         No campaigns found. Create one to get started.
                       </td>
                     </tr>
@@ -163,8 +202,11 @@ export default function CampaignListClient() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.category}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.tone ?? '—'}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.city}{c.neighborhood ? ` (${c.neighborhood})` : ''}</td>
                         <td className="px-4 py-3"><StageBadge stage={c.stage} /></td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.retainer ?? '—'}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.attributes?.join(', ') || '—'}</td>
                         <td className="px-4 py-3">
                           {c.tenant_id ? (
                             <Link
@@ -212,6 +254,12 @@ export default function CampaignListClient() {
                           >
                             <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{c.business_name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{c.category} · {c.city}</p>
+                            {(c.tone || c.retainer || c.attributes?.length) && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                {c.tone}{c.tone && c.retainer ? ' · ' : ''}{c.retainer}
+                                {c.attributes?.length ? ` · ${c.attributes.join(', ')}` : ''}
+                              </p>
+                            )}
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-xs text-gray-400">{staffDisplayName(staffUsers, c.assigned_to) ?? 'Unassigned'}</span>
                               {c.estimated_fee_cents != null && (

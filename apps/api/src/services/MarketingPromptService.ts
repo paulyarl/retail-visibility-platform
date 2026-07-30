@@ -19,6 +19,7 @@ export interface PromptTemplateInput {
   name: string;
   promptType: PromptType;
   category?: string;
+  tone?: string;
   body: string;
   variables?: any;
   isDefault?: boolean;
@@ -54,7 +55,7 @@ export class MarketingPromptService extends BaseService {
     const id = generatePromptTemplateId();
     try {
       if (input.isDefault) {
-        await this.clearDefaultForType(input.promptType, input.category);
+        await this.clearDefaultForType(input.promptType, input.category, input.tone);
       }
       const template = await this.prisma.mkt_prompt_templates_list.create({
         data: {
@@ -62,6 +63,7 @@ export class MarketingPromptService extends BaseService {
           name: input.name,
           prompt_type: input.promptType,
           category: input.category || null,
+          tone: input.tone || null,
           version: 1,
           body: input.body,
           variables: input.variables || null,
@@ -87,10 +89,11 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  async listTemplates(filters: { promptType?: PromptType; category?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
+  async listTemplates(filters: { promptType?: PromptType; category?: string; tone?: string; isActive?: boolean } = {}, ctx?: RequestCtx): Promise<any[]> {
     const where: any = {};
     if (filters.promptType) where.prompt_type = filters.promptType;
     if (filters.category) where.category = filters.category;
+    if (filters.tone) where.tone = filters.tone;
     if (filters.isActive !== undefined) where.is_active = filters.isActive;
     try {
       return await this.prisma.mkt_prompt_templates_list.findMany({
@@ -108,13 +111,14 @@ export class MarketingPromptService extends BaseService {
     if (input.name !== undefined) data.name = input.name;
     if (input.promptType !== undefined) data.prompt_type = input.promptType;
     if (input.category !== undefined) data.category = input.category;
+    if (input.tone !== undefined) data.tone = input.tone;
     if (input.body !== undefined) data.body = input.body;
     if (input.variables !== undefined) data.variables = input.variables;
     if (input.isDefault !== undefined) {
       if (input.isDefault) {
         const template = await this.prisma.mkt_prompt_templates_list.findUnique({ where: { id } });
         if (template) {
-          await this.clearDefaultForType(template.prompt_type, template.category);
+          await this.clearDefaultForType(template.prompt_type, template.category, template.tone);
         }
       }
       data.is_default = input.isDefault;
@@ -138,12 +142,13 @@ export class MarketingPromptService extends BaseService {
     }
   }
 
-  private async clearDefaultForType(promptType: string, category: string | null | undefined): Promise<void> {
+  private async clearDefaultForType(promptType: string, category: string | null | undefined, tone: string | null | undefined): Promise<void> {
     await this.prisma.mkt_prompt_templates_list.updateMany({
       where: {
         prompt_type: promptType,
         is_default: true,
         ...(category ? { category } : {}),
+        ...(tone ? { tone } : {}),
       },
       data: { is_default: false },
     });

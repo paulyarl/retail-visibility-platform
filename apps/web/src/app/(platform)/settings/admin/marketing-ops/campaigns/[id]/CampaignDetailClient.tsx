@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 
@@ -26,6 +26,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [demoResult, setDemoResult] = useState<DemoStorefrontResult | null>(null);
   const [linkingTenant, setLinkingTenant] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [revenue, setRevenue] = useState<MarketingRevenue[]>([]);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
     templateId: '',
     deliverableType: 'review_responses',
@@ -39,6 +40,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     try {
       const data = await marketingOpsService.getCampaign(campaignId);
       setCampaign(data);
+      marketingOpsService.getCampaignRevenue(campaignId).then(setRevenue).catch(() => {});
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
     } finally {
@@ -337,6 +339,50 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   <DetailField label="Package Delivered" value={campaign.package_delivered} />
                   <DetailField label="Date Entered" value={formatDate(campaign.date_entered)} />
                   <DetailField label="Date Paid" value={formatDate(campaign.date_paid)} />
+                </div>
+
+                {/* Pricing & Payment */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Pricing & Payment</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <DetailField label="Package Price" value={formatCurrency(campaign.package_price_cents ?? null)} />
+                    <DetailField label="Service Category" value={campaign.service_category?.replace(/_/g, ' ') ?? null} />
+                    <DetailField label="Coupon Code" value={campaign.coupon_code ?? null} />
+                    <DetailField label="Subscription Tier ID" value={campaign.subscription_tier_id ?? null} />
+                  </div>
+                  {revenue.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Revenue Records</h4>
+                      <div className="space-y-2">
+                        {revenue.map((rev) => (
+                          <div key={rev.id} className="flex items-center justify-between border border-gray-200 dark:border-neutral-700 rounded-lg p-3">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(rev.amount_cents)}</span>
+                              {rev.discount_cents > 0 && (
+                                <span className="text-xs text-green-600 dark:text-green-400">-{formatCurrency(rev.discount_cents)} discount</span>
+                              )}
+                              <span className="text-xs text-gray-400">{rev.gateway_type}</span>
+                              {rev.service_category && (
+                                <span className="text-xs text-gray-400">{rev.service_category.replace(/_/g, ' ')}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-gray-400">{new Date(rev.recorded_at).toLocaleDateString()}</span>
+                              <a
+                                href={marketingOpsService.getReceiptUrl(campaignId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                <Download className="w-3 h-3" />
+                                Receipt
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Conversion (Tenant Prospecting Channel) */}
