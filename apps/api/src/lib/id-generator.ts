@@ -1649,6 +1649,24 @@ export function generateOutreachLogId(): string {
 }
 
 /**
+ * Generate review response pipeline ID
+ * Format: mrrp-{nanoid} (17 chars)
+ */
+export function generateReviewResponsePipelineId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `mrrp-${nanoid()}`;
+}
+
+/**
+ * Generate review response log ID
+ * Format: mrrl-{nanoid} (17 chars)
+ */
+export function generateReviewResponseLogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `mrrl-${nanoid()}`;
+}
+
+/**
  * Generate marketing file ID
  * Format: mfile-{nanoid} (14 chars)
  */

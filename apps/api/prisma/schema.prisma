@@ -6162,6 +6162,7 @@ model mkt_campaigns_list {
   mkt_files_list                                            mkt_files_list[]
   mkt_outreach_log                                          mkt_outreach_log[]
   mkt_prompt_executions_list                                mkt_prompt_executions_list[]
+  mkt_review_response_pipeline                              mkt_review_response_pipeline[]
   mkt_stage_history_list                                    mkt_stage_history_list[]
 
   @@index([assigned_to], map: "idx_mkt_campaigns_assigned")
@@ -6458,6 +6459,55 @@ model mkt_outreach_log {
   mkt_campaigns_list     mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_campaign")
 
   @@index([campaign_id, contact_date(sort: Desc)], map: "idx_mkt_outreach_campaign")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_review_response_pipeline {
+  id                      String                    @id @db.VarChar(255)
+  campaign_id             String                    @db.VarChar(255)
+  platform                String                    @db.VarChar(50)
+  stage                   String                    @default("backlog") @db.VarChar(20)
+  priority                Int                       @default(0)
+  total_reviews           Int                       @default(0)
+  unanswered_count        Int                       @default(0)
+  response_rate           Int                       @default(0)
+  average_rating          Decimal?                  @db.Decimal(2, 1)
+  follow_ups_open         Int                       @default(0)
+  follow_ups_completed    Int                       @default(0)
+  gate_met                Boolean                   @default(false)
+  gate_met_at             DateTime?                 @db.Timestamptz(6)
+  next_follow_up_at       DateTime?                 @db.Timestamptz(6)
+  last_activity_at        DateTime?                 @db.Timestamptz(6)
+  stale_thread_cutoff_at  DateTime?                 @db.Timestamptz(6)
+  metadata                Json?
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  mkt_review_response_log mkt_review_response_log[]
+  mkt_campaigns_list      mkt_campaigns_list        @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_review_pipeline_campaign")
+
+  @@unique([campaign_id, platform], map: "uq_mkt_review_pipeline_campaign_platform")
+  @@index([campaign_id], map: "idx_mkt_review_pipeline_campaign")
+  @@index([stage], map: "idx_mkt_review_pipeline_stage")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_review_response_log {
+  id                           String                       @id @db.VarChar(255)
+  pipeline_id                  String                       @db.VarChar(255)
+  platform_review_id           String?                      @db.VarChar(255)
+  response_text                String?
+  response_type                String                       @db.VarChar(20)
+  responded_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  responded_by                 String?                      @db.VarChar(255)
+  customer_replied             Boolean                      @default(false)
+  customer_reply_at            DateTime?                    @db.Timestamptz(6)
+  thread_closed                Boolean                      @default(false)
+  thread_closed_at             DateTime?                    @db.Timestamptz(6)
+  notes                        String?
+  created_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  mkt_review_response_pipeline mkt_review_response_pipeline @relation(fields: [pipeline_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_review_log_pipeline")
+
+  @@index([pipeline_id, responded_at(sort: Desc)], map: "idx_mkt_review_log_pipeline")
 }
 
 enum action {

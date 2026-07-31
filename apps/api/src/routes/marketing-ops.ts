@@ -92,6 +92,7 @@ import MarketingDeliverableService from '../services/MarketingDeliverableService
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
+import { ReviewResponseService } from '../services/ReviewResponseService';
 
 const router = Router();
 
@@ -178,6 +179,35 @@ const outreachLogSchema = z.object({
 });
 
 const outreachEditSchema = outreachLogSchema.partial();
+
+// Review-response pipeline schemas (Sprint 5 — Option B)
+const reviewPlatformEnum = z.enum(['google', 'yelp', 'facebook', 'other']);
+const reviewPipelineStageEnum = z.enum(['backlog', 'responding', 'follow_up', 'closed', 'monitoring']);
+const responseTypeEnum = z.enum(['first_response', 'follow_up', 'acknowledgment']);
+
+const reviewPipelineCreateSchema = z.object({
+  platform: reviewPlatformEnum,
+  total_reviews: z.number().int().optional(),
+  unanswered_count: z.number().int().optional(),
+  response_rate: z.number().int().min(0).max(100).optional(),
+  average_rating: z.number().min(0).max(5).optional(),
+  metadata: z.any().optional(),
+});
+
+const reviewPipelineMetricsSchema = z.object({
+  total_reviews: z.number().int().optional(),
+  unanswered_count: z.number().int().optional(),
+  response_rate: z.number().int().min(0).max(100).optional(),
+  average_rating: z.number().min(0).max(5).optional(),
+  metadata: z.any().optional(),
+});
+
+const reviewResponseLogSchema = z.object({
+  platform_review_id: z.string().max(255).optional(),
+  response_text: z.string().optional(),
+  response_type: responseTypeEnum,
+  notes: z.string().optional(),
+});
 
 // Hot-prospect override schema (Sprint 3)
 const hotProspectOverrideSchema = z.object({
@@ -1698,6 +1728,160 @@ router.delete('/category-tone-presets/:id', async (req: any, res: Response) => {
   try {
     await MarketingCategoryToneService.deletePreset(req.params.id, getCtx(req));
     res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Review-response pipeline (Sprint 5 — Option B) ─────────────────────
+const reviewResponseService = ReviewResponseService.getInstance();
+
+// Create a pipeline for a (campaign, platform) pair (idempotent)
+router.post('/:id/review-response/pipelines', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewPipelineCreateSchema.parse(req.body);
+    const pipeline = await reviewResponseService.createPipeline({
+      campaignId: req.params.id,
+      platform: parsed.platform,
+      totalReviews: parsed.total_reviews,
+      unansweredCount: parsed.unanswered_count,
+      responseRate: parsed.response_rate,
+      averageRating: parsed.average_rating,
+      metadata: parsed.metadata,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: pipeline });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// List all pipelines for a campaign (ordered by priority)
+router.get('/:id/review-response/pipelines', async (req: any, res: Response) => {
+  try {
+    const pipelines = await reviewResponseService.listPipelines(req.params.id, getCtx(req));
+    res.json({ success: true, data: pipelines });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single pipeline
+router.get('/review-response/pipelines/:pipelineId', async (req: any, res: Response) => {
+  try {
+    const pipeline = await reviewResponseService.getPipeline(req.params.pipelineId, getCtx(req));
+    res.json({ success: true, data: pipeline });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Update platform metrics on a pipeline (e.g., after a sync)
+router.put('/review-response/pipelines/:pipelineId/metrics', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewPipelineMetricsSchema.parse(req.body);
+    const updated = await reviewResponseService.updateMetrics(req.params.pipelineId, {
+      totalReviews: parsed.total_reviews,
+      unansweredCount: parsed.unanswered_count,
+      responseRate: parsed.response_rate,
+      averageRating: parsed.average_rating,
+      metadata: parsed.metadata,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Check gate criteria for a pipeline (returns gate result without mutating stage)
+router.get('/review-response/pipelines/:pipelineId/gate', async (req: any, res: Response) => {
+  try {
+    const result = await reviewResponseService.checkGate(req.params.pipelineId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Advance a pipeline to the next stage (refuses if gate not met unless ?force=true)
+router.post('/review-response/pipelines/:pipelineId/advance', async (req: any, res: Response) => {
+  try {
+    const force = req.query.force === 'true';
+    const updated = await reviewResponseService.advanceStage(req.params.pipelineId, force, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Log a review response (first response, follow-up, or acknowledgment)
+router.post('/review-response/pipelines/:pipelineId/log', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewResponseLogSchema.parse(req.body);
+    const log = await reviewResponseService.logResponse({
+      pipelineId: req.params.pipelineId,
+      platformReviewId: parsed.platform_review_id,
+      responseText: parsed.response_text,
+      responseType: parsed.response_type,
+      respondedBy: req.user?.id,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: log });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// List the response log for a pipeline (newest first)
+router.get('/review-response/pipelines/:pipelineId/log', async (req: any, res: Response) => {
+  try {
+    const log = await reviewResponseService.listLog(req.params.pipelineId, getCtx(req));
+    res.json({ success: true, data: log });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Mark a customer reply on a log entry (creates an open follow-up thread)
+router.post('/review-response/log/:logId/customer-reply', async (req: any, res: Response) => {
+  try {
+    const updated = await reviewResponseService.markCustomerReply(req.params.logId, undefined, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Close a follow-up thread
+router.post('/review-response/log/:logId/close', async (req: any, res: Response) => {
+  try {
+    const updated = await reviewResponseService.closeThread(req.params.logId, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Dashboard: review-response follow-ups due (overdue / due this week)
+router.get('/review-response/follow-ups-due', async (req: any, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekOut = new Date(today);
+    weekOut.setDate(weekOut.getDate() + 7);
+    const result = await reviewResponseService.getFollowUpsDue({
+      from: today,
+      to: weekOut,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
