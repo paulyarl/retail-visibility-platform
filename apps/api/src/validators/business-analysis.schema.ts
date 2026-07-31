@@ -42,6 +42,35 @@ const percentOrNumber = z.preprocess((val) => {
 const coercedNumber = z.coerce.number();
 const coercedNumberNullable = z.union([z.coerce.number(), z.null()]);
 
+/**
+ * Coerce common truthy/falsy string forms to boolean.
+ * Accepts true/false, "yes"/"no", "true"/"false", "1"/"0" (case-insensitive).
+ * Real booleans pass through. Anything else falls back to the original value
+ * so Zod's boolean check reports a clear error for genuinely bad input.
+ */
+const coercedBoolean = z.preprocess((val) => {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'yes' || s === 'true' || s === '1') return true;
+    if (s === 'no' || s === 'false' || s === '0') return false;
+  }
+  return val;
+}, z.boolean());
+
+const coercedBooleanNullable = z.union([coercedBoolean, z.null()]);
+
+/**
+ * Coerce a string-or-number to a string (e.g. Facebook rating emitted as 4.8
+ * instead of "4.8"). Booleans/objects are left alone so Zod reports them.
+ */
+const coercedString = z.preprocess((val) => {
+  if (typeof val === 'number') return String(val);
+  return val;
+}, z.string());
+
+const coercedStringNullable = z.union([coercedString, z.null()]);
+
 // ---- Shared enums (kept in sync with the prompt's enum values) ----
 
 const identityStatusEnum = z.enum(['confirmed', 'ambiguous', 'mismatched']);
@@ -70,6 +99,19 @@ const napStatusEnum = z.enum([
 const tierEnum = z.enum(['tier_1', 'tier_2', 'tier_3']);
 const confidenceEnum = z.enum(['high', 'medium', 'low']);
 const dataStatusEnum = z.enum(['complete', 'partial', 'unavailable', 'unable_to_verify']);
+
+/**
+ * Normalize `data_status` synonyms agents commonly emit. "verified" and
+ * "confirmed" map to "complete"; unknown strings fall through to the enum
+ * check so genuine typos still surface as validation errors.
+ */
+const dataStatusCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'verified' || s === 'confirmed') return 'complete';
+  }
+  return val;
+}, dataStatusEnum);
 
 // ---- Nested object schemas ----
 
@@ -110,7 +152,7 @@ const platformSchema = z.object({
   observable_response_rate_percent: percentOrNumber.nullable(),
   oldest_observable_unanswered_review: z.string().nullable().optional(),
   newest_observable_unanswered_review: z.string().nullable().optional(),
-  data_status: dataStatusEnum.optional(),
+  data_status: dataStatusCoerced.optional(),
 }).passthrough();
 
 const googlePlatformSchema = platformSchema.extend({
@@ -128,7 +170,7 @@ const platformsSchema = z.object({
   yelp: platformSchema.nullable().optional(),
   facebook: z.object({
     profile_status: profileStatusEnum,
-    rating_or_recommendation: z.string().nullable().optional(),
+    rating_or_recommendation: coercedStringNullable.optional(),
     rating: coercedNumberNullable.optional(),
     total_reviews: coercedNumberNullable.optional(),
     reviews_with_observable_response: coercedNumberNullable.optional(),
@@ -138,7 +180,7 @@ const platformsSchema = z.object({
     observable_response_rate_percent: percentOrNumber.nullable().optional(),
     oldest_observable_unanswered_review: z.string().nullable().optional(),
     newest_observable_unanswered_review: z.string().nullable().optional(),
-    data_status: dataStatusEnum.optional(),
+    data_status: dataStatusCoerced.optional(),
   }).nullable().optional(),
 }).passthrough();
 
@@ -159,12 +201,12 @@ const websiteSchema = z.object({
   url: z.string().nullable().optional(),
   status: websiteStatusEnum,
   mobile_friendly: mobileFriendlyEnum.nullable().optional(),
-  https: z.boolean().nullable().optional(),
-  contact_information_visible: z.boolean().nullable().optional(),
-  click_to_call_available: z.boolean().nullable().optional(),
-  call_to_action_present: z.boolean().nullable().optional(),
-  service_information_present: z.boolean().nullable().optional(),
-  location_information_present: z.boolean().nullable().optional(),
+  https: coercedBooleanNullable.optional(),
+  contact_information_visible: coercedBooleanNullable.optional(),
+  click_to_call_available: coercedBooleanNullable.optional(),
+  call_to_action_present: coercedBooleanNullable.optional(),
+  service_information_present: coercedBooleanNullable.optional(),
+  location_information_present: coercedBooleanNullable.optional(),
   issues: z.array(z.string()).optional(),
   conversion_opportunities: z.array(z.string()).optional(),
 }).passthrough();
