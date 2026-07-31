@@ -1680,6 +1680,101 @@ router.get('/:id/revenue', async (req: any, res: Response) => {
   }
 });
 
+// ─── Outreach Openers ───────────────────────────────────────────────────
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
+// otherwise Express matches /openers as a campaign ID param and returns 404.
+// Dual execution path mirroring the Prompt Workspace:
+//   Path 1 (execute): deterministic archetype selection + LLM + quality gate
+//   Path 2 (import):  quality gate on externally-pasted opener text
+const outreachOpenerService = OutreachOpenerService.getInstance();
+
+// Zod schemas for opener endpoints
+const openerExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+});
+
+const openerImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  opener_text: z.string().min(1),
+});
+
+// List openers (filter: campaignId)
+router.get('/openers', async (req: any, res: Response) => {
+  try {
+    const openers = await outreachOpenerService.listOpeners(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: openers });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve archetype + extracted fields + prompt for a campaign (no AI call)
+// Used by the workspace UI to display the detected archetype + resolved prompt
+// before the user clicks Execute (Path 1) or copies the prompt for external use (Path 2).
+router.get('/openers/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute opener generation via AI
+router.post('/openers/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = openerExecuteSchema.parse(req.body);
+    const result = await outreachOpenerService.executeOpener({
+      campaignId: parsed.campaign_id,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated opener
+router.post('/openers/import', async (req: any, res: Response) => {
+  try {
+    const parsed = openerImportSchema.parse(req.body);
+    const result = await outreachOpenerService.importOpener({
+      campaignId: parsed.campaign_id,
+      openerText: parsed.opener_text,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single opener by ID
+router.get('/openers/:id', async (req: any, res: Response) => {
+  try {
+    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
+    if (!opener) {
+      return res.status(404).json({ success: false, error: 'Opener not found' });
+    }
+    res.json({ success: true, data: opener });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.get('/:id', async (req: any, res: Response) => {
   try {
     const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
@@ -1974,99 +2069,6 @@ router.get('/review-response/follow-ups-due', async (req: any, res: Response) =>
       to: weekOut,
     }, getCtx(req));
     res.json({ success: true, data: result });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// ─── Outreach Openers ───────────────────────────────────────────────────
-// Dual execution path mirroring the Prompt Workspace:
-//   Path 1 (execute): deterministic archetype selection + LLM + quality gate
-//   Path 2 (import):  quality gate on externally-pasted opener text
-const outreachOpenerService = OutreachOpenerService.getInstance();
-
-// Zod schemas for opener endpoints
-const openerExecuteSchema = z.object({
-  campaign_id: z.string().min(1),
-});
-
-const openerImportSchema = z.object({
-  campaign_id: z.string().min(1),
-  opener_text: z.string().min(1),
-});
-
-// List openers (filter: campaignId)
-router.get('/openers', async (req: any, res: Response) => {
-  try {
-    const openers = await outreachOpenerService.listOpeners(
-      req.query.campaignId as string | undefined,
-      getCtx(req),
-    );
-    res.json({ success: true, data: openers });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// Resolve archetype + extracted fields + prompt for a campaign (no AI call)
-// Used by the workspace UI to display the detected archetype + resolved prompt
-// before the user clicks Execute (Path 1) or copies the prompt for external use (Path 2).
-router.get('/openers/resolve', async (req: any, res: Response) => {
-  try {
-    const campaignId = req.query.campaignId as string;
-    if (!campaignId) {
-      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
-    }
-    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
-    res.json({ success: true, data: result });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// Path 1: Execute opener generation via AI
-router.post('/openers/execute', async (req: any, res: Response) => {
-  try {
-    const parsed = openerExecuteSchema.parse(req.body);
-    const result = await outreachOpenerService.executeOpener({
-      campaignId: parsed.campaign_id,
-      executedBy: req.user?.id,
-    }, getCtx(req));
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
-    }
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// Path 2: Import externally-generated opener
-router.post('/openers/import', async (req: any, res: Response) => {
-  try {
-    const parsed = openerImportSchema.parse(req.body);
-    const result = await outreachOpenerService.importOpener({
-      campaignId: parsed.campaign_id,
-      openerText: parsed.opener_text,
-      executedBy: req.user?.id,
-    }, getCtx(req));
-    res.status(201).json({ success: true, data: result });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
-    }
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// Get a single opener by ID
-router.get('/openers/:id', async (req: any, res: Response) => {
-  try {
-    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
-    if (!opener) {
-      return res.status(404).json({ success: false, error: 'Opener not found' });
-    }
-    res.json({ success: true, data: opener });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
