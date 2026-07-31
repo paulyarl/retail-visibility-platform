@@ -164,7 +164,7 @@ const linkTenantSchema = z.object({
 
 // Outreach log schemas (Sprint 2)
 const contactChannelEnum = z.enum(['phone', 'email', 'website', 'social', 'in_person', 'other']);
-const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other']);
+const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other', 'auto_follow_up_scheduled']);
 
 const outreachLogSchema = z.object({
   contact_channel: contactChannelEnum,

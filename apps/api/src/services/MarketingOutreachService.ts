@@ -24,7 +24,7 @@ import { NotFoundError } from '../middleware/errorHandler';
 import { generateOutreachLogId } from '../lib/id-generator';
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
-export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other';
+export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled';
 
 export interface LogContactInput {
   campaignId: string;
