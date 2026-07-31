@@ -6160,8 +6160,12 @@ model mkt_campaigns_list {
   mkt_deliverable_preview_tokens                            mkt_deliverable_preview_tokens[]
   mkt_deliverables_list                                     mkt_deliverables_list[]
   mkt_files_list                                            mkt_files_list[]
+  mkt_outreach_closers_list                                 mkt_outreach_closers_list[]
+  mkt_outreach_contacts_list                                mkt_outreach_contacts_list[]
+  mkt_outreach_headers_list                                 mkt_outreach_headers_list[]
   mkt_outreach_log                                          mkt_outreach_log[]
   mkt_outreach_openers_list                                 mkt_outreach_openers_list[]
+  mkt_outreach_pitches_list                                 mkt_outreach_pitches_list[]
   mkt_prompt_executions_list                                mkt_prompt_executions_list[]
   mkt_review_response_pipeline                              mkt_review_response_pipeline[]
   mkt_stage_history_list                                    mkt_stage_history_list[]
@@ -6516,27 +6520,122 @@ model mkt_review_response_log {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_outreach_openers_list {
-  id                  String             @id @db.VarChar(255)
-  campaign_id         String             @db.VarChar(255)
-  archetype           String             @db.VarChar(10)
-  opener_text         String?
-  quality_gate_passed Boolean            @default(false)
-  quality_gate_issues Json?
-  source              String             @default("ai") @db.VarChar(20)
-  ai_provider         String?            @db.VarChar(50)
-  ai_model            String?            @db.VarChar(100)
-  tokens_used         Int                @default(0)
-  cost_cents          Int                @default(0)
-  extracted_fields    Json?
-  executed_by         String?            @db.VarChar(255)
-  executed_at         DateTime           @default(now()) @db.Timestamptz(6)
-  created_at          DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at          DateTime           @default(now()) @db.Timestamptz(6)
-  mkt_campaigns_list  mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  archetype                 String                      @db.VarChar(10)
+  opener_text               String?
+  quality_gate_passed       Boolean                     @default(false)
+  quality_gate_issues       Json?
+  source                    String                      @default("ai") @db.VarChar(20)
+  ai_provider               String?                     @db.VarChar(50)
+  ai_model                  String?                     @db.VarChar(100)
+  tokens_used               Int                         @default(0)
+  cost_cents                Int                         @default(0)
+  extracted_fields          Json?
+  executed_by               String?                     @db.VarChar(255)
+  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_opener")
 
   @@index([archetype], map: "idx_mkt_outreach_openers_archetype")
   @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_openers_campaign")
   @@index([source], map: "idx_mkt_outreach_openers_source")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_headers_list {
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  header_text               String?
+  quality_gate_passed       Boolean                     @default(false)
+  quality_gate_issues       Json?
+  source                    String                      @default("ai") @db.VarChar(20)
+  ai_provider               String?                     @db.VarChar(50)
+  ai_model                  String?                     @db.VarChar(100)
+  tokens_used               Int                         @default(0)
+  cost_cents                Int                         @default(0)
+  extracted_fields          Json?
+  executed_by               String?                     @db.VarChar(255)
+  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_headers_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_header")
+
+  @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_headers_campaign")
+  @@index([source], map: "idx_mkt_outreach_headers_source")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_closers_list {
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  closer_text               String?
+  quality_gate_passed       Boolean                     @default(false)
+  quality_gate_issues       Json?
+  source                    String                      @default("ai") @db.VarChar(20)
+  ai_provider               String?                     @db.VarChar(50)
+  ai_model                  String?                     @db.VarChar(100)
+  tokens_used               Int                         @default(0)
+  cost_cents                Int                         @default(0)
+  extracted_fields          Json?
+  executed_by               String?                     @db.VarChar(255)
+  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_closers_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_closer")
+
+  @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_closers_campaign")
+  @@index([source], map: "idx_mkt_outreach_closers_source")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_contacts_list {
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  contact_text              String?
+  label                     String?                     @db.VarChar(100)
+  created_by                String?                     @db.VarChar(255)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_contacts_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_contact")
+
+  @@index([campaign_id], map: "idx_mkt_outreach_contacts_campaign")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// Cascade rules (authoritative source = migration 145_marketing_ops_outreach_pitch_construction.sql):
+/// campaign_id, opener_id → ON DELETE CASCADE
+/// header_id, closer_id, contact_id → ON DELETE SET NULL
+/// Note: prisma db pull may drop the onDelete directives below; the DB constraints
+/// persist regardless. Re-add onDelete: SetNull on the 3 nullable FKs if regenerating
+/// migrations from this schema (we don't — raw SQL migrations are the source of truth).
+model mkt_outreach_pitches_list {
+  id                         String                      @id @db.VarChar(255)
+  campaign_id                String                      @db.VarChar(255)
+  opener_id                  String                      @db.VarChar(255)
+  header_id                  String?                     @db.VarChar(255)
+  closer_id                  String?                     @db.VarChar(255)
+  contact_id                 String?                     @db.VarChar(255)
+  review_pairs               Json?
+  assembled_text             String?
+  created_by                 String?                     @db.VarChar(255)
+  created_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list         mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_pitches_campaign")
+  mkt_outreach_closers_list  mkt_outreach_closers_list?  @relation("mkt_outreach_pitches_closer", fields: [closer_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_pitches_closer")
+  mkt_outreach_contacts_list mkt_outreach_contacts_list? @relation("mkt_outreach_pitches_contact", fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_pitches_contact")
+  mkt_outreach_headers_list  mkt_outreach_headers_list?  @relation("mkt_outreach_pitches_header", fields: [header_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_pitches_header")
+  mkt_outreach_openers_list  mkt_outreach_openers_list   @relation("mkt_outreach_pitches_opener", fields: [opener_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_pitches_opener")
+
+  @@index([campaign_id, created_at(sort: Desc)], map: "idx_mkt_outreach_pitches_campaign")
+  @@index([opener_id], map: "idx_mkt_outreach_pitches_opener")
+  @@index([header_id], map: "idx_mkt_outreach_pitches_header")
+  @@index([closer_id], map: "idx_mkt_outreach_pitches_closer")
 }
 
 enum action {

@@ -1783,3 +1783,39 @@ export function generateOutreachOpenerId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `mop-${nanoid()}`;
 }
+
+/**
+ * Generate outreach header (subject line) variant ID
+ * Format: moh-{nanoid} (12 chars)
+ */
+export function generateOutreachHeaderId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `moh-${nanoid()}`;
+}
+
+/**
+ * Generate outreach closer variant ID
+ * Format: moc-{nanoid} (12 chars)
+ */
+export function generateOutreachCloserId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `moc-${nanoid()}`;
+}
+
+/**
+ * Generate outreach contact (optional footer) variant ID
+ * Format: mocc-{nanoid} (13 chars) — distinct prefix from closers (moc-)
+ */
+export function generateOutreachContactId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mocc-${nanoid()}`;
+}
+
+/**
+ * Generate outreach pitch (assembled full pitch) record ID
+ * Format: mopch-{nanoid} (13 chars) — distinct prefix from openers (mop-)
+ */
+export function generateOutreachPitchId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mopch-${nanoid()}`;
+}
