@@ -125,4 +125,55 @@ describe('Route Registry Coverage', () => {
     expect(mktEntry!.authLevel).toBe('admin');
     expect(mktEntry!.router, 'Marketing Ops route has no router').toBeDefined();
   });
+
+  // ─── Route-ordering guard ───────────────────────────────────────────
+  // Prevents the bug class where a `:param` catch-all (e.g. /:id, /openers/:id)
+  // is declared before a static sub-path (e.g. /openers/headers) in the same
+  // Express Router, causing Express to match /openers/headers as :id='headers'.
+  // See: end-of-phase-sprint-checklist.md "Route order and catch-all ordering".
+  test('no param route shadows a static sub-path in the same router', () => {
+    for (const entry of routeRegistry) {
+      if (!entry.router?.stack || !Array.isArray(entry.router.stack)) continue;
+
+      const stack = entry.router.stack as any[];
+      // Collect (index, path) pairs for route handlers (skip middleware).
+      const routes: { index: number; path: string }[] = [];
+      for (let i = 0; i < stack.length; i++) {
+        const layer = stack[i];
+        if (!layer.route) continue; // skip middleware (no .route)
+        const path = layer.route.path;
+        if (typeof path !== 'string') continue;
+        routes.push({ index: i, path });
+      }
+
+      // For each param route (contains :param), check that no static route
+      // under the same prefix appears after it.
+      for (const paramRoute of routes) {
+        if (!paramRoute.path.includes(':')) continue;
+
+        // Derive the static prefix before the :param.
+        // e.g. /openers/:id → prefix /openers/
+        const paramIdx = paramRoute.path.indexOf(':');
+        const prefix = paramRoute.path.slice(0, paramIdx);
+
+        for (const staticRoute of routes) {
+          if (staticRoute.index <= paramRoute.index) continue;
+          if (!staticRoute.path.startsWith(prefix)) continue;
+          if (staticRoute.path.includes(':')) continue; // skip other param routes
+
+          // staticRoute is a static path under the same prefix, declared AFTER
+          // the param route → Express will match it as the param value. Bug.
+          expect(
+            staticRoute.index,
+            `Route-ordering bug in ${entry.path}: param route "${paramRoute.path}" ` +
+              `(stack #${paramRoute.index}) is declared before static sub-path ` +
+              `"${staticRoute.path}" (stack #${staticRoute.index}). ` +
+              `Express will match "${staticRoute.path}" as :${paramRoute.path.slice(paramIdx)}=` +
+              `"${staticRoute.path.slice(prefix.length)}". ` +
+              `Move "${staticRoute.path}" before "${paramRoute.path}".`,
+          ).toBeLessThan(paramRoute.index);
+        }
+      }
+    }
+  });
 });

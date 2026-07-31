@@ -46,6 +46,7 @@ const {
   mockMktFiles,
   mockMktBrandingConfig,
   mockMktAudits,
+  mockMktCategoryTonePresets,
 } = vi.hoisted(() => ({
   mockPrismaProductSuppliers: {
     findMany: vi.fn(),
@@ -99,7 +100,7 @@ const {
   mockSetCouponTargets: vi.fn(),
   mockChargePaymentMethod: vi.fn(),
   mockInvalidateEffectiveCapabilities: vi.fn(),
-  mockMktCampaigns: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
+  mockMktCampaigns: { findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn() },
   mockMktStageHistory: { create: vi.fn() },
   mockMktPreviewTokens: { findMany: vi.fn() },
   mockMktPromptTemplates: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() },
@@ -110,7 +111,8 @@ const {
   mockMktScorecards: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
   mockMktFiles: { create: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
   mockMktBrandingConfig: { create: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-  mockMktAudits: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  mockMktAudits: { create: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  mockMktCategoryTonePresets: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
 }));
 
 // ── Mock prisma ────────────────────────────────────────────────────────
@@ -138,6 +140,7 @@ vi.mock('../prisma', () => ({
     mkt_files_list: mockMktFiles,
     mkt_branding_config: mockMktBrandingConfig,
     mkt_audits_list: mockMktAudits,
+    mkt_category_tone_presets_list: mockMktCategoryTonePresets,
   },
 }));
 

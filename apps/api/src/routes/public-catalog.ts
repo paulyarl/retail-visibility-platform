@@ -106,6 +106,61 @@ router.get('/products/featured', async (req, res) => {
 });
 
 /**
+ * GET /api/public/products/search/global
+ * Global product search across all tenants
+ *
+ * IMPORTANT: Must be declared before /products/:id to avoid Express matching
+ * "search/global" as :id="search/global". See route-coverage.test.ts guard.
+ */
+router.get('/products/search/global', async (req, res) => {
+  try {
+    const query = ProductQuerySchema.parse(req.query);
+
+    if (!query.search) {
+      return res.status(400).json({
+        success: false,
+        error: 'Search query is required'
+      });
+    }
+
+    // console.log(`[Public API] Global product search: "${query.search}"`);
+
+    // Use ProductService for global search
+    const { ProductService } = await import('../services/ProductService');
+    const productService = ProductService.getInstance();
+
+    const result = await productService.searchProducts({
+      limit: query.limit,
+      offset: query.offset,
+      sort: query.sort,
+      order: query.order,
+      search: query.search,
+      category: (query as any).category,
+      minPrice: (query as any).minPrice,
+      maxPrice: (query as any).maxPrice
+    });
+
+    res.setHeader('Cache-Control', 'public, max-age=180'); // 3 min cache for search
+    res.setHeader('X-Service-Source', 'ProductService');
+
+    res.json({
+      success: true,
+      ...result,
+      metadata: {
+        searchQuery: query.search,
+        cacheTTL: 3 * 60 * 1000 // 3 minutes
+      }
+    });
+  } catch (error) {
+    logger.error('[PUBLIC API] Global product search error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to search products'
+    });
+  }
+});
+
+/**
  * GET /api/public/products/:id
  * Get single product by ID or product_slug with full details - Universal Identifier Pattern
  * Supports both UUID and product_slug lookup for cross-tenant awareness
@@ -159,58 +214,6 @@ router.get('/products/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product'
-    });
-  }
-});
-
-/**
- * GET /api/public/products/search/global
- * Global product search across all tenants
- */
-router.get('/products/search/global', async (req, res) => {
-  try {
-    const query = ProductQuerySchema.parse(req.query);
-
-    if (!query.search) {
-      return res.status(400).json({
-        success: false,
-        error: 'Search query is required'
-      });
-    }
-
-    // console.log(`[Public API] Global product search: "${query.search}"`);
-
-    // Use ProductService for global search
-    const { ProductService } = await import('../services/ProductService');
-    const productService = ProductService.getInstance();
-
-    const result = await productService.searchProducts({
-      limit: query.limit,
-      offset: query.offset,
-      sort: query.sort,
-      order: query.order,
-      search: query.search,
-      category: (query as any).category,
-      minPrice: (query as any).minPrice,
-      maxPrice: (query as any).maxPrice
-    });
-
-    res.setHeader('Cache-Control', 'public, max-age=180'); // 3 min cache for search
-    res.setHeader('X-Service-Source', 'ProductService');
-
-    res.json({
-      success: true,
-      ...result,
-      metadata: {
-        searchQuery: query.search,
-        cacheTTL: 3 * 60 * 1000 // 3 minutes
-      }
-    });
-  } catch (error) {
-    logger.error('[PUBLIC API] Global product search error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to search products'
     });
   }
 });
