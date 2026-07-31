@@ -11,6 +11,7 @@ import marketingOpsService, {
   OpenerArchetype,
 } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
+import PitchConstructionPanel from './PitchConstructionPanel';
 
 const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A1: 'Review Response Gap',
@@ -436,6 +437,13 @@ export default function OpenerWorkspaceClient() {
           )}
         </div>
       </div>
+
+      {/* Pitch Construction — collapsible panel below the opener workspace.
+          Only renders when a campaign is selected. Lets the admin assemble
+          a full outreach pitch from opener + header + 3-slot preview + closer + contact. */}
+      {selectedCampaignId && (
+        <PitchConstructionPanel campaignId={selectedCampaignId} openers={openers} />
+      )}
     </MarketingOpsPageShell>
   );
 }
