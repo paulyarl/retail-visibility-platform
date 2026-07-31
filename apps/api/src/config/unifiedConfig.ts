@@ -163,6 +163,15 @@ class UnifiedConfig {
     const v = (this.env.MARKETING_OPS_HOT_PROSPECT_SKIP_NATIONAL_CHAINS || '').toLowerCase();
     return v !== 'false' && v !== '0'; // default true
   }
+  // Sprint 4 additions — seek audit sync
+  get marketingOpsHotProspectSkipMismatchedIdentity(): boolean {
+    const v = (this.env.MARKETING_OPS_HOT_PROSPECT_SKIP_MISMATCHED_IDENTITY || '').toLowerCase();
+    return v !== 'false' && v !== '0'; // default true
+  }
+  get marketingOpsHotProspectAutoSyncOnImport(): boolean {
+    const v = (this.env.MARKETING_OPS_HOT_PROSPECT_AUTO_SYNC_ON_IMPORT || '').toLowerCase();
+    return v !== 'false' && v !== '0'; // default true
+  }
 
   // ─── Sentry ───────────────────────────────────────────────────────────
 

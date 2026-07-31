@@ -36,6 +36,46 @@ Return your response as JSON matching this schema:
 }
 
 Return ONLY the JSON object, no markdown fences, no commentary.`,
+  regional_city_opportunity: `
+
+Return your response as JSON matching the Regional City Opportunity Discovery schema.
+Top-level keys: audit_metadata, summary, regional_metrics, city_rankings,
+top_city_opportunities, regional_category_opportunities, data_quality.
+
+Each "city_rankings" element is a bare JSON object { ... } with keys including:
+rank, city, state, county_names, place_type, distance_from_reference_miles,
+direction_from_reference, inside_requested_radius, representative_zip_codes,
+zip_code_count, zip_code_count_complete, population, commercial_context,
+review_benchmarks, google_profile_metrics, website_metrics, nap_metrics,
+common_opportunity_themes, representative_categories, digital_opportunity_score,
+city_priority_score, recommended_next_action, recommended_next_action_rationale,
+data_quality, sources.
+
+CRITICAL JSON RULES:
+- Every element of a JSON array MUST be a bare JSON object "{ ... }" separated by
+  a comma. NEVER prefix array elements with a label or identifier (e.g.
+  "city_2: { ... }" or "decline_3: { ... }" are INVALID).
+- Do not wrap the JSON in Markdown code fences.
+- Do not include any text before or after the JSON object.
+
+Return ONLY the JSON object, no markdown fences, no commentary.`,
+  business_analysis: `
+
+Return your response as JSON matching the Business Analysis schema.
+Top-level keys: audit_metadata, summary, platforms, combined_review_metrics,
+website, nap_consistency, unanswered_negative_review_examples,
+negative_review_themes, digital_opportunity_score, high_attention,
+high_attention_reasons, recommended_tier, tier_rationale,
+estimated_monthly_service_fee, recommended_services, data_quality, sources.
+
+CRITICAL JSON RULES:
+- Every element of a JSON array MUST be a bare JSON object "{ ... }" separated by
+  a comma. NEVER prefix array elements with a label or identifier (e.g.
+  "source_2: { ... }" is INVALID).
+- Do not wrap the JSON in Markdown code fences.
+- Do not include any text before or after the JSON object.
+
+Return ONLY the JSON object, no markdown fences, no commentary.`,
 };
 
 function getOutputSchemaSuffix(template: PromptTemplate | null): string {

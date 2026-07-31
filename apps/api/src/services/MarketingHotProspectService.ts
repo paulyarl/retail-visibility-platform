@@ -123,6 +123,18 @@ export interface HotProspectEntry {
   last_contacted_at: string | null;
 }
 
+export interface AuditSyncReport {
+  campaignId: string;
+  auditId: string;
+  fieldsSynced: string[];
+  contactsSynced: string[];
+  hotProspectMarked: boolean;
+  hotProspectReason: string | null;
+  identityStatus: string | null;
+  skipped: boolean;
+  skipReason?: string;
+}
+
 // ─── Service ────────────────────────────────────────────────────────────
 
 export class MarketingHotProspectService extends BaseService {
@@ -465,6 +477,134 @@ export class MarketingHotProspectService extends BaseService {
       return parts.join(', ');
     }
     return null;
+  }
+
+  /**
+   * Sprint 4: Sync a single already-created `business_analysis` (seek) audit
+   * onto its campaign. Reuses the same data_quality-gated field sync,
+   * null-only contact sync, and hotness derivation as `syncFromExecution`.
+   *
+   * Checks `audit_data.audit_metadata.identity_status` — skips sync entirely
+   * when `mismatched` and `skipMismatchedIdentity` config is true. For
+   * `ambiguous` identity, syncs normally but includes "identity ambiguous"
+   * in the hot_prospect_reason.
+   */
+  async syncFromAudit(auditId: string, ctx?: RequestCtx): Promise<AuditSyncReport> {
+    const report: AuditSyncReport = {
+      campaignId: '',
+      auditId,
+      fieldsSynced: [],
+      contactsSynced: [],
+      hotProspectMarked: false,
+      hotProspectReason: null,
+      identityStatus: null,
+      skipped: false,
+    };
+
+    try {
+      const audit = await this.prisma.mkt_audits_list.findUnique({
+        where: { id: auditId },
+        include: { mkt_campaigns_list: true },
+      });
+      if (!audit) throw new NotFoundError('Audit not found');
+      if (audit.platform !== 'business_analysis') {
+        throw new Error(`Audit ${auditId} is not a business_analysis audit (platform=${audit.platform})`);
+      }
+
+      const campaign = audit.mkt_campaigns_list;
+      if (!campaign) throw new NotFoundError('Campaign not found for audit');
+
+      report.campaignId = campaign.id;
+
+      const data = (audit.audit_data ?? {}) as any;
+      const identityStatus = data.audit_metadata?.identity_status ?? null;
+      report.identityStatus = identityStatus;
+
+      // Identity mismatch → skip sync entirely
+      if (
+        identityStatus === 'mismatched'
+        && unifiedConfig.marketingOpsHotProspectSkipMismatchedIdentity
+      ) {
+        report.skipped = true;
+        report.skipReason = 'identity_status is mismatched — audit appears to be about a different business';
+        logger.info('syncFromAudit skipped: mismatched identity', ctx, { auditId, campaignId: campaign.id });
+        return report;
+      }
+
+      // Build a BusinessJson-shaped object from the seek audit so we can reuse
+      // the same private helpers as syncFromExecution. The seek schema is a
+      // superset of the City Pain Scan per-business shape for the shared fields.
+      const business: BusinessJson = {
+        business_name: data.audit_metadata?.matched_business?.business_name
+          ?? data.audit_metadata?.requested_business?.business_name,
+        category: data.audit_metadata?.matched_business?.category
+          ?? data.audit_metadata?.requested_business?.category,
+        business_phone: data.audit_metadata?.matched_business?.phone ?? null,
+        platforms: data.platforms,
+        combined_review_metrics: data.combined_review_metrics,
+        website: data.website,
+        nap_consistency: data.nap_consistency,
+        digital_opportunity_score: data.digital_opportunity_score,
+        high_attention: data.high_attention,
+        high_attention_reasons: data.high_attention_reasons,
+        recommended_tier: data.recommended_tier,
+        estimated_monthly_service_fee: data.estimated_monthly_service_fee,
+        data_quality: data.data_quality,
+        negative_review_themes: data.negative_review_themes,
+        opportunities: data.opportunities,
+      };
+
+      // Track which fields would be synced by inspecting the data object
+      const beforeKeys = new Set(Object.keys((campaign as any) ?? {}));
+      await this.syncCampaignFields(campaign, business, ctx);
+      const afterCampaign = await this.prisma.mkt_campaigns_list.findUnique({ where: { id: campaign.id } });
+      if (afterCampaign) {
+        for (const k of ['pain_score', 'estimated_tier', 'estimated_fee_cents', 'gbp_claimed', 'has_website', 'nap_consistent', 'unaddressed_reviews']) {
+          if ((afterCampaign as any)[k] !== (campaign as any)[k] && (afterCampaign as any)[k] != null) {
+            report.fieldsSynced.push(k);
+          }
+        }
+      }
+      void beforeKeys;
+
+      // Sync contacts (null-only)
+      const beforePhone = (campaign as any).phone;
+      const beforeWebsite = (campaign as any).website_url;
+      await this.syncContactFields(campaign, business, ctx);
+      const afterContacts = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaign.id },
+        select: { phone: true, website_url: true },
+      });
+      if (afterContacts && afterContacts.phone && !beforePhone) report.contactsSynced.push('phone');
+      if (afterContacts && afterContacts.website_url && !beforeWebsite) report.contactsSynced.push('website_url');
+
+      // Derive hotness (seek has no top_opportunities — pass empty collections)
+      const threshold = unifiedConfig.marketingOpsHotProspectThreshold;
+      const hotReason = this.deriveHotness(business, new Set(), new Map(), threshold);
+      if (hotReason) {
+        // Append identity ambiguity note if applicable
+        const reason = identityStatus === 'ambiguous'
+          ? `seek audit (identity ambiguous): ${hotReason}`
+          : `seek audit: ${hotReason}`;
+        await this.prisma.mkt_campaigns_list.update({
+          where: { id: campaign.id },
+          data: {
+            is_hot_prospect: true,
+            hot_prospect_reason: reason,
+            hot_prospect_set_at: new Date(),
+            hot_prospect_deprioritized: false,
+          },
+        });
+        report.hotProspectMarked = true;
+        report.hotProspectReason = reason;
+      }
+
+      logger.info('syncFromAudit complete', ctx, report);
+      return report;
+    } catch (error) {
+      logger.error('syncFromAudit failed', ctx, { error: (error as Error).message, auditId });
+      throw this.handleError(error, ctx);
+    }
   }
 
   // ─── Operator override + lifecycle ───────────────────────────────────

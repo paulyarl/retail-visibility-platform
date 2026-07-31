@@ -531,4 +531,18 @@ schema with these top-level keys:
   }
 }
 
+CRITICAL JSON RULES:
+- Every element of a JSON array (e.g. "city_rankings", "top_city_opportunities",
+  "regional_category_opportunities", "common_opportunity_themes",
+  "representative_categories", "sources") MUST be a bare JSON object "{ ... }"
+  or bare value, separated from the previous element by a comma.
+- NEVER prefix an array element with a label, key name, identifier, or comment.
+  The following are INVALID and will be rejected:
+      "city_rankings": [ { "rank": 1, ... }, decline_2: { "rank": 2, ... } ]
+      "city_rankings": [ { "rank": 1, ... }, city_3: { "rank": 3, ... } ]
+  The correct form is:
+      "city_rankings": [ { "rank": 1, ... }, { "rank": 2, ... }, { "rank": 3, ... } ]
+- Do not wrap the JSON in Markdown code fences.
+- Do not include any text before or after the JSON object.
+
 Return ONLY the JSON object, no markdown fences, no commentary.`;

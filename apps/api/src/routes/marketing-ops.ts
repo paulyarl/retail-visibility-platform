@@ -710,6 +710,16 @@ router.post('/:id/clear-deprioritized', async (req: any, res: Response) => {
   }
 });
 
+// Sprint 4: manually sync a business_analysis audit onto its campaign
+router.post('/:id/audits/:auditId/sync', async (req: any, res: Response) => {
+  try {
+    const report = await hotProspectService.syncFromAudit(req.params.auditId, getCtx(req));
+    res.json({ success: true, data: report });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Manual campaign→tenant link (sets last_touch_source='manual', fires conversion notification)
 router.post('/:id/link-tenant', async (req: any, res: Response) => {
   try {

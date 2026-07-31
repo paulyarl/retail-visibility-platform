@@ -14,6 +14,7 @@
 import { MarketingPromptService } from '../services/MarketingPromptService';
 import { logger } from '../logger';
 import { MARKET_ANALYSIS_SCHEMA_NAME } from '../validators/market-analysis.schema';
+import { BUSINESS_ANALYSIS_SCHEMA_NAME } from '../validators/business-analysis.schema';
 
 const SEED_TEMPLATES = [
   {
@@ -37,6 +38,10 @@ Provide:
 
 Format as structured JSON.`,
     variables: ['business_name', 'city', 'category'],
+    outputSchema: {
+      name: BUSINESS_ANALYSIS_SCHEMA_NAME,
+      description: 'Single-business deep-dive audit with identity verification, per-platform review metrics, website assessment, NAP consistency, digital opportunity score, high-attention flag, recommended tier + fee, data quality block, and structured sources.',
+    },
     isDefault: true,
   },
   {

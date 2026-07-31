@@ -219,6 +219,19 @@ export interface HotProspectsResult {
   prospects: HotProspectEntry[];
 }
 
+// ─── Business analysis audit sync (Sprint 4) ────────────────────────────
+export interface AuditSyncReport {
+  campaignId: string;
+  auditId: string;
+  fieldsSynced: string[];
+  contactsSynced: string[];
+  hotProspectMarked: boolean;
+  hotProspectReason: string | null;
+  identityStatus: string | null;
+  skipped: boolean;
+  skipReason?: string;
+}
+
 export interface LogContactInput {
   contact_channel: ContactChannel;
   contact_date: string;
@@ -1008,6 +1021,21 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list hot prospects');
     }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Business analysis audit sync (Sprint 4) ────────────────────────────
+  async syncAuditToCampaign(campaignId: string, auditId: string): Promise<AuditSyncReport> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/audits/${auditId}/sync`,
+      { method: 'POST' },
+      `mkt-ops-audit-sync-${auditId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to sync audit to campaign');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;
   }
 

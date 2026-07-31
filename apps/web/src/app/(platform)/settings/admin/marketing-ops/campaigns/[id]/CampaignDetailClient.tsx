@@ -8,6 +8,7 @@ import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge'
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
+import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
 import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection';
 import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard';
@@ -624,6 +625,8 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     {(campaign.audits ?? []).map((audit: Audit) =>
                       audit.platform === 'category_analysis' && audit.audit_data ? (
                         <CategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : audit.platform === 'business_analysis' && audit.audit_data ? (
+                        <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} />
                       ) : audit.platform === 'city_analysis' && audit.audit_data ? (
                         <CityAnalysisAuditCard key={audit.id} audit={audit} />
                       ) : audit.platform === 'city_analysis_summary' ? (

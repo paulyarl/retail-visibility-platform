@@ -15,6 +15,7 @@ import { generatePromptTemplateId, generatePromptExecutionId, generateFilterFlag
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
 import { assertScopeCompatible, ScopeMismatchError } from './scope-utils';
 import MarketingCampaignService from './MarketingCampaignService';
+import { unifiedConfig } from '../config/unifiedConfig';
 
 export type PromptType = 'seek' | 'fulfill' | 'filter' | 'retainer' | 'category_analysis' | 'city_analysis';
 
@@ -38,6 +39,35 @@ export interface PromptExecutionInput {
   templateId?: string;
   variablesUsed?: any;
   executedBy?: string;
+}
+
+/**
+ * Strip common LLM JSON-generation artifacts that produce invalid JSON but are
+ * semantically recoverable. Applied before JSON.parse in the external-import
+ * flow as a defensive fallback when prompt guardrails don't fully hold.
+ *
+ * Currently handles:
+ *   - Labeled array elements: e.g. `decline_3: { "rank": 3, ... }` inside a
+ *     JSON array. LLMs sometimes emit JS-object-key syntax for subsequent
+ *     array elements when the schema example only shows one element. The label
+ *     (identifier followed by a colon) is stripped, leaving a bare `{ ... }`.
+ *
+ * Does NOT mutate the original string; returns a cleaned copy. If cleaning
+ * fails or the input is unchanged, the original is returned so JSON.parse can
+ * surface the original parse error.
+ */
+function stripLlmJsonArtifacts(raw: string): string {
+  try {
+    // Strip a leading identifier label immediately preceding a `{` that itself
+    // follows a `,` or `[` (i.e. an array context). Matches patterns like:
+    //   `, decline_3: {`  →  `, {`
+    //   `[ city_1: {`     →  `[ {`
+    // The label is a bare word (letters, digits, underscore) followed by `:`.
+    // We require whitespace or nothing between the comma/bracket and the label.
+    return raw.replace(/([\[,])\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*\{/g, '$1 {');
+  } catch {
+    return raw;
+  }
 }
 
 export class MarketingPromptService extends BaseService {
@@ -318,7 +348,7 @@ export class MarketingPromptService extends BaseService {
       // 3. Parse + validate JSON against the template's output_schema
       let parsedJson: any;
       try {
-        parsedJson = JSON.parse(input.rawOutput);
+        parsedJson = JSON.parse(stripLlmJsonArtifacts(input.rawOutput));
       } catch (e) {
         throw new Error('raw_output is not valid JSON');
       }
@@ -393,6 +423,26 @@ export class MarketingPromptService extends BaseService {
         schemaName,
         auditCreated: !!result.audit,
       });
+
+      // Sprint 4: best-effort auto-sync of business_analysis audits onto
+      // the campaign (data_quality-gated field sync + hotness derivation).
+      // Catches + logs errors so a sync failure never fails the import.
+      if (result.audit && resolved.auditPlatform === 'business_analysis' && unifiedConfig.marketingOpsHotProspectAutoSyncOnImport) {
+        try {
+          const { MarketingHotProspectService } = await import('./MarketingHotProspectService.js');
+          await MarketingHotProspectService.getInstance().syncFromAudit(result.audit.id, ctx);
+          logger.info('Auto-sync of business_analysis audit complete', ctx, {
+            auditId: result.audit.id,
+            campaignId: input.campaignId,
+          });
+        } catch (syncErr) {
+          logger.error('Auto-sync of business_analysis audit failed (best-effort)', ctx, {
+            error: (syncErr as Error).message,
+            auditId: result.audit.id,
+            campaignId: input.campaignId,
+          });
+        }
+      }
 
       return result;
     } catch (error) {
