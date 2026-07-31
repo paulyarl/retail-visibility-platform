@@ -1819,3 +1819,30 @@ export function generateOutreachPitchId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `mopch-${nanoid()}`;
 }
+
+/**
+ * Generate owner voice profile ID
+ * Format: movp-{nanoid} (12 chars)
+ */
+export function generateOwnerVoiceProfileId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `movp-${nanoid()}`;
+}
+
+/**
+ * Generate deliverable review slot ID
+ * Format: mdrs-{nanoid} (12 chars)
+ */
+export function generateDeliverableReviewSlotId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdrs-${nanoid()}`;
+}
+
+/**
+ * Generate deliverable section ID
+ * Format: mds-{nanoid} (11 chars)
+ */
+export function generateDeliverableSectionId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mds-${nanoid()}`;
+}

@@ -39,12 +39,52 @@ export function buildArchetypePrompt(archetype: ArchetypeCode, extractedFieldsJs
   }
 }
 
+/**
+ * Shared persona + purpose preamble prepended to every archetype prompt.
+ * Establishes WHO is writing (a visibility auditor who reviewed the
+ * business's public review footprint) and WHY (the business owner has left
+ * customer reviews unanswered — the outreach exists to surface that gap
+ * and offer a concrete fix, not to sell a product).
+ */
+const PERSONA_PREAMBLE = `You are a local-business visibility auditor. You pulled this business's
+public review footprint across Google, Yelp, and Facebook, and found that
+customer reviews are going unanswered — including negative ones where the
+owner's response would have turned the situation around.
+
+You're writing a cold first-touch outreach opener to the small business
+owner. The goal: prove you actually looked at their reviews, surface the
+specific gap (unanswered reviews, a cluster of negatives on the same theme,
+listing inconsistencies, or a missing CTA), and offer a concrete deliverable
+that fixes it — not a sales pitch. The tone is quiet, specific, and useful.
+You are not a vendor. You are someone who did the homework for them.`;
+
+/**
+ * Shared NAP context note appended to every archetype prompt. Tells the AI
+ * that city/state/phone/website_url are available for business identification
+ * and cross-referencing public data, but must NOT be dumped into the opener
+ * body verbatim — they're for the AI's internal reference only.
+ */
+const NAP_CONTEXT_NOTE = `
+Business identification context (for your internal reference only — do NOT
+dump these into the opener body verbatim):
+- city, state, phone, website_url are provided in the inputs when available.
+- Use them to identify the business and match it against publicly available
+  information (Google Business Profile, Yelp listings, etc.) so you can write
+  a hyper-specific opener that proves you've done your research.
+- The opener should read as if you already know this business — but never
+  recite the raw NAP data. Weave location context in naturally only if it
+  strengthens the hook (e.g., "the [city] location" when disambiguating a
+  multi-location chain).
+- If phone or website_url is null, the business may not have a public
+  listing or site — don't fabricate one.`;
+
 // ─── A1: Review Response Gap ────────────────────────────────────────────
 
-const A1_PROMPT = `You are writing a cold first-touch outreach opener to a small business owner.
+const A1_PROMPT = `${PERSONA_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
+${NAP_CONTEXT_NOTE}
 
 Task: Write the opener in this exact structure, ~80 words max body:
 
@@ -79,10 +119,11 @@ Output the opener only — no preamble, no explanation, no JSON.`;
 
 // ─── A2: Negative Review Recovery ───────────────────────────────────────
 
-const A2_PROMPT = `You are writing a cold first-touch outreach opener to a small business owner.
+const A2_PROMPT = `${PERSONA_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
+${NAP_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
@@ -122,10 +163,11 @@ Output the opener only.`;
 
 // ─── A3: Listing Inconsistency ──────────────────────────────────────────
 
-const A3_PROMPT = `You are writing a cold first-touch outreach opener to a small business owner.
+const A3_PROMPT = `${PERSONA_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
+${NAP_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 
@@ -152,10 +194,11 @@ Output the opener only.`;
 
 // ─── A4: Conversion / CTA Gap ───────────────────────────────────────────
 
-const A4_PROMPT = `You are writing a cold first-touch outreach opener to a small business owner.
+const A4_PROMPT = `${PERSONA_PREAMBLE}
 
 Inputs (JSON):
 {{extracted_fields}}
+${NAP_CONTEXT_NOTE}
 
 Task: Write the opener, ~80 words max body:
 

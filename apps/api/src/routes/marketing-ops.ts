@@ -136,6 +136,11 @@ import CloserService from '../services/outreach-pitch/CloserService';
 import ContactService from '../services/outreach-pitch/ContactService';
 import ReviewResponseDraftService from '../services/outreach-pitch/ReviewResponseDraftService';
 import PitchService from '../services/outreach-pitch/PitchService';
+import OwnerVoiceService from '../services/deliverable/OwnerVoiceService';
+import ReviewSlotService from '../services/deliverable/ReviewSlotService';
+import DeliverableSectionService from '../services/deliverable/DeliverableSectionService';
+import DeliverableAssemblyService from '../services/deliverable/DeliverableAssemblyService';
+import DeliverableRenderService from '../services/deliverable/DeliverableRenderService';
 
 const router = Router();
 
@@ -2473,6 +2478,226 @@ router.get('/review-response/follow-ups-due', async (req: any, res: Response) =>
       from: today,
       to: weekOut,
     }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Deliverable Construction ───────────────────────────────────────────
+// Post-payment deliverable: owner voice calibration, batch review response
+// generation, recovery playbook, listing corrections, CTA fixes, and render.
+// See: docs/LocalBiz/marketing_ops_deliverable_construction_sprint_plan.md
+
+// Zod schemas
+const voiceUpsertSchema = z.object({
+  person: z.enum(['first_person', 'third_person', 'we']).optional(),
+  formality: z.enum(['casual', 'professional', 'formal']).optional(),
+  humor: z.enum(['none', 'light', 'witty']).optional(),
+  apologyStyle: z.enum(['direct_apology', 'fix_first', 'acknowledge_and_pivot']).optional(),
+  signoffStyle: z.enum(['first_name', 'full_name', 'title', 'team', 'none']).optional(),
+  signature: z.string().max(100).optional(),
+});
+
+const slotUpdateSchema = z.object({
+  response_text: z.string().min(1),
+});
+
+const sectionUpdateSchema = z.object({
+  content: z.string().min(1),
+});
+
+// ─── Owner Voice ─────────────────────────────────────────
+
+// Get voice profile for a campaign
+router.get('/deliverable/voice/:campaignId', async (req: any, res: Response) => {
+  try {
+    const profile = await OwnerVoiceService.getProfile(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// AI infer voice from existing owner responses
+router.post('/deliverable/voice/:campaignId/infer', async (req: any, res: Response) => {
+  try {
+    const result = await OwnerVoiceService.inferVoice(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Create or update voice profile (manual entry or operator override)
+router.post('/deliverable/voice/:campaignId', async (req: any, res: Response) => {
+  try {
+    const parsed = voiceUpsertSchema.parse(req.body || {});
+    const profile = await OwnerVoiceService.upsertProfile(req.params.campaignId, {
+      person: parsed.person,
+      formality: parsed.formality,
+      humor: parsed.humor,
+      apologyStyle: parsed.apologyStyle,
+      signoffStyle: parsed.signoffStyle,
+      signature: parsed.signature,
+    }, getCtx(req));
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Review Slots ─────────────────────────────────────────
+
+// List all slots for a campaign
+router.get('/deliverable/:campaignId/slots', async (req: any, res: Response) => {
+  try {
+    const slots = await ReviewSlotService.listSlots(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: slots });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Ingest all unanswered reviews from audit
+router.post('/deliverable/:campaignId/slots/ingest', async (req: any, res: Response) => {
+  try {
+    const result = await ReviewSlotService.ingestReviews(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Batch generate responses for all draft slots
+router.post('/deliverable/:campaignId/slots/generate', async (req: any, res: Response) => {
+  try {
+    const result = await ReviewSlotService.generateAllResponses(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Re-generate a single slot's response
+router.post('/deliverable/slots/:slotId/regenerate', async (req: any, res: Response) => {
+  try {
+    const slot = await ReviewSlotService.regenerateSlot(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Edit a slot's response text
+router.put('/deliverable/slots/:slotId', async (req: any, res: Response) => {
+  try {
+    const parsed = slotUpdateSchema.parse(req.body);
+    const slot = await ReviewSlotService.updateSlotResponse(req.params.slotId, parsed.response_text, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Approve a slot
+router.post('/deliverable/slots/:slotId/approve', async (req: any, res: Response) => {
+  try {
+    const slot = await ReviewSlotService.approveSlot(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Skip a slot
+router.post('/deliverable/slots/:slotId/skip', async (req: any, res: Response) => {
+  try {
+    const slot = await ReviewSlotService.skipSlot(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Deliverable Sections ─────────────────────────────────
+
+// List all sections for a campaign
+router.get('/deliverable/:campaignId/sections', async (req: any, res: Response) => {
+  try {
+    const sections = await DeliverableSectionService.listSections(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: sections });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Generate all sections (playbook, corrections, CTA based on audit)
+router.post('/deliverable/:campaignId/sections/generate', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableSectionService.generateAllSections(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Edit a section's content
+router.put('/deliverable/sections/:sectionId', async (req: any, res: Response) => {
+  try {
+    const parsed = sectionUpdateSchema.parse(req.body);
+    const section = await DeliverableSectionService.updateSection(req.params.sectionId, parsed.content, getCtx(req));
+    res.json({ success: true, data: section });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Approve a section
+router.post('/deliverable/sections/:sectionId/approve', async (req: any, res: Response) => {
+  try {
+    const section = await DeliverableSectionService.approveSection(req.params.sectionId, getCtx(req));
+    res.json({ success: true, data: section });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Skip a section
+router.post('/deliverable/sections/:sectionId/skip', async (req: any, res: Response) => {
+  try {
+    const section = await DeliverableSectionService.skipSection(req.params.sectionId, getCtx(req));
+    res.json({ success: true, data: section });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Render ───────────────────────────────────────────────
+
+// Check render readiness
+router.get('/deliverable/:campaignId/render/status', async (req: any, res: Response) => {
+  try {
+    const status = await DeliverableAssemblyService.getAssemblyStatus(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: status });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Render deliverable (PDF + TXT)
+router.post('/deliverable/:campaignId/render', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableRenderService.renderDeliverable(req.params.campaignId, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

@@ -104,6 +104,10 @@ export class CloserService extends BaseService {
       business_name: campaign.business_name ?? 'your business',
       contact_name: campaign.contact_info ?? null,
       tone: campaign.tone || 'short informal',
+      city: campaign.city ?? null,
+      state: campaign.state ?? null,
+      phone: campaign.phone ?? null,
+      website_url: campaign.website_url ?? null,
     };
   }
 

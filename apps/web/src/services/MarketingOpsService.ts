@@ -237,6 +237,127 @@ export interface OutreachOpener {
   updated_at: string;
 }
 
+// ─── Outreach Pitch Types ───────────────────────────────────────────────
+// Header / Closer / Contact / ReviewResponseDraft / Pitch — mirrors the
+// opener types above. See docs/LocalBiz/marketing_ops_outreach_pitch_construction_sprint_plan.md
+
+export interface OutreachHeader {
+  id: string;
+  campaign_id: string;
+  header_text: string | null;
+  quality_gate_passed: boolean;
+  quality_gate_issues: string[] | null;
+  source: OpenerSource;
+  ai_provider: string | null;
+  ai_model: string | null;
+  tokens_used: number;
+  cost_cents: number;
+  extracted_fields: Record<string, any> | null;
+  executed_by: string | null;
+  executed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OutreachCloser {
+  id: string;
+  campaign_id: string;
+  closer_text: string | null;
+  quality_gate_passed: boolean;
+  quality_gate_issues: string[] | null;
+  source: OpenerSource;
+  ai_provider: string | null;
+  ai_model: string | null;
+  tokens_used: number;
+  cost_cents: number;
+  extracted_fields: Record<string, any> | null;
+  executed_by: string | null;
+  executed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OutreachContact {
+  id: string;
+  campaign_id: string;
+  contact_text: string | null;
+  label: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HeaderResolution {
+  selection: OpenerArchetypeSelection;
+  extractedFields: Record<string, any>;
+  resolvedPrompt: string;
+}
+
+export interface CloserResolution extends HeaderResolution {
+  remaining: number;
+  defaultTemplate: string;
+}
+
+export interface HeaderResult {
+  header: OutreachHeader;
+  selection: OpenerArchetypeSelection;
+  extractedFields: Record<string, any>;
+  qualityGate: QualityGateResult;
+  resolvedPrompt: string;
+}
+
+export interface CloserResult extends HeaderResult {
+  remaining: number;
+  defaultTemplate: string;
+}
+
+export interface ReviewResponseDraft {
+  review_text: string;
+  response_text: string;
+  response_source: OpenerSource;
+  response_ai_provider: string | null;
+  response_ai_model: string | null;
+  response_tokens_used: number;
+}
+
+export interface ReviewPair {
+  review_text: string;
+  response_text: string;
+  response_source: OpenerSource;
+  response_ai_provider?: string | null;
+  response_ai_model?: string | null;
+  response_tokens_used?: number;
+  is_negative_first: boolean;
+}
+
+export interface AssemblePitchInput {
+  campaignId: string;
+  openerId: string;
+  headerId?: string | null;
+  closerId?: string | null;
+  contactId?: string | null;
+  reviewPairs: ReviewPair[];
+}
+
+export interface OutreachPitch {
+  id: string;
+  campaign_id: string;
+  opener_id: string;
+  header_id: string | null;
+  closer_id: string | null;
+  contact_id: string | null;
+  review_pairs: ReviewPair[] | null;
+  assembled_text: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PitchResult {
+  pitch: OutreachPitch;
+  assembledText: string;
+}
+
 export interface ReviewResponsePipeline {
   id: string;
   campaign_id: string;
@@ -2319,6 +2440,608 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     return result.data?.data ?? result.data ?? [];
   }
+
+  // ─── Outreach Pitch — Headers ──────────────────────────────────────────
+  async resolveHeader(campaignId: string): Promise<HeaderResolution> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/headers/resolve?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      `mkt-ops-header-resolve-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve header');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async executeHeader(campaignId: string): Promise<HeaderResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/headers/execute`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId }) },
+      `mkt-ops-header-execute-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute header');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importHeader(campaignId: string, headerText: string): Promise<HeaderResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/headers/import`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, header_text: headerText }) },
+      `mkt-ops-header-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import header');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async listHeaders(campaignId?: string): Promise<OutreachHeader[]> {
+    const url = campaignId
+      ? `${BASE_URL}/openers/headers?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/openers/headers`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-headers-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list headers');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  // ─── Outreach Pitch — Closers ──────────────────────────────────────────
+  async resolveCloser(campaignId: string): Promise<CloserResolution> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/closers/resolve?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      `mkt-ops-closer-resolve-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve closer');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async executeCloser(campaignId: string): Promise<CloserResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/closers/execute`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId }) },
+      `mkt-ops-closer-execute-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute closer');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importCloser(campaignId: string, closerText: string): Promise<CloserResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/closers/import`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, closer_text: closerText }) },
+      `mkt-ops-closer-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import closer');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async listClosers(campaignId?: string): Promise<OutreachCloser[]> {
+    const url = campaignId
+      ? `${BASE_URL}/openers/closers?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/openers/closers`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-closers-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list closers');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  // ─── Outreach Pitch — Contacts (optional footer, no AI) ────────────────
+  async listContacts(campaignId?: string): Promise<OutreachContact[]> {
+    const url = campaignId
+      ? `${BASE_URL}/openers/contacts?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/openers/contacts`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-contacts-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list contacts');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async createContact(
+    campaignId: string,
+    contactText: string,
+    label?: string,
+  ): Promise<OutreachContact> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/contacts`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, contact_text: contactText, label }) },
+      `mkt-ops-contact-create-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create contact');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async updateContact(
+    id: string,
+    input: { contactText?: string; label?: string },
+  ): Promise<OutreachContact> {
+    const body: any = {};
+    if (input.contactText !== undefined) body.contact_text = input.contactText;
+    if (input.label !== undefined) body.label = input.label;
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/contacts/${encodeURIComponent(id)}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      `mkt-ops-contact-update-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update contact');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/contacts/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+      `mkt-ops-contact-delete-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete contact');
+    }
+  }
+
+  // ─── Outreach Pitch — Review Response Drafts (no persistence) ──────────
+  async generateReviewResponse(
+    campaignId: string,
+    reviewText: string,
+  ): Promise<ReviewResponseDraft> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/review-responses/generate`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, review_text: reviewText }) },
+      `mkt-ops-review-response-generate-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate review response');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importReviewResponse(
+    campaignId: string,
+    reviewText: string,
+    responseText: string,
+  ): Promise<ReviewResponseDraft> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/review-responses/import`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, review_text: reviewText, response_text: responseText }) },
+      `mkt-ops-review-response-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import review response');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach Pitch — Assembly ─────────────────────────────────────────
+  async assemblePitch(input: AssemblePitchInput): Promise<PitchResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/pitches`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          campaign_id: input.campaignId,
+          opener_id: input.openerId,
+          header_id: input.headerId ?? null,
+          closer_id: input.closerId ?? null,
+          contact_id: input.contactId ?? null,
+          review_pairs: input.reviewPairs,
+        }),
+      },
+      `mkt-ops-pitch-assemble-${input.campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to assemble pitch');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async listPitches(campaignId?: string): Promise<OutreachPitch[]> {
+    const url = campaignId
+      ? `${BASE_URL}/openers/pitches?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/openers/pitches`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-pitches-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list pitches');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async getPitch(id: string): Promise<OutreachPitch> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/pitches/${encodeURIComponent(id)}`,
+      { method: 'GET' },
+      `mkt-ops-pitch-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get pitch');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Deliverable Construction ──────────────────────────────────────────
+
+  // Owner Voice
+  async getOwnerVoiceProfile(campaignId: string): Promise<OwnerVoiceProfile | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/voice/${campaignId}`,
+      { method: 'GET' },
+      `mkt-ops-voice-${campaignId}`,
+      0,
+    );
+    if (!result.success) return null;
+    return result.data?.data ?? result.data ?? null;
+  }
+
+  async inferOwnerVoice(campaignId: string): Promise<VoiceInferenceResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/voice/${campaignId}/infer`,
+      { method: 'POST' },
+      `mkt-ops-voice-infer-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to infer owner voice');
+    }
+    await this.invalidateCachePattern('mkt-ops-voice');
+    return result.data?.data ?? result.data;
+  }
+
+  async upsertOwnerVoice(campaignId: string, input: OwnerVoiceInput): Promise<OwnerVoiceProfile> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/voice/${campaignId}`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-voice-upsert-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save owner voice profile');
+    }
+    await this.invalidateCachePattern('mkt-ops-voice');
+    return result.data?.data ?? result.data;
+  }
+
+  // Review Slots
+  async listReviewSlots(campaignId: string): Promise<ReviewSlot[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/slots`,
+      { method: 'GET' },
+      `mkt-ops-slots-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list review slots');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async ingestReviews(campaignId: string): Promise<{ ingested: number; slots: ReviewSlot[] }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/slots/ingest`,
+      { method: 'POST' },
+      `mkt-ops-slots-ingest-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to ingest reviews');
+    }
+    await this.invalidateCachePattern('mkt-ops-slots');
+    return result.data?.data ?? result.data;
+  }
+
+  async generateAllResponses(campaignId: string): Promise<{ generated: number; errors: string[] }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/slots/generate`,
+      { method: 'POST' },
+      `mkt-ops-slots-generate-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate responses');
+    }
+    await this.invalidateCachePattern('mkt-ops-slots');
+    return result.data?.data ?? result.data;
+  }
+
+  async regenerateSlot(slotId: string): Promise<ReviewSlot> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/slots/${slotId}/regenerate`,
+      { method: 'POST' },
+      `mkt-ops-slot-regen-${slotId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to regenerate slot');
+    }
+    await this.invalidateCachePattern('mkt-ops-slots');
+    return result.data?.data ?? result.data;
+  }
+
+  async updateSlotResponse(slotId: string, responseText: string): Promise<ReviewSlot> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/slots/${slotId}`,
+      { method: 'PUT', body: JSON.stringify({ response_text: responseText }) },
+      `mkt-ops-slot-edit-${slotId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update slot');
+    }
+    await this.invalidateCachePattern('mkt-ops-slots');
+    return result.data?.data ?? result.data;
+  }
+
+  async approveSlot(slotId: string): Promise<ReviewSlot> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/slots/${slotId}/approve`,
+      { method: 'POST' },
+      `mkt-ops-slot-approve-${slotId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to approve slot');
+    }
+    await this.invalidateCachePattern('mkt-ops-slots');
+    return result.data?.data ?? result.data;
+  }
+
+  async skipSlot(slotId: string): Promise<ReviewSlot> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/slots/${slotId}/skip`,
+      { method: 'POST' },
+      `mkt-ops-slot-skip-${slotId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to skip slot');
+    }
+    await this.invalidateCachePattern('mkt-ops-slots');
+    return result.data?.data ?? result.data;
+  }
+
+  // Deliverable Sections
+  async listDeliverableSections(campaignId: string): Promise<DeliverableSection[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/sections`,
+      { method: 'GET' },
+      `mkt-ops-sections-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list sections');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async generateAllSections(campaignId: string): Promise<{ generated: string[]; errors: string[] }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/sections/generate`,
+      { method: 'POST' },
+      `mkt-ops-sections-gen-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to generate sections');
+    }
+    await this.invalidateCachePattern('mkt-ops-sections');
+    return result.data?.data ?? result.data;
+  }
+
+  async updateSection(sectionId: string, content: string): Promise<DeliverableSection> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/sections/${sectionId}`,
+      { method: 'PUT', body: JSON.stringify({ content }) },
+      `mkt-ops-section-edit-${sectionId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update section');
+    }
+    await this.invalidateCachePattern('mkt-ops-sections');
+    return result.data?.data ?? result.data;
+  }
+
+  async approveSection(sectionId: string): Promise<DeliverableSection> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/sections/${sectionId}/approve`,
+      { method: 'POST' },
+      `mkt-ops-section-approve-${sectionId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to approve section');
+    }
+    await this.invalidateCachePattern('mkt-ops-sections');
+    return result.data?.data ?? result.data;
+  }
+
+  async skipSection(sectionId: string): Promise<DeliverableSection> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/sections/${sectionId}/skip`,
+      { method: 'POST' },
+      `mkt-ops-section-skip-${sectionId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to skip section');
+    }
+    await this.invalidateCachePattern('mkt-ops-sections');
+    return result.data?.data ?? result.data;
+  }
+
+  // Render
+  async getRenderStatus(campaignId: string): Promise<AssemblyStatus> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/render/status`,
+      { method: 'GET' },
+      `mkt-ops-render-status-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get render status');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async renderDeliverable(campaignId: string): Promise<RenderResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/deliverable/${campaignId}/render`,
+      { method: 'POST' },
+      `mkt-ops-render-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render deliverable');
+    }
+    await this.invalidateCachePattern('mkt-ops-render');
+    return result.data?.data ?? result.data;
+  }
+}
+
+// ─── Deliverable Construction Types ──────────────────────────────────────
+
+export interface OwnerVoiceProfile {
+  id: string;
+  campaignId: string;
+  person: string | null;
+  formality: string | null;
+  humor: string | null;
+  apologyStyle: string | null;
+  signoffStyle: string | null;
+  signature: string | null;
+  inferredFromCount: number;
+  inferredSample: string | null;
+  operatorOverrides: Record<string, any> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OwnerVoiceInput {
+  person?: string;
+  formality?: string;
+  humor?: string;
+  apologyStyle?: string;
+  signoffStyle?: string;
+  signature?: string;
+}
+
+export interface VoiceInferenceResult {
+  person: string;
+  formality: string;
+  humor: string;
+  apologyStyle: string;
+  signoffStyle: string;
+  signature: string | null;
+  inferredFromCount: number;
+  inferredSample: string;
+}
+
+export interface ReviewSlot {
+  id: string;
+  deliverableId: string | null;
+  campaignId: string;
+  platform: string | null;
+  reviewText: string | null;
+  reviewRating: number | null;
+  reviewDate: string | null;
+  reviewAuthor: string | null;
+  sentiment: string | null;
+  theme: string | null;
+  isNegativeFirst: boolean;
+  responseText: string | null;
+  responseSource: string | null;
+  responseAiProvider: string | null;
+  responseAiModel: string | null;
+  responseTokensUsed: number;
+  qualityGatePassed: boolean | null;
+  qualityGateIssues: string[] | null;
+  status: string;
+  slotIndex: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeliverableSection {
+  id: string;
+  deliverableId: string | null;
+  campaignId: string;
+  sectionType: string | null;
+  title: string | null;
+  content: string | null;
+  source: string | null;
+  qualityGatePassed: boolean | null;
+  qualityGateIssues: string[] | null;
+  status: string;
+  sectionIndex: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssemblyStatus {
+  ready: boolean;
+  totalSlots: number;
+  approvedSlots: number;
+  draftSlots: number;
+  skippedSlots: number;
+  totalSections: number;
+  approvedSections: number;
+  draftSections: number;
+  skippedSections: number;
+  missingApprovals: string[];
+}
+
+export interface RenderResult {
+  deliverableId: string;
+  pdfPath: string;
+  txtPath: string;
+  fileName: string;
+  fileSize: number;
 }
 
 const marketingOpsService = MarketingOpsService.getInstance();

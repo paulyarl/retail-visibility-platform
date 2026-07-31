@@ -20,6 +20,14 @@ export interface CommonFields {
   business_name: string;
   contact_name: string | null;
   tone: string;
+  // NAP context — gives the AI agent enough identifying info to match
+  // this business against publicly available data (GBP, Yelp, etc.) when
+  // crafting a hyper-specific opener. All optional since prospecting
+  // campaigns may have partial data.
+  city: string | null;
+  state: string | null;
+  phone: string | null;
+  website_url: string | null;
 }
 
 export interface A1Fields extends CommonFields {
