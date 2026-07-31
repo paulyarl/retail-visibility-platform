@@ -160,14 +160,14 @@ export default function CategoryAnalysisAuditCard({
       {/* GBP metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <Metric label="Total businesses" value={String(data.total_approximate_businesses)} />
-        <Metric label="Avg rating" value={data.average_gbp_metrics.average_rating.toFixed(1)} />
+        <Metric label="Avg rating" value={Number(data.average_gbp_metrics.average_rating).toFixed(1)} />
         <Metric label="Avg reviews" value={String(data.average_gbp_metrics.average_review_count)} />
         <Metric label="GBP claimed" value={`${data.gbp_claimed_percentage}%`} />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <Metric label="Website presence" value={`${data.website_presence_percentage}%`} />
         <Metric label="Reviews (audit)" value={audit.review_count?.toString() ?? '—'} />
-        <Metric label="Avg rating (audit)" value={audit.average_rating?.toFixed(1) ?? '—'} />
+        <Metric label="Avg rating (audit)" value={audit.average_rating != null ? Number(audit.average_rating).toFixed(1) : '—'} />
         <Metric label="Photos (audit)" value={audit.photo_count?.toString() ?? '—'} />
       </div>
 
@@ -181,7 +181,7 @@ export default function CategoryAnalysisAuditCard({
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-medium text-gray-900 dark:text-white truncate">{c.name}</span>
                   <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">
-                    {c.approximate_rating.toFixed(1)} ★ · {c.approximate_review_count} reviews · {c.location_status}
+                    {Number(c.approximate_rating).toFixed(1)} ★ · {c.approximate_review_count} reviews · {c.location_status}
                   </span>
                 </div>
                 <button
