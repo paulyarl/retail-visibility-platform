@@ -5,6 +5,7 @@ import { RefreshCw, TrendingUp, DollarSign, Target, Trophy, Download, Activity, 
 import Link from 'next/link';
 import marketingOpsService, { DashboardStats, ConversionStats, CampaignStage } from '@/services/MarketingOpsService';
 import FollowUpsDueWidget from '@/components/marketing-ops/FollowUpsDueWidget';
+import ReviewFollowUpsDueWidget from '@/components/marketing-ops/ReviewFollowUpsDueWidget';
 import HotProspectsWidget from '@/components/marketing-ops/HotProspectsWidget';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
@@ -209,6 +210,11 @@ export default function MarketingOpsDashboardClient() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
               <FollowUpsDueWidget />
               <HotProspectsWidget />
+            </div>
+
+            {/* Review follow-ups due widget (Sprint 4) */}
+            <div className="mb-8">
+              <ReviewFollowUpsDueWidget />
             </div>
 
             {/* Weekly Summary */}

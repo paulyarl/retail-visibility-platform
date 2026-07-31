@@ -11,12 +11,14 @@ import {
   IconPalette,
   IconFilter,
   IconChartBar,
+  IconMail,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops', label: 'Dashboard', icon: IconLayoutDashboard, emoji: '📊' },
   { href: '/settings/admin/marketing-ops/campaigns', label: 'Campaigns', icon: IconTarget, emoji: '🎯' },
   { href: '/settings/admin/marketing-ops/prompts', label: 'Prompts', icon: IconMessage, emoji: '💬' },
+  { href: '/settings/admin/marketing-ops/openers', label: 'Openers', icon: IconMail, emoji: '✉️' },
   { href: '/settings/admin/marketing-ops/deliverable-templates', label: 'Deliverable Templates', icon: IconFiles, emoji: '📄' },
   { href: '/settings/admin/marketing-ops/branding', label: 'Branding', icon: IconPalette, emoji: '🎨' },
   { href: '/settings/admin/marketing-ops/filter-review', label: 'Filter Review', icon: IconFilter, emoji: '🔍' },

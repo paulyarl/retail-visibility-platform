@@ -1774,3 +1774,12 @@ export function generateMarketingRevenueId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `mrev-${nanoid()}`;
 }
+
+/**
+ * Generate outreach opener record ID
+ * Format: mop-{nanoid} (12 chars)
+ */
+export function generateOutreachOpenerId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mop-${nanoid()}`;
+}

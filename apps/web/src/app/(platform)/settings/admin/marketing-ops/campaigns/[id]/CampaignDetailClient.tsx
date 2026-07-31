@@ -14,6 +14,7 @@ import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverview
 import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection';
 import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard';
 import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCard';
+import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewResponsePipelineCard';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history' | 'lineage';
 
@@ -506,6 +507,11 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   && (
                     <OutreachFollowUpCard campaign={campaign} onLogged={fetchCampaign} />
                   )}
+                {/* Review Response Pipeline — per-platform review response tracking
+                    with staged progression (Google → Yelp → Facebook) and follow-up gating. */}
+                {campaign.scope === 'business' && (
+                  <ReviewResponsePipelineCard campaignId={campaign.id} onRefresh={fetchCampaign} />
+                )}
                 {/* Hot-prospect override controls (Sprint 3) */}
                 {campaign.scope === 'business' && (
                   <div className="flex items-center gap-2 flex-wrap">

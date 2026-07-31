@@ -6,7 +6,7 @@ const {
   mockCampaigns,
 } = vi.hoisted(() => ({
   mockPipelines: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
-  mockPipelineLog: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), update: vi.fn() },
+  mockPipelineLog: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn(), update: vi.fn() },
   mockCampaigns: { findUnique: vi.fn() },
 }));
 
@@ -273,5 +273,201 @@ describe('ReviewResponseService.markCustomerReply / closeThread', () => {
     const result = await ReviewResponseService.getInstance().closeThread('mrrl-1');
     expect(result.thread_closed).toBe(true);
     expect(mockPipelines.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewResponseService.scheduleFollowUp', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPipelines.findUnique.mockResolvedValue(basePipeline());
+    mockPipelineLog.create.mockImplementation(({ data }: any) => Promise.resolve({ ...data, id: 'mrrl-sched-1' }));
+    mockPipelineLog.findFirst.mockResolvedValue(null); // no earlier scheduled
+    mockPipelineLog.count.mockResolvedValue(0);
+    mockPipelines.update.mockImplementation(({ where, data }: any) => Promise.resolve({ ...basePipeline(), id: where.id, ...data }));
+  });
+
+  it('creates a scheduled follow-up log entry with status=scheduled', async () => {
+    const future = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(); // 48h
+    const log = await ReviewResponseService.getInstance().scheduleFollowUp({
+      pipelineId: 'mrrp-1',
+      scheduledFor: future,
+      notes: 'Check if customer replied',
+    });
+    expect(log.status).toBe('scheduled');
+    expect(log.response_type).toBe('follow_up');
+    expect(log.scheduled_for).toBeDefined();
+    expect(mockPipelineLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'scheduled',
+          response_type: 'follow_up',
+          scheduled_for: expect.any(Date),
+        }),
+      })
+    );
+  });
+
+  it('rejects invalid scheduled_for datetime', async () => {
+    await expect(ReviewResponseService.getInstance().scheduleFollowUp({
+      pipelineId: 'mrrp-1',
+      scheduledFor: 'not-a-date',
+    })).rejects.toThrow();
+  });
+
+  it('recomputeRollups sets next_follow_up_at to earliest scheduled_for', async () => {
+    const earliest = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    mockPipelineLog.findFirst
+      .mockResolvedValueOnce({ scheduled_for: earliest }) // earliest scheduled
+      .mockResolvedValue(null); // latest activity
+    mockPipelineLog.count.mockResolvedValue(0);
+    mockPipelines.findUnique.mockResolvedValue(basePipeline({ unanswered_count: 5 }));
+
+    await ReviewResponseService.getInstance().scheduleFollowUp({
+      pipelineId: 'mrrp-1',
+      scheduledFor: earliest.toISOString(),
+    });
+
+    // The update call should set next_follow_up_at to the earliest scheduled_for
+    const updateCall = mockPipelines.update.mock.calls[0][0];
+    expect(updateCall.data.next_follow_up_at).toEqual(earliest);
+  });
+});
+
+describe('ReviewResponseService.completeScheduledFollowUp', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPipelineLog.findFirst.mockResolvedValue(null);
+    mockPipelineLog.count.mockResolvedValue(0);
+    mockPipelines.findUnique.mockResolvedValue(basePipeline({ unanswered_count: 5 }));
+    mockPipelines.update.mockImplementation(({ where, data }: any) => Promise.resolve({ ...basePipeline(), id: where.id, ...data }));
+  });
+
+  it('marks a scheduled follow-up as completed', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled' });
+    mockPipelineLog.update.mockImplementation(({ where, data }: any) => Promise.resolve({ id: where.id, status: 'completed', ...data }));
+
+    const result = await ReviewResponseService.getInstance().completeScheduledFollowUp('mrrl-1', 'Sent follow-up email');
+    expect(result.status).toBe('completed');
+    expect(mockPipelineLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mrrl-1' },
+        data: expect.objectContaining({ status: 'completed', response_text: 'Sent follow-up email', outcome: null }),
+      })
+    );
+  });
+
+  it('persists outcome when completing a follow-up', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled' });
+    mockPipelineLog.update.mockImplementation(({ where, data }: any) => Promise.resolve({ id: where.id, status: 'completed', ...data }));
+
+    const result = await ReviewResponseService.getInstance().completeScheduledFollowUp('mrrl-1', undefined, undefined, 'converted_paid');
+    expect(result.outcome).toBe('converted_paid');
+    expect(mockPipelineLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ outcome: 'converted_paid' }),
+      })
+    );
+  });
+
+  it('is idempotent (already completed)', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'completed' });
+    const result = await ReviewResponseService.getInstance().completeScheduledFollowUp('mrrl-1');
+    expect(result.status).toBe('completed');
+    expect(mockPipelineLog.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewResponseService.skipScheduledFollowUp', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPipelineLog.findFirst.mockResolvedValue(null);
+    mockPipelineLog.count.mockResolvedValue(0);
+    mockPipelines.findUnique.mockResolvedValue(basePipeline({ unanswered_count: 5 }));
+    mockPipelines.update.mockImplementation(({ where, data }: any) => Promise.resolve({ ...basePipeline(), id: where.id, ...data }));
+  });
+
+  it('marks a scheduled follow-up as skipped with reason', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled', notes: null });
+    mockPipelineLog.update.mockImplementation(({ where, data }: any) => Promise.resolve({ id: where.id, status: 'skipped', ...data }));
+
+    const result = await ReviewResponseService.getInstance().skipScheduledFollowUp('mrrl-1', 'Customer already responded');
+    expect(result.status).toBe('skipped');
+    expect(mockPipelineLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'skipped' }),
+      })
+    );
+  });
+
+  it('persists outcome when skipping a follow-up', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled', notes: null });
+    mockPipelineLog.update.mockImplementation(({ where, data }: any) => Promise.resolve({ id: where.id, status: 'skipped', ...data }));
+
+    const result = await ReviewResponseService.getInstance().skipScheduledFollowUp('mrrl-1', undefined, undefined, 'converted_paid');
+    expect(result.outcome).toBe('converted_paid');
+    expect(mockPipelineLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ outcome: 'converted_paid' }),
+      })
+    );
+  });
+
+  it('is idempotent (not scheduled)', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'completed' });
+    const result = await ReviewResponseService.getInstance().skipScheduledFollowUp('mrrl-1');
+    expect(result.status).toBe('completed');
+    expect(mockPipelineLog.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewResponseService.updateScheduledFollowUp', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPipelineLog.findFirst.mockResolvedValue(null);
+    mockPipelineLog.count.mockResolvedValue(0);
+    mockPipelines.findUnique.mockResolvedValue(basePipeline({ unanswered_count: 5 }));
+    mockPipelines.update.mockImplementation(({ where, data }: any) => Promise.resolve({ ...basePipeline(), id: where.id, ...data }));
+  });
+
+  it('updates scheduled_for on a scheduled entry', async () => {
+    const original = { id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled', scheduled_for: new Date(), notes: 'original' };
+    mockPipelineLog.findUnique.mockResolvedValue(original);
+    mockPipelineLog.update.mockImplementation(({ where, data }: any) => Promise.resolve({ ...original, ...data }));
+
+    const newTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const result = await ReviewResponseService.getInstance().updateScheduledFollowUp('mrrl-1', { scheduledFor: newTime });
+    expect(mockPipelineLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mrrl-1' },
+        data: expect.objectContaining({ scheduled_for: expect.any(Date) }),
+      })
+    );
+  });
+
+  it('updates notes on a scheduled entry', async () => {
+    const original = { id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled', scheduled_for: new Date(), notes: 'original' };
+    mockPipelineLog.findUnique.mockResolvedValue(original);
+    mockPipelineLog.update.mockImplementation(({ where, data }: any) => Promise.resolve({ ...original, ...data }));
+
+    await ReviewResponseService.getInstance().updateScheduledFollowUp('mrrl-1', { notes: 'updated notes' });
+    expect(mockPipelineLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ notes: 'updated notes' }),
+      })
+    );
+  });
+
+  it('refuses to update a completed entry', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'completed' });
+    await expect(ReviewResponseService.getInstance().updateScheduledFollowUp('mrrl-1', {
+      scheduledFor: new Date().toISOString(),
+    })).rejects.toThrow();
+  });
+
+  it('rejects invalid scheduled_for datetime', async () => {
+    mockPipelineLog.findUnique.mockResolvedValue({ id: 'mrrl-1', pipeline_id: 'mrrp-1', status: 'scheduled' });
+    await expect(ReviewResponseService.getInstance().updateScheduledFollowUp('mrrl-1', {
+      scheduledFor: 'not-a-date',
+    })).rejects.toThrow();
   });
 });

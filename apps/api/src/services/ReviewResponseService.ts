@@ -50,6 +50,8 @@ export interface UpdatePipelineMetricsInput {
   metadata?: Record<string, any> | null;
 }
 
+export type FollowUpOutcome = 'converted_paid' | 'customer_responded' | 'no_response' | 'duplicate' | 'out_of_scope' | 'other';
+
 export interface LogResponseInput {
   pipelineId: string;
   platformReviewId?: string;
@@ -57,6 +59,13 @@ export interface LogResponseInput {
   responseType: ResponseType;
   respondedBy?: string;
   notes?: string;
+}
+
+export interface ScheduleFollowUpInput {
+  pipelineId: string;
+  scheduledFor: string; // ISO datetime
+  notes?: string;
+  respondedBy?: string;
 }
 
 export interface GateCheckResult {
@@ -240,6 +249,215 @@ export class ReviewResponseService extends BaseService {
     } catch (error) {
       logger.error('Failed to log review response', ctx, { error: (error as Error).message, pipelineId: input.pipelineId });
       throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Schedule a future follow-up at a predetermined time (e.g., 48h, 1 week).
+   * Creates a log row with status='scheduled' and scheduled_for set. Multiple
+   * scheduled follow-ups can be queued per pipeline — the pipeline's
+   * next_follow_up_at rollup becomes MIN(scheduled_for) WHERE status='scheduled'.
+   */
+  async scheduleFollowUp(input: ScheduleFollowUpInput, ctx?: RequestCtx): Promise<any> {
+    try {
+      const pipeline = await this.prisma.mkt_review_response_pipeline.findUnique({
+        where: { id: input.pipelineId },
+      });
+      if (!pipeline) throw new NotFoundError('Review response pipeline not found');
+
+      const scheduledFor = new Date(input.scheduledFor);
+      if (isNaN(scheduledFor.getTime())) {
+        throw new Error('Invalid scheduled_for datetime');
+      }
+
+      const now = new Date();
+      const log = await this.prisma.mkt_review_response_log.create({
+        data: {
+          id: generateReviewResponseLogId(),
+          pipeline_id: input.pipelineId,
+          response_type: 'follow_up',
+          responded_at: now, // when the follow-up was scheduled (not when it fires)
+          responded_by: input.respondedBy || null,
+          notes: input.notes || null,
+          scheduled_for: scheduledFor,
+          status: 'scheduled',
+        },
+      });
+
+      // Recompute rollups so next_follow_up_at reflects the new scheduled entry.
+      await this.recomputeRollups(input.pipelineId, ctx);
+
+      logger.info('Review response follow-up scheduled', ctx, {
+        pipelineId: input.pipelineId,
+        logId: log.id,
+        scheduledFor: scheduledFor.toISOString(),
+      });
+      return log;
+    } catch (error) {
+      logger.error('Failed to schedule review response follow-up', ctx, { error: (error as Error).message, pipelineId: input.pipelineId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Update a scheduled follow-up's time and/or notes in place. Only works
+   * on entries with status='scheduled' (completed/skipped are immutable).
+   * Recomputes rollups so next_follow_up_at reflects the new time.
+   */
+  async updateScheduledFollowUp(logId: string, input: { scheduledFor?: string; notes?: string }, ctx?: RequestCtx): Promise<any> {
+    try {
+      const existing = await this.prisma.mkt_review_response_log.findUnique({ where: { id: logId } });
+      if (!existing) throw new NotFoundError('Review response log entry not found');
+      if (existing.status !== 'scheduled') {
+        throw new Error(`Cannot update follow-up with status '${existing.status}' (only 'scheduled' entries can be edited)`);
+      }
+
+      const data: any = {};
+      if (input.scheduledFor !== undefined) {
+        const scheduledFor = new Date(input.scheduledFor);
+        if (isNaN(scheduledFor.getTime())) {
+          throw new Error('Invalid scheduled_for datetime');
+        }
+        data.scheduled_for = scheduledFor;
+      }
+      if (input.notes !== undefined) {
+        data.notes = input.notes || null;
+      }
+
+      const updated = await this.prisma.mkt_review_response_log.update({
+        where: { id: logId },
+        data,
+      });
+
+      await this.recomputeRollups(existing.pipeline_id, ctx);
+
+      logger.info('Scheduled review response follow-up updated', ctx, { logId, pipelineId: existing.pipeline_id });
+      return updated;
+    } catch (error) {
+      logger.error('Failed to update scheduled follow-up', ctx, { error: (error as Error).message, logId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Mark a scheduled follow-up as completed (the operator sent the follow-up).
+   * Sets status='completed' and recomputes rollups so next_follow_up_at
+   * advances to the next scheduled entry (or null if none remain).
+   * If outcome='converted_paid', triggers campaign stage advancement.
+   */
+  async completeScheduledFollowUp(logId: string, responseText?: string, ctx?: RequestCtx, outcome?: FollowUpOutcome): Promise<any> {
+    try {
+      const existing = await this.prisma.mkt_review_response_log.findUnique({ where: { id: logId } });
+      if (!existing) throw new NotFoundError('Review response log entry not found');
+      if (existing.status === 'completed') return existing; // idempotent
+
+      const now = new Date();
+      const updated = await this.prisma.mkt_review_response_log.update({
+        where: { id: logId },
+        data: {
+          status: 'completed',
+          responded_at: now, // actual send time
+          response_text: responseText || existing.response_text,
+          outcome: outcome || null,
+        },
+      });
+
+      await this.recomputeRollups(existing.pipeline_id, ctx);
+
+      // If the customer converted to paid, advance the campaign stage.
+      if (outcome === 'converted_paid') {
+        await this.handlePaidConversion(existing.pipeline_id, ctx);
+      }
+
+      logger.info('Scheduled review response follow-up completed', ctx, { logId, pipelineId: existing.pipeline_id, outcome });
+      return updated;
+    } catch (error) {
+      logger.error('Failed to complete scheduled follow-up', ctx, { error: (error as Error).message, logId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Skip a scheduled follow-up (operator decided no further action needed).
+   * Sets status='skipped' and recomputes rollups.
+   * If outcome='converted_paid', triggers campaign stage advancement.
+   */
+  async skipScheduledFollowUp(logId: string, reason?: string, ctx?: RequestCtx, outcome?: FollowUpOutcome): Promise<any> {
+    try {
+      const existing = await this.prisma.mkt_review_response_log.findUnique({ where: { id: logId } });
+      if (!existing) throw new NotFoundError('Review response log entry not found');
+      if (existing.status !== 'scheduled') return existing; // idempotent
+
+      const updated = await this.prisma.mkt_review_response_log.update({
+        where: { id: logId },
+        data: {
+          status: 'skipped',
+          notes: reason ? `${existing.notes || ''}\nSkipped: ${reason}`.trim() : existing.notes,
+          outcome: outcome || null,
+        },
+      });
+
+      await this.recomputeRollups(existing.pipeline_id, ctx);
+
+      // If the customer converted to paid, advance the campaign stage.
+      if (outcome === 'converted_paid') {
+        await this.handlePaidConversion(existing.pipeline_id, ctx);
+      }
+
+      logger.info('Scheduled review response follow-up skipped', ctx, { logId, pipelineId: existing.pipeline_id, reason, outcome });
+      return updated;
+    } catch (error) {
+      logger.error('Failed to skip scheduled follow-up', ctx, { error: (error as Error).message, logId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Handle a paid conversion outcome: look up the pipeline's campaign and
+   * advance its stage to 'paid' if it's in a pre-paid stage. Best-effort —
+   * if the transition is invalid (e.g., already paid), we log and continue
+   * without throwing, since the follow-up completion itself already succeeded.
+   */
+  private async handlePaidConversion(pipelineId: string, ctx?: RequestCtx): Promise<void> {
+    try {
+      const pipeline = await this.prisma.mkt_review_response_pipeline.findUnique({
+        where: { id: pipelineId },
+        select: { campaign_id: true },
+      });
+      if (!pipeline) return;
+
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: pipeline.campaign_id },
+        select: { stage: true },
+      });
+      if (!campaign) return;
+
+      const currentStage = campaign.stage as string;
+      const PRE_PAID_STAGES = ['seek', 'preview_built', 'shown'];
+      if (!PRE_PAID_STAGES.includes(currentStage)) {
+        logger.info('Review response paid conversion: campaign not in pre-paid stage, skipping stage transition', ctx, {
+          pipelineId, campaignId: pipeline.campaign_id, currentStage,
+        });
+        return;
+      }
+
+      // Dynamically import to avoid circular dependency at module load time.
+      const { MarketingCampaignService } = await import('./MarketingCampaignService.js');
+      await MarketingCampaignService.getInstance().transitionStage({
+        campaignId: pipeline.campaign_id,
+        toStage: 'paid',
+        triggerType: 'system',
+        notes: `Converted via review response follow-up on ${pipelineId}`,
+      }, ctx);
+
+      logger.info('Review response paid conversion: campaign advanced to paid', ctx, {
+        pipelineId, campaignId: pipeline.campaign_id, fromStage: currentStage,
+      });
+    } catch (error) {
+      // Best-effort: don't fail the follow-up completion if the stage transition fails.
+      logger.error('Review response paid conversion: stage transition failed (best-effort)', ctx, {
+        error: (error as Error).message, pipelineId,
+      });
     }
   }
 
@@ -431,14 +649,21 @@ export class ReviewResponseService extends BaseService {
         where: { pipeline_id: pipelineId, thread_closed: false, customer_replied: true },
       });
 
+      // next_follow_up_at = MIN(scheduled_for) WHERE status='scheduled'
+      // This supports multiple queued follow-ups at predetermined times.
+      const earliestScheduled = await this.prisma.mkt_review_response_log.findFirst({
+        where: { pipeline_id: pipelineId, status: 'scheduled' },
+        orderBy: { scheduled_for: 'asc' },
+        select: { scheduled_for: true },
+      });
+
       const latest = await this.prisma.mkt_review_response_log.findFirst({
         where: { pipeline_id: pipelineId },
         orderBy: { responded_at: 'desc' },
       });
 
       const now = new Date();
-      const cadenceDays = unifiedConfig.marketingOpsReviewResponseFollowUpCadenceDays;
-      const nextFollowUp = openThreads > 0 ? new Date(now.getTime() + cadenceDays * 24 * 60 * 60 * 1000) : null;
+      const nextFollowUp = earliestScheduled?.scheduled_for ?? null;
 
       const pipeline = await this.prisma.mkt_review_response_pipeline.findUnique({
         where: { id: pipelineId },

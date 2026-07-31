@@ -22,7 +22,7 @@ async function runReviewResponseScheduler(): Promise<void> {
 
   try {
     const result = await ReviewResponseScheduler.getInstance().run();
-    logger.info(`[ReviewResponseScheduler] Completed: ${result.advanced} advanced, ${result.gatesChecked} gates checked, ${result.followUpsScheduled} follow-ups scheduled, ${result.staleClosed} stale closed, ${result.promotedToMonitoring} promoted to monitoring`, undefined, result);
+    logger.info(`[ReviewResponseScheduler] Completed: ${result.advanced} advanced, ${result.gatesChecked} gates checked, ${result.followUpsFired} follow-ups fired, ${result.staleClosed} stale closed, ${result.promotedToMonitoring} promoted to monitoring`, undefined, result);
   } catch (error) {
     logger.error('[ReviewResponseScheduler] Failed:', undefined, {
       error: {

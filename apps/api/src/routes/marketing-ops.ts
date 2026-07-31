@@ -72,6 +72,13 @@
  *
  *   Export:
  *     GET    /export                    — export campaigns as CSV
+ *
+ *   Outreach Openers:
+ *     GET    /openers                   — list openers (filter: campaignId)
+ *     GET    /openers/resolve           — resolve archetype + prompt for a campaign (no AI call)
+ *     POST   /openers/execute           — Path 1: generate opener via AI
+ *     POST   /openers/import            — Path 2: import externally-generated opener
+ *     GET    /openers/:id               — get single opener
  */
 
 import { Router, Response } from 'express';
@@ -93,6 +100,7 @@ import MarketingBrandingService from '../services/MarketingBrandingService';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 import { ReviewResponseService } from '../services/ReviewResponseService';
+import { OutreachOpenerService } from '../services/OutreachOpenerService';
 
 const router = Router();
 
@@ -207,6 +215,26 @@ const reviewResponseLogSchema = z.object({
   response_text: z.string().optional(),
   response_type: responseTypeEnum,
   notes: z.string().optional(),
+});
+
+const reviewScheduleFollowUpSchema = z.object({
+  scheduled_for: z.string().datetime(),
+  notes: z.string().optional(),
+});
+
+const reviewCompleteFollowUpSchema = z.object({
+  response_text: z.string().optional(),
+  outcome: z.enum(['converted_paid', 'customer_responded', 'no_response', 'duplicate', 'out_of_scope', 'other']).optional(),
+});
+
+const reviewUpdateFollowUpSchema = z.object({
+  scheduled_for: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+const reviewSkipFollowUpSchema = z.object({
+  reason: z.string().max(500).optional(),
+  outcome: z.enum(['converted_paid', 'customer_responded', 'no_response', 'duplicate', 'out_of_scope', 'other']).optional(),
 });
 
 // Hot-prospect override schema (Sprint 3)
@@ -1870,6 +1898,70 @@ router.post('/review-response/log/:logId/close', async (req: any, res: Response)
   }
 });
 
+// Schedule a future follow-up at a predetermined time (e.g., 48h, 1 week)
+router.post('/review-response/pipelines/:pipelineId/schedule-follow-up', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewScheduleFollowUpSchema.parse(req.body);
+    const log = await reviewResponseService.scheduleFollowUp({
+      pipelineId: req.params.pipelineId,
+      scheduledFor: parsed.scheduled_for,
+      notes: parsed.notes,
+      respondedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: log });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Complete a scheduled follow-up (operator sent the follow-up)
+router.post('/review-response/log/:logId/complete', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewCompleteFollowUpSchema.parse(req.body || {});
+    const updated = await reviewResponseService.completeScheduledFollowUp(req.params.logId, parsed.response_text, getCtx(req), parsed.outcome);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Update a scheduled follow-up's time and/or notes (only status='scheduled')
+router.put('/review-response/log/:logId', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewUpdateFollowUpSchema.parse(req.body);
+    const updated = await reviewResponseService.updateScheduledFollowUp(req.params.logId, {
+      scheduledFor: parsed.scheduled_for,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Skip a scheduled follow-up (operator decided no further action needed)
+router.post('/review-response/log/:logId/skip', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewSkipFollowUpSchema.parse(req.body || {});
+    const updated = await reviewResponseService.skipScheduledFollowUp(req.params.logId, parsed.reason, getCtx(req), parsed.outcome);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Dashboard: review-response follow-ups due (overdue / due this week)
 router.get('/review-response/follow-ups-due', async (req: any, res: Response) => {
   try {
@@ -1882,6 +1974,99 @@ router.get('/review-response/follow-ups-due', async (req: any, res: Response) =>
       to: weekOut,
     }, getCtx(req));
     res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Openers ───────────────────────────────────────────────────
+// Dual execution path mirroring the Prompt Workspace:
+//   Path 1 (execute): deterministic archetype selection + LLM + quality gate
+//   Path 2 (import):  quality gate on externally-pasted opener text
+const outreachOpenerService = OutreachOpenerService.getInstance();
+
+// Zod schemas for opener endpoints
+const openerExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+});
+
+const openerImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  opener_text: z.string().min(1),
+});
+
+// List openers (filter: campaignId)
+router.get('/openers', async (req: any, res: Response) => {
+  try {
+    const openers = await outreachOpenerService.listOpeners(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: openers });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve archetype + extracted fields + prompt for a campaign (no AI call)
+// Used by the workspace UI to display the detected archetype + resolved prompt
+// before the user clicks Execute (Path 1) or copies the prompt for external use (Path 2).
+router.get('/openers/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute opener generation via AI
+router.post('/openers/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = openerExecuteSchema.parse(req.body);
+    const result = await outreachOpenerService.executeOpener({
+      campaignId: parsed.campaign_id,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated opener
+router.post('/openers/import', async (req: any, res: Response) => {
+  try {
+    const parsed = openerImportSchema.parse(req.body);
+    const result = await outreachOpenerService.importOpener({
+      campaignId: parsed.campaign_id,
+      openerText: parsed.opener_text,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single opener by ID
+router.get('/openers/:id', async (req: any, res: Response) => {
+  try {
+    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
+    if (!opener) {
+      return res.status(404).json({ success: false, error: 'Opener not found' });
+    }
+    res.json({ success: true, data: opener });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
