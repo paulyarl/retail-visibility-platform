@@ -72,6 +72,13 @@
  *
  *   Export:
  *     GET    /export                    — export campaigns as CSV
+ *
+ *   Outreach Openers:
+ *     GET    /openers                   — list openers (filter: campaignId)
+ *     GET    /openers/resolve           — resolve archetype + prompt for a campaign (no AI call)
+ *     POST   /openers/execute           — Path 1: generate opener via AI
+ *     POST   /openers/import            — Path 2: import externally-generated opener
+ *     GET    /openers/:id               — get single opener
  */
 
 import { Router, Response } from 'express';
@@ -92,6 +99,8 @@ import MarketingDeliverableService from '../services/MarketingDeliverableService
 import MarketingBrandingService from '../services/MarketingBrandingService';
 import MarketingCategoryToneService from '../services/MarketingCategoryToneService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
+import { ReviewResponseService } from '../services/ReviewResponseService';
+import { OutreachOpenerService } from '../services/OutreachOpenerService';
 
 const router = Router();
 
@@ -178,6 +187,55 @@ const outreachLogSchema = z.object({
 });
 
 const outreachEditSchema = outreachLogSchema.partial();
+
+// Review-response pipeline schemas (Sprint 5 — Option B)
+const reviewPlatformEnum = z.enum(['google', 'yelp', 'facebook', 'other']);
+const reviewPipelineStageEnum = z.enum(['backlog', 'responding', 'follow_up', 'closed', 'monitoring']);
+const responseTypeEnum = z.enum(['first_response', 'follow_up', 'acknowledgment']);
+
+const reviewPipelineCreateSchema = z.object({
+  platform: reviewPlatformEnum,
+  total_reviews: z.number().int().optional(),
+  unanswered_count: z.number().int().optional(),
+  response_rate: z.number().int().min(0).max(100).optional(),
+  average_rating: z.number().min(0).max(5).optional(),
+  metadata: z.any().optional(),
+});
+
+const reviewPipelineMetricsSchema = z.object({
+  total_reviews: z.number().int().optional(),
+  unanswered_count: z.number().int().optional(),
+  response_rate: z.number().int().min(0).max(100).optional(),
+  average_rating: z.number().min(0).max(5).optional(),
+  metadata: z.any().optional(),
+});
+
+const reviewResponseLogSchema = z.object({
+  platform_review_id: z.string().max(255).optional(),
+  response_text: z.string().optional(),
+  response_type: responseTypeEnum,
+  notes: z.string().optional(),
+});
+
+const reviewScheduleFollowUpSchema = z.object({
+  scheduled_for: z.string().datetime(),
+  notes: z.string().optional(),
+});
+
+const reviewCompleteFollowUpSchema = z.object({
+  response_text: z.string().optional(),
+  outcome: z.enum(['converted_paid', 'customer_responded', 'no_response', 'duplicate', 'out_of_scope', 'other']).optional(),
+});
+
+const reviewUpdateFollowUpSchema = z.object({
+  scheduled_for: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+const reviewSkipFollowUpSchema = z.object({
+  reason: z.string().max(500).optional(),
+  outcome: z.enum(['converted_paid', 'customer_responded', 'no_response', 'duplicate', 'out_of_scope', 'other']).optional(),
+});
 
 // Hot-prospect override schema (Sprint 3)
 const hotProspectOverrideSchema = z.object({
@@ -1698,6 +1756,317 @@ router.delete('/category-tone-presets/:id', async (req: any, res: Response) => {
   try {
     await MarketingCategoryToneService.deletePreset(req.params.id, getCtx(req));
     res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Review-response pipeline (Sprint 5 — Option B) ─────────────────────
+const reviewResponseService = ReviewResponseService.getInstance();
+
+// Create a pipeline for a (campaign, platform) pair (idempotent)
+router.post('/:id/review-response/pipelines', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewPipelineCreateSchema.parse(req.body);
+    const pipeline = await reviewResponseService.createPipeline({
+      campaignId: req.params.id,
+      platform: parsed.platform,
+      totalReviews: parsed.total_reviews,
+      unansweredCount: parsed.unanswered_count,
+      responseRate: parsed.response_rate,
+      averageRating: parsed.average_rating,
+      metadata: parsed.metadata,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: pipeline });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// List all pipelines for a campaign (ordered by priority)
+router.get('/:id/review-response/pipelines', async (req: any, res: Response) => {
+  try {
+    const pipelines = await reviewResponseService.listPipelines(req.params.id, getCtx(req));
+    res.json({ success: true, data: pipelines });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single pipeline
+router.get('/review-response/pipelines/:pipelineId', async (req: any, res: Response) => {
+  try {
+    const pipeline = await reviewResponseService.getPipeline(req.params.pipelineId, getCtx(req));
+    res.json({ success: true, data: pipeline });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Update platform metrics on a pipeline (e.g., after a sync)
+router.put('/review-response/pipelines/:pipelineId/metrics', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewPipelineMetricsSchema.parse(req.body);
+    const updated = await reviewResponseService.updateMetrics(req.params.pipelineId, {
+      totalReviews: parsed.total_reviews,
+      unansweredCount: parsed.unanswered_count,
+      responseRate: parsed.response_rate,
+      averageRating: parsed.average_rating,
+      metadata: parsed.metadata,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Check gate criteria for a pipeline (returns gate result without mutating stage)
+router.get('/review-response/pipelines/:pipelineId/gate', async (req: any, res: Response) => {
+  try {
+    const result = await reviewResponseService.checkGate(req.params.pipelineId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Advance a pipeline to the next stage (refuses if gate not met unless ?force=true)
+router.post('/review-response/pipelines/:pipelineId/advance', async (req: any, res: Response) => {
+  try {
+    const force = req.query.force === 'true';
+    const updated = await reviewResponseService.advanceStage(req.params.pipelineId, force, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Log a review response (first response, follow-up, or acknowledgment)
+router.post('/review-response/pipelines/:pipelineId/log', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewResponseLogSchema.parse(req.body);
+    const log = await reviewResponseService.logResponse({
+      pipelineId: req.params.pipelineId,
+      platformReviewId: parsed.platform_review_id,
+      responseText: parsed.response_text,
+      responseType: parsed.response_type,
+      respondedBy: req.user?.id,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: log });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// List the response log for a pipeline (newest first)
+router.get('/review-response/pipelines/:pipelineId/log', async (req: any, res: Response) => {
+  try {
+    const log = await reviewResponseService.listLog(req.params.pipelineId, getCtx(req));
+    res.json({ success: true, data: log });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Mark a customer reply on a log entry (creates an open follow-up thread)
+router.post('/review-response/log/:logId/customer-reply', async (req: any, res: Response) => {
+  try {
+    const updated = await reviewResponseService.markCustomerReply(req.params.logId, undefined, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Close a follow-up thread
+router.post('/review-response/log/:logId/close', async (req: any, res: Response) => {
+  try {
+    const updated = await reviewResponseService.closeThread(req.params.logId, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Schedule a future follow-up at a predetermined time (e.g., 48h, 1 week)
+router.post('/review-response/pipelines/:pipelineId/schedule-follow-up', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewScheduleFollowUpSchema.parse(req.body);
+    const log = await reviewResponseService.scheduleFollowUp({
+      pipelineId: req.params.pipelineId,
+      scheduledFor: parsed.scheduled_for,
+      notes: parsed.notes,
+      respondedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: log });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Complete a scheduled follow-up (operator sent the follow-up)
+router.post('/review-response/log/:logId/complete', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewCompleteFollowUpSchema.parse(req.body || {});
+    const updated = await reviewResponseService.completeScheduledFollowUp(req.params.logId, parsed.response_text, getCtx(req), parsed.outcome);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Update a scheduled follow-up's time and/or notes (only status='scheduled')
+router.put('/review-response/log/:logId', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewUpdateFollowUpSchema.parse(req.body);
+    const updated = await reviewResponseService.updateScheduledFollowUp(req.params.logId, {
+      scheduledFor: parsed.scheduled_for,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Skip a scheduled follow-up (operator decided no further action needed)
+router.post('/review-response/log/:logId/skip', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewSkipFollowUpSchema.parse(req.body || {});
+    const updated = await reviewResponseService.skipScheduledFollowUp(req.params.logId, parsed.reason, getCtx(req), parsed.outcome);
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Dashboard: review-response follow-ups due (overdue / due this week)
+router.get('/review-response/follow-ups-due', async (req: any, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekOut = new Date(today);
+    weekOut.setDate(weekOut.getDate() + 7);
+    const result = await reviewResponseService.getFollowUpsDue({
+      from: today,
+      to: weekOut,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Openers ───────────────────────────────────────────────────
+// Dual execution path mirroring the Prompt Workspace:
+//   Path 1 (execute): deterministic archetype selection + LLM + quality gate
+//   Path 2 (import):  quality gate on externally-pasted opener text
+const outreachOpenerService = OutreachOpenerService.getInstance();
+
+// Zod schemas for opener endpoints
+const openerExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+});
+
+const openerImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  opener_text: z.string().min(1),
+});
+
+// List openers (filter: campaignId)
+router.get('/openers', async (req: any, res: Response) => {
+  try {
+    const openers = await outreachOpenerService.listOpeners(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: openers });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve archetype + extracted fields + prompt for a campaign (no AI call)
+// Used by the workspace UI to display the detected archetype + resolved prompt
+// before the user clicks Execute (Path 1) or copies the prompt for external use (Path 2).
+router.get('/openers/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute opener generation via AI
+router.post('/openers/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = openerExecuteSchema.parse(req.body);
+    const result = await outreachOpenerService.executeOpener({
+      campaignId: parsed.campaign_id,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated opener
+router.post('/openers/import', async (req: any, res: Response) => {
+  try {
+    const parsed = openerImportSchema.parse(req.body);
+    const result = await outreachOpenerService.importOpener({
+      campaignId: parsed.campaign_id,
+      openerText: parsed.opener_text,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single opener by ID
+router.get('/openers/:id', async (req: any, res: Response) => {
+  try {
+    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
+    if (!opener) {
+      return res.status(404).json({ success: false, error: 'Opener not found' });
+    }
+    res.json({ success: true, data: opener });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

@@ -183,6 +183,126 @@ export interface FreshSnapshot {
   dataFreshAt: string;
 }
 
+// ─── Review Response Pipeline types ──────────────────────────────────────
+export type ReviewPipelineStage = 'backlog' | 'responding' | 'follow_up' | 'closed' | 'monitoring';
+export type ReviewResponseType = 'first_response' | 'follow_up' | 'public_reply' | 'private_message';
+export type ReviewLogStatus = 'scheduled' | 'completed' | 'skipped';
+export type FollowUpOutcome = 'converted_paid' | 'customer_responded' | 'no_response' | 'duplicate' | 'out_of_scope' | 'other';
+
+// ─── Outreach Opener Types ──────────────────────────────────────────────
+export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4';
+export type OpenerSource = 'ai' | 'external';
+
+export interface OpenerArchetypeSelection {
+  archetype: OpenerArchetype;
+  reason: string;
+  theme?: { theme: string; summary: string; supporting_review_count: number };
+}
+
+export interface OpenerResolution {
+  selection: OpenerArchetypeSelection;
+  extractedFields: Record<string, any>;
+  resolvedPrompt: string;
+}
+
+export interface QualityGateResult {
+  passed: boolean;
+  issues: string[];
+}
+
+export interface OpenerResult {
+  opener: OutreachOpener;
+  selection: OpenerArchetypeSelection;
+  extractedFields: Record<string, any>;
+  qualityGate: QualityGateResult;
+  resolvedPrompt: string;
+}
+
+export interface OutreachOpener {
+  id: string;
+  campaign_id: string;
+  archetype: OpenerArchetype;
+  opener_text: string | null;
+  quality_gate_passed: boolean;
+  quality_gate_issues: string[] | null;
+  source: OpenerSource;
+  ai_provider: string | null;
+  ai_model: string | null;
+  tokens_used: number;
+  cost_cents: number;
+  extracted_fields: Record<string, any> | null;
+  executed_by: string | null;
+  executed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReviewResponsePipeline {
+  id: string;
+  campaign_id: string;
+  platform: string;
+  stage: ReviewPipelineStage;
+  priority: number;
+  total_reviews: number;
+  unanswered_count: number;
+  response_rate: number;
+  average_rating: number | null;
+  follow_ups_open: number;
+  follow_ups_completed: number;
+  gate_met: boolean;
+  gate_met_at: string | null;
+  next_follow_up_at: string | null;
+  last_activity_at: string | null;
+  stale_thread_cutoff_at: string | null;
+  metadata: any;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReviewResponseLogEntry {
+  id: string;
+  pipeline_id: string;
+  platform_review_id: string | null;
+  response_text: string | null;
+  response_type: ReviewResponseType;
+  responded_at: string;
+  responded_by: string | null;
+  customer_replied: boolean;
+  customer_reply_at: string | null;
+  thread_closed: boolean;
+  thread_closed_at: string | null;
+  notes: string | null;
+  scheduled_for: string | null;
+  status: ReviewLogStatus;
+  outcome: FollowUpOutcome | null;
+  created_at: string;
+}
+
+export interface ReviewGateResult {
+  gateMet: boolean;
+  reasons: string[];
+  metrics: {
+    unansweredCount: number;
+    responseRate: number;
+    followUpsOpen: number;
+    thresholdUnanswered: number;
+    thresholdResponseRate: number;
+  };
+}
+
+export interface LogReviewResponseInput {
+  platform_review_id?: string;
+  response_text?: string;
+  response_type: ReviewResponseType;
+  notes?: string;
+}
+
+export interface ReviewFollowUpsDueResult {
+  overdue: ReviewResponsePipeline[];
+  dueToday: ReviewResponsePipeline[];
+  thisWeek: ReviewResponsePipeline[];
+}
+
 export interface FollowUpEntry {
   campaign_id: string;
   business_name: string | null;
@@ -1936,6 +2056,268 @@ class MarketingOpsService extends AdminApiSingleton {
 
   getReceiptUrl(campaignId: string): string {
     return `/api/public/marketing/receipt/${campaignId}`;
+  }
+
+  // ─── Review Response Pipeline (Sprint 4) ─────────────────────────────────
+  async listReviewPipelines(campaignId: string): Promise<ReviewResponsePipeline[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      `mkt-ops-review-pipelines-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list review pipelines');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async getReviewPipeline(pipelineId: string): Promise<ReviewResponsePipeline> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}`,
+      { method: 'GET' },
+      `mkt-ops-review-pipeline-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get review pipeline');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async createReviewPipeline(input: { campaignId: string; platform: string }): Promise<ReviewResponsePipeline> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-review-pipeline-create-${input.campaignId}-${input.platform}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create review pipeline');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async updateReviewMetrics(pipelineId: string, input: Partial<ReviewResponsePipeline>): Promise<ReviewResponsePipeline> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/metrics`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `mkt-ops-review-pipeline-metrics-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update review metrics');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async checkReviewGate(pipelineId: string): Promise<ReviewGateResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/gate-check`,
+      { method: 'GET' },
+      `mkt-ops-review-gate-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to check review gate');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async advanceReviewStage(pipelineId: string, force = false): Promise<ReviewResponsePipeline> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/advance`,
+      { method: 'POST', body: JSON.stringify({ force }) },
+      `mkt-ops-review-advance-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to advance review stage');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async logReviewResponse(pipelineId: string, input: LogReviewResponseInput): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/log`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-review-log-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to log review response');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async listReviewLog(pipelineId: string): Promise<ReviewResponseLogEntry[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/log`,
+      { method: 'GET' },
+      `mkt-ops-review-log-list-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list review log');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async markCustomerReply(logId: string): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/log/${logId}/reply`,
+      { method: 'POST' },
+      `mkt-ops-review-reply-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to mark customer reply');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async closeReviewThread(logId: string): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/log/${logId}/close`,
+      { method: 'POST' },
+      `mkt-ops-review-close-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to close review thread');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async scheduleReviewFollowUp(pipelineId: string, input: { scheduledFor: string; notes?: string }): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/schedule-follow-up`,
+      { method: 'POST', body: JSON.stringify({ scheduled_for: input.scheduledFor, notes: input.notes }) },
+      `mkt-ops-review-schedule-${pipelineId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to schedule review follow-up');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async updateScheduledFollowUp(logId: string, input: { scheduledFor?: string; notes?: string }): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/log/${logId}`,
+      { method: 'PUT', body: JSON.stringify({ scheduled_for: input.scheduledFor, notes: input.notes }) },
+      `mkt-ops-review-update-fu-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update scheduled follow-up');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async completeScheduledFollowUp(logId: string, responseText?: string, outcome?: FollowUpOutcome): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/log/${logId}/complete`,
+      { method: 'POST', body: JSON.stringify({ response_text: responseText, outcome }) },
+      `mkt-ops-review-complete-fu-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to complete scheduled follow-up');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async skipScheduledFollowUp(logId: string, reason?: string, outcome?: FollowUpOutcome): Promise<ReviewResponseLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/log/${logId}/skip`,
+      { method: 'POST', body: JSON.stringify({ reason, outcome }) },
+      `mkt-ops-review-skip-fu-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to skip scheduled follow-up');
+    }
+    await this.invalidateCachePattern('mkt-ops-review-pipeline');
+    return result.data?.data ?? result.data;
+  }
+
+  async getReviewFollowUpsDue(): Promise<ReviewFollowUpsDueResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/review-response/follow-ups-due`,
+      { method: 'GET' },
+      `mkt-ops-review-follow-ups-due`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get review follow-ups due');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach Openers ──────────────────────────────────────────────────
+  async resolveOpener(campaignId: string): Promise<OpenerResolution> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/resolve?campaignId=${encodeURIComponent(campaignId)}`,
+      { method: 'GET' },
+      `mkt-ops-opener-resolve-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve opener');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async executeOpener(campaignId: string): Promise<OpenerResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/execute`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId }) },
+      `mkt-ops-opener-execute-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute opener');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importOpener(campaignId: string, openerText: string): Promise<OpenerResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/import`,
+      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, opener_text: openerText }) },
+      `mkt-ops-opener-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import opener');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async listOpeners(campaignId?: string): Promise<OutreachOpener[]> {
+    const url = campaignId
+      ? `${BASE_URL}/openers?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/openers`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-openers-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list openers');
+    }
+    return result.data?.data ?? result.data ?? [];
   }
 }
 

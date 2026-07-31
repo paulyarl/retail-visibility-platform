@@ -368,6 +368,16 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         logger.error('Failed to start marketing ops auto-follow-up scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
+
+      // Start review response scheduler (every 6h) — checks gates, auto-advances
+      // stages, closes stale threads, promotes closed pipelines to monitoring
+      try {
+        const { startReviewResponseScheduler } = await import('./jobs/review-response-scheduler');
+        startReviewResponseScheduler();
+        logger.info('Review response scheduler started');
+      } catch (err) {
+        logger.error('Failed to start review response scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
     });
 
     // Handle server errors

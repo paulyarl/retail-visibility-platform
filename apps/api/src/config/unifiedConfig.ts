@@ -173,6 +173,40 @@ class UnifiedConfig {
     return v !== 'false' && v !== '0'; // default true
   }
 
+  // Review-response pipeline config (Sprint 5 — Option B)
+  // Gate: a platform advances to the next stage only when unanswered_count
+  // <= threshold AND follow_ups_open = 0 AND response_rate >= target.
+  get marketingOpsReviewResponseGateUnansweredThreshold(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_REVIEW_RESPONSE_GATE_UNANSWERED || '', 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 16; // ~10% of 158 Google backlog
+  }
+  get marketingOpsReviewResponseGateResponseRateTarget(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_REVIEW_RESPONSE_GATE_RATE_TARGET || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 && parsed <= 100 ? parsed : 90;
+  }
+  get marketingOpsReviewResponseFollowUpCadenceDays(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_REVIEW_RESPONSE_FOLLOWUP_CADENCE_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+  }
+  get marketingOpsReviewResponseStaleThreadCutoffDays(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_REVIEW_RESPONSE_STALE_CUTOFF_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 90;
+  }
+  get marketingOpsReviewResponseSchedulerIntervalHours(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_REVIEW_RESPONSE_INTERVAL_HOURS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 6;
+  }
+  // Default platform priority order (lower = work first). Drives which
+  // platform's backlog an operator should tackle first for a campaign.
+  get marketingOpsReviewResponsePlatformPriority(): Record<string, number> {
+    return {
+      google: 1,
+      yelp: 2,
+      facebook: 3,
+      other: 4,
+    };
+  }
+
   // ─── Sentry ───────────────────────────────────────────────────────────
 
   get sentryDsn(): string | undefined {
