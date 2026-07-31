@@ -34,13 +34,13 @@ export class ScopeMismatchError extends Error {
  */
 export const SCOPE_VARIABLES: Record<string, string[]> = {
   business: [
-    'business_name', 'category', 'city', 'neighborhood', 'contact_method',
+    'business_name', 'category', 'city', 'state', 'neighborhood', 'contact_method',
     'contact_info', 'unaddressed_reviews', 'last_review_date', 'gbp_claimed',
     'has_website', 'nap_consistent', 'pain_score', 'estimated_tier', 'notes',
     'tone', 'attributes',
   ],
-  category: ['category', 'city', 'neighborhood', 'tone', 'attributes'],
-  city: ['city', 'neighborhood'],
+  category: ['category', 'city', 'state', 'neighborhood', 'tone', 'attributes'],
+  city: ['city', 'state', 'neighborhood'],
 };
 
 /**

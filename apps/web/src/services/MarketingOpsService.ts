@@ -73,6 +73,10 @@ export interface Campaign {
   neighborhood: string | null;
   contact_method: string | null;
   contact_info: string | null;
+  phone: string | null;
+  email: string | null;
+  website_url: string | null;
+  social_profiles: { platform: string; url: string }[] | null;
   gbp_claimed: boolean | null;
   unaddressed_reviews: number | null;
   last_review_date: string | null;
@@ -114,12 +118,129 @@ export interface Campaign {
   coupon_code?: string | null;
   service_category?: string | null;
   service_category_label?: string | null;
+  parent_campaign_id?: string | null;
+  last_contacted_at?: string | null;
+  next_follow_up_at?: string | null;
+  last_contact_channel?: string | null;
+  state?: string | null;
+  is_hot_prospect?: boolean;
+  hot_prospect_reason?: string | null;
+  hot_prospect_set_at?: string | null;
+  hot_prospect_deprioritized?: boolean;
+  auto_followup_count?: number;
+}
+
+export interface CampaignLineageEntry {
+  id: string;
+  business_name: string | null;
+  scope: CampaignScope;
+  stage: CampaignStage;
+  created_at?: string;
+  category?: string | null;
+  city?: string | null;
 }
 
 export interface CampaignDetail extends Campaign {
   audits?: Audit[];
   files?: MarketingFile[];
   stage_history?: StageHistory[];
+  parent_campaign?: CampaignLineageEntry | null;
+  children?: CampaignLineageEntry[];
+  outreach_log?: OutreachLogEntry[];
+}
+
+export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
+export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled';
+
+export interface OutreachLogEntry {
+  id: string;
+  campaign_id: string;
+  stage_at_time: string;
+  contact_channel: ContactChannel;
+  contact_date: string;
+  outcome: ContactOutcome;
+  follow_up_date: string | null;
+  follow_up_completed_at: string | null;
+  notes: string | null;
+  contacted_by: string | null;
+  message_snapshot: string | null;
+  message_subject: string | null;
+  data_snapshot: {
+    review_count?: number;
+    average_rating?: number | null;
+    unaddressed_reviews?: number;
+    last_review_date?: string | null;
+    gbp_claimed?: boolean;
+    photo_count?: number;
+  } | null;
+  data_fresh_at: string | null;
+  preview_token: string | null;
+  created_at: string;
+}
+
+export interface FreshSnapshot {
+  dataSnapshot: OutreachLogEntry['data_snapshot'];
+  dataFreshAt: string;
+}
+
+export interface FollowUpEntry {
+  campaign_id: string;
+  business_name: string | null;
+  next_follow_up_at: string;
+  days_overdue?: number;
+  assigned_to: string | null;
+}
+
+export interface FollowUpsDueResult {
+  overdue: FollowUpEntry[];
+  dueToday: FollowUpEntry[];
+  thisWeek: FollowUpEntry[];
+}
+
+// ─── Hot-prospect (Sprint 3) ────────────────────────────────────────────
+export interface HotProspectEntry {
+  campaign_id: string;
+  business_name: string | null;
+  stage: string;
+  city: string | null;
+  state: string | null;
+  category: string | null;
+  pain_score: number | null;
+  estimated_tier: string | null;
+  hot_prospect_reason: string | null;
+  hot_prospect_set_at: string | null;
+  auto_followup_count: number;
+  max_auto_followups: number;
+  next_follow_up_at: string | null;
+  last_contacted_at: string | null;
+}
+
+export interface HotProspectsResult {
+  prospects: HotProspectEntry[];
+}
+
+// ─── Business analysis audit sync (Sprint 4) ────────────────────────────
+export interface AuditSyncReport {
+  campaignId: string;
+  auditId: string;
+  fieldsSynced: string[];
+  contactsSynced: string[];
+  hotProspectMarked: boolean;
+  hotProspectReason: string | null;
+  identityStatus: string | null;
+  skipped: boolean;
+  skipReason?: string;
+}
+
+export interface LogContactInput {
+  contact_channel: ContactChannel;
+  contact_date: string;
+  outcome: ContactOutcome;
+  follow_up_date?: string;
+  notes?: string;
+  message_snapshot?: string;
+  message_subject?: string;
+  preview_token?: string;
 }
 
 export interface Audit {
@@ -388,6 +509,10 @@ export interface CampaignCreateInput {
   neighborhood?: string;
   contact_method?: string;
   contact_info?: string;
+  phone?: string;
+  email?: string;
+  website_url?: string;
+  social_profiles?: { platform: string; url: string }[];
   display_id?: string;
   gbp_claimed?: boolean;
   unaddressed_reviews?: number;
@@ -423,6 +548,21 @@ export interface StageTransitionInput {
   to_stage: CampaignStage;
   notes?: string;
   trigger_type?: 'manual' | 'automated' | 'system';
+}
+
+export interface ContactReadiness {
+  hasPhone: boolean;
+  hasEmail: boolean;
+  hasWebsite: boolean;
+  hasSocial: boolean;
+  complete: boolean;
+}
+
+export interface EnrichContactResult {
+  phone: string | null;
+  websiteUrl: string | null;
+  source: 'places_api' | 'cache' | 'audit_fallback' | 'no_match' | 'already_populated';
+  populated: string[];
 }
 
 export interface AuditCreateInput {
@@ -640,6 +780,34 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
+  /**
+   * Derive a business-scope child campaign from a discovered competitor.
+   * Seeds business_name + estimated_tier from the payload; inherits category,
+   * city, neighborhood, tone, attributes from the parent. Child starts at `seek`.
+   * Returns the created child campaign.
+   */
+  async deriveBusinessCampaign(parentId: string, input: {
+    business_name: string;
+    rating?: number;
+    review_count?: number;
+    location?: string;
+    assigned_to?: string;
+  }): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${parentId}/derive-business`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-campaign-derive-${parentId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to derive business campaign');
+    }
+    // Invalidate the parent campaign cache so lineage (children) updates.
+    await this.invalidateCachePattern(`mkt-ops-campaign-${parentId}`);
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    return result.data?.data ?? result.data;
+  }
+
   async updateCampaign(id: string, input: CampaignUpdateInput): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/${id}`,
@@ -676,6 +844,196 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async enrichContact(id: string, opts: { force?: boolean } = {}): Promise<EnrichContactResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/enrich-contact`,
+      { method: 'POST', body: JSON.stringify({ force: opts.force ?? false }) },
+      `mkt-ops-campaign-enrich-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to enrich contact from GBP');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async getContactReadiness(id: string): Promise<ContactReadiness> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/contact-readiness`,
+      { method: 'GET' },
+      `mkt-ops-campaign-readiness-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get contact readiness');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach log (Sprint 2) ────────────────────────────────────────────
+  async logContact(campaignId: string, input: LogContactInput): Promise<OutreachLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-campaign-outreach-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to log contact');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async listOutreach(campaignId: string): Promise<OutreachLogEntry[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/outreach`,
+      { method: 'GET' },
+      `mkt-ops-campaign-outreach-list-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list outreach log');
+    }
+    return result.data?.data ?? result.data ?? [];
+  }
+
+  async getFreshSnapshot(campaignId: string): Promise<FreshSnapshot> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/fresh-snapshot`,
+      { method: 'GET' },
+      `mkt-ops-campaign-fresh-snapshot-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get fresh snapshot');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async editOutreach(logId: string, input: Partial<LogContactInput>): Promise<OutreachLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/outreach/${logId}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `mkt-ops-outreach-edit-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to edit outreach log');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async deleteOutreach(logId: string): Promise<void> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/outreach/${logId}`,
+      { method: 'DELETE' },
+      `mkt-ops-outreach-delete-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to delete outreach log');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+  }
+
+  async completeFollowUp(logId: string): Promise<OutreachLogEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/outreach/${logId}/complete`,
+      { method: 'POST' },
+      `mkt-ops-outreach-complete-${logId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to complete follow-up');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async getFollowUpsDue(opts: { from?: string; to?: string; assignedTo?: string } = {}): Promise<FollowUpsDueResult> {
+    const params = new URLSearchParams();
+    if (opts.from) params.set('from', opts.from);
+    if (opts.to) params.set('to', opts.to);
+    if (opts.assignedTo) params.set('assigned_to', opts.assignedTo);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups-due${qs}`,
+      { method: 'GET' },
+      `mkt-ops-follow-ups-due`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to get follow-ups due');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Hot-prospect (Sprint 3) ────────────────────────────────────────────
+  async setHotProspect(campaignId: string, opts: { isHot: boolean; reason?: string }): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/hot-prospect`,
+      { method: 'PUT', body: JSON.stringify({ isHot: opts.isHot, reason: opts.reason }) },
+      `mkt-ops-campaign-hot-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to set hot prospect');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async clearDeprioritized(campaignId: string): Promise<{ is_hot_prospect: boolean; hot_prospect_deprioritized: boolean; auto_followup_count: number }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/clear-deprioritized`,
+      { method: 'POST' },
+      `mkt-ops-campaign-clear-deprio-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to clear deprioritization');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async listHotProspects(filters: { stage?: string; city?: string; state?: string; category?: string } = {}): Promise<HotProspectsResult> {
+    const params = new URLSearchParams();
+    if (filters.stage) params.set('stage', filters.stage);
+    if (filters.city) params.set('city', filters.city);
+    if (filters.state) params.set('state', filters.state);
+    if (filters.category) params.set('category', filters.category);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/hot-prospects${qs}`,
+      { method: 'GET' },
+      `mkt-ops-hot-prospects`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list hot prospects');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Business analysis audit sync (Sprint 4) ────────────────────────────
+  async syncAuditToCampaign(campaignId: string, auditId: string): Promise<AuditSyncReport> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/audits/${auditId}/sync`,
+      { method: 'POST' },
+      `mkt-ops-audit-sync-${auditId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to sync audit to campaign');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;

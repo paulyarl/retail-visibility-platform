@@ -358,6 +358,16 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         logger.error('Failed to start marketing ops auto-advance job', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
+
+      // Start marketing ops auto-follow-up scheduler (every 6h) — schedules
+      // follow-ups for hot prospects whose latest contact was a no-response
+      try {
+        const { startMarketingOpsAutoFollowUp } = await import('./jobs/marketing-ops-auto-followup');
+        startMarketingOpsAutoFollowUp();
+        logger.info('Marketing ops auto-follow-up scheduler started');
+      } catch (err) {
+        logger.error('Failed to start marketing ops auto-follow-up scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
     });
 
     // Handle server errors

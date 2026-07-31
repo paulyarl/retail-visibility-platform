@@ -17,6 +17,16 @@
  */
 
 import { z } from 'zod';
+import {
+  regionalCityOpportunitySchema,
+  REGIONAL_CITY_OPPORTUNITY_SCHEMA_NAME,
+  REGIONAL_CITY_OPPORTUNITY_PROMPT_SUFFIX,
+} from './regional-city-opportunity.schema';
+import {
+  businessAnalysisSchema,
+  BUSINESS_ANALYSIS_SCHEMA_NAME,
+  BUSINESS_ANALYSIS_PROMPT_SUFFIX,
+} from './business-analysis.schema';
 
 /**
  * Strip a trailing `%` and coerce to number.
@@ -132,6 +142,16 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: marketAnalysisSchema,
     auditPlatform: 'category_analysis',
     promptSuffix: MARKET_ANALYSIS_PROMPT_SUFFIX,
+  },
+  [REGIONAL_CITY_OPPORTUNITY_SCHEMA_NAME]: {
+    validator: regionalCityOpportunitySchema,
+    auditPlatform: 'city_analysis',
+    promptSuffix: REGIONAL_CITY_OPPORTUNITY_PROMPT_SUFFIX,
+  },
+  [BUSINESS_ANALYSIS_SCHEMA_NAME]: {
+    validator: businessAnalysisSchema,
+    auditPlatform: 'business_analysis',
+    promptSuffix: BUSINESS_ANALYSIS_PROMPT_SUFFIX,
   },
 };
 

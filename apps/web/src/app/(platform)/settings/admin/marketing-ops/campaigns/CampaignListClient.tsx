@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { RefreshCw, Plus, Search, LayoutGrid, Table as TableIcon, Flame } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { Campaign, CampaignStage, CampaignScope } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
@@ -12,6 +12,31 @@ const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'pai
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
+
+type FollowUpFilter = '' | 'overdue' | 'due_today' | 'this_week';
+
+function followUpBadge(c: Campaign): { label: string; cls: string } | null {
+  if (!c.next_follow_up_at) return null;
+  const fu = new Date(c.next_follow_up_at);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  fu.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((fu.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) return { label: `Overdue ${Math.abs(diffDays)}d`, cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' };
+  if (diffDays === 0) return { label: 'Due today', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' };
+  if (diffDays <= 7) return { label: `Due ${fu.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' };
+  return null;
+}
+
+function matchesFollowUpFilter(c: Campaign, filter: FollowUpFilter): boolean {
+  if (!filter) return true;
+  const badge = followUpBadge(c);
+  if (!badge) return false;
+  if (filter === 'overdue') return badge.label.startsWith('Overdue');
+  if (filter === 'due_today') return badge.label === 'Due today';
+  if (filter === 'this_week') return badge.label.startsWith('Due ');
+  return true;
+}
 
 export default function CampaignListClient() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -24,6 +49,7 @@ export default function CampaignListClient() {
   const [toneFilter, setToneFilter] = useState('');
   const [retainerFilter, setRetainerFilter] = useState<'Fast' | 'Medium' | 'Slow' | ''>('');
   const [attributeFilter, setAttributeFilter] = useState('');
+  const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('');
   const staffUsers = useStaffUsers();
 
   const fetchCampaigns = useCallback(async () => {
@@ -56,6 +82,10 @@ export default function CampaignListClient() {
   const toneOptions = useMemo(() => distinctValues(campaigns, (c) => c.tone), [campaigns]);
 
   const campaignsByStage = (stage: CampaignStage) => campaigns.filter((c) => c.stage === stage);
+  const filteredCampaigns = useMemo(
+    () => campaigns.filter((c) => matchesFollowUpFilter(c, followUpFilter)),
+    [campaigns, followUpFilter],
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
@@ -158,6 +188,28 @@ export default function CampaignListClient() {
           </div>
         </div>
 
+        {/* Follow-up quick filter chips */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Follow-ups:</span>
+          {(['', 'overdue', 'due_today', 'this_week'] as FollowUpFilter[]).map((f) => {
+            const labels: Record<FollowUpFilter, string> = { '': 'All', overdue: 'Overdue', due_today: 'Due today', this_week: 'This week' };
+            const active = followUpFilter === f;
+            return (
+              <button
+                key={f || 'all'}
+                onClick={() => setFollowUpFilter(f)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  active
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-300 dark:border-neutral-700 dark:hover:bg-neutral-700'
+                }`}
+              >
+                {labels[f]}
+              </button>
+            );
+          })}
+        </div>
+
         {error && (
           <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
             <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
@@ -180,6 +232,7 @@ export default function CampaignListClient() {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tone</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">City</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Stage</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Follow-up</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Retainer</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Attributes</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Tenant</th>
@@ -190,18 +243,19 @@ export default function CampaignListClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-neutral-700">
-                  {campaigns.length === 0 ? (
+                  {filteredCampaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={14} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                         No campaigns found. Create one to get started.
                       </td>
                     </tr>
                   ) : (
-                    campaigns.map((c) => (
+                    filteredCampaigns.map((c) => (
                       <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-neutral-700/30">
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.scope}</td>
                         <td className="px-4 py-3">
                           <Link href={`/settings/admin/marketing-ops/campaigns/${c.id}`} className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
+                            {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 text-orange-500" />}
                             {c.business_name ?? '—'}
                           </Link>
                           {c.display_id && (
@@ -212,6 +266,12 @@ export default function CampaignListClient() {
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.tone ?? '—'}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.city}{c.neighborhood ? ` (${c.neighborhood})` : ''}</td>
                         <td className="px-4 py-3"><StageBadge stage={c.stage} /></td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const b = followUpBadge(c);
+                            return b ? <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${b.cls}`}>{b.label}</span> : <span className="text-xs text-gray-400">—</span>;
+                          })()}
+                        </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.retainer ?? '—'}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.attributes?.join(', ') || '—'}</td>
                         <td className="px-4 py-3">
@@ -248,7 +308,7 @@ export default function CampaignListClient() {
           <div className="overflow-x-auto pb-4">
             <div className="flex gap-4 min-w-max">
               {PIPELINE_STAGES.map((stage) => {
-                const items = campaignsByStage(stage);
+                const items = filteredCampaigns.filter((c) => c.stage === stage);
                 return (
                   <div key={stage} className="w-72 flex-shrink-0">
                     <div className="flex items-center justify-between mb-3">
@@ -261,13 +321,21 @@ export default function CampaignListClient() {
                           Empty
                         </div>
                       ) : (
-                        items.map((c) => (
+                        items.map((c) => {
+                          const fuBadge = followUpBadge(c);
+                          return (
                           <Link
                             key={c.id}
                             href={`/settings/admin/marketing-ops/campaigns/${c.id}`}
                             className="block bg-white dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-neutral-700 p-3 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
                           >
-                            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{c.business_name ?? c.category ?? c.city}</p>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                {c.is_hot_prospect && <Flame className="inline w-3 h-3 mr-1 flex-shrink-0 text-orange-500" />}
+                                {c.business_name ?? c.category ?? c.city}
+                              </p>
+                              {fuBadge && <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${fuBadge.cls}`}>{fuBadge.label}</span>}
+                            </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1"><span className="uppercase text-[10px] tracking-wider text-gray-400">{c.scope}</span> · {c.category} · {c.city}</p>
                             {(c.tone || c.retainer || c.attributes?.length) && (
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -282,7 +350,8 @@ export default function CampaignListClient() {
                               )}
                             </div>
                           </Link>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

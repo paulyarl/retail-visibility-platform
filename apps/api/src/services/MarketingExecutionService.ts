@@ -16,6 +16,7 @@ import { MarketingPromptService } from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import aiProviderFactory from './ai-providers';
 import { ScopeMismatchError, assertScopeCompatible, SCOPE_VARIABLES } from './scope-utils';
+import { MarketingHotProspectService } from './MarketingHotProspectService';
 
 // Re-export for backward compatibility (tests + existing imports).
 export { ScopeMismatchError, assertScopeCompatible };
@@ -166,6 +167,26 @@ export class MarketingExecutionService extends BaseService {
           model: result.model,
         });
 
+        // Sprint 3: best-effort City Pain Scan → hot-prospect sync hook.
+        // Catches + logs errors so a sync failure never fails the execution.
+        if (template.prompt_type === 'city_analysis') {
+          try {
+            const report = await MarketingHotProspectService.getInstance().syncFromExecution(execution.id, ctx);
+            logger.info('City Pain Scan sync hook complete', ctx, {
+              executionId: execution.id,
+              matched: report.matched.length,
+              unmatched: report.unmatched.length,
+              hot: report.hotProspectsMarked,
+              skippedChains: report.skippedChains,
+            });
+          } catch (syncErr) {
+            logger.error('City Pain Scan sync hook failed (best-effort)', ctx, {
+              error: (syncErr as Error).message,
+              executionId: execution.id,
+            });
+          }
+        }
+
         return updated;
       } catch (aiError) {
         await promptService.updateExecution(execution.id, {
@@ -230,6 +251,7 @@ export class MarketingExecutionService extends BaseService {
       business_name: campaign.business_name || '',
       category: campaign.category || '',
       city: campaign.city || '',
+      state: campaign.state || '',
       neighborhood: campaign.neighborhood || '',
       contact_method: campaign.contact_method || '',
       contact_info: campaign.contact_info || '',

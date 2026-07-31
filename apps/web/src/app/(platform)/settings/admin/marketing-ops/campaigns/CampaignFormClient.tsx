@@ -23,6 +23,10 @@ interface FormState {
   neighborhood: string;
   contact_method: string;
   contact_info: string;
+  phone: string;
+  email: string;
+  website_url: string;
+  social_profiles: { platform: string; url: string }[];
   display_id: string;
   gbp_claimed: boolean | '';
   unaddressed_reviews: number | '';
@@ -58,6 +62,10 @@ const EMPTY_FORM: FormState = {
   neighborhood: '',
   contact_method: '',
   contact_info: '',
+  phone: '',
+  email: '',
+  website_url: '',
+  social_profiles: [],
   display_id: '',
   gbp_claimed: '',
   unaddressed_reviews: '',
@@ -132,6 +140,10 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         neighborhood: c.neighborhood ?? '',
         contact_method: c.contact_method ?? '',
         contact_info: c.contact_info ?? '',
+        phone: c.phone ?? '',
+        email: c.email ?? '',
+        website_url: c.website_url ?? '',
+        social_profiles: c.social_profiles ?? [],
         display_id: c.display_id ?? '',
         gbp_claimed: c.gbp_claimed ?? '',
         unaddressed_reviews: c.unaddressed_reviews ?? '',
@@ -169,7 +181,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     fetchCampaign();
   }, [fetchCampaign]);
 
-  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[]) => {
+  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -193,14 +205,31 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       const strOrUndef = (v: string) => v === '' ? undefined : v;
 
       if (mode === 'create') {
+        // Backfill legacy contact_method/contact_info from the first non-empty
+        // new channel if the operator left the legacy pair blank (preserves
+        // existing filters/reports that key off the legacy pair).
+        const legacyContactMethod = strOrUndef(form.contact_method);
+        const legacyContactInfo = strOrUndef(form.contact_info);
+        const backfillMethod = !legacyContactMethod && (form.phone || form.email || form.website_url);
+        const backfilledMethod = backfillMethod
+          ? (form.phone ? 'phone' : form.email ? 'email' : 'website')
+          : legacyContactMethod;
+        const backfilledInfo = backfillMethod
+          ? (form.phone || form.email || form.website_url || undefined)
+          : legacyContactInfo;
+
         const input: CampaignCreateInput = {
           scope: form.scope,
           business_name: strOrUndef(form.business_name),
           category: form.category,
           city: form.city,
           neighborhood: strOrUndef(form.neighborhood),
-          contact_method: strOrUndef(form.contact_method),
-          contact_info: strOrUndef(form.contact_info),
+          contact_method: backfilledMethod,
+          contact_info: backfilledInfo,
+          phone: strOrUndef(form.phone),
+          email: strOrUndef(form.email),
+          website_url: strOrUndef(form.website_url),
+          social_profiles: form.social_profiles.length > 0 ? form.social_profiles : undefined,
           display_id: strOrUndef(form.display_id),
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
@@ -220,14 +249,29 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         const created = await marketingOpsService.createCampaign(input);
         router.push(`/settings/admin/marketing-ops/campaigns/${created.id}`);
       } else if (mode === 'edit' && campaignId) {
+        // Same legacy backfill as create.
+        const legacyContactMethod = strOrUndef(form.contact_method);
+        const legacyContactInfo = strOrUndef(form.contact_info);
+        const backfillMethod = !legacyContactMethod && (form.phone || form.email || form.website_url);
+        const backfilledMethod = backfillMethod
+          ? (form.phone ? 'phone' : form.email ? 'email' : 'website')
+          : legacyContactMethod;
+        const backfilledInfo = backfillMethod
+          ? (form.phone || form.email || form.website_url || undefined)
+          : legacyContactInfo;
+
         const input: CampaignUpdateInput = {
           scope: form.scope,
           business_name: strOrUndef(form.business_name),
           category: form.category,
           city: form.city,
           neighborhood: strOrUndef(form.neighborhood),
-          contact_method: strOrUndef(form.contact_method),
-          contact_info: strOrUndef(form.contact_info),
+          contact_method: backfilledMethod,
+          contact_info: backfilledInfo,
+          phone: strOrUndef(form.phone),
+          email: strOrUndef(form.email),
+          website_url: strOrUndef(form.website_url),
+          social_profiles: form.social_profiles.length > 0 ? form.social_profiles : undefined,
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
           last_review_date: form.last_review_date ? new Date(form.last_review_date).toISOString() : undefined,
@@ -358,13 +402,59 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
           {/* Contact & Audit Info */}
           <FormSection title="Contact & GBP Audit">
-            <FormField label="Contact Method">
-              <ContactMethodChecklist value={form.contact_method} options={vocab.contactMethods}
-                onChange={(v) => handleChange('contact_method', v)} className={inputClass} />
-            </FormField>
-            <FormField label="Contact Info">
-              <input type="text" value={form.contact_info} onChange={(e) => handleChange('contact_info', e.target.value)}
+            <FormField label="Phone">
+              <input type="tel" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
+                placeholder="+1 555-0100"
                 className={inputClass} />
+            </FormField>
+            <FormField label="Email">
+              <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)}
+                placeholder="owner@business.com"
+                className={inputClass} />
+            </FormField>
+            <FormField label="Website URL">
+              <input type="url" value={form.website_url} onChange={(e) => handleChange('website_url', e.target.value)}
+                placeholder="https://business.com"
+                className={inputClass} />
+            </FormField>
+            <FormField label="Social Profiles" className="sm:col-span-2">
+              <div className="space-y-2">
+                {form.social_profiles.map((sp, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input type="text" value={sp.platform} placeholder="Platform (e.g. Instagram)"
+                      onChange={(e) => {
+                        const next = [...form.social_profiles];
+                        next[idx] = { ...sp, platform: e.target.value };
+                        handleChange('social_profiles', next);
+                      }}
+                      className={`${inputClass} w-1/3`} />
+                    <input type="url" value={sp.url} placeholder="https://instagram.com/business"
+                      onChange={(e) => {
+                        const next = [...form.social_profiles];
+                        next[idx] = { ...sp, url: e.target.value };
+                        handleChange('social_profiles', next);
+                      }}
+                      className={`${inputClass} flex-1`} />
+                    <button type="button" onClick={() => handleChange('social_profiles', form.social_profiles.filter((_, i) => i !== idx))}
+                      className="px-2 text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
+                  </div>
+                ))}
+                <button type="button"
+                  onClick={() => handleChange('social_profiles', [...form.social_profiles, { platform: '', url: '' }])}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add social profile</button>
+              </div>
+            </FormField>
+            <FormField label="Legacy contact method (optional)" className="sm:col-span-2">
+              <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                Retained for backwards compatibility with existing filters/reports. Auto-filled from the new channels above when left blank.
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <ContactMethodChecklist value={form.contact_method} options={vocab.contactMethods}
+                  onChange={(v) => handleChange('contact_method', v)} className={inputClass} />
+                <input type="text" value={form.contact_info} onChange={(e) => handleChange('contact_info', e.target.value)}
+                  placeholder="Legacy contact info"
+                  className={inputClass} />
+              </div>
             </FormField>
             <FormField label="GBP Claimed">
               <select value={form.gbp_claimed === true ? 'true' : form.gbp_claimed === false ? 'false' : ''} onChange={(e) => handleChange('gbp_claimed', e.target.value === '' ? '' : e.target.value === 'true')}

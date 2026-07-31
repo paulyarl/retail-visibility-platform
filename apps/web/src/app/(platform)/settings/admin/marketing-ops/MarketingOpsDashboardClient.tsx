@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, TrendingUp, DollarSign, Target, Trophy, Download, Activity, Eye, Package } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { DashboardStats, ConversionStats, CampaignStage } from '@/services/MarketingOpsService';
+import FollowUpsDueWidget from '@/components/marketing-ops/FollowUpsDueWidget';
+import HotProspectsWidget from '@/components/marketing-ops/HotProspectsWidget';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
   seek: 'Seek',
@@ -201,6 +203,12 @@ export default function MarketingOpsDashboardClient() {
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{(stats.conversionRate * 100).toFixed(1)}%</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">shown → paid</p>
               </div>
+            </div>
+
+            {/* Follow-ups due widget (Sprint 2) + Hot prospects widget (Sprint 3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+              <FollowUpsDueWidget />
+              <HotProspectsWidget />
             </div>
 
             {/* Weekly Summary */}

@@ -22,8 +22,11 @@ const DANGEROUS_PATTERNS = [
   /(<script|javascript:|vbscript:|onload=|onerror=|onclick=|onmouseover=)/i,
   // Path traversal
   /(\.\.|\/etc\/passwd|\/etc\/shadow|\/proc\/|\/home\/)/i,
-  // SQL comments - require trailing whitespace after -- to avoid flagging URL tokens
-  /(-{2,}\s|\/\*|\*\/)/,
+  // SQL line/block comments. The line-comment marker is exactly "--" followed by
+  // whitespace. We use a negative lookbehind (?<!-) so that markdown horizontal
+  // rules ("---\n" or longer dash runs) are NOT flagged as SQL comments, while
+  // real SQL comments ("-- foo", "--\n") still match.
+  /(?<!-)--(?=\s)|\/\*|\*\//,
 ];
 
 // File upload security
