@@ -720,6 +720,87 @@ router.post('/:id/audits/:auditId/sync', async (req: any, res: Response) => {
   }
 });
 
+// Sprint 5: retrieve persisted sync report for an execution
+router.get('/executions/:executionId/sync-report', async (req: any, res: Response) => {
+  try {
+    const report = await hotProspectService.getSyncReport(req.params.executionId, getCtx(req));
+    res.json({ success: true, data: report });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Sprint 5: create a business-scope child campaign from an unmatched scan business
+router.post('/:id/derive-from-scan', async (req: any, res: Response) => {
+  try {
+    const business = req.body?.business;
+    if (!business || typeof business !== 'object' || !business.business_name) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: [{ message: 'business.business_name is required' }] });
+    }
+    const result = await hotProspectService.deriveBusinessCampaignFromScanBusiness(
+      req.params.id,
+      business,
+      getCtx(req),
+    );
+    res.status(result.created ? 201 : 200).json({ success: true, data: result.campaign, created: result.created });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Sprint 5: bulk create business-scope children for all unmatched businesses in a sync report
+const deriveAllUnmatchedSchema = z.object({
+  executionId: z.string().min(1),
+});
+
+router.post('/:id/derive-all-unmatched', async (req: any, res: Response) => {
+  try {
+    const parsed = deriveAllUnmatchedSchema.parse(req.body);
+    const report = await hotProspectService.getSyncReport(parsed.executionId, getCtx(req));
+    if (!report || !report.unmatched?.length) {
+      return res.json({ success: true, data: { created: [], failed: [], message: 'No unmatched businesses in sync report' } });
+    }
+
+    // Load the execution to get the raw output for the full business JSON.
+    // The sync report's unmatched entries only have {businessName, reason} —
+    // we need the full business objects to seed the child campaigns.
+    const execution = await MarketingPromptService.getExecution(parsed.executionId, getCtx(req));
+    if (!execution) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Execution not found' });
+    }
+    const parsedJson = hotProspectService.parseOutputJson(execution.raw_output);
+    if (!parsedJson) {
+      return res.status(400).json({ success: false, error: 'parse_error', message: 'Could not parse execution output' });
+    }
+    const businesses: any[] = parsedJson.businesses ?? [];
+    const unmatchedNames = new Set(report.unmatched.map((u: any) => (u.businessName || '').toLowerCase().trim()));
+    const unmatchedBusinesses = businesses.filter((b) => unmatchedNames.has((b.business_name || '').toLowerCase().trim()));
+
+    const created: Array<{ campaignId: string; businessName: string }> = [];
+    const failed: Array<{ businessName: string; error: string }> = [];
+
+    for (const business of unmatchedBusinesses) {
+      try {
+        const result = await hotProspectService.deriveBusinessCampaignFromScanBusiness(
+          req.params.id,
+          business,
+          getCtx(req),
+        );
+        created.push({ campaignId: result.campaign.id, businessName: business.business_name });
+      } catch (err: any) {
+        failed.push({ businessName: business.business_name ?? '', error: err.message ?? 'Unknown error' });
+      }
+    }
+
+    res.json({ success: true, data: { created, failed } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Manual campaign→tenant link (sets last_touch_source='manual', fires conversion notification)
 router.post('/:id/link-tenant', async (req: any, res: Response) => {
   try {

@@ -9,6 +9,7 @@ import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/Plat
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
+import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
 import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection';
 import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard';
@@ -38,6 +39,8 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [readinessChecking, setReadinessChecking] = useState(false);
   const [readinessEnriching, setReadinessEnriching] = useState(false);
   const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
+  // Sprint 5: latest city_analysis execution for SyncReportCard
+  const [cityScanExecutionId, setCityScanExecutionId] = useState<string | null>(null);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
     templateId: '',
     deliverableType: 'review_responses',
@@ -67,6 +70,25 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   useEffect(() => {
     fetchCampaign();
   }, [fetchCampaign]);
+
+  // Sprint 5: for city-scope campaigns, find the latest execution with a
+  // sync_report so the SyncReportCard can render it.
+  useEffect(() => {
+    if (campaign?.scope !== 'city') {
+      setCityScanExecutionId(null);
+      return;
+    }
+    marketingOpsService
+      .listExecutions(campaignId)
+      .then((execs) => {
+        // Find the latest execution that has a sync_report (i.e. syncFromExecution ran).
+        const withSync = execs
+          .filter((e) => e.sync_report != null)
+          .sort((a, b) => (b.executed_at || '').localeCompare(a.executed_at || ''));
+        setCityScanExecutionId(withSync[0]?.id ?? null);
+      })
+      .catch(() => setCityScanExecutionId(null));
+  }, [campaign?.scope, campaignId]);
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -513,7 +535,18 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 {campaign.scope === 'category' ? (
                   <CategoryOverviewSection campaign={campaign} />
                 ) : campaign.scope === 'city' ? (
-                  <CityOverviewSection campaign={campaign} />
+                  <>
+                    <CityOverviewSection campaign={campaign} />
+                    {cityScanExecutionId && (
+                      <div className="mt-4">
+                        <SyncReportCard
+                          executionId={cityScanExecutionId}
+                          campaignId={campaignId}
+                          onRefresh={fetchCampaign}
+                        />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <DetailField label="Contact Method" value={campaign.contact_method} />

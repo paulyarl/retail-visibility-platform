@@ -232,6 +232,26 @@ export interface AuditSyncReport {
   skipReason?: string;
 }
 
+// ─── Sprint 5: Scan-to-Campaign Spawning ────────────────────────────────
+export interface SyncReport {
+  executionId?: string;
+  city?: string;
+  state?: string;
+  businessesInOutput?: number;
+  matched: Array<{ campaignId: string; businessName: string; hot: boolean }>;
+  unmatched: Array<{ businessName: string; reason: string }>;
+  skippedChains: number;
+  hotProspectsMarked: number;
+  summaryStored: boolean;
+  syncedAt?: string;
+}
+
+export interface DeriveAllUnmatchedResult {
+  created: Array<{ campaignId: string; businessName: string }>;
+  failed: Array<{ businessName: string; error: string }>;
+  message?: string;
+}
+
 export interface LogContactInput {
   contact_channel: ContactChannel;
   contact_date: string;
@@ -319,6 +339,11 @@ export interface PromptExecution {
   tokens_used: number | null;
   cost_cents: number | null;
   filter_flags?: FilterFlag[];
+  // Sprint 5: persisted sync report (for city_analysis executions)
+  sync_report?: SyncReport | null;
+  // Template info (joined from prompt template)
+  prompt_type?: string;
+  output_schema?: { name: string } | null;
 }
 
 export interface FilterFlag {
@@ -1036,6 +1061,53 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to sync audit to campaign');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Sprint 5: Scan-to-Campaign Spawning ────────────────────────────────
+  async getSyncReport(executionId: string): Promise<SyncReport | null> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/executions/${executionId}/sync-report`,
+      { method: 'GET' },
+      `mkt-ops-sync-report-${executionId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch sync report');
+    }
+    return result.data?.data ?? null;
+  }
+
+  async deriveFromScan(parentId: string, business: any): Promise<{ campaign: Campaign; created: boolean }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${parentId}/derive-from-scan`,
+      { method: 'POST', body: JSON.stringify({ business }) },
+      `mkt-ops-derive-from-scan-${parentId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to derive campaign from scan');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    return {
+      campaign: result.data?.data ?? result.data,
+      created: result.data?.created ?? true,
+    };
+  }
+
+  async deriveAllUnmatched(parentId: string, executionId: string): Promise<DeriveAllUnmatchedResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${parentId}/derive-all-unmatched`,
+      { method: 'POST', body: JSON.stringify({ executionId }) },
+      `mkt-ops-derive-all-unmatched-${parentId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to derive all unmatched');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
     return result.data?.data ?? result.data;
   }
 
