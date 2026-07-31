@@ -147,12 +147,23 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
     return renderedPrompt + getOutputSchemaSuffix(template);
   }, [renderedPrompt, template]);
 
+  // Build the variables payload sent to the backend. Every variable referenced
+  // in the template body is included (defaulting to '') so the backend treats
+  // them as explicit user overrides regardless of scope. Without this, untouched
+  // fields are absent from the payload and the scope validator rejects them as
+  // out-of-scope references (e.g. regional-scan vars on a city-scope template).
+  const buildVariablesPayload = useCallback((): Record<string, string> => {
+    const payload: Record<string, string> = {};
+    for (const v of extractedVariables) payload[v] = variables[v] ?? '';
+    return { ...payload, ...variables };
+  }, [extractedVariables, variables]);
+
   const handleRenderFromServer = async () => {
     if (!selectedCampaignId) return;
     setRendering(true);
     setRenderError(null);
     try {
-      const rendered = await marketingOpsService.renderPrompt(templateId, selectedCampaignId, variables);
+      const rendered = await marketingOpsService.renderPrompt(templateId, selectedCampaignId, buildVariablesPayload());
       setServerRendered(rendered);
     } catch (err: any) {
       setRenderError(err.message || 'Failed to render prompt from server');
@@ -169,7 +180,7 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
       const execution = await marketingOpsService.createExecution({
         campaign_id: selectedCampaignId,
         template_id: templateId,
-        variables_used: variables,
+        variables_used: buildVariablesPayload(),
       });
       // Capture the returned execution and surface it in the Result panel.
       setLastExecution(execution);

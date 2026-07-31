@@ -1640,6 +1640,15 @@ export function generateStageHistoryId(): string {
 }
 
 /**
+ * Generate marketing outreach log ID
+ * Format: mol-{nanoid} (16 chars)
+ */
+export function generateOutreachLogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
+  return `mol-${nanoid()}`;
+}
+
+/**
  * Generate marketing file ID
  * Format: mfile-{nanoid} (14 chars)
  */

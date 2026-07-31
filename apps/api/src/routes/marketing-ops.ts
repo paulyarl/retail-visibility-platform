@@ -81,6 +81,8 @@ import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import MarketingCampaignService from '../services/MarketingCampaignService';
+import { MarketingOutreachService } from '../services/MarketingOutreachService';
+import { MarketingHotProspectService } from '../services/MarketingHotProspectService';
 import MarketingAuditService from '../services/MarketingAuditService';
 import MarketingPromptService from '../services/MarketingPromptService';
 import MarketingExecutionService from '../services/MarketingExecutionService';
@@ -109,6 +111,10 @@ const campaignBaseSchema = z.object({
   neighborhood: z.string().max(100).optional(),
   contact_method: z.string().max(50).optional(),
   contact_info: z.string().max(255).optional(),
+  phone: z.string().max(40).optional(),
+  email: z.string().max(255).optional(),
+  website_url: z.string().max(500).optional(),
+  social_profiles: z.array(z.object({ platform: z.string().max(50), url: z.string().url() })).optional(),
   display_id: z.string().max(20).optional(),
   gbp_claimed: z.boolean().optional(),
   unaddressed_reviews: z.number().int().optional(),
@@ -154,6 +160,29 @@ const stageTransitionSchema = z.object({
 
 const linkTenantSchema = z.object({
   tenant_id: z.string().min(1),
+});
+
+// Outreach log schemas (Sprint 2)
+const contactChannelEnum = z.enum(['phone', 'email', 'website', 'social', 'in_person', 'other']);
+const contactOutcomeEnum = z.enum(['reached', 'no_answer', 'left_message', 'interested', 'not_interested', 'callback_scheduled', 'other']);
+
+const outreachLogSchema = z.object({
+  contact_channel: contactChannelEnum,
+  contact_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'contact_date must be YYYY-MM-DD'),
+  outcome: contactOutcomeEnum,
+  follow_up_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'follow_up_date must be YYYY-MM-DD').optional(),
+  notes: z.string().optional(),
+  message_snapshot: z.string().optional(),
+  message_subject: z.string().max(255).optional(),
+  preview_token: z.string().max(255).optional(),
+});
+
+const outreachEditSchema = outreachLogSchema.partial();
+
+// Hot-prospect override schema (Sprint 3)
+const hotProspectOverrideSchema = z.object({
+  isHot: z.boolean(),
+  reason: z.string().max(255).optional(),
 });
 
 const auditCreateSchema = z.object({
@@ -394,6 +423,10 @@ router.post('/', async (req: any, res: Response) => {
       neighborhood: parsed.neighborhood,
       contactMethod: parsed.contact_method,
       contactInfo: parsed.contact_info,
+      phone: parsed.phone,
+      email: parsed.email,
+      websiteUrl: parsed.website_url,
+      socialProfiles: parsed.social_profiles,
       displayId: parsed.display_id,
       gbpClaimed: parsed.gbp_claimed,
       unaddressedReviews: parsed.unaddressed_reviews,
@@ -429,6 +462,10 @@ router.put('/:id', async (req: any, res: Response) => {
       neighborhood: parsed.neighborhood,
       contactMethod: parsed.contact_method,
       contactInfo: parsed.contact_info,
+      phone: parsed.phone,
+      email: parsed.email,
+      websiteUrl: parsed.website_url,
+      socialProfiles: parsed.social_profiles,
       gbpClaimed: parsed.gbp_claimed,
       unaddressedReviews: parsed.unaddressed_reviews,
       lastReviewDate: parsed.last_review_date ? new Date(parsed.last_review_date) : undefined,
@@ -487,6 +524,192 @@ router.post('/:id/transition', async (req: any, res: Response) => {
   }
 });
 
+// Enrich campaign contact fields from Google Places API (opt-in, 72h cache)
+router.post('/:id/enrich-contact', async (req: any, res: Response) => {
+  try {
+    const force = req.body?.force === true;
+    const { MarketingGbpEnhancerService } = await import('../services/MarketingGbpEnhancerService.js');
+    const result = await MarketingGbpEnhancerService.getInstance().populateContactFields(
+      req.params.id,
+      getCtx(req),
+      { force },
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Contact readiness for stage-gate UI check
+router.get('/:id/contact-readiness', async (req: any, res: Response) => {
+  try {
+    const readiness = await MarketingCampaignService.getContactReadiness(req.params.id, getCtx(req));
+    res.json({ success: true, data: readiness });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach log (Sprint 2) ────────────────────────────────────────────
+const outreachService = MarketingOutreachService.getInstance();
+
+// Log a contact attempt (creates log + fresh-data snapshot + rollup update)
+router.post('/:id/outreach', async (req: any, res: Response) => {
+  try {
+    const parsed = outreachLogSchema.parse(req.body);
+    const log = await outreachService.logContact({
+      campaignId: req.params.id,
+      contactChannel: parsed.contact_channel,
+      contactDate: parsed.contact_date,
+      outcome: parsed.outcome,
+      followUpDate: parsed.follow_up_date,
+      notes: parsed.notes,
+      messageSnapshot: parsed.message_snapshot,
+      messageSubject: parsed.message_subject,
+      previewToken: parsed.preview_token,
+      contactedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: log });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// List the outreach log for a campaign
+router.get('/:id/outreach', async (req: any, res: Response) => {
+  try {
+    const log = await outreachService.listLog(req.params.id, getCtx(req));
+    res.json({ success: true, data: log });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a fresh-data snapshot for the contact message composer (pre-send)
+router.get('/:id/fresh-snapshot', async (req: any, res: Response) => {
+  try {
+    const snapshot = await outreachService.buildFreshSnapshot(req.params.id, getCtx(req));
+    res.json({ success: true, data: snapshot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Edit a log entry
+router.put('/outreach/:logId', async (req: any, res: Response) => {
+  try {
+    const parsed = outreachEditSchema.parse(req.body);
+    const updated = await outreachService.editLog(req.params.logId, {
+      contactChannel: parsed.contact_channel,
+      contactDate: parsed.contact_date,
+      outcome: parsed.outcome,
+      followUpDate: parsed.follow_up_date,
+      notes: parsed.notes,
+      messageSnapshot: parsed.message_snapshot,
+      messageSubject: parsed.message_subject,
+      previewToken: parsed.preview_token,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Delete a log entry
+router.delete('/outreach/:logId', async (req: any, res: Response) => {
+  try {
+    await outreachService.deleteLog(req.params.logId, getCtx(req));
+    res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Mark a follow-up as completed
+router.post('/outreach/:logId/complete', async (req: any, res: Response) => {
+  try {
+    const updated = await outreachService.completeFollowUp(req.params.logId, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Dashboard: follow-ups due (overdue / due today / this week)
+router.get('/follow-ups-due', async (req: any, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekOut = new Date(today);
+    weekOut.setDate(weekOut.getDate() + 7);
+    const result = await outreachService.getFollowUpsDue({
+      from: today,
+      to: weekOut,
+      assignedTo: req.query.assigned_to as string | undefined,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Hot-prospect (Sprint 3) ────────────────────────────────────────────
+const hotProspectService = MarketingHotProspectService.getInstance();
+
+// List hot prospects (dashboard view)
+router.get('/hot-prospects', async (req: any, res: Response) => {
+  try {
+    const prospects = await hotProspectService.listHotProspects({
+      stage: req.query.stage as string | undefined,
+      city: req.query.city as string | undefined,
+      state: req.query.state as string | undefined,
+      category: req.query.category as string | undefined,
+    }, getCtx(req));
+    res.json({ success: true, data: { prospects } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Operator override: mark hot / not hot
+router.put('/:id/hot-prospect', async (req: any, res: Response) => {
+  try {
+    const parsed = hotProspectOverrideSchema.parse(req.body);
+    const campaign = parsed.isHot
+      ? await hotProspectService.setHot(req.params.id, parsed.reason || 'Operator marked hot', getCtx(req))
+      : await hotProspectService.setNotHot(req.params.id, getCtx(req));
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Clear deprioritization (resume auto-follow-ups)
+router.post('/:id/clear-deprioritized', async (req: any, res: Response) => {
+  try {
+    const campaign = await hotProspectService.clearDeprioritized(req.params.id, getCtx(req));
+    res.json({
+      success: true,
+      data: {
+        is_hot_prospect: campaign.is_hot_prospect,
+        hot_prospect_deprioritized: campaign.hot_prospect_deprioritized,
+        auto_followup_count: campaign.auto_followup_count,
+      },
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Manual campaign→tenant link (sets last_touch_source='manual', fires conversion notification)
 router.post('/:id/link-tenant', async (req: any, res: Response) => {
   try {
@@ -498,6 +721,37 @@ router.post('/:id/link-tenant', async (req: any, res: Response) => {
       changedBy: req.user?.id,
     }, getCtx(req));
     res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Derive a business-scope child campaign from a discovered competitor.
+// Seeds business_name + estimated_tier from the payload; inherits category,
+// city, neighborhood, tone, attributes from the parent. Child starts at `seek`.
+const deriveBusinessSchema = z.object({
+  business_name: z.string().min(1).max(255),
+  rating: z.number().min(0).max(5).optional(),
+  review_count: z.number().int().min(0).optional(),
+  location: z.string().max(500).optional(),
+  assigned_to: z.string().optional(),
+});
+
+router.post('/:id/derive-business', async (req: any, res: Response) => {
+  try {
+    const parsed = deriveBusinessSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: req.params.id,
+      businessName: parsed.business_name,
+      rating: parsed.rating,
+      reviewCount: parsed.review_count,
+      location: parsed.location,
+      assignedTo: parsed.assigned_to ?? req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: campaign });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });

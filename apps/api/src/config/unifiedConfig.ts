@@ -138,6 +138,32 @@ class UnifiedConfig {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
   }
 
+  // Hot-prospect + auto-follow-up config (Sprint 3)
+  get marketingOpsHotProspectThreshold(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_HOT_PROSPECT_THRESHOLD || '', 10);
+    return Number.isFinite(parsed) && parsed >= 0 && parsed <= 10 ? parsed : 7;
+  }
+  get marketingOpsAutoFollowUpCadenceDays(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_AUTO_FOLLOWUP_CADENCE_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
+  }
+  get marketingOpsMaxAutoFollowUps(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_MAX_AUTO_FOLLOWUPS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+  }
+  get marketingOpsAutoFollowUpSchedulerIntervalHours(): number {
+    const parsed = parseInt(this.env.MARKETING_OPS_AUTO_FOLLOWUP_INTERVAL_HOURS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 6;
+  }
+  get marketingOpsHotProspectConfidenceThreshold(): 'high' | 'medium' | 'low' {
+    const v = (this.env.MARKETING_OPS_HOT_PROSPECT_CONFIDENCE_THRESHOLD || '').toLowerCase();
+    return v === 'high' || v === 'low' ? v : 'medium';
+  }
+  get marketingOpsHotProspectSkipNationalChains(): boolean {
+    const v = (this.env.MARKETING_OPS_HOT_PROSPECT_SKIP_NATIONAL_CHAINS || '').toLowerCase();
+    return v !== 'false' && v !== '0'; // default true
+  }
+
   // ─── Sentry ───────────────────────────────────────────────────────────
 
   get sentryDsn(): string | undefined {

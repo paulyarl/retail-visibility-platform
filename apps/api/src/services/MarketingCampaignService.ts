@@ -12,6 +12,7 @@ import { BaseService } from './BaseService';
 import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
+import { NotFoundError } from '../middleware/errorHandler';
 import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId } from '../lib/id-generator';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
 import DemoTenantService from './DemoTenantService';
@@ -82,6 +83,10 @@ export interface CampaignInput {
   neighborhood?: string;
   contactMethod?: string;
   contactInfo?: string;
+  phone?: string;
+  email?: string;
+  websiteUrl?: string;
+  socialProfiles?: { platform: string; url: string }[];
   displayId?: string;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
@@ -96,6 +101,7 @@ export interface CampaignInput {
   attributes?: string[];
   assignedTo?: string;
   notes?: string;
+  parentCampaignId?: string;
 }
 
 export interface CampaignUpdateInput {
@@ -106,6 +112,10 @@ export interface CampaignUpdateInput {
   neighborhood?: string;
   contactMethod?: string;
   contactInfo?: string;
+  phone?: string;
+  email?: string;
+  websiteUrl?: string;
+  socialProfiles?: { platform: string; url: string }[];
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
   lastReviewDate?: Date | null;
@@ -130,6 +140,14 @@ export interface CampaignUpdateInput {
   subscriptionTierId?: string;
   couponCode?: string;
   serviceCategory?: string;
+}
+
+export interface ContactReadiness {
+  hasPhone: boolean;
+  hasEmail: boolean;
+  hasWebsite: boolean;
+  hasSocial: boolean;
+  complete: boolean;
 }
 
 export interface LinkTenantInput {
@@ -169,6 +187,7 @@ export interface CampaignListFilters {
   search?: string;
   page?: number;
   limit?: number;
+  parentCampaignId?: string;
 }
 
 export interface MarkCampaignPaidInput {
@@ -237,10 +256,14 @@ export class MarketingCampaignService extends BaseService {
           neighborhood: input.neighborhood || null,
           contact_method: input.contactMethod || null,
           contact_info: input.contactInfo || null,
+          phone: input.phone || null,
+          email: input.email || null,
+          website_url: input.websiteUrl || null,
+          social_profiles: (input.socialProfiles ?? undefined) as any,
           gbp_claimed: input.gbpClaimed || false,
           unaddressed_reviews: input.unaddressedReviews || 0,
           last_review_date: input.lastReviewDate || null,
-          has_website: input.hasWebsite || null,
+          has_website: input.websiteUrl ? 'yes' : (input.hasWebsite || null),
           nap_consistent: input.napConsistent ?? null,
           estimated_tier: input.estimatedTier || null,
           estimated_fee_cents: input.estimatedFeeCents || 0,
@@ -250,6 +273,7 @@ export class MarketingCampaignService extends BaseService {
           attributes: input.attributes || [],
           assigned_to: input.assignedTo || null,
           notes: input.notes || null,
+          parent_campaign_id: input.parentCampaignId || null,
           stage: 'seek',
           stage_entered_at: new Date(),
         },
@@ -264,6 +288,15 @@ export class MarketingCampaignService extends BaseService {
       });
 
       logger.info('Marketing campaign created', ctx, { campaignId: id, businessName: input.businessName });
+
+      // Sprint 3: evaluate pain_score fallback for hot-prospect flagging
+      try {
+        const { MarketingHotProspectService } = await import('./MarketingHotProspectService.js');
+        await MarketingHotProspectService.getInstance().evaluatePainScoreFallback(id, ctx);
+      } catch (fbErr) {
+        logger.error('pain_score fallback eval failed (best-effort)', ctx, { error: (fbErr as Error).message, campaignId: id });
+      }
+
       return campaign;
     } catch (error) {
       logger.error('Failed to create marketing campaign', ctx, { error: (error as Error).message, businessName: input.businessName });
@@ -283,6 +316,12 @@ export class MarketingCampaignService extends BaseService {
           mkt_audits_list: true,
           mkt_files_list: { orderBy: { uploaded_at: 'desc' } },
           mkt_stage_history_list: { orderBy: { changed_at: 'desc' }, take: 20 },
+          parent: { select: { id: true, business_name: true, category: true, city: true, scope: true, stage: true } },
+          mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list: {
+            select: { id: true, business_name: true, scope: true, stage: true, created_at: true },
+            orderBy: { created_at: 'desc' },
+          },
+          mkt_outreach_log: { orderBy: { contact_date: 'desc' }, take: 20 },
         },
       });
       if (!campaign) return null;
@@ -301,6 +340,9 @@ export class MarketingCampaignService extends BaseService {
         mkt_audits_list,
         mkt_files_list,
         mkt_stage_history_list,
+        mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list: children,
+        mkt_outreach_log,
+        parent,
         ...rest
       } = campaign as any;
       return {
@@ -308,12 +350,137 @@ export class MarketingCampaignService extends BaseService {
         audits: mkt_audits_list ?? [],
         files: mkt_files_list ?? [],
         stage_history: mkt_stage_history_list ?? [],
+        outreach_log: mkt_outreach_log ?? [],
+        parent_campaign: parent ?? null,
+        children: children ?? [],
         service_category_label,
       };
     } catch (error) {
       logger.error('Failed to get campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
     }
+  }
+
+  /**
+   * Returns contact readiness flags for a campaign.
+   * A campaign is "contact complete" if it has at least one of phone or email
+   * (a reachable channel for outreach), plus a website or social profile for
+   * context. Phone alone is sufficient for cold-call workflows.
+   */
+  async getContactReadiness(id: string, ctx?: RequestCtx): Promise<ContactReadiness> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id },
+        select: { phone: true, email: true, website_url: true, social_profiles: true },
+      });
+      if (!campaign) {
+        throw new NotFoundError('Campaign not found');
+      }
+      const hasSocial = Array.isArray(campaign.social_profiles) && campaign.social_profiles.length > 0;
+      const hasPhone = !!campaign.phone;
+      const hasEmail = !!campaign.email;
+      const hasWebsite = !!campaign.website_url;
+      const complete = hasPhone || hasEmail;
+      return { hasPhone, hasEmail, hasWebsite, hasSocial, complete };
+    } catch (error) {
+      logger.error('Failed to get contact readiness', ctx, { error: (error as Error).message, campaignId: id });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Derive a business-scope child campaign from a parent category/city/business
+   * campaign, seeded with a discovered competitor's data. The child starts at
+   * `seek` stage — it needs a business-scope analysis (full contact details,
+   * GBP audit) before reaching `preview_built`.
+   *
+   * Inherited from parent: category, city, neighborhood, tone, attributes.
+   * Seeded from payload: business_name, estimated_tier (derived from
+   * rating/review count), notes (references parent + outreach angle if
+   * available from the parent's latest category_analysis audit).
+   *
+   * Recursion is allowed: a business-scope parent can spawn business children
+   * (e.g. from competitors uncovered by a business scan). The parent link is
+   * an optional lineage reference only.
+   *
+   * Rejects spawning category/city children from a business parent (no use
+   * case; prevents confusion) — but this method always creates a business
+   * child, so that guard is enforced by the fixed `scope='business'` here.
+   */
+  async deriveBusinessCampaign(input: {
+    parentId: string;
+    businessName: string;
+    rating?: number;
+    reviewCount?: number;
+    location?: string;
+    assignedTo?: string;
+  }, ctx?: RequestCtx): Promise<any> {
+    try {
+      const parent = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: input.parentId },
+        include: {
+          mkt_audits_list: {
+            where: { platform: 'category_analysis' },
+            orderBy: { created_at: 'desc' },
+            take: 1,
+          },
+        },
+      });
+      if (!parent) {
+        throw new NotFoundError(`Parent campaign ${input.parentId} not found`);
+      }
+
+      // Derive estimated_tier from rating + review count heuristics.
+      const tier = this.inferTierFromMetrics(input.rating, input.reviewCount);
+
+      // Build notes referencing the parent + outreach angle (if available).
+      const latestAudit = parent.mkt_audits_list[0];
+      const outreachAngle = (latestAudit?.audit_data as any)?.market_analysis?.recommended_outreach_angle;
+      const noteParts = [
+        `Derived from parent campaign ${parent.display_id ?? parent.id} (${parent.scope} scope).`,
+        input.location ? `Discovered location: ${input.location}` : null,
+        input.rating != null ? `Rating: ${input.rating.toFixed(1)}` : null,
+        input.reviewCount != null ? `Reviews: ${input.reviewCount}` : null,
+        outreachAngle ? `Outreach angle: ${outreachAngle}` : null,
+      ].filter(Boolean);
+      const notes = noteParts.join('\n');
+
+      return await this.createCampaign({
+        scope: 'business',
+        businessName: input.businessName,
+        category: parent.category,
+        city: parent.city,
+        neighborhood: parent.neighborhood ?? undefined,
+        tone: parent.tone ?? undefined,
+        attributes: (parent.attributes as string[]) ?? undefined,
+        estimatedTier: tier ?? undefined,
+        assignedTo: input.assignedTo,
+        notes,
+        parentCampaignId: input.parentId,
+      }, ctx);
+    } catch (error) {
+      logger.error('Failed to derive business campaign', ctx, {
+        error: (error as Error).message,
+        parentId: input.parentId,
+        businessName: input.businessName,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Infer an estimated tier from GBP rating + review count.
+   *   - High: rating >= 4.5 AND review_count >= 200
+   *   - Mid:  rating >= 4.0 OR review_count >= 50
+   *   - Low:  everything else (or insufficient data)
+   */
+  private inferTierFromMetrics(rating?: number, reviewCount?: number): string | null {
+    if (rating == null && reviewCount == null) return null;
+    const r = rating ?? 0;
+    const rc = reviewCount ?? 0;
+    if (r >= 4.5 && rc >= 200) return 'High';
+    if (r >= 4.0 || rc >= 50) return 'Mid';
+    return 'Low';
   }
 
   async listCampaigns(filters: CampaignListFilters = {}, ctx?: RequestCtx): Promise<{ items: any[]; total: number; page: number; limit: number; totalPages: number }> {
@@ -329,6 +496,7 @@ export class MarketingCampaignService extends BaseService {
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
     if (filters.tone) where.tone = filters.tone;
     if (filters.retainer) where.retainer = filters.retainer;
+    if (filters.parentCampaignId) where.parent_campaign_id = filters.parentCampaignId;
     if (filters.attributes && filters.attributes.length > 0) {
       where.attributes = { hasEvery: filters.attributes };
     }
@@ -376,6 +544,13 @@ export class MarketingCampaignService extends BaseService {
     if (input.neighborhood !== undefined) data.neighborhood = input.neighborhood;
     if (input.contactMethod !== undefined) data.contact_method = input.contactMethod;
     if (input.contactInfo !== undefined) data.contact_info = input.contactInfo;
+    if (input.phone !== undefined) data.phone = input.phone || null;
+    if (input.email !== undefined) data.email = input.email || null;
+    if (input.websiteUrl !== undefined) {
+      data.website_url = input.websiteUrl || null;
+      if (input.websiteUrl) data.has_website = 'yes';
+    }
+    if (input.socialProfiles !== undefined) data.social_profiles = (input.socialProfiles || undefined) as any;
     if (input.gbpClaimed !== undefined) data.gbp_claimed = input.gbpClaimed;
     if (input.unaddressedReviews !== undefined) data.unaddressed_reviews = input.unaddressedReviews;
     if (input.lastReviewDate !== undefined) data.last_review_date = input.lastReviewDate;
@@ -401,7 +576,19 @@ export class MarketingCampaignService extends BaseService {
     if (input.serviceCategory !== undefined) data.service_category = input.serviceCategory;
 
     try {
-      return await this.prisma.mkt_campaigns_list.update({ where: { id }, data });
+      const updated = await this.prisma.mkt_campaigns_list.update({ where: { id }, data });
+
+      // Sprint 3: evaluate pain_score fallback for hot-prospect flagging
+      if (input.painScore !== undefined) {
+        try {
+          const { MarketingHotProspectService } = await import('./MarketingHotProspectService.js');
+          await MarketingHotProspectService.getInstance().evaluatePainScoreFallback(id, ctx);
+        } catch (fbErr) {
+          logger.error('pain_score fallback eval failed (best-effort)', ctx, { error: (fbErr as Error).message, campaignId: id });
+        }
+      }
+
+      return updated;
     } catch (error) {
       logger.error('Failed to update campaign', ctx, { error: (error as Error).message, campaignId: id });
       throw this.handleError(error, ctx);
@@ -424,6 +611,22 @@ export class MarketingCampaignService extends BaseService {
       const fromStage = campaign.stage as string;
       if (!this.isValidTransition(fromStage, toStage)) {
         throw new Error(`Invalid stage transition: ${fromStage} → ${toStage}`);
+      }
+
+      // Best-effort GBP enrichment on seek → preview_built when no phone AND
+      // no website_url are present. Soft gate: enrichment failure must NOT
+      // block the transition (some campaigns advance on in-person context).
+      if (fromStage === 'seek' && toStage === 'preview_built' && !campaign.phone && !campaign.website_url) {
+        try {
+          const { MarketingGbpEnhancerService } = await import('./MarketingGbpEnhancerService.js');
+          await MarketingGbpEnhancerService.getInstance().populateContactFields(campaignId, ctx);
+          logger.info('Best-effort GBP enrichment completed for seek → preview_built', ctx, { campaignId });
+        } catch (enrichError) {
+          logger.warn('Best-effort GBP enrichment failed, proceeding with transition', ctx, {
+            campaignId,
+            error: (enrichError as Error).message,
+          });
+        }
       }
 
       const updateData: any = {
@@ -624,7 +827,7 @@ export class MarketingCampaignService extends BaseService {
           stage: 'shown',
           stage_entered_at: { lt: cutoff },
         },
-        select: { id: true },
+        select: { id: true, next_follow_up_at: true, last_contacted_at: true },
       });
 
       // G1 guard: skip campaigns with live unconverted preview tokens —
@@ -646,12 +849,36 @@ export class MarketingCampaignService extends BaseService {
 
       let advanced = 0;
       let skipped = 0;
+      const now = new Date();
       for (const campaign of stale) {
         if (guardedIds.has(campaign.id)) {
           skipped++;
           logger.info('Auto-advance skipped: campaign has live unconverted preview tokens', ctx, { campaignId: campaign.id });
           continue;
         }
+
+        // Sprint 2 follow-up guard: respect scheduled follow-ups.
+        //  - next_follow_up_at in the future → skip (do not auto-lose)
+        //  - next_follow_up_at in the past AND last_contacted_at is older than
+        //    the follow-up date → auto-advance (follow-up was missed)
+        //  - no next_follow_up_at → keep existing 7-day rule
+        const nextFu = campaign.next_follow_up_at ? new Date(campaign.next_follow_up_at) : null;
+        if (nextFu) {
+          if (nextFu > now) {
+            skipped++;
+            logger.info('Auto-advance skipped: future follow-up scheduled', ctx, { campaignId: campaign.id, next_follow_up_at: nextFu, reason: 'follow_up_scheduled' });
+            continue;
+          }
+          // Follow-up is in the past — only auto-advance if the operator
+          // hasn't contacted since the follow-up was due.
+          const lastContact = campaign.last_contacted_at ? new Date(campaign.last_contacted_at) : null;
+          if (lastContact && lastContact >= nextFu) {
+            skipped++;
+            logger.info('Auto-advance skipped: contacted after follow-up due date', ctx, { campaignId: campaign.id, last_contacted_at: lastContact, reason: 'recent_contact' });
+            continue;
+          }
+        }
+
         try {
           await this.transitionStage({
             campaignId: campaign.id,
@@ -665,7 +892,7 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
-      logger.info(`Auto-advanced ${advanced} stale shown campaigns to lost (${skipped} skipped — live tokens)`, ctx, { advanced, skipped, days });
+      logger.info(`Auto-advanced ${advanced} stale shown campaigns to lost (${skipped} skipped — live tokens / follow-ups / recent contacts)`, ctx, { advanced, skipped, days });
       return { advanced, skipped };
     } catch (error) {
       logger.error('Failed to auto-advance stale campaigns', ctx, { error: (error as Error).message });

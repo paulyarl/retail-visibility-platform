@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Check, ArrowRight, Sparkles, StickyNote } from 'lucide-react';
+import { Copy, Check, ArrowRight, Sparkles, StickyNote, Plus, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Audit } from '@/services/MarketingOpsService';
 
 /**
@@ -16,6 +17,8 @@ import type { Audit } from '@/services/MarketingOpsService';
  *   - Copy outreach angle
  *   - Save to campaign notes (append)
  *   - Create seek prompt deep-link (S3b)
+ *   - Derive business-scope child campaign from a discovered competitor
+ *     (per-competitor button + custom-name action)
  */
 
 interface MarketAnalysisData {
@@ -63,9 +66,52 @@ export default function CategoryAnalysisAuditCard({
   const ma = parseMarketAnalysis(audit);
   const [copiedAngle, setCopiedAngle] = useState(false);
   const [savedNotes, setSavedNotes] = useState(false);
+  const [derivingIdx, setDerivingIdx] = useState<number | null>(null);
+  const [deriveError, setDeriveError] = useState<string | null>(null);
+  const [showCustomDerive, setShowCustomDerive] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [derivingCustom, setDerivingCustom] = useState(false);
+  const router = useRouter();
 
   if (!ma) return null;
   const data = ma.market_analysis;
+
+  const handleDeriveFromCompetitor = async (idx: number) => {
+    const c = data.top_5_competitors[idx];
+    if (!c) return;
+    setDerivingIdx(idx);
+    setDeriveError(null);
+    try {
+      const { default: service } = await import('@/services/MarketingOpsService');
+      const child = await service.deriveBusinessCampaign(campaignId, {
+        business_name: c.name,
+        rating: c.approximate_rating,
+        review_count: c.approximate_review_count,
+        location: c.location_status,
+      });
+      router.push(`/settings/admin/marketing-ops/campaigns/${child.id}`);
+    } catch (err: any) {
+      setDeriveError(err.message || 'Failed to create campaign');
+      setDerivingIdx(null);
+    }
+  };
+
+  const handleDeriveCustom = async () => {
+    const name = customName.trim();
+    if (!name) return;
+    setDerivingCustom(true);
+    setDeriveError(null);
+    try {
+      const { default: service } = await import('@/services/MarketingOpsService');
+      const child = await service.deriveBusinessCampaign(campaignId, {
+        business_name: name,
+      });
+      router.push(`/settings/admin/marketing-ops/campaigns/${child.id}`);
+    } catch (err: any) {
+      setDeriveError(err.message || 'Failed to create campaign');
+      setDerivingCustom(false);
+    }
+  };
 
   const handleCopyAngle = () => {
     navigator.clipboard.writeText(data.recommended_outreach_angle);
@@ -132,10 +178,21 @@ export default function CategoryAnalysisAuditCard({
           <div className="space-y-1">
             {data.top_5_competitors.map((c, i) => (
               <div key={i} className="flex items-center justify-between text-xs bg-white dark:bg-neutral-800 rounded px-2 py-1.5 border border-gray-200 dark:border-neutral-700">
-                <span className="font-medium text-gray-900 dark:text-white">{c.name}</span>
-                <span className="text-gray-500 dark:text-gray-400">
-                  {c.approximate_rating.toFixed(1)} ★ · {c.approximate_review_count} reviews · {c.location_status}
-                </span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-medium text-gray-900 dark:text-white truncate">{c.name}</span>
+                  <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">
+                    {c.approximate_rating.toFixed(1)} ★ · {c.approximate_review_count} reviews · {c.location_status}
+                  </span>
+                </div>
+                <button
+                  onClick={() => handleDeriveFromCompetitor(i)}
+                  disabled={derivingIdx !== null}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800 dark:hover:bg-violet-900/40 disabled:opacity-50 flex-shrink-0 ml-2"
+                  title={`Create a business-scope campaign for ${c.name}`}
+                >
+                  {derivingIdx === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  Campaign
+                </button>
               </div>
             ))}
           </div>
@@ -184,6 +241,13 @@ export default function CategoryAnalysisAuditCard({
           <StickyNote className="w-3.5 h-3.5" />
           {savedNotes ? 'Saved!' : 'Save to notes'}
         </button>
+        <button
+          onClick={() => setShowCustomDerive((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-white border border-violet-300 rounded-lg hover:bg-violet-50 dark:bg-neutral-800 dark:text-violet-300 dark:border-violet-800 dark:hover:bg-violet-900/20"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {showCustomDerive ? 'Cancel' : 'Business campaign…'}
+        </button>
         <Link
           href={seekPromptHref}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
@@ -193,6 +257,39 @@ export default function CategoryAnalysisAuditCard({
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      {/* Custom business-name derive form */}
+      {showCustomDerive && (
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            placeholder="Business name (e.g. Acme HVAC)"
+            className="flex-1 min-w-[200px] px-3 py-1.5 text-xs border border-gray-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleDeriveCustom(); }}
+          />
+          <button
+            onClick={handleDeriveCustom}
+            disabled={derivingCustom || !customName.trim()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+          >
+            {derivingCustom ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+            Create
+          </button>
+          <button
+            onClick={() => { setShowCustomDerive(false); setCustomName(''); setDeriveError(null); }}
+            className="inline-flex items-center px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Derive error */}
+      {deriveError && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{deriveError}</p>
+      )}
     </div>
   );
 }

@@ -360,15 +360,20 @@ export class MarketingPromptService extends BaseService {
         let audit: any = null;
         if (resolved.auditPlatform) {
           const auditId = generateMarketingAuditId();
-          // For market_analysis, extract audit-relevant fields from the validated JSON.
+          // Extract audit-relevant fields from the validated JSON.
+          // market_analysis exposes GBP metrics at parsedJson.market_analysis;
+          // regional_city_opportunity is a regional scan with no single
+          // business-level rating, so we store the full payload in audit_data
+          // and leave the scalar audit columns at their defaults.
           const ma = parsedJson.market_analysis;
+          const hasMarketAnalysis = !!ma;
           audit = await tx.mkt_audits_list.create({
             data: {
               id: auditId,
               campaign_id: input.campaignId,
               platform: resolved.auditPlatform,
-              review_count: ma?.average_gbp_metrics?.average_review_count ?? 0,
-              average_rating: ma?.average_gbp_metrics?.average_rating ?? undefined,
+              review_count: hasMarketAnalysis ? (ma?.average_gbp_metrics?.average_review_count ?? 0) : 0,
+              average_rating: hasMarketAnalysis ? (ma?.average_gbp_metrics?.average_rating ?? undefined) : undefined,
               unaddressed_reviews: 0,
               owner_response_rate: 0,
               photo_count: 0,

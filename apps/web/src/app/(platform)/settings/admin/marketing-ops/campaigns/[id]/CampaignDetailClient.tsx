@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
+import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import CategoryOverviewSection from '@/components/marketing-ops/CategoryOverviewSection';
 import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection';
+import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard';
+import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCard';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history' | 'lineage';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -30,6 +33,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [linkingTenant, setLinkingTenant] = useState(false);
   const [copied, setCopied] = useState(false);
   const [revenue, setRevenue] = useState<MarketingRevenue[]>([]);
+  const [readinessDialog, setReadinessDialog] = useState<{ toStage: CampaignStage } | null>(null);
+  const [readinessChecking, setReadinessChecking] = useState(false);
+  const [readinessEnriching, setReadinessEnriching] = useState(false);
+  const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
   const [genForm, setGenForm] = useState<{ templateId: string; deliverableType: DeliverableType; isPreview: boolean; content: string }>({
     templateId: '',
     deliverableType: 'review_responses',
@@ -44,6 +51,11 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
       const data = await marketingOpsService.getCampaign(campaignId);
       setCampaign(data);
       marketingOpsService.getCampaignRevenue(campaignId).then(setRevenue).catch(() => {});
+      // Pre-fetch contact readiness so the warning dot can render on the
+      // preview_built pipeline button before the operator clicks it.
+      if (data.stage === 'seek') {
+        marketingOpsService.getContactReadiness(campaignId).then(setContactReadiness).catch(() => {});
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load campaign');
     } finally {
@@ -74,7 +86,46 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     }
   }, [activeTab, fetchDeliverables]);
 
+  const handleSetHotProspect = async (isHot: boolean) => {
+    try {
+      await marketingOpsService.setHotProspect(campaignId, { isHot });
+      await fetchCampaign();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update hot prospect status');
+    }
+  };
+
+  const handleClearDeprioritized = async () => {
+    try {
+      await marketingOpsService.clearDeprioritized(campaignId);
+      await fetchCampaign();
+    } catch (err: any) {
+      setError(err.message || 'Failed to clear deprioritization');
+    }
+  };
+
   const handleTransition = async (toStage: CampaignStage) => {
+    // Soft stage-gate: seek → preview_built with incomplete contact data
+    // prompts the operator to enrich or proceed. Cancel aborts the transition.
+    if (campaign?.stage === 'seek' && toStage === 'preview_built') {
+      setReadinessChecking(true);
+      try {
+        const readiness = await marketingOpsService.getContactReadiness(campaignId);
+        setContactReadiness(readiness);
+        if (!readiness.complete) {
+          setReadinessDialog({ toStage });
+          return; // Wait for operator decision.
+        }
+      } catch {
+        // Readiness check failed — proceed with transition (soft gate).
+      } finally {
+        setReadinessChecking(false);
+      }
+    }
+    await runTransition(toStage);
+  };
+
+  const runTransition = async (toStage: CampaignStage) => {
     setTransitioning(true);
     try {
       await marketingOpsService.transitionStage(campaignId, { to_stage: toStage, trigger_type: 'manual' });
@@ -83,6 +134,27 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
       setError(err.message || 'Failed to transition stage');
     } finally {
       setTransitioning(false);
+      setReadinessDialog(null);
+    }
+  };
+
+  const handleEnrichFromDialog = async () => {
+    setReadinessEnriching(true);
+    try {
+      await marketingOpsService.enrichContact(campaignId, { force: false });
+      await fetchCampaign();
+      // Re-check readiness after enrichment.
+      const readiness = await marketingOpsService.getContactReadiness(campaignId);
+      setContactReadiness(readiness);
+      if (readiness.complete) {
+        // Auto-proceed once enriched.
+        setReadinessDialog(null);
+        await runTransition('preview_built');
+      }
+    } catch (err: any) {
+      setError(err.message || 'GBP enrichment failed');
+    } finally {
+      setReadinessEnriching(false);
     }
   };
 
@@ -143,6 +215,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'files', label: 'Files', count: campaign?.files?.length },
     { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
+    { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
   ];
 
   return (
@@ -152,6 +225,43 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
         {error && (
           <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
             <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* Stage-gate readiness dialog — seek → preview_built with no phone/website */}
+        {readinessDialog && (
+          <div className="mb-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
+            <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Contact incomplete</h3>
+            <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+              This campaign has no phone or website on file. Enriching from Google Business Profile now gives you the
+              right outreach channel before building a preview. You can also proceed anyway.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleEnrichFromDialog}
+                disabled={readinessEnriching}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {readinessEnriching ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                Enrich from GBP
+              </button>
+              <button
+                type="button"
+                onClick={() => runTransition('preview_built')}
+                disabled={transitioning}
+                className="rounded-md bg-white dark:bg-neutral-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-600 disabled:opacity-50"
+              >
+                Proceed anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setReadinessDialog(null)}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -170,6 +280,20 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     {campaign.scope}
                   </span>
                   <StageBadge stage={campaign.stage} size="md" />
+                  {campaign.is_hot_prospect && !campaign.hot_prospect_deprioritized && (
+                    <span
+                      title={campaign.hot_prospect_reason ? `Hot prospect: ${campaign.hot_prospect_reason}${campaign.hot_prospect_set_at ? `\nSet: ${new Date(campaign.hot_prospect_set_at).toLocaleString()}` : ''}` : 'Hot prospect'}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                    >
+                      <Flame className="w-3 h-3" />
+                      Hot Prospect
+                    </span>
+                  )}
+                  {campaign.hot_prospect_deprioritized && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                      Deprioritized
+                    </span>
+                  )}
                   {campaign.demo_tenant_id && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
                       <Store className="w-3 h-3" />
@@ -181,6 +305,18 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   {campaign.scope} · {campaign.category} · {campaign.city}{campaign.neighborhood ? ` · ${campaign.neighborhood}` : ''}
                   {campaign.display_id && ` · ${campaign.display_id}`}
                 </p>
+                {campaign.parent_campaign && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Derived from{' '}
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${campaign.parent_campaign.id}`}
+                      className="text-violet-600 dark:text-violet-400 hover:underline"
+                    >
+                      {campaign.parent_campaign.business_name ?? campaign.parent_campaign.category ?? campaign.parent_campaign.id}
+                    </Link>
+                    {' '}(parent · {campaign.parent_campaign.scope})
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -279,12 +415,17 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   const currentIdx = PIPELINE_STAGES.indexOf(campaign.stage);
                   const isPast = idx < currentIdx;
                   const isCurrent = idx === currentIdx;
+                  // Warning dot on preview_built when contact readiness is incomplete.
+                  const showReadinessDot = stage === 'preview_built'
+                    && campaign.stage === 'seek'
+                    && contactReadiness != null
+                    && !contactReadiness.complete;
                   return (
                     <div key={stage} className="flex items-center flex-shrink-0">
                       <button
                         onClick={() => handleTransition(stage)}
-                        disabled={transitioning || isCurrent}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        disabled={transitioning || isCurrent || readinessChecking}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors relative ${
                           isCurrent
                             ? 'bg-blue-600 text-white'
                             : isPast
@@ -293,6 +434,12 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                         }`}
                       >
                         {STAGE_LABELS[stage]}
+                        {showReadinessDot && (
+                          <span
+                            title="Contact data incomplete — stage-gate will prompt"
+                            className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-1 ring-white dark:ring-neutral-800"
+                          />
+                        )}
                       </button>
                       {idx < PIPELINE_STAGES.length - 1 && (
                         <ChevronRight className="w-4 h-4 text-gray-300 dark:text-neutral-600 mx-0.5" />
@@ -325,7 +472,42 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
 
             {/* Tab Content */}
             {activeTab === 'overview' && (
-              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+              <div className="space-y-4">
+                {/* Business Contact card — visible before preview_built so the
+                    operator has the right outreach channel at hand. */}
+                <BusinessContactCard campaign={campaign} onEnriched={fetchCampaign} />
+                {/* Outreach & Follow-Up card — only for business-scope campaigns
+                    in outreach stages (preview_built/shown/paid). */}
+                {campaign.scope === 'business'
+                  && ['preview_built', 'shown', 'paid'].includes(campaign.stage)
+                  && (
+                    <OutreachFollowUpCard campaign={campaign} onLogged={fetchCampaign} />
+                  )}
+                {/* Hot-prospect override controls (Sprint 3) */}
+                {campaign.scope === 'business' && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleSetHotProspect(!campaign.is_hot_prospect)}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border ${
+                        campaign.is_hot_prospect
+                          ? 'border-orange-300 text-orange-700 dark:border-orange-700 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20'
+                          : 'border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <Flame className="w-3 h-3" />
+                      {campaign.is_hot_prospect ? 'Mark not hot' : 'Mark hot'}
+                    </button>
+                    {campaign.hot_prospect_deprioritized && (
+                      <button
+                        onClick={handleClearDeprioritized}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      >
+                        Resume auto-follow-ups
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
                 {/* Scope-conditional primary content */}
                 {campaign.scope === 'category' ? (
                   <CategoryOverviewSection campaign={campaign} />
@@ -429,6 +611,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{campaign.notes}</p>
                   </div>
                 )}
+                </div>
               </div>
             )}
 
@@ -441,6 +624,30 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     {(campaign.audits ?? []).map((audit: Audit) =>
                       audit.platform === 'category_analysis' && audit.audit_data ? (
                         <CategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : audit.platform === 'city_analysis' && audit.audit_data ? (
+                        <CityAnalysisAuditCard key={audit.id} audit={audit} />
+                      ) : audit.platform === 'city_analysis_summary' ? (
+                        <div key={audit.id} className="border border-blue-200 dark:border-blue-700 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/10">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-blue-900 dark:text-blue-300">City Pain Scan — Summary</span>
+                            <span className="text-xs text-gray-400">{new Date(audit.created_at).toLocaleDateString()}</span>
+                          </div>
+                          {audit.audit_data?.summary && (
+                            <p className="text-sm text-gray-700 dark:text-gray-300">{audit.audit_data.summary}</p>
+                          )}
+                          {audit.audit_data?.category_rankings?.length > 0 && (
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-xs text-blue-600 dark:text-blue-400">Category rankings ({audit.audit_data.category_rankings.length})</summary>
+                              <pre className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 overflow-auto max-h-40">{JSON.stringify(audit.audit_data.category_rankings, null, 2)}</pre>
+                            </details>
+                          )}
+                          {audit.audit_data?.city_metrics && (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-xs text-blue-600 dark:text-blue-400">City metrics</summary>
+                              <pre className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 overflow-auto max-h-40">{JSON.stringify(audit.audit_data.city_metrics, null, 2)}</pre>
+                            </details>
+                          )}
+                        </div>
                       ) : (
                         <div key={audit.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
@@ -571,6 +778,61 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                         <span className="text-xs text-gray-400 ml-auto">{new Date(hist.changed_at).toLocaleString()}</span>
                         {hist.notes && <span className="text-xs text-gray-500 dark:text-gray-400">· {hist.notes}</span>}
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'lineage' && (
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+                {/* Parent */}
+                {campaign.parent_campaign ? (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Parent Campaign</h3>
+                    <Link
+                      href={`/settings/admin/marketing-ops/campaigns/${campaign.parent_campaign.id}`}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {campaign.parent_campaign.business_name ?? campaign.parent_campaign.category ?? campaign.parent_campaign.id}
+                      </span>
+                      <span className="text-xs text-gray-400 uppercase">{campaign.parent_campaign.scope}</span>
+                      <StageBadge stage={campaign.parent_campaign.stage} size="sm" />
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 mb-4">This campaign has no parent (it is a top-level campaign).</p>
+                )}
+
+                {/* Children */}
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Derived Campaigns</h3>
+                {(campaign.children ?? []).length === 0 ? (
+                  <p className="text-center text-gray-400 py-8">
+                    No derived campaigns yet. Use the &ldquo;Campaign&rdquo; button on a competitor in the Audits tab
+                    (category analysis) to spawn a business-scope child campaign.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {(campaign.children ?? []).map((child) => (
+                      <Link
+                        key={child.id}
+                        href={`/settings/admin/marketing-ops/campaigns/${child.id}`}
+                        className="flex items-center justify-between px-3 py-2 border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-gray-900 dark:text-white truncate">
+                            {child.business_name ?? child.id}
+                          </span>
+                          <span className="text-xs text-gray-400 uppercase flex-shrink-0">{child.scope}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <StageBadge stage={child.stage} size="sm" />
+                          {child.created_at && (
+                            <span className="text-xs text-gray-400">{new Date(child.created_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 )}
