@@ -1802,23 +1802,10 @@ router.post('/openers/import', async (req: any, res: Response) => {
   }
 });
 
-// Get a single opener by ID
-router.get('/openers/:id', async (req: any, res: Response) => {
-  try {
-    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
-    if (!opener) {
-      return res.status(404).json({ success: false, error: 'Opener not found' });
-    }
-    res.json({ success: true, data: opener });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
 // ─── Outreach Pitch — Headers ────────────────────────────────────────────
-// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
-// otherwise Express matches /openers/headers as a campaign ID param and returns 404.
-// Same ordering constraint as the opener routes above (see comment at line ~1684).
+// IMPORTANT: These routes MUST be declared before router.get('/openers/:id', ...)
+// below, otherwise Express matches /openers/headers as :id='headers' and returns 404.
+// The /openers/:id route has been moved to after all pitch sub-routes.
 const headerExecuteSchema = z.object({
   campaign_id: z.string().min(1),
 });
@@ -2180,6 +2167,21 @@ router.get('/openers/pitches/:id', async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Pitch not found' });
     }
     res.json({ success: true, data: pitch });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single opener by ID — MUST be declared after all /openers/* sub-routes
+// (headers, closers, contacts, review-responses, pitches) to avoid Express
+// matching /openers/headers as :id='headers'. See route ordering comment above.
+router.get('/openers/:id', async (req: any, res: Response) => {
+  try {
+    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
+    if (!opener) {
+      return res.status(404).json({ success: false, error: 'Opener not found' });
+    }
+    res.json({ success: true, data: opener });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
