@@ -19,7 +19,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError } from '../middleware/errorHandler';
 import { unifiedConfig } from '../config/unifiedConfig';
-import { generateMarketingAuditId } from '../lib/id-generator';
+import { generateMarketingAuditId, generateCampaignId } from '../lib/id-generator';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -251,6 +251,17 @@ export class MarketingHotProspectService extends BaseService {
       // Store city-level summary audit
       report.summaryStored = await this.storeSummaryAudit(parsed, execution.campaign_id, ctx);
 
+      // Sprint 5: persist the sync report on the execution record so the UI
+      // can retrieve it without re-running the sync.
+      try {
+        await this.prisma.mkt_prompt_executions_list.update({
+          where: { id: executionId },
+          data: { sync_report: { ...report, syncedAt: new Date().toISOString() } as any },
+        });
+      } catch (persistErr) {
+        logger.error('Failed to persist sync report (best-effort)', ctx, { error: (persistErr as Error).message, executionId });
+      }
+
       logger.info('City Pain Scan sync complete', ctx, report);
       return report;
     } catch (error) {
@@ -260,10 +271,33 @@ export class MarketingHotProspectService extends BaseService {
   }
 
   /**
+   * Sprint 5: Retrieve the persisted sync report for an execution.
+   * Returns null if no sync has run for this execution.
+   */
+  async getSyncReport(executionId: string, ctx?: RequestCtx): Promise<(SyncReport & { syncedAt: string }) | null> {
+    try {
+      const execution = await this.prisma.mkt_prompt_executions_list.findUnique({
+        where: { id: executionId },
+        select: { sync_report: true },
+      });
+      if (!execution || !execution.sync_report) return null;
+      return execution.sync_report as any;
+    } catch (error) {
+      logger.error('getSyncReport failed', ctx, { error: (error as Error).message, executionId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
    * Parse the execution output, tolerating markdown code fences and
    * leading/trailing prose. Returns null if no valid JSON is found.
    */
-  private parseOutputJson(raw: string): CityScanOutput | null {
+  /**
+   * Parse the City Pain Scan execution output, tolerating markdown fences
+   * and leading/trailing prose. Returns null if no valid JSON is found.
+   * Public so the routes layer can reuse it for bulk-derive (Sprint 5).
+   */
+  parseOutputJson(raw: string): CityScanOutput | null {
     const trimmed = raw.trim();
     // Strip markdown code fences if present
     const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -603,6 +637,135 @@ export class MarketingHotProspectService extends BaseService {
       return report;
     } catch (error) {
       logger.error('syncFromAudit failed', ctx, { error: (error as Error).message, auditId });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  /**
+   * Sprint 5: Create a business-scope child campaign from an unmatched City
+   * Pain Scan business, seeding all scan-derived fields + creating the
+   * `city_analysis` audit on the child. The child starts at `seek` stage
+   * with hot-prospect already derived.
+   *
+   * Deduplication: if a campaign already exists with the same business_name
+   * + city + category + scope='business', returns the existing one instead
+   * of creating a duplicate (AC84).
+   */
+  async deriveBusinessCampaignFromScanBusiness(
+    parentId: string,
+    business: BusinessJson,
+    ctx?: RequestCtx,
+  ): Promise<{ campaign: any; created: boolean }> {
+    try {
+      const parent = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: parentId },
+      });
+      if (!parent) {
+        throw new NotFoundError(`Parent campaign ${parentId} not found`);
+      }
+
+      const businessName = business.business_name?.trim() || '';
+      if (!businessName) {
+        throw new Error('business_name is required');
+      }
+      const category = business.category || parent.category;
+      const city = parent.city;
+      const state = (parent as any).state ?? null;
+
+      // Deduplication: check for existing business-scope campaign with same
+      // business_name + city + category (AC84).
+      const existing = await this.prisma.mkt_campaigns_list.findFirst({
+        where: {
+          scope: 'business',
+          business_name: { equals: businessName, mode: 'insensitive' },
+          city: { equals: city, mode: 'insensitive' },
+          category: { equals: category, mode: 'insensitive' },
+        },
+      });
+      if (existing) {
+        logger.info('deriveBusinessCampaignFromScanBusiness: returning existing campaign', ctx, {
+          parentId, existingId: existing.id, businessName,
+        });
+        return { campaign: existing, created: false };
+      }
+
+      // Map scan fields onto campaign columns (reusing private helpers).
+      const score = business.digital_opportunity_score?.score ?? 0;
+      const tier = business.recommended_tier ?? null;
+      const fee = business.estimated_monthly_service_fee;
+      const feeCents = fee?.minimum != null ? Math.round(fee.minimum * 100) : 0;
+      const gbpClaimed = this.mapProfileStatusToClaimed(business.platforms?.google?.profile_status) ?? false;
+      const hasWebsite = this.mapWebsiteStatusToHasWebsite(business.website?.status) ?? null;
+      const napConsistent = this.mapNapStatus(business.nap_consistency?.status) ?? null;
+      const unaddressed = business.platforms?.google?.observable_unanswered_reviews
+        ?? business.combined_review_metrics?.observable_unanswered_reviews
+        ?? 0;
+      const phone = business.business_phone ?? null;
+      const websiteUrl = business.website?.url ?? null;
+
+      // Derive hotness (no top_opportunities context for single derive).
+      const threshold = unifiedConfig.marketingOpsHotProspectThreshold;
+      const hotReason = this.deriveHotness(business, new Set(), new Map(), threshold);
+      const isHot = !!hotReason;
+
+      const campaignId = generateCampaignId();
+      const campaign = await this.prisma.mkt_campaigns_list.create({
+        data: {
+          id: campaignId,
+          scope: 'business',
+          business_name: businessName,
+          category,
+          city,
+          state,
+          neighborhood: parent.neighborhood ?? null,
+          tone: parent.tone ?? null,
+          attributes: (parent.attributes as any) ?? [],
+          estimated_tier: tier,
+          estimated_fee_cents: feeCents,
+          pain_score: score,
+          gbp_claimed: gbpClaimed,
+          has_website: hasWebsite,
+          nap_consistent: napConsistent,
+          unaddressed_reviews: unaddressed,
+          phone: phone,
+          website_url: websiteUrl,
+          is_hot_prospect: isHot,
+          hot_prospect_reason: hotReason,
+          hot_prospect_set_at: isHot ? new Date() : null,
+          parent_campaign_id: parentId,
+          stage: 'seek',
+          stage_entered_at: new Date(),
+          notes: `Derived from parent campaign ${parent.display_id ?? parent.id} (${parent.scope} scope) via City Pain Scan sync.`,
+        },
+      });
+
+      // Create the city_analysis audit on the child with the full business JSON.
+      const auditId = generateMarketingAuditId();
+      await this.prisma.mkt_audits_list.create({
+        data: {
+          id: auditId,
+          campaign_id: campaignId,
+          platform: 'city_analysis',
+          review_count: business.combined_review_metrics?.observable_total_reviews
+            ?? business.platforms?.google?.total_reviews
+            ?? 0,
+          average_rating: business.platforms?.google?.rating ?? undefined,
+          unaddressed_reviews: unaddressed,
+          owner_response_rate: 0,
+          photo_count: 0,
+          audit_data: business as any,
+        },
+      });
+
+      logger.info('deriveBusinessCampaignFromScanBusiness: created child campaign', ctx, {
+        parentId, campaignId, businessName, isHot,
+      });
+
+      return { campaign, created: true };
+    } catch (error) {
+      logger.error('deriveBusinessCampaignFromScanBusiness failed', ctx, {
+        error: (error as Error).message, parentId, businessName: business.business_name,
+      });
       throw this.handleError(error, ctx);
     }
   }

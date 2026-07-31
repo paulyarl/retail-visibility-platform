@@ -1,11 +1,11 @@
 # Sprint Plan: Marketing Ops — Business Campaign Contact Details, Outreach Tracking, Hot-Prospect Follow-Up & Seek Audit Integration
 
-**Document Version:** 1.6
+**Document Version:** 1.7
 **Date:** 2026-07-30
 **Status:** Draft — Ready for Review
 **Prerequisite:** Marketing Ops Sprint 1–4 complete (campaign pipeline, prompt workspace, deliverables, branding); Tenant Prospecting Channel sprint schema landed (`gbp_lookup_cache`, `gbp_lookup_cached_at` columns exist but are unpopulated)
 
-This plan contains **four sprints**:
+This plan contains **five sprints**:
 - **Sprint 1 (Part I, §§1–11):** Business Campaign Contact Details — make the campaign the source of truth for prospect contactability (phone / email / website / social), populated via GBP enrichment and manual intake, and rendered in the Overview.
 - **Sprint 2 (Part II, §§12–22):** Outreach Tracking & Follow-Up Visibility — track each point of contact during `preview_built` and `shown` with a **message + fresh-data snapshot per contact** so historical contacts are reviewable in Ops; schedule follow-ups; surface overdue follow-ups at a glance.
 - **Sprint 3 (Part III, §§23–33):** Hot-Prospect Auto-Follow-Up + City Pain Scan Sync — when recent contacts produce no response, automatically schedule the next follow-up *only* for businesses flagged as hot prospects from recent City Pain Scan analysis. Sprint 3 also closes the loop between City Pain Scan executions and the campaign record: the multi-business audit JSON (up to 15 businesses across 5+ categories, with per-business GBP status, website, NAP, digital opportunity score, high-attention flag, tier, fee estimate, data quality, and contact details) is parsed and synced onto matched campaigns as `city_analysis` audits, so the campaign is the single source of truth and Sprint 2's `buildFreshSnapshot` has real data to work with. The `top_opportunities` array from the scan is the primary hot-prospect signal.
@@ -13,6 +13,12 @@ This plan contains **four sprints**:
 Sprint 2 depends on Sprint 1 (outreach logging references the contact channels populated by Sprint 1). Sprint 3 depends on Sprint 2 (auto-scheduling writes into the same outreach log + `next_follow_up_at` rollup) and on scope scan analysis being run (existing `category_analysis` / `city_analysis` prompt types). Sprint 4 depends on Sprint 1 (contact field sync) and Sprint 3 (hot-prospect derivation logic + `MarketingHotProspectService` reuse).
 
 - **Sprint 4 (Part IV, §§34–44):** Business-Scope Seek Audit Integration — register the production seek prompt's `business_analysis` output schema, build a `BusinessAnalysisAuditCard` renderer, sync seek audit fields onto the campaign (data_quality-gated, like Sprint 3's City Pain Scan sync), and derive hot-prospect signals from single-business seek audits. This closes the loop between seek-stage executions and the campaign record, complementing Sprint 3's citywide sync with a per-business deep dive.
+
+Sprint 4 depends on Sprint 1 (contact field sync) and Sprint 3 (hot-prospect derivation logic + `MarketingHotProspectService` reuse).
+
+- **Sprint 5 (Part V, §§45–54):** Scan-to-Campaign Spawning — surface the City Pain Scan sync report in the UI, extend `deriveBusinessCampaign` to accept the full scan business payload (seeding all fields + creating the `city_analysis` audit on the child), and add "Create campaign" + "Create all unmatched" actions so operators can spawn business-scope campaigns from unmatched scan businesses in one click. Turns the sync report from a log line into an actionable surface.
+
+Sprint 5 depends on Sprint 3 (`syncFromExecution` report + `MarketingHotProspectService`) and the existing `deriveBusinessCampaign` infrastructure.
 
 ---
 
@@ -1772,3 +1778,294 @@ marketingOps: {
 5. **Seek audit + City Pain Scan audit conflict** — if a seek audit sets `pain_score = 8` and a later City Pain Scan sets `pain_score = 6`, the campaign's `pain_score` becomes 6 (most recent wins). Is this correct, or should the higher score win (most pessimistic)? Recommend: most recent wins (consistent with "freshest data" principle). Operator can manually override.
 6. **Should seek audit hotness trigger Sprint 3's auto-follow-up scheduler?** — Yes, by design. The scheduler checks `is_hot_prospect` regardless of which sync set it. A seek audit flagging hot should trigger auto-follow-ups just like a City Pain Scan. Confirm this works end-to-end (no Sprint 4 code needed — just verify).
 7. **Seek prompt template seeding** — should the default seek template be updated in-place (replacing the current body) or versioned (create a new version, keep the old)? Recommend: update in-place via seed script. The current seek template body is likely a placeholder; the production prompt is the real content. Versioning is for when operators customize the prompt.
+
+---
+
+# Part V — Sprint 5: Scan-to-Campaign Spawning
+
+## 45. Executive Summary
+
+Sprints 3 and 4 close the loop between scan executions and *existing* campaigns — but only for businesses that already have a campaign record. When a City Pain Scan audits 15 businesses and only 3 have matching campaigns, the other 12 are logged as `unmatched` in the sync report and discarded. The operator has no way to act on them without manually creating 12 campaigns one by one.
+
+Sprint 5 closes this gap by turning the sync report into an **actionable surface**:
+
+1. **Surface the sync report in the UI** — after a City Pain Scan sync runs (either via the execution completion hook or a manual re-sync), the report is visible on the parent campaign's detail page with matched / unmatched / skipped-chains breakdowns and per-business actions.
+2. **Extend `deriveBusinessCampaign` to accept the full scan business payload** — the existing method accepts only `{businessName, rating, reviewCount, location}`. Sprint 5 adds a richer variant that seeds all scan-derived fields (pain_score, estimated_tier, estimated_fee_cents, gbp_claimed, has_website, nap_consistent, unaddressed_reviews, phone, website_url, high_attention, hot_prospect_reason) onto the new child campaign and creates the `city_analysis` audit on it — so the child is fully populated at creation time, not just a stub.
+3. **Add "Create campaign" + "Create all unmatched" actions** — per-unmatched-business and bulk creation from the sync report UI.
+4. **Persist the sync report** — currently the report is returned from `syncFromExecution` but only logged. Sprint 5 stores the latest report on the parent campaign (or execution metadata) so it's retrievable for the UI without re-running the sync.
+
+### Existing infrastructure (already in place)
+
+| Piece | Location | What it does |
+|-------|----------|--------------|
+| `deriveBusinessCampaign` | `MarketingCampaignService.ts:410` | Creates a business-scope child from a parent, inherits category/city/tone/attributes, sets `parent_campaign_id`. Currently accepts minimal fields only. |
+| `POST /:id/derive-business` | `marketing-ops.ts:753` | Route for the above. |
+| `service.deriveBusinessCampaign` | `MarketingOpsService.ts:789` | Frontend service client. |
+| `CategoryAnalysisAuditCard` derive buttons | `CategoryAnalysisAuditCard.tsx:79-114` | UI for spawning business campaigns from category-scan competitors. Proves the pattern works end-to-end. |
+| `syncFromExecution` report | `MarketingHotProspectService.ts:97-107` | Returns `{ matched, unmatched, skippedChains, hotProspectsMarked, summaryStored }` — but only logs it, doesn't persist or surface it. |
+| `parent_campaign_id` column | `mkt_campaigns_list` | Lineage link from child → parent. Already populated by `deriveBusinessCampaign`. |
+| `mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list` relation | `schema.prisma` | Prisma relation for parent → children. Already included in `getCampaign` response. |
+
+### Core Capabilities
+
+| Capability | Description |
+|-----------|-------------|
+| **Sync report persistence** | The latest `syncFromExecution` report is stored as execution metadata (or a dedicated column) so the UI can retrieve it without re-running the sync. Stored on the execution record, keyed by execution ID. |
+| **Sync report UI** | A `SyncReportCard` component on the parent campaign's detail page (Overview or a new "Scan Results" tab) showing matched campaigns (with links), unmatched businesses (with "Create campaign" buttons), skipped chains count, and hot-prospects-marked count. |
+| **Rich derive** | `deriveBusinessCampaignFromScanBusiness` accepts the full City Pain Scan business JSON and seeds all fields + creates the `city_analysis` audit on the new child. The child starts at `seek` stage with hot-prospect already derived. |
+| **Bulk create** | "Create all unmatched" button that spawns business campaigns for every unmatched business in the report. Returns a batch result with created campaign IDs. |
+| **Re-sync action** | "Re-run sync" button that calls `syncFromExecution` again (useful after creating campaigns for previously-unmatched businesses — a re-sync will now match them). |
+
+## 46. Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│         City Pain Scan execution (existing)                         │
+│   → syncFromExecution() runs (Sprint 3)                             │
+│   → returns SyncReport { matched, unmatched, skippedChains, ... }   │
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │ NEW: persist report on execution
+                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              Execution record (extended)                            │
+│   + sync_report JSONB  — { matched, unmatched, skippedChains,       │
+│                            hotProspectsMarked, summaryStored,       │
+│                            syncedAt }                               │
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │ GET /:id/sync-report
+                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              SyncReportCard (NEW frontend component)                │
+│   • Matched: list of {campaignId, businessName, hot} → links       │
+│   • Unmatched: list of {businessName, reason} → [Create campaign]  │
+│   • Skipped chains: N                                               │
+│   • Hot marked: K                                                   │
+│   • [Create all unmatched] [Re-run sync]                            │
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │ "Create campaign" click
+                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│     deriveBusinessCampaignFromScanBusiness()                        │
+│   1. Load parent campaign (city-scope)                              │
+│   2. Create business-scope child:                                   │
+│      - Inherit: category, city, state, neighborhood, tone, attrs    │
+│      - Seed from scan business: business_name, pain_score,          │
+│        estimated_tier, estimated_fee_cents, gbp_claimed,            │
+│        has_website, nap_consistent, unaddressed_reviews,            │
+│        phone, website_url, is_hot_prospect, hot_prospect_reason     │
+│      - Set parent_campaign_id                                       │
+│   3. Create city_analysis audit on child (full business JSON)       │
+│   4. Return child campaign                                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 46a. Field Mapping — Scan Business → New Child Campaign
+
+| Scan business JSON path | Child campaign field | Sync rule |
+|--------------------------|---------------------|-----------|
+| `business_name` | `business_name` | Always set |
+| `category` | `category` | Always set (from business, fallback to parent) |
+| `audit_metadata.city` | `city` | From scan metadata |
+| `audit_metadata.state` | `state` | From scan metadata |
+| `digital_opportunity_score.score` | `pain_score` | Integer, no rounding |
+| `recommended_tier` | `estimated_tier` | Direct map |
+| `estimated_monthly_service_fee.minimum × 100` | `estimated_fee_cents` | If confidence >= threshold |
+| `platforms.google.profile_status` | `gbp_claimed` | Mapped (claimed/likely_claimed → true) |
+| `website.status` | `has_website` | Mapped (working → 'yes', etc.) |
+| `nap_consistency.status` | `nap_consistent` | Mapped (consistent → true) |
+| `platforms.google.observable_unanswered_reviews` | `unaddressed_reviews` | If in verified_fields |
+| `business_phone` | `phone` | Always set (null-only on existing, but new campaign = always) |
+| `website.url` | `website_url` | Always set if non-null |
+| `high_attention` OR `score >= 7` OR `tier_1` | `is_hot_prospect` + `hot_prospect_reason` | Same OR logic as Sprint 3 |
+| Parent's `tone` | `tone` | Inherited |
+| Parent's `attributes` | `attributes` | Inherited |
+| Parent's `neighborhood` | `neighborhood` | Inherited |
+
+## 47. Schema Migration
+
+```sql
+-- ============================================================
+-- Migration 140: Marketing Ops — Sync Report Persistence
+-- ============================================================
+-- Stores the latest City Pain Scan sync report on the execution
+-- record so the UI can retrieve it without re-running the sync.
+-- ============================================================
+
+ALTER TABLE mkt_prompt_executions_list
+  ADD COLUMN IF NOT EXISTS sync_report JSONB;
+
+-- Index for fast lookup by campaign_id
+CREATE INDEX IF NOT EXISTS idx_mkt_executions_sync_report
+  ON mkt_prompt_executions_list(campaign_id)
+  WHERE sync_report IS NOT NULL;
+```
+
+### Prisma Sync
+
+After migration, run `npx prisma db pull && npx prisma generate` to sync the `sync_report` column.
+
+### Rollback
+
+```sql
+ALTER TABLE mkt_prompt_executions_list
+  DROP COLUMN IF EXISTS sync_report;
+DROP INDEX IF EXISTS idx_mkt_executions_sync_report;
+```
+
+## 48. Tasks
+
+### Task 27: Backend — Persist sync report + retrieve endpoint
+
+| Sub-Task | File | Description |
+|----------|------|-------------|
+| Persist report in `syncFromExecution` | `apps/api/src/services/MarketingHotProspectService.ts` (MODIFY) | After sync completes, store the report as `sync_report` JSONB on the execution record: `this.prisma.mkt_prompt_executions_list.update({ where: { id: executionId }, data: { sync_report: report as any } })`. Include a `syncedAt` timestamp in the stored report. |
+| Add `getSyncReport` method | `apps/api/src/services/MarketingHotProspectService.ts` (MODIFY) | `getSyncReport(executionId, ctx)` — loads the execution and returns the stored `sync_report` JSONB. Returns null if no sync has run. |
+| Add `GET /:id/sync-report` route | `apps/api/src/routes/marketing-ops.ts` (MODIFY) | Returns the stored sync report for an execution. `GET /executions/:executionId/sync-report` (or `GET /:campaignId/sync-report?executionId=...` if we want it campaign-scoped). |
+
+### Task 28: Backend — Rich derive from scan business
+
+| Sub-Task | File | Description |
+|----------|------|-------------|
+| Add `deriveBusinessCampaignFromScanBusiness` | `apps/api/src/services/MarketingHotProspectService.ts` (MODIFY) | New method: `deriveBusinessCampaignFromScanBusiness(parentId, business, ctx)`. Loads the parent (city-scope) campaign. Creates a business-scope child with all fields seeded from the scan business JSON (per §46a field mapping). Creates a `city_analysis` audit on the child with the full business JSON. Derives hotness (same OR logic). Sets `parent_campaign_id`. Returns the new child campaign. |
+| Add `POST /:id/derive-from-scan` route | `apps/api/src/routes/marketing-ops.ts` (MODIFY) | Body: `{ business: BusinessJson }` (the full scan business object). Calls `deriveBusinessCampaignFromScanBusiness`. Returns 201 with the new campaign. |
+| Add `POST /:id/derive-all-unmatched` route | `apps/api/src/routes/marketing-ops.ts` (MODIFY) | Body: `{ executionId: string }`. Loads the sync report, iterates `unmatched[]`, calls `deriveBusinessCampaignFromScanBusiness` for each. Returns `{ created: [{campaignId, businessName}], failed: [{businessName, error}] }`. Best-effort — one failure doesn't stop the batch. |
+
+### Task 29: Frontend — SyncReportCard + actions
+
+| Sub-Task | File | Description |
+|----------|------|-------------|
+| Add `getSyncReport` service method | `apps/web/src/services/MarketingOpsService.ts` (MODIFY) | `getSyncReport(executionId)` → calls `GET /executions/:executionId/sync-report`. |
+| Add `deriveFromScan` + `deriveAllUnmatched` service methods | `apps/web/src/services/MarketingOpsService.ts` (MODIFY) | `deriveFromScan(parentId, business)` → `POST /:id/derive-from-scan`. `deriveAllUnmatched(parentId, executionId)` → `POST /:id/derive-all-unmatched`. |
+| Create `SyncReportCard` | `apps/web/src/components/marketing-ops/SyncReportCard.tsx` (NEW) | Renders the sync report: matched campaigns (links), unmatched businesses (with "Create campaign" buttons), skipped chains count, hot-prospects-marked count, "Create all unmatched" + "Re-run sync" buttons. Shows `syncedAt` timestamp. |
+| Wire into CampaignDetailClient | `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx` (MODIFY) | For city-scope campaigns with a recent `city_analysis` execution, fetch + render `SyncReportCard` in the Overview tab. |
+
+## 49. API Contract
+
+### `GET /api/admin/marketing-ops/executions/:executionId/sync-report`
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "executionId": "mpe-1",
+    "city": "Plainfield",
+    "state": "Indiana",
+    "businessesInOutput": 15,
+    "matched": [{ "campaignId": "mc-1", "businessName": "Acme HVAC", "hot": true }],
+    "unmatched": [{ "businessName": "Bob's Plumbing", "reason": "No matching campaign" }],
+    "skippedChains": 2,
+    "hotProspectsMarked": 5,
+    "summaryStored": true,
+    "syncedAt": "2026-07-30T12:00:00Z"
+  }
+}
+```
+
+### `POST /api/admin/marketing-ops/:id/derive-from-scan`
+
+**Request:**
+```json
+{
+  "business": {
+    "rank": 4,
+    "business_name": "Bob's Plumbing",
+    "category": "Plumbing",
+    "business_phone": "(317) 555-0100",
+    "website": { "url": "https://bobsplumbing.com", "status": "working" },
+    "digital_opportunity_score": { "score": 8 },
+    "recommended_tier": "tier_1",
+    "high_attention": true,
+    "platforms": { "google": { "profile_status": "unclaimed", "total_reviews": 45, "rating": 3.2 } }
+  }
+}
+```
+
+**Response 201:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "mc-new-1",
+    "scope": "business",
+    "business_name": "Bob's Plumbing",
+    "stage": "seek",
+    "parent_campaign_id": "mc-city-1",
+    "is_hot_prospect": true,
+    "hot_prospect_reason": "City Pain Scan rank #4: score=8, tier=tier_1, high_attention=true",
+    "pain_score": 8
+  }
+}
+```
+
+### `POST /api/admin/marketing-ops/:id/derive-all-unmatched`
+
+**Request:** `{ "executionId": "mpe-1" }`
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "created": [{ "campaignId": "mc-new-1", "businessName": "Bob's Plumbing" }],
+    "failed": [{ "businessName": "Jane's Electrical", "error": "Parent campaign not found" }]
+  }
+}
+```
+
+## 50. Acceptance Criteria
+
+| # | Criterion | Verification |
+|---|-----------|--------------|
+| AC76 | `syncFromExecution` persists the sync report as `sync_report` JSONB on the execution record | Integration test: run sync, query execution, assert `sync_report` non-null with matched/unmatched arrays |
+| AC77 | `getSyncReport(executionId)` returns the stored report | Unit test: persist a report, call getSyncReport, assert shape matches |
+| AC78 | `deriveBusinessCampaignFromScanBusiness` creates a business-scope child with all scan fields seeded (pain_score, tier, fee, gbp_claimed, has_website, nap_consistent, phone, website_url) | Integration test: derive from a scan business, GET child campaign, assert all fields match |
+| AC79 | `deriveBusinessCampaignFromScanBusiness` creates a `city_analysis` audit on the child with the full business JSON | Integration test: derive, GET audits for child, assert `city_analysis` audit present |
+| AC80 | `deriveBusinessCampaignFromScanBusiness` sets `is_hot_prospect` when the business has `score >= 7` OR `high_attention == true` OR `tier_1` | Unit test: derive from a hot business, assert child `is_hot_prospect == true` |
+| AC81 | `deriveBusinessCampaignFromScanBusiness` sets `parent_campaign_id` to the parent campaign | Unit test: derive, assert child's `parent_campaign_id` matches parent |
+| AC82 | `deriveBusinessCampaignFromScanBusiness` inherits category, city, state, tone, attributes from the parent | Unit test: derive, assert inherited fields match parent |
+| AC83 | `POST /:id/derive-all-unmatched` creates campaigns for all unmatched businesses in the report and returns created/failed arrays | Integration test: seed a sync report with 3 unmatched, call derive-all, assert 3 created |
+| AC84 | `deriveBusinessCampaignFromScanBusiness` does NOT create a duplicate if a campaign already exists for that business name + city + category | Unit test: derive twice for the same business, assert second call returns the existing campaign (or throws a clear error) |
+| AC85 | The `SyncReportCard` renders matched campaigns (with links), unmatched businesses (with "Create campaign" buttons), and counts | Manual: seed a sync report, open campaign detail, verify card |
+| AC86 | Clicking "Create campaign" on an unmatched business calls `deriveFromScan` and redirects to the new child campaign | Manual: click button, verify redirect + child campaign loads |
+| AC87 | Clicking "Create all unmatched" calls `deriveAllUnmatched` and shows the created/failed result | Manual: click button, verify batch result |
+| AC88 | Clicking "Re-run sync" calls `syncFromExecution` again and refreshes the report | Manual: create campaigns for unmatched, click re-run, verify they now appear in "matched" |
+
+## 51. Out of Scope (Sprint 5)
+
+| Item | Why deferred |
+|------|--------------|
+| **Auto-creating campaigns for all unmatched businesses during sync** | Could be noisy (15 new campaigns per scan). Sprint 5 makes it operator-initiated. Auto-create-on-sync is a future config option. |
+| **Deduplication across scans** | If two City Pain Scans both audit "Acme HVAC", Sprint 5 creates one child per scan (unless a matching campaign already exists). Cross-scan dedup is a future enhancement. |
+| **Seek audit mismatch → create new campaign** | When a seek audit comes back `identity_status: 'mismatched'`, Sprint 4 skips sync. Offering to create a new campaign for the *matched* business is a future enhancement. |
+| **Category-scope scan → business spawning** | The existing `CategoryAnalysisAuditCard` derive buttons already handle this (top-5 competitors). Sprint 5 focuses on City Pain Scan's richer per-business data. |
+| **Sync report history** | Sprint 5 stores only the latest report per execution. A history of sync runs (with diffs) is a future analytics enhancement. |
+
+## 52. Risks & Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| Bulk create spawns many campaigns at once → noisy pipeline | "Create all" shows a confirmation modal with the count before proceeding. Operator can also create individually. |
+| Duplicate campaigns for the same business | `deriveBusinessCampaignFromScanBusiness` checks for an existing campaign by business_name + city + category before creating. Returns the existing one if found (AC84). |
+| Sync report grows large (15 businesses × full JSON) | `sync_report` JSONB is bounded by the scan output size (max 15 businesses). PostgreSQL JSONB handles this efficiently. |
+| Parent campaign deleted after sync report stored | `sync_report` is on the execution record, which is cascade-deleted with the campaign. No orphaned reports. |
+
+## 53. File Inventory (Sprint 5)
+
+**Backend:**
+- `apps/api/src/services/MarketingHotProspectService.ts` (MODIFY — persist report, getSyncReport, deriveBusinessCampaignFromScanBusiness)
+- `apps/api/src/routes/marketing-ops.ts` (MODIFY — 3 new routes)
+- `database/migrations/140_marketing_ops_sync_report.sql` (NEW)
+
+**Frontend:**
+- `apps/web/src/services/MarketingOpsService.ts` (MODIFY — 3 new service methods)
+- `apps/web/src/components/marketing-ops/SyncReportCard.tsx` (NEW)
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx` (MODIFY — wire SyncReportCard)
+
+## 54. Open Questions (Sprint 5)
+
+1. **Sync report storage location** — on the execution record (`mkt_prompt_executions_list.sync_report`) or on the campaign (`mkt_campaigns_list`)? Recommend: execution record. The report is execution-scoped (one report per scan run), and executions are already linked to campaigns. Multiple scans on the same campaign each have their own report.
+2. **Deduplication on derive** — should `deriveBusinessCampaignFromScanBusiness` check for an existing campaign by business_name + city + category before creating? Recommend: yes, return the existing one if found (AC84). Prevents duplicates from "Create all" + manual "Create" on the same business.
+3. **Sync report tab vs Overview** — should the `SyncReportCard` be in the Overview tab or a new "Scan Results" tab? Recommend: Overview for city-scope campaigns (it's the primary content). A separate tab is overkill for one card.
+4. **Re-run sync from UI** — should "Re-run sync" call `syncFromExecution` (which re-parses the execution output) or just re-match businesses against campaigns? Recommend: full re-run. The execution output hasn't changed, but new campaigns may exist since the last sync. Re-running picks them up.
+5. **Bulk create confirmation** — should "Create all unmatched" show a confirmation modal? Recommend: yes, with the count and business names. Prevents accidental mass creation.
