@@ -102,13 +102,19 @@ export class OutreachOpenerService extends BaseService {
   }
 
   /**
-   * Build the common fields (business_name, contact_name, tone) from a campaign.
+   * Build the common fields (business_name, contact_name, tone, NAP) from a campaign.
+   * NAP (Name, Address, Phone) context lets the AI agent identify the business
+   * and cross-reference publicly available data when crafting the opener.
    */
   private buildCommonFields(campaign: any): CommonFields {
     return {
       business_name: campaign.business_name ?? 'your business',
       contact_name: campaign.contact_info ?? null, // contact_info holds a name if available
       tone: campaign.tone || 'short informal',
+      city: campaign.city ?? null,
+      state: campaign.state ?? null,
+      phone: campaign.phone ?? null,
+      website_url: campaign.website_url ?? null,
     };
   }
 

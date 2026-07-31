@@ -79,6 +79,36 @@
  *     POST   /openers/execute           — Path 1: generate opener via AI
  *     POST   /openers/import            — Path 2: import externally-generated opener
  *     GET    /openers/:id               — get single opener
+ *
+ *   Outreach Pitch — Headers:
+ *     GET    /openers/headers           — list header variants (filter: campaignId)
+ *     GET    /openers/headers/resolve   — resolve header prompt for a campaign (no AI call)
+ *     POST   /openers/headers/execute   — Path 1: generate header via AI
+ *     POST   /openers/headers/import    — Path 2: import externally-generated header
+ *     GET    /openers/headers/:id       — get single header
+ *
+ *   Outreach Pitch — Closers:
+ *     GET    /openers/closers           — list closer variants (filter: campaignId)
+ *     GET    /openers/closers/resolve   — resolve closer prompt + default template (no AI call)
+ *     POST   /openers/closers/execute   — Path 1: generate closer via AI
+ *     POST   /openers/closers/import    — Path 2: import externally-generated/template-edited closer
+ *     GET    /openers/closers/:id       — get single closer
+ *
+ *   Outreach Pitch — Contacts (optional footer, no AI):
+ *     GET    /openers/contacts          — list contact variants (filter: campaignId)
+ *     POST   /openers/contacts          — create contact variant
+ *     PUT    /openers/contacts/:id      — update contact variant
+ *     DELETE /openers/contacts/:id      — delete contact variant
+ *     GET    /openers/contacts/:id      — get single contact
+ *
+ *   Outreach Pitch — Review Response Drafts (no persistence — returns draft for slot):
+ *     POST   /openers/review-responses/generate — Path 1: AI draft owner response using campaign tone
+ *     POST   /openers/review-responses/import   — Path 2: validate externally-drafted owner response
+ *
+ *   Outreach Pitch — Assembly:
+ *     GET    /openers/pitches           — list assembled pitches (filter: campaignId)
+ *     POST   /openers/pitches           — assemble + persist a full pitch from variant IDs + review pairs
+ *     GET    /openers/pitches/:id       — get single assembled pitch
  */
 
 import { Router, Response } from 'express';
@@ -101,6 +131,16 @@ import MarketingCategoryToneService from '../services/MarketingCategoryToneServi
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
 import { ReviewResponseService } from '../services/ReviewResponseService';
 import { OutreachOpenerService } from '../services/OutreachOpenerService';
+import HeaderService from '../services/outreach-pitch/HeaderService';
+import CloserService from '../services/outreach-pitch/CloserService';
+import ContactService from '../services/outreach-pitch/ContactService';
+import ReviewResponseDraftService from '../services/outreach-pitch/ReviewResponseDraftService';
+import PitchService from '../services/outreach-pitch/PitchService';
+import OwnerVoiceService from '../services/deliverable/OwnerVoiceService';
+import ReviewSlotService from '../services/deliverable/ReviewSlotService';
+import DeliverableSectionService from '../services/deliverable/DeliverableSectionService';
+import DeliverableAssemblyService from '../services/deliverable/DeliverableAssemblyService';
+import DeliverableRenderService from '../services/deliverable/DeliverableRenderService';
 
 const router = Router();
 
@@ -1680,6 +1720,471 @@ router.get('/:id/revenue', async (req: any, res: Response) => {
   }
 });
 
+// ─── Outreach Openers ───────────────────────────────────────────────────
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
+// otherwise Express matches /openers as a campaign ID param and returns 404.
+// Dual execution path mirroring the Prompt Workspace:
+//   Path 1 (execute): deterministic archetype selection + LLM + quality gate
+//   Path 2 (import):  quality gate on externally-pasted opener text
+const outreachOpenerService = OutreachOpenerService.getInstance();
+
+// Zod schemas for opener endpoints
+const openerExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+});
+
+const openerImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  opener_text: z.string().min(1),
+});
+
+// List openers (filter: campaignId)
+router.get('/openers', async (req: any, res: Response) => {
+  try {
+    const openers = await outreachOpenerService.listOpeners(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: openers });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve archetype + extracted fields + prompt for a campaign (no AI call)
+// Used by the workspace UI to display the detected archetype + resolved prompt
+// before the user clicks Execute (Path 1) or copies the prompt for external use (Path 2).
+router.get('/openers/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute opener generation via AI
+router.post('/openers/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = openerExecuteSchema.parse(req.body);
+    const result = await outreachOpenerService.executeOpener({
+      campaignId: parsed.campaign_id,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated opener
+router.post('/openers/import', async (req: any, res: Response) => {
+  try {
+    const parsed = openerImportSchema.parse(req.body);
+    const result = await outreachOpenerService.importOpener({
+      campaignId: parsed.campaign_id,
+      openerText: parsed.opener_text,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single opener by ID
+router.get('/openers/:id', async (req: any, res: Response) => {
+  try {
+    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
+    if (!opener) {
+      return res.status(404).json({ success: false, error: 'Opener not found' });
+    }
+    res.json({ success: true, data: opener });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Pitch — Headers ────────────────────────────────────────────
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
+// otherwise Express matches /openers/headers as a campaign ID param and returns 404.
+// Same ordering constraint as the opener routes above (see comment at line ~1684).
+const headerExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+});
+const headerImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  header_text: z.string().min(1),
+});
+
+// List header variants (filter: campaignId)
+router.get('/openers/headers', async (req: any, res: Response) => {
+  try {
+    const headers = await HeaderService.listHeaders(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: headers });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve header prompt for a campaign (no AI call) — for Path 2 prompt display
+router.get('/openers/headers/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const result = await HeaderService.resolveHeader(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute header generation via AI
+router.post('/openers/headers/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = headerExecuteSchema.parse(req.body);
+    const result = await HeaderService.executeHeader({
+      campaignId: parsed.campaign_id,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated header
+router.post('/openers/headers/import', async (req: any, res: Response) => {
+  try {
+    const parsed = headerImportSchema.parse(req.body);
+    const result = await HeaderService.importHeader({
+      campaignId: parsed.campaign_id,
+      headerText: parsed.header_text,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single header by ID
+router.get('/openers/headers/:id', async (req: any, res: Response) => {
+  try {
+    const header = await HeaderService.getHeader(req.params.id, getCtx(req));
+    if (!header) {
+      return res.status(404).json({ success: false, error: 'Header not found' });
+    }
+    res.json({ success: true, data: header });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Pitch — Closers ────────────────────────────────────────────
+const closerExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+});
+const closerImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  closer_text: z.string().min(1),
+});
+
+// List closer variants (filter: campaignId)
+router.get('/openers/closers', async (req: any, res: Response) => {
+  try {
+    const closers = await CloserService.listClosers(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: closers });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve closer prompt + default template for a campaign (no AI call)
+router.get('/openers/closers/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const result = await CloserService.resolveCloser(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute closer generation via AI
+router.post('/openers/closers/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = closerExecuteSchema.parse(req.body);
+    const result = await CloserService.executeCloser({
+      campaignId: parsed.campaign_id,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated or template-edited closer
+router.post('/openers/closers/import', async (req: any, res: Response) => {
+  try {
+    const parsed = closerImportSchema.parse(req.body);
+    const result = await CloserService.importCloser({
+      campaignId: parsed.campaign_id,
+      closerText: parsed.closer_text,
+      executedBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single closer by ID
+router.get('/openers/closers/:id', async (req: any, res: Response) => {
+  try {
+    const closer = await CloserService.getCloser(req.params.id, getCtx(req));
+    if (!closer) {
+      return res.status(404).json({ success: false, error: 'Closer not found' });
+    }
+    res.json({ success: true, data: closer });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Pitch — Contacts (optional footer, no AI) ──────────────────
+const contactCreateSchema = z.object({
+  campaign_id: z.string().min(1),
+  contact_text: z.string().min(1),
+  label: z.string().max(100).optional(),
+});
+const contactUpdateSchema = z.object({
+  contact_text: z.string().min(1).optional(),
+  label: z.string().max(100).optional(),
+});
+
+// List contact variants (filter: campaignId)
+router.get('/openers/contacts', async (req: any, res: Response) => {
+  try {
+    const contacts = await ContactService.listContacts(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: contacts });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Create contact variant
+router.post('/openers/contacts', async (req: any, res: Response) => {
+  try {
+    const parsed = contactCreateSchema.parse(req.body);
+    const contact = await ContactService.createContact({
+      campaignId: parsed.campaign_id,
+      contactText: parsed.contact_text,
+      label: parsed.label,
+      createdBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: contact });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Update contact variant
+router.put('/openers/contacts/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = contactUpdateSchema.parse(req.body);
+    const contact = await ContactService.updateContact(req.params.id, {
+      contactText: parsed.contact_text,
+      label: parsed.label,
+    }, getCtx(req));
+    res.json({ success: true, data: contact });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Delete contact variant
+router.delete('/openers/contacts/:id', async (req: any, res: Response) => {
+  try {
+    await ContactService.deleteContact(req.params.id, getCtx(req));
+    res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single contact by ID
+router.get('/openers/contacts/:id', async (req: any, res: Response) => {
+  try {
+    const contact = await ContactService.getContact(req.params.id, getCtx(req));
+    if (!contact) {
+      return res.status(404).json({ success: false, error: 'Contact not found' });
+    }
+    res.json({ success: true, data: contact });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Pitch — Review Response Drafts (no persistence) ────────────
+// Returns a draft for one preview slot. The caller (UI) collects 3 drafts
+// and passes them to POST /openers/pitches for assembly + persistence.
+const reviewResponseGenerateSchema = z.object({
+  campaign_id: z.string().min(1),
+  review_text: z.string().min(1),
+});
+const reviewResponseImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  review_text: z.string().min(1),
+  response_text: z.string().min(1),
+});
+
+// Path 1: AI draft owner response using campaign tone
+router.post('/openers/review-responses/generate', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewResponseGenerateSchema.parse(req.body);
+    const draft = await ReviewResponseDraftService.generateResponse({
+      campaignId: parsed.campaign_id,
+      reviewText: parsed.review_text,
+    }, getCtx(req));
+    res.status(200).json({ success: true, data: draft });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-drafted owner response (validate non-empty)
+router.post('/openers/review-responses/import', async (req: any, res: Response) => {
+  try {
+    const parsed = reviewResponseImportSchema.parse(req.body);
+    const draft = await ReviewResponseDraftService.importResponse({
+      campaignId: parsed.campaign_id,
+      reviewText: parsed.review_text,
+      responseText: parsed.response_text,
+    }, getCtx(req));
+    res.status(200).json({ success: true, data: draft });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Pitch — Assembly ───────────────────────────────────────────
+const pitchAssembleSchema = z.object({
+  campaign_id: z.string().min(1),
+  opener_id: z.string().min(1),
+  header_id: z.string().nullable().optional(),
+  closer_id: z.string().nullable().optional(),
+  contact_id: z.string().nullable().optional(),
+  review_pairs: z.array(
+    z.object({
+      review_text: z.string().min(1),
+      response_text: z.string().min(1),
+      response_source: z.enum(['ai', 'external']),
+      response_ai_provider: z.string().nullable().optional(),
+      response_ai_model: z.string().nullable().optional(),
+      response_tokens_used: z.number().optional(),
+      is_negative_first: z.boolean(),
+    }),
+  ).min(1),
+});
+
+// List assembled pitches (filter: campaignId)
+router.get('/openers/pitches', async (req: any, res: Response) => {
+  try {
+    const pitches = await PitchService.listPitches(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: pitches });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Assemble + persist a full pitch from variant IDs + review pairs
+router.post('/openers/pitches', async (req: any, res: Response) => {
+  try {
+    const parsed = pitchAssembleSchema.parse(req.body);
+    const result = await PitchService.assemblePitch({
+      campaignId: parsed.campaign_id,
+      openerId: parsed.opener_id,
+      headerId: parsed.header_id,
+      closerId: parsed.closer_id,
+      contactId: parsed.contact_id,
+      reviewPairs: parsed.review_pairs,
+      createdBy: req.user?.id,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get a single assembled pitch by ID
+router.get('/openers/pitches/:id', async (req: any, res: Response) => {
+  try {
+    const pitch = await PitchService.getPitch(req.params.id, getCtx(req));
+    if (!pitch) {
+      return res.status(404).json({ success: false, error: 'Pitch not found' });
+    }
+    res.json({ success: true, data: pitch });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.get('/:id', async (req: any, res: Response) => {
   try {
     const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
@@ -1979,60 +2484,64 @@ router.get('/review-response/follow-ups-due', async (req: any, res: Response) =>
   }
 });
 
-// ─── Outreach Openers ───────────────────────────────────────────────────
-// Dual execution path mirroring the Prompt Workspace:
-//   Path 1 (execute): deterministic archetype selection + LLM + quality gate
-//   Path 2 (import):  quality gate on externally-pasted opener text
-const outreachOpenerService = OutreachOpenerService.getInstance();
+// ─── Deliverable Construction ───────────────────────────────────────────
+// Post-payment deliverable: owner voice calibration, batch review response
+// generation, recovery playbook, listing corrections, CTA fixes, and render.
+// See: docs/LocalBiz/marketing_ops_deliverable_construction_sprint_plan.md
 
-// Zod schemas for opener endpoints
-const openerExecuteSchema = z.object({
-  campaign_id: z.string().min(1),
+// Zod schemas
+const voiceUpsertSchema = z.object({
+  person: z.enum(['first_person', 'third_person', 'we']).optional(),
+  formality: z.enum(['casual', 'professional', 'formal']).optional(),
+  humor: z.enum(['none', 'light', 'witty']).optional(),
+  apologyStyle: z.enum(['direct_apology', 'fix_first', 'acknowledge_and_pivot']).optional(),
+  signoffStyle: z.enum(['first_name', 'full_name', 'title', 'team', 'none']).optional(),
+  signature: z.string().max(100).optional(),
 });
 
-const openerImportSchema = z.object({
-  campaign_id: z.string().min(1),
-  opener_text: z.string().min(1),
+const slotUpdateSchema = z.object({
+  response_text: z.string().min(1),
 });
 
-// List openers (filter: campaignId)
-router.get('/openers', async (req: any, res: Response) => {
+const sectionUpdateSchema = z.object({
+  content: z.string().min(1),
+});
+
+// ─── Owner Voice ─────────────────────────────────────────
+
+// Get voice profile for a campaign
+router.get('/deliverable/voice/:campaignId', async (req: any, res: Response) => {
   try {
-    const openers = await outreachOpenerService.listOpeners(
-      req.query.campaignId as string | undefined,
-      getCtx(req),
-    );
-    res.json({ success: true, data: openers });
+    const profile = await OwnerVoiceService.getProfile(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: profile });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });
 
-// Resolve archetype + extracted fields + prompt for a campaign (no AI call)
-// Used by the workspace UI to display the detected archetype + resolved prompt
-// before the user clicks Execute (Path 1) or copies the prompt for external use (Path 2).
-router.get('/openers/resolve', async (req: any, res: Response) => {
+// AI infer voice from existing owner responses
+router.post('/deliverable/voice/:campaignId/infer', async (req: any, res: Response) => {
   try {
-    const campaignId = req.query.campaignId as string;
-    if (!campaignId) {
-      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
-    }
-    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
+    const result = await OwnerVoiceService.inferVoice(req.params.campaignId, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });
 
-// Path 1: Execute opener generation via AI
-router.post('/openers/execute', async (req: any, res: Response) => {
+// Create or update voice profile (manual entry or operator override)
+router.post('/deliverable/voice/:campaignId', async (req: any, res: Response) => {
   try {
-    const parsed = openerExecuteSchema.parse(req.body);
-    const result = await outreachOpenerService.executeOpener({
-      campaignId: parsed.campaign_id,
-      executedBy: req.user?.id,
+    const parsed = voiceUpsertSchema.parse(req.body || {});
+    const profile = await OwnerVoiceService.upsertProfile(req.params.campaignId, {
+      person: parsed.person,
+      formality: parsed.formality,
+      humor: parsed.humor,
+      apologyStyle: parsed.apologyStyle,
+      signoffStyle: parsed.signoffStyle,
+      signature: parsed.signature,
     }, getCtx(req));
-    res.status(201).json({ success: true, data: result });
+    res.json({ success: true, data: profile });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
@@ -2041,16 +2550,54 @@ router.post('/openers/execute', async (req: any, res: Response) => {
   }
 });
 
-// Path 2: Import externally-generated opener
-router.post('/openers/import', async (req: any, res: Response) => {
+// ─── Review Slots ─────────────────────────────────────────
+
+// List all slots for a campaign
+router.get('/deliverable/:campaignId/slots', async (req: any, res: Response) => {
   try {
-    const parsed = openerImportSchema.parse(req.body);
-    const result = await outreachOpenerService.importOpener({
-      campaignId: parsed.campaign_id,
-      openerText: parsed.opener_text,
-      executedBy: req.user?.id,
-    }, getCtx(req));
-    res.status(201).json({ success: true, data: result });
+    const slots = await ReviewSlotService.listSlots(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: slots });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Ingest all unanswered reviews from audit
+router.post('/deliverable/:campaignId/slots/ingest', async (req: any, res: Response) => {
+  try {
+    const result = await ReviewSlotService.ingestReviews(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Batch generate responses for all draft slots
+router.post('/deliverable/:campaignId/slots/generate', async (req: any, res: Response) => {
+  try {
+    const result = await ReviewSlotService.generateAllResponses(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Re-generate a single slot's response
+router.post('/deliverable/slots/:slotId/regenerate', async (req: any, res: Response) => {
+  try {
+    const slot = await ReviewSlotService.regenerateSlot(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Edit a slot's response text
+router.put('/deliverable/slots/:slotId', async (req: any, res: Response) => {
+  try {
+    const parsed = slotUpdateSchema.parse(req.body);
+    const slot = await ReviewSlotService.updateSlotResponse(req.params.slotId, parsed.response_text, getCtx(req));
+    res.json({ success: true, data: slot });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
@@ -2059,14 +2606,99 @@ router.post('/openers/import', async (req: any, res: Response) => {
   }
 });
 
-// Get a single opener by ID
-router.get('/openers/:id', async (req: any, res: Response) => {
+// Approve a slot
+router.post('/deliverable/slots/:slotId/approve', async (req: any, res: Response) => {
   try {
-    const opener = await outreachOpenerService.getOpener(req.params.id, getCtx(req));
-    if (!opener) {
-      return res.status(404).json({ success: false, error: 'Opener not found' });
+    const slot = await ReviewSlotService.approveSlot(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Skip a slot
+router.post('/deliverable/slots/:slotId/skip', async (req: any, res: Response) => {
+  try {
+    const slot = await ReviewSlotService.skipSlot(req.params.slotId, getCtx(req));
+    res.json({ success: true, data: slot });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Deliverable Sections ─────────────────────────────────
+
+// List all sections for a campaign
+router.get('/deliverable/:campaignId/sections', async (req: any, res: Response) => {
+  try {
+    const sections = await DeliverableSectionService.listSections(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: sections });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Generate all sections (playbook, corrections, CTA based on audit)
+router.post('/deliverable/:campaignId/sections/generate', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableSectionService.generateAllSections(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Edit a section's content
+router.put('/deliverable/sections/:sectionId', async (req: any, res: Response) => {
+  try {
+    const parsed = sectionUpdateSchema.parse(req.body);
+    const section = await DeliverableSectionService.updateSection(req.params.sectionId, parsed.content, getCtx(req));
+    res.json({ success: true, data: section });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
-    res.json({ success: true, data: opener });
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Approve a section
+router.post('/deliverable/sections/:sectionId/approve', async (req: any, res: Response) => {
+  try {
+    const section = await DeliverableSectionService.approveSection(req.params.sectionId, getCtx(req));
+    res.json({ success: true, data: section });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Skip a section
+router.post('/deliverable/sections/:sectionId/skip', async (req: any, res: Response) => {
+  try {
+    const section = await DeliverableSectionService.skipSection(req.params.sectionId, getCtx(req));
+    res.json({ success: true, data: section });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Render ───────────────────────────────────────────────
+
+// Check render readiness
+router.get('/deliverable/:campaignId/render/status', async (req: any, res: Response) => {
+  try {
+    const status = await DeliverableAssemblyService.getAssemblyStatus(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: status });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Render deliverable (PDF + TXT)
+router.post('/deliverable/:campaignId/render', async (req: any, res: Response) => {
+  try {
+    const result = await DeliverableRenderService.renderDeliverable(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }

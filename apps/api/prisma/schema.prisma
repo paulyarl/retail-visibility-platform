@@ -6180,10 +6180,17 @@ model mkt_campaigns_list {
   mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list mkt_campaigns_list[]             @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list")
   tenants_mkt_campaigns_list_tenant_idTotenants             tenants?                         @relation("mkt_campaigns_list_tenant_idTotenants", fields: [tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_tenant")
   mkt_deliverable_preview_tokens                            mkt_deliverable_preview_tokens[]
+  mkt_deliverable_review_slot                               mkt_deliverable_review_slot[]
+  mkt_deliverable_section                                   mkt_deliverable_section[]
   mkt_deliverables_list                                     mkt_deliverables_list[]
   mkt_files_list                                            mkt_files_list[]
+  mkt_outreach_closers_list                                 mkt_outreach_closers_list[]
+  mkt_outreach_contacts_list                                mkt_outreach_contacts_list[]
+  mkt_outreach_headers_list                                 mkt_outreach_headers_list[]
   mkt_outreach_log                                          mkt_outreach_log[]
   mkt_outreach_openers_list                                 mkt_outreach_openers_list[]
+  mkt_outreach_pitches_list                                 mkt_outreach_pitches_list[]
+  mkt_owner_voice_profile                                   mkt_owner_voice_profile?
   mkt_prompt_executions_list                                mkt_prompt_executions_list[]
   mkt_review_response_pipeline                              mkt_review_response_pipeline[]
   mkt_stage_history_list                                    mkt_stage_history_list[]
@@ -6244,6 +6251,8 @@ model mkt_deliverables_list {
   created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
   updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
   mkt_deliverable_preview_tokens mkt_deliverable_preview_tokens[]
+  mkt_deliverable_review_slots   mkt_deliverable_review_slot[]
+  mkt_deliverable_sections       mkt_deliverable_section[]
   mkt_campaigns_list             mkt_campaigns_list               @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_deliverables_campaign")
   mkt_prompt_executions_list     mkt_prompt_executions_list?      @relation(fields: [execution_id], references: [id], onUpdate: NoAction, map: "fk_mkt_deliverables_execution")
   mkt_deliverable_templates_list mkt_deliverable_templates_list?  @relation(fields: [template_id], references: [id], onUpdate: NoAction, map: "fk_mkt_deliverables_template")
@@ -6251,6 +6260,78 @@ model mkt_deliverables_list {
   @@index([campaign_id], map: "idx_mkt_deliverables_campaign")
   @@index([status], map: "idx_mkt_deliverables_status")
   @@index([deliverable_type], map: "idx_mkt_deliverables_type")
+}
+
+/// Owner voice profile — per-campaign voice calibration for deliverable
+/// response drafts. AI-inferred from existing owner responses, operator-overrideable.
+model mkt_owner_voice_profile {
+  id                  String             @id @db.VarChar(255)
+  campaign_id         String             @unique @db.VarChar(255)
+  person              String?            @db.VarChar(10)
+  formality           String?            @db.VarChar(10)
+  humor               String?            @db.VarChar(10)
+  apology_style       String?            @db.VarChar(20)
+  signoff_style       String?            @db.VarChar(20)
+  signature           String?            @db.VarChar(100)
+  inferred_from_count Int?               @default(0)
+  inferred_sample     String?
+  operator_overrides  Json?              @default("{}") @db.Json
+  created_at          DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?          @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list  mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_owner_voice_campaign")
+}
+
+/// Deliverable review slot — one per unanswered review in the deliverable.
+/// The preview is the first 3 slots; the full deliverable expands to all.
+model mkt_deliverable_review_slot {
+  id                    String                 @id @db.VarChar(255)
+  deliverable_id        String?                @db.VarChar(255)
+  campaign_id           String                 @db.VarChar(255)
+  platform              String?                @db.VarChar(20)
+  review_text           String?
+  review_rating         Int?
+  review_date           DateTime?              @db.Date
+  review_author         String?                @db.VarChar(100)
+  sentiment             String?                @db.VarChar(10)
+  theme                 String?                @db.VarChar(50)
+  is_negative_first     Boolean?               @default(false)
+  response_text         String?
+  response_source       String?                @db.VarChar(10)
+  response_ai_provider  String?                @db.VarChar(50)
+  response_ai_model     String?                @db.VarChar(50)
+  response_tokens_used  Int?                   @default(0)
+  quality_gate_passed   Boolean?
+  quality_gate_issues   String[]
+  status                String?                @default("draft") @db.VarChar(20)
+  slot_index            Int?                   @default(0)
+  created_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list    mkt_campaigns_list     @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_review_slot_campaign")
+  mkt_deliverables_list mkt_deliverables_list? @relation(fields: [deliverable_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_review_slot_deliverable")
+
+  @@index([campaign_id, slot_index], map: "idx_mkt_deliverable_slots_campaign")
+  @@index([campaign_id, status], map: "idx_mkt_deliverable_slots_status")
+}
+
+/// Deliverable section — non-review sections (playbook, corrections, CTA).
+model mkt_deliverable_section {
+  id                    String                 @id @db.VarChar(255)
+  deliverable_id        String?                @db.VarChar(255)
+  campaign_id           String                 @db.VarChar(255)
+  section_type          String?                @db.VarChar(30)
+  title                 String?                @db.VarChar(200)
+  content               String?
+  source                String?                @db.VarChar(10)
+  quality_gate_passed   Boolean?
+  quality_gate_issues   String[]
+  status                String?                @default("draft") @db.VarChar(20)
+  section_index         Int?                   @default(0)
+  created_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list    mkt_campaigns_list     @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_section_campaign")
+  mkt_deliverables_list mkt_deliverables_list? @relation(fields: [deliverable_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_section_deliverable")
+
+  @@index([campaign_id, section_index], map: "idx_mkt_deliverable_sections_campaign")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -6538,27 +6619,122 @@ model mkt_review_response_log {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_outreach_openers_list {
-  id                  String             @id @db.VarChar(255)
-  campaign_id         String             @db.VarChar(255)
-  archetype           String             @db.VarChar(10)
-  opener_text         String?
-  quality_gate_passed Boolean            @default(false)
-  quality_gate_issues Json?
-  source              String             @default("ai") @db.VarChar(20)
-  ai_provider         String?            @db.VarChar(50)
-  ai_model            String?            @db.VarChar(100)
-  tokens_used         Int                @default(0)
-  cost_cents          Int                @default(0)
-  extracted_fields    Json?
-  executed_by         String?            @db.VarChar(255)
-  executed_at         DateTime           @default(now()) @db.Timestamptz(6)
-  created_at          DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at          DateTime           @default(now()) @db.Timestamptz(6)
-  mkt_campaigns_list  mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  archetype                 String                      @db.VarChar(10)
+  opener_text               String?
+  quality_gate_passed       Boolean                     @default(false)
+  quality_gate_issues       Json?
+  source                    String                      @default("ai") @db.VarChar(20)
+  ai_provider               String?                     @db.VarChar(50)
+  ai_model                  String?                     @db.VarChar(100)
+  tokens_used               Int                         @default(0)
+  cost_cents                Int                         @default(0)
+  extracted_fields          Json?
+  executed_by               String?                     @db.VarChar(255)
+  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_opener")
 
   @@index([archetype], map: "idx_mkt_outreach_openers_archetype")
   @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_openers_campaign")
   @@index([source], map: "idx_mkt_outreach_openers_source")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_headers_list {
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  header_text               String?
+  quality_gate_passed       Boolean                     @default(false)
+  quality_gate_issues       Json?
+  source                    String                      @default("ai") @db.VarChar(20)
+  ai_provider               String?                     @db.VarChar(50)
+  ai_model                  String?                     @db.VarChar(100)
+  tokens_used               Int                         @default(0)
+  cost_cents                Int                         @default(0)
+  extracted_fields          Json?
+  executed_by               String?                     @db.VarChar(255)
+  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_headers_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_header")
+
+  @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_headers_campaign")
+  @@index([source], map: "idx_mkt_outreach_headers_source")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_closers_list {
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  closer_text               String?
+  quality_gate_passed       Boolean                     @default(false)
+  quality_gate_issues       Json?
+  source                    String                      @default("ai") @db.VarChar(20)
+  ai_provider               String?                     @db.VarChar(50)
+  ai_model                  String?                     @db.VarChar(100)
+  tokens_used               Int                         @default(0)
+  cost_cents                Int                         @default(0)
+  extracted_fields          Json?
+  executed_by               String?                     @db.VarChar(255)
+  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_closers_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_closer")
+
+  @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_closers_campaign")
+  @@index([source], map: "idx_mkt_outreach_closers_source")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_outreach_contacts_list {
+  id                        String                      @id @db.VarChar(255)
+  campaign_id               String                      @db.VarChar(255)
+  contact_text              String?
+  label                     String?                     @db.VarChar(100)
+  created_by                String?                     @db.VarChar(255)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_contacts_campaign")
+  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_contact")
+
+  @@index([campaign_id], map: "idx_mkt_outreach_contacts_campaign")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// Cascade rules (authoritative source = migration 145_marketing_ops_outreach_pitch_construction.sql):
+/// campaign_id, opener_id → ON DELETE CASCADE
+/// header_id, closer_id, contact_id → ON DELETE SET NULL
+/// Note: prisma db pull may drop the onDelete directives below; the DB constraints
+/// persist regardless. Re-add onDelete: SetNull on the 3 nullable FKs if regenerating
+/// migrations from this schema (we don't — raw SQL migrations are the source of truth).
+model mkt_outreach_pitches_list {
+  id                         String                      @id @db.VarChar(255)
+  campaign_id                String                      @db.VarChar(255)
+  opener_id                  String                      @db.VarChar(255)
+  header_id                  String?                     @db.VarChar(255)
+  closer_id                  String?                     @db.VarChar(255)
+  contact_id                 String?                     @db.VarChar(255)
+  review_pairs               Json?
+  assembled_text             String?
+  created_by                 String?                     @db.VarChar(255)
+  created_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list         mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_pitches_campaign")
+  mkt_outreach_closers_list  mkt_outreach_closers_list?  @relation("mkt_outreach_pitches_closer", fields: [closer_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_pitches_closer")
+  mkt_outreach_contacts_list mkt_outreach_contacts_list? @relation("mkt_outreach_pitches_contact", fields: [contact_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_pitches_contact")
+  mkt_outreach_headers_list  mkt_outreach_headers_list?  @relation("mkt_outreach_pitches_header", fields: [header_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_pitches_header")
+  mkt_outreach_openers_list  mkt_outreach_openers_list   @relation("mkt_outreach_pitches_opener", fields: [opener_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_pitches_opener")
+
+  @@index([campaign_id, created_at(sort: Desc)], map: "idx_mkt_outreach_pitches_campaign")
+  @@index([opener_id], map: "idx_mkt_outreach_pitches_opener")
+  @@index([header_id], map: "idx_mkt_outreach_pitches_header")
+  @@index([closer_id], map: "idx_mkt_outreach_pitches_closer")
 }
 
 enum action {

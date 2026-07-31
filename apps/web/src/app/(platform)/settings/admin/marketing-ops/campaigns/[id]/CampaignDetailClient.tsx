@@ -512,6 +512,19 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 {campaign.scope === 'business' && (
                   <ReviewResponsePipelineCard campaignId={campaign.id} onRefresh={fetchCampaign} />
                 )}
+                {/* Deliverable Construction link — visible once the campaign is paid.
+                    Opens the post-payment workspace: owner voice calibration, batch
+                    review response generation, recovery playbook, and render. */}
+                {campaign.scope === 'business'
+                  && ['paid', 'delivered'].includes(campaign.stage)
+                  && (
+                    <Link
+                      href={`/settings/admin/marketing-ops/deliverables/${campaign.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-300 text-indigo-700 dark:border-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                    >
+                      Deliverable Construction →
+                    </Link>
+                  )}
                 {/* Hot-prospect override controls (Sprint 3) */}
                 {campaign.scope === 'business' && (
                   <div className="flex items-center gap-2 flex-wrap">
