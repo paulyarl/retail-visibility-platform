@@ -6450,10 +6450,14 @@ model mkt_scorecards_list {
   notes                   String?
   created_at              DateTime @default(now()) @db.Timestamptz(6)
   updated_at              DateTime @default(now()) @db.Timestamptz(6)
+  scope_focus             String?  @db.VarChar(20)
+  stage_focus             String?  @db.VarChar(50)
 
   @@unique([user_id, date])
   @@index([date(sort: Desc)], map: "idx_mkt_scorecards_date")
   @@index([user_id, date(sort: Desc)], map: "idx_mkt_scorecards_user")
+  @@index([scope_focus], map: "idx_mkt_scorecards_scope")
+  @@index([stage_focus], map: "idx_mkt_scorecards_stage")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

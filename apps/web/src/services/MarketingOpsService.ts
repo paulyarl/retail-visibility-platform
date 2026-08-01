@@ -708,6 +708,8 @@ export interface Scorecard {
   date: string;
   category_focus: string | null;
   neighborhood_focus: string | null;
+  scope_focus: CampaignScope | null;
+  stage_focus: string | null;
   previews_built: number;
   previews_shown: number;
   packages_paid: number;
@@ -1016,6 +1018,25 @@ export interface ScorecardUpsertInput {
   date: string;
   category_focus?: string;
   neighborhood_focus?: string;
+  scope_focus?: CampaignScope;
+  stage_focus?: string;
+  previews_built?: number;
+  previews_shown?: number;
+  packages_paid?: number;
+  packages_delivered?: number;
+  revenue_collected_cents?: number;
+  retainers_pitched?: number;
+  retainers_won?: number;
+  notes?: string;
+}
+
+export interface ScorecardUpdateInput {
+  user_id?: string;
+  date?: string;
+  category_focus?: string;
+  neighborhood_focus?: string;
+  scope_focus?: CampaignScope;
+  stage_focus?: string;
   previews_built?: number;
   previews_shown?: number;
   packages_paid?: number;
@@ -1870,11 +1891,15 @@ class MarketingOpsService extends AdminApiSingleton {
     user_id?: string;
     start_date?: string;
     end_date?: string;
+    scope?: CampaignScope;
+    stage?: string;
   }): Promise<Scorecard[]> {
     const params = new URLSearchParams();
     if (filters?.user_id) params.set('user_id', filters.user_id);
     if (filters?.start_date) params.set('start_date', filters.start_date);
     if (filters?.end_date) params.set('end_date', filters.end_date);
+    if (filters?.scope) params.set('scope', filters.scope);
+    if (filters?.stage) params.set('stage', filters.stage);
     const query = params.toString();
     const url = `${BASE_URL}/scorecards${query ? `?${query}` : ''}`;
 
@@ -1895,6 +1920,20 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save scorecard');
+    }
+    await this.invalidateCachePattern('mkt-ops-scorecards');
+    return result.data?.data ?? result.data;
+  }
+
+  async updateScorecard(id: string, input: ScorecardUpdateInput): Promise<Scorecard> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/scorecards/${id}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `mkt-ops-scorecard-update-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update scorecard');
     }
     await this.invalidateCachePattern('mkt-ops-scorecards');
     return result.data?.data ?? result.data;

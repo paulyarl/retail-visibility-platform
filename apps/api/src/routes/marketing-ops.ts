@@ -369,6 +369,25 @@ const scorecardUpsertSchema = z.object({
   date: z.string().datetime(),
   category_focus: z.string().max(100).optional(),
   neighborhood_focus: z.string().max(100).optional(),
+  scope_focus: z.enum(['business', 'category', 'city']).optional(),
+  stage_focus: z.string().max(50).optional(),
+  previews_built: z.number().int().optional(),
+  previews_shown: z.number().int().optional(),
+  packages_paid: z.number().int().optional(),
+  packages_delivered: z.number().int().optional(),
+  revenue_collected_cents: z.number().int().optional(),
+  retainers_pitched: z.number().int().optional(),
+  retainers_won: z.number().int().optional(),
+  notes: z.string().optional(),
+});
+
+const scorecardUpdateSchema = z.object({
+  user_id: z.string().min(1).optional(),
+  date: z.string().datetime().optional(),
+  category_focus: z.string().max(100).optional(),
+  neighborhood_focus: z.string().max(100).optional(),
+  scope_focus: z.enum(['business', 'category', 'city']).optional(),
+  stage_focus: z.string().max(50).optional(),
   previews_built: z.number().int().optional(),
   previews_shown: z.number().int().optional(),
   packages_paid: z.number().int().optional(),
@@ -1330,6 +1349,8 @@ router.get('/scorecards', async (req: any, res: Response) => {
       userId: req.query.user_id,
       startDate: req.query.start_date ? new Date(req.query.start_date) : undefined,
       endDate: req.query.end_date ? new Date(req.query.end_date) : undefined,
+      scopeFocus: req.query.scope,
+      stageFocus: req.query.stage,
     }, getCtx(req));
     res.json({ success: true, data: scorecards });
   } catch (error) {
@@ -1345,6 +1366,36 @@ router.post('/scorecards', async (req: any, res: Response) => {
       date: new Date(parsed.date),
       categoryFocus: parsed.category_focus,
       neighborhoodFocus: parsed.neighborhood_focus,
+      scopeFocus: parsed.scope_focus,
+      stageFocus: parsed.stage_focus,
+      previewsBuilt: parsed.previews_built,
+      previewsShown: parsed.previews_shown,
+      packagesPaid: parsed.packages_paid,
+      packagesDelivered: parsed.packages_delivered,
+      revenueCollectedCents: parsed.revenue_collected_cents,
+      retainersPitched: parsed.retainers_pitched,
+      retainersWon: parsed.retainers_won,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.json({ success: true, data: scorecard });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/scorecards/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = scorecardUpdateSchema.parse(req.body);
+    const scorecard = await MarketingScorecardService.updateScorecard(req.params.id, {
+      userId: parsed.user_id,
+      date: parsed.date ? new Date(parsed.date) : undefined,
+      categoryFocus: parsed.category_focus,
+      neighborhoodFocus: parsed.neighborhood_focus,
+      scopeFocus: parsed.scope_focus,
+      stageFocus: parsed.stage_focus,
       previewsBuilt: parsed.previews_built,
       previewsShown: parsed.previews_shown,
       packagesPaid: parsed.packages_paid,
