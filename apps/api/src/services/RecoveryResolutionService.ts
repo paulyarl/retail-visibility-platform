@@ -767,9 +767,12 @@ export class RecoveryResolutionService extends BaseService {
       }, ctx);
 
       // Transition campaign to final_resolution_drafted
-      await MarketingCampaignService.transitionStage(campaignId, 'final_resolution_drafted', ctx, {
-        note: 'Recovery resolution imported from external AI output',
-      });
+      await MarketingCampaignService.transitionStage({
+        campaignId,
+        toStage: 'final_resolution_drafted',
+        triggerType: 'system',
+        notes: 'Recovery resolution imported from external AI output',
+      }, ctx);
 
       logger.info('Recovery external result imported successfully', ctx, {
         executionId: execution.id,
