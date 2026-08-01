@@ -247,6 +247,9 @@ Added during Marketing Ops Sprint 1. These are global (no tenant key) because ma
 | `generateDeliverableId()` | `mdlv` | `mdlv-{nanoid}` | Marketing deliverables |
 | `generateBrandingConfigId()` | `mbcfg` | `mbcfg-{nanoid}` | Marketing branding configs |
 | `generatePreviewTokenId()` | `mdpt` | `mdpt-{nanoid}` | Marketing deliverable preview tokens |
+| `generateDisputeIntakeId()` | `mdint` | `mdint-{nanoid}` | Recovery dispute intake records |
+| `generateDisputeAttachmentId()` | `mdatt` | `mdatt-{nanoid}` | Recovery dispute attachments |
+| `generateDisputeToken()` | — | `{32-char nanoid}` | Recovery intake magic-link token (URL-safe, no prefix — mirrors `generatePreviewToken()`) |
 
 ---
 

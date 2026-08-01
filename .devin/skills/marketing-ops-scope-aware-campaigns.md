@@ -23,6 +23,36 @@ Campaigns and prompt templates carry a `scope` field with three values
 scope. `assertScopeCompatible(template, campaign)` throws `ScopeMismatchError`
 (→ 400) when a template's scope doesn't match the campaign's scope.
 
+## The Category Axis (Recovery Engine Sprint 1)
+
+In addition to `scope`, campaigns now carry a `campaign_category` column
+(`review_management` | `recovery_management`, default `review_management`)
+added in migration 149. This is a **second orthogonal axis** — `scope`
+describes *what level* the campaign targets (business/category/city), while
+`campaign_category` describes *which pipeline* it runs through:
+
+- `review_management` — the existing sales-pipeline stage machine
+  (`seek → preview_built → shown → paid → delivered → …`), governed by
+  `REVIEW_TRANSITIONS` in `MarketingCampaignService`.
+- `recovery_management` — the dispute-intake stage machine
+  (`audit_identified → framework_preview_generated → outreach_dispatched
+  → awaiting_owner_intake → intake_submitted → final_resolution_drafted
+  → owner_approved → resolved_and_closed`), governed by
+  `RECOVERY_TRANSITIONS`. The 9 recovery stage literals are centralized in
+  `apps/api/src/services/recoveryStages.ts` — never inline them.
+
+`transitionsFor(category)` returns the correct map;
+`isValidTransition(from, to, category)` defaults to `review_management` so
+every existing caller gets unchanged behavior. `transitionStage()` reads
+`campaign_category` from the loaded row and dispatches accordingly.
+`createCampaign()` sets the initial stage to `seek` (review) or
+`audit_identified` (recovery) based on the category.
+
+The two axes compose: a recovery campaign can be `scope=business` (a single
+disputing owner) or `scope=category` (a category-wide dispute pattern). The
+scope drives template variable injection; the category drives the stage
+machine.
+
 External-import flow (`MarketingPromptService.importExternalResult`) validates
 pasted JSON against the template's `output_schema` and creates a
 `mkt_audits_list` record keyed off `output_schema->>'name'` (e.g.

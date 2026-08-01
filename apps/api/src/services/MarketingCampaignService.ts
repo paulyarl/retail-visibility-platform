@@ -674,6 +674,26 @@ export class MarketingCampaignService extends BaseService {
         }
       }
 
+      // Recovery Engine: auto-generate dispute intake link when a recovery
+      // campaign enters outreach_dispatched. The link URL is included in the
+      // outreach opener payload so the owner can submit their side of the
+      // dispute. Best-effort — failure must NOT block the transition.
+      if (
+        toStage === 'outreach_dispatched' &&
+        category === 'recovery_management'
+      ) {
+        try {
+          const { DisputeIntakeService } = await import('./DisputeIntakeService.js');
+          await DisputeIntakeService.getInstance().generateIntakeLink(campaignId, ctx);
+          logger.info('Recovery intake link auto-generated for outreach_dispatched', ctx, { campaignId });
+        } catch (intakeError) {
+          logger.warn('Recovery intake link generation failed, proceeding with transition', ctx, {
+            campaignId,
+            error: (intakeError as Error).message,
+          });
+        }
+      }
+
       const updateData: any = {
         stage: toStage,
         stage_entered_at: new Date(),

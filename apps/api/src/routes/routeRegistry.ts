@@ -216,6 +216,7 @@ import couponsRoutes from '../routes/coupons';
 import couponAnalyticsRoutes from '../routes/coupon-analytics';
 import marketingOpsRoutes from '../routes/marketing-ops';
 import marketingOpsPublicRoutes from '../routes/marketing-ops-public';
+import recoveryIntakePublicRoutes from '../routes/recovery-intake-public';
 
 // Inline handler route files (extracted from index.ts)
 import inlineAuthRbacRoutes from '../routes/inline-auth-rbac';
@@ -1306,6 +1307,13 @@ export const routeRegistry: RouteEntry[] = [
     domain: 'misc',
     authLevel: 'public',
     comment: 'Public Marketing Ops payment routes at /api/public/marketing/pay, /api/public/marketing/checkout, /api/public/marketing/coupons/validate, /api/public/marketing/pay/confirm, /api/public/marketing/receipt/:campaignId',
+  },
+  {
+    path: '/api',
+    router: recoveryIntakePublicRoutes,
+    domain: 'misc',
+    authLevel: 'public',
+    comment: 'Public Recovery intake routes at /api/public/recovery/intake (GET resolve), /submit, /reissue, /attachments (POST upload), /attachments/:id (GET download)',
   },
   {
     path: '/api/admin/marketing-ops',

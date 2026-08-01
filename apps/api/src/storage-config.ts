@@ -12,17 +12,26 @@ export const StorageBuckets = {
     name: process.env.BUCKET_NAME || 'photos',
     isPublic: process.env.PUBLIC_FLAG?.toLowerCase() === 'true' || true,
   },
-  
+
   // Tenants bucket - tenant branding assets (logos, etc.)
   TENANTS: {
     name: process.env.TENANT_BUCKET_NAME || 'tenants',
     isPublic: process.env.TENANT_PUBLIC_FLAG?.toLowerCase() === 'true' || true,
   },
-  
+
   // Brands bucket - platform branding assets (platform logo, favicon, etc.)
   BRANDS: {
     name: process.env.BRAND_BUCKET_NAME || 'brands',
     isPublic: process.env.BRAND_PUBLIC_FLAG?.toLowerCase() === 'true' || true,
+  },
+
+  // Disputes bucket — recovery intake proof attachments (PDF/PNG/JPEG)
+  // Private bucket: files are served via token-scoped download endpoints,
+  // not public URLs. The file_url stored in mkt_dispute_attachments is the
+  // Supabase path, not a public URL.
+  DISPUTES: {
+    name: process.env.DISPUTE_BUCKET_NAME || 'disputes',
+    isPublic: false,
   },
 } as const;
 

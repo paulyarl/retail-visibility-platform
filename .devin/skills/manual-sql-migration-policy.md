@@ -115,6 +115,24 @@ Do NOT remove columns from `schema.prisma` to "fix" drift — fix the database i
 - **Idempotency:** Use `IF NOT EXISTS` / `IF EXISTS` / `ON CONFLICT DO NOTHING` wherever possible
 - **RLS:** New tenant-scoped tables must enable RLS and create isolation policies
 - **Triggers:** Include `updated_at` triggers for new tables
+
+### Marketing Ops (`mkt_*`) namespace exception
+
+The `mkt_*` table family (migrations 141–149+) does **not** enable row level
+security, despite the `/// This model contains row level security` comments
+that Prisma introspects into `schema.prisma`. Those comments are Supabase
+table-default artifacts, not applied policies — confirmed by inspecting the
+migration SQL (none run `ENABLE ROW LEVEL SECURITY` on `mkt_*` tables). New
+`mkt_*` tables should follow suit: no `ENABLE ROW LEVEL SECURITY` in the
+migration. This is intentional — the public pay route and the recovery intake
+portal read `mkt_deliverable_preview_tokens` / `mkt_dispute_intake` by token
+without auth, which RLS would block. The `tenant_id` column is still included
+on `mkt_*` tables for admin filtering and future RLS enablement, but the
+policy is not applied today.
+
+The `mkt_*` family also omits explicit `updated_at` trigger functions — they
+rely on `DEFAULT NOW()` + app-layer Prisma `@updatedAt`. New `mkt_*` tables
+follow the same pattern (no `CREATE TRIGGER` block in the migration).
 - **Verification:** Add commented-out `SELECT` queries at the bottom for manual verification
 
 ---
