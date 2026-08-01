@@ -3126,6 +3126,67 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-render');
     return result.data?.data ?? result.data;
   }
+
+  // ─── Cascade methods ───────────────────────────────────────────
+
+  async enableCascade(campaignId: string, config?: any): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/enable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ cascade_config: config }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to enable cascade (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async disableCascade(campaignId: string): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/disable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to disable cascade (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async getCascadeStatus(campaignId: string): Promise<CascadeStatus> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/status`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to get cascade status (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+}
+
+export interface CascadeStatus {
+  campaignId: string;
+  cascadeEnabled: boolean;
+  cascadeConfig: any;
+  stepsFired: number;
+  stepsRemaining: number;
+  totalSteps: number;
+  contacts: Array<{
+    id: string;
+    contactDate: string;
+    channel: string;
+    outcome: string;
+    notes: string;
+  }>;
 }
 
 // ─── Deliverable Construction Types ──────────────────────────────────────
