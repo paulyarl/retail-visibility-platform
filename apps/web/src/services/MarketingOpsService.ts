@@ -2285,7 +2285,7 @@ class MarketingOpsService extends AdminApiSingleton {
   // ─── Review Response Pipeline (Sprint 4) ─────────────────────────────────
   async listReviewPipelines(campaignId: string): Promise<ReviewResponsePipeline[]> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines?campaignId=${encodeURIComponent(campaignId)}`,
+      `${BASE_URL}/${encodeURIComponent(campaignId)}/review-response/pipelines`,
       { method: 'GET' },
       `mkt-ops-review-pipelines-${campaignId}`,
       0,
@@ -2311,8 +2311,8 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async createReviewPipeline(input: { campaignId: string; platform: string }): Promise<ReviewResponsePipeline> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines`,
-      { method: 'POST', body: JSON.stringify(input) },
+      `${BASE_URL}/${encodeURIComponent(input.campaignId)}/review-response/pipelines`,
+      { method: 'POST', body: JSON.stringify({ platform: input.platform }) },
       `mkt-ops-review-pipeline-create-${input.campaignId}-${input.platform}`,
       0,
     );
@@ -2339,7 +2339,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async checkReviewGate(pipelineId: string): Promise<ReviewGateResult> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines/${pipelineId}/gate-check`,
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/gate`,
       { method: 'GET' },
       `mkt-ops-review-gate-${pipelineId}`,
       0,
@@ -2351,9 +2351,10 @@ class MarketingOpsService extends AdminApiSingleton {
   }
 
   async advanceReviewStage(pipelineId: string, force = false): Promise<ReviewResponsePipeline> {
+    const forceQuery = force ? '?force=true' : '';
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines/${pipelineId}/advance`,
-      { method: 'POST', body: JSON.stringify({ force }) },
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/advance${forceQuery}`,
+      { method: 'POST' },
       `mkt-ops-review-advance-${pipelineId}`,
       0,
     );
@@ -2393,7 +2394,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async markCustomerReply(logId: string): Promise<ReviewResponseLogEntry> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/log/${logId}/reply`,
+      `${BASE_URL}/review-response/log/${logId}/customer-reply`,
       { method: 'POST' },
       `mkt-ops-review-reply-${logId}`,
       0,
