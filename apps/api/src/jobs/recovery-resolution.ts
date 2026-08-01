@@ -131,6 +131,97 @@ async function runOrphanAttachmentPurge(): Promise<void> {
 }
 
 // ====================
+// INTAKE TIMEOUT SWEEP — campaigns stuck in awaiting_owner_intake past
+// token TTL + cascade exhaustion transition to dead (no limbo states)
+// ====================
+
+async function runIntakeTimeoutSweep(): Promise<void> {
+  try {
+    // Find recovery campaigns stuck in awaiting_owner_intake
+    const stuckCampaigns = await prisma.mkt_campaigns_list.findMany({
+      where: {
+        campaign_category: 'recovery_management',
+        stage: 'awaiting_owner_intake',
+      },
+      select: {
+        id: true,
+        stage_entered_at: true,
+        mkt_dispute_intake: { select: { expires_at: true } },
+      },
+    });
+
+    if (stuckCampaigns.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+    const cascadeBufferMs = 4 * 24 * 60 * 60 * 1000; // 4 days past expiry for cascade exhaustion
+    const { default: MarketingCampaignService } = await import('../services/MarketingCampaignService.js');
+    let sweptCount = 0;
+
+    for (const campaign of stuckCampaigns) {
+      const intake = campaign.mkt_dispute_intake;
+      if (!intake) continue;
+
+      const expiryWithBuffer = new Date(intake.expires_at.getTime() + cascadeBufferMs);
+      if (now < expiryWithBuffer) continue;
+
+      // Token expired + cascade exhausted → transition to dead
+      try {
+        await MarketingCampaignService.transitionStage({
+          campaignId: campaign.id,
+          toStage: 'dead',
+          triggerType: 'system',
+          notes: 'Intake token expired + outreach cascade exhausted',
+        });
+        sweptCount++;
+        logger.info('[RecoveryResolution] Stuck campaign transitioned to dead', undefined, {
+          campaignId: campaign.id,
+        });
+      } catch (error) {
+        logger.warn('[RecoveryResolution] Failed to sweep stuck campaign', undefined, {
+          campaignId: campaign.id,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    if (sweptCount > 0) {
+      logger.info(`[RecoveryResolution] Intake timeout sweep: ${sweptCount} campaign(s) transitioned to dead`);
+    }
+  } catch (error) {
+    logger.error('[RecoveryResolution] Intake timeout sweep failed:', undefined, {
+      error: {
+        name: (error as Error)?.name || 'Error',
+        message: (error as Error)?.message || String(error),
+      },
+    });
+  }
+}
+
+// ====================
+// RECOVERY CASCADE — fire Day 1/2/4 outreach sequence for campaigns
+// stuck in awaiting_owner_intake
+// ====================
+
+async function runRecoveryCascadePass(): Promise<void> {
+  try {
+    const { default: RecoveryCascadeService } = await import('../services/RecoveryCascadeService.js');
+    const result = await RecoveryCascadeService.run();
+    if (result.fired > 0) {
+      logger.info(`[RecoveryResolution] Cascade: ${result.fired} step(s) fired, ${result.skipped} skipped`);
+    }
+  } catch (error) {
+    logger.error('[RecoveryResolution] Cascade pass failed:', undefined, {
+      error: {
+        name: (error as Error)?.name || 'Error',
+        message: (error as Error)?.message || String(error),
+      },
+    });
+  }
+}
+
+// ====================
 // LIFECYCLE
 // ====================
 
@@ -150,10 +241,14 @@ export async function startRecoveryResolutionJob(): Promise<void> {
   // Initial pass after startup delay
   setTimeout(() => {
     runRecoveryResolutionPass();
+    runIntakeTimeoutSweep();
+    runRecoveryCascadePass();
   }, STARTUP_DELAY_MS);
 
   resolutionIntervalId = setInterval(() => {
     runRecoveryResolutionPass();
+    runIntakeTimeoutSweep();
+    runRecoveryCascadePass();
   }, POLL_INTERVAL_MS);
 
   // Orphan purge runs on its own slower interval

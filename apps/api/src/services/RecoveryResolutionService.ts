@@ -347,6 +347,173 @@ export class RecoveryResolutionService extends BaseService {
   }
 
   // ====================
+  // REGENERATE — operator re-runs the agent with edited intake/notes
+  // ====================
+
+  async regenerate(campaignId: string, ctx?: RequestCtx): Promise<EnqueueResult> {
+    try {
+      // Archive the existing deliverable (mark status='archived')
+      const existingDeliverable = await this.prisma.mkt_deliverables_list.findFirst({
+        where: {
+          campaign_id: campaignId,
+          deliverable_type: 'recovery_resolution',
+          status: 'drafted',
+        },
+        orderBy: { generated_at: 'desc' },
+      });
+
+      if (existingDeliverable) {
+        await this.prisma.mkt_deliverables_list.update({
+          where: { id: existingDeliverable.id },
+          data: { status: 'archived' },
+        });
+        logger.info('Recovery deliverable archived for regeneration', ctx, {
+          campaignId,
+          deliverableId: existingDeliverable.id,
+        });
+      }
+
+      // Re-enqueue a fresh execution (loads current intake state)
+      const intake = await this.prisma.mkt_dispute_intake.findUnique({
+        where: { campaign_id: campaignId },
+      });
+
+      if (!intake) {
+        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+      }
+
+      return this.enqueue(campaignId, intake.id, ctx);
+    } catch (error) {
+      logger.error('Failed to regenerate recovery resolution', ctx, {
+        error: (error as Error).message,
+        campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // APPROVE DRAFT — operator approves, transitions to resolved_and_closed
+  // ====================
+
+  async approveDraft(campaignId: string, ctx?: RequestCtx): Promise<{
+    campaignId: string;
+    stage: string;
+    deliverableId: string;
+  }> {
+    try {
+      // Find the current drafted deliverable
+      const deliverable = await this.prisma.mkt_deliverables_list.findFirst({
+        where: {
+          campaign_id: campaignId,
+          deliverable_type: 'recovery_resolution',
+          status: 'drafted',
+        },
+        orderBy: { generated_at: 'desc' },
+      });
+
+      if (!deliverable) {
+        throw new Error(`No drafted recovery resolution found for campaign ${campaignId}`);
+      }
+
+      // Mark deliverable as approved
+      await this.prisma.mkt_deliverables_list.update({
+        where: { id: deliverable.id },
+        data: { status: 'approved' },
+      });
+
+      // Transition: final_resolution_drafted → owner_approved → resolved_and_closed
+      // Two-step transition (single action from operator perspective)
+      await MarketingCampaignService.transitionStage({
+        campaignId,
+        toStage: 'owner_approved',
+        triggerType: 'manual',
+        notes: 'Operator approved recovery resolution draft',
+      }, ctx);
+
+      const updated = await MarketingCampaignService.transitionStage({
+        campaignId,
+        toStage: 'resolved_and_closed',
+        triggerType: 'manual',
+        notes: 'Recovery resolution delivered to owner',
+      }, ctx);
+
+      // Deliver the approved resolution to the owner via email
+      await this.deliverToOwner(campaignId, deliverable.id, ctx);
+
+      logger.info('Recovery resolution approved and delivered', ctx, {
+        campaignId,
+        deliverableId: deliverable.id,
+        stage: updated.stage,
+      });
+
+      return {
+        campaignId,
+        stage: updated.stage,
+        deliverableId: deliverable.id,
+      };
+    } catch (error) {
+      logger.error('Failed to approve recovery draft', ctx, {
+        error: (error as Error).message,
+        campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // DELIVER TO OWNER — send approved resolution via email
+  // ====================
+
+  private async deliverToOwner(campaignId: string, deliverableId: string, ctx?: RequestCtx): Promise<void> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+      });
+      if (!campaign) return;
+
+      // Load the deliverable sections
+      const sections = await this.prisma.mkt_deliverable_section.findMany({
+        where: { deliverable_id: deliverableId },
+        orderBy: { section_index: 'asc' },
+      });
+
+      const responseDraft = sections.find((s: any) => s.section_type === 'response_draft');
+      const submissionGuide = sections.find((s: any) => s.section_type === 'submission_guide');
+
+      const messageSnapshot = JSON.stringify({
+        responseDraft: responseDraft?.content || '',
+        submissionGuide: submissionGuide?.content || '',
+      });
+
+      // Log the delivery via MarketingOutreachService (records in mkt_outreach_log)
+      const { MarketingOutreachService } = await import('./MarketingOutreachService.js');
+      await MarketingOutreachService.getInstance().logContact({
+        campaignId,
+        contactChannel: 'email',
+        contactDate: new Date().toISOString(),
+        outcome: 'other',
+        notes: 'Approved recovery resolution delivered to owner',
+        messageSnapshot,
+        messageSubject: `Your Recovery Resolution — ${campaign.business_name || 'Action Required'}`,
+        contactedBy: ctx?.userId || 'system',
+      }, ctx);
+
+      logger.info('Recovery resolution delivered to owner', ctx, {
+        campaignId,
+        deliverableId,
+      });
+    } catch (error) {
+      // Best-effort — delivery failure shouldn't roll back the approval
+      logger.warn('Recovery resolution owner delivery failed (best-effort)', ctx, {
+        campaignId,
+        deliverableId,
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  // ====================
   // HELPERS
   // ====================
 
