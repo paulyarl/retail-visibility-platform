@@ -90,7 +90,7 @@ function isScopeMismatchError(msg: string): boolean {
     || /out-of-scope variables for scope/i.test(msg);
 }
 
-export default function PromptWorkspaceClient({ templateId }: { templateId: string }) {
+export default function PromptWorkspaceClient({ templateId, initialCampaignId }: { templateId: string; initialCampaignId?: string }) {
   const [template, setTemplate] = useState<PromptTemplate | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [executions, setExecutions] = useState<PromptExecution[]>([]);
@@ -98,6 +98,9 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
+  // Tracks whether the deep-linked campaign has been auto-selected so we only
+  // auto-render once (avoid clobbering operator edits on re-renders).
+  const [autoSelected, setAutoSelected] = useState(false);
 
   const selectedCampaign = useMemo(() =>
     campaigns.find((c) => c.id === selectedCampaignId) || null,
@@ -149,6 +152,23 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   useEffect(() => {
     fetchTemplate();
   }, [fetchTemplate]);
+
+  // Deep-link: when opened from a campaign detail page (?campaignId=), pre-select
+  // the campaign and auto-resolve the prompt server-side so the operator lands on
+  // a ready-to-run workspace. Only fires once per template/campaign pair.
+  useEffect(() => {
+    if (autoSelected || !initialCampaignId || loading || !template) return;
+    const match = campaigns.find((c) => c.id === initialCampaignId);
+    if (!match) return;
+    // Scope guard: only auto-select when the campaign scope is compatible with
+    // the template scope. Otherwise the operator must pick manually.
+    if (template.scope && match.scope !== template.scope) {
+      setAutoSelected(true);
+      return;
+    }
+    setSelectedCampaignId(match.id);
+    setAutoSelected(true);
+  }, [autoSelected, initialCampaignId, loading, template, campaigns]);
 
   const extractedVariables = useMemo(() => {
     if (!template?.body) return [];
