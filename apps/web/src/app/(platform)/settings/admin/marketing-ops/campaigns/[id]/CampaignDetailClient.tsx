@@ -16,8 +16,9 @@ import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection'
 import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard';
 import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCard';
 import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewResponsePipelineCard';
+import CascadePanel from '@/components/marketing-ops/CascadePanel';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage' | 'cascade';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -293,6 +294,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'prompts', label: 'Prompts' },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
     { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
+    { key: 'cascade', label: 'Cascade' },
   ];
 
   return (
@@ -1021,6 +1023,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   </div>
                 )}
               </div>
+            )}
+
+            {activeTab === 'cascade' && campaign && (
+              <CascadePanel campaignId={campaign.id} />
             )}
           </>
         ) : (

@@ -3231,3 +3231,64 @@ export interface RenderResult {
 const marketingOpsService = MarketingOpsService.getInstance();
 export { marketingOpsService, MarketingOpsService };
 export default marketingOpsService;
+
+// ─── Cascade methods (added to the prototype for use by CascadePanel) ──────
+
+export interface CascadeStatus {
+  campaignId: string;
+  cascadeEnabled: boolean;
+  cascadeConfig: any;
+  stepsFired: number;
+  stepsRemaining: number;
+  totalSteps: number;
+  contacts: Array<{
+    id: string;
+    contactDate: string;
+    channel: string;
+    outcome: string;
+    notes: string;
+  }>;
+}
+
+MarketingOpsService.prototype.enableCascade = async function (campaignId: string, config?: any): Promise<any> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/enable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ cascade_config: config }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to enable cascade (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};
+
+MarketingOpsService.prototype.disableCascade = async function (campaignId: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/disable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to disable cascade (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};
+
+MarketingOpsService.prototype.getCascadeStatus = async function (campaignId: string): Promise<CascadeStatus> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/status`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to get cascade status (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};

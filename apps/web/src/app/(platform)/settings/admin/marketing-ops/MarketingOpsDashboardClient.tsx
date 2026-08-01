@@ -7,6 +7,7 @@ import marketingOpsService, { DashboardStats, ConversionStats, CampaignStage } f
 import FollowUpsDueWidget from '@/components/marketing-ops/FollowUpsDueWidget';
 import ReviewFollowUpsDueWidget from '@/components/marketing-ops/ReviewFollowUpsDueWidget';
 import HotProspectsWidget from '@/components/marketing-ops/HotProspectsWidget';
+import RecoveryTabClient from './RecoveryTabClient';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
   seek: 'Seek',
@@ -60,6 +61,7 @@ function SourceBreakdown({ title, data }: { title: string; data: Record<string, 
 export default function MarketingOpsDashboardClient() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [convStats, setConvStats] = useState<ConversionStats | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'recovery'>('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -150,13 +152,41 @@ export default function MarketingOpsDashboardClient() {
           </div>
         </div>
 
-        {error && (
+        {error && activeTab === 'dashboard' && (
           <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
             <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
           </div>
         )}
 
-        {loading ? (
+        {/* Tab switcher */}
+        <div className="mb-6 border-b border-gray-200 dark:border-neutral-700">
+          <nav className="flex gap-4">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'dashboard'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('recovery')}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'recovery'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              Recovery
+            </button>
+          </nav>
+        </div>
+
+        {activeTab === 'recovery' ? (
+          <RecoveryTabClient />
+        ) : loading ? (
           <div className="flex items-center justify-center py-20">
             <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
           </div>
