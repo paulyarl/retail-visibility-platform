@@ -61,21 +61,24 @@ const coercedBoolean = z.preprocess((val) => {
 const coercedBooleanNullable = z.union([coercedBoolean, z.null()]);
 
 /**
- * Like `coercedBooleanNullable`, but also accepts the sentinel string
- * "unable_to_verify" (and common variants) and maps it to null.
+ * Like `coercedBooleanNullable`, but also accepts the sentinel strings agents
+ * commonly emit for the tri-state website assessment fields:
+ *   - "verified" / "present" / "yes" / "true" / "1"  -> true
+ *   - "not_verified" / "absent" / "missing" / "no" / "false" / "0" -> false
+ *   - "unable_to_verify" / "unverified" / "unknown" / "n/a" / "na" -> null
  *
- * Website assessment fields are tri-state in the prompt (yes / no /
- * unable_to_verify) but the schema stores unable-to-verify as null. Some
- * prompt templates emit "unable_to_verify" for these boolean fields instead
- * of null; this preprocessor accepts both so validation does not fail on
- * otherwise-correct audits.
+ * The schema stores unable-to-verify as null. Some prompt templates and
+ * agents emit "verified" (meaning "confirmed present") or "unable_to_verify"
+ * for these boolean fields instead of true/false/null; this preprocessor
+ * accepts all three forms so validation does not fail on otherwise-correct
+ * audits.
  */
 const coercedBooleanNullableTolerant = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'unable_to_verify' || s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') {
-      return null;
-    }
+    if (s === 'verified' || s === 'present' || s === 'yes' || s === 'true' || s === '1') return true;
+    if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'no' || s === 'false' || s === '0') return false;
+    if (s === 'unable_to_verify' || s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') return null;
   }
   return val;
 }, coercedBooleanNullable);
