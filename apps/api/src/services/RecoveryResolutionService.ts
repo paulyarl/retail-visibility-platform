@@ -22,6 +22,7 @@ import MarketingPromptService from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import { generateDeliverableId, generateDeliverableSectionId, generateFilterFlagId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import AiProviderFactory from './ai-providers/AiProviderFactory';
 import type { RequestCtx } from '../context';
 
 // ====================
@@ -365,8 +366,8 @@ export class RecoveryResolutionService extends BaseService {
     tokensUsed: number;
     costCents: number;
   }> {
-    const { AiProviderFactory } = await import('./ai-providers/AiProviderFactory');
-    const factory = AiProviderFactory.getInstance();
+    // AiProviderFactory is imported as the singleton instance (default export)
+    const factory = AiProviderFactory;
 
     const provider = unifiedConfig.recoveryAiProvider;
     const model = unifiedConfig.recoveryAiModel;
@@ -379,7 +380,6 @@ export class RecoveryResolutionService extends BaseService {
 
     if (provider && model) {
       // Use the recovery-specific provider — get the instance from the factory
-      const { getChatConfig } = await import('./ai-providers/AiProviderFactory');
       const config = await factory.getChatConfig();
       result = await config.provider.generateChatCompletion({
         model,

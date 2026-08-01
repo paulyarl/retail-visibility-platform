@@ -114,7 +114,7 @@ async function runOrphanAttachmentPurge(): Promise<void> {
     // clean the DB metadata)
     for (const intakeId of orphanIntakeIds) {
       const deleted = await prisma.mkt_dispute_attachments.deleteMany({
-        where: { intake_id: intakeId },
+        where: { dispute_intake_id: intakeId },
       });
       purgedCount += deleted.count;
     }

@@ -76,7 +76,7 @@ vi.mock('../MarketingCampaignService', () => ({
   default: mockCampaignService,
 }));
 
-// Mock AiProviderFactory
+// Mock AiProviderFactory (default export is the singleton instance)
 const mockAiResult = {
   content: '{"recovery_resolution": {"deliverableText": "This is a professionally drafted response to the complaint that acknowledges the issue and offers a fair resolution. We take all feedback seriously and appreciate the opportunity to make things right.", "submissionGuide": "1. Log into your Google Business Profile. 2. Navigate to Reviews. 3. Click Reply on the complaint. 4. Paste the response draft. 5. Click Post."}}',
   usage: { totalTokens: 450 },
@@ -85,14 +85,12 @@ const mockProvider = {
   generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
   isAvailable: vi.fn().mockReturnValue(true),
 };
-vi.mock('../ai-providers/AiProviderFactory', () => ({
-  AiProviderFactory: {
-    getInstance: () => ({
-      getChatConfig: vi.fn().mockResolvedValue({ provider: mockProvider, model: 'gpt-4o-mini' }),
-      generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
-    }),
-  },
+const mockFactoryInstance = {
   getChatConfig: vi.fn().mockResolvedValue({ provider: mockProvider, model: 'gpt-4o-mini' }),
+  generateChatCompletion: vi.fn().mockResolvedValue(mockAiResult),
+};
+vi.mock('../ai-providers/AiProviderFactory', () => ({
+  default: mockFactoryInstance,
 }));
 
 import RecoveryResolutionService from '../RecoveryResolutionService';
@@ -242,8 +240,7 @@ describe('RecoveryResolutionService', () => {
       mockFilterFlags.create.mockResolvedValue({});
 
       // Override AI to return invalid JSON
-      const { AiProviderFactory } = await import('../ai-providers/AiProviderFactory');
-      AiProviderFactory.getInstance().generateChatCompletion.mockResolvedValueOnce({
+      mockFactoryInstance.generateChatCompletion.mockResolvedValueOnce({
         content: 'This is not JSON at all.',
         usage: { totalTokens: 100 },
       });
@@ -263,8 +260,7 @@ describe('RecoveryResolutionService', () => {
       mockFilterFlags.create.mockResolvedValue({});
 
       // Override AI to return JSON that doesn't match the schema
-      const { AiProviderFactory } = await import('../ai-providers/AiProviderFactory');
-      AiProviderFactory.getInstance().generateChatCompletion.mockResolvedValueOnce({
+      mockFactoryInstance.generateChatCompletion.mockResolvedValueOnce({
         content: '{"recovery_resolution": {"deliverableText": "too short"}}',
         usage: { totalTokens: 100 },
       });
