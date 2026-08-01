@@ -144,6 +144,7 @@ import DeliverableAssemblyService from '../services/deliverable/DeliverableAssem
 import DeliverableRenderService from '../services/deliverable/DeliverableRenderService';
 import RecoveryResolutionService from '../services/RecoveryResolutionService';
 import disputeIntakeService from '../services/DisputeIntakeService';
+import ReviewCascadeService from '../services/ReviewCascadeService';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -3039,6 +3040,54 @@ router.post('/recovery/:campaignId/regenerate', async (req: any, res: Response) 
   try {
     const { campaignId } = req.params;
     const result = await RecoveryResolutionService.regenerate(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Multi-Channel Cascade (Review Campaigns) ─────────────────────────────
+// Operator opts-in a review campaign to the email → SMS → DM cascade.
+
+// Enable cascade for a campaign (with optional custom step config)
+const cascadeEnableSchema = z.object({
+  cascade_config: z.any().optional(),
+});
+
+router.post('/:campaignId/cascade/enable', async (req: any, res: Response) => {
+  try {
+    const parsed = cascadeEnableSchema.parse(req.body || {});
+    const { campaignId } = req.params;
+    const result = await ReviewCascadeService.enableCascade(
+      campaignId,
+      parsed.cascade_config,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Disable cascade for a campaign
+router.post('/:campaignId/cascade/disable', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await ReviewCascadeService.disableCascade(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get cascade status for a campaign
+router.get('/:campaignId/cascade/status', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await ReviewCascadeService.getCascadeStatus(campaignId, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

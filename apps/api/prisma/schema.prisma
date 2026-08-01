@@ -6152,6 +6152,8 @@ model mkt_campaigns_list {
   hot_prospect_deprioritized                                Boolean                          @default(false)
   auto_followup_count                                       Int                              @default(0)
   campaign_category                                         String                           @default("review_management") @db.VarChar(30)
+  cascade_enabled                                           Boolean                          @default(false)
+  cascade_config                                            Json?                            @db.Json
   marketing_revenue                                         marketing_revenue[]
   mkt_audits_list                                           mkt_audits_list[]
   tenants_mkt_campaigns_list_demo_tenant_idTotenants        tenants?                         @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")

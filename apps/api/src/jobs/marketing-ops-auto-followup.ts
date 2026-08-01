@@ -32,6 +32,22 @@ async function runMarketingOpsAutoFollowUp(): Promise<void> {
       },
     });
   }
+
+  // Run the review cascade pass (email → SMS → DM escalation for opted-in campaigns)
+  try {
+    const { default: ReviewCascadeService } = await import('../services/ReviewCascadeService.js');
+    const cascadeResult = await ReviewCascadeService.run();
+    if (cascadeResult.fired > 0 || cascadeResult.exhausted > 0) {
+      logger.info(`[MarketingOpsAutoFollowUp] Review cascade: ${cascadeResult.fired} fired, ${cascadeResult.skipped} skipped, ${cascadeResult.exhausted} exhausted`, undefined, cascadeResult);
+    }
+  } catch (error) {
+    logger.error('[MarketingOpsAutoFollowUp] Review cascade failed:', undefined, {
+      error: {
+        name: (error as Error)?.name || 'Error',
+        message: (error as Error)?.message || String(error),
+      },
+    });
+  }
 }
 
 export async function startMarketingOpsAutoFollowUp(): Promise<void> {
