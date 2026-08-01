@@ -52,11 +52,11 @@ interface PitchConstructionPanelProps {
 // assembly when the operator already knows what they want.
 
 const HEADER_STARTER_EXAMPLES: string[] = [
+  'PREVIEW - {{shown}} of your {{total}} completed review responses',
   '{{business}} — your unanswered Google reviews',
   '{{business}} — three reviews need responses',
   'Quick note about {{business}}\'s reviews',
   '{{business}} — your Yelp listing has gaps',
-  '{{business}} — a question about your reviews',
 ];
 
 const CLOSER_STARTER_EXAMPLES: string[] = [
