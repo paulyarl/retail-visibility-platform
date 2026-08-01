@@ -3046,6 +3046,53 @@ router.post('/recovery/:campaignId/regenerate', async (req: any, res: Response) 
   }
 });
 
+// ─── Recovery Dual-Mode AI Surface (mirrors review pipeline) ──────────────
+
+// Render prompt text for copy-paste bridge (external AI)
+router.get('/recovery/:campaignId/prompt-text', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.renderPromptText(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Import external AI result (copy-paste bridge)
+const importResultSchema = z.object({
+  raw_output: z.string().min(10, 'raw_output must be at least 10 characters'),
+});
+
+router.post('/recovery/:campaignId/import-result', async (req: any, res: Response) => {
+  try {
+    const parsed = importResultSchema.parse(req.body || {});
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.importExternalResult(
+      campaignId,
+      parsed.raw_output,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Direct execute via API (enqueue + run immediately)
+router.post('/recovery/:campaignId/execute', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.executeDirect(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ─── Multi-Channel Cascade (Review Campaigns) ─────────────────────────────
 // Operator opts-in a review campaign to the email → SMS → DM cascade.
 

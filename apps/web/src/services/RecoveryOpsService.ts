@@ -213,6 +213,71 @@ class RecoveryOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern(`recovery-draft-${campaignId}`);
     return result.data?.data ?? result.data;
   }
+
+  // ─── Dual-Mode: Render prompt text for copy-paste bridge ───────
+
+  async getPromptText(campaignId: string): Promise<{
+    renderedPrompt: string;
+    templateId: string;
+    variablesUsed: Record<string, any>;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/prompt-text`,
+      {},
+      `recovery-prompt-text-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to render prompt text');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Dual-Mode: Import external AI result ──────────────────────
+
+  async importExternalResult(campaignId: string, rawOutput: string): Promise<{
+    executionId: string;
+    campaignId: string;
+    deliverableId: string;
+    passed: boolean;
+    errors?: string[];
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/import-result`,
+      { method: 'POST', body: JSON.stringify({ raw_output: rawOutput }) },
+      `recovery-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import external result');
+    }
+    await this.invalidateCachePattern(`recovery-draft-${campaignId}`);
+    await this.invalidateCachePattern('recovery-campaigns');
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Dual-Mode: Direct execute via API ─────────────────────────
+
+  async executeDirect(campaignId: string): Promise<{
+    executionId: string;
+    campaignId: string;
+    deliverableId: string;
+    passed: boolean;
+    errors?: string[];
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/execute`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `recovery-execute-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute directly');
+    }
+    await this.invalidateCachePattern(`recovery-draft-${campaignId}`);
+    await this.invalidateCachePattern('recovery-campaigns');
+    return result.data?.data ?? result.data;
+  }
 }
 
 export default RecoveryOpsService.getInstance();

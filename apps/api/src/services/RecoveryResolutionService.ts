@@ -22,6 +22,7 @@ import MarketingPromptService from './MarketingPromptService';
 import MarketingCampaignService from './MarketingCampaignService';
 import { generateDeliverableId, generateDeliverableSectionId, generateFilterFlagId } from '../lib/id-generator';
 import { resolveOutputSchema } from '../validators/market-analysis.schema';
+import { RECOVERY_RESOLUTION_PROMPT_SUFFIX } from '../validators/recovery-resolution.schema';
 import AiProviderFactory from './ai-providers/AiProviderFactory';
 import type { RequestCtx } from '../context';
 
@@ -510,6 +511,326 @@ export class RecoveryResolutionService extends BaseService {
         deliverableId,
         error: (error as Error).message,
       });
+    }
+  }
+
+  // ====================
+  // DUAL-MODE: Render prompt text for copy-paste bridge
+  // ====================
+
+  async renderPromptText(campaignId: string, ctx?: RequestCtx): Promise<{
+    renderedPrompt: string;
+    templateId: string;
+    variablesUsed: Record<string, any>;
+  }> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        include: {
+          mkt_audits_list: { take: 1, orderBy: { created_at: 'desc' } },
+          mkt_dispute_intake: { include: { mkt_dispute_attachments: true } },
+        },
+      });
+
+      if (!campaign) {
+        throw new Error(`Campaign ${campaignId} not found`);
+      }
+
+      const intake = campaign.mkt_dispute_intake;
+      if (!intake) {
+        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+      }
+
+      // Load the prompt template
+      const template = await this.prisma.mkt_prompt_templates_list.findUnique({
+        where: { id: RECOVERY_TEMPLATE_ID },
+      });
+
+      if (!template) {
+        throw new Error(`Recovery resolution template "${RECOVERY_TEMPLATE_ID}" not found`);
+      }
+
+      // Build the same variables as enqueue()
+      const complaintText = campaign.notes || '(No complaint text recorded — see audit data)';
+      const intakePayload = JSON.stringify({
+        ownerStatement: intake.owner_statement,
+        proposedResolution: intake.proposed_resolution,
+        serviceDate: intake.service_date,
+        statusFlag: intake.status_flag,
+      });
+      const attachmentMeta = JSON.stringify(
+        (intake.mkt_dispute_attachments || []).map((a: any) => ({
+          fileName: a.file_name,
+          fileType: a.file_type,
+        })),
+      );
+
+      const variablesUsed = {
+        complaintText,
+        intakePayload,
+        attachmentMeta,
+        intakeId: intake.id,
+      };
+
+      const interpolated = this.interpolateTemplate(template.body, variablesUsed);
+
+      // Append the output schema suffix so external agents know the expected JSON shape
+      const fullPrompt = interpolated + RECOVERY_RESOLUTION_PROMPT_SUFFIX;
+
+      logger.info('Recovery prompt text rendered for copy', ctx, { campaignId });
+
+      return {
+        renderedPrompt: fullPrompt,
+        templateId: RECOVERY_TEMPLATE_ID,
+        variablesUsed,
+      };
+    } catch (error) {
+      logger.error('Failed to render recovery prompt text', ctx, {
+        error: (error as Error).message,
+        campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // DUAL-MODE: Import external result (copy-paste bridge)
+  // ====================
+
+  async importExternalResult(campaignId: string, rawOutput: string, ctx?: RequestCtx): Promise<{
+    executionId: string;
+    campaignId: string;
+    deliverableId: string;
+    passed: boolean;
+    errors?: string[];
+  }> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        include: {
+          mkt_dispute_intake: { include: { mkt_dispute_attachments: true } },
+        },
+      });
+
+      if (!campaign) {
+        throw new Error(`Campaign ${campaignId} not found`);
+      }
+
+      const intake = campaign.mkt_dispute_intake;
+      if (!intake) {
+        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+      }
+
+      // Build variables (same as enqueue)
+      const complaintText = campaign.notes || '(No complaint text recorded — see audit data)';
+      const intakePayload = JSON.stringify({
+        ownerStatement: intake.owner_statement,
+        proposedResolution: intake.proposed_resolution,
+        serviceDate: intake.service_date,
+        statusFlag: intake.status_flag,
+      });
+      const attachmentMeta = JSON.stringify(
+        (intake.mkt_dispute_attachments || []).map((a: any) => ({
+          fileName: a.file_name,
+          fileType: a.file_type,
+        })),
+      );
+
+      const variablesUsed = {
+        complaintText,
+        intakePayload,
+        attachmentMeta,
+        intakeId: intake.id,
+      };
+
+      // Create a completed execution record (external source)
+      const execution = await MarketingPromptService.createExecution({
+        campaignId,
+        templateId: RECOVERY_TEMPLATE_ID,
+        variablesUsed,
+        executedBy: ctx?.userId || 'operator-external',
+      }, ctx);
+
+      // Parse + validate the external output
+      let parsedJson: any;
+      try {
+        parsedJson = JSON.parse(this.stripJsonArtifacts(rawOutput));
+      } catch (e) {
+        await MarketingPromptService.updateExecution(execution.id, {
+          rawOutput,
+          status: 'failed',
+          flaggedCount: 1,
+          passRate: 0,
+        }, ctx);
+        await this.createFilterFlag(execution.id, {
+          failedChecks: [{ issue: 'invalid_json', detail: 'Imported output is not valid JSON' }],
+          suggestedFix: 'Ensure the external AI returned only JSON, no markdown fences or commentary.',
+        }, ctx);
+        return {
+          executionId: execution.id,
+          campaignId,
+          deliverableId: '',
+          passed: false,
+          errors: ['Invalid JSON — the external output could not be parsed'],
+        };
+      }
+
+      const resolved = resolveOutputSchema(RECOVERY_SCHEMA_NAME);
+      if (!resolved) {
+        throw new Error(`Output schema "${RECOVERY_SCHEMA_NAME}" not registered`);
+      }
+
+      const validationResult = resolved.validator.safeParse(parsedJson);
+      if (!validationResult.success) {
+        const issues = validationResult.error.issues.map((i) => ({
+          path: i.path.join('.'),
+          message: i.message,
+        }));
+        await this.createFilterFlag(execution.id, {
+          failedChecks: issues,
+          suggestedFix: 'Edit the external output to match the recovery_resolution schema and re-import.',
+        }, ctx);
+        await MarketingPromptService.updateExecution(execution.id, {
+          rawOutput,
+          status: 'failed',
+          flaggedCount: issues.length,
+          passRate: 0,
+          filteredOutput: JSON.stringify(parsedJson),
+        }, ctx);
+        return {
+          executionId: execution.id,
+          campaignId,
+          deliverableId: '',
+          passed: false,
+          errors: issues.map((i) => `${i.path}: ${i.message}`),
+        };
+      }
+
+      // Success — persist the deliverable + sections (same as run())
+      const output = parsedJson.recovery_resolution;
+      const deliverableId = generateDeliverableId();
+
+      await this.prisma.mkt_deliverables_list.create({
+        data: {
+          id: deliverableId,
+          campaign_id: campaignId,
+          execution_id: execution.id,
+          template_id: null,
+          deliverable_type: 'recovery_resolution',
+          status: 'drafted',
+          file_name: `recovery-resolution-${campaignId}.json`,
+          storage_path: `recovery/${campaignId}/${deliverableId}.json`,
+          mime_type: 'application/json',
+          generated_by: ctx?.userId || 'operator-external',
+        },
+      });
+
+      await this.prisma.mkt_deliverable_section.createMany({
+        data: [
+          {
+            id: generateDeliverableSectionId(),
+            deliverable_id: deliverableId,
+            campaign_id: campaignId,
+            section_type: 'response_draft',
+            title: 'Response Draft',
+            content: output.deliverableText,
+            source: 'external',
+            quality_gate_passed: true,
+            quality_gate_issues: [],
+            status: 'draft',
+            section_index: 0,
+          },
+          {
+            id: generateDeliverableSectionId(),
+            deliverable_id: deliverableId,
+            campaign_id: campaignId,
+            section_type: 'submission_guide',
+            title: 'Submission Guide',
+            content: output.submissionGuide,
+            source: 'external',
+            quality_gate_passed: true,
+            quality_gate_issues: [],
+            status: 'draft',
+            section_index: 1,
+          },
+        ],
+      });
+
+      await MarketingPromptService.updateExecution(execution.id, {
+        rawOutput,
+        filteredOutput: JSON.stringify(parsedJson),
+        status: 'completed',
+        passRate: 100,
+        flaggedCount: 0,
+        aiProvider: 'external',
+        aiModel: 'external-import',
+      }, ctx);
+
+      // Transition campaign to final_resolution_drafted
+      await MarketingCampaignService.transitionStage(campaignId, 'final_resolution_drafted', ctx, {
+        note: 'Recovery resolution imported from external AI output',
+      });
+
+      logger.info('Recovery external result imported successfully', ctx, {
+        executionId: execution.id,
+        campaignId,
+        deliverableId,
+      });
+
+      return {
+        executionId: execution.id,
+        campaignId,
+        deliverableId,
+        passed: true,
+      };
+    } catch (error) {
+      logger.error('Failed to import external recovery result', ctx, {
+        error: (error as Error).message,
+        campaignId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // DUAL-MODE: Direct execute (enqueue + run immediately)
+  // ====================
+
+  async executeDirect(campaignId: string, ctx?: RequestCtx): Promise<{
+    executionId: string;
+    campaignId: string;
+    deliverableId: string;
+    passed: boolean;
+    errors?: string[];
+  }> {
+    try {
+      const intake = await this.prisma.mkt_dispute_intake.findUnique({
+        where: { campaign_id: campaignId },
+      });
+
+      if (!intake) {
+        throw new Error(`Dispute intake for campaign ${campaignId} not found`);
+      }
+
+      // Enqueue
+      const enqueued = await this.enqueue(campaignId, intake.id, ctx);
+
+      // Run immediately (don't wait for scheduler)
+      const result = await this.run(enqueued.executionId, ctx);
+
+      return {
+        executionId: result.executionId,
+        campaignId: result.campaignId,
+        deliverableId: result.deliverableId,
+        passed: result.passed,
+        errors: result.passed ? undefined : ['AI output failed validation — check filter flags'],
+      };
+    } catch (error) {
+      logger.error('Failed to execute recovery resolution directly', ctx, {
+        error: (error as Error).message,
+        campaignId,
+      });
+      throw this.handleError(error, ctx);
     }
   }
 
