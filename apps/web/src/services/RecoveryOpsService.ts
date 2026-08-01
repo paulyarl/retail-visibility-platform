@@ -39,6 +39,8 @@ export interface DisputeIntake {
   id: string;
   campaign_id: string;
   owner_statement: string;
+  owner_email: string | null;
+  owner_phone: string | null;
   proposed_resolution: string;
   service_date: string | null;
   status_flag: string | null;

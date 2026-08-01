@@ -15,6 +15,8 @@ import { unifiedConfig } from '../config/unifiedConfig';
 export const intakeSubmitSchema = z.object({
   token: z.string().min(1, 'token is required'),
   ownerStatement: z.string().min(20, 'Owner statement must be at least 20 characters'),
+  ownerEmail: z.string().email('A valid email address is required so we can deliver your resolution'),
+  ownerPhone: z.string().optional().nullable(),
   proposedResolution: z.string().min(1, 'Proposed resolution is required'),
   serviceDate: z.coerce.date().optional().nullable(),
   statusFlag: z

@@ -10,6 +10,7 @@ import {
   Button,
   Textarea,
   Select,
+  TextInput,
   Alert,
   Group,
   Stack,
@@ -56,6 +57,8 @@ export default function IntakePageClient() {
 
   // Form state
   const [ownerStatement, setOwnerStatement] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
   const [proposedResolution, setProposedResolution] = useState('');
   const [serviceDate, setServiceDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -121,6 +124,10 @@ export default function IntakePageClient() {
       setError('Please provide a statement of at least 20 characters.');
       return;
     }
+    if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
+      setError('Please provide a valid email address so we can deliver your resolution.');
+      return;
+    }
     if (!proposedResolution) {
       setError('Please select a proposed resolution.');
       return;
@@ -131,6 +138,8 @@ export default function IntakePageClient() {
     try {
       const result = await recoveryIntakePublicService.submitIntake(token, {
         ownerStatement,
+        ownerEmail,
+        ownerPhone: ownerPhone || null,
         proposedResolution,
         serviceDate: serviceDate || null,
         attachmentIds: uploadedAttachments.map((a) => a.attachmentId),
@@ -283,6 +292,30 @@ export default function IntakePageClient() {
               <Text size="xs" c="dimmed" mt={4}>
                 {ownerStatement.length}/20 characters minimum
               </Text>
+            </div>
+
+            <div>
+              <Title order={4} mb="xs">Contact Information</Title>
+              <Text size="sm" c="dimmed" mb="sm">
+                We need your email to deliver the drafted resolution. Phone is optional but helps us reach you urgently if there's a deadline.
+              </Text>
+              <Stack gap="sm">
+                <TextInput
+                  label="Email Address"
+                  required
+                  type="email"
+                  value={ownerEmail}
+                  onChange={(e) => setOwnerEmail(e.currentTarget.value)}
+                  placeholder="owner@example.com"
+                  description="Your resolution will be delivered to this address."
+                />
+                <TextInput
+                  label="Phone Number (optional)"
+                  value={ownerPhone}
+                  onChange={(e) => setOwnerPhone(e.currentTarget.value)}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </Stack>
             </div>
 
             <div>

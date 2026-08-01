@@ -176,6 +176,8 @@ export class DisputeIntakeService extends BaseService {
       // Persist the submission
       await this.repo.submitIntake(record.id, {
         ownerStatement: input.ownerStatement,
+        ownerEmail: input.ownerEmail,
+        ownerPhone: input.ownerPhone || null,
         serviceDate: input.serviceDate || null,
         proposedResolution: input.proposedResolution,
         statusFlag: input.statusFlag || undefined,

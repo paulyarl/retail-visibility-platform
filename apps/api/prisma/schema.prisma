@@ -6757,6 +6757,8 @@ model mkt_dispute_intake {
   access_token            String                    @unique @db.VarChar(255)
   expires_at              DateTime                  @db.Timestamptz(6)
   owner_statement         String?
+  owner_email             String?                   @db.VarChar(255)
+  owner_phone             String?                   @db.VarChar(40)
   service_date            DateTime?                 @db.Date
   proposed_resolution     String?
   status_flag             String?                   @db.VarChar(50)

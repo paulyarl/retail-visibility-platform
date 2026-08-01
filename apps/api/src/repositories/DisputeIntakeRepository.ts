@@ -33,6 +33,8 @@ export interface CreateDisputeIntakeInput {
 
 export interface SubmitIntakeInput {
   ownerStatement: string;
+  ownerEmail: string;
+  ownerPhone?: string | null;
   serviceDate?: Date | null;
   proposedResolution?: string;
   statusFlag?: string;
@@ -52,6 +54,8 @@ export interface DisputeIntakeRecord {
   access_token: string;
   expires_at: Date;
   owner_statement: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
   service_date: Date | null;
   proposed_resolution: string | null;
   status_flag: string | null;
@@ -177,6 +181,8 @@ export class DisputeIntakeRepository {
         where: { id },
         data: {
           owner_statement: input.ownerStatement,
+          owner_email: input.ownerEmail,
+          owner_phone: input.ownerPhone || null,
           service_date: input.serviceDate || null,
           proposed_resolution: input.proposedResolution || null,
           status_flag: input.statusFlag || null,

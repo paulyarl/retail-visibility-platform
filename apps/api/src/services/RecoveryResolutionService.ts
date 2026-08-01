@@ -470,8 +470,41 @@ export class RecoveryResolutionService extends BaseService {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
+        include: {
+          mkt_dispute_intake: {
+            select: { owner_email: true, owner_phone: true },
+          },
+        },
       });
       if (!campaign) return;
+
+      // Determine the delivery destination:
+      // 1. Prefer the owner email captured at intake (most reliable — the owner
+      //    typed it themselves)
+      // 2. Fall back to the campaign's business email (captured during audit)
+      // 3. If neither exists, log a delivery failure for manual intervention
+      const intakeEmail = campaign.mkt_dispute_intake?.owner_email;
+      const campaignEmail = campaign.email;
+      const deliveryEmail = intakeEmail || campaignEmail;
+
+      if (!deliveryEmail) {
+        logger.warn('Recovery resolution delivery failed — no email destination', ctx, {
+          campaignId,
+          deliverableId,
+          intakePhone: campaign.mkt_dispute_intake?.owner_phone || null,
+        });
+        // Log the failed delivery so it surfaces in the outreach log
+        const { MarketingOutreachService } = await import('./MarketingOutreachService.js');
+        await MarketingOutreachService.getInstance().logContact({
+          campaignId,
+          contactChannel: 'email',
+          contactDate: new Date().toISOString(),
+          outcome: 'no_answer',
+          notes: 'Recovery resolution delivery FAILED — no email destination (intake email and campaign email both missing)',
+          contactedBy: ctx?.userId || 'system',
+        }, ctx);
+        return;
+      }
 
       // Load the deliverable sections
       const sections = await this.prisma.mkt_deliverable_section.findMany({
@@ -485,6 +518,8 @@ export class RecoveryResolutionService extends BaseService {
       const messageSnapshot = JSON.stringify({
         responseDraft: responseDraft?.content || '',
         submissionGuide: submissionGuide?.content || '',
+        deliveryEmail,
+        emailSource: intakeEmail ? 'intake' : 'campaign',
       });
 
       // Log the delivery via MarketingOutreachService (records in mkt_outreach_log)
@@ -493,8 +528,8 @@ export class RecoveryResolutionService extends BaseService {
         campaignId,
         contactChannel: 'email',
         contactDate: new Date().toISOString(),
-        outcome: 'other',
-        notes: 'Approved recovery resolution delivered to owner',
+        outcome: 'reached',
+        notes: `Approved recovery resolution delivered to owner (${intakeEmail ? 'intake email' : 'campaign email'})`,
         messageSnapshot,
         messageSubject: `Your Recovery Resolution — ${campaign.business_name || 'Action Required'}`,
         contactedBy: ctx?.userId || 'system',
@@ -503,6 +538,7 @@ export class RecoveryResolutionService extends BaseService {
       logger.info('Recovery resolution delivered to owner', ctx, {
         campaignId,
         deliverableId,
+        emailSource: intakeEmail ? 'intake' : 'campaign',
       });
     } catch (error) {
       // Best-effort — delivery failure shouldn't roll back the approval

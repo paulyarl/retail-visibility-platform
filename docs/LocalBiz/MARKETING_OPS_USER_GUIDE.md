@@ -806,6 +806,8 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 
 ### Known Gaps and Potential Frictions
 
+> **Production readiness sprint plan:** `docs/RECOVERY_PRODUCTION_READINESS_SPRINT_PLAN.md` tracks the work to close the P0 gaps below before go-live.
+
 - **Cost tracking is backend-only.** `cost_cents` and `tokens_used` are recorded for every execution, but there is no UI dashboard for per-prompt or per-campaign spend yet.
 - **Prompt version rollbacks are not in the UI.** The database stores versions, but the library does not yet let you view or restore an older version.
 - **Batch prompt execution is planned for v1.1.** For now, prompts are run one campaign at a time.

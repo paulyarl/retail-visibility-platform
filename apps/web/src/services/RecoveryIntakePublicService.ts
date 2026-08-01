@@ -75,6 +75,8 @@ export class RecoveryIntakePublicService extends PublicApiSingleton {
     token: string,
     payload: {
       ownerStatement: string;
+      ownerEmail: string;
+      ownerPhone?: string | null;
       proposedResolution: string;
       serviceDate?: string | null;
       statusFlag?: string | null;

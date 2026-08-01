@@ -27,10 +27,11 @@ import type { RequestCtx } from '../context';
 // ====================
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CASCADE_NOTE_PREFIX = 'Recovery cascade';
 const CASCADE_STEPS = [
   { day: 1, channel: 'email' as const, label: 'Day 1: Primary email with intake link' },
-  { day: 2, channel: 'email' as const, label: 'Day 2: SMS pointer to email' },
-  { day: 4, channel: 'email' as const, label: 'Day 4: Administrative check-in' },
+  { day: 2, channel: 'phone' as const, label: 'Day 2: SMS pointer to email' },
+  { day: 4, channel: 'social' as const, label: 'Day 4: Administrative check-in' },
 ];
 
 // ====================
@@ -72,6 +73,7 @@ export class RecoveryCascadeService extends BaseService {
           stage_entered_at: true,
           email: true,
           phone: true,
+          social_profiles: true,
           mkt_dispute_intake: { select: { id: true, access_token: true } },
         },
       });
@@ -112,7 +114,7 @@ export class RecoveryCascadeService extends BaseService {
       const existingContacts = await this.prisma.mkt_outreach_log.findMany({
         where: {
           campaign_id: campaign.id,
-          notes: { contains: 'Recovery cascade' },
+          notes: { contains: CASCADE_NOTE_PREFIX },
         },
         orderBy: { contact_date: 'asc' },
       });
@@ -137,6 +139,26 @@ export class RecoveryCascadeService extends BaseService {
         return { fired: false };
       }
 
+      // Check channel availability — skip the step if the contact info
+      // for this channel is missing. Log the skip so we don't re-evaluate
+      // it on every cascade pass.
+      if (!this.hasChannelInfo(campaign, nextStep.channel)) {
+        logger.info('[RecoveryCascade] Skipping step — channel contact info missing', ctx, {
+          campaignId: campaign.id,
+          channel: nextStep.channel,
+          step: nextStep.label,
+        });
+        await MarketingOutreachService.getInstance().logContact({
+          campaignId: campaign.id,
+          contactChannel: nextStep.channel,
+          contactDate: now.toISOString(),
+          outcome: 'no_answer',
+          notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label} (SKIPPED — no contact info)`,
+          contactedBy: 'recovery-cascade',
+        }, ctx);
+        return { fired: false };
+      }
+
       // Build the intake link
       const intakeLink = `${unifiedConfig.webBaseUrl || ''}/recovery/intake?token=${intake.access_token}`;
 
@@ -149,8 +171,8 @@ export class RecoveryCascadeService extends BaseService {
         campaignId: campaign.id,
         contactChannel: nextStep.channel,
         contactDate: now.toISOString(),
-        outcome: 'other',
-        notes: `Recovery cascade — ${nextStep.label}`,
+        outcome: 'left_message',
+        notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label}`,
         messageSnapshot,
         messageSubject,
         contactedBy: 'recovery-cascade',
@@ -172,13 +194,35 @@ export class RecoveryCascadeService extends BaseService {
     }
   }
 
-  private buildMessageSnapshot(campaign: any, intakeLink: string, step: { day: number; label: string }): string {
+  private hasChannelInfo(campaign: any, channel: 'email' | 'phone' | 'social'): boolean {
+    switch (channel) {
+      case 'email':
+        return !!campaign.email && campaign.email.trim().length > 0;
+      case 'phone':
+        return !!campaign.phone && campaign.phone.trim().length > 0;
+      case 'social': {
+        if (!campaign.social_profiles) return false;
+        const profiles = Array.isArray(campaign.social_profiles) ? campaign.social_profiles : [];
+        return profiles.length > 0;
+      }
+      default:
+        return false;
+    }
+  }
+
+  private buildMessageSnapshot(campaign: any, intakeLink: string, step: { day: number; channel: string; label: string }): string {
     const businessName = campaign.business_name || 'your business';
+    const bodies: Record<string, string> = {
+      email: `Hello ${businessName},\n\nWe've identified a complaint that needs your attention. Please complete the recovery intake form so we can draft a resolution on your behalf.\n\nIntake link: ${intakeLink}\n\nThis link will expire. If you have questions, reply to this email.\n\n— Recovery Team`,
+      phone: `${businessName} — we sent you an email about a complaint that needs your response. Please check your inbox for the intake link, or visit: ${intakeLink}. Reply STOP to opt out.`,
+      social: `Hello ${businessName}, we've been trying to reach you about a complaint on your profile. Please complete the intake form so we can draft your resolution: ${intakeLink}`,
+    };
     return JSON.stringify({
       step: step.label,
+      channel: step.channel,
       businessName,
       intakeLink,
-      body: `Hello ${businessName},\n\nWe've identified a complaint that needs your attention. Please complete the recovery intake form so we can draft a resolution on your behalf.\n\nIntake link: ${intakeLink}\n\nThis link will expire. If you have questions, reply to this email.\n\n— Recovery Team`,
+      body: bodies[step.channel] || bodies.email,
     });
   }
 }
