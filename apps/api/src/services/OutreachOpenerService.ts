@@ -23,24 +23,41 @@ import {
   extractFields,
   buildArchetypePrompt,
   runQualityGate,
+  DEFAULT_CLOSE_VARIANT,
   type BusinessAnalysisAuditData,
   type ArchetypeSelection,
   type ArchetypeFields,
   type CommonFields,
   type QualityGateResult,
+  type CloseVariant,
 } from './outreach-openers';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface ExecuteOpenerInput {
   campaignId: string;
+  closeVariant?: CloseVariant;
   executedBy?: string;
+  // Operator name to substitute for "[your name]" in the signoff. When
+  // provided, the resolved prompt and persisted opener text end with
+  // "— <operatorName>" instead of the literal placeholder. When omitted,
+  // the placeholder is left in place (legacy behavior).
+  operatorName?: string;
 }
 
 export interface ImportOpenerInput {
   campaignId: string;
   openerText: string;
+  closeVariant?: CloseVariant;
   executedBy?: string;
+  // Operator name to record on the imported opener row for provenance.
+  // The imported text is operator-authored (pasted from an external
+  // agent), so we do NOT rewrite it — but we DO persist the operator
+  // name on the row so the campaign knows who handled it. If the pasted
+  // text still contains the literal "[your name]" placeholder and an
+  // operatorName is provided, the placeholder is substituted so the
+  // stored text is ready to send.
+  operatorName?: string;
 }
 
 export interface OpenerResult {
@@ -127,14 +144,22 @@ export class OutreachOpenerService extends BaseService {
    * WITHOUT calling the LLM. Used by:
    *   - Path 2 (Import External Opener) to show the resolved prompt
    *   - The workspace UI to display the detected archetype + fields
+   *
+   * If `operatorName` is provided, the literal "[your name]" placeholder
+   * in the signoff is substituted with the operator's name in the
+   * returned `resolvedPrompt`, so the operator sees the exact opener
+   * the AI will produce before they execute.
    */
   async resolveOpener(
     campaignId: string,
+    closeVariant: CloseVariant = DEFAULT_CLOSE_VARIANT,
     ctx?: RequestCtx,
+    operatorName?: string,
   ): Promise<{
     selection: ArchetypeSelection;
     extractedFields: ArchetypeFields;
     resolvedPrompt: string;
+    closeVariant: CloseVariant;
   }> {
     const auditResult = await this.getLatestBusinessAnalysisAudit(campaignId, ctx);
     if (!auditResult) {
@@ -154,12 +179,29 @@ export class OutreachOpenerService extends BaseService {
       selection.theme,
     );
 
-    const resolvedPrompt = buildArchetypePrompt(
+    let resolvedPrompt = buildArchetypePrompt(
       selection.archetype,
       JSON.stringify(extractedFields, null, 2),
+      closeVariant,
     );
+    if (operatorName && operatorName.trim()) {
+      resolvedPrompt = this.substituteSignoff(resolvedPrompt, operatorName);
+    }
 
-    return { selection, extractedFields, resolvedPrompt };
+    return { selection, extractedFields, resolvedPrompt, closeVariant };
+  }
+
+  /**
+   * Substitute the literal "[your name]" placeholder with the operator's
+   * real name in an opener text or resolved prompt. Idempotent: a text
+   * that already has a real name substituted is returned unchanged.
+   * Trims and collapses internal whitespace in the name so " Alex "
+   * becomes "Alex".
+   */
+  private substituteSignoff(text: string, operatorName: string): string {
+    const name = operatorName.trim().replace(/\s+/g, ' ');
+    if (!name) return text;
+    return text.replace(/—\s*\[your name\]/g, `— ${name}`);
   }
 
   // ====================
@@ -174,15 +216,20 @@ export class OutreachOpenerService extends BaseService {
    * 4. Store the opener record
    */
   async executeOpener(input: ExecuteOpenerInput, ctx?: RequestCtx): Promise<OpenerResult> {
+    const closeVariant = input.closeVariant ?? DEFAULT_CLOSE_VARIANT;
     const { selection, extractedFields, resolvedPrompt } = await this.resolveOpener(
       input.campaignId,
+      closeVariant,
       ctx,
+      input.operatorName,
     );
 
     logger.info('Executing outreach opener', ctx, {
       campaignId: input.campaignId,
       archetype: selection.archetype,
       reason: selection.reason,
+      closeVariant,
+      operatorName: input.operatorName ?? null,
     });
 
     // Call the AI provider (same factory as MarketingExecutionService).
@@ -199,7 +246,13 @@ export class OutreachOpenerService extends BaseService {
       temperature: 0.7,
     });
 
-    const openerText = result.content.trim();
+    // The AI may emit the literal "[your name]" placeholder even when the
+    // resolved prompt substituted the operator's name. Substitute again
+    // on the output so the persisted text is send-ready.
+    let openerText = result.content.trim();
+    if (input.operatorName && input.operatorName.trim()) {
+      openerText = this.substituteSignoff(openerText, input.operatorName);
+    }
     const qualityGate = runQualityGate(openerText);
     const tokensUsed = result.usage?.totalTokens || 0;
     const costCents = this.estimateCostCents(tokensUsed);
@@ -209,6 +262,7 @@ export class OutreachOpenerService extends BaseService {
         id: generateOutreachOpenerId(),
         campaign_id: input.campaignId,
         archetype: selection.archetype,
+        close_variant: closeVariant,
         opener_text: openerText,
         quality_gate_passed: qualityGate.passed,
         quality_gate_issues: qualityGate.issues,
@@ -219,6 +273,7 @@ export class OutreachOpenerService extends BaseService {
         cost_cents: costCents,
         extracted_fields: extractedFields as any,
         executed_by: input.executedBy || null,
+        operator_name: input.operatorName?.trim() || null,
       },
     });
 
@@ -226,6 +281,7 @@ export class OutreachOpenerService extends BaseService {
       openerId: opener.id,
       campaignId: input.campaignId,
       archetype: selection.archetype,
+      closeVariant,
       qualityGatePassed: qualityGate.passed,
       issuesCount: qualityGate.issues.length,
       tokensUsed,
@@ -249,14 +305,25 @@ export class OutreachOpenerService extends BaseService {
    * 3. Store the opener record with source='external'
    */
   async importOpener(input: ImportOpenerInput, ctx?: RequestCtx): Promise<OpenerResult> {
+    const closeVariant = input.closeVariant ?? DEFAULT_CLOSE_VARIANT;
     const { selection, extractedFields, resolvedPrompt } = await this.resolveOpener(
       input.campaignId,
+      closeVariant,
       ctx,
+      input.operatorName,
     );
 
-    const openerText = input.openerText.trim();
+    let openerText = input.openerText.trim();
     if (!openerText) {
       throw new Error('Opener text cannot be empty');
+    }
+    // The operator may have pasted text that still contains the literal
+    // "[your name]" placeholder (e.g. they ran the resolved prompt
+    // without an operator name set). If an operatorName is provided,
+    // substitute it so the stored text is send-ready. A real name already
+    // present in the pasted text is left untouched (idempotent).
+    if (input.operatorName && input.operatorName.trim()) {
+      openerText = this.substituteSignoff(openerText, input.operatorName);
     }
 
     const qualityGate = runQualityGate(openerText);
@@ -266,12 +333,14 @@ export class OutreachOpenerService extends BaseService {
         id: generateOutreachOpenerId(),
         campaign_id: input.campaignId,
         archetype: selection.archetype,
+        close_variant: closeVariant,
         opener_text: openerText,
         quality_gate_passed: qualityGate.passed,
         quality_gate_issues: qualityGate.issues,
         source: 'external',
         extracted_fields: extractedFields as any,
         executed_by: input.executedBy || null,
+        operator_name: input.operatorName?.trim() || null,
       },
     });
 
@@ -279,6 +348,7 @@ export class OutreachOpenerService extends BaseService {
       openerId: opener.id,
       campaignId: input.campaignId,
       archetype: selection.archetype,
+      closeVariant,
       qualityGatePassed: qualityGate.passed,
       issuesCount: qualityGate.issues.length,
     });
@@ -320,6 +390,229 @@ export class OutreachOpenerService extends BaseService {
   }
 
   // ====================
+  // SPLIT-TEST ANALYTICS
+  // ====================
+
+  /**
+   * Outcomes that count as a "reply" — any outcome where a human at the
+   * prospect business responded (positively or negatively). Excludes
+   * no_answer, left_message, and auto_follow_up_scheduled (no human
+   * contact). This is the reply-rate numerator.
+   *
+   * Rationale: at this stage the messaging/opener strategy is unsettled,
+   * so we log all human-contact signals up front. Stage advancement
+   * (paid/delivered) is a downstream signal better suited to an
+   * established flow.
+   */
+  private static readonly REPLY_OUTCOMES = new Set([
+    'reached',
+    'interested',
+    'not_interested',
+    'callback_scheduled',
+  ]);
+
+  /**
+   * Aggregate split-test stats grouped by close_variant. For each cohort:
+   *   - openers generated (total)
+   *   - campaigns sent (stage >= 'shown' — the opener was actually used)
+   *   - replies (campaigns with at least one outreach log entry whose
+   *     outcome is in REPLY_OUTCOMES)
+   *   - reply rate (replies / sent)
+   *   - outcome breakdown (count per outcome type)
+   *
+   * Also returns per-cohort campaign drill-down with: business name,
+   * stage, archetype, latest outreach outcome, reply status.
+   *
+   * Only openers with close_variant IS NOT NULL are included (legacy
+   * NULL openers are excluded from the split-test view).
+   */
+  async getSplitTestStats(ctx?: RequestCtx): Promise<{
+    cohorts: SplitTestCohort[];
+    totals: { openers: number; sent: number; replies: number; replyRate: number };
+  }> {
+    try {
+      // Fetch all openers with a close_variant set, newest first.
+      const openers = await this.prisma.mkt_outreach_openers_list.findMany({
+        where: { close_variant: { not: null } },
+        orderBy: { executed_at: 'desc' },
+        select: {
+          id: true,
+          campaign_id: true,
+          archetype: true,
+          close_variant: true,
+          source: true,
+          quality_gate_passed: true,
+          executed_at: true,
+        },
+      });
+
+      if (openers.length === 0) {
+        return { cohorts: [], totals: { openers: 0, sent: 0, replies: 0, replyRate: 0 } };
+      }
+
+      // Collect unique campaign IDs and map opener → campaign.
+      const campaignIds = [...new Set(openers.map((o) => o.campaign_id))];
+
+      // Fetch campaigns for those IDs.
+      const campaigns = await this.prisma.mkt_campaigns_list.findMany({
+        where: { id: { in: campaignIds } },
+        select: {
+          id: true,
+          business_name: true,
+          stage: true,
+          city: true,
+          service_category: true,
+          date_shown: true,
+        },
+      });
+      const campaignMap = new Map(campaigns.map((c) => [c.id, c]));
+
+      // Fetch all outreach log entries for these campaigns.
+      const logs = await this.prisma.mkt_outreach_log.findMany({
+        where: { campaign_id: { in: campaignIds } },
+        orderBy: { contact_date: 'desc' },
+        select: {
+          campaign_id: true,
+          outcome: true,
+          contact_date: true,
+        },
+      });
+
+      // Per-campaign: latest outcome + whether any reply outcome exists.
+      const campaignOutcomes = new Map<string, { latest: string | null; replied: boolean; outcomes: Record<string, number> }>();
+      for (const log of logs) {
+        const existing = campaignOutcomes.get(log.campaign_id) ?? { latest: null, replied: false, outcomes: {} as Record<string, number> };
+        // logs are ordered desc by contact_date, so the first entry we
+        // encounter for a campaign is the latest.
+        if (existing.latest === null) {
+          existing.latest = log.outcome;
+        }
+        if (OutreachOpenerService.REPLY_OUTCOMES.has(log.outcome)) {
+          existing.replied = true;
+        }
+        existing.outcomes[log.outcome] = (existing.outcomes[log.outcome] ?? 0) + 1;
+        campaignOutcomes.set(log.campaign_id, existing);
+      }
+
+      // Group openers by close_variant. If a campaign has multiple
+      // openers (e.g. one soft + one direct_paid), each opener is its
+      // own row in the cohort — but for "sent" counting we dedupe by
+      // campaign within each cohort (a campaign is sent once per
+      // cohort it appears in, which should be once).
+      const SENT_STAGES = new Set(['shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'tenant_onboarded']);
+
+      const cohortMap = new Map<string, {
+        variant: string;
+        openers: number;
+        sentCampaignIds: Set<string>;
+        repliedCampaignIds: Set<string>;
+        allCampaignIds: Set<string>;
+        outcomeBreakdown: Record<string, number>;
+        campaigns: SplitTestCampaignRow[];
+      }>();
+
+      for (const opener of openers) {
+        const variant = opener.close_variant!;
+        const cohort = cohortMap.get(variant) ?? {
+          variant,
+          openers: 0,
+          sentCampaignIds: new Set<string>(),
+          repliedCampaignIds: new Set<string>(),
+          allCampaignIds: new Set<string>(),
+          outcomeBreakdown: {} as Record<string, number>,
+          campaigns: [] as SplitTestCampaignRow[],
+        };
+
+        cohort.openers++;
+        cohort.allCampaignIds.add(opener.campaign_id);
+
+        const campaign = campaignMap.get(opener.campaign_id);
+        const outcomes = campaignOutcomes.get(opener.campaign_id);
+        const isSent = campaign ? SENT_STAGES.has(campaign.stage) : false;
+        const replied = outcomes?.replied ?? false;
+
+        if (isSent) {
+          cohort.sentCampaignIds.add(opener.campaign_id);
+          if (replied) {
+            cohort.repliedCampaignIds.add(opener.campaign_id);
+          }
+          // Merge outcome breakdown (only for sent campaigns — those are
+          // the ones that matter for reply-rate measurement).
+          if (outcomes) {
+            for (const [outcome, count] of Object.entries(outcomes.outcomes)) {
+              cohort.outcomeBreakdown[outcome] = (cohort.outcomeBreakdown[outcome] ?? 0) + count;
+            }
+          }
+        }
+
+        // Add to campaign drill-down (only one row per campaign per cohort).
+        if (campaign && !cohort.campaigns.some((c) => c.campaign_id === opener.campaign_id)) {
+          cohort.campaigns.push({
+            campaign_id: opener.campaign_id,
+            business_name: campaign.business_name ?? 'Unknown',
+            stage: campaign.stage,
+            city: campaign.city ?? null,
+            service_category: campaign.service_category ?? null,
+            archetype: opener.archetype,
+            close_variant: variant,
+            opener_source: opener.source,
+            quality_gate_passed: opener.quality_gate_passed,
+            sent: isSent,
+            replied,
+            latest_outcome: outcomes?.latest ?? null,
+            date_shown: campaign.date_shown ?? null,
+          });
+        }
+
+        cohortMap.set(variant, cohort);
+      }
+
+      // Build cohort results.
+      const cohorts: SplitTestCohort[] = [...cohortMap.values()].map((c) => {
+        const sent = c.sentCampaignIds.size;
+        const replies = c.repliedCampaignIds.size;
+        return {
+          variant: c.variant,
+          openers: c.openers,
+          campaigns: c.allCampaignIds.size,
+          sent,
+          replies,
+          replyRate: sent > 0 ? replies / sent : 0,
+          outcomeBreakdown: c.outcomeBreakdown,
+          campaignRows: c.campaigns.sort((a, b) => {
+            // Sent + replied first, then sent, then unsent.
+            if (a.sent !== b.sent) return a.sent ? -1 : 1;
+            if (a.replied !== b.replied) return a.replied ? -1 : 1;
+            return a.business_name.localeCompare(b.business_name);
+          }),
+        };
+      });
+
+      // Sort cohorts: direct_paid first, then soft (deterministic order).
+      cohorts.sort((a, b) => a.variant.localeCompare(b.variant));
+
+      const totalSent = cohorts.reduce((sum, c) => sum + c.sent, 0);
+      const totalReplies = cohorts.reduce((sum, c) => sum + c.replies, 0);
+      const totalOpeners = cohorts.reduce((sum, c) => sum + c.openers, 0);
+
+      return {
+        cohorts,
+        totals: {
+          openers: totalOpeners,
+          sent: totalSent,
+          replies: totalReplies,
+          replyRate: totalSent > 0 ? totalReplies / totalSent : 0,
+        },
+      };
+    } catch (error) {
+      logger.error('Failed to get split-test stats', ctx, {
+        error: (error as Error).message,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
   // HELPERS
   // ====================
 
@@ -327,4 +620,33 @@ export class OutreachOpenerService extends BaseService {
     // Rough estimate: $0.002 per 1K tokens = 0.2 cents per 1K tokens
     return Math.ceil((tokens / 1000) * 0.2);
   }
+}
+
+// ─── Split-test types (exported for route + web consumption) ────────────
+
+export interface SplitTestCampaignRow {
+  campaign_id: string;
+  business_name: string;
+  stage: string;
+  city: string | null;
+  service_category: string | null;
+  archetype: string;
+  close_variant: string;
+  opener_source: string;
+  quality_gate_passed: boolean;
+  sent: boolean;
+  replied: boolean;
+  latest_outcome: string | null;
+  date_shown: Date | null;
+}
+
+export interface SplitTestCohort {
+  variant: string;
+  openers: number;
+  campaigns: number;
+  sent: number;
+  replies: number;
+  replyRate: number;
+  outcomeBreakdown: Record<string, number>;
+  campaignRows: SplitTestCampaignRow[];
 }

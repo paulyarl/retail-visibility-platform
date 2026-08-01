@@ -33,6 +33,11 @@ export {
   type A4Fields,
 } from './field-extractors';
 
-export { buildArchetypePrompt } from './archetype-prompts';
+export {
+  buildArchetypePrompt,
+  CLOSE_VARIANTS,
+  DEFAULT_CLOSE_VARIANT,
+  type CloseVariant,
+} from './archetype-prompts';
 
 export { runQualityGate, type QualityGateResult } from './quality-gate';
