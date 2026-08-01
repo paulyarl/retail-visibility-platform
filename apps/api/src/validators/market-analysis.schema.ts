@@ -27,6 +27,11 @@ import {
   BUSINESS_ANALYSIS_SCHEMA_NAME,
   BUSINESS_ANALYSIS_PROMPT_SUFFIX,
 } from './business-analysis.schema';
+import {
+  recoveryResolutionSchema,
+  RECOVERY_RESOLUTION_SCHEMA_NAME,
+  RECOVERY_RESOLUTION_PROMPT_SUFFIX,
+} from './recovery-resolution.schema';
 
 /**
  * Strip a trailing `%` and coerce to number.
@@ -152,6 +157,11 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: businessAnalysisSchema,
     auditPlatform: 'business_analysis',
     promptSuffix: BUSINESS_ANALYSIS_PROMPT_SUFFIX,
+  },
+  [RECOVERY_RESOLUTION_SCHEMA_NAME]: {
+    validator: recoveryResolutionSchema,
+    auditPlatform: null, // recovery resolutions create deliverables, not audits
+    promptSuffix: RECOVERY_RESOLUTION_PROMPT_SUFFIX,
   },
 };
 

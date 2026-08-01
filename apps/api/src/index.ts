@@ -378,6 +378,17 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         logger.error('Failed to start review response scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
       }
+
+      // Start recovery resolution scheduler (every 5min) — polls for pending
+      // recovery_resolution prompt executions, runs the Recovery AI Agent,
+      // and purges orphan attachments from expired unsubmitted intakes
+      try {
+        const { startRecoveryResolutionJob } = await import('./jobs/recovery-resolution');
+        startRecoveryResolutionJob();
+        logger.info('Recovery resolution scheduler started');
+      } catch (err) {
+        logger.error('Failed to start recovery resolution scheduler', undefined, { error: { name: err instanceof Error ? err.name : 'Error', message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined } });
+      }
     });
 
     // Handle server errors

@@ -189,12 +189,23 @@ export class DisputeIntakeService extends BaseService {
         notes: 'Owner submitted dispute intake',
       }, ctx);
 
-      // S3 stub: enqueue recovery resolution job (body implemented in S3)
-      // For now, just log that the job would be enqueued.
-      logger.info('Dispute intake submitted — recovery resolution job would be enqueued (S3 stub)', ctx, {
-        intakeId: record.id,
-        campaignId: record.campaign_id,
-      });
+      // Enqueue the Recovery AI Agent — async execution via the scheduler job.
+      // Best-effort: failure to enqueue does NOT roll back the submission
+      // (the operator can manually trigger a re-run from the admin workspace).
+      try {
+        const { default: RecoveryResolutionService } = await import('./RecoveryResolutionService.js');
+        await RecoveryResolutionService.enqueue(record.campaign_id, record.id, ctx);
+        logger.info('Recovery resolution execution enqueued after intake submission', ctx, {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+        });
+      } catch (enqueueError) {
+        logger.warn('Recovery resolution enqueue failed — operator can manually re-run', ctx, {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+          error: (enqueueError as Error).message,
+        });
+      }
 
       return {
         intakeId: record.id,
