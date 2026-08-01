@@ -6472,10 +6472,14 @@ model mkt_scorecards_list {
   notes                   String?
   created_at              DateTime @default(now()) @db.Timestamptz(6)
   updated_at              DateTime @default(now()) @db.Timestamptz(6)
+  scope_focus             String?  @db.VarChar(20)
+  stage_focus             String?  @db.VarChar(50)
 
   @@unique([user_id, date])
   @@index([date(sort: Desc)], map: "idx_mkt_scorecards_date")
   @@index([user_id, date(sort: Desc)], map: "idx_mkt_scorecards_user")
+  @@index([scope_focus], map: "idx_mkt_scorecards_scope")
+  @@index([stage_focus], map: "idx_mkt_scorecards_stage")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -6619,26 +6623,33 @@ model mkt_review_response_log {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_outreach_openers_list {
-  id                        String                      @id @db.VarChar(255)
-  campaign_id               String                      @db.VarChar(255)
-  archetype                 String                      @db.VarChar(10)
-  opener_text               String?
-  quality_gate_passed       Boolean                     @default(false)
-  quality_gate_issues       Json?
-  source                    String                      @default("ai") @db.VarChar(20)
-  ai_provider               String?                     @db.VarChar(50)
-  ai_model                  String?                     @db.VarChar(100)
-  tokens_used               Int                         @default(0)
-  cost_cents                Int                         @default(0)
-  extracted_fields          Json?
-  executed_by               String?                     @db.VarChar(255)
-  executed_at               DateTime                    @default(now()) @db.Timestamptz(6)
-  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
-  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
-  close_variant             String?                     @db.VarChar(20)
-  operator_name             String?                     @db.VarChar(120)
-  mkt_campaigns_list        mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
-  mkt_outreach_pitches_list mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_opener")
+  id                              String                      @id @db.VarChar(255)
+  campaign_id                     String                      @db.VarChar(255)
+  archetype                       String                      @db.VarChar(10)
+  opener_text                     String?
+  quality_gate_passed             Boolean                     @default(false)
+  quality_gate_issues             Json?
+  source                          String                      @default("ai") @db.VarChar(20)
+  ai_provider                     String?                     @db.VarChar(50)
+  ai_model                        String?                     @db.VarChar(100)
+  tokens_used                     Int                         @default(0)
+  cost_cents                      Int                         @default(0)
+  extracted_fields                Json?
+  executed_by                     String?                     @db.VarChar(255)
+  executed_at                     DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                      DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime                    @default(now()) @db.Timestamptz(6)
+  close_variant                   String?                     @db.VarChar(20)
+  operator_name                   String?                     @db.VarChar(120)
+  message_type                    String?                     @db.VarChar(20)
+  followup_type                   String?                     @db.VarChar(20)
+  followup_number                 Int?
+  opener_id                       String?                     @db.VarChar(255)
+  data_diff                       Json?
+  mkt_campaigns_list              mkt_campaigns_list          @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_openers_campaign")
+  mkt_outreach_openers_list       mkt_outreach_openers_list?  @relation("mkt_outreach_openers_listTomkt_outreach_openers_list", fields: [opener_id], references: [id], onUpdate: NoAction, map: "fk_mkt_outreach_openers_opener_ref")
+  other_mkt_outreach_openers_list mkt_outreach_openers_list[] @relation("mkt_outreach_openers_listTomkt_outreach_openers_list")
+  mkt_outreach_pitches_list       mkt_outreach_pitches_list[] @relation("mkt_outreach_pitches_opener")
 
   @@index([archetype], map: "idx_mkt_outreach_openers_archetype")
   @@index([campaign_id, executed_at(sort: Desc)], map: "idx_mkt_outreach_openers_campaign")

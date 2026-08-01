@@ -18,6 +18,25 @@ export interface ScorecardInput {
   date: Date;
   categoryFocus?: string;
   neighborhoodFocus?: string;
+  scopeFocus?: string;
+  stageFocus?: string;
+  previewsBuilt?: number;
+  previewsShown?: number;
+  packagesPaid?: number;
+  packagesDelivered?: number;
+  revenueCollectedCents?: number;
+  retainersPitched?: number;
+  retainersWon?: number;
+  notes?: string;
+}
+
+export interface ScorecardUpdateInput {
+  userId?: string;
+  date?: Date;
+  categoryFocus?: string;
+  neighborhoodFocus?: string;
+  scopeFocus?: string;
+  stageFocus?: string;
   previewsBuilt?: number;
   previewsShown?: number;
   packagesPaid?: number;
@@ -53,6 +72,8 @@ export class MarketingScorecardService extends BaseService {
         const data: any = {};
         if (input.categoryFocus !== undefined) data.category_focus = input.categoryFocus;
         if (input.neighborhoodFocus !== undefined) data.neighborhood_focus = input.neighborhoodFocus;
+        if (input.scopeFocus !== undefined) data.scope_focus = input.scopeFocus;
+        if (input.stageFocus !== undefined) data.stage_focus = input.stageFocus;
         if (input.previewsBuilt !== undefined) data.previews_built = input.previewsBuilt;
         if (input.previewsShown !== undefined) data.previews_shown = input.previewsShown;
         if (input.packagesPaid !== undefined) data.packages_paid = input.packagesPaid;
@@ -72,6 +93,8 @@ export class MarketingScorecardService extends BaseService {
           date: input.date,
           category_focus: input.categoryFocus || null,
           neighborhood_focus: input.neighborhoodFocus || null,
+          scope_focus: input.scopeFocus || null,
+          stage_focus: input.stageFocus || null,
           previews_built: input.previewsBuilt || 0,
           previews_shown: input.previewsShown || 0,
           packages_paid: input.packagesPaid || 0,
@@ -99,9 +122,11 @@ export class MarketingScorecardService extends BaseService {
     }
   }
 
-  async listScorecards(filters: { userId?: string; startDate?: Date; endDate?: Date } = {}, ctx?: RequestCtx): Promise<any[]> {
+  async listScorecards(filters: { userId?: string; startDate?: Date; endDate?: Date; scopeFocus?: string; stageFocus?: string } = {}, ctx?: RequestCtx): Promise<any[]> {
     const where: any = {};
     if (filters.userId) where.user_id = filters.userId;
+    if (filters.scopeFocus) where.scope_focus = filters.scopeFocus;
+    if (filters.stageFocus) where.stage_focus = filters.stageFocus;
     if (filters.startDate || filters.endDate) {
       where.date = {};
       if (filters.startDate) where.date.gte = filters.startDate;
@@ -114,6 +139,31 @@ export class MarketingScorecardService extends BaseService {
       });
     } catch (error) {
       logger.error('Failed to list scorecards', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  async updateScorecard(id: string, input: ScorecardUpdateInput, ctx?: RequestCtx): Promise<any> {
+    try {
+      const data: any = {};
+      if (input.userId !== undefined) data.user_id = input.userId;
+      if (input.date !== undefined) data.date = input.date;
+      if (input.categoryFocus !== undefined) data.category_focus = input.categoryFocus;
+      if (input.neighborhoodFocus !== undefined) data.neighborhood_focus = input.neighborhoodFocus;
+      if (input.scopeFocus !== undefined) data.scope_focus = input.scopeFocus;
+      if (input.stageFocus !== undefined) data.stage_focus = input.stageFocus;
+      if (input.previewsBuilt !== undefined) data.previews_built = input.previewsBuilt;
+      if (input.previewsShown !== undefined) data.previews_shown = input.previewsShown;
+      if (input.packagesPaid !== undefined) data.packages_paid = input.packagesPaid;
+      if (input.packagesDelivered !== undefined) data.packages_delivered = input.packagesDelivered;
+      if (input.revenueCollectedCents !== undefined) data.revenue_collected_cents = input.revenueCollectedCents;
+      if (input.retainersPitched !== undefined) data.retainers_pitched = input.retainersPitched;
+      if (input.retainersWon !== undefined) data.retainers_won = input.retainersWon;
+      if (input.notes !== undefined) data.notes = input.notes;
+
+      return await this.prisma.mkt_scorecards_list.update({ where: { id }, data });
+    } catch (error) {
+      logger.error('Failed to update scorecard', ctx, { error: (error as Error).message, scorecardId: id });
       throw this.handleError(error, ctx);
     }
   }

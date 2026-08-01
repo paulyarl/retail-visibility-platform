@@ -3,8 +3,9 @@
 /**
  * PitchConstructionPanel — Pitch assembly UI for the Outreach Openers page.
  *
- * Renders below the existing opener workspace when a campaign is selected.
- * Lets the admin assemble a full outreach pitch from component variants:
+ * Rendered inside the "Pitch Construction" tab of the openers workspace when
+ * a campaign is selected. Lets the admin assemble a full outreach pitch from
+ * component variants:
  *   - Opener (selected from existing variants)
  *   - Header (subject line) — dual AI/Import path, split-testable
  *   - 3-slot Preview (review paste + AI/Import owner response, negative-first)
@@ -17,8 +18,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
   Play,
   Upload,
   Copy,
@@ -45,10 +44,71 @@ interface PitchConstructionPanelProps {
   openers: OutreachOpener[];
 }
 
-export default function PitchConstructionPanel({ campaignId, openers }: PitchConstructionPanelProps) {
-  // ─── Collapsible state ──────────────────────────────────────────────
-  const [panelOpen, setPanelOpen] = useState(false);
+// ─── Common convertable starters ─────────────────────────────────────
+// Unpersonalized starter copy that tends to convert well. Click to load
+// into the import field, then edit the {{placeholders}} before importing.
+// AI Generate remains the recommended path — it personalizes these for
+// the prospect using the audit data; the starters are for fast manual
+// assembly when the operator already knows what they want.
 
+const HEADER_STARTER_EXAMPLES: string[] = [
+  '{{business}} — your unanswered Google reviews',
+  '{{business}} — three reviews need responses',
+  'Quick note about {{business}}\'s reviews',
+  '{{business}} — your Yelp listing has gaps',
+  '{{business}} — a question about your reviews',
+];
+
+const CLOSER_STARTER_EXAMPLES: string[] = [
+  'The remaining {{remaining}} responses are written and ready to deliver today.',
+  'I\'ve drafted replies to the other {{remaining}} unanswered reviews — ready when you are.',
+  '{{remaining}} more responses are written and waiting. Want them?',
+  'There are {{remaining}} more responses ready to send. Say the word.',
+  'I\'ve handled {{remaining}} more reviews beyond these three. Should I send them?',
+];
+
+const CONTACT_STARTER_EXAMPLES: string[] = [
+  '— {{name}} | {{email}} | {{phone}}',
+  '— {{name}}, VisibleShelf — {{email}}',
+  'Reply with "go" and I\'ll send the rest. — {{name}}',
+  '— {{name}} | {{phone}}',
+  'Text "more" to {{phone}} and I\'ll send the rest. — {{name}}',
+];
+
+interface StarterExamplesProps {
+  examples: string[];
+  onPick: (text: string) => void;
+}
+
+function StarterExamples({ examples, onPick }: StarterExamplesProps) {
+  return (
+    <details className="mt-3 group rounded-lg border border-gray-200 dark:border-neutral-700 bg-gray-50/60 dark:bg-neutral-900/30">
+      <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 select-none flex items-center justify-between gap-2">
+        <span>Common convertable starters (click to load)</span>
+        <span className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 group-open:hidden">
+          AI Generate recommended for personalization
+        </span>
+      </summary>
+      <div className="px-3 pb-3 pt-1 space-y-1.5">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          Unpersonalized starters — edit the <code className="font-mono">{'{{placeholders}}'}</code> after loading. AI Generate personalizes for the prospect automatically.
+        </p>
+        {examples.map((ex, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(ex)}
+            className="block w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-neutral-800 rounded-md border border-gray-200 dark:border-neutral-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-mono"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+export default function PitchConstructionPanel({ campaignId, openers }: PitchConstructionPanelProps) {
   // ─── Variant lists ──────────────────────────────────────────────────
   const [headers, setHeaders] = useState<OutreachHeader[]>([]);
   const [closers, setClosers] = useState<OutreachCloser[]>([]);
@@ -132,11 +192,15 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
     fetchAll();
   }, [fetchAll]);
 
+  // Fetch the closer resolution (default template) on mount. Previously
+  // this was deferred until the collapsible panel was opened; now that the
+  // panel lives behind a tab and is always rendered when shown, we fetch
+  // eagerly so the closer template is pre-filled as soon as the tab opens.
   useEffect(() => {
-    if (panelOpen && !closerResolution) {
+    if (!closerResolution) {
       fetchCloserResolution();
     }
-  }, [panelOpen, closerResolution, fetchCloserResolution]);
+  }, [closerResolution, fetchCloserResolution]);
 
   // Auto-select first opener when list changes
   useEffect(() => {
@@ -336,25 +400,9 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
 
   // ─── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="mt-8 bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700">
-      {/* Panel header */}
-      <button
-        onClick={() => setPanelOpen((v) => !v)}
-        className="flex items-center justify-between w-full p-5"
-      >
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          {panelOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          Pitch Construction
-        </h2>
-        <span className="text-xs text-gray-400">
-          Assemble header + opener + 3-slot preview + closer + contact
-        </span>
-      </button>
-
-      {panelOpen && (
-        <div className="px-5 pb-5 space-y-6">
-          {/* ─── Opener selector ─────────────────────────────────────── */}
-          <section>
+    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-6">
+      {/* ─── Opener selector ─────────────────────────────────────── */}
+      <section>
             <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
               Opener (handshake)
             </h3>
@@ -430,6 +478,10 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
               </button>
             </div>
             {headerError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{headerError}</p>}
+            <StarterExamples
+              examples={HEADER_STARTER_EXAMPLES}
+              onPick={(text) => setHeaderImportText(text)}
+            />
           </section>
 
           {/* ─── 3-Slot Preview ──────────────────────────────────────── */}
@@ -570,6 +622,10 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
               </button>
             </div>
             {closerError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{closerError}</p>}
+            <StarterExamples
+              examples={CLOSER_STARTER_EXAMPLES}
+              onPick={(text) => setCloserImportText(text)}
+            />
           </section>
 
           {/* ─── Contact (optional) ──────────────────────────────────── */}
@@ -626,6 +682,10 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
               </button>
             </div>
             {contactError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{contactError}</p>}
+            <StarterExamples
+              examples={CONTACT_STARTER_EXAMPLES}
+              onPick={(text) => setContactText(text)}
+            />
           </section>
 
           {/* ─── Assemble ────────────────────────────────────────────── */}
@@ -712,8 +772,6 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
               </div>
             </section>
           )}
-        </div>
-      )}
     </div>
   );
 }

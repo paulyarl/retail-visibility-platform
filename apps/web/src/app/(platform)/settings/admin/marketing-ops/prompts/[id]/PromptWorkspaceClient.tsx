@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalLink, Flag, ArrowRight, AlertTriangle, Upload } from 'lucide-react';
+import { RefreshCw, Play, Copy, FileSearch, ChevronDown, ChevronRight, ExternalLink, Flag, ArrowRight, AlertTriangle, Upload, Edit3, Save, X } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { PromptTemplate, PromptExecution, Campaign, ExternalExecutionResult } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
@@ -90,7 +90,7 @@ function isScopeMismatchError(msg: string): boolean {
     || /out-of-scope variables for scope/i.test(msg);
 }
 
-export default function PromptWorkspaceClient({ templateId }: { templateId: string }) {
+export default function PromptWorkspaceClient({ templateId, initialCampaignId }: { templateId: string; initialCampaignId?: string }) {
   const [template, setTemplate] = useState<PromptTemplate | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [executions, setExecutions] = useState<PromptExecution[]>([]);
@@ -98,6 +98,9 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
+  // Tracks whether the deep-linked campaign has been auto-selected so we only
+  // auto-render once (avoid clobbering operator edits on re-renders).
+  const [autoSelected, setAutoSelected] = useState(false);
 
   const selectedCampaign = useMemo(() =>
     campaigns.find((c) => c.id === selectedCampaignId) || null,
@@ -121,6 +124,13 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+
+  // Template body inline-edit state
+  const [editingBody, setEditingBody] = useState(false);
+  const [bodyDraft, setBodyDraft] = useState('');
+  const [savingBody, setSavingBody] = useState(false);
+  const [bodySaveError, setBodySaveError] = useState<string | null>(null);
+  const [bodySaved, setBodySaved] = useState(false);
 
   const fetchTemplate = useCallback(async () => {
     setLoading(true);
@@ -149,6 +159,23 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
   useEffect(() => {
     fetchTemplate();
   }, [fetchTemplate]);
+
+  // Deep-link: when opened from a campaign detail page (?campaignId=), pre-select
+  // the campaign and auto-resolve the prompt server-side so the operator lands on
+  // a ready-to-run workspace. Only fires once per template/campaign pair.
+  useEffect(() => {
+    if (autoSelected || !initialCampaignId || loading || !template) return;
+    const match = campaigns.find((c) => c.id === initialCampaignId);
+    if (!match) return;
+    // Scope guard: only auto-select when the campaign scope is compatible with
+    // the template scope. Otherwise the operator must pick manually.
+    if (template.scope && match.scope !== template.scope) {
+      setAutoSelected(true);
+      return;
+    }
+    setSelectedCampaignId(match.id);
+    setAutoSelected(true);
+  }, [autoSelected, initialCampaignId, loading, template, campaigns]);
 
   const extractedVariables = useMemo(() => {
     if (!template?.body) return [];
@@ -249,6 +276,36 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
     URL.revokeObjectURL(url);
   };
 
+  const handleStartEditBody = () => {
+    setBodyDraft(template?.body ?? '');
+    setBodySaveError(null);
+    setBodySaved(false);
+    setEditingBody(true);
+  };
+
+  const handleCancelEditBody = () => {
+    setEditingBody(false);
+    setBodySaveError(null);
+  };
+
+  const handleSaveBody = async () => {
+    if (!template) return;
+    setSavingBody(true);
+    setBodySaveError(null);
+    setBodySaved(false);
+    try {
+      const updated = await marketingOpsService.updatePromptTemplate(template.id, { body: bodyDraft });
+      setTemplate(updated);
+      setEditingBody(false);
+      setBodySaved(true);
+      setTimeout(() => setBodySaved(false), 2000);
+    } catch (err: any) {
+      setBodySaveError(err.message || 'Failed to save template body');
+    } finally {
+      setSavingBody(false);
+    }
+  };
+
   const handleImportExternal = async () => {
     if (!selectedCampaignId || !importJson.trim()) return;
     setImporting(true);
@@ -337,10 +394,57 @@ export default function PromptWorkspaceClient({ templateId }: { templateId: stri
         {/* Left: Template + Variables */}
         <div className="space-y-4">
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Template Body</h2>
-            <pre className="text-sm text-gray-600 dark:text-gray-400 font-mono whitespace-pre-wrap bg-gray-50 dark:bg-neutral-900/50 rounded-lg p-3 max-h-64 overflow-y-auto">
-              {template.body}
-            </pre>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Template Body</h2>
+              <div className="flex items-center gap-3">
+                {bodySaved && (
+                  <span className="text-xs text-green-600 dark:text-green-400 font-medium">Saved</span>
+                )}
+                {editingBody ? (
+                  <>
+                    <button
+                      onClick={handleSaveBody}
+                      disabled={savingBody}
+                      className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      {savingBody ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleCancelEditBody}
+                      disabled={savingBody}
+                      className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleStartEditBody}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                )}
+              </div>
+            </div>
+            {bodySaveError && (
+              <div className="mb-3 text-xs text-red-600 dark:text-red-400">{bodySaveError}</div>
+            )}
+            {editingBody ? (
+              <textarea
+                value={bodyDraft}
+                onChange={(e) => setBodyDraft(e.target.value)}
+                disabled={savingBody}
+                className="w-full text-sm text-gray-600 dark:text-gray-400 font-mono whitespace-pre-wrap bg-gray-50 dark:bg-neutral-900/50 rounded-lg p-3 max-h-96 min-h-[12rem] overflow-y-auto border border-gray-300 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              />
+            ) : (
+              <pre className="text-sm text-gray-600 dark:text-gray-400 font-mono whitespace-pre-wrap bg-gray-50 dark:bg-neutral-900/50 rounded-lg p-3 max-h-64 overflow-y-auto">
+                {template.body}
+              </pre>
+            )}
             {hasOutputSchema && (
               <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
                 Output schema: <code className="font-mono">{template.output_schema!.name}</code>

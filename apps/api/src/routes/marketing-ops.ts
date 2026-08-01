@@ -115,6 +115,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import * as fs from 'fs';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
+import { HttpError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import MarketingCampaignService from '../services/MarketingCampaignService';
@@ -368,6 +369,25 @@ const scorecardUpsertSchema = z.object({
   date: z.string().datetime(),
   category_focus: z.string().max(100).optional(),
   neighborhood_focus: z.string().max(100).optional(),
+  scope_focus: z.enum(['business', 'category', 'city']).optional(),
+  stage_focus: z.string().max(50).optional(),
+  previews_built: z.number().int().optional(),
+  previews_shown: z.number().int().optional(),
+  packages_paid: z.number().int().optional(),
+  packages_delivered: z.number().int().optional(),
+  revenue_collected_cents: z.number().int().optional(),
+  retainers_pitched: z.number().int().optional(),
+  retainers_won: z.number().int().optional(),
+  notes: z.string().optional(),
+});
+
+const scorecardUpdateSchema = z.object({
+  user_id: z.string().min(1).optional(),
+  date: z.string().datetime().optional(),
+  category_focus: z.string().max(100).optional(),
+  neighborhood_focus: z.string().max(100).optional(),
+  scope_focus: z.enum(['business', 'category', 'city']).optional(),
+  stage_focus: z.string().max(50).optional(),
   previews_built: z.number().int().optional(),
   previews_shown: z.number().int().optional(),
   packages_paid: z.number().int().optional(),
@@ -435,6 +455,13 @@ function getCtx(req: any): RequestCtx {
 }
 
 function handleServiceError(res: Response, error: unknown, ctx?: RequestCtx): void {
+  // Typed HTTP errors (NotFoundError, ConflictError, ValidationError, ...)
+  // carry their own statusCode + code and must NOT be collapsed into 500.
+  // 500 is reserved for truly unexpected backend failures that need fixing.
+  if (error instanceof HttpError) {
+    res.status(error.statusCode).json({ success: false, error: error.code, message: error.message });
+    return;
+  }
   const message = error instanceof Error ? error.message : 'Unknown error';
   if (message.includes('not found') || message.includes('Invalid stage transition')) {
     res.status(400).json({ success: false, error: message });
@@ -1322,6 +1349,8 @@ router.get('/scorecards', async (req: any, res: Response) => {
       userId: req.query.user_id,
       startDate: req.query.start_date ? new Date(req.query.start_date) : undefined,
       endDate: req.query.end_date ? new Date(req.query.end_date) : undefined,
+      scopeFocus: req.query.scope,
+      stageFocus: req.query.stage,
     }, getCtx(req));
     res.json({ success: true, data: scorecards });
   } catch (error) {
@@ -1337,6 +1366,36 @@ router.post('/scorecards', async (req: any, res: Response) => {
       date: new Date(parsed.date),
       categoryFocus: parsed.category_focus,
       neighborhoodFocus: parsed.neighborhood_focus,
+      scopeFocus: parsed.scope_focus,
+      stageFocus: parsed.stage_focus,
+      previewsBuilt: parsed.previews_built,
+      previewsShown: parsed.previews_shown,
+      packagesPaid: parsed.packages_paid,
+      packagesDelivered: parsed.packages_delivered,
+      revenueCollectedCents: parsed.revenue_collected_cents,
+      retainersPitched: parsed.retainers_pitched,
+      retainersWon: parsed.retainers_won,
+      notes: parsed.notes,
+    }, getCtx(req));
+    res.json({ success: true, data: scorecard });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/scorecards/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = scorecardUpdateSchema.parse(req.body);
+    const scorecard = await MarketingScorecardService.updateScorecard(req.params.id, {
+      userId: parsed.user_id,
+      date: parsed.date ? new Date(parsed.date) : undefined,
+      categoryFocus: parsed.category_focus,
+      neighborhoodFocus: parsed.neighborhood_focus,
+      scopeFocus: parsed.scope_focus,
+      stageFocus: parsed.stage_focus,
       previewsBuilt: parsed.previews_built,
       previewsShown: parsed.previews_shown,
       packagesPaid: parsed.packages_paid,
@@ -1818,6 +1877,101 @@ router.get('/openers/split-tests', async (req: any, res: Response) => {
     const result = await outreachOpenerService.getSplitTestStats(getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Outreach Follow-Ups ─────────────────────────────────────────────────
+// Follow-up messages for prospects who didn't reply to the opener.
+// Stored in the same table (mkt_outreach_openers_list) with
+// message_type='follow_up'. Inherits the opener's close_variant.
+
+import { OutreachFollowUpService } from '../services/OutreachFollowUpService';
+const outreachFollowUpService = OutreachFollowUpService.getInstance();
+
+const followUpExecuteSchema = z.object({
+  campaign_id: z.string().min(1),
+  close_variant: z.enum(['soft', 'direct_paid']).optional(),
+  operator_name: z.string().max(120).optional(),
+});
+
+const followUpImportSchema = z.object({
+  campaign_id: z.string().min(1),
+  followup_text: z.string().min(1),
+  close_variant: z.enum(['soft', 'direct_paid']).optional(),
+  followup_type: z.enum(['doing', 'telling']).optional(),
+  operator_name: z.string().max(120).optional(),
+});
+
+// List follow-ups (filter: campaignId)
+router.get('/follow-ups', async (req: any, res: Response) => {
+  try {
+    const followUps = await outreachFollowUpService.listFollowUps(
+      req.query.campaignId as string | undefined,
+      getCtx(req),
+    );
+    res.json({ success: true, data: followUps });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Resolve follow-up: find opener, re-pull fresh data, diff, auto-select
+// doing/telling branch, build the prompt. No LLM call.
+router.get('/follow-ups/resolve', async (req: any, res: Response) => {
+  try {
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
+    }
+    const closeVariant = req.query.close_variant as 'soft' | 'direct_paid' | undefined;
+    const operatorName = req.query.operator_name as string | undefined;
+    const result = await outreachFollowUpService.resolveFollowUp(
+      { campaignId, closeVariant, operatorName },
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 1: Execute follow-up generation via AI
+router.post('/follow-ups/execute', async (req: any, res: Response) => {
+  try {
+    const parsed = followUpExecuteSchema.parse(req.body);
+    const result = await outreachFollowUpService.executeFollowUp({
+      campaignId: parsed.campaign_id,
+      closeVariant: parsed.close_variant,
+      executedBy: req.user?.id,
+      operatorName: parsed.operator_name,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Path 2: Import externally-generated follow-up
+router.post('/follow-ups/import', async (req: any, res: Response) => {
+  try {
+    const parsed = followUpImportSchema.parse(req.body);
+    const result = await outreachFollowUpService.importFollowUp({
+      campaignId: parsed.campaign_id,
+      followUpText: parsed.followup_text,
+      closeVariant: parsed.close_variant,
+      followUpType: parsed.followup_type,
+      executedBy: req.user?.id,
+      operatorName: parsed.operator_name,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

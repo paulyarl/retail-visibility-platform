@@ -276,6 +276,70 @@ export interface SplitTestStats {
   totals: { openers: number; sent: number; replies: number; replyRate: number };
 }
 
+// ─── Outreach Follow-Up Types ───────────────────────────────────────────
+// Follow-up messages for prospects who didn't reply to the opener.
+// Stored in the same table as openers (mkt_outreach_openers_list) with
+// message_type='follow_up'. Inherits the opener's close_variant.
+
+export type FollowUpType = 'doing' | 'telling';
+
+export interface FollowUpDataDiff {
+  new_review_count?: number;
+  new_negative_count?: number;
+  new_themes?: string[];
+  new_platforms?: string[];
+  opener_theme?: string;
+  opener_archetype?: string;
+}
+
+export interface OutreachFollowUp {
+  id: string;
+  campaign_id: string;
+  archetype: string;
+  opener_text: string | null;
+  quality_gate_passed: boolean;
+  quality_gate_issues: string[] | null;
+  source: string;
+  ai_provider: string | null;
+  ai_model: string | null;
+  tokens_used: number;
+  cost_cents: number;
+  extracted_fields: Record<string, any> | null;
+  executed_by: string | null;
+  operator_name: string | null;
+  executed_at: string;
+  created_at: string;
+  updated_at: string;
+  close_variant: string | null;
+  message_type: string | null;
+  followup_type: FollowUpType | null;
+  followup_number: number | null;
+  opener_id: string | null;
+  data_diff: FollowUpDataDiff | null;
+}
+
+export interface FollowUpResolution {
+  opener: OutreachOpener;
+  selection: { archetype: string; reason: string; theme: string };
+  extractedFields: Record<string, any>;
+  followUpType: FollowUpType;
+  dataDiff: FollowUpDataDiff | null;
+  freshSnapshot: any;
+  resolvedPrompt: string;
+  closeVariant: CloseVariant;
+  followUpNumber: number;
+}
+
+export interface FollowUpResult {
+  followUp: OutreachFollowUp;
+  opener: OutreachOpener;
+  selection: { archetype: string; reason: string; theme: string };
+  extractedFields: Record<string, any>;
+  followUpType: FollowUpType;
+  qualityGate: { passed: boolean; issues: string[] };
+  resolvedPrompt: string;
+}
+
 // ─── Outreach Pitch Types ───────────────────────────────────────────────
 // Header / Closer / Contact / ReviewResponseDraft / Pitch — mirrors the
 // opener types above. See docs/LocalBiz/marketing_ops_outreach_pitch_construction_sprint_plan.md
@@ -644,6 +708,8 @@ export interface Scorecard {
   date: string;
   category_focus: string | null;
   neighborhood_focus: string | null;
+  scope_focus: CampaignScope | null;
+  stage_focus: string | null;
   previews_built: number;
   previews_shown: number;
   packages_paid: number;
@@ -952,6 +1018,25 @@ export interface ScorecardUpsertInput {
   date: string;
   category_focus?: string;
   neighborhood_focus?: string;
+  scope_focus?: CampaignScope;
+  stage_focus?: string;
+  previews_built?: number;
+  previews_shown?: number;
+  packages_paid?: number;
+  packages_delivered?: number;
+  revenue_collected_cents?: number;
+  retainers_pitched?: number;
+  retainers_won?: number;
+  notes?: string;
+}
+
+export interface ScorecardUpdateInput {
+  user_id?: string;
+  date?: string;
+  category_focus?: string;
+  neighborhood_focus?: string;
+  scope_focus?: CampaignScope;
+  stage_focus?: string;
   previews_built?: number;
   previews_shown?: number;
   packages_paid?: number;
@@ -1806,11 +1891,15 @@ class MarketingOpsService extends AdminApiSingleton {
     user_id?: string;
     start_date?: string;
     end_date?: string;
+    scope?: CampaignScope;
+    stage?: string;
   }): Promise<Scorecard[]> {
     const params = new URLSearchParams();
     if (filters?.user_id) params.set('user_id', filters.user_id);
     if (filters?.start_date) params.set('start_date', filters.start_date);
     if (filters?.end_date) params.set('end_date', filters.end_date);
+    if (filters?.scope) params.set('scope', filters.scope);
+    if (filters?.stage) params.set('stage', filters.stage);
     const query = params.toString();
     const url = `${BASE_URL}/scorecards${query ? `?${query}` : ''}`;
 
@@ -1831,6 +1920,20 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to save scorecard');
+    }
+    await this.invalidateCachePattern('mkt-ops-scorecards');
+    return result.data?.data ?? result.data;
+  }
+
+  async updateScorecard(id: string, input: ScorecardUpdateInput): Promise<Scorecard> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/scorecards/${id}`,
+      { method: 'PUT', body: JSON.stringify(input) },
+      `mkt-ops-scorecard-update-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update scorecard');
     }
     await this.invalidateCachePattern('mkt-ops-scorecards');
     return result.data?.data ?? result.data;
@@ -2221,7 +2324,7 @@ class MarketingOpsService extends AdminApiSingleton {
   // ─── Review Response Pipeline (Sprint 4) ─────────────────────────────────
   async listReviewPipelines(campaignId: string): Promise<ReviewResponsePipeline[]> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines?campaignId=${encodeURIComponent(campaignId)}`,
+      `${BASE_URL}/${encodeURIComponent(campaignId)}/review-response/pipelines`,
       { method: 'GET' },
       `mkt-ops-review-pipelines-${campaignId}`,
       0,
@@ -2247,8 +2350,8 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async createReviewPipeline(input: { campaignId: string; platform: string }): Promise<ReviewResponsePipeline> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines`,
-      { method: 'POST', body: JSON.stringify(input) },
+      `${BASE_URL}/${encodeURIComponent(input.campaignId)}/review-response/pipelines`,
+      { method: 'POST', body: JSON.stringify({ platform: input.platform }) },
       `mkt-ops-review-pipeline-create-${input.campaignId}-${input.platform}`,
       0,
     );
@@ -2275,7 +2378,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async checkReviewGate(pipelineId: string): Promise<ReviewGateResult> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines/${pipelineId}/gate-check`,
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/gate`,
       { method: 'GET' },
       `mkt-ops-review-gate-${pipelineId}`,
       0,
@@ -2287,9 +2390,10 @@ class MarketingOpsService extends AdminApiSingleton {
   }
 
   async advanceReviewStage(pipelineId: string, force = false): Promise<ReviewResponsePipeline> {
+    const forceQuery = force ? '?force=true' : '';
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/pipelines/${pipelineId}/advance`,
-      { method: 'POST', body: JSON.stringify({ force }) },
+      `${BASE_URL}/review-response/pipelines/${pipelineId}/advance${forceQuery}`,
+      { method: 'POST' },
       `mkt-ops-review-advance-${pipelineId}`,
       0,
     );
@@ -2329,7 +2433,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async markCustomerReply(logId: string): Promise<ReviewResponseLogEntry> {
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/review-response/log/${logId}/reply`,
+      `${BASE_URL}/review-response/log/${logId}/customer-reply`,
       { method: 'POST' },
       `mkt-ops-review-reply-${logId}`,
       0,
@@ -2515,6 +2619,87 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load split-test stats');
     }
     return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach Follow-Ups ───────────────────────────────────────────────
+  async resolveFollowUp(
+    campaignId: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<FollowUpResolution> {
+    const params = new URLSearchParams();
+    params.set('campaignId', campaignId);
+    if (closeVariant) params.set('close_variant', closeVariant);
+    if (operatorName && operatorName.trim()) params.set('operator_name', operatorName.trim());
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups/resolve?${params.toString()}`,
+      { method: 'GET' },
+      `mkt-ops-followup-resolve-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve follow-up');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async executeFollowUp(
+    campaignId: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<FollowUpResult> {
+    const body: Record<string, any> = { campaign_id: campaignId };
+    if (closeVariant) body.close_variant = closeVariant;
+    if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups/execute`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-followup-execute-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute follow-up');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importFollowUp(
+    campaignId: string,
+    followUpText: string,
+    closeVariant?: CloseVariant,
+    followUpType?: FollowUpType,
+    operatorName?: string,
+  ): Promise<FollowUpResult> {
+    const body: Record<string, any> = { campaign_id: campaignId, followup_text: followUpText };
+    if (closeVariant) body.close_variant = closeVariant;
+    if (followUpType) body.followup_type = followUpType;
+    if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups/import`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-followup-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import follow-up');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async listFollowUps(campaignId?: string): Promise<OutreachFollowUp[]> {
+    const url = campaignId
+      ? `${BASE_URL}/follow-ups?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/follow-ups`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-followups-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list follow-ups');
+    }
+    return result.data?.data ?? result.data ?? [];
   }
 
   // ─── Outreach Pitch — Headers ──────────────────────────────────────────

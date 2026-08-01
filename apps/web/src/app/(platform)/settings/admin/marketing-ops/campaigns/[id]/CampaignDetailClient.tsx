@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue } from '@/services/MarketingOpsService';
+import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
@@ -16,9 +16,45 @@ import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard'
 import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCard';
 import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewResponsePipelineCard';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'history' | 'lineage';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+
+/**
+ * Stage → prompt_type mapping used by the Prompts tab to surface only
+ * stage-relevant prompts for the current campaign.
+ *
+ * - seek / preview_built / shown: discovery & audit prompts (seek), plus the
+ *   scope-specific analysis prompt (category_analysis for category scope,
+ *   city_analysis for city scope).
+ * - paid / delivered: fulfillment prompts (fulfill), with filter available for
+ *   QA on generated responses.
+ * - retainer_pitched / retainer_won: retainer prompts.
+ * - filter is always available (QA pass on any generated output).
+ * - lost / dead / tenant_onboarded: no stage-specific prompts — show all
+ *   scope-matching prompts so the operator can still run ad-hoc work.
+ */
+const STAGE_PROMPT_TYPES: Record<CampaignStage, PromptType[]> = {
+  seek: ['seek', 'category_analysis', 'city_analysis', 'filter'],
+  preview_built: ['seek', 'category_analysis', 'city_analysis', 'filter'],
+  shown: ['seek', 'category_analysis', 'city_analysis', 'filter'],
+  paid: ['fulfill', 'filter'],
+  delivered: ['fulfill', 'filter'],
+  retainer_pitched: ['retainer', 'filter'],
+  retainer_won: ['retainer', 'filter'],
+  lost: [],
+  dead: [],
+  tenant_onboarded: [],
+};
+
+const PROMPT_TYPE_LABELS: Record<PromptType, string> = {
+  seek: 'Seek',
+  fulfill: 'Fulfill',
+  filter: 'Filter',
+  retainer: 'Retainer',
+  category_analysis: 'Category Analysis',
+  city_analysis: 'City Analysis',
+};
 
 export default function CampaignDetailClient({ campaignId }: { campaignId: string }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
@@ -29,6 +65,8 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [transitioning, setTransitioning] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [deliverableTemplates, setDeliverableTemplates] = useState<DeliverableTemplate[]>([]);
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
+  const [promptsLoading, setPromptsLoading] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatingDemo, setGeneratingDemo] = useState(false);
@@ -109,6 +147,19 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
       fetchDeliverables();
     }
   }, [activeTab, fetchDeliverables]);
+
+  // Prompts tab: fetch scope-matching prompt templates. Stage filtering is
+  // applied client-side via STAGE_PROMPT_TYPES so the operator sees only
+  // stage-relevant prompts for this campaign.
+  useEffect(() => {
+    if (activeTab !== 'prompts' || !campaign) return;
+    setPromptsLoading(true);
+    marketingOpsService
+      .listPromptTemplates({ scope: campaign.scope, is_active: true })
+      .then(setPromptTemplates)
+      .catch(() => setPromptTemplates([]))
+      .finally(() => setPromptsLoading(false));
+  }, [activeTab, campaign]);
 
   const handleSetHotProspect = async (isHot: boolean) => {
     try {
@@ -238,6 +289,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'audits', label: 'Audits', count: campaign?.audits?.length },
     { key: 'files', label: 'Files', count: campaign?.files?.length },
     { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
+    { key: 'prompts', label: 'Prompts' },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
     { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
   ];
@@ -814,6 +866,82 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'prompts' && campaign && (
+              <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-6">
+                <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Compatible Prompts</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Filtered by scope <span className="font-medium uppercase">{campaign.scope}</span> and stage{' '}
+                      <span className="font-medium">{campaign.stage}</span>. Opening a workspace pre-selects this campaign.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/settings/admin/marketing-ops/prompts?campaignId=${campaignId}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-50 dark:bg-neutral-800 dark:text-indigo-400 dark:border-indigo-800 dark:hover:bg-indigo-900/20"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Browse all prompts
+                  </Link>
+                </div>
+
+                {promptsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+                  </div>
+                ) : (() => {
+                  const allowedTypes = STAGE_PROMPT_TYPES[campaign.stage] ?? [];
+                  const stageRelevant = allowedTypes.length
+                    ? promptTemplates.filter((t) => allowedTypes.includes(t.prompt_type))
+                    : promptTemplates;
+                  if (stageRelevant.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <FileText className="w-10 h-10 text-gray-300 dark:text-neutral-600 mb-2" />
+                        <p className="text-sm text-gray-400">
+                          No active {campaign.scope}-scope prompts for the <span className="font-medium">{campaign.stage}</span> stage.
+                        </p>
+                        <Link
+                          href={`/settings/admin/marketing-ops/prompts?campaignId=${campaignId}`}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          Create a prompt
+                        </Link>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {stageRelevant.map((t) => (
+                        <div key={t.id} className="border border-gray-200 dark:border-neutral-700 rounded-xl p-4 flex flex-col">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <h4 className="font-semibold text-gray-900 dark:text-white text-sm">{t.name}</h4>
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-gray-300">
+                              {PROMPT_TYPE_LABELS[t.prompt_type]}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-50 dark:bg-neutral-900/50 rounded p-2 line-clamp-3 flex-1">
+                            {t.body.slice(0, 160)}{t.body.length > 160 ? '...' : ''}
+                          </p>
+                          {t.output_schema?.name && (
+                            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">Schema: {t.output_schema.name}</p>
+                          )}
+                          <Link
+                            href={`/settings/admin/marketing-ops/prompts/${t.id}?campaignId=${campaignId}`}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 self-start"
+                          >
+                            Open Workspace
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
