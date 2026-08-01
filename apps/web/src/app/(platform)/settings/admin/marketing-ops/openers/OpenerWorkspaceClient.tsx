@@ -9,6 +9,7 @@ import marketingOpsService, {
   OpenerResult,
   OutreachOpener,
   OpenerArchetype,
+  CloseVariant,
 } from '@/services/MarketingOpsService';
 import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageShell';
 import PitchConstructionPanel from './PitchConstructionPanel';
@@ -18,6 +19,17 @@ const ARCHETYPE_LABELS: Record<OpenerArchetype, string> = {
   A2: 'Negative Review Recovery',
   A3: 'Listing Inconsistency',
   A4: 'Conversion / CTA Gap',
+};
+
+const CLOSE_VARIANT_LABELS: Record<CloseVariant, { label: string; hint: string }> = {
+  soft: {
+    label: 'Soft close',
+    hint: `Ambiguity by design — "Full deliverable's ready within a day if any of it's useful." Optimized for response rate; introduce payment on the reply.`,
+  },
+  direct_paid: {
+    label: 'Direct paid close',
+    hint: `Commercial intent up front — "The full deliverable's a paid engagement, ready within a day if any of the previews land." Optimized for reply quality; filters freebie-seekers immediately.`,
+  },
 };
 
 export default function OpenerWorkspaceClient() {
@@ -30,6 +42,12 @@ export default function OpenerWorkspaceClient() {
   const [resolution, setResolution] = useState<OpenerResolution | null>(null);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
+
+  // Close-variant selector — split-tests soft (ambiguity) vs direct_paid
+  // (confident commercial intent). Defaults to 'soft' (legacy behavior).
+  // Changing it re-resolves the prompt so the operator sees the exact
+  // close line that will be generated before executing or copying.
+  const [closeVariant, setCloseVariant] = useState<CloseVariant>('soft');
 
   const [executing, setExecuting] = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
@@ -71,7 +89,7 @@ export default function OpenerWorkspaceClient() {
     fetchData();
   }, [fetchData]);
 
-  // Resolve archetype + prompt when campaign is selected
+  // Resolve archetype + prompt when campaign is selected or close variant changes
   const fetchResolution = useCallback(async () => {
     if (!selectedCampaignId) {
       setResolution(null);
@@ -80,19 +98,19 @@ export default function OpenerWorkspaceClient() {
     setResolving(true);
     setResolveError(null);
     try {
-      const res = await marketingOpsService.resolveOpener(selectedCampaignId);
+      const res = await marketingOpsService.resolveOpener(selectedCampaignId, closeVariant);
       setResolution(res);
       // Also fetch existing openers for this campaign
       const existing = await marketingOpsService.listOpeners(selectedCampaignId);
       setOpeners(existing);
-      setLastResult(null); // Reset result panel on campaign change
+      setLastResult(null); // Reset result panel on campaign/variant change
     } catch (err: any) {
       setResolveError(err.message || 'Failed to resolve opener');
       setResolution(null);
     } finally {
       setResolving(false);
     }
-  }, [selectedCampaignId]);
+  }, [selectedCampaignId, closeVariant]);
 
   useEffect(() => {
     fetchResolution();
@@ -103,7 +121,7 @@ export default function OpenerWorkspaceClient() {
     setExecuting(true);
     setExecuteError(null);
     try {
-      const result = await marketingOpsService.executeOpener(selectedCampaignId);
+      const result = await marketingOpsService.executeOpener(selectedCampaignId, closeVariant);
       setLastResult(result);
       setResultOpen(true);
       // Refresh openers list
@@ -122,7 +140,7 @@ export default function OpenerWorkspaceClient() {
     setImportError(null);
     setImportSuccess(null);
     try {
-      const result = await marketingOpsService.importOpener(selectedCampaignId, importText.trim());
+      const result = await marketingOpsService.importOpener(selectedCampaignId, importText.trim(), closeVariant);
       setLastResult(result);
       setResultOpen(true);
       setImportSuccess(`Imported opener ${result.opener.id}`);
@@ -261,6 +279,40 @@ export default function OpenerWorkspaceClient() {
           {selectedCampaignId && (
             <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
               <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Execute</h2>
+
+              {/* Close-variant selector — split-tests soft vs direct_paid close.
+                  Changing it re-resolves the prompt above so the operator sees
+                  the exact close line before generating or copying. */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  Close variant
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(CLOSE_VARIANT_LABELS) as CloseVariant[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setCloseVariant(v)}
+                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                        closeVariant === v
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600'
+                          : 'border-gray-200 dark:border-neutral-700 hover:border-gray-300 dark:hover:border-neutral-600'
+                      }`}
+                    >
+                      <span className={`block font-semibold ${closeVariant === v ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {CLOSE_VARIANT_LABELS[v].label}
+                      </span>
+                      <span className="block text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                        {CLOSE_VARIANT_LABELS[v].hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  Recorded on the opener row so reply outcomes can be measured per variant.
+                </p>
+              </div>
+
               <button
                 onClick={handleExecute}
                 disabled={executing || !hasResolution}
@@ -348,6 +400,15 @@ export default function OpenerWorkspaceClient() {
                       <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300">
                         {lastOpener.source}
                       </span>
+                      {lastOpener.close_variant && (
+                        <span className={`px-2 py-0.5 rounded ${
+                          lastOpener.close_variant === 'direct_paid'
+                            ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                            : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-gray-300'
+                        }`}>
+                          close: {lastOpener.close_variant}
+                        </span>
+                      )}
                       {lastOpener.ai_provider && (
                         <span className="text-gray-500 dark:text-gray-400">
                           {lastOpener.ai_provider}{lastOpener.ai_model ? ` · ${lastOpener.ai_model}` : ''}

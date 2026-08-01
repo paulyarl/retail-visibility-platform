@@ -23,23 +23,27 @@ import {
   extractFields,
   buildArchetypePrompt,
   runQualityGate,
+  DEFAULT_CLOSE_VARIANT,
   type BusinessAnalysisAuditData,
   type ArchetypeSelection,
   type ArchetypeFields,
   type CommonFields,
   type QualityGateResult,
+  type CloseVariant,
 } from './outreach-openers';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface ExecuteOpenerInput {
   campaignId: string;
+  closeVariant?: CloseVariant;
   executedBy?: string;
 }
 
 export interface ImportOpenerInput {
   campaignId: string;
   openerText: string;
+  closeVariant?: CloseVariant;
   executedBy?: string;
 }
 
@@ -130,11 +134,13 @@ export class OutreachOpenerService extends BaseService {
    */
   async resolveOpener(
     campaignId: string,
+    closeVariant: CloseVariant = DEFAULT_CLOSE_VARIANT,
     ctx?: RequestCtx,
   ): Promise<{
     selection: ArchetypeSelection;
     extractedFields: ArchetypeFields;
     resolvedPrompt: string;
+    closeVariant: CloseVariant;
   }> {
     const auditResult = await this.getLatestBusinessAnalysisAudit(campaignId, ctx);
     if (!auditResult) {
@@ -157,9 +163,10 @@ export class OutreachOpenerService extends BaseService {
     const resolvedPrompt = buildArchetypePrompt(
       selection.archetype,
       JSON.stringify(extractedFields, null, 2),
+      closeVariant,
     );
 
-    return { selection, extractedFields, resolvedPrompt };
+    return { selection, extractedFields, resolvedPrompt, closeVariant };
   }
 
   // ====================
@@ -174,8 +181,10 @@ export class OutreachOpenerService extends BaseService {
    * 4. Store the opener record
    */
   async executeOpener(input: ExecuteOpenerInput, ctx?: RequestCtx): Promise<OpenerResult> {
+    const closeVariant = input.closeVariant ?? DEFAULT_CLOSE_VARIANT;
     const { selection, extractedFields, resolvedPrompt } = await this.resolveOpener(
       input.campaignId,
+      closeVariant,
       ctx,
     );
 
@@ -183,6 +192,7 @@ export class OutreachOpenerService extends BaseService {
       campaignId: input.campaignId,
       archetype: selection.archetype,
       reason: selection.reason,
+      closeVariant,
     });
 
     // Call the AI provider (same factory as MarketingExecutionService).
@@ -209,6 +219,7 @@ export class OutreachOpenerService extends BaseService {
         id: generateOutreachOpenerId(),
         campaign_id: input.campaignId,
         archetype: selection.archetype,
+        close_variant: closeVariant,
         opener_text: openerText,
         quality_gate_passed: qualityGate.passed,
         quality_gate_issues: qualityGate.issues,
@@ -226,6 +237,7 @@ export class OutreachOpenerService extends BaseService {
       openerId: opener.id,
       campaignId: input.campaignId,
       archetype: selection.archetype,
+      closeVariant,
       qualityGatePassed: qualityGate.passed,
       issuesCount: qualityGate.issues.length,
       tokensUsed,
@@ -249,8 +261,10 @@ export class OutreachOpenerService extends BaseService {
    * 3. Store the opener record with source='external'
    */
   async importOpener(input: ImportOpenerInput, ctx?: RequestCtx): Promise<OpenerResult> {
+    const closeVariant = input.closeVariant ?? DEFAULT_CLOSE_VARIANT;
     const { selection, extractedFields, resolvedPrompt } = await this.resolveOpener(
       input.campaignId,
+      closeVariant,
       ctx,
     );
 
@@ -266,6 +280,7 @@ export class OutreachOpenerService extends BaseService {
         id: generateOutreachOpenerId(),
         campaign_id: input.campaignId,
         archetype: selection.archetype,
+        close_variant: closeVariant,
         opener_text: openerText,
         quality_gate_passed: qualityGate.passed,
         quality_gate_issues: qualityGate.issues,
@@ -279,6 +294,7 @@ export class OutreachOpenerService extends BaseService {
       openerId: opener.id,
       campaignId: input.campaignId,
       archetype: selection.archetype,
+      closeVariant,
       qualityGatePassed: qualityGate.passed,
       issuesCount: qualityGate.issues.length,
     });

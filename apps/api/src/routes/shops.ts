@@ -139,88 +139,6 @@ router.get('/categories', async (req, res) => {
  * GET /api/shops/:identifier
  * Get shop details by any identifier (slug, tenantId, or autoId)
  */
-router.get('/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    console.log('[SHOPS API] Getting shop by identifier:', identifier);
-    
-    // Use the unified shop service with fallbacks from 3 tables
-    const shopService = ShopService.getInstance();
-    const unifiedShop = await shopService.getUnifiedShopByIdentifier(identifier);
-    
-    if (!unifiedShop) {
-      return res.status(404).json({
-        success: false,
-        error: 'Shop not found',
-        message: `No published shop found for identifier: ${identifier}`
-      });
-    }
-    
-    console.log('[SHOPS API] Found unified shop data:', unifiedShop.tenantId);
-
-    // Build shop response using unified data
-    const shopDetails = {
-      tenantId: unifiedShop.tenantId,
-      name: unifiedShop.name,
-      slug: unifiedShop.slug,
-      autoId: unifiedShop.autoId || unifiedShop.subdomain?.toUpperCase() || 'AUTOID',
-      description: unifiedShop.description,
-      location: `${unifiedShop.city}, ${unifiedShop.state}`,
-      address: unifiedShop.address,
-      city: unifiedShop.city,
-      state: unifiedShop.state,
-      zip_code: unifiedShop.zipCode,
-      latitude: unifiedShop.latitude ? parseFloat(unifiedShop.latitude as string) : null,
-      longitude: unifiedShop.longitude ? parseFloat(unifiedShop.longitude as string) : null,
-      category: unifiedShop.primaryCategory,
-      productCount: unifiedShop.productCount,
-      rating: unifiedShop.ratingAvg,
-      reviewCount: unifiedShop.ratingCount,
-      imageUrl: unifiedShop.logoUrl,
-      bannerUrl: unifiedShop.bannerUrl,
-      logo_url: unifiedShop.logoUrl,
-      isVerified: unifiedShop.isFeatured,
-      isActive: unifiedShop.isPublished,
-      createdAt: unifiedShop.createdAt,
-      updatedAt: unifiedShop.updatedAt,
-      contact: {
-        email: unifiedShop.email,
-        phone: unifiedShop.phone,
-        website: unifiedShop.website
-      },
-      hours: unifiedShop.hours || {
-        monday: '8:00 AM - 8:00 PM',
-        tuesday: '8:00 AM - 8:00 PM',
-        wednesday: '8:00 AM - 8:00 PM',
-        thursday: '8:00 AM - 8:00 PM',
-        friday: '8:00 AM - 8:00 PM',
-        saturday: '9:00 AM - 6:00 PM',
-        sunday: '10:00 AM - 4:00 PM'
-      },
-      urls: unifiedShop.urls
-    };
-
-    // Return shop data directly - FlexibleApiSingleton will add the wrapper
-    res.json({
-      success: true,
-      data: shopDetails,
-      resolved: {
-        identifier: unifiedShop.tenantId,
-        type: 'tenantId',
-        found: true
-      }
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[SHOPS API] Error fetching shop details:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch shop details',
-      message: errorMessage
-    });
-  }
-});
-
 // ====================
 // SHOPS FEATURED PRODUCTS ENDPOINTS
 // ====================
@@ -550,5 +468,89 @@ router.get('/health', async (req, res) => {
     });
   }
 });
+
+router.get('/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log('[SHOPS API] Getting shop by identifier:', identifier);
+    
+    // Use the unified shop service with fallbacks from 3 tables
+    const shopService = ShopService.getInstance();
+    const unifiedShop = await shopService.getUnifiedShopByIdentifier(identifier);
+    
+    if (!unifiedShop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found',
+        message: `No published shop found for identifier: ${identifier}`
+      });
+    }
+    
+    console.log('[SHOPS API] Found unified shop data:', unifiedShop.tenantId);
+
+    // Build shop response using unified data
+    const shopDetails = {
+      tenantId: unifiedShop.tenantId,
+      name: unifiedShop.name,
+      slug: unifiedShop.slug,
+      autoId: unifiedShop.autoId || unifiedShop.subdomain?.toUpperCase() || 'AUTOID',
+      description: unifiedShop.description,
+      location: `${unifiedShop.city}, ${unifiedShop.state}`,
+      address: unifiedShop.address,
+      city: unifiedShop.city,
+      state: unifiedShop.state,
+      zip_code: unifiedShop.zipCode,
+      latitude: unifiedShop.latitude ? parseFloat(unifiedShop.latitude as string) : null,
+      longitude: unifiedShop.longitude ? parseFloat(unifiedShop.longitude as string) : null,
+      category: unifiedShop.primaryCategory,
+      productCount: unifiedShop.productCount,
+      rating: unifiedShop.ratingAvg,
+      reviewCount: unifiedShop.ratingCount,
+      imageUrl: unifiedShop.logoUrl,
+      bannerUrl: unifiedShop.bannerUrl,
+      logo_url: unifiedShop.logoUrl,
+      isVerified: unifiedShop.isFeatured,
+      isActive: unifiedShop.isPublished,
+      createdAt: unifiedShop.createdAt,
+      updatedAt: unifiedShop.updatedAt,
+      contact: {
+        email: unifiedShop.email,
+        phone: unifiedShop.phone,
+        website: unifiedShop.website
+      },
+      hours: unifiedShop.hours || {
+        monday: '8:00 AM - 8:00 PM',
+        tuesday: '8:00 AM - 8:00 PM',
+        wednesday: '8:00 AM - 8:00 PM',
+        thursday: '8:00 AM - 8:00 PM',
+        friday: '8:00 AM - 8:00 PM',
+        saturday: '9:00 AM - 6:00 PM',
+        sunday: '10:00 AM - 4:00 PM'
+      },
+      urls: unifiedShop.urls
+    };
+
+    // Return shop data directly - FlexibleApiSingleton will add the wrapper
+    res.json({
+      success: true,
+      data: shopDetails,
+      resolved: {
+        identifier: unifiedShop.tenantId,
+        type: 'tenantId',
+        found: true
+      }
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('[SHOPS API] Error fetching shop details:', undefined, { error: { name: (errorMessage as any)?.name || 'Error', message: (errorMessage as any)?.message || String(errorMessage), stack: (errorMessage as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch shop details',
+      message: errorMessage
+    });
+  }
+});
+
+
 
 export default router;

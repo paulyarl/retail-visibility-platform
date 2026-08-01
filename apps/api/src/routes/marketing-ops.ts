@@ -1731,11 +1731,13 @@ const outreachOpenerService = OutreachOpenerService.getInstance();
 // Zod schemas for opener endpoints
 const openerExecuteSchema = z.object({
   campaign_id: z.string().min(1),
+  close_variant: z.enum(['soft', 'direct_paid']).optional(),
 });
 
 const openerImportSchema = z.object({
   campaign_id: z.string().min(1),
   opener_text: z.string().min(1),
+  close_variant: z.enum(['soft', 'direct_paid']).optional(),
 });
 
 // List openers (filter: campaignId)
@@ -1760,7 +1762,8 @@ router.get('/openers/resolve', async (req: any, res: Response) => {
     if (!campaignId) {
       return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
     }
-    const result = await outreachOpenerService.resolveOpener(campaignId, getCtx(req));
+    const closeVariant = req.query.close_variant as 'soft' | 'direct_paid' | undefined;
+    const result = await outreachOpenerService.resolveOpener(campaignId, closeVariant, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
@@ -1773,6 +1776,7 @@ router.post('/openers/execute', async (req: any, res: Response) => {
     const parsed = openerExecuteSchema.parse(req.body);
     const result = await outreachOpenerService.executeOpener({
       campaignId: parsed.campaign_id,
+      closeVariant: parsed.close_variant,
       executedBy: req.user?.id,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });
@@ -1791,6 +1795,7 @@ router.post('/openers/import', async (req: any, res: Response) => {
     const result = await outreachOpenerService.importOpener({
       campaignId: parsed.campaign_id,
       openerText: parsed.opener_text,
+      closeVariant: parsed.close_variant,
       executedBy: req.user?.id,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });

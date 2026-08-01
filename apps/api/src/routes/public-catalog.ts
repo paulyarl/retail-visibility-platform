@@ -1556,6 +1556,270 @@ router.get('/shops/trending', async (req, res) => {
 // DYNAMIC SHOP LOOKUP ROUTES (must be after all static /shops/ routes)
 // ====================
 
+// ==========================
+// LEGACY ENDPOINTS (for backward compatibility)
+// ==========================
+
+/**
+ * GET /api/public/shops/featured/random
+ * Get random products for shops discovery
+ */
+router.get('/shops/featured/random', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopRandomProducts({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] Random products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch random products'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/featured/trending
+ * Get trending products for shops discovery
+ */
+router.get('/shops/featured/trending', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    console.log(`[PUBLIC API] Shops trending request:`, {
+      method: req.method,
+      url: req.url,
+      query: req.query,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer')
+    });
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopTrendingProducts({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] Trending products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch trending products'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/featured/new
+ * Get new products for shops discovery
+ */
+router.get('/shops/featured/new', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopNewProducts({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] New products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch new products'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/featured/sale
+ * Get sale products for shops discovery
+ */
+router.get('/shops/featured/sale', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopSaleProducts({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] Sale products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch sale products'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/featured/seasonal
+ * Get seasonal products for shops discovery
+ */
+router.get('/shops/featured/seasonal', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopSeasonalProducts({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] Seasonal products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch seasonal products'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/featured/staff
+ * Get staff pick products for shops discovery
+ */
+router.get('/shops/featured/staff', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopStaffPicks({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] Staff pick products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch staff pick products'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/featured/selection
+ * Get store selection products for shops discovery
+ */
+router.get('/shops/featured/selection', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    const shopsService = (await import('../services/ShopsFeaturedService')).default;
+    const service = shopsService.getInstance();
+    
+    const products = await service.getShopStoreSelections({
+      tenantId: tenantId as string,
+      limit: parseInt(limit as string),
+      shopScope: shopScope as 'global' | 'shop'
+    });
+    
+    res.json({
+      success: true,
+      data: products,
+      cached: true,
+      metrics: {
+        cacheHit: true,
+        responseTime: Date.now() - startTime
+      }
+    });
+  } catch (error) {
+    logger.error('[SHOPS API] Store selection products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch store selection products'
+    });
+  }
+});
+
 /**
  * GET /api/public/shops/:identifier
  * Get shop by any identifier (tenant-id, slug, auto-id) - public access
@@ -1882,270 +2146,6 @@ router.get('/shops/:scope/:bucketType', async (req, res) => {
       error: error instanceof Error ? error.message : 'Unknown error',
       scope: req.params.scope,
       bucketType: req.params.bucketType
-    });
-  }
-});
-
-// ==========================
-// LEGACY ENDPOINTS (for backward compatibility)
-// ==========================
-
-/**
- * GET /api/public/shops/featured/random
- * Get random products for shops discovery
- */
-router.get('/shops/featured/random', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopRandomProducts({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] Random products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch random products'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/featured/trending
- * Get trending products for shops discovery
- */
-router.get('/shops/featured/trending', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    console.log(`[PUBLIC API] Shops trending request:`, {
-      method: req.method,
-      url: req.url,
-      query: req.query,
-      userAgent: req.get('User-Agent'),
-      referer: req.get('Referer')
-    });
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopTrendingProducts({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] Trending products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch trending products'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/featured/new
- * Get new products for shops discovery
- */
-router.get('/shops/featured/new', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopNewProducts({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] New products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch new products'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/featured/sale
- * Get sale products for shops discovery
- */
-router.get('/shops/featured/sale', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopSaleProducts({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] Sale products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch sale products'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/featured/seasonal
- * Get seasonal products for shops discovery
- */
-router.get('/shops/featured/seasonal', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopSeasonalProducts({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] Seasonal products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch seasonal products'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/featured/staff
- * Get staff pick products for shops discovery
- */
-router.get('/shops/featured/staff', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopStaffPicks({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] Staff pick products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch staff pick products'
-    });
-  }
-});
-
-/**
- * GET /api/public/shops/featured/selection
- * Get store selection products for shops discovery
- */
-router.get('/shops/featured/selection', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { tenantId, limit = 12, shopScope = 'global' } = req.query;
-    
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
-    
-    const products = await service.getShopStoreSelections({
-      tenantId: tenantId as string,
-      limit: parseInt(limit as string),
-      shopScope: shopScope as 'global' | 'shop'
-    });
-    
-    res.json({
-      success: true,
-      data: products,
-      cached: true,
-      metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime
-      }
-    });
-  } catch (error) {
-    logger.error('[SHOPS API] Store selection products error:', req.ctx, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch store selection products'
     });
   }
 });

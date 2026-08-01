@@ -19,23 +19,71 @@
 
 import type { ArchetypeCode } from './archetype-selection';
 
+// ─── Close variants (split-testable) ────────────────────────────────────
+//
+// Two opener close strategies, selectable per generation. The opener
+// anatomy is otherwise fixed; only the close line varies. Each variant
+// is recorded on the opener row (close_variant column) so reply outcomes
+// can be measured against the close strategy.
+//
+//   'soft'        — ambiguity by design. Optimized for response rate.
+//                   Lets the operator introduce payment on the reply.
+//                   (Legacy default — matches the original sprint plan.)
+//
+//   'direct_paid' — confident commercial intent up front. Optimized for
+//                   reply quality: filters freebie-seekers immediately,
+//                   signals confidence, saves the operator from chasing
+//                   unqualified replies.
+//
+// The 'direct_paid' variant intentionally names the commercial nature
+// WITHOUT a dollar figure — a price in a cold first touch triggers
+// defensive scanning, but naming "paid engagement" signals honesty and
+// pre-qualifies the prospect. This is the split-test the strategy debate
+// (response rate vs reply quality) hinges on.
+
+export type CloseVariant = 'soft' | 'direct_paid';
+
+export const CLOSE_VARIANTS: Record<CloseVariant, string> = {
+  soft:
+    "Full deliverable's ready within a day if any of it's useful.",
+  direct_paid:
+    "The full deliverable's a paid engagement, ready within a day if any of the previews land.",
+};
+
+export const DEFAULT_CLOSE_VARIANT: CloseVariant = 'soft';
+
 // ─── Prompt builders ────────────────────────────────────────────────────
 
 /**
  * Build the resolved prompt for a given archetype by injecting the extracted
- * fields as a JSON block. The LLM receives the prompt + fields and outputs
- * only the opener text.
+ * fields as a JSON block and the selected close-variant line. The LLM
+ * receives the prompt + fields and outputs only the opener text.
+ *
+ * closeVariant defaults to 'soft' (legacy behavior) when omitted.
  */
-export function buildArchetypePrompt(archetype: ArchetypeCode, extractedFieldsJson: string): string {
+export function buildArchetypePrompt(
+  archetype: ArchetypeCode,
+  extractedFieldsJson: string,
+  closeVariant: CloseVariant = DEFAULT_CLOSE_VARIANT,
+): string {
+  const closeLine = CLOSE_VARIANTS[closeVariant] ?? CLOSE_VARIANTS[DEFAULT_CLOSE_VARIANT];
   switch (archetype) {
     case 'A1':
-      return A1_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson);
+      return A1_PROMPT
+        .replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{close_line}}', closeLine);
     case 'A2':
-      return A2_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson);
+      return A2_PROMPT
+        .replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{close_line}}', closeLine);
     case 'A3':
-      return A3_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson);
+      return A3_PROMPT
+        .replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{close_line}}', closeLine);
     case 'A4':
-      return A4_PROMPT.replace('{{extracted_fields}}', extractedFieldsJson);
+      return A4_PROMPT
+        .replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{close_line}}', closeLine);
   }
 }
 
@@ -106,7 +154,7 @@ Task: Write the opener in this exact structure, ~80 words max body:
 4. One line: "Three previews attached showing exactly where the gaps
    are and what fixed responses look like."
 
-5. Close: "Full deliverable's ready within a day if any of it's useful."
+5. Close: "{{close_line}}"
 
 6. Signoff: "— [your name]"
 
@@ -148,10 +196,20 @@ Task: Write the opener, ~80 words max body:
    you may append one clause: " — and a second cluster around
    [secondary theme, also rephrased]."
 
-4. One line: "Three previews attached — the review cluster, drafted
-   responses that turn each one around, and the recovery playbook."
+4. One line: "Three previews attached — the [rephrased theme from
+   step 3] review cluster, owner responses I drafted to turn each one
+   around, and the recovery playbook."
+   - The first preview MUST echo the same rephrased theme wording used
+     in the hook — never the generic "the review cluster" and never the
+     raw audit label. "trip fees and pricing surprises" → "the trip-fee
+     review cluster."
+   - Use "owner responses I drafted" — not the bare "drafted responses."
+     Naming the artifact ("owner responses") and claiming authorship
+     ("I drafted") is what proves the homework was done; "drafted
+     responses" alone reads as a generic attachment list and could be
+     anyone's.
 
-5. Close: "Full deliverable's ready within a day if any of it's useful."
+5. Close: "{{close_line}}"
 
 6. Signoff: "— [your name]"
 
@@ -184,7 +242,8 @@ Task: Write the opener, ~80 words max body:
 4. One line: "Three previews attached — the directory diff, the
    corrected listing, and what synced looks like across every
    platform."
-5. Close + signoff as above.
+5. Close: "{{close_line}}"
+6. Signoff: "— [your name]"
 
 Forbidden: vague "your listings are inconsistent" without naming
 the platforms or the specific variation, pricing/tier jargon,
@@ -213,7 +272,8 @@ Task: Write the opener, ~80 words max body:
    it in plain language (not the audit's internal phrasing).
 4. One line: "Three previews attached — the CTA audit, proposed
    placements, and what the booking flow looks like."
-5. Close + signoff as above.
+5. Close: "{{close_line}}"
+6. Signoff: "— [your name]"
 
 Forbidden: listing every missing CTA — pick the one highest-impact
 gap, pricing/tier jargon, exclamation points, emojis.

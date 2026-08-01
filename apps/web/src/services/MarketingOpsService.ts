@@ -192,6 +192,7 @@ export type FollowUpOutcome = 'converted_paid' | 'customer_responded' | 'no_resp
 // ─── Outreach Opener Types ──────────────────────────────────────────────
 export type OpenerArchetype = 'A1' | 'A2' | 'A3' | 'A4';
 export type OpenerSource = 'ai' | 'external';
+export type CloseVariant = 'soft' | 'direct_paid';
 
 export interface OpenerArchetypeSelection {
   archetype: OpenerArchetype;
@@ -203,6 +204,7 @@ export interface OpenerResolution {
   selection: OpenerArchetypeSelection;
   extractedFields: Record<string, any>;
   resolvedPrompt: string;
+  closeVariant: CloseVariant;
 }
 
 export interface QualityGateResult {
@@ -222,6 +224,7 @@ export interface OutreachOpener {
   id: string;
   campaign_id: string;
   archetype: OpenerArchetype;
+  close_variant: CloseVariant | null;
   opener_text: string | null;
   quality_gate_passed: boolean;
   quality_gate_issues: string[] | null;
@@ -2386,11 +2389,14 @@ class MarketingOpsService extends AdminApiSingleton {
   }
 
   // ─── Outreach Openers ──────────────────────────────────────────────────
-  async resolveOpener(campaignId: string): Promise<OpenerResolution> {
+  async resolveOpener(campaignId: string, closeVariant?: CloseVariant): Promise<OpenerResolution> {
+    const qs = closeVariant
+      ? `?campaignId=${encodeURIComponent(campaignId)}&close_variant=${encodeURIComponent(closeVariant)}`
+      : `?campaignId=${encodeURIComponent(campaignId)}`;
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/openers/resolve?campaignId=${encodeURIComponent(campaignId)}`,
+      `${BASE_URL}/openers/resolve${qs}`,
       { method: 'GET' },
-      `mkt-ops-opener-resolve-${campaignId}`,
+      `mkt-ops-opener-resolve-${campaignId}-${closeVariant ?? 'default'}`,
       0,
     );
     if (!result.success) {
@@ -2399,11 +2405,13 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async executeOpener(campaignId: string): Promise<OpenerResult> {
+  async executeOpener(campaignId: string, closeVariant?: CloseVariant): Promise<OpenerResult> {
+    const body: Record<string, any> = { campaign_id: campaignId };
+    if (closeVariant) body.close_variant = closeVariant;
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/openers/execute`,
-      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId }) },
-      `mkt-ops-opener-execute-${campaignId}`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-opener-execute-${campaignId}-${closeVariant ?? 'default'}`,
       0,
     );
     if (!result.success) {
@@ -2412,11 +2420,13 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async importOpener(campaignId: string, openerText: string): Promise<OpenerResult> {
+  async importOpener(campaignId: string, openerText: string, closeVariant?: CloseVariant): Promise<OpenerResult> {
+    const body: Record<string, any> = { campaign_id: campaignId, opener_text: openerText };
+    if (closeVariant) body.close_variant = closeVariant;
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/openers/import`,
-      { method: 'POST', body: JSON.stringify({ campaign_id: campaignId, opener_text: openerText }) },
-      `mkt-ops-opener-import-${campaignId}`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-opener-import-${campaignId}-${closeVariant ?? 'default'}`,
       0,
     );
     if (!result.success) {
