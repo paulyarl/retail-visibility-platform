@@ -120,6 +120,7 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 2. Open **Admin Settings**.
 3. Select **Marketing Ops** in the sidebar (Megaphone icon) or use the **Marketing Ops** settings card.
 4. The dashboard loads at `/settings/admin/marketing-ops`.
+5. For recovery campaigns, select **Recovery** under Marketing Ops in the sidebar, or click the **Recovery** tab on the dashboard. The recovery list is at `/settings/admin/marketing-ops/recovery`.
 
 ---
 
@@ -157,7 +158,7 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 The dashboard has two tabs at the top:
 
 - **Dashboard** — the default metric cards, pipeline overview, and quick actions described above.
-- **Recovery** — shows recovery management campaigns grouped by stage. See §16 for details.
+- **Recovery** — links to the standalone Recovery list page at `/settings/admin/marketing-ops/recovery`. See §25 for details.
 
 ---
 
@@ -850,9 +851,12 @@ To enable payment collection on a campaign:
 
 Recovery Management handles dispute resolution for local businesses that have received complaints on review platforms (Google Business Profile, BBB, Yelp, etc.). The engine drafts a professional response on behalf of the business owner, provides a submission guide, and delivers the approved resolution via email.
 
-### Recovery Tab — `/settings/admin/marketing-ops` (Recovery tab)
+### Recovery List — `/settings/admin/marketing-ops/recovery`
 
-`RecoveryTabClient.tsx` shows recovery campaigns grouped by stage.
+`RecoveryTabClient.tsx` shows recovery campaigns grouped by stage. Accessible via:
+- The **Recovery** link in the admin sidebar (under Marketing Ops)
+- The **Recovery** link in the in-module nav panel
+- The **Recovery** tab on the Marketing Ops dashboard (links to the standalone route)
 
 - Campaigns are listed under their current stage badge (Awaiting Owner Intake, Intake Submitted, Final Resolution Drafted, etc.).
 - Click a campaign to open the recovery detail view.
