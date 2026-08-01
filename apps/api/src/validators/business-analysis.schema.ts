@@ -61,6 +61,26 @@ const coercedBoolean = z.preprocess((val) => {
 const coercedBooleanNullable = z.union([coercedBoolean, z.null()]);
 
 /**
+ * Like `coercedBooleanNullable`, but also accepts the sentinel string
+ * "unable_to_verify" (and common variants) and maps it to null.
+ *
+ * Website assessment fields are tri-state in the prompt (yes / no /
+ * unable_to_verify) but the schema stores unable-to-verify as null. Some
+ * prompt templates emit "unable_to_verify" for these boolean fields instead
+ * of null; this preprocessor accepts both so validation does not fail on
+ * otherwise-correct audits.
+ */
+const coercedBooleanNullableTolerant = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'unable_to_verify' || s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') {
+      return null;
+    }
+  }
+  return val;
+}, coercedBooleanNullable);
+
+/**
  * Coerce a string-or-number to a string (e.g. Facebook rating emitted as 4.8
  * instead of "4.8"). Booleans/objects are left alone so Zod reports them.
  */
@@ -201,12 +221,12 @@ const websiteSchema = z.object({
   url: z.string().nullable().optional(),
   status: websiteStatusEnum,
   mobile_friendly: mobileFriendlyEnum.nullable().optional(),
-  https: coercedBooleanNullable.optional(),
-  contact_information_visible: coercedBooleanNullable.optional(),
-  click_to_call_available: coercedBooleanNullable.optional(),
-  call_to_action_present: coercedBooleanNullable.optional(),
-  service_information_present: coercedBooleanNullable.optional(),
-  location_information_present: coercedBooleanNullable.optional(),
+  https: coercedBooleanNullableTolerant.optional(),
+  contact_information_visible: coercedBooleanNullableTolerant.optional(),
+  click_to_call_available: coercedBooleanNullableTolerant.optional(),
+  call_to_action_present: coercedBooleanNullableTolerant.optional(),
+  service_information_present: coercedBooleanNullableTolerant.optional(),
+  location_information_present: coercedBooleanNullableTolerant.optional(),
   issues: z.array(z.string()).optional(),
   conversion_opportunities: z.array(z.string()).optional(),
 }).passthrough();
@@ -369,12 +389,12 @@ Return your response as JSON matching this exact schema:
     "url": "<string|null>",
     "status": "working|broken|none_found|social_media_only|unable_to_verify",
     "mobile_friendly": "yes|likely|no|unable_to_verify",
-    "https": <boolean|null>,
-    "contact_information_visible": <boolean|null>,
-    "click_to_call_available": <boolean|null>,
-    "call_to_action_present": <boolean|null>,
-    "service_information_present": <boolean|null>,
-    "location_information_present": <boolean|null>,
+    "https": <boolean|null> (null when unable to verify),
+    "contact_information_visible": <boolean|null> (null when unable to verify),
+    "click_to_call_available": <boolean|null> (null when unable to verify),
+    "call_to_action_present": <boolean|null> (null when unable to verify),
+    "service_information_present": <boolean|null> (null when unable to verify),
+    "location_information_present": <boolean|null> (null when unable to verify),
     "issues": ["<string>", ...],
     "conversion_opportunities": ["<string>", ...]
   },
