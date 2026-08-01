@@ -1846,3 +1846,34 @@ export function generateDeliverableSectionId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `mds-${nanoid()}`;
 }
+
+// ─── Recovery Management (Recovery Engine Sprint 1) ───────────────────────
+// Global IDs (admin-scoped, no tenant key) — matches the Marketing Ops family.
+
+/**
+ * Generate dispute intake record ID
+ * Format: mdint-{nanoid} (14 chars)
+ */
+export function generateDisputeIntakeId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdint-${nanoid()}`;
+}
+
+/**
+ * Generate dispute attachment record ID
+ * Format: mdatt-{nanoid} (14 chars)
+ */
+export function generateDisputeAttachmentId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mdatt-${nanoid()}`;
+}
+
+/**
+ * Generate public dispute intake access token (URL-safe, 32-char entropy)
+ * Used in public magic-link URLs: /recovery/intake?token={token}
+ * Mirrors generatePreviewToken() — high-entropy, no prefix, opaque.
+ */
+export function generateDisputeToken(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 32);
+  return nanoid();
+}

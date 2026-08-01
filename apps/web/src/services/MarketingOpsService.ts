@@ -26,6 +26,10 @@ export type CampaignStage =
   | 'dead'
   | 'tenant_onboarded';
 
+// Recovery Management stages run on the same stage column; literals are
+// app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
+export type CampaignCategory = 'review_management' | 'recovery_management';
+
 export type ConversionSource =
   | 'qr_deliverable'
   | 'demo_storefront'
@@ -67,6 +71,7 @@ export interface Campaign {
   id: string;
   display_id: string | null;
   scope: CampaignScope;
+  campaign_category?: CampaignCategory;
   business_name: string | null;
   category: string;
   city: string;
@@ -843,6 +848,7 @@ export interface ServiceCategory {
 
 export interface CampaignCreateInput {
   scope?: CampaignScope;
+  campaign_category?: CampaignCategory;
   business_name?: string;
   category: string;
   city: string;
@@ -1079,6 +1085,7 @@ class MarketingOpsService extends AdminApiSingleton {
   async listCampaigns(filters?: {
     stage?: CampaignStage;
     scope?: CampaignScope;
+    campaignCategory?: CampaignCategory;
     category?: string;
     city?: string;
     assignedTo?: string;
@@ -1092,6 +1099,7 @@ class MarketingOpsService extends AdminApiSingleton {
     const params = new URLSearchParams();
     if (filters?.stage) params.set('stage', filters.stage);
     if (filters?.scope) params.set('scope', filters.scope);
+    if (filters?.campaignCategory) params.set('campaignCategory', filters.campaignCategory);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.city) params.set('city', filters.city);
     if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo);

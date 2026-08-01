@@ -32,21 +32,26 @@ service layer with zero behavior change for review campaigns.
 
 ### 2.1 Tasks
 
-1. **Prisma migration** — add `mkt_campaigns_list.campaign_category` (default
-   `review_management`, `VarChar(30)`, index). Add `mkt_dispute_intake` +
-   `mkt_dispute_attachments` per analysis §4.3 (including `tenant_id`). IDs are
-   app-generated strings (no `@default`) via `lib/id-generator.ts`. **Migration
-   workflow caveat:** this repo does not use plain `prisma migrate dev`
-   timestamped folders for everything — `apps/api/prisma/migrations/` holds
-   docs/backups, custom scripts live in `apps/api/prisma/scripts/`
-   (e.g. `migrate_v34.sh` / `rollback_v34.sh`), and `db:migrate` runs through
-   doppler. Confirm the exact workflow used for the most recent `mkt_*` table
-   addition and follow it, including a matching rollback script. RLS decision:
-   first verify the actual DB-level RLS posture on an existing `mkt_*` table
-   (analysis R7 — no policies exist in migration SQL, and the public pay route
-   reads preview tokens without issue), then mirror the
-   `mkt_deliverable_preview_tokens` posture for the new tables and document it
-   in the migration.
+1. **SQL migration** (per `manual-sql-migration-policy.md` — never edit
+   `schema.prisma` directly) — file:
+   `database/migrations/149_marketing_ops_recovery_intake.sql` (next after
+   `148_marketing_ops_scorecards_scope_stage.sql`). Add
+   `mkt_campaigns_list.campaign_category` (default `review_management`,
+   `VarChar(30)`, index). Add `mkt_dispute_intake` + `mkt_dispute_attachments`
+   per analysis §4.3 (including `tenant_id`). IDs are app-generated strings
+   (`VARCHAR(255) PRIMARY KEY`, no `DEFAULT gen_random_uuid()`) via
+   `lib/id-generator.ts`. **Workflow:** hand-written SQL → apply via SQL
+   editor (staging then prod) → `npx prisma db pull && npx prisma generate`.
+   No `prisma migrate dev` / `db push` / `migrate reset`. The
+   `apps/api/prisma/scripts/migrate_v34.sh` is a one-off doppler wrapper, not
+   the general pattern. **RLS:** confirmed `mkt_*` migrations (141–148) never
+   run `ENABLE ROW LEVEL SECURITY` — the `/// This model contains row level
+   security` comments in `schema.prisma` are Supabase introspection artifacts,
+   not applied policies. New tables follow suit (no RLS), matching the public
+   pay route reading `mkt_deliverable_preview_tokens` without auth. This
+   resolves analysis §11 Q1 and R7. Include a commented rollback block
+   matching migration 147's style. No explicit `updated_at` trigger function
+   — `mkt_*` tables rely on `DEFAULT NOW()` + app-layer Prisma `@updatedAt`.
 2. **Stage literals** — new `apps/api/src/services/recoveryStages.ts` exporting
    the 9 recovery stage strings as a const + Zod enum. No inline strings
    anywhere (R5).
@@ -66,10 +71,17 @@ service layer with zero behavior change for review campaigns.
 6. **Token generator** — `generateDisputeToken()` in `lib/id-generator.ts`
    following the existing nanoid convention (`generatePreviewToken()`, :1755 —
    32-char URL-safe alphabet). TTL from
-   `unifiedConfig.recovery.intakeTokenTtlDays` (default 7).
-7. **`unifiedConfig` keys** — add `recovery.intakeTokenTtlDays`,
-   `recovery.maxAttachmentBytes`, `recovery.allowedAttachmentMimes`,
-   `recovery.aiProvider`, `recovery.aiModel`. No `process.env` anywhere.
+   `unifiedConfig.recoveryIntakeTokenTtlDays` (default 7).
+7. **`unifiedConfig` keys** — flat getters reading `this.env.*` with typed
+   defaults (matching the existing `marketingOps*` pattern, **not** nested
+   objects): `recoveryIntakeTokenTtlDays` (env
+   `RECOVERY_INTAKE_TOKEN_TTL_DAYS`, default 7),
+   `recoveryMaxAttachmentBytes` (env `RECOVERY_MAX_ATTACHMENT_BYTES`, default
+   10485760), `recoveryAllowedAttachmentMimes` (env
+   `RECOVERY_ALLOWED_ATTACHMENT_MIMES`, default
+   `['application/pdf','image/png','image/jpeg']`), `recoveryAiProvider` (env
+   `RECOVERY_AI_PROVIDER`), `recoveryAiModel` (env `RECOVERY_AI_MODEL`). No
+   `process.env` anywhere outside `unifiedConfig`.
 
 ### 2.2 Tests (gate for S2)
 
@@ -87,9 +99,8 @@ service layer with zero behavior change for review campaigns.
 ### 2.3 Files touched
 
 ```
-apps/api/prisma/schema.prisma                              (edit)
-<migration per confirmed repo workflow — see S1 task 1;  (new)
- e.g. apps/api/prisma/scripts/ + rollback script>
+database/migrations/149_marketing_ops_recovery_intake.sql  (new — SQL migration)
+apps/api/prisma/schema.prisma                              (auto-updated via prisma db pull — do NOT hand-edit)
 apps/api/src/services/MarketingCampaignService.ts          (edit)
 apps/api/src/services/recoveryStages.ts                    (new)
 apps/api/src/repositories/DisputeIntakeRepository.ts       (new)

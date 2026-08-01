@@ -37,6 +37,14 @@ export type CampaignStage =
   | 'dead'
   | 'tenant_onboarded';
 
+// Recovery Management stages live on the same mkt_campaigns_list.stage
+// column (VARCHAR(50), no DB enum). The literals are centralized in
+// recoveryStages.ts; the transition map is below. A campaign's
+// campaign_category determines which transition table governs it.
+export type CampaignCategory = 'review_management' | 'recovery_management';
+
+export const CAMPAIGN_CATEGORY_DEFAULT: CampaignCategory = 'review_management';
+
 export type RetainerStatus = 'not_pitched' | 'pitched' | 'won' | 'declined';
 
 export type ConversionSource =
@@ -51,7 +59,8 @@ export type CampaignOrigin = 'prospect' | 'upsell';
 
 export type CampaignScope = 'business' | 'category' | 'city';
 
-const VALID_TRANSITIONS: Record<string, string[]> = {
+// Review track — existing sales-pipeline machine (unchanged).
+const REVIEW_TRANSITIONS: Record<string, string[]> = {
   seek:           ['preview_built', 'dead'],
   preview_built:  ['shown', 'dead'],
   shown:          ['paid', 'lost', 'tenant_onboarded'],
@@ -62,6 +71,32 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   lost:           ['seek', 'tenant_onboarded'],   // resurrection: late QR/demo conversion (G1)
   dead:           ['seek', 'tenant_onboarded'],   // resurrection: re-engaged prospect converts (G1)
 };
+
+// Recovery track — dispute intake machine (Recovery Engine Sprint 1).
+// awaiting_owner_intake allows re-dispatch to outreach_dispatched (token
+// expired / cascade re-touch) and dead (cascade exhaustion / timeout).
+// dead resurrects to audit_identified (re-engage after cooldown).
+const RECOVERY_TRANSITIONS: Record<string, string[]> = {
+  audit_identified:            ['framework_preview_generated', 'dead'],
+  framework_preview_generated: ['outreach_dispatched', 'dead'],
+  outreach_dispatched:         ['awaiting_owner_intake', 'dead'],
+  awaiting_owner_intake:       ['intake_submitted', 'outreach_dispatched', 'dead'],
+  intake_submitted:            ['final_resolution_drafted'],
+  final_resolution_drafted:    ['owner_approved'],
+  owner_approved:              ['resolved_and_closed'],
+  resolved_and_closed:         [],
+  dead:                        ['audit_identified'],
+};
+
+/**
+ * Returns the transition map for the given campaign category.
+ * Review campaigns use the sales-pipeline machine; recovery campaigns use
+ * the dispute-intake machine. Defaults to review_management so every
+ * existing caller that does not pass a category gets unchanged behavior.
+ */
+export function transitionsFor(category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT): Record<string, string[]> {
+  return category === 'recovery_management' ? RECOVERY_TRANSITIONS : REVIEW_TRANSITIONS;
+}
 
 const RESURRECTION_STAGES = ['lost', 'dead'];
 
@@ -77,6 +112,7 @@ const STAGE_DATE_FIELDS: Record<string, string> = {
 
 export interface CampaignInput {
   scope?: CampaignScope;
+  campaignCategory?: CampaignCategory;
   businessName?: string;
   category: string;
   city: string;
@@ -106,6 +142,7 @@ export interface CampaignInput {
 
 export interface CampaignUpdateInput {
   scope?: CampaignScope;
+  campaignCategory?: CampaignCategory;
   businessName?: string;
   category?: string;
   city?: string;
@@ -178,6 +215,7 @@ export interface StageTransitionInput {
 export interface CampaignListFilters {
   stage?: CampaignStage;
   scope?: CampaignScope;
+  campaignCategory?: CampaignCategory;
   category?: string;
   city?: string;
   assignedTo?: string;
@@ -226,9 +264,9 @@ export class MarketingCampaignService extends BaseService {
   // VALIDATION
   // ====================
 
-  isValidTransition(from: string | null, to: string): boolean {
+  isValidTransition(from: string | null, to: string, category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT): boolean {
     if (!from) return true;
-    const allowed = VALID_TRANSITIONS[from];
+    const allowed = transitionsFor(category)[from];
     return allowed ? allowed.includes(to) : false;
   }
 
@@ -245,11 +283,15 @@ export class MarketingCampaignService extends BaseService {
         tone = preset?.tone || undefined;
       }
 
+      const campaignCategory = input.campaignCategory || CAMPAIGN_CATEGORY_DEFAULT;
+      const initialStage = campaignCategory === 'recovery_management' ? 'audit_identified' : 'seek';
+
       const campaign = await this.prisma.mkt_campaigns_list.create({
         data: {
           id,
           display_id: input.displayId || null,
           scope: input.scope ?? 'business',
+          campaign_category: campaignCategory,
           business_name: input.businessName || null,
           category: input.category,
           city: input.city,
@@ -274,7 +316,7 @@ export class MarketingCampaignService extends BaseService {
           assigned_to: input.assignedTo || null,
           notes: input.notes || null,
           parent_campaign_id: input.parentCampaignId || null,
-          stage: 'seek',
+          stage: initialStage,
           stage_entered_at: new Date(),
         },
       });
@@ -282,7 +324,7 @@ export class MarketingCampaignService extends BaseService {
       await this.logStageTransition({
         campaignId: id,
         fromStage: null,
-        toStage: 'seek',
+        toStage: initialStage,
         triggerType: 'system',
         changedBy: input.assignedTo,
       });
@@ -491,6 +533,7 @@ export class MarketingCampaignService extends BaseService {
     const where: any = {};
     if (filters.stage) where.stage = filters.stage;
     if (filters.scope) where.scope = filters.scope;
+    if (filters.campaignCategory) where.campaign_category = filters.campaignCategory;
     if (filters.category) where.category = filters.category;
     if (filters.city) where.city = filters.city;
     if (filters.assignedTo) where.assigned_to = filters.assignedTo;
@@ -538,6 +581,7 @@ export class MarketingCampaignService extends BaseService {
   async updateCampaign(id: string, input: CampaignUpdateInput, ctx?: RequestCtx): Promise<any> {
     const data: any = {};
     if (input.scope !== undefined) data.scope = input.scope;
+    if (input.campaignCategory !== undefined) data.campaign_category = input.campaignCategory;
     if (input.businessName !== undefined) data.business_name = input.businessName || null;
     if (input.category !== undefined) data.category = input.category;
     if (input.city !== undefined) data.city = input.city;
@@ -609,7 +653,8 @@ export class MarketingCampaignService extends BaseService {
       }
 
       const fromStage = campaign.stage as string;
-      if (!this.isValidTransition(fromStage, toStage)) {
+      const category = (campaign.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT;
+      if (!this.isValidTransition(fromStage, toStage, category)) {
         throw new Error(`Invalid stage transition: ${fromStage} → ${toStage}`);
       }
 
@@ -920,7 +965,8 @@ export class MarketingCampaignService extends BaseService {
       }
 
       const fromStage = campaign.stage as string;
-      if (fromStage !== 'tenant_onboarded' && !this.isValidTransition(fromStage, 'tenant_onboarded')) {
+      const category = (campaign.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT;
+      if (fromStage !== 'tenant_onboarded' && !this.isValidTransition(fromStage, 'tenant_onboarded', category)) {
         throw new Error(`Invalid stage transition: ${fromStage} → tenant_onboarded`);
       }
 

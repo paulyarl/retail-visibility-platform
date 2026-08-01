@@ -207,6 +207,31 @@ class UnifiedConfig {
     };
   }
 
+  // ─── Recovery Management (Recovery Engine Sprint 1) ────────────────────
+  // Flat getters matching the marketingOps* pattern. The dispute intake
+  // portal is token-gated (no account auth); these config keys drive token
+  // TTL, upload guards, and the Recovery AI Agent provider/model selection.
+
+  get recoveryIntakeTokenTtlDays(): number {
+    const parsed = parseInt(this.env.RECOVERY_INTAKE_TOKEN_TTL_DAYS || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+  }
+  get recoveryMaxAttachmentBytes(): number {
+    const parsed = parseInt(this.env.RECOVERY_MAX_ATTACHMENT_BYTES || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10 * 1024 * 1024; // 10MB
+  }
+  get recoveryAllowedAttachmentMimes(): string[] {
+    const raw = this.env.RECOVERY_ALLOWED_ATTACHMENT_MIMES || '';
+    if (!raw) return ['application/pdf', 'image/png', 'image/jpeg'];
+    return raw.split(',').map((m) => m.trim()).filter(Boolean);
+  }
+  get recoveryAiProvider(): string | undefined {
+    return this.env.RECOVERY_AI_PROVIDER;
+  }
+  get recoveryAiModel(): string | undefined {
+    return this.env.RECOVERY_AI_MODEL;
+  }
+
   // ─── Sentry ───────────────────────────────────────────────────────────
 
   get sentryDsn(): string | undefined {
