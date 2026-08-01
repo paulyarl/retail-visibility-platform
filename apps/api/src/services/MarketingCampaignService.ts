@@ -206,7 +206,9 @@ export interface DemoStorefrontResult {
 
 export interface StageTransitionInput {
   campaignId: string;
-  toStage: CampaignStage;
+  // Accepts both review (CampaignStage) and recovery stage literals.
+  // Recovery stages are centralized in recoveryStages.ts.
+  toStage: CampaignStage | string;
   notes?: string;
   triggerType?: 'manual' | 'automated' | 'system';
   changedBy?: string;

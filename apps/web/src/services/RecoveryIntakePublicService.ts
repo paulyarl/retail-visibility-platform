@@ -21,7 +21,6 @@ export interface IntakeContext {
   serviceDate: string | null;
   expiresAt: string;
   alreadySubmitted: boolean;
-  expired: boolean;
 }
 
 export interface SubmitResult {

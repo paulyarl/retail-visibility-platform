@@ -20,7 +20,7 @@ import express from 'express';
 import multer from 'multer';
 import { logger } from '../logger';
 import { asyncErrorWrapper } from '../middleware/errorHandler';
-import DisputeIntakeService from '../services/DisputeIntakeService';
+import disputeIntakeService from '../services/DisputeIntakeService';
 import {
   intakeSubmitSchema,
   reissueSchema,
@@ -48,7 +48,7 @@ router.get(
       return res.status(400).json({ success: false, error: 'token is required' });
     }
 
-    const result = await DisputeIntakeService.getInstance().resolveIntake(token, req.ctx);
+    const result = await disputeIntakeService.resolveIntake(token, req.ctx);
 
     if (result === null) {
       return res.status(404).json({ success: false, error: 'Invalid token' });
@@ -79,7 +79,7 @@ router.post(
     }
 
     try {
-      const result = await DisputeIntakeService.getInstance().submitIntake(parsed.data, req.ctx);
+      const result = await disputeIntakeService.submitIntake(parsed.data, req.ctx);
       return res.json({ success: true, data: result });
     } catch (error) {
       const msg = (error as Error).message;
@@ -109,7 +109,7 @@ router.post(
     }
 
     try {
-      const result = await DisputeIntakeService.getInstance().reissueLink(parsed.data.campaignId, req.ctx);
+      const result = await disputeIntakeService.reissueLink(parsed.data.campaignId, req.ctx);
       return res.json({ success: true, data: result });
     } catch (error) {
       logger.error('[recovery-intake-public] POST /reissue error', req.ctx, {
@@ -147,7 +147,7 @@ router.post(
     }
 
     try {
-      const result = await DisputeIntakeService.getInstance().uploadAttachment(
+      const result = await disputeIntakeService.uploadAttachment(
         token,
         {
           buffer: req.file.buffer,
@@ -182,7 +182,7 @@ router.get(
       return res.status(400).json({ success: false, error: 'token is required' });
     }
 
-    const result = await DisputeIntakeService.getInstance().downloadAttachment(token, attachmentId, req.ctx);
+    const result = await disputeIntakeService.downloadAttachment(token, attachmentId, req.ctx);
     if (!result) {
       return res.status(404).json({ success: false, error: 'Attachment not found or token invalid' });
     }

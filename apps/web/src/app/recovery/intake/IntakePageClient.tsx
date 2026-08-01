@@ -76,6 +76,7 @@ export default function IntakePageClient() {
       if (result && 'expired' in result && result.expired) {
         setExpired(true);
       } else if (result && !('expired' in result)) {
+        // IntakeContext (has full fields) — not the expired shorthand
         setContext(result);
         if (result.alreadySubmitted) {
           setSubmitted({

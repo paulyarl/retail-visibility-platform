@@ -116,7 +116,7 @@ describe('DisputeIntakeService', () => {
       mockDisputeIntake.update.mockResolvedValue({ ...mockIntakeRecord, viewed_at: new Date() });
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
 
-      const result = await DisputeIntakeService.getInstance().resolveIntake('valid-token');
+      const result = await DisputeIntakeService.resolveIntake('valid-token');
 
       expect(result).not.toBeNull();
       expect(result).not.toHaveProperty('expired');
@@ -124,7 +124,6 @@ describe('DisputeIntakeService', () => {
         expect(result.campaignId).toBe('mcamp-1');
         expect(result.businessName).toBe('Test Biz');
         expect(result.alreadySubmitted).toBe(false);
-        expect(result.expired).toBe(false);
       }
     });
 
@@ -134,7 +133,7 @@ describe('DisputeIntakeService', () => {
         expires_at: pastDate(1),
       });
 
-      const result = await DisputeIntakeService.getInstance().resolveIntake('expired-token');
+      const result = await DisputeIntakeService.resolveIntake('expired-token');
 
       expect(result).toEqual({ expired: true });
     });
@@ -142,7 +141,7 @@ describe('DisputeIntakeService', () => {
     it('returns null for an invalid token', async () => {
       mockDisputeIntake.findUnique.mockResolvedValue(null);
 
-      const result = await DisputeIntakeService.getInstance().resolveIntake('invalid-token');
+      const result = await DisputeIntakeService.resolveIntake('invalid-token');
 
       expect(result).toBeNull();
     });
@@ -152,7 +151,7 @@ describe('DisputeIntakeService', () => {
       mockDisputeIntake.update.mockResolvedValue({});
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
 
-      await DisputeIntakeService.getInstance().resolveIntake('valid-token');
+      await DisputeIntakeService.resolveIntake('valid-token');
 
       expect(mockDisputeIntake.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -169,7 +168,7 @@ describe('DisputeIntakeService', () => {
       });
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
 
-      await DisputeIntakeService.getInstance().resolveIntake('valid-token');
+      await DisputeIntakeService.resolveIntake('valid-token');
 
       expect(mockDisputeIntake.update).not.toHaveBeenCalled();
     });
@@ -181,7 +180,7 @@ describe('DisputeIntakeService', () => {
       });
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
 
-      const result = await DisputeIntakeService.getInstance().resolveIntake('valid-token');
+      const result = await DisputeIntakeService.resolveIntake('valid-token');
 
       if (result && !('expired' in result)) {
         expect(result.alreadySubmitted).toBe(true);
@@ -202,7 +201,7 @@ describe('DisputeIntakeService', () => {
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
       mockCampaignsList.update.mockResolvedValue({ ...mockCampaign, stage: 'intake_submitted' });
 
-      const result = await DisputeIntakeService.getInstance().submitIntake({
+      const result = await DisputeIntakeService.submitIntake({
         token: 'valid-token',
         ownerStatement: 'This is a test statement with enough characters.',
         proposedResolution: 'Full Refund',
@@ -224,7 +223,7 @@ describe('DisputeIntakeService', () => {
       });
       mockCampaignsList.findUnique.mockResolvedValue({ ...mockCampaign, stage: 'intake_submitted' });
 
-      const result = await DisputeIntakeService.getInstance().submitIntake({
+      const result = await DisputeIntakeService.submitIntake({
         token: 'valid-token',
         ownerStatement: 'This is a different statement.',
         proposedResolution: 'Partial Refund',
@@ -246,7 +245,7 @@ describe('DisputeIntakeService', () => {
       });
 
       await expect(
-        DisputeIntakeService.getInstance().submitIntake({
+        DisputeIntakeService.submitIntake({
           token: 'expired-token',
           ownerStatement: 'This is a test statement with enough characters.',
           proposedResolution: 'Full Refund',
@@ -261,7 +260,7 @@ describe('DisputeIntakeService', () => {
       mockDisputeIntake.findUnique.mockResolvedValue(null);
 
       await expect(
-        DisputeIntakeService.getInstance().submitIntake({
+        DisputeIntakeService.submitIntake({
           token: 'invalid-token',
           ownerStatement: 'This is a test statement with enough characters.',
           proposedResolution: 'Full Refund',
@@ -281,7 +280,7 @@ describe('DisputeIntakeService', () => {
       mockDisputeIntake.findUnique.mockResolvedValue(null); // no existing intake
       mockDisputeIntake.create.mockResolvedValue(mockIntakeRecord);
 
-      const result = await DisputeIntakeService.getInstance().generateIntakeLink('mcamp-1');
+      const result = await DisputeIntakeService.generateIntakeLink('mcamp-1');
 
       expect(result.intakeId).toBe('mdint-1');
       expect(result.token).toBeTruthy();
@@ -297,7 +296,7 @@ describe('DisputeIntakeService', () => {
         access_token: 'new-token-32chars-bbbbbbbbbbbb',
       });
 
-      const result = await DisputeIntakeService.getInstance().generateIntakeLink('mcamp-1');
+      const result = await DisputeIntakeService.generateIntakeLink('mcamp-1');
 
       expect(result.token).toBe('new-token-32chars-bbbbbbbbbbbb');
       // Should NOT create a second row
@@ -310,7 +309,7 @@ describe('DisputeIntakeService', () => {
       mockCampaignsList.findUnique.mockResolvedValue(null);
 
       await expect(
-        DisputeIntakeService.getInstance().generateIntakeLink('nonexistent'),
+        DisputeIntakeService.generateIntakeLink('nonexistent'),
       ).rejects.toThrow('not found');
     });
   });
@@ -325,7 +324,7 @@ describe('DisputeIntakeService', () => {
         access_token: 'reissued-token-32chars-cccccccc',
       });
 
-      const result = await DisputeIntakeService.getInstance().reissueLink('mcamp-1');
+      const result = await DisputeIntakeService.reissueLink('mcamp-1');
 
       expect(result.token).toBe('reissued-token-32chars-cccccccc');
       expect(mockDisputeIntake.update).toHaveBeenCalled();
@@ -336,7 +335,7 @@ describe('DisputeIntakeService', () => {
       mockCampaignsList.findUnique.mockResolvedValue(mockCampaign);
       mockDisputeIntake.create.mockResolvedValue(mockIntakeRecord);
 
-      const result = await DisputeIntakeService.getInstance().reissueLink('mcamp-1');
+      const result = await DisputeIntakeService.reissueLink('mcamp-1');
 
       expect(result.intakeId).toBe('mdint-1');
       expect(mockDisputeIntake.create).toHaveBeenCalled();

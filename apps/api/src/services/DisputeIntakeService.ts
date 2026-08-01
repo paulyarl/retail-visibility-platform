@@ -30,7 +30,6 @@ export interface IntakeContext {
   serviceDate: string | null;
   expiresAt: string;
   alreadySubmitted: boolean;
-  expired: boolean;
 }
 
 export interface SubmitResult {
@@ -136,7 +135,6 @@ export class DisputeIntakeService extends BaseService {
         serviceDate: record.service_date ? record.service_date.toISOString().split('T')[0] : null,
         expiresAt: record.expires_at.toISOString(),
         alreadySubmitted,
-        expired: false,
       };
     } catch (error) {
       logger.error('Failed to resolve dispute intake', ctx, { error: (error as Error).message });
@@ -184,7 +182,7 @@ export class DisputeIntakeService extends BaseService {
       }, ctx);
 
       // Transition the campaign to intake_submitted
-      const updated = await MarketingCampaignService.getInstance().transitionStage({
+      const updated = await MarketingCampaignService.transitionStage({
         campaignId: record.campaign_id,
         toStage: 'intake_submitted',
         triggerType: 'system',
