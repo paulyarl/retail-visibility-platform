@@ -276,6 +276,70 @@ export interface SplitTestStats {
   totals: { openers: number; sent: number; replies: number; replyRate: number };
 }
 
+// ─── Outreach Follow-Up Types ───────────────────────────────────────────
+// Follow-up messages for prospects who didn't reply to the opener.
+// Stored in the same table as openers (mkt_outreach_openers_list) with
+// message_type='follow_up'. Inherits the opener's close_variant.
+
+export type FollowUpType = 'doing' | 'telling';
+
+export interface FollowUpDataDiff {
+  new_review_count?: number;
+  new_negative_count?: number;
+  new_themes?: string[];
+  new_platforms?: string[];
+  opener_theme?: string;
+  opener_archetype?: string;
+}
+
+export interface OutreachFollowUp {
+  id: string;
+  campaign_id: string;
+  archetype: string;
+  opener_text: string | null;
+  quality_gate_passed: boolean;
+  quality_gate_issues: string[] | null;
+  source: string;
+  ai_provider: string | null;
+  ai_model: string | null;
+  tokens_used: number;
+  cost_cents: number;
+  extracted_fields: Record<string, any> | null;
+  executed_by: string | null;
+  operator_name: string | null;
+  executed_at: string;
+  created_at: string;
+  updated_at: string;
+  close_variant: string | null;
+  message_type: string | null;
+  followup_type: FollowUpType | null;
+  followup_number: number | null;
+  opener_id: string | null;
+  data_diff: FollowUpDataDiff | null;
+}
+
+export interface FollowUpResolution {
+  opener: OutreachOpener;
+  selection: { archetype: string; reason: string; theme: string };
+  extractedFields: Record<string, any>;
+  followUpType: FollowUpType;
+  dataDiff: FollowUpDataDiff | null;
+  freshSnapshot: any;
+  resolvedPrompt: string;
+  closeVariant: CloseVariant;
+  followUpNumber: number;
+}
+
+export interface FollowUpResult {
+  followUp: OutreachFollowUp;
+  opener: OutreachOpener;
+  selection: { archetype: string; reason: string; theme: string };
+  extractedFields: Record<string, any>;
+  followUpType: FollowUpType;
+  qualityGate: { passed: boolean; issues: string[] };
+  resolvedPrompt: string;
+}
+
 // ─── Outreach Pitch Types ───────────────────────────────────────────────
 // Header / Closer / Contact / ReviewResponseDraft / Pitch — mirrors the
 // opener types above. See docs/LocalBiz/marketing_ops_outreach_pitch_construction_sprint_plan.md
@@ -2515,6 +2579,87 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load split-test stats');
     }
     return result.data?.data ?? result.data;
+  }
+
+  // ─── Outreach Follow-Ups ───────────────────────────────────────────────
+  async resolveFollowUp(
+    campaignId: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<FollowUpResolution> {
+    const params = new URLSearchParams();
+    params.set('campaignId', campaignId);
+    if (closeVariant) params.set('close_variant', closeVariant);
+    if (operatorName && operatorName.trim()) params.set('operator_name', operatorName.trim());
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups/resolve?${params.toString()}`,
+      { method: 'GET' },
+      `mkt-ops-followup-resolve-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resolve follow-up');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async executeFollowUp(
+    campaignId: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<FollowUpResult> {
+    const body: Record<string, any> = { campaign_id: campaignId };
+    if (closeVariant) body.close_variant = closeVariant;
+    if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups/execute`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-followup-execute-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to execute follow-up');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async importFollowUp(
+    campaignId: string,
+    followUpText: string,
+    closeVariant?: CloseVariant,
+    followUpType?: FollowUpType,
+    operatorName?: string,
+  ): Promise<FollowUpResult> {
+    const body: Record<string, any> = { campaign_id: campaignId, followup_text: followUpText };
+    if (closeVariant) body.close_variant = closeVariant;
+    if (followUpType) body.followup_type = followUpType;
+    if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/follow-ups/import`,
+      { method: 'POST', body: JSON.stringify(body) },
+      `mkt-ops-followup-import-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to import follow-up');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async listFollowUps(campaignId?: string): Promise<OutreachFollowUp[]> {
+    const url = campaignId
+      ? `${BASE_URL}/follow-ups?campaignId=${encodeURIComponent(campaignId)}`
+      : `${BASE_URL}/follow-ups`;
+    const result = await this.makeDefaultRequest<any>(
+      url,
+      { method: 'GET' },
+      `mkt-ops-followups-${campaignId ?? 'all'}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list follow-ups');
+    }
+    return result.data?.data ?? result.data ?? [];
   }
 
   // ─── Outreach Pitch — Headers ──────────────────────────────────────────

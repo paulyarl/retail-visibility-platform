@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops/campaigns', label: 'Campaigns', icon: IconTarget, emoji: '🎯' },
   { href: '/settings/admin/marketing-ops/prompts', label: 'Prompts', icon: IconMessage, emoji: '💬' },
   { href: '/settings/admin/marketing-ops/openers', label: 'Openers', icon: IconMail, emoji: '✉️' },
+  { href: '/settings/admin/marketing-ops/follow-ups', label: 'Follow-Ups', icon: IconMail, emoji: '📨' },
   { href: '/settings/admin/marketing-ops/split-tests', label: 'Split Tests', icon: IconFlask, emoji: '🧪' },
   { href: '/settings/admin/marketing-ops/deliverable-templates', label: 'Deliverable Templates', icon: IconFiles, emoji: '📄' },
   { href: '/settings/admin/marketing-ops/branding', label: 'Branding', icon: IconPalette, emoji: '🎨' },

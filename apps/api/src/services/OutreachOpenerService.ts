@@ -361,7 +361,7 @@ export class OutreachOpenerService extends BaseService {
   // ====================
 
   async listOpeners(campaignId?: string, ctx?: RequestCtx): Promise<any[]> {
-    const where: any = {};
+    const where: any = { message_type: { not: 'follow_up' } };
     if (campaignId) where.campaign_id = campaignId;
     try {
       return await this.prisma.mkt_outreach_openers_list.findMany({
@@ -433,7 +433,7 @@ export class OutreachOpenerService extends BaseService {
     try {
       // Fetch all openers with a close_variant set, newest first.
       const openers = await this.prisma.mkt_outreach_openers_list.findMany({
-        where: { close_variant: { not: null } },
+        where: { close_variant: { not: null }, message_type: { not: 'follow_up' } },
         orderBy: { executed_at: 'desc' },
         select: {
           id: true,
