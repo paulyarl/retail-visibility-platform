@@ -818,37 +818,6 @@ export interface DemoStorefrontResult {
   demoUrl: string;
 }
 
-export interface PayPageData {
-  campaignId: string;
-  businessName: string;
-  category: string;
-  city: string;
-  serviceCategory: string | null;
-  serviceCategoryLabel: string;
-  packagePriceCents: number;
-  subscriptionTierId: string | null;
-  couponCode: string | null;
-  tokenType: string;
-  deliverableId: string | null;
-  alreadyPaid: boolean;
-}
-
-export interface CheckoutResult {
-  clientSecret: string;
-  paymentIntentId: string;
-  amountCents: number;
-  discountCents: number;
-  originalPriceCents: number;
-}
-
-export interface PayConfirmResult {
-  campaignId: string;
-  stage: string;
-  amountCents: number;
-  gatewayTransactionId: string;
-  receiptUrl: string;
-}
-
 export interface MarketingRevenue {
   id: string;
   campaign_id: string;
@@ -2263,63 +2232,9 @@ class MarketingOpsService extends AdminApiSingleton {
 
   // ====================
   // PUBLIC PAYMENT (no auth — ptoken gated)
+  // Moved to MarketingPayPublicService (extends PublicApiSingleton) —
+  // raw fetch is forbidden per deploy-service-extending-base-singleton.
   // ====================
-
-  async getPayPageData(ptoken: string): Promise<PayPageData> {
-    const res = await fetch(`/api/public/marketing/pay?ptoken=${encodeURIComponent(ptoken)}`);
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || 'Failed to load pay page');
-    }
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Failed to load pay page');
-    }
-    return json.data;
-  }
-
-  async createCheckout(ptoken: string, couponCode?: string): Promise<CheckoutResult> {
-    const res = await fetch('/api/public/marketing/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptoken, couponCode }),
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Failed to create checkout session');
-    }
-    return json.data;
-  }
-
-  async validateCoupon(ptoken: string, couponCode: string, amountCents: number): Promise<any> {
-    const res = await fetch('/api/public/marketing/coupons/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptoken, couponCode, amountCents }),
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Invalid coupon code');
-    }
-    return json.data;
-  }
-
-  async confirmPayment(ptoken: string, paymentIntentId: string, couponCode?: string, subscriptionTierId?: string): Promise<PayConfirmResult> {
-    const res = await fetch('/api/public/marketing/pay/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptoken, paymentIntentId, couponCode, subscriptionTierId }),
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Failed to confirm payment');
-    }
-    return json.data;
-  }
-
-  getReceiptUrl(campaignId: string): string {
-    return `/api/public/marketing/receipt/${campaignId}`;
-  }
 
   // ─── Review Response Pipeline (Sprint 4) ─────────────────────────────────
   async listReviewPipelines(campaignId: string): Promise<ReviewResponsePipeline[]> {

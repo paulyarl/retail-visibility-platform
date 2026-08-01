@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
+import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
@@ -670,7 +671,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-gray-400">{new Date(rev.recorded_at).toLocaleDateString()}</span>
                               <a
-                                href={marketingOpsService.getReceiptUrl(campaignId)}
+                                href={marketingPayPublicService.getReceiptUrl(campaignId)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"

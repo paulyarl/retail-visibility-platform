@@ -32,8 +32,8 @@ import {
 } from '@tabler/icons-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import marketingOpsService from '@/services/MarketingOpsService';
-import type { PayPageData, CheckoutResult, PayConfirmResult } from '@/services/MarketingOpsService';
+import marketingPayPublicService from '@/services/MarketingPayPublicService';
+import type { PayPageData, CheckoutResult, PayConfirmResult } from '@/services/MarketingPayPublicService';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -81,7 +81,7 @@ function CheckoutForm({
       setIsLoading(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       try {
-        const result = await marketingOpsService.confirmPayment(ptoken, paymentIntent.id, couponCode);
+        const result = await marketingPayPublicService.confirmPayment(ptoken, paymentIntent.id, couponCode);
         onSuccess(result);
       } catch (confirmError: any) {
         setErrorMessage(`Payment succeeded but confirmation failed: ${confirmError.message}. Please contact support.`);
@@ -138,7 +138,7 @@ export default function PayPageClient() {
       return;
     }
     try {
-      const data = await marketingOpsService.getPayPageData(ptoken);
+      const data = await marketingPayPublicService.getPayPageData(ptoken);
       setPayData(data);
       if (data.couponCode) {
         setCouponInput(data.couponCode);
@@ -159,7 +159,7 @@ export default function PayPageClient() {
     setCouponLoading(true);
     setCouponError(null);
     try {
-      const result = await marketingOpsService.validateCoupon(ptoken, couponInput.trim(), payData.packagePriceCents);
+      const result = await marketingPayPublicService.validateCoupon(ptoken, couponInput.trim(), payData.packagePriceCents);
       setAppliedCoupon(couponInput.trim());
       setCheckout(null);
     } catch (err: any) {
@@ -182,7 +182,7 @@ export default function PayPageClient() {
     setInitiatingCheckout(true);
     setError(null);
     try {
-      const result = await marketingOpsService.createCheckout(ptoken, appliedCoupon);
+      const result = await marketingPayPublicService.createCheckout(ptoken, appliedCoupon);
       setCheckout(result);
     } catch (err: any) {
       setError(err.message || 'Failed to start checkout. Please try again.');
@@ -198,7 +198,7 @@ export default function PayPageClient() {
 
   const handleDownloadReceipt = () => {
     if (payResult) {
-      window.open(marketingOpsService.getReceiptUrl(payResult.campaignId), '_blank');
+      window.open(marketingPayPublicService.getReceiptUrl(payResult.campaignId), '_blank');
     }
   };
 
@@ -286,7 +286,7 @@ export default function PayPageClient() {
             </Text>
             <Button
               leftSection={<IconDownload size="1rem" />}
-              onClick={() => window.open(marketingOpsService.getReceiptUrl(payData.campaignId), '_blank')}
+              onClick={() => window.open(marketingPayPublicService.getReceiptUrl(payData.campaignId), '_blank')}
               size="md"
               variant="light"
             >
