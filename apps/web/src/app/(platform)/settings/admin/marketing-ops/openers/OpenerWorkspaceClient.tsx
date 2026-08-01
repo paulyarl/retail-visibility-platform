@@ -49,6 +49,15 @@ export default function OpenerWorkspaceClient() {
   // close line that will be generated before executing or copying.
   const [closeVariant, setCloseVariant] = useState<CloseVariant>('soft');
 
+  // Operator name — substituted for "[your name]" in the signoff at
+  // resolve/execute/import time. Prefilled from the active
+  // MarketingBrandingConfig on mount so the operator doesn't retype it
+  // each session. Not persisted on its own; it is recorded on each
+  // opener row at generate/import time so the campaign knows who
+  // handled it. Editing it re-resolves the prompt so the operator
+  // sees the exact signoff that will be produced.
+  const [operatorName, setOperatorName] = useState('');
+
   const [executing, setExecuting] = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<OpenerResult | null>(null);
@@ -85,11 +94,34 @@ export default function OpenerWorkspaceClient() {
     }
   }, []);
 
+  // Prefill operator name from the active branding config (if any).
+  // Runs once on mount; the operator can override afterwards. We don't
+  // overwrite a name the operator has already typed, so this only fires
+  // when the input is still empty.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const active = await marketingOpsService.getActiveBrandingConfig();
+        if (!cancelled && active?.operator_name && !operatorName) {
+          setOperatorName(active.operator_name);
+        }
+      } catch {
+        // Branding config is optional — ignore failures silently.
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Resolve archetype + prompt when campaign is selected or close variant changes
+  // Resolve archetype + prompt when campaign is selected, close variant
+  // changes, or operator name changes. The operator name is part of the
+  // resolved prompt (it's substituted into the signoff), so the operator
+  // sees the exact opener the AI will produce before they execute.
   const fetchResolution = useCallback(async () => {
     if (!selectedCampaignId) {
       setResolution(null);
@@ -98,7 +130,11 @@ export default function OpenerWorkspaceClient() {
     setResolving(true);
     setResolveError(null);
     try {
-      const res = await marketingOpsService.resolveOpener(selectedCampaignId, closeVariant);
+      const res = await marketingOpsService.resolveOpener(
+        selectedCampaignId,
+        closeVariant,
+        operatorName || undefined,
+      );
       setResolution(res);
       // Also fetch existing openers for this campaign
       const existing = await marketingOpsService.listOpeners(selectedCampaignId);
@@ -110,7 +146,7 @@ export default function OpenerWorkspaceClient() {
     } finally {
       setResolving(false);
     }
-  }, [selectedCampaignId, closeVariant]);
+  }, [selectedCampaignId, closeVariant, operatorName]);
 
   useEffect(() => {
     fetchResolution();
@@ -121,7 +157,7 @@ export default function OpenerWorkspaceClient() {
     setExecuting(true);
     setExecuteError(null);
     try {
-      const result = await marketingOpsService.executeOpener(selectedCampaignId, closeVariant);
+      const result = await marketingOpsService.executeOpener(selectedCampaignId, closeVariant, operatorName || undefined);
       setLastResult(result);
       setResultOpen(true);
       // Refresh openers list
@@ -140,7 +176,7 @@ export default function OpenerWorkspaceClient() {
     setImportError(null);
     setImportSuccess(null);
     try {
-      const result = await marketingOpsService.importOpener(selectedCampaignId, importText.trim(), closeVariant);
+      const result = await marketingOpsService.importOpener(selectedCampaignId, importText.trim(), closeVariant, operatorName || undefined);
       setLastResult(result);
       setResultOpen(true);
       setImportSuccess(`Imported opener ${result.opener.id}`);
@@ -280,6 +316,30 @@ export default function OpenerWorkspaceClient() {
             <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
               <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Execute</h2>
 
+              {/* Operator name — substituted for "[your name]" in the signoff
+                  at resolve/execute/import time. Prefilled from the active
+                  branding config; the operator can override. Recorded on the
+                  opener row so the campaign knows who handled it. Editing it
+                  re-resolves the prompt so the operator sees the exact
+                  signoff that will be produced. */}
+              <div className="mb-4">
+                <label htmlFor="operator-name" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  Operator name
+                </label>
+                <input
+                  id="operator-name"
+                  type="text"
+                  value={operatorName}
+                  onChange={(e) => setOperatorName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  maxLength={120}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  Substituted for &quot;[your name]&quot; in the signoff. Prefilled from your active branding config; recorded on the opener so the campaign knows who handled it.
+                </p>
+              </div>
+
               {/* Close-variant selector — split-tests soft vs direct_paid close.
                   Changing it re-resolves the prompt above so the operator sees
                   the exact close line before generating or copying. */}
@@ -413,6 +473,11 @@ export default function OpenerWorkspaceClient() {
                         <span className="text-gray-500 dark:text-gray-400">
                           {lastOpener.ai_provider}{lastOpener.ai_model ? ` · ${lastOpener.ai_model}` : ''}
                           {lastOpener.tokens_used > 0 && ` · ${lastOpener.tokens_used} tokens`}
+                        </span>
+                      )}
+                      {lastOpener.operator_name && (
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                          operator: {lastOpener.operator_name}
                         </span>
                       )}
                     </div>

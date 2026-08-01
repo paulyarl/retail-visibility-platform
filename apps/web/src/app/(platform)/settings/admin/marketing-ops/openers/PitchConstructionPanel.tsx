@@ -366,7 +366,7 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
               <option value="">— Select an opener variant —</option>
               {openers.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.archetype} · {o.source} · {o.quality_gate_passed ? '✓' : '✗'} · {new Date(o.executed_at).toLocaleDateString()}
+                  {o.archetype} · {o.source}{o.close_variant ? ` · close: ${o.close_variant}` : ''} · {o.quality_gate_passed ? '✓' : '✗'} · {new Date(o.executed_at).toLocaleDateString()}
                 </option>
               ))}
             </select>

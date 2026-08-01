@@ -1732,12 +1732,14 @@ const outreachOpenerService = OutreachOpenerService.getInstance();
 const openerExecuteSchema = z.object({
   campaign_id: z.string().min(1),
   close_variant: z.enum(['soft', 'direct_paid']).optional(),
+  operator_name: z.string().max(120).optional(),
 });
 
 const openerImportSchema = z.object({
   campaign_id: z.string().min(1),
   opener_text: z.string().min(1),
   close_variant: z.enum(['soft', 'direct_paid']).optional(),
+  operator_name: z.string().max(120).optional(),
 });
 
 // List openers (filter: campaignId)
@@ -1763,7 +1765,8 @@ router.get('/openers/resolve', async (req: any, res: Response) => {
       return res.status(400).json({ success: false, error: 'campaignId query parameter is required' });
     }
     const closeVariant = req.query.close_variant as 'soft' | 'direct_paid' | undefined;
-    const result = await outreachOpenerService.resolveOpener(campaignId, closeVariant, getCtx(req));
+    const operatorName = req.query.operator_name as string | undefined;
+    const result = await outreachOpenerService.resolveOpener(campaignId, closeVariant, getCtx(req), operatorName);
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
@@ -1778,6 +1781,7 @@ router.post('/openers/execute', async (req: any, res: Response) => {
       campaignId: parsed.campaign_id,
       closeVariant: parsed.close_variant,
       executedBy: req.user?.id,
+      operatorName: parsed.operator_name,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });
   } catch (error) {
@@ -1797,12 +1801,23 @@ router.post('/openers/import', async (req: any, res: Response) => {
       openerText: parsed.opener_text,
       closeVariant: parsed.close_variant,
       executedBy: req.user?.id,
+      operatorName: parsed.operator_name,
     }, getCtx(req));
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Split-test analytics — cohort comparison by close_variant
+router.get('/openers/split-tests', async (req: any, res: Response) => {
+  try {
+    const result = await outreachOpenerService.getSplitTestStats(getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

@@ -33,7 +33,19 @@ const FORBIDDEN_PATTERNS: { pattern: RegExp; label: string }[] = [
 const SALUTATION_RE = /^Hi .+/m;
 const PREVIEW_REF_RE = /three previews attached/i;
 const CLOSE_RE = /full deliverable.*within a day/i;
-const SIGNOFF_RE = /—\s*\[your name\]/;
+
+// Signoff — accepts either the literal placeholder ("— [your name]") OR a
+// real substituted name ("— Alex"). The placeholder is what the prompt
+// templates emit and what Path 1 (AI execute) produces; Path 2 (external
+// import) is the operator pasting a finished opener, where they are
+// expected to have replaced [your name] with their actual name. Penalizing
+// a real name turned the import path into a guaranteed gate failure.
+//
+// Matches a line ending in "—" followed by 1–60 non-empty chars that are
+// NOT the literal "[your name]" placeholder. The placeholder branch is
+// checked separately so both forms pass.
+const SIGNOFF_PLACEHOLDER_RE = /—\s*\[your name\]/;
+const SIGNOFF_REAL_RE = /—\s*(?!\[your name\])[^\s][^\n]{0,59}$/m;
 
 // ─── Emoji detection ────────────────────────────────────────────────────
 
@@ -49,9 +61,10 @@ export function runQualityGate(openerText: string): QualityGateResult {
   const issues: string[] = [];
 
   // Strip salutation and signoff to isolate the body for word/stat counting.
+  // Strip either the placeholder signoff or a real substituted name.
   const body = openerText
     .replace(/^Hi .+[—,-]\s*/m, '')
-    .replace(/—\s*\[your name\]\s*$/, '')
+    .replace(/—\s*(?:\[your name\]|[^\s].*)\s*$/m, '')
     .trim();
 
   const words = body.split(/\s+/).filter(Boolean);
@@ -85,8 +98,8 @@ export function runQualityGate(openerText: string): QualityGateResult {
   if (!CLOSE_RE.test(openerText)) {
     issues.push('Missing close ("full deliverable within a day")');
   }
-  if (!SIGNOFF_RE.test(openerText)) {
-    issues.push('Missing signoff ("— [your name]")');
+  if (!SIGNOFF_PLACEHOLDER_RE.test(openerText) && !SIGNOFF_REAL_RE.test(openerText)) {
+    issues.push('Missing signoff ("— [your name]" or "— <your name>")');
   }
 
   // No exclamation points.

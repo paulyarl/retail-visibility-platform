@@ -235,9 +235,45 @@ export interface OutreachOpener {
   cost_cents: number;
   extracted_fields: Record<string, any> | null;
   executed_by: string | null;
+  operator_name: string | null;
   executed_at: string;
   created_at: string;
   updated_at: string;
+}
+
+// ─── Split-Test Analytics Types ─────────────────────────────────────────
+// Cohort comparison by close_variant. See OutreachOpenerService.getSplitTestStats.
+
+export interface SplitTestCampaignRow {
+  campaign_id: string;
+  business_name: string;
+  stage: string;
+  city: string | null;
+  service_category: string | null;
+  archetype: string;
+  close_variant: string;
+  opener_source: string;
+  quality_gate_passed: boolean;
+  sent: boolean;
+  replied: boolean;
+  latest_outcome: string | null;
+  date_shown: string | null;
+}
+
+export interface SplitTestCohort {
+  variant: string;
+  openers: number;
+  campaigns: number;
+  sent: number;
+  replies: number;
+  replyRate: number;
+  outcomeBreakdown: Record<string, number>;
+  campaignRows: SplitTestCampaignRow[];
+}
+
+export interface SplitTestStats {
+  cohorts: SplitTestCohort[];
+  totals: { openers: number; sent: number; replies: number; replyRate: number };
 }
 
 // ─── Outreach Pitch Types ───────────────────────────────────────────────
@@ -2389,14 +2425,19 @@ class MarketingOpsService extends AdminApiSingleton {
   }
 
   // ─── Outreach Openers ──────────────────────────────────────────────────
-  async resolveOpener(campaignId: string, closeVariant?: CloseVariant): Promise<OpenerResolution> {
-    const qs = closeVariant
-      ? `?campaignId=${encodeURIComponent(campaignId)}&close_variant=${encodeURIComponent(closeVariant)}`
-      : `?campaignId=${encodeURIComponent(campaignId)}`;
+  async resolveOpener(
+    campaignId: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<OpenerResolution> {
+    const params = new URLSearchParams();
+    params.set('campaignId', campaignId);
+    if (closeVariant) params.set('close_variant', closeVariant);
+    if (operatorName && operatorName.trim()) params.set('operator_name', operatorName.trim());
     const result = await this.makeDefaultRequest<any>(
-      `${BASE_URL}/openers/resolve${qs}`,
+      `${BASE_URL}/openers/resolve?${params.toString()}`,
       { method: 'GET' },
-      `mkt-ops-opener-resolve-${campaignId}-${closeVariant ?? 'default'}`,
+      `mkt-ops-opener-resolve-${campaignId}-${closeVariant ?? 'default'}-${operatorName ?? ''}`,
       0,
     );
     if (!result.success) {
@@ -2405,9 +2446,14 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async executeOpener(campaignId: string, closeVariant?: CloseVariant): Promise<OpenerResult> {
+  async executeOpener(
+    campaignId: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<OpenerResult> {
     const body: Record<string, any> = { campaign_id: campaignId };
     if (closeVariant) body.close_variant = closeVariant;
+    if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/openers/execute`,
       { method: 'POST', body: JSON.stringify(body) },
@@ -2420,9 +2466,15 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async importOpener(campaignId: string, openerText: string, closeVariant?: CloseVariant): Promise<OpenerResult> {
+  async importOpener(
+    campaignId: string,
+    openerText: string,
+    closeVariant?: CloseVariant,
+    operatorName?: string,
+  ): Promise<OpenerResult> {
     const body: Record<string, any> = { campaign_id: campaignId, opener_text: openerText };
     if (closeVariant) body.close_variant = closeVariant;
+    if (operatorName && operatorName.trim()) body.operator_name = operatorName.trim();
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/openers/import`,
       { method: 'POST', body: JSON.stringify(body) },
@@ -2449,6 +2501,20 @@ class MarketingOpsService extends AdminApiSingleton {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list openers');
     }
     return result.data?.data ?? result.data ?? [];
+  }
+
+  // ─── Split-Test Analytics ──────────────────────────────────────────────
+  async getSplitTestStats(): Promise<SplitTestStats> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/openers/split-tests`,
+      { method: 'GET' },
+      `mkt-ops-split-tests`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to load split-test stats');
+    }
+    return result.data?.data ?? result.data;
   }
 
   // ─── Outreach Pitch — Headers ──────────────────────────────────────────
