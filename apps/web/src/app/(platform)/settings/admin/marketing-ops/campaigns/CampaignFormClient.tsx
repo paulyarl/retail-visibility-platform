@@ -342,6 +342,25 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 className={inputClass}>
                 {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : 'Recovery Management'}</option>)}
               </select>
+              <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
+                {form.campaign_category === 'review_management' ? (
+                  <>
+                    <p className="font-medium">Review Management</p>
+                    <p className="mt-1"><strong>Stages:</strong> Seek → Preview Built → Shown → Paid → Delivered → Retainer Pitched → Retainer Won → Tenant Onboarded</p>
+                    <p className="mt-1"><strong>Prompts:</strong> Seek, Fulfill, Filter, Retainer (Prompt Library)</p>
+                    <p className="mt-1"><strong>AI workflows:</strong> Openers workspace (A1-A4 archetype + close variant) → Follow-Ups workspace (doing/telling branch) → optional Cascade (email → SMS → DM)</p>
+                    <p className="mt-1"><strong>Deliverables:</strong> Review responses, service menu, GBP audit, testimonial cards, NAP report, SEO content, lead magnet</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">Recovery Management</p>
+                    <p className="mt-1"><strong>Stages:</strong> Audit Identified → Framework Preview → Outreach Dispatched → Awaiting Owner Intake → Intake Submitted → Final Resolution Drafted → Owner Approved → Resolved & Closed</p>
+                    <p className="mt-1"><strong>Prompts:</strong> Recovery Resolution (drafted response + submission guide)</p>
+                    <p className="mt-1"><strong>AI workflows:</strong> Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API). Outreach is the Day 1/2/4 cascade (email → SMS → DM), auto-fired by the scheduler.</p>
+                    <p className="mt-1"><strong>Deliverables:</strong> Recovery resolution (response draft + submission guide, emailed to owner on approval)</p>
+                  </>
+                )}
+              </div>
             </FormField>
             <FormField label="Scope" required>
               <select value={form.scope} onChange={(e) => handleChange('scope', e.target.value as CampaignScope)}

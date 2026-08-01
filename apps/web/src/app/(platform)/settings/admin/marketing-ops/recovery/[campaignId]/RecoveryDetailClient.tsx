@@ -204,6 +204,43 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
         </button>
       </div>
 
+      {/* Campaign Cycle banner — makes the recovery outreach model explicit */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Recovery Campaign Cycle</h2>
+        </div>
+        <p className="text-xs text-blue-700 dark:text-blue-400 mb-2">
+          Recovery campaigns have their own outreach cycle — distinct from the review pipeline&apos;s Opener + Follow-Up pages.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
+            <div className="font-medium text-gray-900 dark:text-white">1. Audit</div>
+            <div className="text-gray-500 dark:text-gray-400">Complaint identified</div>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
+            <div className="font-medium text-gray-900 dark:text-white">2. Framework</div>
+            <div className="text-gray-500 dark:text-gray-400">Response preview</div>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
+            <div className="font-medium text-gray-900 dark:text-white">3. Outreach Opener</div>
+            <div className="text-gray-500 dark:text-gray-400">Day 1 email (intake link)</div>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
+            <div className="font-medium text-gray-900 dark:text-white">4. Follow-Ups</div>
+            <div className="text-gray-500 dark:text-gray-400">Day 2 SMS + Day 4 DM</div>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
+            <div className="font-medium text-gray-900 dark:text-white">5. Resolution</div>
+            <div className="text-gray-500 dark:text-gray-400">AI draft → Approve → Deliver</div>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-blue-700 dark:text-blue-400">
+          <strong>Outreach Opener + Follow-Ups</strong> = the Day 1/2/4 cascade (email → SMS → DM), auto-fired by the scheduler.
+          This is the recovery equivalent of the review pipeline&apos;s Opener + Follow-Up workspace pages.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column: Complaint + Intake */}
         <div className="lg:col-span-1 space-y-6">

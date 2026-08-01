@@ -72,7 +72,49 @@ Stage transitions are validated; some moves are irreversible and all transitions
 
 ---
 
-## 3. Getting to Marketing Ops
+## 3. Campaign Cycle Mental Model — Review vs Recovery
+
+Each campaign category has its own outreach cycle. The AI surfaces and workspace pages are different — operators should understand which cycle applies to which campaign type.
+
+### Review Management Cycle
+
+| Stage | Surface | What happens |
+|-------|---------|--------------|
+| **Opener** | Openers page (`/settings/admin/marketing-ops/openers`) | AI generates a first-touch email from the campaign's `business_analysis` audit. Picks one of 4 archetypes (A1 Review Gap, A2 Negative Recovery, A3 Listing Drift, A4 CTA Gap). Operator chooses soft or direct_paid close. |
+| **Follow-Up** | Follow-Ups page (`/settings/admin/marketing-ops/follow-ups`) | AI generates a follow-up email if the prospect didn't reply. Auto-selects "doing" (footprint changed) or "telling" (footprint unchanged) branch based on a fresh data snapshot diff. Inherits the opener's archetype + close variant. |
+| **Reply** | Campaign detail → Stage transition | Prospect replies → operator transitions the campaign forward (e.g., `shown` → `paid`). |
+| **Cascade (optional)** | Campaign detail → Cascade tab | Opt-in email → SMS → DM escalation (Day 1/2/4) for silent prospects. Bypasses the manual follow-up workspace. |
+
+**Both Openers and Follow-Ups pages are review-management only.** Recovery campaigns are filtered out.
+
+### Recovery Management Cycle
+
+| Stage | Surface | What happens |
+|-------|---------|--------------|
+| **Audit** | Recovery tab → Recovery detail | Complaint identified on a review platform. Campaign created with category "Recovery Management". |
+| **Framework** | Recovery detail | Response framework preview generated. |
+| **Outreach Opener** | Automatic (scheduler) | Day 1 email sent with intake link. This is the recovery equivalent of the review pipeline's Opener — but it's auto-fired by `RecoveryCascadeService`, not the Openers workspace. |
+| **Follow-Ups** | Automatic (scheduler) | Day 2 SMS pointer + Day 4 DM check-in. This is the recovery equivalent of the review pipeline's Follow-Ups — but it's auto-fired by the cascade, not the Follow-Ups workspace. |
+| **Intake** | Public intake page (`/recovery/intake?token=...`) | Owner submits complaint statement + proposed resolution + attachments. |
+| **Resolution Draft** | Recovery detail → AI Workspace | Recovery AI Agent drafts Response Draft + Submission Guide. Dual-mode: Copy-Paste Bridge (external AI) or Direct API (in-platform). |
+| **Approve & Deliver** | Recovery detail → Actions | Operator approves → campaign transitions to `resolved_and_closed` → owner receives resolution via email. |
+
+**Recovery campaigns do NOT use the Openers or Follow-Ups pages.** Their outreach cycle is the Day 1/2/4 cascade, auto-fired by the scheduler.
+
+### Side-by-Side Comparison
+
+| Concept | Review Management | Recovery Management |
+|---------|-------------------|---------------------|
+| **Opener** | Openers workspace (A1-A4 archetype, soft/direct_paid close) | Day 1 cascade email (intake link) — automatic |
+| **Follow-Up** | Follow-Ups workspace (doing/telling branch, footprint diff) | Day 2 SMS + Day 4 DM — automatic |
+| **AI surface** | Prompt Workspace (Copy-Paste Bridge + Direct API) | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API) |
+| **Close variants** | Soft vs Direct Paid | None (intake is free) |
+| **Pitch assembly** | Header + Opener + Previews + Closer + Contact | None (single intake-request email) |
+| **Campaign filter** | `campaign_category = 'review_management'` | `campaign_category = 'recovery_management'` |
+
+---
+
+## 4. Getting to Marketing Ops
 
 1. Sign in as a platform admin.
 2. Open **Admin Settings**.
@@ -81,7 +123,7 @@ Stage transitions are validated; some moves are irreversible and all transitions
 
 ---
 
-## 4. Dashboard — `/settings/admin/marketing-ops`
+## 5. Dashboard — `/settings/admin/marketing-ops`
 
 `MarketingOpsDashboardClient.tsx` is the module landing page.
 
@@ -119,7 +161,7 @@ The dashboard has two tabs at the top:
 
 ---
 
-## 5. Campaigns — `/settings/admin/marketing-ops/campaigns`
+## 6. Campaigns — `/settings/admin/marketing-ops/campaigns`
 
 `CampaignListClient.tsx` shows the full campaign list.
 
@@ -150,7 +192,7 @@ Columns include:
 
 ---
 
-## 6. New Campaign — `/settings/admin/marketing-ops/campaigns/new`
+## 7. New Campaign — `/settings/admin/marketing-ops/campaigns/new`
 
 `CampaignFormClient.tsx` in create mode.
 
@@ -160,7 +202,12 @@ The form is split into four cards:
 
 #### Business Information
 
-- **Campaign Category** (required) — select **Review Management** (default) or **Recovery Management**. Recovery campaigns follow the dispute resolution pipeline (see §16) instead of the standard review pipeline.
+- **Campaign Category** (required) — select **Review Management** (default) or **Recovery Management**. This choice determines the campaign's stages, prompt templates, AI workflows, and deliverable types. The form shows an inline explainer below the selector with the specific stages, prompts, AI workflows, and deliverables for the selected category. See §3 for the full mental model.
+
+  | Category | Stages | Prompts | AI Workflows | Deliverables |
+  |----------|--------|---------|--------------|--------------|
+  | **Review Management** | Seek → Preview Built → Shown → Paid → Delivered → Retainer → Tenant Onboarded | Seek, Fulfill, Filter, Retainer | Openers workspace (A1-A4 + close variant) → Follow-Ups workspace (doing/telling) → optional Cascade | Review responses, service menu, GBP audit, NAP report, SEO content, lead magnet |
+  | **Recovery Management** | Audit Identified → Framework Preview → Outreach Dispatched → Awaiting Intake → Intake Submitted → Final Resolution Drafted → Resolved & Closed | Recovery Resolution | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API). Outreach = Day 1/2/4 cascade (automatic) | Recovery resolution (response draft + submission guide, emailed to owner) |
 - **Business Name** (required)
 - **Category** (required) — select an existing category or choose `+ New category...` and enter a new one
 - **Tone** (optional) — select an existing tone or choose `+ New tone...` and enter a new one
@@ -198,7 +245,7 @@ Click **Create Campaign** to save. You are redirected to the new campaign detail
 
 ---
 
-## 7. Prompts — `/settings/admin/marketing-ops/prompts`
+## 8. Prompts — `/settings/admin/marketing-ops/prompts`
 
 `PromptLibraryClient.tsx` is the template library.
 
@@ -250,7 +297,7 @@ Both modes are valid and share the same goal: producing the seek/fulfill/retaine
 
 ---
 
-## 8. Scorecards — `/settings/admin/marketing-ops/scorecards`
+## 9. Scorecards — `/settings/admin/marketing-ops/scorecards`
 
 `ScorecardClient.tsx` tracks daily activity.
 
@@ -284,7 +331,7 @@ The table lists previous entries with:
 
 ---
 
-## 9. Deliverable Templates — `/settings/admin/marketing-ops/deliverable-templates`
+## 10. Deliverable Templates — `/settings/admin/marketing-ops/deliverable-templates`
 
 `DeliverableTemplateLibraryClient.tsx` manages PDF layout templates used to generate client deliverables.
 
@@ -349,7 +396,7 @@ Example:
 
 ---
 
-## 10. Branding — `/settings/admin/marketing-ops/branding`
+## 11. Branding — `/settings/admin/marketing-ops/branding`
 
 `BrandingConfigClient.tsx` controls the look of every generated deliverable PDF.
 
@@ -388,7 +435,7 @@ Only one config is active at a time. Generated deliverables use the active confi
 
 ---
 
-## 11. Generating and Sending Deliverables
+## 12. Generating and Sending Deliverables
 
 Deliverables are generated from a campaign detail page (`/settings/admin/marketing-ops/campaigns/[id]`).
 
@@ -408,7 +455,7 @@ Deliverables are generated from a campaign detail page (`/settings/admin/marketi
 
 ---
 
-## 12. Tenant Prospecting and Conversion
+## 13. Tenant Prospecting and Conversion
 
 If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acquisition tool.
 
@@ -437,7 +484,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ---
 
-## 13. Common Tasks
+## 14. Common Tasks
 
 ### Create a New Prospect
 
@@ -469,7 +516,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ---
 
-## 14. Field Reference
+## 15. Field Reference
 
 ### Campaign Fields
 
@@ -516,7 +563,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Problem | Likely Cause | Fix |
 |---------|--------------|-----|

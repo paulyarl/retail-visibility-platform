@@ -84,9 +84,15 @@ export default function OpenerWorkspaceClient() {
     [campaigns, selectedCampaignId],
   );
 
-  // Filter to business-scope campaigns (openers are per-business)
+  // Filter to business-scope review-management campaigns only.
+  // Openers + follow-ups are the review pipeline's outreach cycle:
+  //   Opener (A1-A4 archetype) → Follow-Up (doing/telling) → Reply
+  // Recovery campaigns have their own outreach cycle (the Day 1/2/4 cascade
+  // handled by RecoveryCascadeService) and are intentionally excluded here.
   const businessCampaigns = useMemo(
-    () => campaigns.filter((c) => c.scope === 'business'),
+    () => campaigns.filter(
+      (c) => c.scope === 'business' && (c.campaign_category ?? 'review_management') === 'review_management',
+    ),
     [campaigns],
   );
 
@@ -231,8 +237,8 @@ export default function OpenerWorkspaceClient() {
 
   return (
     <MarketingOpsPageShell
-      title="Outreach Openers"
-      subtitle="Personalized first-touch openers from campaign audit data"
+      title="Outreach Openers — Review Management"
+      subtitle="First-touch openers for review-management campaigns. Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade)."
       breadcrumbs={[
         { label: 'Marketing Ops', href: '/settings/admin/marketing-ops' },
         { label: 'Openers' },
@@ -305,7 +311,8 @@ export default function OpenerWorkspaceClient() {
             </select>
             {businessCampaigns.length === 0 && campaigns.length > 0 && (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                No business-scope campaigns found. Openers require business-scope campaigns with a business_analysis audit.
+                No review-management campaigns found. Openers only apply to review-management campaigns with a business_analysis audit.
+                Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
               </p>
             )}
           </div>
