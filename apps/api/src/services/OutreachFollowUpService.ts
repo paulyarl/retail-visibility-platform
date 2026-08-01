@@ -22,6 +22,7 @@
 
 import { BaseService } from './BaseService';
 import { logger } from '../logger';
+import { ConflictError, NotFoundError, ValidationError } from '../middleware/errorHandler';
 import type { RequestCtx } from '../context';
 import { generateOutreachOpenerId } from '../lib/id-generator';
 import MarketingCampaignService from './MarketingCampaignService';
@@ -134,13 +135,16 @@ export class OutreachFollowUpService extends BaseService {
     });
 
     if (!opener) {
-      throw new Error('No opener found for this campaign. Generate an opener first.');
+      // This is a campaign-state precondition, not a backend bug.
+      // 409 Conflict — the campaign exists but isn't in a state that
+      // permits follow-up generation yet (no opener to follow up on).
+      throw new ConflictError('No opener found for this campaign. Generate an opener first.');
     }
 
     // 2. Get the campaign's audit data for archetype selection + field extraction.
     const campaign = await MarketingCampaignService.getCampaign(input.campaignId, ctx);
     if (!campaign) {
-      throw new Error('Campaign not found');
+      throw new NotFoundError('Campaign not found');
     }
 
     // Find the latest business_analysis audit (same pattern as opener service).
@@ -150,7 +154,7 @@ export class OutreachFollowUpService extends BaseService {
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     if (businessAudits.length === 0) {
-      throw new Error('No business_analysis audit found for this campaign');
+      throw new NotFoundError('No business_analysis audit found for this campaign');
     }
 
     const auditData = businessAudits[0].audit_data as BusinessAnalysisAuditData;
@@ -337,7 +341,7 @@ export class OutreachFollowUpService extends BaseService {
 
     let followUpText = input.followUpText.trim();
     if (!followUpText) {
-      throw new Error('Follow-up text cannot be empty');
+      throw new ValidationError('Follow-up text cannot be empty');
     }
     if (input.operatorName && input.operatorName.trim()) {
       followUpText = this.substituteSignoff(followUpText, input.operatorName);

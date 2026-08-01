@@ -115,6 +115,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import * as fs from 'fs';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth';
+import { HttpError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import MarketingCampaignService from '../services/MarketingCampaignService';
@@ -435,6 +436,13 @@ function getCtx(req: any): RequestCtx {
 }
 
 function handleServiceError(res: Response, error: unknown, ctx?: RequestCtx): void {
+  // Typed HTTP errors (NotFoundError, ConflictError, ValidationError, ...)
+  // carry their own statusCode + code and must NOT be collapsed into 500.
+  // 500 is reserved for truly unexpected backend failures that need fixing.
+  if (error instanceof HttpError) {
+    res.status(error.statusCode).json({ success: false, error: error.code, message: error.message });
+    return;
+  }
   const message = error instanceof Error ? error.message : 'Unknown error';
   if (message.includes('not found') || message.includes('Invalid stage transition')) {
     res.status(400).json({ success: false, error: message });
