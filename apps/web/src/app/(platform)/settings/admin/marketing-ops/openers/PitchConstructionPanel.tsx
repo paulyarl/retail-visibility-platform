@@ -3,8 +3,9 @@
 /**
  * PitchConstructionPanel — Pitch assembly UI for the Outreach Openers page.
  *
- * Renders below the existing opener workspace when a campaign is selected.
- * Lets the admin assemble a full outreach pitch from component variants:
+ * Rendered inside the "Pitch Construction" tab of the openers workspace when
+ * a campaign is selected. Lets the admin assemble a full outreach pitch from
+ * component variants:
  *   - Opener (selected from existing variants)
  *   - Header (subject line) — dual AI/Import path, split-testable
  *   - 3-slot Preview (review paste + AI/Import owner response, negative-first)
@@ -17,8 +18,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
   Play,
   Upload,
   Copy,
@@ -46,9 +45,6 @@ interface PitchConstructionPanelProps {
 }
 
 export default function PitchConstructionPanel({ campaignId, openers }: PitchConstructionPanelProps) {
-  // ─── Collapsible state ──────────────────────────────────────────────
-  const [panelOpen, setPanelOpen] = useState(false);
-
   // ─── Variant lists ──────────────────────────────────────────────────
   const [headers, setHeaders] = useState<OutreachHeader[]>([]);
   const [closers, setClosers] = useState<OutreachCloser[]>([]);
@@ -132,11 +128,15 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
     fetchAll();
   }, [fetchAll]);
 
+  // Fetch the closer resolution (default template) on mount. Previously
+  // this was deferred until the collapsible panel was opened; now that the
+  // panel lives behind a tab and is always rendered when shown, we fetch
+  // eagerly so the closer template is pre-filled as soon as the tab opens.
   useEffect(() => {
-    if (panelOpen && !closerResolution) {
+    if (!closerResolution) {
       fetchCloserResolution();
     }
-  }, [panelOpen, closerResolution, fetchCloserResolution]);
+  }, [closerResolution, fetchCloserResolution]);
 
   // Auto-select first opener when list changes
   useEffect(() => {
@@ -336,25 +336,9 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
 
   // ─── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="mt-8 bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700">
-      {/* Panel header */}
-      <button
-        onClick={() => setPanelOpen((v) => !v)}
-        className="flex items-center justify-between w-full p-5"
-      >
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          {panelOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          Pitch Construction
-        </h2>
-        <span className="text-xs text-gray-400">
-          Assemble header + opener + 3-slot preview + closer + contact
-        </span>
-      </button>
-
-      {panelOpen && (
-        <div className="px-5 pb-5 space-y-6">
-          {/* ─── Opener selector ─────────────────────────────────────── */}
-          <section>
+    <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5 space-y-6">
+      {/* ─── Opener selector ─────────────────────────────────────── */}
+      <section>
             <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
               Opener (handshake)
             </h3>
@@ -712,8 +696,6 @@ export default function PitchConstructionPanel({ campaignId, openers }: PitchCon
               </div>
             </section>
           )}
-        </div>
-      )}
     </div>
   );
 }

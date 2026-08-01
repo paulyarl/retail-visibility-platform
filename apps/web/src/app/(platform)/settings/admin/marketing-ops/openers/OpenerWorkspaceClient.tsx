@@ -39,6 +39,15 @@ export default function OpenerWorkspaceClient() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
 
+  // Active workspace tab. "opener" is the legacy generate/import workspace;
+  // "pitch" is the pitch construction assembly UI (header + opener + 3-slot
+  // preview + closer + contact → assembled pitch). The tab bar only renders
+  // once a campaign is selected. Switching tabs preserves all in-memory
+  // state (resolution, openers, draft pitch) so the operator can assemble
+  // on the pitch tab, then flip back to the opener tab to execute or import
+  // a fresh opener without losing the assembled pitch.
+  const [activeTab, setActiveTab] = useState<'opener' | 'pitch'>('opener');
+
   const [resolution, setResolution] = useState<OpenerResolution | null>(null);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
@@ -243,6 +252,39 @@ export default function OpenerWorkspaceClient() {
         </div>
       )}
 
+      {/* Tab bar — only renders once a campaign is selected. Matches the
+          campaign detail page tab styling. "Opener" is the generate/import
+          workspace; "Pitch Construction" is the assembly UI. Switching tabs
+          preserves all in-memory state so the operator can assemble a pitch,
+          then flip back to execute or import a fresh opener. */}
+      {selectedCampaignId && (
+        <div className="flex items-center gap-1 mb-4 border-b border-gray-200 dark:border-neutral-700">
+          <button
+            type="button"
+            onClick={() => setActiveTab('opener')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'opener'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            Opener
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('pitch')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'pitch'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            Pitch Construction
+          </button>
+        </div>
+      )}
+
+      {(!selectedCampaignId || activeTab === 'opener') && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Campaign Selector + Archetype + Fields + Execute */}
         <div className="space-y-4">
@@ -563,11 +605,12 @@ export default function OpenerWorkspaceClient() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Pitch Construction — collapsible panel below the opener workspace.
-          Only renders when a campaign is selected. Lets the admin assemble
-          a full outreach pitch from opener + header + 3-slot preview + closer + contact. */}
-      {selectedCampaignId && (
+      {/* Pitch Construction tab — assembly UI for header + opener + 3-slot
+          preview + closer + contact → assembled pitch. Only renders when a
+          campaign is selected and the Pitch Construction tab is active. */}
+      {selectedCampaignId && activeTab === 'pitch' && (
         <PitchConstructionPanel campaignId={selectedCampaignId} openers={openers} />
       )}
     </MarketingOpsPageShell>
