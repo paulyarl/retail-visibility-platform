@@ -4,18 +4,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, CampaignScope, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
+const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management'];
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const CAMPAIGN_ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 
 interface FormState {
+  campaign_category: CampaignCategory;
   scope: CampaignScope;
   business_name: string;
   category: string;
@@ -55,6 +57,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
+  campaign_category: 'review_management',
   scope: 'business',
   business_name: '',
   category: '',
@@ -133,6 +136,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     try {
       const c = await marketingOpsService.getCampaign(campaignId);
       setForm({
+        campaign_category: (c.campaign_category as CampaignCategory) ?? 'review_management',
         scope: (c.scope as CampaignScope) ?? 'business',
         business_name: c.business_name ?? '',
         category: c.category ?? '',
@@ -219,6 +223,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           : legacyContactInfo;
 
         const input: CampaignCreateInput = {
+          campaign_category: form.campaign_category,
           scope: form.scope,
           business_name: strOrUndef(form.business_name),
           category: form.category,
@@ -261,6 +266,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           : legacyContactInfo;
 
         const input: CampaignUpdateInput = {
+          campaign_category: form.campaign_category,
           scope: form.scope,
           business_name: strOrUndef(form.business_name),
           category: form.category,
@@ -331,6 +337,31 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Core Fields */}
           <FormSection title="Business Information">
+            <FormField label="Campaign Category" required>
+              <select value={form.campaign_category} onChange={(e) => handleChange('campaign_category', e.target.value as CampaignCategory)}
+                className={inputClass}>
+                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : 'Recovery Management'}</option>)}
+              </select>
+              <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
+                {form.campaign_category === 'review_management' ? (
+                  <>
+                    <p className="font-medium">Review Management</p>
+                    <p className="mt-1"><strong>Stages:</strong> Seek → Preview Built → Shown → Paid → Delivered → Retainer Pitched → Retainer Won → Tenant Onboarded</p>
+                    <p className="mt-1"><strong>Prompts:</strong> Seek, Fulfill, Filter, Retainer (Prompt Library)</p>
+                    <p className="mt-1"><strong>AI workflows:</strong> Openers workspace (A1-A4 archetype + close variant) → Follow-Ups workspace (doing/telling branch) → optional Cascade (email → SMS → DM)</p>
+                    <p className="mt-1"><strong>Deliverables:</strong> Review responses, service menu, GBP audit, testimonial cards, NAP report, SEO content, lead magnet</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">Recovery Management</p>
+                    <p className="mt-1"><strong>Stages:</strong> Audit Identified → Framework Preview → Outreach Dispatched → Awaiting Owner Intake → Intake Submitted → Final Resolution Drafted → Owner Approved → Resolved & Closed</p>
+                    <p className="mt-1"><strong>Prompts:</strong> Recovery Resolution (drafted response + submission guide)</p>
+                    <p className="mt-1"><strong>AI workflows:</strong> Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API). Outreach is the Day 1/2/4 cascade (email → SMS → DM), auto-fired by the scheduler.</p>
+                    <p className="mt-1"><strong>Deliverables:</strong> Recovery resolution (response draft + submission guide, emailed to owner on approval)</p>
+                  </>
+                )}
+              </div>
+            </FormField>
             <FormField label="Scope" required>
               <select value={form.scope} onChange={(e) => handleChange('scope', e.target.value as CampaignScope)}
                 className={inputClass}>

@@ -1,18 +1,25 @@
 # Marketing Ops — User Guide
 
-**Scope:** This guide covers the recently implemented admin Marketing Operations module and its new pages.
+**Scope:** This guide covers the recently implemented admin Marketing Operations module and its new pages, including Recovery Management and the Multi-Channel Cascade.
 
 **Sources:**
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
 - `docs/LocalBiz/tenant_prospecting_channel_sprint_plan.md`
 - `docs/LocalBiz/local_marketing_ops_payment_collection_sprint_plan.md`
+- `docs/RECOVERY_MANAGEMENT_ENGINE_SPRINT_PLAN.md`
+- `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
 
 ---
 
 ## 1. What Marketing Ops Does
 
 Marketing Ops turns each local business prospect into a **campaign journey**. An admin tracks the prospect from first discovery (`seek`) through preview, payment, delivery, and ultimately a recurring retainer or tenant conversion.
+
+Campaigns belong to one of two categories:
+
+- **Review Management** — the default pipeline (seek → preview → paid → retainer). Covers prospecting, audit, deliverable generation, payment, and tenant conversion.
+- **Recovery Management** — dispute resolution for businesses that have received complaints on review platforms. The engine drafts a professional response on behalf of the owner, provides a submission guide, and delivers the approved resolution via email.
 
 ### Core Admin Workflows
 
@@ -23,12 +30,16 @@ Marketing Ops turns each local business prospect into a **campaign journey**. An
 - **Branding control** — configure operator colors, logo, and footer for all generated PDFs.
 - **Daily scorecards** — log outreach activity and revenue.
 - **Tenant conversion** — link a campaign to a real or demo tenant and track first/last-touch attribution.
+- **Recovery management** — generate intake links, collect owner statements, draft AI-powered resolution responses, and deliver approved resolutions to business owners.
+- **Multi-channel cascade** — opt-in a review campaign to an automated email → SMS → DM outreach sequence (Day 1/2/4).
 
 ---
 
 ## 2. Campaign Pipeline Stages
 
-The stage names are shown as color-coded badges across the module (`StageBadge.tsx`).
+The stage names are shown as color-coded badges across the module (`StageBadge.tsx`). The stage set depends on the campaign category.
+
+### Review Management Stages (default)
 
 | Stage | Meaning |
 |-------|---------|
@@ -43,20 +54,77 @@ The stage names are shown as color-coded badges across the module (`StageBadge.t
 | **Dead** | No opportunity. |
 | **Tenant Onboarded** | Prospect has become a platform tenant. |
 
+### Recovery Management Stages
+
+| Stage | Meaning |
+|-------|---------|
+| **Audit Identified** | Complaint/dispute identified on a review platform. |
+| **Framework Preview** | Response framework preview generated. |
+| **Outreach Dispatched** | Intake link generated + outreach cascade begins. |
+| **Awaiting Owner Intake** | Owner has received the intake link; Day 1/2/4 cascade fires. |
+| **Intake Submitted** | Owner submitted their complaint statement + proposed resolution. |
+| **Final Resolution Drafted** | Recovery AI Agent drafted the response + submission guide. |
+| **Owner Approved** | Operator approved the draft (intermediate — auto-transitions to resolved). |
+| **Resolved & Closed** | Resolution delivered to owner via email. |
+| **Dead** | Intake timed out, cascade exhausted, or manually closed. |
+
 Stage transitions are validated; some moves are irreversible and all transitions are logged in `mkt_stage_history_list`.
 
 ---
 
-## 3. Getting to Marketing Ops
+## 3. Campaign Cycle Mental Model — Review vs Recovery
+
+Each campaign category has its own outreach cycle. The AI surfaces and workspace pages are different — operators should understand which cycle applies to which campaign type.
+
+### Review Management Cycle
+
+| Stage | Surface | What happens |
+|-------|---------|--------------|
+| **Opener** | Openers page (`/settings/admin/marketing-ops/openers`) | AI generates a first-touch email from the campaign's `business_analysis` audit. Picks one of 4 archetypes (A1 Review Gap, A2 Negative Recovery, A3 Listing Drift, A4 CTA Gap). Operator chooses soft or direct_paid close. |
+| **Follow-Up** | Follow-Ups page (`/settings/admin/marketing-ops/follow-ups`) | AI generates a follow-up email if the prospect didn't reply. Auto-selects "doing" (footprint changed) or "telling" (footprint unchanged) branch based on a fresh data snapshot diff. Inherits the opener's archetype + close variant. |
+| **Reply** | Campaign detail → Stage transition | Prospect replies → operator transitions the campaign forward (e.g., `shown` → `paid`). |
+| **Cascade (optional)** | Campaign detail → Cascade tab | Opt-in email → SMS → DM escalation (Day 1/2/4) for silent prospects. Bypasses the manual follow-up workspace. |
+
+**Both Openers and Follow-Ups pages are review-management only.** Recovery campaigns are filtered out.
+
+### Recovery Management Cycle
+
+| Stage | Surface | What happens |
+|-------|---------|--------------|
+| **Audit** | Recovery tab → Recovery detail | Complaint identified on a review platform. Campaign created with category "Recovery Management". |
+| **Framework** | Recovery detail | Response framework preview generated. |
+| **Outreach Opener** | Automatic (scheduler) | Day 1 email sent with intake link. This is the recovery equivalent of the review pipeline's Opener — but it's auto-fired by `RecoveryCascadeService`, not the Openers workspace. |
+| **Follow-Ups** | Automatic (scheduler) | Day 2 SMS pointer + Day 4 DM check-in. This is the recovery equivalent of the review pipeline's Follow-Ups — but it's auto-fired by the cascade, not the Follow-Ups workspace. |
+| **Intake** | Public intake page (`/recovery/intake?token=...`) | Owner submits complaint statement + proposed resolution + attachments. |
+| **Resolution Draft** | Recovery detail → AI Workspace | Recovery AI Agent drafts Response Draft + Submission Guide. Dual-mode: Copy-Paste Bridge (external AI) or Direct API (in-platform). |
+| **Approve & Deliver** | Recovery detail → Actions | Operator approves → campaign transitions to `resolved_and_closed` → owner receives resolution via email. |
+
+**Recovery campaigns do NOT use the Openers or Follow-Ups pages.** Their outreach cycle is the Day 1/2/4 cascade, auto-fired by the scheduler.
+
+### Side-by-Side Comparison
+
+| Concept | Review Management | Recovery Management |
+|---------|-------------------|---------------------|
+| **Opener** | Openers workspace (A1-A4 archetype, soft/direct_paid close) | Day 1 cascade email (intake link) — automatic |
+| **Follow-Up** | Follow-Ups workspace (doing/telling branch, footprint diff) | Day 2 SMS + Day 4 DM — automatic |
+| **AI surface** | Prompt Workspace (Copy-Paste Bridge + Direct API) | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API) |
+| **Close variants** | Soft vs Direct Paid | None (intake is free) |
+| **Pitch assembly** | Header + Opener + Previews + Closer + Contact | None (single intake-request email) |
+| **Campaign filter** | `campaign_category = 'review_management'` | `campaign_category = 'recovery_management'` |
+
+---
+
+## 4. Getting to Marketing Ops
 
 1. Sign in as a platform admin.
 2. Open **Admin Settings**.
 3. Select **Marketing Ops** in the sidebar (Megaphone icon) or use the **Marketing Ops** settings card.
 4. The dashboard loads at `/settings/admin/marketing-ops`.
+5. For recovery campaigns, select **Recovery** under Marketing Ops in the sidebar, or click the **Recovery** tab on the dashboard. The recovery list is at `/settings/admin/marketing-ops/recovery`.
 
 ---
 
-## 4. Dashboard — `/settings/admin/marketing-ops`
+## 5. Dashboard — `/settings/admin/marketing-ops`
 
 `MarketingOpsDashboardClient.tsx` is the module landing page.
 
@@ -85,9 +153,16 @@ Stage transitions are validated; some moves are irreversible and all transitions
 - Click **Export CSV** to download a CSV of campaigns.
 - The dashboard auto-refreshes every 30 seconds.
 
+### Dashboard Tabs
+
+The dashboard has two tabs at the top:
+
+- **Dashboard** — the default metric cards, pipeline overview, and quick actions described above.
+- **Recovery** — links to the standalone Recovery list page at `/settings/admin/marketing-ops/recovery`. See §25 for details.
+
 ---
 
-## 5. Campaigns — `/settings/admin/marketing-ops/campaigns`
+## 6. Campaigns — `/settings/admin/marketing-ops/campaigns`
 
 `CampaignListClient.tsx` shows the full campaign list.
 
@@ -118,7 +193,7 @@ Columns include:
 
 ---
 
-## 6. New Campaign — `/settings/admin/marketing-ops/campaigns/new`
+## 7. New Campaign — `/settings/admin/marketing-ops/campaigns/new`
 
 `CampaignFormClient.tsx` in create mode.
 
@@ -128,6 +203,12 @@ The form is split into four cards:
 
 #### Business Information
 
+- **Campaign Category** (required) — select **Review Management** (default) or **Recovery Management**. This choice determines the campaign's stages, prompt templates, AI workflows, and deliverable types. The form shows an inline explainer below the selector with the specific stages, prompts, AI workflows, and deliverables for the selected category. See §3 for the full mental model.
+
+  | Category | Stages | Prompts | AI Workflows | Deliverables |
+  |----------|--------|---------|--------------|--------------|
+  | **Review Management** | Seek → Preview Built → Shown → Paid → Delivered → Retainer → Tenant Onboarded | Seek, Fulfill, Filter, Retainer | Openers workspace (A1-A4 + close variant) → Follow-Ups workspace (doing/telling) → optional Cascade | Review responses, service menu, GBP audit, NAP report, SEO content, lead magnet |
+  | **Recovery Management** | Audit Identified → Framework Preview → Outreach Dispatched → Awaiting Intake → Intake Submitted → Final Resolution Drafted → Resolved & Closed | Recovery Resolution | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API). Outreach = Day 1/2/4 cascade (automatic) | Recovery resolution (response draft + submission guide, emailed to owner) |
 - **Business Name** (required)
 - **Category** (required) — select an existing category or choose `+ New category...` and enter a new one
 - **Tone** (optional) — select an existing tone or choose `+ New tone...` and enter a new one
@@ -165,7 +246,7 @@ Click **Create Campaign** to save. You are redirected to the new campaign detail
 
 ---
 
-## 7. Prompts — `/settings/admin/marketing-ops/prompts`
+## 8. Prompts — `/settings/admin/marketing-ops/prompts`
 
 `PromptLibraryClient.tsx` is the template library.
 
@@ -217,7 +298,7 @@ Both modes are valid and share the same goal: producing the seek/fulfill/retaine
 
 ---
 
-## 8. Scorecards — `/settings/admin/marketing-ops/scorecards`
+## 9. Scorecards — `/settings/admin/marketing-ops/scorecards`
 
 `ScorecardClient.tsx` tracks daily activity.
 
@@ -251,7 +332,7 @@ The table lists previous entries with:
 
 ---
 
-## 9. Deliverable Templates — `/settings/admin/marketing-ops/deliverable-templates`
+## 10. Deliverable Templates — `/settings/admin/marketing-ops/deliverable-templates`
 
 `DeliverableTemplateLibraryClient.tsx` manages PDF layout templates used to generate client deliverables.
 
@@ -316,7 +397,7 @@ Example:
 
 ---
 
-## 10. Branding — `/settings/admin/marketing-ops/branding`
+## 11. Branding — `/settings/admin/marketing-ops/branding`
 
 `BrandingConfigClient.tsx` controls the look of every generated deliverable PDF.
 
@@ -355,7 +436,7 @@ Only one config is active at a time. Generated deliverables use the active confi
 
 ---
 
-## 11. Generating and Sending Deliverables
+## 12. Generating and Sending Deliverables
 
 Deliverables are generated from a campaign detail page (`/settings/admin/marketing-ops/campaigns/[id]`).
 
@@ -375,7 +456,7 @@ Deliverables are generated from a campaign detail page (`/settings/admin/marketi
 
 ---
 
-## 12. Tenant Prospecting and Conversion
+## 13. Tenant Prospecting and Conversion
 
 If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acquisition tool.
 
@@ -404,7 +485,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ---
 
-## 13. Common Tasks
+## 14. Common Tasks
 
 ### Create a New Prospect
 
@@ -436,12 +517,15 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ---
 
-## 14. Field Reference
+## 15. Field Reference
 
 ### Campaign Fields
 
 | Field | Purpose |
 |-------|---------|
+| `campaign_category` | Campaign type: `review_management` (default) or `recovery_management` |
+| `cascade_enabled` | Whether the multi-channel cascade is active for this campaign (review campaigns only) |
+| `cascade_config` | Optional JSON config for custom cascade step timing/channels |
 | `business_name` | Prospect business name |
 | `category` | Business category |
 | `city` / `neighborhood` | Location |
@@ -480,7 +564,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Problem | Likely Cause | Fix |
 |---------|--------------|-----|
@@ -489,6 +573,13 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 | Campaign stage won't change | Transition is not in `VALID_TRANSITIONS` | Review allowed stage moves in the campaign detail; some transitions are irreversible. |
 | QR preview link 404s | Preview token expired | Generate a new preview token from the campaign deliverables tab. |
 | Dashboard conversion widget missing | `tenant_prospecting_channel` migration not applied | Apply migration `129_tenant_prospecting_channel.sql`. |
+| Recovery tab is empty | No campaigns with `campaign_category = 'recovery_management'` | Create a new campaign and select "Recovery Management" as the category. |
+| Recovery campaign stuck in Awaiting Owner Intake | Intake token expired (7-day TTL) or cascade exhausted | Wait for the timeout sweep (token TTL + 4 days) or manually transition to `dead`. See `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`. |
+| Recovery AI agent output failed | Schema validation mismatch | Check `mkt_filter_flags_list` for the failed execution. Edit the intake statement and click **Regenerate Draft**. |
+| Owner didn't receive resolution email | Email delivery failed (best-effort) | Check `mkt_outreach_log` for the campaign. The approval still succeeded; manually resend if needed. |
+| Cascade tab missing | Campaign is a recovery campaign | The cascade tab only appears on review campaigns. Recovery campaigns have their own outreach cascade. |
+| Cascade step shows "SKIPPED" | Missing contact info for that channel | Add the missing contact info (email, phone, or social_profiles) to the campaign and disable/re-enable the cascade. |
+| Cascade not firing | Campaign not in `preview_built` or `shown` stage, or latest contact was a response | The cascade only fires for hot-prospect stages with no-response latest contacts. |
 
 ---
 
@@ -523,6 +614,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 - **Files** — attached campaign files.
 - **Deliverables** — generate, download, and mark deliverables as sent.
 - **Stage History** — chronological transition log.
+- **Cascade** — multi-channel cascade controls (see §17).
 
 ---
 
@@ -648,6 +740,27 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 6. **Retention** — transition to `retainer_pitched` and `retainer_won` using a `retainer` prompt.
 7. **Attribution** — `first_touch_source` and `last_touch_source` track which deliverable or demo drove the conversion.
 
+### Use Case: Recovery Management — Dispute Resolution
+
+1. **Identify** — a business has an active complaint on Google Business Profile, BBB, or Yelp. Create a campaign with category "Recovery Management".
+2. **Audit** — run an audit to identify the complaint details. Transition to `audit_identified`.
+3. **Framework** — generate a response framework preview. Transition to `framework_preview_generated`.
+4. **Outreach** — transition to `outreach_dispatched`. The platform auto-generates an intake link and starts the Day 1/2/4 outreach cascade.
+5. **Intake** — the owner clicks the intake link, submits their complaint statement + proposed resolution + attachments. Campaign transitions to `intake_submitted`.
+6. **Draft** — the Recovery AI Agent generates a Response Draft + Submission Guide. Campaign transitions to `final_resolution_drafted`.
+7. **Review** — open the Recovery tab → click the campaign → review the draft. Edit if needed.
+8. **Approve** — click **Approve & Deliver**. Campaign transitions to `resolved_and_closed`. Owner receives the resolution via email.
+
+### Use Case: Multi-Channel Cascade — Re-engaging a Silent Prospect
+
+1. **Identify** — a review campaign in `preview_built` or `shown` hasn't responded to the initial email.
+2. **Enable** — open the campaign → **Cascade** tab → click **Enable Cascade**.
+3. **Day 1** — the cascade fires the primary email (frame preview + grade impact + CTA).
+4. **Day 2** — if unopened, the cascade fires an SMS pointer referencing the email.
+5. **Day 4** — if still unopened, the cascade fires a DM administrative check-in.
+6. **Response** — if the prospect responds at any point, disable the cascade and continue manually.
+7. **Exhaustion** — if all three steps fire with no response, consider transitioning to `lost`.
+
 ### Advice for Prompts
 
 - Start with the **Copy-Paste Bridge** when testing a new AI provider or prompt wording; switch to **Direct API** once the template is stable and you want execution history.
@@ -675,7 +788,25 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 - Use **Category Focus** and **Neighborhood Focus** to spot which verticals and territories convert best.
 - Align scorecard numbers with real campaign stage transitions so pipeline math stays honest.
 
+### Advice for Recovery Management
+
+- **Create recovery campaigns** with category "Recovery Management" when a business has an active dispute on a review platform.
+- **Review the intake carefully** before approving — the owner's statement and proposed resolution shape the AI-generated response.
+- **Edit the draft** if the AI response doesn't match the owner's tone or the platform's requirements. The editable textareas let you refine before approving.
+- **Use Regenerate** if the owner updates their intake statement after the initial draft was generated. The old draft is archived, not deleted.
+- **Approve promptly** — the owner is waiting for the resolution. Once approved, the response is emailed automatically.
+- **Monitor the Recovery tab** for campaigns stuck in `awaiting_owner_intake` — the cascade fires automatically, but if the owner doesn't respond, the campaign will time out to `dead`.
+
+### Advice for the Multi-Channel Cascade
+
+- **Ensure contact info is complete** before enabling the cascade. If `phone` or `social_profiles` are missing, those steps will be skipped.
+- **Use the cascade for high-value prospects** who haven't responded to the initial email — the channel escalation (email → SMS → DM) increases touchpoints without manual effort.
+- **Disable the cascade** once the prospect responds — the auto-follow-up scheduler will resume if the campaign is still a hot prospect.
+- **Monitor the contact log** — if all three steps fire with no response, consider a manual follow-up or transition the campaign to `lost`.
+
 ### Known Gaps and Potential Frictions
+
+> **Production readiness sprint plan:** `docs/RECOVERY_PRODUCTION_READINESS_SPRINT_PLAN.md` tracks the work to close the P0 gaps below before go-live.
 
 - **Cost tracking is backend-only.** `cost_cents` and `tokens_used` are recorded for every execution, but there is no UI dashboard for per-prompt or per-campaign spend yet.
 - **Prompt version rollbacks are not in the UI.** The database stores versions, but the library does not yet let you view or restore an older version.
@@ -687,6 +818,10 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 - **Route coverage warnings** in the test suite (duplicate mount paths) are a pre-existing platform-wide concern and not specific to Marketing Ops.
 - **Payment receipts require a completed payment.** The receipt PDF download link only appears on the campaign detail when revenue records exist.
 - **Coupon validation is server-side only.** The public pay page validates coupons via the backend; client-side total mismatches are rejected.
+- **Recovery resolution email delivery is best-effort.** If the email fails to send, the approval still succeeds. Check `mkt_outreach_log` and manually resend if needed.
+- **Cascade step content is template-based, not AI-generated.** The Day 1/2/4 messages use hardcoded templates per channel. AI-generated cascade content is a future enhancement.
+- **Cascade custom config is API-only.** The UI enables the cascade with default settings. Custom step timing via `cascade_config` JSON requires an API call.
+- **Recovery E2E tests are planned.** The Playwright spec `recovery-ops.spec.ts` is listed in the sprint plan but not yet implemented.
 
 ---
 
@@ -714,21 +849,175 @@ To enable payment collection on a campaign:
 
 ---
 
-## 25. References
+## 25. Recovery Management — Dispute Resolution Pipeline
+
+Recovery Management handles dispute resolution for local businesses that have received complaints on review platforms (Google Business Profile, BBB, Yelp, etc.). The engine drafts a professional response on behalf of the business owner, provides a submission guide, and delivers the approved resolution via email.
+
+### Recovery List — `/settings/admin/marketing-ops/recovery`
+
+`RecoveryTabClient.tsx` shows recovery campaigns grouped by stage. Accessible via:
+- The **Recovery** link in the admin sidebar (under Marketing Ops)
+- The **Recovery** link in the in-module nav panel
+- The **Recovery** tab on the Marketing Ops dashboard (links to the standalone route)
+
+- Campaigns are listed under their current stage badge (Awaiting Owner Intake, Intake Submitted, Final Resolution Drafted, etc.).
+- Click a campaign to open the recovery detail view.
+- Empty state shows a **New Campaign** CTA if no recovery campaigns exist.
+
+### Recovery Detail — `/settings/admin/marketing-ops/recovery/[campaignId]`
+
+`RecoveryDetailClient.tsx` is the recovery campaign workspace.
+
+#### Layout
+
+- **Left column — Owner Intake panel:**
+  - Owner Statement (the complaint description from the business owner)
+  - Proposed Resolution (what the owner wants)
+  - Service Date, Status Flag, Submitted timestamp
+- **Left column — Attachments panel:**
+  - Lists files uploaded by the owner with the intake (screenshots, receipts, etc.)
+- **Right column — Resolution Draft panel:**
+  - **Response Draft** — editable textarea with the AI-generated response
+  - **Submission Guide** — editable textarea with step-by-step submission instructions
+  - Click **Edit** to modify either section inline
+  - Stage badge shows whether the draft is in `final_resolution_drafted` or `resolved_and_closed`
+
+#### Actions
+
+- **Approve & Deliver** — transitions the campaign to `resolved_and_closed` and emails the approved resolution to the owner. Confirmation dialog before executing.
+- **Regenerate Draft** — archives the current draft and re-runs the Recovery AI Agent. A new draft will be available within ~5 minutes (next scheduler pass). Confirmation dialog before executing.
+- **Save Changes** (in edit mode) — saves inline edits to the Response Draft and Submission Guide sections.
+
+#### Recovery AI Agent
+
+- Uses the `recovery_resolution` prompt template (seeded by migration 150).
+- Output schema: `deliverableText` (80–300 words) + `submissionGuide` (50–200 words).
+- Output is validated against a Zod schema. Invalid output → filter flags created, operator can regenerate.
+
+### Owner Intake Form (Public)
+
+The intake form is a public page at `/recovery/intake?token=...`. The owner receives the link via the outreach cascade (Day 1 email).
+
+- The owner enters their complaint statement, proposed resolution, service date, and optional status flag.
+- Attachments can be uploaded (images, PDFs, text files up to 10MB each).
+- On submission, the Recovery AI Agent is automatically enqueued.
+- If the link expires (7-day TTL), the owner sees an expired page with a **Request New Link** button.
+
+### Outreach Cascade (Recovery)
+
+Recovery campaigns in `awaiting_owner_intake` receive an automated outreach sequence:
+
+| Day | Channel | Content |
+|-----|---------|---------|
+| 1   | email   | Frame preview + grade impact + CTA = intake link |
+| 2   | email   | SMS pointer to email (if unopened 24–48h) |
+| 4   | email   | Administrative check-in (if unopened 48h+) |
+
+After Day 4 with no response, the cascade is exhausted. The intake timeout sweep transitions the campaign to `dead` 4 days after the intake token expires.
+
+For the full recovery management technical reference, see `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`.
+
+---
+
+## 26. Multi-Channel Cascade — Review Campaigns
+
+The Multi-Channel Cascade is an opt-in automated outreach sequence for review campaigns. It escalates across channels (email → SMS → DM) based on time elapsed without a response.
+
+### Cascade Tab — Campaign Detail
+
+`CascadePanel.tsx` is rendered in the **Cascade** tab on any review campaign's detail page.
+
+#### Cascade Flow
+
+| Step | Day | Channel | Content |
+|------|-----|---------|---------|
+| 1    | 1   | Email   | Frame preview + grade impact + CTA |
+| 2    | 2   | SMS     | Short reference to email + drop link |
+| 3    | 4   | DM      | Administrative check-in |
+
+#### Enabling the Cascade
+
+1. Open a review campaign → click the **Cascade** tab.
+2. Click **Enable Cascade**.
+3. The cascade starts on the next scheduler pass (runs every 6 hours).
+4. Steps fire automatically based on elapsed time since the previous step (or since `stage_entered_at` for step 1).
+
+#### What You See
+
+- **Flow diagram** — three cards showing Day 1 (Email), Day 2 (SMS), Day 4 (DM). Each card shows:
+  - Green checkmark if the step was fired
+  - Gray X if the step was skipped (missing contact info for that channel)
+  - Empty if the step is pending
+- **Progress summary** — steps fired / remaining / total
+- **Contact log** — chronological list of cascade contacts with channel icon, timestamp, and notes
+- **Active/Inactive badge** — shows whether the cascade is currently enabled
+
+#### Channel Availability
+
+The cascade checks contact info before firing each step:
+
+- **Email** — requires `email` on the campaign
+- **SMS** — requires `phone` on the campaign
+- **DM** — requires at least one entry in `social_profiles`
+
+If a channel's contact info is missing, that step is logged as **SKIPPED** (not fired) so it isn't re-evaluated every pass.
+
+#### Disabling the Cascade
+
+- Click **Disable Cascade** to stop the sequence.
+- Previously fired contacts remain in the log.
+- The `MarketingAutoFollowUpScheduler` automatically resumes handling the campaign if it's a hot prospect.
+
+#### Custom Step Config (Optional)
+
+When enabling the cascade, operators can pass a custom `cascade_config` JSON to override the default Day 1/2/4 timing:
+
+```json
+{
+  "steps": [
+    { "day": 1, "channel": "email", "label": "Custom Day 1" },
+    { "day": 3, "channel": "phone", "label": "Custom Day 3 SMS" },
+    { "day": 7, "channel": "social", "label": "Custom Day 7 DM" }
+  ]
+}
+```
+
+If no config is provided, the default Day 1/2/4 sequence is used.
+
+#### Interaction with Auto-Follow-Up
+
+When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the campaign — the cascade takes over follow-ups. Disabling the cascade returns the campaign to the auto-follow-up scheduler (if it's still a hot prospect).
+
+---
+
+## 27. References
 
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
 - `docs/LocalBiz/tenant_prospecting_channel_sprint_plan.md`
 - `docs/LocalBiz/local_marketing_ops_payment_collection_sprint_plan.md`
 - `docs/LocalBiz/MARKETING_OPS_USER_GUIDE_GAP_CLOSE_SPRINT.md`
+- `docs/RECOVERY_MANAGEMENT_ENGINE_SPRINT_PLAN.md`
+- `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/MarketingOpsDashboardClient.tsx`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/RecoveryTabClient.tsx`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/recovery/[campaignId]/RecoveryDetailClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/campaigns/[id]/CampaignDetailClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/filter-review/FilterReviewClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/prompts/PromptLibraryClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/prompts/[id]/PromptWorkspaceClient.tsx`
 - `apps/web/src/app/marketing/pay/PayPageClient.tsx`
+- `apps/web/src/app/recovery/intake/IntakePageClient.tsx`
 - `apps/web/src/services/MarketingOpsService.ts`
+- `apps/web/src/services/RecoveryOpsService.ts`
 - `apps/web/src/components/marketing-ops/StageBadge.tsx`
+- `apps/web/src/components/marketing-ops/CascadePanel.tsx`
 - `apps/api/src/services/MarketingCampaignService.ts`
+- `apps/api/src/services/RecoveryResolutionService.ts`
+- `apps/api/src/services/RecoveryCascadeService.ts`
+- `apps/api/src/services/ReviewCascadeService.ts`
+- `apps/api/src/services/DisputeIntakeService.ts`
 - `apps/api/src/routes/marketing-ops-public.ts`
+- `apps/api/src/routes/recovery-intake-public.ts`
 - `apps/api/src/services/subscription/SubscriptionBillingService.ts`

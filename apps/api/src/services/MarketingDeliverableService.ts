@@ -26,7 +26,8 @@ export type DeliverableType =
   | 'testimonial_cards'
   | 'nap_report'
   | 'seo_content'
-  | 'lead_magnet';
+  | 'lead_magnet'
+  | 'recovery_resolution';
 
 export interface DeliverableTemplateInput {
   name: string;
@@ -439,6 +440,7 @@ export class MarketingDeliverableService extends BaseService {
       nap_report: 'NAP Consistency Report',
       seo_content: 'SEO Content',
       lead_magnet: 'Lead Magnet',
+      recovery_resolution: 'Recovery Resolution',
     };
     return labels[type] || type;
   }
@@ -450,6 +452,56 @@ export class MarketingDeliverableService extends BaseService {
         { type: 'body', text: 'Content will be populated from AI execution output.' },
       ],
     };
+  }
+
+  // ====================
+  // RECOVERY RESOLUTION RENDERING
+  // ====================
+
+  /**
+   * Render a recovery_resolution deliverable as structured text blocks for
+   * the operator preview. Reads the two mkt_deliverable_section rows
+   * (response_draft + submission_guide) and returns them as labeled blocks.
+   *
+   * Sprint 3 — Recovery Management Engine.
+   */
+  async renderRecoveryResolution(deliverableId: string, ctx?: RequestCtx): Promise<{
+    deliverableId: string;
+    deliverableType: string;
+    status: string;
+    sections: { sectionType: string; title: string; content: string; status: string }[];
+  } | null> {
+    try {
+      const deliverable = await this.prisma.mkt_deliverables_list.findUnique({
+        where: { id: deliverableId },
+      });
+      if (!deliverable || deliverable.deliverable_type !== 'recovery_resolution') {
+        return null;
+      }
+
+      const sections = await this.prisma.mkt_deliverable_section.findMany({
+        where: { deliverable_id: deliverableId },
+        orderBy: { section_index: 'asc' },
+      });
+
+      return {
+        deliverableId,
+        deliverableType: deliverable.deliverable_type,
+        status: deliverable.status,
+        sections: sections.map((s: any) => ({
+          sectionType: s.section_type,
+          title: s.title || '',
+          content: s.content || '',
+          status: s.status || 'draft',
+        })),
+      };
+    } catch (error) {
+      logger.error('Failed to render recovery resolution deliverable', ctx, {
+        error: (error as Error).message,
+        deliverableId,
+      });
+      throw this.handleError(error, ctx);
+    }
   }
 
   private renderLayoutSections(

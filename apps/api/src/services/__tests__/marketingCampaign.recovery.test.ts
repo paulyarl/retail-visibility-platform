@@ -1,0 +1,290 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock prisma + logger + id-generator + dependencies so we can test the
+// transition logic in isolation without a DB.
+const { mockCampaignsList, mockStageHistory } = vi.hoisted(() => ({
+  mockCampaignsList: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+  mockStageHistory: { create: vi.fn() },
+}));
+
+vi.mock('../../prisma', () => ({
+  prisma: {
+    mkt_campaigns_list: mockCampaignsList,
+    mkt_stage_history_list: mockStageHistory,
+  },
+}));
+
+vi.mock('../../logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('../../lib/id-generator', () => ({
+  generateCampaignId: () => 'mcamp-test-001',
+  generateStageHistoryId: () => 'msh-test-001',
+}));
+
+vi.mock('../MarketingCategoryToneService', () => ({
+  default: { getPresetByCategory: vi.fn().mockResolvedValue(null) },
+}));
+
+vi.mock('../MarketingServiceCategoryService', () => ({
+  default: { getLabel: vi.fn().mockResolvedValue(null) },
+}));
+
+import MarketingCampaignService, {
+  transitionsFor,
+  CAMPAIGN_CATEGORY_DEFAULT,
+} from '../MarketingCampaignService';
+
+const service = MarketingCampaignService.getInstance();
+
+// ====================
+// REVIEW TRACK REGRESSION
+// ====================
+// The actual map from MarketingCampaignService.ts — must not change when
+// recovery transitions are added. Includes the `closed` stage and one-way
+// `lost → seek` / `dead → seek` resurrection paths.
+
+describe('review track transitions (regression)', () => {
+  it('transitionsFor(review_management) returns the existing map unchanged', () => {
+    const map = transitionsFor('review_management');
+    expect(map).toEqual({
+      seek:             ['preview_built', 'dead'],
+      preview_built:    ['shown', 'dead'],
+      shown:            ['paid', 'lost', 'tenant_onboarded'],
+      paid:             ['delivered', 'tenant_onboarded'],
+      delivered:        ['retainer_pitched', 'closed', 'tenant_onboarded'],
+      retainer_pitched: ['retainer_won', 'closed'],
+      retainer_won:     ['lost', 'tenant_onboarded'],
+      lost:             ['seek', 'tenant_onboarded'],
+      dead:             ['seek', 'tenant_onboarded'],
+    });
+  });
+
+  it('transitionsFor() defaults to review_management', () => {
+    expect(transitionsFor()).toEqual(transitionsFor('review_management'));
+  });
+
+  it('CAMPAIGN_CATEGORY_DEFAULT is review_management', () => {
+    expect(CAMPAIGN_CATEGORY_DEFAULT).toBe('review_management');
+  });
+
+  it('isValidTransition uses review map by default', () => {
+    expect(service.isValidTransition('seek', 'preview_built')).toBe(true);
+    expect(service.isValidTransition('seek', 'paid')).toBe(false);
+    expect(service.isValidTransition('delivered', 'closed')).toBe(true);
+    expect(service.isValidTransition('lost', 'seek')).toBe(true);
+    expect(service.isValidTransition('dead', 'seek')).toBe(true);
+    // one-way resurrection: seek cannot go back to lost
+    expect(service.isValidTransition('seek', 'lost')).toBe(false);
+  });
+
+  it('isValidTransition(null, anything) is true (initial transition)', () => {
+    expect(service.isValidTransition(null, 'seek')).toBe(true);
+    expect(service.isValidTransition(null, 'audit_identified')).toBe(true);
+  });
+});
+
+// ====================
+// RECOVERY TRACK
+// ====================
+
+describe('recovery track transitions', () => {
+  it('transitionsFor(recovery_management) returns the recovery map', () => {
+    const map = transitionsFor('recovery_management');
+    expect(map).toEqual({
+      audit_identified:            ['framework_preview_generated', 'dead'],
+      framework_preview_generated: ['outreach_dispatched', 'dead'],
+      outreach_dispatched:         ['awaiting_owner_intake', 'dead'],
+      awaiting_owner_intake:       ['intake_submitted', 'outreach_dispatched', 'dead'],
+      intake_submitted:            ['final_resolution_drafted'],
+      final_resolution_drafted:    ['owner_approved'],
+      owner_approved:              ['resolved_and_closed'],
+      resolved_and_closed:         [],
+      dead:                        ['audit_identified'],
+    });
+  });
+
+  it('isValidTransition uses recovery map when category is passed', () => {
+    // Happy path from the spec's state machine
+    expect(service.isValidTransition('audit_identified', 'framework_preview_generated', 'recovery_management')).toBe(true);
+    expect(service.isValidTransition('framework_preview_generated', 'outreach_dispatched', 'recovery_management')).toBe(true);
+    expect(service.isValidTransition('outreach_dispatched', 'awaiting_owner_intake', 'recovery_management')).toBe(true);
+    expect(service.isValidTransition('awaiting_owner_intake', 'intake_submitted', 'recovery_management')).toBe(true);
+    expect(service.isValidTransition('intake_submitted', 'final_resolution_drafted', 'recovery_management')).toBe(true);
+    expect(service.isValidTransition('final_resolution_drafted', 'owner_approved', 'recovery_management')).toBe(true);
+    expect(service.isValidTransition('owner_approved', 'resolved_and_closed', 'recovery_management')).toBe(true);
+  });
+
+  it('awaiting_owner_intake can re-dispatch to outreach_dispatched (token expiry / cascade re-touch)', () => {
+    expect(service.isValidTransition('awaiting_owner_intake', 'outreach_dispatched', 'recovery_management')).toBe(true);
+  });
+
+  it('awaiting_owner_intake can go to dead (cascade exhaustion / timeout)', () => {
+    expect(service.isValidTransition('awaiting_owner_intake', 'dead', 'recovery_management')).toBe(true);
+  });
+
+  it('dead resurrects to audit_identified (re-engage after cooldown)', () => {
+    expect(service.isValidTransition('dead', 'audit_identified', 'recovery_management')).toBe(true);
+  });
+
+  it('resolved_and_closed is terminal (no outgoing transitions)', () => {
+    expect(service.isValidTransition('resolved_and_closed', 'audit_identified', 'recovery_management')).toBe(false);
+    expect(service.isValidTransition('resolved_and_closed', 'dead', 'recovery_management')).toBe(false);
+  });
+
+  it('rejects illegal recovery jumps', () => {
+    // Cannot skip stages
+    expect(service.isValidTransition('audit_identified', 'intake_submitted', 'recovery_management')).toBe(false);
+    expect(service.isValidTransition('outreach_dispatched', 'final_resolution_drafted', 'recovery_management')).toBe(false);
+    expect(service.isValidTransition('intake_submitted', 'owner_approved', 'recovery_management')).toBe(false);
+    // Cannot go backwards (except dead → audit_identified and awaiting_owner_intake → outreach_dispatched)
+    expect(service.isValidTransition('intake_submitted', 'awaiting_owner_intake', 'recovery_management')).toBe(false);
+    expect(service.isValidTransition('final_resolution_drafted', 'intake_submitted', 'recovery_management')).toBe(false);
+    expect(service.isValidTransition('owner_approved', 'final_resolution_drafted', 'recovery_management')).toBe(false);
+  });
+
+  it('rejects review-track stages on the recovery map', () => {
+    expect(service.isValidTransition('audit_identified', 'seek', 'recovery_management')).toBe(false);
+    expect(service.isValidTransition('audit_identified', 'paid', 'recovery_management')).toBe(false);
+  });
+
+  it('rejects recovery-track stages on the review map', () => {
+    expect(service.isValidTransition('seek', 'audit_identified')).toBe(false);
+    expect(service.isValidTransition('paid', 'intake_submitted')).toBe(false);
+  });
+});
+
+// ====================
+// transitionStage uses campaign_category from the loaded row
+// ====================
+
+describe('transitionStage reads campaign_category', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStageHistory.create.mockResolvedValue({});
+  });
+
+  it('allows recovery transitions for a recovery_management campaign', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({
+      id: 'mcamp-1',
+      stage: 'audit_identified',
+      campaign_category: 'recovery_management',
+    });
+    mockCampaignsList.update.mockImplementation(({ where, data }) =>
+      Promise.resolve({ id: where.id, ...data }),
+    );
+
+    const result = await service.transitionStage({
+      campaignId: 'mcamp-1',
+      toStage: 'framework_preview_generated',
+      triggerType: 'manual',
+    });
+
+    expect(result.stage).toBe('framework_preview_generated');
+    expect(mockCampaignsList.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mcamp-1' },
+        data: expect.objectContaining({ stage: 'framework_preview_generated' }),
+      }),
+    );
+  });
+
+  it('rejects recovery transitions for a review_management campaign', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({
+      id: 'mcamp-2',
+      stage: 'seek',
+      campaign_category: 'review_management',
+    });
+
+    await expect(
+      service.transitionStage({
+        campaignId: 'mcamp-2',
+        toStage: 'audit_identified',
+        triggerType: 'manual',
+      }),
+    ).rejects.toThrow('Invalid stage transition');
+
+    expect(mockCampaignsList.update).not.toHaveBeenCalled();
+  });
+
+  it('defaults to review_management when campaign_category is null (legacy rows)', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({
+      id: 'mcamp-3',
+      stage: 'seek',
+      campaign_category: null,
+    });
+
+    await expect(
+      service.transitionStage({
+        campaignId: 'mcamp-3',
+        toStage: 'audit_identified',
+        triggerType: 'manual',
+      }),
+    ).rejects.toThrow('Invalid stage transition');
+  });
+
+  it('allows review transitions for a review_management campaign', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue({
+      id: 'mcamp-4',
+      stage: 'seek',
+      campaign_category: 'review_management',
+    });
+    mockCampaignsList.update.mockImplementation(({ where, data }) =>
+      Promise.resolve({ id: where.id, ...data }),
+    );
+
+    const result = await service.transitionStage({
+      campaignId: 'mcamp-4',
+      toStage: 'preview_built',
+      triggerType: 'manual',
+    });
+
+    expect(result.stage).toBe('preview_built');
+  });
+});
+
+// ====================
+// createCampaign sets initial stage based on category
+// ====================
+
+describe('createCampaign sets initial stage by category', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStageHistory.create.mockResolvedValue({});
+    mockCampaignsList.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...data, id: data.id }),
+    );
+  });
+
+  it('creates a review campaign with stage=seek by default', async () => {
+    const result = await service.createCampaign({
+      category: 'plumber',
+      city: 'Austin',
+    });
+
+    expect(result.stage).toBe('seek');
+    expect(result.campaign_category).toBe('review_management');
+    expect(mockStageHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ to_stage: 'seek' }),
+      }),
+    );
+  });
+
+  it('creates a recovery campaign with stage=audit_identified', async () => {
+    const result = await service.createCampaign({
+      category: 'plumber',
+      city: 'Austin',
+      campaignCategory: 'recovery_management',
+    });
+
+    expect(result.stage).toBe('audit_identified');
+    expect(result.campaign_category).toBe('recovery_management');
+    expect(mockStageHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ to_stage: 'audit_identified' }),
+      }),
+    );
+  });
+});

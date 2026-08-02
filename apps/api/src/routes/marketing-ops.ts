@@ -142,6 +142,10 @@ import ReviewSlotService from '../services/deliverable/ReviewSlotService';
 import DeliverableSectionService from '../services/deliverable/DeliverableSectionService';
 import DeliverableAssemblyService from '../services/deliverable/DeliverableAssemblyService';
 import DeliverableRenderService from '../services/deliverable/DeliverableRenderService';
+import RecoveryResolutionService from '../services/RecoveryResolutionService';
+import disputeIntakeService from '../services/DisputeIntakeService';
+import ReviewCascadeService from '../services/ReviewCascadeService';
+import { prisma } from '../prisma';
 
 const router = Router();
 
@@ -2874,6 +2878,323 @@ router.get('/deliverable/:campaignId/render/status', async (req: any, res: Respo
 router.post('/deliverable/:campaignId/render', async (req: any, res: Response) => {
   try {
     const result = await DeliverableRenderService.renderDeliverable(req.params.campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Recovery Management Admin Endpoints ──────────────────────────────────
+// Sprint 4 — Recovery Management Engine.
+// All routes are admin-authed (mounted at /api/admin/marketing-ops).
+
+// List recovery campaigns grouped by stage
+router.get('/recovery/campaigns', async (req: any, res: Response) => {
+  try {
+    const campaigns = await prisma.mkt_campaigns_list.findMany({
+      where: { campaign_category: 'recovery_management' },
+      orderBy: { stage_entered_at: 'desc' },
+      select: {
+        id: true,
+        display_id: true,
+        business_name: true,
+        category: true,
+        city: true,
+        stage: true,
+        stage_entered_at: true,
+        notes: true,
+        assigned_to: true,
+        created_at: true,
+      },
+    });
+
+    // Group by stage
+    const byStage: Record<string, any[]> = {};
+    for (const c of campaigns) {
+      if (!byStage[c.stage]) byStage[c.stage] = [];
+      byStage[c.stage].push(c);
+    }
+
+    res.json({ success: true, data: { campaigns, byStage, total: campaigns.length } });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get full intake + attachments for a campaign
+router.get('/recovery/:campaignId/intake', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const intake = await prisma.mkt_dispute_intake.findUnique({
+      where: { campaign_id: campaignId },
+      include: { mkt_dispute_attachments: true },
+    });
+
+    if (!intake) {
+      return res.status(404).json({ success: false, error: 'No dispute intake found for this campaign' });
+    }
+
+    res.json({ success: true, data: intake });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get current resolution draft + sections
+router.get('/recovery/:campaignId/draft', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const deliverable = await prisma.mkt_deliverables_list.findFirst({
+      where: {
+        campaign_id: campaignId,
+        deliverable_type: 'recovery_resolution',
+        status: { in: ['drafted', 'approved'] },
+      },
+      orderBy: { generated_at: 'desc' },
+      include: {
+        mkt_deliverable_sections: { orderBy: { section_index: 'asc' } },
+      },
+    });
+
+    if (!deliverable) {
+      return res.status(404).json({ success: false, error: 'No recovery resolution draft found' });
+    }
+
+    res.json({ success: true, data: deliverable });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Edit draft sections (response_draft / submission_guide)
+const recoveryDraftEditSchema = z.object({
+  responseDraft: z.string().optional(),
+  submissionGuide: z.string().optional(),
+});
+
+router.patch('/recovery/:campaignId/draft', async (req: any, res: Response) => {
+  try {
+    const parsed = recoveryDraftEditSchema.parse(req.body);
+    const { campaignId } = req.params;
+
+    const deliverable = await prisma.mkt_deliverables_list.findFirst({
+      where: {
+        campaign_id: campaignId,
+        deliverable_type: 'recovery_resolution',
+        status: 'drafted',
+      },
+      orderBy: { generated_at: 'desc' },
+    });
+
+    if (!deliverable) {
+      return res.status(404).json({ success: false, error: 'No editable recovery resolution draft found' });
+    }
+
+    // Update sections
+    if (parsed.responseDraft !== undefined) {
+      const section = await prisma.mkt_deliverable_section.findFirst({
+        where: { deliverable_id: deliverable.id, section_type: 'response_draft' },
+      });
+      if (section) {
+        await prisma.mkt_deliverable_section.update({
+          where: { id: section.id },
+          data: { content: parsed.responseDraft, source: 'operator_edit', status: 'edited' },
+        });
+      }
+    }
+
+    if (parsed.submissionGuide !== undefined) {
+      const section = await prisma.mkt_deliverable_section.findFirst({
+        where: { deliverable_id: deliverable.id, section_type: 'submission_guide' },
+      });
+      if (section) {
+        await prisma.mkt_deliverable_section.update({
+          where: { id: section.id },
+          data: { content: parsed.submissionGuide, source: 'operator_edit', status: 'edited' },
+        });
+      }
+    }
+
+    res.json({ success: true, data: { deliverableId: deliverable.id, updated: true } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Approve draft → resolved_and_closed (single action, two-step transition)
+router.post('/recovery/:campaignId/approve', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.approveDraft(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Regenerate draft (re-run the agent)
+router.post('/recovery/:campaignId/regenerate', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.regenerate(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Recovery Dual-Mode AI Surface (mirrors review pipeline) ──────────────
+
+// Render prompt text for copy-paste bridge (external AI)
+router.get('/recovery/:campaignId/prompt-text', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.renderPromptText(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Import external AI result (copy-paste bridge)
+const importResultSchema = z.object({
+  raw_output: z.string().min(10, 'raw_output must be at least 10 characters'),
+});
+
+router.post('/recovery/:campaignId/import-result', async (req: any, res: Response) => {
+  try {
+    const parsed = importResultSchema.parse(req.body || {});
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.importExternalResult(
+      campaignId,
+      parsed.raw_output,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Direct execute via API (enqueue + run immediately)
+router.post('/recovery/:campaignId/execute', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.executeDirect(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get delivery status for a recovery campaign (outreach log + deliverable)
+router.get('/recovery/:campaignId/delivery-status', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    // Find the most recent delivery-related outreach log entry
+    const deliveryLog = await prisma.mkt_outreach_log.findFirst({
+      where: {
+        campaign_id: campaignId,
+        notes: { contains: 'Recovery resolution delivery' },
+      },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        delivery_status: true,
+        delivery_attempts: true,
+        last_delivery_error: true,
+        retry_after: true,
+        created_at: true,
+        notes: true,
+      },
+    });
+
+    // Find the approved deliverable
+    const deliverable = await prisma.mkt_deliverables_list.findFirst({
+      where: {
+        campaign_id: campaignId,
+        deliverable_type: 'recovery_resolution',
+        status: 'approved',
+      },
+      select: {
+        id: true,
+        delivery_status: true,
+        delivered_at: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        deliveryLog,
+        deliverable,
+      },
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Manually resend a failed delivery
+router.post('/recovery/:campaignId/resend-delivery', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.resendDelivery(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Multi-Channel Cascade (Review Campaigns) ─────────────────────────────
+// Operator opts-in a review campaign to the email → SMS → DM cascade.
+
+// Enable cascade for a campaign (with optional custom step config)
+const cascadeEnableSchema = z.object({
+  cascade_config: z.any().optional(),
+});
+
+router.post('/:campaignId/cascade/enable', async (req: any, res: Response) => {
+  try {
+    const parsed = cascadeEnableSchema.parse(req.body || {});
+    const { campaignId } = req.params;
+    const result = await ReviewCascadeService.enableCascade(
+      campaignId,
+      parsed.cascade_config,
+      getCtx(req),
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Disable cascade for a campaign
+router.post('/:campaignId/cascade/disable', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await ReviewCascadeService.disableCascade(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Get cascade status for a campaign
+router.get('/:campaignId/cascade/status', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await ReviewCascadeService.getCascadeStatus(campaignId, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));

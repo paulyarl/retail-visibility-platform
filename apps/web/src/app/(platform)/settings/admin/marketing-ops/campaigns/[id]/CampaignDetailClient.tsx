@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
+import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
@@ -15,8 +16,10 @@ import CityOverviewSection from '@/components/marketing-ops/CityOverviewSection'
 import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard';
 import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCard';
 import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewResponsePipelineCard';
+import CascadePanel from '@/components/marketing-ops/CascadePanel';
+import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage' | 'cascade';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -292,6 +295,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'prompts', label: 'Prompts' },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
     { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
+    { key: 'cascade', label: 'Cascade' },
   ];
 
   return (
@@ -552,6 +556,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 {/* Business Contact card — visible before preview_built so the
                     operator has the right outreach channel at hand. */}
                 <BusinessContactCard campaign={campaign} onEnriched={fetchCampaign} />
+                {/* Channel Readiness — shows email/phone/social/website availability
+                    + cascade readiness indicator. */}
+                <ChannelReadinessWidget campaignId={campaign.id} />
                 {/* Outreach & Follow-Up card — only for business-scope campaigns
                     in outreach stages (preview_built/shown/paid). */}
                 {campaign.scope === 'business'
@@ -670,7 +677,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-gray-400">{new Date(rev.recorded_at).toLocaleDateString()}</span>
                               <a
-                                href={marketingOpsService.getReceiptUrl(campaignId)}
+                                href={marketingPayPublicService.getReceiptUrl(campaignId)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -1020,6 +1027,10 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   </div>
                 )}
               </div>
+            )}
+
+            {activeTab === 'cascade' && campaign && (
+              <CascadePanel campaignId={campaign.id} />
             )}
           </>
         ) : (

@@ -26,6 +26,10 @@ export type CampaignStage =
   | 'dead'
   | 'tenant_onboarded';
 
+// Recovery Management stages run on the same stage column; literals are
+// app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
+export type CampaignCategory = 'review_management' | 'recovery_management';
+
 export type ConversionSource =
   | 'qr_deliverable'
   | 'demo_storefront'
@@ -67,6 +71,7 @@ export interface Campaign {
   id: string;
   display_id: string | null;
   scope: CampaignScope;
+  campaign_category?: CampaignCategory;
   business_name: string | null;
   category: string;
   city: string;
@@ -818,37 +823,6 @@ export interface DemoStorefrontResult {
   demoUrl: string;
 }
 
-export interface PayPageData {
-  campaignId: string;
-  businessName: string;
-  category: string;
-  city: string;
-  serviceCategory: string | null;
-  serviceCategoryLabel: string;
-  packagePriceCents: number;
-  subscriptionTierId: string | null;
-  couponCode: string | null;
-  tokenType: string;
-  deliverableId: string | null;
-  alreadyPaid: boolean;
-}
-
-export interface CheckoutResult {
-  clientSecret: string;
-  paymentIntentId: string;
-  amountCents: number;
-  discountCents: number;
-  originalPriceCents: number;
-}
-
-export interface PayConfirmResult {
-  campaignId: string;
-  stage: string;
-  amountCents: number;
-  gatewayTransactionId: string;
-  receiptUrl: string;
-}
-
 export interface MarketingRevenue {
   id: string;
   campaign_id: string;
@@ -874,6 +848,7 @@ export interface ServiceCategory {
 
 export interface CampaignCreateInput {
   scope?: CampaignScope;
+  campaign_category?: CampaignCategory;
   business_name?: string;
   category: string;
   city: string;
@@ -1110,6 +1085,7 @@ class MarketingOpsService extends AdminApiSingleton {
   async listCampaigns(filters?: {
     stage?: CampaignStage;
     scope?: CampaignScope;
+    campaignCategory?: CampaignCategory;
     category?: string;
     city?: string;
     assignedTo?: string;
@@ -1123,6 +1099,7 @@ class MarketingOpsService extends AdminApiSingleton {
     const params = new URLSearchParams();
     if (filters?.stage) params.set('stage', filters.stage);
     if (filters?.scope) params.set('scope', filters.scope);
+    if (filters?.campaignCategory) params.set('campaignCategory', filters.campaignCategory);
     if (filters?.category) params.set('category', filters.category);
     if (filters?.city) params.set('city', filters.city);
     if (filters?.assignedTo) params.set('assignedTo', filters.assignedTo);
@@ -2263,63 +2240,9 @@ class MarketingOpsService extends AdminApiSingleton {
 
   // ====================
   // PUBLIC PAYMENT (no auth — ptoken gated)
+  // Moved to MarketingPayPublicService (extends PublicApiSingleton) —
+  // raw fetch is forbidden per deploy-service-extending-base-singleton.
   // ====================
-
-  async getPayPageData(ptoken: string): Promise<PayPageData> {
-    const res = await fetch(`/api/public/marketing/pay?ptoken=${encodeURIComponent(ptoken)}`);
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || 'Failed to load pay page');
-    }
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Failed to load pay page');
-    }
-    return json.data;
-  }
-
-  async createCheckout(ptoken: string, couponCode?: string): Promise<CheckoutResult> {
-    const res = await fetch('/api/public/marketing/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptoken, couponCode }),
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Failed to create checkout session');
-    }
-    return json.data;
-  }
-
-  async validateCoupon(ptoken: string, couponCode: string, amountCents: number): Promise<any> {
-    const res = await fetch('/api/public/marketing/coupons/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptoken, couponCode, amountCents }),
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Invalid coupon code');
-    }
-    return json.data;
-  }
-
-  async confirmPayment(ptoken: string, paymentIntentId: string, couponCode?: string, subscriptionTierId?: string): Promise<PayConfirmResult> {
-    const res = await fetch('/api/public/marketing/pay/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptoken, paymentIntentId, couponCode, subscriptionTierId }),
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || 'Failed to confirm payment');
-    }
-    return json.data;
-  }
-
-  getReceiptUrl(campaignId: string): string {
-    return `/api/public/marketing/receipt/${campaignId}`;
-  }
 
   // ─── Review Response Pipeline (Sprint 4) ─────────────────────────────────
   async listReviewPipelines(campaignId: string): Promise<ReviewResponsePipeline[]> {
@@ -3203,6 +3126,67 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-render');
     return result.data?.data ?? result.data;
   }
+
+  // ─── Cascade methods ───────────────────────────────────────────
+
+  async enableCascade(campaignId: string, config?: any): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/enable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ cascade_config: config }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to enable cascade (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async disableCascade(campaignId: string): Promise<any> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/disable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to disable cascade (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async getCascadeStatus(campaignId: string): Promise<CascadeStatus> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/cascade/status`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to get cascade status (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+}
+
+export interface CascadeStatus {
+  campaignId: string;
+  cascadeEnabled: boolean;
+  cascadeConfig: any;
+  stepsFired: number;
+  stepsRemaining: number;
+  totalSteps: number;
+  contacts: Array<{
+    id: string;
+    contactDate: string;
+    channel: string;
+    outcome: string;
+    notes: string;
+  }>;
 }
 
 // ─── Deliverable Construction Types ──────────────────────────────────────
@@ -3308,3 +3292,64 @@ export interface RenderResult {
 const marketingOpsService = MarketingOpsService.getInstance();
 export { marketingOpsService, MarketingOpsService };
 export default marketingOpsService;
+
+// ─── Cascade methods (added to the prototype for use by CascadePanel) ──────
+
+export interface CascadeStatus {
+  campaignId: string;
+  cascadeEnabled: boolean;
+  cascadeConfig: any;
+  stepsFired: number;
+  stepsRemaining: number;
+  totalSteps: number;
+  contacts: Array<{
+    id: string;
+    contactDate: string;
+    channel: string;
+    outcome: string;
+    notes: string;
+  }>;
+}
+
+MarketingOpsService.prototype.enableCascade = async function (campaignId: string, config?: any): Promise<any> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/enable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ cascade_config: config }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to enable cascade (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};
+
+MarketingOpsService.prototype.disableCascade = async function (campaignId: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/disable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to disable cascade (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};
+
+MarketingOpsService.prototype.getCascadeStatus = async function (campaignId: string): Promise<CascadeStatus> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/cascade/status`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to get cascade status (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};

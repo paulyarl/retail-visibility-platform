@@ -57,6 +57,7 @@ export class MarketingAutoFollowUpScheduler extends BaseService {
         where: {
           is_hot_prospect: true,
           hot_prospect_deprioritized: false,
+          cascade_enabled: false, // skip cascade-opted campaigns — ReviewCascadeService handles them
           stage: { in: ['preview_built', 'shown'] },
         },
         select: {

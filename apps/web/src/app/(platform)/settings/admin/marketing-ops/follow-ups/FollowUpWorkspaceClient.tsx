@@ -20,7 +20,7 @@
  *   4. Execute (AI generation) or Import (external paste)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Play, Copy, Upload, AlertTriangle, CheckCircle, XCircle, Mail, MailOpen } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, {
@@ -82,6 +82,18 @@ export default function FollowUpWorkspaceClient() {
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
   const [copied, setCopied] = useState(false);
+
+  // Filter to review-management campaigns only.
+  // Follow-ups build on the review pipeline's opener (A1-A4 archetype +
+  // close_variant). Recovery campaigns have their own outreach cycle
+  // (Day 1/2/4 cascade handled by RecoveryCascadeService) and are
+  // intentionally excluded here.
+  const reviewCampaigns = useMemo(
+    () => campaigns.filter(
+      (c) => (c.campaign_category ?? 'review_management') === 'review_management',
+    ),
+    [campaigns],
+  );
 
   // ─── Data fetching ─────────────────────────────────────────────────────
 
@@ -233,16 +245,28 @@ export default function FollowUpWorkspaceClient() {
 
   return (
     <div className="space-y-6">
+      {/* ─── Page header — Review Management only ──────────────────────── */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
+        <h1 className="text-base font-semibold text-gray-900 dark:text-white">Follow-Ups — Review Management</h1>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Follow-up messages for review-management campaigns that didn&apos;t reply to the opener.
+          Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
+        </p>
+      </div>
+
       {/* ─── Campaign Selector ──────────────────────────────────────────── */}
       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Campaign</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Campaign — Review Management</h2>
+          <span className="text-xs text-gray-400 dark:text-gray-500">Recovery campaigns excluded</span>
+        </div>
         <select
           value={selectedCampaignId}
           onChange={(e) => setSelectedCampaignId(e.target.value)}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white dark:bg-neutral-900 dark:border-neutral-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">— Select a campaign —</option>
-          {campaigns.map((c) => (
+          {reviewCampaigns.map((c) => (
             <option key={c.id} value={c.id}>
               {c.business_name} · {c.city} · {c.stage}
             </option>
@@ -250,7 +274,13 @@ export default function FollowUpWorkspaceClient() {
         </select>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Follow-ups require an opener to exist for the selected campaign. The opener&apos;s archetype and close variant are inherited.
+          Recovery campaigns use their own outreach cycle (Day 1/2/4 cascade on the Recovery tab).
         </p>
+        {reviewCampaigns.length === 0 && campaigns.length > 0 && (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            No review-management campaigns found. All current campaigns are recovery-management campaigns, which use the Day 1/2/4 cascade instead.
+          </p>
+        )}
       </div>
 
       {/* ─── Resolve Error ──────────────────────────────────────────────── */}

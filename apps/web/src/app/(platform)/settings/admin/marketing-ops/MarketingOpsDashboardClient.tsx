@@ -156,6 +156,21 @@ export default function MarketingOpsDashboardClient() {
           </div>
         )}
 
+        {/* Tab switcher — Dashboard is the current page; Recovery links to its own route */}
+        <div className="mb-6 border-b border-gray-200 dark:border-neutral-700">
+          <nav className="flex gap-4">
+            <span className="px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400">
+              Dashboard
+            </span>
+            <Link
+              href="/settings/admin/marketing-ops/recovery"
+              className="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            >
+              Recovery
+            </Link>
+          </nav>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />

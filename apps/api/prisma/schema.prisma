@@ -6173,6 +6173,9 @@ model mkt_campaigns_list {
   hot_prospect_set_at                                       DateTime?                        @db.Timestamptz(6)
   hot_prospect_deprioritized                                Boolean                          @default(false)
   auto_followup_count                                       Int                              @default(0)
+  campaign_category                                         String                           @default("review_management") @db.VarChar(30)
+  cascade_enabled                                           Boolean                          @default(false)
+  cascade_config                                            Json?                            @db.Json
   marketing_revenue                                         marketing_revenue[]
   mkt_audits_list                                           mkt_audits_list[]
   tenants_mkt_campaigns_list_demo_tenant_idTotenants        tenants?                         @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
@@ -6183,6 +6186,7 @@ model mkt_campaigns_list {
   mkt_deliverable_review_slot                               mkt_deliverable_review_slot[]
   mkt_deliverable_section                                   mkt_deliverable_section[]
   mkt_deliverables_list                                     mkt_deliverables_list[]
+  mkt_dispute_intake                                        mkt_dispute_intake?
   mkt_files_list                                            mkt_files_list[]
   mkt_outreach_closers_list                                 mkt_outreach_closers_list[]
   mkt_outreach_contacts_list                                mkt_outreach_contacts_list[]
@@ -6208,6 +6212,7 @@ model mkt_campaigns_list {
   @@index([retainer], map: "idx_mkt_campaigns_retainer")
   @@index([tone], map: "idx_mkt_campaigns_tone")
   @@index([scope], map: "idx_mkt_campaigns_scope")
+  @@index([campaign_category], map: "idx_mkt_campaigns_campaign_category")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -6250,6 +6255,8 @@ model mkt_deliverables_list {
   sent_method                    String?                          @db.VarChar(50)
   created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
   updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  delivery_status                String?                          @db.VarChar(20)
+  delivered_at                   DateTime?                        @db.Timestamptz(6)
   mkt_deliverable_preview_tokens mkt_deliverable_preview_tokens[]
   mkt_deliverable_review_slots   mkt_deliverable_review_slot[]
   mkt_deliverable_sections       mkt_deliverable_section[]
@@ -6564,6 +6571,10 @@ model mkt_outreach_log {
   data_fresh_at          DateTime?          @db.Timestamptz(6)
   preview_token          String?            @db.VarChar(255)
   created_at             DateTime           @default(now()) @db.Timestamptz(6)
+  delivery_status        String?            @default("sent") @db.VarChar(20)
+  delivery_attempts      Int?               @default(0)
+  last_delivery_error    String?
+  retry_after            DateTime?          @db.Timestamptz(6)
   mkt_campaigns_list     mkt_campaigns_list @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mkt_outreach_campaign")
 
   @@index([campaign_id, contact_date(sort: Desc)], map: "idx_mkt_outreach_campaign")
@@ -6750,6 +6761,44 @@ model mkt_outreach_pitches_list {
   @@index([opener_id], map: "idx_mkt_outreach_pitches_opener")
   @@index([header_id], map: "idx_mkt_outreach_pitches_header")
   @@index([closer_id], map: "idx_mkt_outreach_pitches_closer")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_dispute_attachments {
+  id                 String             @id @db.VarChar(255)
+  dispute_intake_id  String             @db.VarChar(255)
+  file_url           String             @db.VarChar(500)
+  file_name          String             @db.VarChar(255)
+  file_type          String             @db.VarChar(20)
+  file_size          Int?
+  uploaded_at        DateTime           @default(now()) @db.Timestamptz(6)
+  mkt_dispute_intake mkt_dispute_intake @relation(fields: [dispute_intake_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dispute_attach_intake")
+
+  @@index([dispute_intake_id], map: "idx_dispute_attach_intake")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_dispute_intake {
+  id                      String                    @id @db.VarChar(255)
+  campaign_id             String                    @unique @db.VarChar(255)
+  tenant_id               String?                   @db.VarChar(255)
+  access_token            String                    @unique @db.VarChar(255)
+  expires_at              DateTime                  @db.Timestamptz(6)
+  owner_statement         String?
+  service_date            DateTime?                 @db.Date
+  proposed_resolution     String?
+  status_flag             String?                   @db.VarChar(50)
+  submitted_at            DateTime?                 @db.Timestamptz(6)
+  viewed_at               DateTime?                 @db.Timestamptz(6)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  owner_email             String?                   @db.VarChar(255)
+  owner_phone             String?                   @db.VarChar(40)
+  mkt_dispute_attachments mkt_dispute_attachments[]
+  mkt_campaigns_list      mkt_campaigns_list        @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_dispute_intake_campaign")
+
+  @@index([campaign_id], map: "idx_dispute_intake_campaign")
+  @@index([access_token], map: "idx_dispute_intake_token")
 }
 
 enum action {
