@@ -75,14 +75,43 @@ const websiteStatusEnum = z.enum([
   'social_media_only',
   'unable_to_verify',
 ]);
-const mobileFriendlyEnum = z.enum(['yes', 'likely', 'no', 'unable_to_verify']);
-const concentrationEnum = z.enum([
+
+/**
+ * Tolerant coercion for mobile_friendly: maps common agent synonyms to the
+ * canonical enum values. Agents sometimes emit "likely_good", "verified",
+ * "yes_verified", "mobile_optimized", etc.
+ */
+const mobileFriendlyCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'likely_good' || s === 'verified' || s === 'yes_verified' || s === 'mobile_optimized' || s === 'mobile_friendly') return 'yes';
+    if (s === 'probably' || s === 'appears_yes') return 'likely';
+    if (s === 'not_mobile_friendly' || s === 'poor') return 'no';
+  }
+  return val;
+}, z.enum(['yes', 'likely', 'no', 'unable_to_verify']));
+
+/**
+ * Tolerant coercion for competitive concentration.
+ * Agents sometimes emit "mixed" or "balanced" instead of "moderately_concentrated".
+ */
+const concentrationCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'mixed' || s === 'balanced' || s === 'moderate') return 'moderately_concentrated';
+    if (s === 'concentrated' || s === 'high_concentration') return 'highly_concentrated';
+    if (s === 'monopoly' || s === 'single_dominant') return 'dominated_by_one';
+    if (s === 'dispersed' || s === 'very_fragmented') return 'fragmented';
+  }
+  return val;
+}, z.enum([
   'fragmented',
   'moderately_concentrated',
   'highly_concentrated',
   'dominated_by_one',
   'unable_to_verify',
-]);
+]));
+
 const ownershipTypeEnum = z.enum([
   'independent',
   'local_chain',
@@ -96,18 +125,45 @@ const locationStatusEnum = z.enum([
   'outside_city_serving_city',
   'unable_to_verify',
 ]);
-const hoursStatusEnum = z.enum([
+
+/**
+ * Tolerant coercion for hours_status.
+ * Agents sometimes emit "likely_current" or "appears_current" instead of "current".
+ */
+const hoursStatusCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'likely_current' || s === 'appears_current' || s === 'probably_current') return 'current';
+    if (s === 'likely_outdated' || s === 'appears_outdated') return 'outdated';
+    if (s === 'partial' || s === 'missing_some') return 'incomplete';
+  }
+  return val;
+}, z.enum([
   'current',
   'outdated',
   'incomplete',
   'unable_to_verify',
-]);
-const photoActivityEnum = z.enum([
+]));
+
+/**
+ * Tolerant coercion for photo_activity.
+ * Agents sometimes emit "recent_activity", "active", or "current" instead of "recent".
+ */
+const photoActivityCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'recent_activity' || s === 'active' || s === 'current' || s === 'updated') return 'recent';
+    if (s === 'old' || s === 'outdated_photos') return 'stale';
+    if (s === 'no_photos' || s === 'missing') return 'none_visible';
+  }
+  return val;
+}, z.enum([
   'recent',
   'stale',
   'none_visible',
   'unable_to_verify',
-]);
+]));
+
 const napStatusEnum = z.enum([
   'consistent',
   'minor_variations',
@@ -125,6 +181,20 @@ const opportunityClassificationEnum = z.enum(['low', 'medium', 'high', 'very_hig
 const tierEnum = z.enum(['tier_1', 'tier_2', 'tier_3']);
 const estimateConfidenceEnum = z.enum(['low', 'medium', 'high']);
 const countUnitEnum = z.enum(['businesses', 'business_locations', 'listings']);
+
+/**
+ * Tolerant coercion for clear_call_to_action.
+ * Agents sometimes emit "present", "visible", or "clear" instead of "yes",
+ * and "absent", "missing", or "none" instead of "no".
+ */
+const clearCallToActionCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'present' || s === 'visible' || s === 'clear' || s === 'yes_present') return 'yes';
+    if (s === 'absent' || s === 'missing' || s === 'none' || s === 'weak' || s === 'unclear') return 'no';
+  }
+  return val;
+}, z.enum(['yes', 'no', 'unable_to_verify']));
 
 // ---- Nested object schemas ----
 
@@ -231,7 +301,7 @@ const categoryBenchmarksSchema = z.object({
 }).passthrough();
 
 const competitiveLandscapeSchema = z.object({
-  concentration: concentrationEnum,
+  concentration: concentrationCoerced,
   highest_google_review_count: coercedNumberNullable,
   top_five_share_of_sample_reviews_percent: percentOrNumber.nullable().optional(),
   market_leader: z.string().nullable().optional(),
@@ -245,7 +315,7 @@ const competitorGoogleSchema = z.object({
   primary_category: z.string().nullable().optional(),
   recent_owner_responses_observed: coercedBoolean.nullable().optional(),
   hours_issue_observed: coercedBoolean.nullable().optional(),
-  photo_activity: photoActivityEnum,
+  photo_activity: photoActivityCoerced,
 }).passthrough();
 
 const competitorYelpSchema = z.object({
@@ -260,8 +330,8 @@ const competitorFacebookSchema = z.object({
 
 const competitorWebsiteAssessmentSchema = z.object({
   status: websiteStatusEnum,
-  mobile_friendly: mobileFriendlyEnum.nullable().optional(),
-  clear_call_to_action: z.enum(['yes', 'no', 'unable_to_verify']).nullable().optional(),
+  mobile_friendly: mobileFriendlyCoerced.nullable().optional(),
+  clear_call_to_action: clearCallToActionCoerced.nullable().optional(),
 }).passthrough();
 
 const competitiveVisibilityScoreSchema = z.object({
@@ -295,15 +365,15 @@ const sampledBusinessGoogleSchema = z.object({
   profile_status: profileStatusEnum,
   rating: coercedNumberNullable,
   review_count: coercedNumberNullable,
-  hours_status: hoursStatusEnum,
-  photo_activity: photoActivityEnum,
+  hours_status: hoursStatusCoerced,
+  photo_activity: photoActivityCoerced,
   recent_owner_responses_observed: coercedBoolean.nullable().optional(),
 }).passthrough();
 
 const sampledBusinessWebsiteSchema = z.object({
   status: websiteStatusEnum,
-  mobile_friendly: mobileFriendlyEnum.nullable().optional(),
-  clear_call_to_action: z.enum(['yes', 'no', 'unable_to_verify']).nullable().optional(),
+  mobile_friendly: mobileFriendlyCoerced.nullable().optional(),
+  clear_call_to_action: clearCallToActionCoerced.nullable().optional(),
   issues: z.array(z.string()).optional(),
 }).passthrough();
 

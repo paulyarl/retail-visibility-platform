@@ -36,9 +36,19 @@ let totalChecked = 0;
 
 for (const group of calibrationGroups) {
   console.log(`\n=== ${group.label} ===`);
-  const variants = readdirSync(promptsDir).filter((f) =>
-    variantAgents.some((a) => f.startsWith(`${group.filePrefix} - ${a} -`) && f.endsWith('- seek.md')),
-  );
+  // Match files like:
+  //   "<filePrefix> - <agent> - seek.md"
+  //   "<filePrefix> - Alignment Scoring - <agent> - Seek.md"
+  //   "<filePrefix> - <city> - <category> - <agent> - Seek.md"
+  // Key: starts with filePrefix, contains " - <agent> - ", ends with "Seek.md" or "seek.md",
+  // and is NOT the rendered/base template (which contains "Rendered" or lacks an agent label).
+  const variants = readdirSync(promptsDir).filter((f) => {
+    if (!f.startsWith(group.filePrefix)) return false;
+    const lower = f.toLowerCase();
+    if (lower.includes('rendered')) return false;
+    if (!lower.endsWith('- seek.md')) return false;
+    return variantAgents.some((a) => f.includes(` - ${a} -`));
+  });
 
   if (variants.length === 0) {
     console.log('  (no variant files found yet)');
