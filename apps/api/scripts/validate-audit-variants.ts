@@ -1,43 +1,84 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { businessAnalysisSchema } from '../src/validators/business-analysis.schema';
+import { cityCategoryOpportunitySchema } from '../src/validators/city-category-opportunity.schema';
 
 // __dirname = apps/api/scripts -> repo root is three levels up
 const promptsDir = join(__dirname, '..', '..', '..', 'docs', 'LocalBiz', 'Audit Prompts');
 
-// Only the three agent-produced variant outputs (gpt / kimi / gemini).
-// The base prompt templates (`- seek.md` without a variant label) are
-// markdown documents, not JSON, and are excluded.
+// Agent providers we calibrate against.
 const variantAgents = ['gpt', 'kimi', 'gemini', 'perplexity', 'claude'];
-const variants = readdirSync(promptsDir).filter((f) =>
-  variantAgents.some((a) => f === `Local Business Digital Opportunity Audit - One Hour - ${a} - seek.md`),
-);
+
+/**
+ * A calibration group: a human label, a file-name prefix, a Zod schema, and
+ * the list of agent variant suffixes to discover. Add a new group here when
+ * calibrating a new prompt output shape.
+ */
+const calibrationGroups: {
+  label: string;
+  filePrefix: string;
+  schema: ReturnType<typeof Object>;
+}[] = [
+  {
+    label: 'business_analysis',
+    filePrefix: 'Local Business Digital Opportunity Audit - One Hour',
+    schema: businessAnalysisSchema,
+  },
+  {
+    label: 'city_category_opportunity',
+    filePrefix: 'City Category Digital Audit',
+    schema: cityCategoryOpportunitySchema,
+  },
+];
 
 let failures = 0;
+let totalChecked = 0;
 
-for (const file of variants) {
-  const raw = readFileSync(join(promptsDir, file), 'utf8').trim();
-  // The variant files are JSON (some pretty-printed, some minified).
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
-    console.error(`[JSON PARSE FAIL] ${file}: ${(e as Error).message}`);
-    failures++;
+for (const group of calibrationGroups) {
+  console.log(`\n=== ${group.label} ===`);
+  // Match files like:
+  //   "<filePrefix> - <agent> - seek.md"
+  //   "<filePrefix> - Alignment Scoring - <agent> - Seek.md"
+  //   "<filePrefix> - <city> - <category> - <agent> - Seek.md"
+  // Key: starts with filePrefix, contains " - <agent> - ", ends with "Seek.md" or "seek.md",
+  // and is NOT the rendered/base template (which contains "Rendered" or lacks an agent label).
+  const variants = readdirSync(promptsDir).filter((f) => {
+    if (!f.startsWith(group.filePrefix)) return false;
+    const lower = f.toLowerCase();
+    if (lower.includes('rendered')) return false;
+    if (!lower.endsWith('- seek.md')) return false;
+    return variantAgents.some((a) => f.includes(` - ${a} -`));
+  });
+
+  if (variants.length === 0) {
+    console.log('  (no variant files found yet)');
     continue;
   }
 
-  const result = businessAnalysisSchema.safeParse(parsed);
-  if (result.success) {
-    console.log(`[PASS] ${file}`);
-  } else {
-    failures++;
-    console.error(`[SCHEMA FAIL] ${file}`);
-    for (const issue of result.error.issues) {
-      console.error(`  - ${issue.path.join('.')}: ${issue.message} (code=${issue.code})`);
+  for (const file of variants) {
+    totalChecked++;
+    const raw = readFileSync(join(promptsDir, file), 'utf8').trim();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      console.error(`[JSON PARSE FAIL] ${file}: ${(e as Error).message}`);
+      failures++;
+      continue;
+    }
+
+    const result = (group.schema as any).safeParse(parsed);
+    if (result.success) {
+      console.log(`[PASS] ${file}`);
+    } else {
+      failures++;
+      console.error(`[SCHEMA FAIL] ${file}`);
+      for (const issue of result.error.issues) {
+        console.error(`  - ${issue.path.join('.')}: ${issue.message} (code=${issue.code})`);
+      }
     }
   }
 }
 
-console.log(`\n${failures === 0 ? 'ALL VARIANTS VALID' : `${failures} variant(s) failed`}`);
+console.log(`\n${failures === 0 ? 'ALL VARIANTS VALID' : `${failures} of ${totalChecked} variant(s) failed`}`);
 process.exit(failures === 0 ? 0 : 1);

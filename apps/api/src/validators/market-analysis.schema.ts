@@ -32,6 +32,11 @@ import {
   RECOVERY_RESOLUTION_SCHEMA_NAME,
   RECOVERY_RESOLUTION_PROMPT_SUFFIX,
 } from './recovery-resolution.schema';
+import {
+  cityCategoryOpportunitySchema,
+  CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME,
+  CITY_CATEGORY_OPPORTUNITY_PROMPT_SUFFIX,
+} from './city-category-opportunity.schema';
 
 /**
  * Strip a trailing `%` and coerce to number.
@@ -162,6 +167,11 @@ export const OUTPUT_SCHEMA_REGISTRY: Record<
     validator: recoveryResolutionSchema,
     auditPlatform: null, // recovery resolutions create deliverables, not audits
     promptSuffix: RECOVERY_RESOLUTION_PROMPT_SUFFIX,
+  },
+  [CITY_CATEGORY_OPPORTUNITY_SCHEMA_NAME]: {
+    validator: cityCategoryOpportunitySchema,
+    auditPlatform: 'city_category_analysis',
+    promptSuffix: CITY_CATEGORY_OPPORTUNITY_PROMPT_SUFFIX,
   },
 };
 
