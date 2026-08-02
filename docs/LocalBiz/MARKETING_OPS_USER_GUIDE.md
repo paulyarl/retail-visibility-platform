@@ -97,7 +97,7 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 | **Follow-Ups** | Automatic (scheduler) | Day 2 SMS pointer + Day 4 DM check-in. This is the recovery equivalent of the review pipeline's Follow-Ups — but it's auto-fired by the cascade, not the Follow-Ups workspace. |
 | **Intake** | Public intake page (`/recovery/intake?token=...`) | Owner submits complaint statement + proposed resolution + attachments. |
 | **Resolution Draft** | Recovery detail → AI Workspace | Recovery AI Agent drafts Response Draft + Submission Guide. Dual-mode: Copy-Paste Bridge (external AI) or Direct API (in-platform). |
-| **Approve & Deliver** | Recovery detail → Actions | Operator approves → campaign transitions to `resolved_and_closed` → owner receives resolution via email. |
+| **Approve & Deliver** | Recovery detail → Actions | Operator approves → campaign transitions to `resolved_and_closed` → owner receives resolution via email (tracked + auto-retried if delivery fails). |
 
 **Recovery campaigns do NOT use the Openers or Follow-Ups pages.** Their outreach cycle is the Day 1/2/4 cascade, auto-fired by the scheduler.
 
@@ -576,9 +576,11 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 | Recovery tab is empty | No campaigns with `campaign_category = 'recovery_management'` | Create a new campaign and select "Recovery Management" as the category. |
 | Recovery campaign stuck in Awaiting Owner Intake | Intake token expired (7-day TTL) or cascade exhausted | Wait for the timeout sweep (token TTL + 4 days) or manually transition to `dead`. See `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`. |
 | Recovery AI agent output failed | Schema validation mismatch | Check `mkt_filter_flags_list` for the failed execution. Edit the intake statement and click **Regenerate Draft**. |
-| Owner didn't receive resolution email | Email delivery failed (best-effort) | Check `mkt_outreach_log` for the campaign. The approval still succeeded; manually resend if needed. |
+| Owner didn't receive resolution email | Email delivery failed or no email destination | Open the recovery detail page → check the **Delivery Status** panel. If `retrying`, the scheduler will auto-retry (max 3). If `failed`, click **Resend Email**. If "No email destination available", add an email to the campaign or intake first. |
 | Cascade tab missing | Campaign is a recovery campaign | The cascade tab only appears on review campaigns. Recovery campaigns have their own outreach cascade. |
-| Cascade step shows "SKIPPED" | Missing contact info for that channel | Add the missing contact info (email, phone, or social_profiles) to the campaign and disable/re-enable the cascade. |
+| Cascade step shows "SKIPPED" | Missing contact info for that channel AND no email fallback | Add the missing contact info (email, phone, or social_profiles) to the campaign. The cascade will not re-attempt this step. |
+| Cascade step shows "FALLBACK" | Primary channel unavailable, fell back to email | This is expected behavior. Add phone or social profile info to enable the primary channel. |
+| Cascade shows "BLOCKED" | No contact channels at all on the campaign | Add email, phone, or social profile info via the Business Contact card. The cascade will fire on the next scheduler pass. |
 | Cascade not firing | Campaign not in `preview_built` or `shown` stage, or latest contact was a response | The cascade only fires for hot-prospect stages with no-response latest contacts. |
 
 ---
@@ -749,17 +751,18 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 5. **Intake** — the owner clicks the intake link, submits their complaint statement + proposed resolution + attachments. Campaign transitions to `intake_submitted`.
 6. **Draft** — the Recovery AI Agent generates a Response Draft + Submission Guide. Campaign transitions to `final_resolution_drafted`.
 7. **Review** — open the Recovery tab → click the campaign → review the draft. Edit if needed.
-8. **Approve** — click **Approve & Deliver**. Campaign transitions to `resolved_and_closed`. Owner receives the resolution via email.
+8. **Approve** — click **Approve & Deliver**. Campaign transitions to `resolved_and_closed`. Owner receives the resolution via email. The delivery is tracked — see **Delivery Status** below.
 
 ### Use Case: Multi-Channel Cascade — Re-engaging a Silent Prospect
 
 1. **Identify** — a review campaign in `preview_built` or `shown` hasn't responded to the initial email.
-2. **Enable** — open the campaign → **Cascade** tab → click **Enable Cascade**.
-3. **Day 1** — the cascade fires the primary email (frame preview + grade impact + CTA).
-4. **Day 2** — if unopened, the cascade fires an SMS pointer referencing the email.
-5. **Day 4** — if still unopened, the cascade fires a DM administrative check-in.
-6. **Response** — if the prospect responds at any point, disable the cascade and continue manually.
-7. **Exhaustion** — if all three steps fire with no response, consider transitioning to `lost`.
+2. **Check readiness** — verify the **Channel Readiness** widget shows "Cascade Ready" (email + phone/social). If "Partial" (email only), SMS/DM steps will fall back to email. If "Blocked", add contact info first.
+3. **Enable** — open the campaign → **Cascade** tab → click **Enable Cascade**.
+4. **Day 1** — the cascade fires the primary email (frame preview + grade impact + CTA).
+5. **Day 2** — if unopened, the cascade fires an SMS pointer referencing the email. Falls back to email if no phone.
+6. **Day 4** — if still unopened, the cascade fires a DM administrative check-in. Falls back to email if no social.
+7. **Response** — if the prospect responds at any point, disable the cascade and continue manually.
+8. **Exhaustion** — if all three steps fire with no response, consider transitioning to `lost`.
 
 ### Advice for Prompts
 
@@ -818,10 +821,11 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 - **Route coverage warnings** in the test suite (duplicate mount paths) are a pre-existing platform-wide concern and not specific to Marketing Ops.
 - **Payment receipts require a completed payment.** The receipt PDF download link only appears on the campaign detail when revenue records exist.
 - **Coupon validation is server-side only.** The public pay page validates coupons via the backend; client-side total mismatches are rejected.
-- **Recovery resolution email delivery is best-effort.** If the email fails to send, the approval still succeeds. Check `mkt_outreach_log` and manually resend if needed.
+- **Recovery resolution email delivery is tracked + auto-retried.** Failed deliveries retry up to 3 times (15min/30min/45min backoff). After 3 failures, the operator can manually resend via the **Resend Email** button on the recovery detail page. The approval still succeeds regardless of delivery outcome.
 - **Cascade step content is template-based, not AI-generated.** The Day 1/2/4 messages use hardcoded templates per channel. AI-generated cascade content is a future enhancement.
 - **Cascade custom config is API-only.** The UI enables the cascade with default settings. Custom step timing via `cascade_config` JSON requires an API call.
-- **Recovery E2E tests are planned.** The Playwright spec `recovery-ops.spec.ts` is listed in the sprint plan but not yet implemented.
+- **Cascade falls back to email when primary channel is unavailable.** If a step's primary channel (phone/social) is missing, the cascade fires on email instead. This is logged as `FALLBACK` in the outreach log.
+- **Recovery E2E tests cover the UI flow.** The Playwright spec `recovery-ops.spec.ts` tests the recovery list, detail page, Channel Readiness widget, AI Workspace panel, navigation, and intake form.
 
 ---
 
@@ -874,19 +878,36 @@ Recovery Management handles dispute resolution for local businesses that have re
   - Owner Statement (the complaint description from the business owner)
   - Proposed Resolution (what the owner wants)
   - Service Date, Status Flag, Submitted timestamp
+  - Owner Email + Owner Phone (captured at intake submission)
 - **Left column — Attachments panel:**
   - Lists files uploaded by the owner with the intake (screenshots, receipts, etc.)
+- **Left column — Channel Readiness widget:**
+  - Shows email/phone/social/website availability with green/gray badges
+  - Cascade readiness indicator (Ready / Partial / Blocked)
+  - Intake email status (captured vs. not yet submitted)
 - **Right column — Resolution Draft panel:**
   - **Response Draft** — editable textarea with the AI-generated response
   - **Submission Guide** — editable textarea with step-by-step submission instructions
   - Click **Edit** to modify either section inline
   - Stage badge shows whether the draft is in `final_resolution_drafted` or `resolved_and_closed`
+- **Right column — Delivery Status panel** (visible after approval):
+  - Green "Delivered" badge with timestamp on success
+  - Amber "Retrying" badge with attempts count + next retry time on transient failure
+  - Red "Delivery Failed (Permanent)" badge with error details + **Resend Email** button after 3 failed attempts
 
 #### Actions
 
-- **Approve & Deliver** — transitions the campaign to `resolved_and_closed` and emails the approved resolution to the owner. Confirmation dialog before executing.
+- **Approve & Deliver** — transitions the campaign to `resolved_and_closed` and emails the approved resolution to the owner. The delivery destination priority is: intake email → campaign email → logged as failed if neither. Confirmation dialog before executing.
 - **Regenerate Draft** — archives the current draft and re-runs the Recovery AI Agent. A new draft will be available within ~5 minutes (next scheduler pass). Confirmation dialog before executing.
 - **Save Changes** (in edit mode) — saves inline edits to the Response Draft and Submission Guide sections.
+- **Resend Email** (visible after failed delivery) — manually re-attempts delivery. Resets the retry counter and forces a new delivery attempt immediately.
+
+#### Delivery Tracking + Retry
+
+- Every delivery attempt is tracked in `mkt_outreach_log` with `delivery_status` (`pending`/`sent`/`failed`/`retrying`), `delivery_attempts`, `last_delivery_error`, and `retry_after`.
+- The **delivery retry scheduler** runs every 15 minutes and automatically retries failed deliveries up to 3 times with exponential backoff (15min → 30min → 45min).
+- After 3 failed attempts, the delivery is permanently `failed` and the operator can manually resend via the **Resend Email** button.
+- The deliverable record is also marked with `delivery_status` + `delivered_at` timestamp.
 
 #### Recovery AI Agent
 
@@ -899,6 +920,8 @@ Recovery Management handles dispute resolution for local businesses that have re
 The intake form is a public page at `/recovery/intake?token=...`. The owner receives the link via the outreach cascade (Day 1 email).
 
 - The owner enters their complaint statement, proposed resolution, service date, and optional status flag.
+- **Owner email** (required) — the owner provides their email address. This is the primary delivery destination for the approved resolution.
+- **Owner phone** (optional) — the owner provides their phone number for SMS follow-up.
 - Attachments can be uploaded (images, PDFs, text files up to 10MB each).
 - On submission, the Recovery AI Agent is automatically enqueued.
 - If the link expires (7-day TTL), the owner sees an expired page with a **Request New Link** button.
@@ -907,11 +930,18 @@ The intake form is a public page at `/recovery/intake?token=...`. The owner rece
 
 Recovery campaigns in `awaiting_owner_intake` receive an automated outreach sequence:
 
-| Day | Channel | Content |
-|-----|---------|---------|
-| 1   | email   | Frame preview + grade impact + CTA = intake link |
-| 2   | email   | SMS pointer to email (if unopened 24–48h) |
-| 4   | email   | Administrative check-in (if unopened 48h+) |
+| Day | Channel | Content | Fallback |
+|-----|---------|---------|----------|
+| 1   | email   | Frame preview + grade impact + CTA = intake link | None (email is primary) |
+| 2   | phone (SMS) | Short SMS pointer to email | Falls back to email if no phone |
+| 4   | social (DM) | Administrative check-in | Falls back to email if no social |
+
+**Channel availability + fallback:** If a step's primary channel is unavailable (no phone for SMS, no social for DM), the cascade falls back to email. If email is also missing, the step is skipped. If the campaign has no contact channels at all, the cascade is blocked until contact info is added.
+
+**Channel Readiness widget:** Both the campaign detail and recovery detail pages show a Channel Readiness widget with 4 badges (Email, Phone, Social, Website) and a cascade readiness indicator:
+- **Green "Cascade Ready"** — email + at least one secondary channel
+- **Amber "Partial"** — email only (SMS/DM steps will fall back to email)
+- **Red "Blocked"** — no email (cascade cannot fire)
 
 After Day 4 with no response, the cascade is exhausted. The intake timeout sweep transitions the campaign to `dead` 4 days after the intake token expires.
 
