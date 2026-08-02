@@ -499,7 +499,7 @@ export class MarketingCampaignService extends BaseService {
         where: { id: input.parentId },
         include: {
           mkt_audits_list: {
-            where: { platform: 'category_analysis' },
+            where: { platform: { in: ['category_analysis', 'city_category_analysis'] } },
             orderBy: { created_at: 'desc' },
             take: 1,
           },
@@ -513,8 +513,13 @@ export class MarketingCampaignService extends BaseService {
       const tier = this.inferTierFromMetrics(input.rating, input.reviewCount);
 
       // Build notes referencing the parent + outreach angle (if available).
+      // Supports both the legacy market_analysis shape and the newer
+      // city_category_opportunity shape (outreach_recommendation.primary_angle).
       const latestAudit = parent.mkt_audits_list[0];
-      const outreachAngle = (latestAudit?.audit_data as any)?.market_analysis?.recommended_outreach_angle;
+      const auditData = latestAudit?.audit_data as any;
+      const outreachAngle =
+        auditData?.outreach_recommendation?.primary_angle ??
+        auditData?.market_analysis?.recommended_outreach_angle;
       const noteParts = [
         `Derived from parent campaign ${parent.display_id ?? parent.id} (${parent.scope} scope).`,
         input.location ? `Discovered location: ${input.location}` : null,
