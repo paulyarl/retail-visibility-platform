@@ -280,6 +280,54 @@ class RecoveryOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('recovery-campaigns');
     return result.data?.data ?? result.data;
   }
+
+  // ─── Delivery Status + Resend ──────────────────────────────────
+
+  async getDeliveryStatus(campaignId: string): Promise<{
+    deliveryLog: {
+      id: string;
+      delivery_status: string | null;
+      delivery_attempts: number | null;
+      last_delivery_error: string | null;
+      retry_after: string | null;
+      created_at: string;
+      notes: string;
+    } | null;
+    deliverable: {
+      id: string;
+      delivery_status: string | null;
+      delivered_at: string | null;
+    } | null;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/delivery-status`,
+      {},
+      `recovery-delivery-${campaignId}`,
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch delivery status');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async resendDelivery(campaignId: string): Promise<{
+    success: boolean;
+    attempts: number;
+    error?: string;
+  }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/resend-delivery`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `recovery-resend-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to resend delivery');
+    }
+    await this.invalidateCachePattern(`recovery-delivery-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
 }
 
 export default RecoveryOpsService.getInstance();

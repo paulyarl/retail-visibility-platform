@@ -25,12 +25,30 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
   const [copying, setCopying] = useState(false);
   const [copied, setCopied] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState<{
+    deliveryLog: {
+      id: string;
+      delivery_status: string | null;
+      delivery_attempts: number | null;
+      last_delivery_error: string | null;
+      retry_after: string | null;
+      created_at: string;
+      notes: string;
+    } | null;
+    deliverable: {
+      id: string;
+      delivery_status: string | null;
+      delivered_at: string | null;
+    } | null;
+  } | null>(null);
+  const [resending, setResending] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [intakeResult, draftResult] = await Promise.all([
+      const [intakeResult, draftResult, deliveryResult] = await Promise.all([
         recoveryOpsService.getIntake(campaignId),
         recoveryOpsService.getDraft(campaignId),
+        recoveryOpsService.getDeliveryStatus(campaignId).catch(() => null),
       ]);
       setIntake(intakeResult);
       setDraft(draftResult);
@@ -40,6 +58,7 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
         setResponseDraft(responseSection?.content || '');
         setSubmissionGuide(guideSection?.content || '');
       }
+      if (deliveryResult) setDeliveryStatus(deliveryResult);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load recovery campaign');
@@ -93,6 +112,25 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
       setActionMessage({ type: 'error', text: err.message || 'Failed to regenerate draft' });
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleResendDelivery = async () => {
+    if (!confirm('Resend the resolution email to the owner? This will reset the retry counter and attempt a new delivery.')) return;
+    setResending(true);
+    setActionMessage(null);
+    try {
+      const result = await recoveryOpsService.resendDelivery(campaignId);
+      if (result.success) {
+        setActionMessage({ type: 'success', text: `Delivery resent successfully (attempt ${result.attempts}).` });
+      } else {
+        setActionMessage({ type: 'error', text: `Resend failed: ${result.error || 'Unknown error'}` });
+      }
+      fetchData();
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to resend delivery' });
+    } finally {
+      setResending(false);
     }
   };
 
@@ -501,6 +539,85 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
                   This resolution has been approved and delivered to the owner.
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Delivery Status Panel — shows delivery outcome + resend for failed deliveries */}
+          {isApproved && deliveryStatus && (
+            <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 p-5">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Delivery Status</h3>
+              {(() => {
+                const log = deliveryStatus.deliveryLog;
+                const del = deliveryStatus.deliverable;
+                const status = log?.delivery_status || del?.delivery_status || 'sent';
+                const attempts = log?.delivery_attempts ?? 0;
+                const error = log?.last_delivery_error;
+                const deliveredAt = del?.delivered_at;
+                const retryAfter = log?.retry_after;
+
+                if (status === 'sent') {
+                  return (
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                        <CheckCircle className="w-3.5 h-3.5" /> Delivered
+                      </span>
+                      {deliveredAt && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(deliveredAt).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (status === 'failed' || status === 'retrying') {
+                  const isPermanent = status === 'failed' && attempts >= 3;
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${
+                          isPermanent
+                            ? 'text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400'
+                            : 'text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}>
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {isPermanent ? 'Delivery Failed (Permanent)' : 'Retrying'}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Attempts: {attempts}/3
+                        </span>
+                        {retryAfter && !isPermanent && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Next retry: {new Date(retryAfter).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      {error && (
+                        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+                          <p className="text-xs text-red-700 dark:text-red-400 font-mono break-all">{error}</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={handleResendDelivery}
+                        disabled={resending}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${resending ? 'animate-spin' : ''}`} />
+                        {resending ? 'Resending...' : 'Resend Email'}
+                      </button>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        Resending will reset the retry counter and attempt a new delivery immediately.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Status: {status}
+                  </span>
+                );
+              })()}
             </div>
           )}
         </div>

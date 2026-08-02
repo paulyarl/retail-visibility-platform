@@ -25,6 +25,7 @@ import { generateOutreachLogId } from '../lib/id-generator';
 
 export type ContactChannel = 'phone' | 'email' | 'website' | 'social' | 'in_person' | 'other';
 export type ContactOutcome = 'reached' | 'no_answer' | 'left_message' | 'interested' | 'not_interested' | 'callback_scheduled' | 'other' | 'auto_follow_up_scheduled';
+export type DeliveryStatus = 'pending' | 'sent' | 'failed' | 'retrying';
 
 export interface LogContactInput {
   campaignId: string;
@@ -37,6 +38,10 @@ export interface LogContactInput {
   messageSubject?: string;
   previewToken?: string;
   contactedBy?: string;
+  deliveryStatus?: DeliveryStatus;
+  deliveryAttempts?: number;
+  lastDeliveryError?: string;
+  retryAfter?: string;
 }
 
 export interface FreshSnapshot {
@@ -126,6 +131,10 @@ export class MarketingOutreachService extends BaseService {
           data_snapshot: (dataSnapshot ?? undefined) as any,
           data_fresh_at: dataFreshAt,
           preview_token: input.previewToken || null,
+          delivery_status: input.deliveryStatus || 'sent',
+          delivery_attempts: input.deliveryAttempts ?? 0,
+          last_delivery_error: input.lastDeliveryError || null,
+          retry_after: input.retryAfter ? new Date(input.retryAfter) : null,
         },
       });
 

@@ -3093,6 +3093,66 @@ router.post('/recovery/:campaignId/execute', async (req: any, res: Response) => 
   }
 });
 
+// Get delivery status for a recovery campaign (outreach log + deliverable)
+router.get('/recovery/:campaignId/delivery-status', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    // Find the most recent delivery-related outreach log entry
+    const deliveryLog = await prisma.mkt_outreach_log.findFirst({
+      where: {
+        campaign_id: campaignId,
+        notes: { contains: 'Recovery resolution delivery' },
+      },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        delivery_status: true,
+        delivery_attempts: true,
+        last_delivery_error: true,
+        retry_after: true,
+        created_at: true,
+        notes: true,
+      },
+    });
+
+    // Find the approved deliverable
+    const deliverable = await prisma.mkt_deliverables_list.findFirst({
+      where: {
+        campaign_id: campaignId,
+        deliverable_type: 'recovery_resolution',
+        status: 'approved',
+      },
+      select: {
+        id: true,
+        delivery_status: true,
+        delivered_at: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        deliveryLog,
+        deliverable,
+      },
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Manually resend a failed delivery
+router.post('/recovery/:campaignId/resend-delivery', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await RecoveryResolutionService.resendDelivery(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // ─── Multi-Channel Cascade (Review Campaigns) ─────────────────────────────
 // Operator opts-in a review campaign to the email → SMS → DM cascade.
 
