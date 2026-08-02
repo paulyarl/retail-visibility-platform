@@ -89,9 +89,12 @@ export default function OpenerWorkspaceClient() {
   //   Opener (A1-A4 archetype) → Follow-Up (doing/telling) → Reply
   // Recovery campaigns have their own outreach cycle (the Day 1/2/4 cascade
   // handled by RecoveryCascadeService) and are intentionally excluded here.
+  // Profile repair campaigns on the standard track (or in triage) ARE
+  // included — they use the review pipeline. Escalated profile repair
+  // campaigns use the recovery pipeline and are excluded.
   const businessCampaigns = useMemo(
     () => campaigns.filter(
-      (c) => c.scope === 'business' && (c.campaign_category ?? 'review_management') === 'review_management',
+      (c) => c.scope === 'business' && (c as any).pipeline === 'review',
     ),
     [campaigns],
   );

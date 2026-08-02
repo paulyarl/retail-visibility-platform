@@ -311,6 +311,51 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
                     <p className="text-sm text-gray-700 dark:text-gray-300">{intake.status_flag}</p>
                   </div>
                 )}
+                {/* Evidence payload — only for profile_repair intakes */}
+                {(intake as any).intake_kind === 'profile_repair' && (intake as any).evidence_payload && (
+                  <div className="rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-purple-700 dark:text-purple-400">Evidence Payload</p>
+                    {(() => {
+                      const ev = (intake as any).evidence_payload as any;
+                      return (
+                        <>
+                          {ev.proof_of_location && ev.proof_of_location.length > 0 && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              <strong>Proof of location:</strong> {ev.proof_of_location.length} document(s)
+                            </p>
+                          )}
+                          {ev.storefront_photos && ev.storefront_photos.length > 0 && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              <strong>Storefront photos:</strong> {ev.storefront_photos.length} photo(s)
+                            </p>
+                          )}
+                          {ev.google_profile_id && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              <strong>Google profile ID:</strong> {ev.google_profile_id}
+                            </p>
+                          )}
+                          {ev.suspension_notice_details && (ev.suspension_notice_details.date || ev.suspension_notice_details.quoted_reason) && (
+                            <div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400"><strong>Suspension notice:</strong></p>
+                              {ev.suspension_notice_details.date && (
+                                <p className="text-xs text-gray-500 dark:text-gray-500 ml-2">Date: {ev.suspension_notice_details.date}</p>
+                              )}
+                              {ev.suspension_notice_details.quoted_reason && (
+                                <p className="text-xs text-gray-500 dark:text-gray-500 ml-2">Reason: {ev.suspension_notice_details.quoted_reason}</p>
+                              )}
+                            </div>
+                          )}
+                          {ev.duplicate_listing_url && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              <strong>Duplicate listing URL:</strong>{' '}
+                              <a href={ev.duplicate_listing_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{ev.duplicate_listing_url}</a>
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Submitted</p>
                   <p className="text-sm text-gray-700 dark:text-gray-300">

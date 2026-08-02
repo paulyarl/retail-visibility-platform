@@ -13,6 +13,9 @@ const DELIVERABLE_TYPE_LABELS: Record<DeliverableType, string> = {
   nap_report: 'NAP Consistency Report',
   seo_content: 'SEO Content',
   lead_magnet: 'Lead Magnet',
+  recovery_resolution: 'Recovery Resolution',
+  reinstatement_appeal: 'Reinstatement Appeal',
+  citation_repair_package: 'Citation & Profile Repair Package',
 };
 
 const DELIVERABLE_TYPE_COLORS: Record<DeliverableType, string> = {
@@ -23,9 +26,12 @@ const DELIVERABLE_TYPE_COLORS: Record<DeliverableType, string> = {
   nap_report: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
   seo_content: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
   lead_magnet: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
+  recovery_resolution: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  reinstatement_appeal: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  citation_repair_package: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
 };
 
-const ALL_TYPES: DeliverableType[] = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet'];
+const ALL_TYPES: DeliverableType[] = ['review_responses', 'service_menu', 'gbp_audit', 'testimonial_cards', 'nap_report', 'seo_content', 'lead_magnet', 'recovery_resolution', 'reinstatement_appeal', 'citation_repair_package'];
 
 export default function DeliverableTemplateLibraryClient() {
   const [templates, setTemplates] = useState<DeliverableTemplate[]>([]);

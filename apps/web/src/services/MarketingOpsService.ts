@@ -28,7 +28,8 @@ export type CampaignStage =
 
 // Recovery Management stages run on the same stage column; literals are
 // app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
-export type CampaignCategory = 'review_management' | 'recovery_management';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair';
+export type RepairTrack = 'standard' | 'escalated';
 
 export type ConversionSource =
   | 'qr_deliverable'
@@ -63,7 +64,10 @@ export type DeliverableType =
   | 'testimonial_cards'
   | 'nap_report'
   | 'seo_content'
-  | 'lead_magnet';
+  | 'lead_magnet'
+  | 'recovery_resolution'
+  | 'reinstatement_appeal'
+  | 'citation_repair_package';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 
@@ -72,6 +76,9 @@ export interface Campaign {
   display_id: string | null;
   scope: CampaignScope;
   campaign_category?: CampaignCategory;
+  repair_track?: RepairTrack | null;
+  repair_issue_type?: string | null;
+  pipeline?: 'review' | 'recovery';
   business_name: string | null;
   category: string;
   city: string;
@@ -849,6 +856,8 @@ export interface ServiceCategory {
 export interface CampaignCreateInput {
   scope?: CampaignScope;
   campaign_category?: CampaignCategory;
+  repair_track?: RepairTrack | null;
+  repair_issue_type?: string;
   business_name?: string;
   category: string;
   city: string;
@@ -1211,6 +1220,24 @@ class MarketingOpsService extends AdminApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
+    }
+    await this.invalidateCachePattern('mkt-ops-campaign');
+    return result.data?.data ?? result.data;
+  }
+
+  async switchRepairTrack(id: string, input: {
+    to_track: RepairTrack;
+    issue_type?: string;
+    reason: string;
+  }): Promise<Campaign> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${id}/switch-track`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-campaign-switch-track-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to switch repair track');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
     return result.data?.data ?? result.data;

@@ -9,6 +9,8 @@
 - `docs/LocalBiz/local_marketing_ops_payment_collection_sprint_plan.md`
 - `docs/RECOVERY_MANAGEMENT_ENGINE_SPRINT_PLAN.md`
 - `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
+- `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
+- `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
 
 ---
 
@@ -72,9 +74,14 @@ Stage transitions are validated; some moves are irreversible and all transitions
 
 ---
 
-## 3. Campaign Cycle Mental Model — Review vs Recovery
+## 3. Campaign Cycle Mental Model — Review vs Recovery vs Profile Repair
 
 Each campaign category has its own outreach cycle. The AI surfaces and workspace pages are different — operators should understand which cycle applies to which campaign type.
+
+Profile Repair is a **third vector** that reuses both existing pipelines via a track discriminator:
+- **Track A (standard):** NAP drift, unclaimed profiles, missing categories → uses the **review pipeline** (Openers, Follow-Ups, Cascade tab).
+- **Track B (escalated):** suspensions, hijacks, duplicates, ownership disputes → uses the **recovery pipeline** (Recovery tab, Day 1/2/4 cascade, evidence intake, AI appeal letter).
+- **Triage:** every profile repair campaign starts with no track. The triage prompt recommends a track; the operator confirms or overrides. Track can be switched mid-flight with guardrails.
 
 ### Review Management Cycle
 
@@ -85,7 +92,7 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 | **Reply** | Campaign detail → Stage transition | Prospect replies → operator transitions the campaign forward (e.g., `shown` → `paid`). |
 | **Cascade (optional)** | Campaign detail → Cascade tab | Opt-in email → SMS → DM escalation (Day 1/2/4) for silent prospects. Bypasses the manual follow-up workspace. |
 
-**Both Openers and Follow-Ups pages are review-management only.** Recovery campaigns are filtered out.
+**Both Openers and Follow-Ups pages are review-pipeline only.** Recovery campaigns and escalated profile repair campaigns are filtered out. Profile repair campaigns in triage or on the standard track ARE included (they use the review pipeline).
 
 ### Recovery Management Cycle
 
@@ -97,20 +104,23 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 | **Follow-Ups** | Automatic (scheduler) | Day 2 SMS pointer + Day 4 DM check-in. This is the recovery equivalent of the review pipeline's Follow-Ups — but it's auto-fired by the cascade, not the Follow-Ups workspace. |
 | **Intake** | Public intake page (`/recovery/intake?token=...`) | Owner submits complaint statement + proposed resolution + attachments. |
 | **Resolution Draft** | Recovery detail → AI Workspace | Recovery AI Agent drafts Response Draft + Submission Guide. Dual-mode: Copy-Paste Bridge (external AI) or Direct API (in-platform). |
-| **Approve & Deliver** | Recovery detail → Actions | Operator approves → campaign transitions to `resolved_and_closed` → owner receives resolution via email. |
+| **Approve & Deliver** | Recovery detail → Actions | Operator approves → campaign transitions to `resolved_and_closed` → owner receives resolution via email (tracked + auto-retried if delivery fails). |
 
 **Recovery campaigns do NOT use the Openers or Follow-Ups pages.** Their outreach cycle is the Day 1/2/4 cascade, auto-fired by the scheduler.
 
 ### Side-by-Side Comparison
 
-| Concept | Review Management | Recovery Management |
-|---------|-------------------|---------------------|
-| **Opener** | Openers workspace (A1-A4 archetype, soft/direct_paid close) | Day 1 cascade email (intake link) — automatic |
-| **Follow-Up** | Follow-Ups workspace (doing/telling branch, footprint diff) | Day 2 SMS + Day 4 DM — automatic |
-| **AI surface** | Prompt Workspace (Copy-Paste Bridge + Direct API) | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API) |
-| **Close variants** | Soft vs Direct Paid | None (intake is free) |
-| **Pitch assembly** | Header + Opener + Previews + Closer + Contact | None (single intake-request email) |
-| **Campaign filter** | `campaign_category = 'review_management'` | `campaign_category = 'recovery_management'` |
+| Concept | Review Management | Recovery Management | Profile Repair (Standard) | Profile Repair (Escalated) |
+|---------|-------------------|---------------------|---------------------------|----------------------------|
+| **Pipeline** | Review | Recovery | Review (Track A) | Recovery (Track B) |
+| **Opener** | Openers workspace (A1-A4 archetype, soft/direct_paid close) | Day 1 cascade email (intake link) — automatic | Openers workspace (A3 Listing Drift archetype) | Day 1 cascade email (evidence intake link) — automatic |
+| **Follow-Up** | Follow-Ups workspace (doing/telling branch, footprint diff) | Day 2 SMS + Day 4 DM — automatic | Follow-Ups workspace | Day 2 SMS + Day 4 DM — automatic |
+| **AI surface** | Prompt Workspace (Copy-Paste Bridge + Direct API) | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API) | Prompt Workspace (seek + fulfill prompts) | Recovery detail → AI Workspace (appeal letter + submission guide) |
+| **Close variants** | Soft vs Direct Paid | None (intake is free) | Soft vs Direct Paid | None (intake is free) |
+| **Pitch assembly** | Header + Opener + Previews + Closer + Contact | None (single intake-request email) | Header + Opener + Previews + Closer + Contact | None (single evidence-request email) |
+| **Campaign filter** | `pipeline = 'review'` | `pipeline = 'recovery'` | `pipeline = 'review'` | `pipeline = 'recovery'` |
+| **Deliverables** | Review responses, GBP audit, NAP report, etc. | Recovery resolution (response + submission guide) | NAP report (preview), Citation & Profile Repair Package (paid) | Reinstatement Appeal (appeal letter + submission guide) |
+| **Intake** | None | Dispute intake (token-gated, owner statement + proposed resolution) | None | Evidence intake (token-gated, owner narrative + evidence payload + attachments) |
 
 ---
 
@@ -576,9 +586,11 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 | Recovery tab is empty | No campaigns with `campaign_category = 'recovery_management'` | Create a new campaign and select "Recovery Management" as the category. |
 | Recovery campaign stuck in Awaiting Owner Intake | Intake token expired (7-day TTL) or cascade exhausted | Wait for the timeout sweep (token TTL + 4 days) or manually transition to `dead`. See `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`. |
 | Recovery AI agent output failed | Schema validation mismatch | Check `mkt_filter_flags_list` for the failed execution. Edit the intake statement and click **Regenerate Draft**. |
-| Owner didn't receive resolution email | Email delivery failed (best-effort) | Check `mkt_outreach_log` for the campaign. The approval still succeeded; manually resend if needed. |
+| Owner didn't receive resolution email | Email delivery failed or no email destination | Open the recovery detail page → check the **Delivery Status** panel. If `retrying`, the scheduler will auto-retry (max 3). If `failed`, click **Resend Email**. If "No email destination available", add an email to the campaign or intake first. |
 | Cascade tab missing | Campaign is a recovery campaign | The cascade tab only appears on review campaigns. Recovery campaigns have their own outreach cascade. |
-| Cascade step shows "SKIPPED" | Missing contact info for that channel | Add the missing contact info (email, phone, or social_profiles) to the campaign and disable/re-enable the cascade. |
+| Cascade step shows "SKIPPED" | Missing contact info for that channel AND no email fallback | Add the missing contact info (email, phone, or social_profiles) to the campaign. The cascade will not re-attempt this step. |
+| Cascade step shows "FALLBACK" | Primary channel unavailable, fell back to email | This is expected behavior. Add phone or social profile info to enable the primary channel. |
+| Cascade shows "BLOCKED" | No contact channels at all on the campaign | Add email, phone, or social profile info via the Business Contact card. The cascade will fire on the next scheduler pass. |
 | Cascade not firing | Campaign not in `preview_built` or `shown` stage, or latest contact was a response | The cascade only fires for hot-prospect stages with no-response latest contacts. |
 
 ---
@@ -749,17 +761,18 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 5. **Intake** — the owner clicks the intake link, submits their complaint statement + proposed resolution + attachments. Campaign transitions to `intake_submitted`.
 6. **Draft** — the Recovery AI Agent generates a Response Draft + Submission Guide. Campaign transitions to `final_resolution_drafted`.
 7. **Review** — open the Recovery tab → click the campaign → review the draft. Edit if needed.
-8. **Approve** — click **Approve & Deliver**. Campaign transitions to `resolved_and_closed`. Owner receives the resolution via email.
+8. **Approve** — click **Approve & Deliver**. Campaign transitions to `resolved_and_closed`. Owner receives the resolution via email. The delivery is tracked — see **Delivery Status** below.
 
 ### Use Case: Multi-Channel Cascade — Re-engaging a Silent Prospect
 
 1. **Identify** — a review campaign in `preview_built` or `shown` hasn't responded to the initial email.
-2. **Enable** — open the campaign → **Cascade** tab → click **Enable Cascade**.
-3. **Day 1** — the cascade fires the primary email (frame preview + grade impact + CTA).
-4. **Day 2** — if unopened, the cascade fires an SMS pointer referencing the email.
-5. **Day 4** — if still unopened, the cascade fires a DM administrative check-in.
-6. **Response** — if the prospect responds at any point, disable the cascade and continue manually.
-7. **Exhaustion** — if all three steps fire with no response, consider transitioning to `lost`.
+2. **Check readiness** — verify the **Channel Readiness** widget shows "Cascade Ready" (email + phone/social). If "Partial" (email only), SMS/DM steps will fall back to email. If "Blocked", add contact info first.
+3. **Enable** — open the campaign → **Cascade** tab → click **Enable Cascade**.
+4. **Day 1** — the cascade fires the primary email (frame preview + grade impact + CTA).
+5. **Day 2** — if unopened, the cascade fires an SMS pointer referencing the email. Falls back to email if no phone.
+6. **Day 4** — if still unopened, the cascade fires a DM administrative check-in. Falls back to email if no social.
+7. **Response** — if the prospect responds at any point, disable the cascade and continue manually.
+8. **Exhaustion** — if all three steps fire with no response, consider transitioning to `lost`.
 
 ### Advice for Prompts
 
@@ -818,10 +831,11 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 - **Route coverage warnings** in the test suite (duplicate mount paths) are a pre-existing platform-wide concern and not specific to Marketing Ops.
 - **Payment receipts require a completed payment.** The receipt PDF download link only appears on the campaign detail when revenue records exist.
 - **Coupon validation is server-side only.** The public pay page validates coupons via the backend; client-side total mismatches are rejected.
-- **Recovery resolution email delivery is best-effort.** If the email fails to send, the approval still succeeds. Check `mkt_outreach_log` and manually resend if needed.
+- **Recovery resolution email delivery is tracked + auto-retried.** Failed deliveries retry up to 3 times (15min/30min/45min backoff). After 3 failures, the operator can manually resend via the **Resend Email** button on the recovery detail page. The approval still succeeds regardless of delivery outcome.
 - **Cascade step content is template-based, not AI-generated.** The Day 1/2/4 messages use hardcoded templates per channel. AI-generated cascade content is a future enhancement.
 - **Cascade custom config is API-only.** The UI enables the cascade with default settings. Custom step timing via `cascade_config` JSON requires an API call.
-- **Recovery E2E tests are planned.** The Playwright spec `recovery-ops.spec.ts` is listed in the sprint plan but not yet implemented.
+- **Cascade falls back to email when primary channel is unavailable.** If a step's primary channel (phone/social) is missing, the cascade fires on email instead. This is logged as `FALLBACK` in the outreach log.
+- **Recovery E2E tests cover the UI flow.** The Playwright spec `recovery-ops.spec.ts` tests the recovery list, detail page, Channel Readiness widget, AI Workspace panel, navigation, and intake form.
 
 ---
 
@@ -874,19 +888,36 @@ Recovery Management handles dispute resolution for local businesses that have re
   - Owner Statement (the complaint description from the business owner)
   - Proposed Resolution (what the owner wants)
   - Service Date, Status Flag, Submitted timestamp
+  - Owner Email + Owner Phone (captured at intake submission)
 - **Left column — Attachments panel:**
   - Lists files uploaded by the owner with the intake (screenshots, receipts, etc.)
+- **Left column — Channel Readiness widget:**
+  - Shows email/phone/social/website availability with green/gray badges
+  - Cascade readiness indicator (Ready / Partial / Blocked)
+  - Intake email status (captured vs. not yet submitted)
 - **Right column — Resolution Draft panel:**
   - **Response Draft** — editable textarea with the AI-generated response
   - **Submission Guide** — editable textarea with step-by-step submission instructions
   - Click **Edit** to modify either section inline
   - Stage badge shows whether the draft is in `final_resolution_drafted` or `resolved_and_closed`
+- **Right column — Delivery Status panel** (visible after approval):
+  - Green "Delivered" badge with timestamp on success
+  - Amber "Retrying" badge with attempts count + next retry time on transient failure
+  - Red "Delivery Failed (Permanent)" badge with error details + **Resend Email** button after 3 failed attempts
 
 #### Actions
 
-- **Approve & Deliver** — transitions the campaign to `resolved_and_closed` and emails the approved resolution to the owner. Confirmation dialog before executing.
+- **Approve & Deliver** — transitions the campaign to `resolved_and_closed` and emails the approved resolution to the owner. The delivery destination priority is: intake email → campaign email → logged as failed if neither. Confirmation dialog before executing.
 - **Regenerate Draft** — archives the current draft and re-runs the Recovery AI Agent. A new draft will be available within ~5 minutes (next scheduler pass). Confirmation dialog before executing.
 - **Save Changes** (in edit mode) — saves inline edits to the Response Draft and Submission Guide sections.
+- **Resend Email** (visible after failed delivery) — manually re-attempts delivery. Resets the retry counter and forces a new delivery attempt immediately.
+
+#### Delivery Tracking + Retry
+
+- Every delivery attempt is tracked in `mkt_outreach_log` with `delivery_status` (`pending`/`sent`/`failed`/`retrying`), `delivery_attempts`, `last_delivery_error`, and `retry_after`.
+- The **delivery retry scheduler** runs every 15 minutes and automatically retries failed deliveries up to 3 times with exponential backoff (15min → 30min → 45min).
+- After 3 failed attempts, the delivery is permanently `failed` and the operator can manually resend via the **Resend Email** button.
+- The deliverable record is also marked with `delivery_status` + `delivered_at` timestamp.
 
 #### Recovery AI Agent
 
@@ -899,6 +930,8 @@ Recovery Management handles dispute resolution for local businesses that have re
 The intake form is a public page at `/recovery/intake?token=...`. The owner receives the link via the outreach cascade (Day 1 email).
 
 - The owner enters their complaint statement, proposed resolution, service date, and optional status flag.
+- **Owner email** (required) — the owner provides their email address. This is the primary delivery destination for the approved resolution.
+- **Owner phone** (optional) — the owner provides their phone number for SMS follow-up.
 - Attachments can be uploaded (images, PDFs, text files up to 10MB each).
 - On submission, the Recovery AI Agent is automatically enqueued.
 - If the link expires (7-day TTL), the owner sees an expired page with a **Request New Link** button.
@@ -907,11 +940,18 @@ The intake form is a public page at `/recovery/intake?token=...`. The owner rece
 
 Recovery campaigns in `awaiting_owner_intake` receive an automated outreach sequence:
 
-| Day | Channel | Content |
-|-----|---------|---------|
-| 1   | email   | Frame preview + grade impact + CTA = intake link |
-| 2   | email   | SMS pointer to email (if unopened 24–48h) |
-| 4   | email   | Administrative check-in (if unopened 48h+) |
+| Day | Channel | Content | Fallback |
+|-----|---------|---------|----------|
+| 1   | email   | Frame preview + grade impact + CTA = intake link | None (email is primary) |
+| 2   | phone (SMS) | Short SMS pointer to email | Falls back to email if no phone |
+| 4   | social (DM) | Administrative check-in | Falls back to email if no social |
+
+**Channel availability + fallback:** If a step's primary channel is unavailable (no phone for SMS, no social for DM), the cascade falls back to email. If email is also missing, the step is skipped. If the campaign has no contact channels at all, the cascade is blocked until contact info is added.
+
+**Channel Readiness widget:** Both the campaign detail and recovery detail pages show a Channel Readiness widget with 4 badges (Email, Phone, Social, Website) and a cascade readiness indicator:
+- **Green "Cascade Ready"** — email + at least one secondary channel
+- **Amber "Partial"** — email only (SMS/DM steps will fall back to email)
+- **Red "Blocked"** — no email (cascade cannot fire)
 
 After Day 4 with no response, the cascade is exhausted. The intake timeout sweep transitions the campaign to `dead` 4 days after the intake token expires.
 
@@ -990,7 +1030,119 @@ When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the ca
 
 ---
 
-## 27. References
+## 28. Profile Repair — Triage-First Dual-Track Pipeline
+
+Profile Repair is the third Marketing Ops service vector. It covers fixing unclaimed profiles, inconsistent NAP data, hijacked/duplicate listings, and suspended-profile reinstatements.
+
+### Key Insight: Two Tracks, One Category
+
+Profile repair is not one pipeline — it is two. The nature of the issue determines which existing campaign pattern it maps to:
+
+- **Track A (standard):** Routine damage — NAP drift, unclaimed profile, missing categories, platform gaps. Uses the **review pipeline** (Seek → Preview → Shown → Paid → Delivered). Pitched as a package via the Openers workspace.
+- **Track B (escalated):** Severe damage — suspensions, hijacked/duplicate listings, ownership disputes, address verification blocks. Uses the **recovery pipeline** (Audit Identified → … → Resolved & Closed). Evidence intake + AI-drafted appeal letter.
+
+### Triage-First: The Track is a Decision, Not a Fork
+
+1. **Create in triage.** Every profile repair campaign starts with `repair_track = NULL` in `seek`. Creation only requires the business identity + the raw audit signal.
+2. **Audit analysis recommends a track.** The `profile_repair_triage` prompt runs against the audit payload and returns a severity score (1-10), recommended track, issue type, and rationale. Heuristic guardrails backstop the AI:
+   - Any `suspension` / `hijacked_listing` / `duplicate_listing` / `ownership_dispute` signal → recommend `escalated`.
+   - `nap_drift` / `unclaimed_profile` / `missing_category` / `platform_gap` only → recommend `standard`.
+3. **Operator confirms or overrides.** The recommendation is advisory. The operator picks the track on the campaign detail page (Repair Track Panel).
+4. **Switch later if the picture changes.** A NAP-drift case that turns out to be a hijacked listing escalates mid-flight; an apparent suspension that resolves to a simple unclaimed profile de-escalates.
+
+### Track Switching — Guardrails
+
+| Move | Allowed? | Notes |
+|------|----------|-------|
+| Triage/standard → escalated (before `paid`) | Yes | Escalate freely early |
+| Standard → escalated (after `paid`) | **Blocked** | Refund first, then create a new linked campaign |
+| Escalated → standard (before `intake_submitted`) | Yes | De-escalate only before evidence is collected |
+| Escalated → standard (after `intake_submitted`) | **Blocked** | Evidence payload only makes sense on the recovery track |
+
+**Side effects on switch:**
+- Switching TO escalated while entering `outreach_dispatched` → auto-generates the intake link with `intake_kind = 'profile_repair'`.
+- Switching AWAY from escalated during `awaiting_owner_intake` → voids the outstanding intake token (sets `expires_at = now()`).
+- Every switch is logged in stage history with `trigger_type = 'track_switch'` and the mandatory reason.
+
+### Campaign Form
+
+When creating a profile repair campaign:
+- **Category:** Profile Repair
+- **Initial Issue Type:** Select the diagnosis from the dropdown (standard: nap_drift, unclaimed_profile, missing_category, missing_hours, platform_gap; escalated: suspension, duplicate_listing, hijacked_listing, ownership_dispute, address_verification_block). This is revisable.
+- **No track selector on the create form.** Campaigns are created in triage; the track is confirmed on the detail page after analysis.
+
+### Campaign Detail — Repair Track Panel
+
+For profile repair campaigns, the detail page shows a **Repair Track Panel**:
+- **Triage state** (no track set): amber banner — "Run the triage prompt to get an AI recommendation, then confirm a track."
+- **Track confirmed:** green (standard) or red (escalated) banner showing the current track + issue type + decided-at + reason.
+- **Switch Track button:** opens a dialog with mandatory reason + optional issue-type revision. Blocked moves are rejected with an explanation.
+
+### Track A Walkthrough (Standard)
+
+| Stage | What happens |
+|-------|--------------|
+| `seek` (triage) | Audit captured; triage prompt returns severity + recommended track; operator confirms `standard` |
+| `preview_built` | Watermarked Listing Drift & Audit Report generated (`nap_report` deliverable) |
+| `shown` | Opener sent (A3 Listing Drift archetype, soft or direct_paid close) via Openers workspace |
+| `paid` | Owner pays via `/marketing/pay`; coupon validated against `profile_repair_package` |
+| `delivered` | Full Citation & Profile Repair Package delivered (`citation_repair_package` deliverable) |
+| `retainer_pitched` → … | Standard retainer / tenant-conversion flow, unchanged |
+
+### Track B Walkthrough (Escalated)
+
+| Stage | What happens |
+|-------|--------------|
+| `audit_identified` | Suspension/duplicate/hijack flagged; issue type recorded |
+| `framework_preview_generated` | Reinstatement strategy preview drafted |
+| `outreach_dispatched` | Intake link auto-generated (`intake_kind = 'profile_repair'`) |
+| `awaiting_owner_intake` | Day 1 email → Day 2 SMS → Day 4 DM cascade (profile repair copy: frames profile issue + requests evidence) |
+| `intake_submitted` | Owner submitted narrative + evidence payload + attachments; AI Agent enqueued |
+| `final_resolution_drafted` | Appeal letter + submission guide drafted (`reinstatement_appeal` deliverable) |
+| `owner_approved` | Operator approves (auto-transitions) |
+| `resolved_and_closed` | Appeal package emailed to owner (tracked + auto-retried) |
+
+### Evidence Intake (Track B)
+
+The public intake page (`/recovery/intake`) renders a profile-repair-specific form variant when `intake_kind = 'profile_repair'`:
+- **Owner narrative** (reuses `owner_statement`)
+- **Issue type** selector (suspension, duplicate, hijack, ownership dispute, address verification block)
+- **Google profile ID or URL** (for identifying the correct listing)
+- **Suspension notice details** (date + quoted reason — for suspension appeals)
+- **Duplicate/hijacked listing URL** (for duplicate/hijack appeals)
+- **Evidence documents** (required — business license, utility bill, storefront photos; PDF/PNG/JPEG up to 10MB)
+
+Issue-type-specific validation rejects missing evidence (e.g., suspension appeals require the notice details + Google profile ID; duplicate/hijack appeals require the duplicate URL + storefront photos).
+
+### Service Categories + Coupons
+
+Three new service category values for per-vector coupon validation:
+- `profile_repair_audit` — for the preview/audit phase
+- `profile_repair_package` — for the paid Track A package
+- `profile_repair_appeal` — for Track B (if monetized as a paid package)
+
+### Deliverable Types
+
+| Type | Track | Phase | Description |
+|------|-------|-------|-------------|
+| `nap_report` | A | Preview | Watermarked NAP consistency report (existing) |
+| `citation_repair_package` | A | Paid | Per-platform fix instructions, claim links, corrected NAP canonical record |
+| `reinstatement_appeal` | B | Paid | Appeal letter + step-by-step Google Support submission guide |
+
+### Prompt Templates
+
+| Template | Type | Track | Purpose |
+|----------|------|-------|---------|
+| `profile_repair_triage` | seek | Both | Analyzes audit signals, recommends track + severity score |
+| `profile_repair_nap_drift` | seek | A | NAP drift audit — inconsistent platforms, recommended fixes, opener angle |
+| `profile_repair_unclaimed` | seek | A | Unclaimed profile audit — missed features, competitor gap, opener angle |
+| `profile_repair_platform_gap` | seek | A | Platform gap audit — missing platforms, reach loss, opener angle |
+| `citation_repair_package` | fulfill | A | Constructs the paid Citation & Profile Repair Package |
+| `profile_repair_resolution` | recovery_resolution | B | Drafts reinstatement appeal letter + submission guide (issue-type-specific framing) |
+
+---
+
+## 29. References
 
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
@@ -999,6 +1151,8 @@ When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the ca
 - `docs/LocalBiz/MARKETING_OPS_USER_GUIDE_GAP_CLOSE_SPRINT.md`
 - `docs/RECOVERY_MANAGEMENT_ENGINE_SPRINT_PLAN.md`
 - `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
+- `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
+- `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/MarketingOpsDashboardClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/RecoveryTabClient.tsx`
@@ -1013,6 +1167,7 @@ When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the ca
 - `apps/web/src/services/RecoveryOpsService.ts`
 - `apps/web/src/components/marketing-ops/StageBadge.tsx`
 - `apps/web/src/components/marketing-ops/CascadePanel.tsx`
+- `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx`
 - `apps/api/src/services/MarketingCampaignService.ts`
 - `apps/api/src/services/RecoveryResolutionService.ts`
 - `apps/api/src/services/RecoveryCascadeService.ts`

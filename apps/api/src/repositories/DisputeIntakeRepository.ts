@@ -29,6 +29,7 @@ export interface CreateDisputeIntakeInput {
   campaignId: string;
   tenantId?: string;
   ttlDays?: number;
+  intakeKind?: 'dispute' | 'profile_repair';
 }
 
 export interface SubmitIntakeInput {
@@ -99,6 +100,7 @@ export class DisputeIntakeRepository {
           tenant_id: input.tenantId || null,
           access_token: accessToken,
           expires_at: expiresAt,
+          intake_kind: input.intakeKind || 'dispute',
         },
       });
       logger.info('Dispute intake created', ctx, { intakeId: id, campaignId: input.campaignId });

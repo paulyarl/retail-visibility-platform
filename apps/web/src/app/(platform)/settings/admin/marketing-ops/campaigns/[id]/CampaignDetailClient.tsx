@@ -18,6 +18,7 @@ import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCar
 import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewResponsePipelineCard';
 import CascadePanel from '@/components/marketing-ops/CascadePanel';
 import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
+import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage' | 'cascade';
 
@@ -295,7 +296,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'prompts', label: 'Prompts' },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
     { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
-    { key: 'cascade', label: 'Cascade' },
+    // Cascade tab is review-pipeline only (Track A yes, Track B no).
+    // Recovery-pipeline campaigns use RecoveryCascadeService instead.
+    ...((campaign as any)?.pipeline === 'review' ? [{ key: 'cascade' as Tab, label: 'Cascade' }] : []),
   ];
 
   return (
@@ -559,6 +562,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 {/* Channel Readiness — shows email/phone/social/website availability
                     + cascade readiness indicator. */}
                 <ChannelReadinessWidget campaignId={campaign.id} />
+                {/* Repair Track Panel — only for profile_repair campaigns.
+                    Shows triage status + Switch Track action. */}
+                <RepairTrackPanel campaign={campaign} onRefresh={fetchCampaign} />
                 {/* Outreach & Follow-Up card — only for business-scope campaigns
                     in outreach stages (preview_built/shown/paid). */}
                 {campaign.scope === 'business'

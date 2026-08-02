@@ -4,20 +4,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
+import marketingOpsService, { Campaign, CampaignStage, CampaignScope, CampaignCategory, RepairTrack, RetainerStatus, CampaignCreateInput, CampaignUpdateInput, ServiceCategory } from '@/services/MarketingOpsService';
 import { STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
-const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management'];
+const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair'];
+
+const REPAIR_ISSUE_TYPES_STANDARD = ['nap_drift', 'unclaimed_profile', 'missing_category', 'missing_hours', 'platform_gap'];
+const REPAIR_ISSUE_TYPES_ESCALATED = ['suspension', 'duplicate_listing', 'hijacked_listing', 'ownership_dispute', 'address_verification_block'];
+const ALL_REPAIR_ISSUE_TYPES = [...REPAIR_ISSUE_TYPES_STANDARD, ...REPAIR_ISSUE_TYPES_ESCALATED];
 const RETAINER_STATUSES: RetainerStatus[] = ['not_pitched', 'pitched', 'won', 'declined'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const CAMPAIGN_ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 
 interface FormState {
   campaign_category: CampaignCategory;
+  repair_issue_type: string;
   scope: CampaignScope;
   business_name: string;
   category: string;
@@ -58,6 +63,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   campaign_category: 'review_management',
+  repair_issue_type: '',
   scope: 'business',
   business_name: '',
   category: '',
@@ -137,6 +143,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       const c = await marketingOpsService.getCampaign(campaignId);
       setForm({
         campaign_category: (c.campaign_category as CampaignCategory) ?? 'review_management',
+        repair_issue_type: (c as any).repair_issue_type ?? '',
         scope: (c.scope as CampaignScope) ?? 'business',
         business_name: c.business_name ?? '',
         category: c.category ?? '',
@@ -224,6 +231,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
         const input: CampaignCreateInput = {
           campaign_category: form.campaign_category,
+          repair_issue_type: form.campaign_category === 'profile_repair' ? strOrUndef(form.repair_issue_type) : undefined,
           scope: form.scope,
           business_name: strOrUndef(form.business_name),
           category: form.category,
@@ -340,7 +348,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Campaign Category" required>
               <select value={form.campaign_category} onChange={(e) => handleChange('campaign_category', e.target.value as CampaignCategory)}
                 className={inputClass}>
-                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : 'Recovery Management'}</option>)}
+                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : 'Profile Repair'}</option>)}
               </select>
               <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
                 {form.campaign_category === 'review_management' ? (
@@ -351,7 +359,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     <p className="mt-1"><strong>AI workflows:</strong> Openers workspace (A1-A4 archetype + close variant) → Follow-Ups workspace (doing/telling branch) → optional Cascade (email → SMS → DM)</p>
                     <p className="mt-1"><strong>Deliverables:</strong> Review responses, service menu, GBP audit, testimonial cards, NAP report, SEO content, lead magnet</p>
                   </>
-                ) : (
+                ) : form.campaign_category === 'recovery_management' ? (
                   <>
                     <p className="font-medium">Recovery Management</p>
                     <p className="mt-1"><strong>Stages:</strong> Audit Identified → Framework Preview → Outreach Dispatched → Awaiting Owner Intake → Intake Submitted → Final Resolution Drafted → Owner Approved → Resolved & Closed</p>
@@ -359,9 +367,35 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     <p className="mt-1"><strong>AI workflows:</strong> Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API). Outreach is the Day 1/2/4 cascade (email → SMS → DM), auto-fired by the scheduler.</p>
                     <p className="mt-1"><strong>Deliverables:</strong> Recovery resolution (response draft + submission guide, emailed to owner on approval)</p>
                   </>
+                ) : (
+                  <>
+                    <p className="font-medium">Profile Repair</p>
+                    <p className="mt-1"><strong>Triage-first:</strong> Campaigns start in triage (no track). The triage prompt analyzes audit signals and recommends a track — the operator confirms or overrides.</p>
+                    <p className="mt-1"><strong>Standard track:</strong> Uses the review pipeline (Seek → Preview → Shown → Paid → Delivered). For NAP drift, unclaimed profiles, missing categories. Pitched as a package.</p>
+                    <p className="mt-1"><strong>Escalated track:</strong> Uses the recovery pipeline (Audit Identified → … → Resolved & Closed). For suspensions, hijacked/duplicate listings, ownership disputes. Evidence intake + appeal letter.</p>
+                    <p className="mt-1"><strong>Switchable:</strong> Track can be switched mid-flight with guardrails (escalate freely before payment; de-escalate only before intake submission).</p>
+                  </>
                 )}
               </div>
             </FormField>
+            {form.campaign_category === 'profile_repair' && (
+              <FormField label="Initial Issue Type (diagnosis, revisable)">
+                <select
+                  value={form.repair_issue_type}
+                  onChange={(e) => handleChange('repair_issue_type', e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— Select issue type —</option>
+                  <optgroup label="Standard">
+                    {REPAIR_ISSUE_TYPES_STANDARD.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                  </optgroup>
+                  <optgroup label="Escalated">
+                    {REPAIR_ISSUE_TYPES_ESCALATED.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                  </optgroup>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Initial diagnosis from audit signals. The track is confirmed later on the campaign detail page after triage analysis.</p>
+              </FormField>
+            )}
             <FormField label="Scope" required>
               <select value={form.scope} onChange={(e) => handleChange('scope', e.target.value as CampaignScope)}
                 className={inputClass}>
