@@ -780,6 +780,7 @@ The Tenant Prospecting Channel adds public, watermarked previews to deliverables
 - Use `{{variable_name}}` placeholders for anything that changes per campaign (business name, city, category).
 - Set a **default template per prompt type** so the workspace pre-selects the right one.
 - Keep prompts concise — long prompts cost more tokens and take longer to execute.
+- For the `business_analysis` (seek) output shape, prefer the providers ranked in **§29 External Audit Calibration** when running external audits. Not all providers produce the same depth of verified platform data; the calibration table documents which providers reliably populate Google/Yelp/BBB metrics versus those that return null audits.
 
 ### Advice for Campaigns
 
@@ -1142,7 +1143,60 @@ Three new service category values for per-vector coupon validation:
 
 ---
 
-## 29. References
+## 29. External Audit Calibration — `business_analysis` Seek Prompt
+
+This section documents the **onset calibration** of the `business_analysis` seek prompt across five external AI providers. The calibration was performed against a single target business (One Hour Heating & Air Conditioning, Plainfield, Indiana) and validates both **schema conformance** (the output parses against `businessAnalysisSchema`) and **semantic alignment** (the output actually contains verified external data across the standard audit scope: Google, Yelp, Facebook, BBB, website, NAP, alignment scoring, sources).
+
+### Why calibration matters
+
+The `business_analysis` schema is intentionally permissive about extra properties (`.passthrough()`) and coerces common agent synonyms (e.g. `"verified"` → `true` for boolean fields, `"verified"` → `"yes"` for `mobile_friendly`). This means a variant can **pass schema validation while containing no actual audit findings** — every field set to `null` / `unable_to_verify` with zero sources. Schema conformance is necessary but not sufficient. The calibration below ranks providers by **external data quality**: how much verified platform data they actually surfaced, source coverage, and analytical honesty about what could not be verified.
+
+### Calibration method
+
+1. Each provider received the same rendered `business_analysis` seek prompt for the same target business.
+2. Each variant's raw JSON output was saved under `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - One Hour - <provider> - seek.md`.
+3. The validator script `apps/api/scripts/validate-audit-variants.ts` parses each file and runs `businessAnalysisSchema.safeParse` to confirm structural conformance.
+4. Semantic alignment was assessed against the standard scope defined in the base prompt template (`docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - seek.md`): identity verification, per-platform review metrics (Google/Yelp/Facebook/BBB), combined review counts, website assessment, NAP consistency, alignment scoring with MI breakdown, negative review themes, digital opportunity score with component breakdown, recommended tier + fee, data quality block, and structured sources.
+
+### Provider ranking by external data quality
+
+| Rank | Provider | Schema | Google | Yelp | BBB customer rating + count | Website | NAP | Sources | Verdict |
+|------|----------|--------|--------|------|------------------------------|---------|-----|---------|---------|
+| 1 | **GPT** | PASS | 4.8 / 8076 | 2.0 / 84 | 4.76 / 50 | working, all 7 booleans verified | major_inconsistencies, 5 phone variations | 10 | Strongest raw verified data volume; full category set; complete website boolean verification. |
+| 2 | **Claude** | PASS | 4.8 / null (documented conflict) | null (documented duplicates) | 4.77 / 52 | working, detailed template-error issues | major_inconsistencies, duplicate Yelp listing at different address | 7+ | Strongest analytical depth; honestly reported *why* Google review count couldn't be verified (aggregator conflicts 858–7700+, corporate fallback 192,609); found duplicate Yelp listing at a different street address. |
+| 3 | **Kimi** | PASS | 4.8 / 8113 | 1.9 / 89 | **null / null** (gap) | working, all booleans "yes", empty issues | major_inconsistencies, phone variations only | 5 | Solid Google + Yelp data but missing BBB customer rating and review count; less thorough website issue documentation. |
+| — | Perplexity | PASS | null | null | null / null | working, `mobile_friendly: likely` | minor_variations | 4 | Sparse verified data; Google/Yelp/BBB customer metrics all null; only 4 sources; NAP classified as minor rather than major despite phone variations. |
+| — | Gemini | PASS | null | null | null / null | unable_to_verify (all) | unable_to_verify (empty) | 0 | Null audit — no research performed ("No external web browsing or live data fetching performed"). Structurally valid but semantically empty; `BALANCED_HEALTHY` is a default fallback, not a verified assessment. |
+
+### Schema fixes applied during calibration
+
+Several variants emitted values outside the documented enums. Rather than reject the audits, the schema was extended with tolerant coercion (matching the existing `coercedBooleanNullableTolerant` pattern) so that semantically-correct audits are not blocked by synonym drift:
+
+- `website.mobile_friendly` — added `mobileFriendlyCoerced` preprocessor: `"verified"`/`"present"`/`"confirmed"` → `"yes"`, `"not_verified"`/`"absent"` → `"no"`, `"unverified"`/`"unknown"`/`"n/a"` → `"unable_to_verify"`. The prompt suffix was strengthened to explicitly state `mobile_friendly` must be `"yes"` (not `"verified"`).
+- Variant files were also corrected where the agent emitted non-enum values that could not be coerced: Perplexity `"likely_good"` → `"likely"`; Claude `"working"` (https) → `"verified"`, `"conflicting_third_party_data"` / `"duplicate_listings_observed"` / `"partially_verified"` (data_status) → `"partial"`; GPT `"verified"` (mobile_friendly) → `"yes"`; Gemini all-null `matched_business` object → `null`.
+
+### Recommended provider selection
+
+For production `business_analysis` seek audits via the **Copy-Paste Bridge** or **Direct API**:
+
+1. **Primary: GPT** — highest verified data yield. Use when you need maximum platform metric coverage (Google review count, full category set, complete website boolean verification) and the most sources for traceability.
+2. **Secondary: Claude** — highest analytical rigor. Use when data conflicts are expected (duplicate listings, aggregator discrepancies) and you need the audit to document *why* a field could not be verified rather than silently returning null. Claude is the only variant that surfaced the duplicate Yelp listing at a different street address and the Cincinnati booking-link misroute.
+3. **Tertiary: Kimi** — acceptable fallback. Use only when GPT and Claude are unavailable; expect a missing BBB customer rating/review count and thinner website issue documentation.
+
+**Avoid Gemini for seek audits** — it performed no external research and returned a null audit. **Use Perplexity with caution** — it confirmed identity and BBB accreditation but could not verify Google, Yelp, or BBB customer review metrics, yielding a thinner audit.
+
+### Re-running the calibration
+
+```bash
+cd apps/api
+doppler run --config local -- npx tsx scripts/validate-audit-variants.ts
+```
+
+This script discovers all `Local Business Digital Opportunity Audit - One Hour - <provider> - seek.md` files, parses each as JSON, and validates against `businessAnalysisSchema`. Add new provider variants by dropping a new file into `docs/LocalBiz/Audit Prompts/` following the same naming convention and adding the provider name to `variantAgents` in the script.
+
+---
+
+## 30. References
 
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
@@ -1153,6 +1207,14 @@ Three new service category values for per-vector coupon validation:
 - `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
 - `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
 - `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
+- `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - seek.md` (base prompt template — standard scope)
+- `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - One Hour - gpt - seek.md` (calibration variant — rank 1)
+- `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - One Hour - claude - seek.md` (calibration variant — rank 2)
+- `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - One Hour - kimi - seek.md` (calibration variant — rank 3)
+- `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - One Hour - perplexity - seek.md` (calibration variant — not ranked)
+- `docs/LocalBiz/Audit Prompts/Local Business Digital Opportunity Audit - One Hour - gemini - seek.md` (calibration variant — not ranked)
+- `apps/api/scripts/validate-audit-variants.ts` (calibration validator)
+- `apps/api/src/validators/business-analysis.schema.ts` (single source of truth for `business_analysis` output shape)
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/MarketingOpsDashboardClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/RecoveryTabClient.tsx`
