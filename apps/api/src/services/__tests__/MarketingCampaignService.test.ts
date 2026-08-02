@@ -147,6 +147,21 @@ const parentWithOutreachAudit = parentCategoryCampaign({
   ],
 });
 
+const parentWithCityCategoryAudit = parentCategoryCampaign({
+  id: 'mcamp-parent-city-cat-audit',
+  mkt_audits_list: [
+    {
+      id: 'maud-2',
+      platform: 'city_category_analysis',
+      audit_data: {
+        outreach_recommendation: {
+          primary_angle: 'Competitive visibility-gap audit for highly rated local HVAC contractors',
+        },
+      },
+    },
+  ],
+});
+
 const createdChild = (data: any) => ({
   id: 'mkt-test-001',
   stage: 'seek',
@@ -256,6 +271,22 @@ describe('deriveBusinessCampaign', () => {
     expect(createCall.data.notes).toContain('Outreach angle: Peak Season Lead Capture');
     expect(createCall.data.notes).toContain('Derived from parent campaign MC-001 (category scope)');
     expect(createCall.data.notes).toContain('Discovered location: 564 Northfield Rd, Plainfield, IN');
+  });
+
+  it('includes the outreach angle in notes when parent has a city_category_analysis audit', async () => {
+    mockCampaignsList.findUnique.mockResolvedValue(parentWithCityCategoryAudit);
+
+    await MarketingCampaignService.deriveBusinessCampaign({
+      parentId: 'mcamp-parent-city-cat-audit',
+      businessName: 'Central Air Heating and Cooling',
+      rating: 5.0,
+      reviewCount: 460,
+      location: '1200 Leesburg Rd Suite A, Fort Wayne, IN 46808',
+    });
+
+    const createCall = mockCampaignsList.create.mock.calls[0][0];
+    expect(createCall.data.notes).toContain('Outreach angle: Competitive visibility-gap audit for highly rated local HVAC contractors');
+    expect(createCall.data.notes).toContain('Derived from parent campaign MC-001 (category scope)');
   });
 
   it('throws NotFoundError when parent campaign does not exist', async () => {

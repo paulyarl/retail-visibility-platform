@@ -8,6 +8,7 @@ import marketingPayPublicService from '@/services/MarketingPayPublicService';
 import { StageBadge, STAGE_LABELS } from '@/components/marketing-ops/StageBadge';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
 import CategoryAnalysisAuditCard from '@/components/marketing-ops/CategoryAnalysisAuditCard';
+import CityCategoryAnalysisAuditCard from '@/components/marketing-ops/CityCategoryAnalysisAuditCard';
 import CityAnalysisAuditCard from '@/components/marketing-ops/CityAnalysisAuditCard';
 import BusinessAnalysisAuditCard from '@/components/marketing-ops/BusinessAnalysisAuditCard';
 import SyncReportCard from '@/components/marketing-ops/SyncReportCard';
@@ -740,7 +741,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 ) : (
                   <div className="space-y-3">
                     {(campaign.audits ?? []).map((audit: Audit) =>
-                      audit.platform === 'category_analysis' && audit.audit_data ? (
+                      audit.platform === 'city_category_analysis' && audit.audit_data ? (
+                        <CityCategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
+                      ) : audit.platform === 'category_analysis' && audit.audit_data ? (
                         <CategoryAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} />
                       ) : audit.platform === 'business_analysis' && audit.audit_data ? (
                         <BusinessAnalysisAuditCard key={audit.id} audit={audit} campaignId={campaignId} onSynced={fetchCampaign} />

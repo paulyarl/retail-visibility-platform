@@ -186,7 +186,7 @@ export function inputValidationMiddleware(req: Request, res: Response, next: Nex
     if (req.url === '/api/recommendations/track-batch') {
       return next();
     }
-    
+
     // Skip input validation for telemetry test endpoints
     if (req.url === '/api/security/telemetry/batch') {
       return next();
@@ -194,6 +194,16 @@ export function inputValidationMiddleware(req: Request, res: Response, next: Nex
 
     // Skip for OAuth test token endpoints - tokens may contain patterns like '---' that trigger false positives
     if (req.url === '/api/oauth/square/register-test-token' || req.url === '/api/oauth/paypal/register-test-token') {
+      return next();
+    }
+
+    // Skip for external prompt execution imports — these accept large LLM-generated
+    // JSON blobs (audit outputs) that legitimately contain prose with patterns like
+    // "-- " (em-dash usage in natural language) which falsely trigger the SQL
+    // line-comment detector. The raw_output is validated by the output schema
+    // (Zod) inside MarketingPromptService.importExternalResult, so security is
+    // still enforced at the application layer.
+    if (req.url === '/api/admin/marketing-ops/prompts/executions/external') {
       return next();
     }
 

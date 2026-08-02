@@ -614,4 +614,69 @@
       "Website conversion review (mobile-friendliness and booking/quote-request functionality)"
     ],
     "recommended_proof_or_demonstration": "A side-by-side pull of the business's current listings across BBB, Yelp, and Google-mirroring aggregators showing existing name/address variants, paired with an example of a corrected, consistent listing set",
-    "suggested_call_to_action": "Offer a free
+    "suggested_call_to_action": "Offer a free listing-consistency and local-visibility audit call",
+    "claims_to_avoid": [
+      "Do not claim the business is losing customers or failing",
+      "Do not cite exact lost-revenue figures",
+      "Do not claim guaranteed ranking or lead-volume improvements"
+    ],
+    "ideal_prospect_profile": "A single-location, independently owned Fort Wayne HVAC contractor with an already-strong star rating (4.5+) but review volume well below the category leader, and at least one verified directory name or address inconsistency."
+  },
+  "recommended_tier": "tier_3",
+  "tier_rationale": "The category digital opportunity score (2) falls in the 0-3 low range. Most sampled businesses show generally strong ratings and active, if imperfectly documented, digital presences; the clearest and most defensible opportunities identified (directory-name consistency, listing cleanup) are narrow, corrective services consistent with a monitoring/maintenance-level engagement rather than a broad overhaul.",
+  "estimated_monthly_service_fee": {
+    "minimum": 300,
+    "maximum": 750,
+    "currency": "USD"
+  },
+  "data_quality": {
+    "confidence": "low",
+    "verified_fields": [
+      "Business names, addresses, and phone numbers for 5 of 6 sampled businesses",
+      "Google rating and review count for 4 of 6 sampled businesses",
+      "BBB accreditation status for Brockman, Legacy, and Northeast Mechanical",
+      "Website mobile-responsiveness (viewport configuration) for Brockman",
+      "Exclusion basis for Masters Heating, Cooling, Plumbing & Electrical (confirmed multi-state operation: Fort Wayne and Decatur, IN plus Angola, IN and Lima, OH) and Home Comfort Experts (confirmed multi-state regional operation across Northern Indiana and Southwest Michigan)"
+    ],
+    "estimated_fields": [
+      "Approximate total category business count (20)",
+      "Category-level average/median Google rating and review count (based on n=4 valid businesses)"
+    ],
+    "unavailable_fields": [
+      "Google rating/review count for Integrity Heating & Air Conditioning and Fire & Ice Heating/Cooling",
+      "Recent owner-response percentage across the sample",
+      "Business-hours accuracy across the sample",
+      "Photo-coverage freshness across the sample",
+      "Confirmed physical address for Fire & Ice Heating/Cooling"
+    ],
+    "small_sample_warnings": [
+      "Google category benchmarks are based on only 4 valid businesses",
+      "Yelp category benchmarks are based on only 1 valid business (Legacy)",
+      "Mobile-friendly website percentage is based on only 1 directly-verified business (Brockman)"
+    ],
+    "limitations": [
+      "This audit reflects a partial, non-exhaustive sample of the Fort Wayne HVAC market and should not be read as a complete census.",
+      "Third-party aggregator data (ServiceAgent, Birdeye) mirrors Google Business Profile data with unknown and possibly varying recency/accuracy across businesses."
+    ]
+  },
+  "sources": [
+    { "source_name": "Brockman Heating & Air Conditioning - official website (Reviews page)", "source_type": "official_business_website", "url": "https://www.brockmanheating.com/reviews/", "accessed_date": "2026-08-02" },
+    { "source_name": "Brockman Heating & Air Conditioning - BBB Business Profile", "source_type": "bbb_profile", "url": "https://www.bbb.org/us/in/fort-wayne/profile/heating-and-air-conditioning/brockman-heating-air-conditioning-0352-901", "accessed_date": "2026-08-02" },
+    { "source_name": "Brockman Heating & Air Conditioning - ServiceAgent listing", "source_type": "gbp_mirroring_aggregator", "url": "https://serviceagent.ai/directory/indiana/fort-wayne/hvac/brockman-heating-air-conditioning/", "accessed_date": "2026-08-02" },
+    { "source_name": "Brockman Heating & Air Conditioning - Birdeye profile", "source_type": "gbp_mirroring_aggregator", "url": "https://reviews.birdeye.com/brockman-heating-air-conditioning-164781159415977", "accessed_date": "2026-08-02" },
+    { "source_name": "Northeast Mechanical Services, Inc. - ServiceAgent listing", "source_type": "gbp_mirroring_aggregator", "url": "https://serviceagent.ai/directory/indiana/fort-wayne/hvac/northeast-mechanical-services-inc/", "accessed_date": "2026-08-02" },
+    { "source_name": "Northeast Mechanical Services, Inc. - BBB Business Profile", "source_type": "bbb_profile", "url": "https://www.bbb.org/us/in/fort-wayne/profile/heating-and-air-conditioning/northeast-mechanical-services-inc-0352-10020407", "accessed_date": "2026-08-02" },
+    { "source_name": "Poorman's Heating & Air Conditioning, Inc. - ServiceAgent listing", "source_type": "gbp_mirroring_aggregator", "url": "https://serviceagent.ai/directory/indiana/fort-wayne/hvac/poormans-heating-air/", "accessed_date": "2026-08-02" },
+    { "source_name": "Poorman's Heating & Air Conditioning, Inc. - BBB Business Profile", "source_type": "bbb_profile", "url": "https://www.bbb.org/us/in/fort-wayne/profile/heating-and-air-conditioning/poormans-heating-air-conditioning-inc-0352-4874", "accessed_date": "2026-08-02" },
+    { "source_name": "Legacy Plumbing, Heating & Air, LLC - BBB Business Profile", "source_type": "bbb_profile", "url": "https://www.bbb.org/us/in/fort-wayne/profile/heating-and-air-conditioning/legacy-plumbing-heating-air-llc-0352-2025209", "accessed_date": "2026-08-02" },
+    { "source_name": "Legacy Plumbing, Heating & Air Conditioning - Birdeye profile", "source_type": "gbp_mirroring_aggregator", "url": "https://reviews.birdeye.com/legacy-plumbing-heating-air-conditioning-148891176471790", "accessed_date": "2026-08-02" },
+    { "source_name": "Legacy Plumbing, Heating & Air Conditioning - Yahoo Local listing", "source_type": "directory_listing", "url": "https://local.yahoo.com/info-16014387-legacy-plumbing-heating-air-conditioning-fort-wayne/", "accessed_date": "2026-08-02" },
+    { "source_name": "Integrity Heating & Air Conditioning, Inc. - BBB Business Profile", "source_type": "bbb_profile", "url": "https://www.bbb.org/us/in/fort-wayne/profile/heating-and-air-conditioning/integrity-heating-air-conditioning-inc-0352-10021428", "accessed_date": "2026-08-02" },
+    { "source_name": "Integrity Heating & Air Conditioning - Yelp listing", "source_type": "directory_listing", "url": "https://www.yelp.com/biz/integrity-heating-and-air-conditioning-fort-wayne", "accessed_date": "2026-08-02" },
+    { "source_name": "Fire & Ice Heating/Cooling Inc - Angi listing", "source_type": "directory_listing", "url": "https://www.angi.com/companylist/us/in/fort-wayne/fire-and-ice-heatingcooling-inc-reviews-6389809.htm", "accessed_date": "2026-08-02" },
+    { "source_name": "Masters Heating, Cooling, Plumbing & Electrical - official website (used to confirm multi-state exclusion)", "source_type": "official_business_website", "url": "https://mastersheatcool.com/", "accessed_date": "2026-08-02" },
+    { "source_name": "Home Comfort Experts - Yelp listing (used to confirm multi-state regional exclusion)", "source_type": "directory_listing", "url": "https://www.yelp.com/biz/home-comfort-experts-fort-wayne", "accessed_date": "2026-08-02" },
+    { "source_name": "Expertise.com - 18 Best Fort Wayne, IN HVAC & Furnace Repair Services", "source_type": "curated_directory", "url": "https://www.expertise.com/in/fort-wayne/hvac", "accessed_date": "2026-08-02" },
+    { "source_name": "Houzz - HVAC Contractors in Fort Wayne, IN", "source_type": "directory_listing", "url": "https://www.houzz.com/professionals/hvac-contractors/fort-wayne-in-us-probr0-bo~t_11814~r_4920423", "accessed_date": "2026-08-02" }
+  ]
+}
