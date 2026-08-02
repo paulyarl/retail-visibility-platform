@@ -2975,6 +2975,44 @@ router.get('/recovery/:campaignId/intake', async (req: any, res: Response) => {
   }
 });
 
+// Download an intake attachment (admin/operator) — streams bytes from Supabase.
+// Auth: authenticateToken + requirePlatformAdmin (applied at router top).
+router.get('/recovery/:campaignId/intake/attachments/:id', async (req: any, res: Response) => {
+  try {
+    const { campaignId, id } = req.params;
+    const result = await disputeIntakeService.downloadAttachmentByCampaign(campaignId, id, getCtx(req));
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'Attachment not found for this campaign' });
+    }
+
+    const contentTypeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      png: 'image/png',
+      jpeg: 'image/jpeg',
+    };
+    const contentType = contentTypeMap[result.fileType] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${result.fileName}"`);
+    return res.send(result.buffer);
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Reissue the intake link for a campaign (admin/operator). Mints a fresh
+// access_token + URL to share with the business owner. Auth: router-level
+// authenticateToken + requirePlatformAdmin.
+router.post('/recovery/:campaignId/reissue-link', async (req: any, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const result = await disputeIntakeService.reissueLink(campaignId, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Get current resolution draft + sections
 router.get('/recovery/:campaignId/draft', async (req: any, res: Response) => {
   try {
