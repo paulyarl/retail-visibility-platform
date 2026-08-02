@@ -99,7 +99,7 @@ const concentrationCoerced = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
     if (s === 'mixed' || s === 'balanced' || s === 'moderate') return 'moderately_concentrated';
-    if (s === 'concentrated' || s === 'high_concentration') return 'highly_concentrated';
+    if (s === 'high' || s === 'concentrated' || s === 'high_concentration') return 'highly_concentrated';
     if (s === 'monopoly' || s === 'single_dominant') return 'dominated_by_one';
     if (s === 'dispersed' || s === 'very_fragmented') return 'fragmented';
   }
@@ -190,7 +190,7 @@ const countUnitEnum = z.enum(['businesses', 'business_locations', 'listings']);
 const clearCallToActionCoerced = z.preprocess((val) => {
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'present' || s === 'visible' || s === 'clear' || s === 'yes_present') return 'yes';
+    if (s === 'present' || s === 'visible' || s === 'clear' || s === 'yes_present' || s === 'verified' || s === 'confirmed') return 'yes';
     if (s === 'absent' || s === 'missing' || s === 'none' || s === 'weak' || s === 'unclear') return 'no';
   }
   return val;
