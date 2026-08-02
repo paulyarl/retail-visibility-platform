@@ -9,6 +9,8 @@
 - `docs/LocalBiz/local_marketing_ops_payment_collection_sprint_plan.md`
 - `docs/RECOVERY_MANAGEMENT_ENGINE_SPRINT_PLAN.md`
 - `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
+- `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
+- `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
 
 ---
 
@@ -72,9 +74,14 @@ Stage transitions are validated; some moves are irreversible and all transitions
 
 ---
 
-## 3. Campaign Cycle Mental Model — Review vs Recovery
+## 3. Campaign Cycle Mental Model — Review vs Recovery vs Profile Repair
 
 Each campaign category has its own outreach cycle. The AI surfaces and workspace pages are different — operators should understand which cycle applies to which campaign type.
+
+Profile Repair is a **third vector** that reuses both existing pipelines via a track discriminator:
+- **Track A (standard):** NAP drift, unclaimed profiles, missing categories → uses the **review pipeline** (Openers, Follow-Ups, Cascade tab).
+- **Track B (escalated):** suspensions, hijacks, duplicates, ownership disputes → uses the **recovery pipeline** (Recovery tab, Day 1/2/4 cascade, evidence intake, AI appeal letter).
+- **Triage:** every profile repair campaign starts with no track. The triage prompt recommends a track; the operator confirms or overrides. Track can be switched mid-flight with guardrails.
 
 ### Review Management Cycle
 
@@ -85,7 +92,7 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 | **Reply** | Campaign detail → Stage transition | Prospect replies → operator transitions the campaign forward (e.g., `shown` → `paid`). |
 | **Cascade (optional)** | Campaign detail → Cascade tab | Opt-in email → SMS → DM escalation (Day 1/2/4) for silent prospects. Bypasses the manual follow-up workspace. |
 
-**Both Openers and Follow-Ups pages are review-management only.** Recovery campaigns are filtered out.
+**Both Openers and Follow-Ups pages are review-pipeline only.** Recovery campaigns and escalated profile repair campaigns are filtered out. Profile repair campaigns in triage or on the standard track ARE included (they use the review pipeline).
 
 ### Recovery Management Cycle
 
@@ -103,14 +110,17 @@ Each campaign category has its own outreach cycle. The AI surfaces and workspace
 
 ### Side-by-Side Comparison
 
-| Concept | Review Management | Recovery Management |
-|---------|-------------------|---------------------|
-| **Opener** | Openers workspace (A1-A4 archetype, soft/direct_paid close) | Day 1 cascade email (intake link) — automatic |
-| **Follow-Up** | Follow-Ups workspace (doing/telling branch, footprint diff) | Day 2 SMS + Day 4 DM — automatic |
-| **AI surface** | Prompt Workspace (Copy-Paste Bridge + Direct API) | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API) |
-| **Close variants** | Soft vs Direct Paid | None (intake is free) |
-| **Pitch assembly** | Header + Opener + Previews + Closer + Contact | None (single intake-request email) |
-| **Campaign filter** | `campaign_category = 'review_management'` | `campaign_category = 'recovery_management'` |
+| Concept | Review Management | Recovery Management | Profile Repair (Standard) | Profile Repair (Escalated) |
+|---------|-------------------|---------------------|---------------------------|----------------------------|
+| **Pipeline** | Review | Recovery | Review (Track A) | Recovery (Track B) |
+| **Opener** | Openers workspace (A1-A4 archetype, soft/direct_paid close) | Day 1 cascade email (intake link) — automatic | Openers workspace (A3 Listing Drift archetype) | Day 1 cascade email (evidence intake link) — automatic |
+| **Follow-Up** | Follow-Ups workspace (doing/telling branch, footprint diff) | Day 2 SMS + Day 4 DM — automatic | Follow-Ups workspace | Day 2 SMS + Day 4 DM — automatic |
+| **AI surface** | Prompt Workspace (Copy-Paste Bridge + Direct API) | Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API) | Prompt Workspace (seek + fulfill prompts) | Recovery detail → AI Workspace (appeal letter + submission guide) |
+| **Close variants** | Soft vs Direct Paid | None (intake is free) | Soft vs Direct Paid | None (intake is free) |
+| **Pitch assembly** | Header + Opener + Previews + Closer + Contact | None (single intake-request email) | Header + Opener + Previews + Closer + Contact | None (single evidence-request email) |
+| **Campaign filter** | `pipeline = 'review'` | `pipeline = 'recovery'` | `pipeline = 'review'` | `pipeline = 'recovery'` |
+| **Deliverables** | Review responses, GBP audit, NAP report, etc. | Recovery resolution (response + submission guide) | NAP report (preview), Citation & Profile Repair Package (paid) | Reinstatement Appeal (appeal letter + submission guide) |
+| **Intake** | None | Dispute intake (token-gated, owner statement + proposed resolution) | None | Evidence intake (token-gated, owner narrative + evidence payload + attachments) |
 
 ---
 
@@ -1020,7 +1030,119 @@ When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the ca
 
 ---
 
-## 27. References
+## 28. Profile Repair — Triage-First Dual-Track Pipeline
+
+Profile Repair is the third Marketing Ops service vector. It covers fixing unclaimed profiles, inconsistent NAP data, hijacked/duplicate listings, and suspended-profile reinstatements.
+
+### Key Insight: Two Tracks, One Category
+
+Profile repair is not one pipeline — it is two. The nature of the issue determines which existing campaign pattern it maps to:
+
+- **Track A (standard):** Routine damage — NAP drift, unclaimed profile, missing categories, platform gaps. Uses the **review pipeline** (Seek → Preview → Shown → Paid → Delivered). Pitched as a package via the Openers workspace.
+- **Track B (escalated):** Severe damage — suspensions, hijacked/duplicate listings, ownership disputes, address verification blocks. Uses the **recovery pipeline** (Audit Identified → … → Resolved & Closed). Evidence intake + AI-drafted appeal letter.
+
+### Triage-First: The Track is a Decision, Not a Fork
+
+1. **Create in triage.** Every profile repair campaign starts with `repair_track = NULL` in `seek`. Creation only requires the business identity + the raw audit signal.
+2. **Audit analysis recommends a track.** The `profile_repair_triage` prompt runs against the audit payload and returns a severity score (1-10), recommended track, issue type, and rationale. Heuristic guardrails backstop the AI:
+   - Any `suspension` / `hijacked_listing` / `duplicate_listing` / `ownership_dispute` signal → recommend `escalated`.
+   - `nap_drift` / `unclaimed_profile` / `missing_category` / `platform_gap` only → recommend `standard`.
+3. **Operator confirms or overrides.** The recommendation is advisory. The operator picks the track on the campaign detail page (Repair Track Panel).
+4. **Switch later if the picture changes.** A NAP-drift case that turns out to be a hijacked listing escalates mid-flight; an apparent suspension that resolves to a simple unclaimed profile de-escalates.
+
+### Track Switching — Guardrails
+
+| Move | Allowed? | Notes |
+|------|----------|-------|
+| Triage/standard → escalated (before `paid`) | Yes | Escalate freely early |
+| Standard → escalated (after `paid`) | **Blocked** | Refund first, then create a new linked campaign |
+| Escalated → standard (before `intake_submitted`) | Yes | De-escalate only before evidence is collected |
+| Escalated → standard (after `intake_submitted`) | **Blocked** | Evidence payload only makes sense on the recovery track |
+
+**Side effects on switch:**
+- Switching TO escalated while entering `outreach_dispatched` → auto-generates the intake link with `intake_kind = 'profile_repair'`.
+- Switching AWAY from escalated during `awaiting_owner_intake` → voids the outstanding intake token (sets `expires_at = now()`).
+- Every switch is logged in stage history with `trigger_type = 'track_switch'` and the mandatory reason.
+
+### Campaign Form
+
+When creating a profile repair campaign:
+- **Category:** Profile Repair
+- **Initial Issue Type:** Select the diagnosis from the dropdown (standard: nap_drift, unclaimed_profile, missing_category, missing_hours, platform_gap; escalated: suspension, duplicate_listing, hijacked_listing, ownership_dispute, address_verification_block). This is revisable.
+- **No track selector on the create form.** Campaigns are created in triage; the track is confirmed on the detail page after analysis.
+
+### Campaign Detail — Repair Track Panel
+
+For profile repair campaigns, the detail page shows a **Repair Track Panel**:
+- **Triage state** (no track set): amber banner — "Run the triage prompt to get an AI recommendation, then confirm a track."
+- **Track confirmed:** green (standard) or red (escalated) banner showing the current track + issue type + decided-at + reason.
+- **Switch Track button:** opens a dialog with mandatory reason + optional issue-type revision. Blocked moves are rejected with an explanation.
+
+### Track A Walkthrough (Standard)
+
+| Stage | What happens |
+|-------|--------------|
+| `seek` (triage) | Audit captured; triage prompt returns severity + recommended track; operator confirms `standard` |
+| `preview_built` | Watermarked Listing Drift & Audit Report generated (`nap_report` deliverable) |
+| `shown` | Opener sent (A3 Listing Drift archetype, soft or direct_paid close) via Openers workspace |
+| `paid` | Owner pays via `/marketing/pay`; coupon validated against `profile_repair_package` |
+| `delivered` | Full Citation & Profile Repair Package delivered (`citation_repair_package` deliverable) |
+| `retainer_pitched` → … | Standard retainer / tenant-conversion flow, unchanged |
+
+### Track B Walkthrough (Escalated)
+
+| Stage | What happens |
+|-------|--------------|
+| `audit_identified` | Suspension/duplicate/hijack flagged; issue type recorded |
+| `framework_preview_generated` | Reinstatement strategy preview drafted |
+| `outreach_dispatched` | Intake link auto-generated (`intake_kind = 'profile_repair'`) |
+| `awaiting_owner_intake` | Day 1 email → Day 2 SMS → Day 4 DM cascade (profile repair copy: frames profile issue + requests evidence) |
+| `intake_submitted` | Owner submitted narrative + evidence payload + attachments; AI Agent enqueued |
+| `final_resolution_drafted` | Appeal letter + submission guide drafted (`reinstatement_appeal` deliverable) |
+| `owner_approved` | Operator approves (auto-transitions) |
+| `resolved_and_closed` | Appeal package emailed to owner (tracked + auto-retried) |
+
+### Evidence Intake (Track B)
+
+The public intake page (`/recovery/intake`) renders a profile-repair-specific form variant when `intake_kind = 'profile_repair'`:
+- **Owner narrative** (reuses `owner_statement`)
+- **Issue type** selector (suspension, duplicate, hijack, ownership dispute, address verification block)
+- **Google profile ID or URL** (for identifying the correct listing)
+- **Suspension notice details** (date + quoted reason — for suspension appeals)
+- **Duplicate/hijacked listing URL** (for duplicate/hijack appeals)
+- **Evidence documents** (required — business license, utility bill, storefront photos; PDF/PNG/JPEG up to 10MB)
+
+Issue-type-specific validation rejects missing evidence (e.g., suspension appeals require the notice details + Google profile ID; duplicate/hijack appeals require the duplicate URL + storefront photos).
+
+### Service Categories + Coupons
+
+Three new service category values for per-vector coupon validation:
+- `profile_repair_audit` — for the preview/audit phase
+- `profile_repair_package` — for the paid Track A package
+- `profile_repair_appeal` — for Track B (if monetized as a paid package)
+
+### Deliverable Types
+
+| Type | Track | Phase | Description |
+|------|-------|-------|-------------|
+| `nap_report` | A | Preview | Watermarked NAP consistency report (existing) |
+| `citation_repair_package` | A | Paid | Per-platform fix instructions, claim links, corrected NAP canonical record |
+| `reinstatement_appeal` | B | Paid | Appeal letter + step-by-step Google Support submission guide |
+
+### Prompt Templates
+
+| Template | Type | Track | Purpose |
+|----------|------|-------|---------|
+| `profile_repair_triage` | seek | Both | Analyzes audit signals, recommends track + severity score |
+| `profile_repair_nap_drift` | seek | A | NAP drift audit — inconsistent platforms, recommended fixes, opener angle |
+| `profile_repair_unclaimed` | seek | A | Unclaimed profile audit — missed features, competitor gap, opener angle |
+| `profile_repair_platform_gap` | seek | A | Platform gap audit — missing platforms, reach loss, opener angle |
+| `citation_repair_package` | fulfill | A | Constructs the paid Citation & Profile Repair Package |
+| `profile_repair_resolution` | recovery_resolution | B | Drafts reinstatement appeal letter + submission guide (issue-type-specific framing) |
+
+---
+
+## 29. References
 
 - `docs/LocalBiz/local_marketing_ops_gap_analysis_and_optimized_plan.md`
 - `docs/LocalBiz/local_marketing_ops_sprint_plan_v3.md`
@@ -1029,6 +1151,8 @@ When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the ca
 - `docs/LocalBiz/MARKETING_OPS_USER_GUIDE_GAP_CLOSE_SPRINT.md`
 - `docs/RECOVERY_MANAGEMENT_ENGINE_SPRINT_PLAN.md`
 - `docs/RECOVERY_MANAGEMENT_RUNBOOK.md`
+- `docs/LocalBiz/PROFILE_REPAIR_INTEGRATION_SPEC.md`
+- `docs/LocalBiz/PROFILE_REPAIR_RUNBOOK.md`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/MarketingOpsDashboardClient.tsx`
 - `apps/web/src/app/(platform)/settings/admin/marketing-ops/RecoveryTabClient.tsx`
@@ -1043,6 +1167,7 @@ When `cascade_enabled = true`, the `MarketingAutoFollowUpScheduler` skips the ca
 - `apps/web/src/services/RecoveryOpsService.ts`
 - `apps/web/src/components/marketing-ops/StageBadge.tsx`
 - `apps/web/src/components/marketing-ops/CascadePanel.tsx`
+- `apps/web/src/components/marketing-ops/RepairTrackPanel.tsx`
 - `apps/api/src/services/MarketingCampaignService.ts`
 - `apps/api/src/services/RecoveryResolutionService.ts`
 - `apps/api/src/services/RecoveryCascadeService.ts`

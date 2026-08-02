@@ -66,7 +66,8 @@ export type DeliverableType =
   | 'seo_content'
   | 'lead_magnet'
   | 'recovery_resolution'
-  | 'reinstatement_appeal';
+  | 'reinstatement_appeal'
+  | 'citation_repair_package';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 

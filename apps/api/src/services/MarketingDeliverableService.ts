@@ -28,7 +28,8 @@ export type DeliverableType =
   | 'seo_content'
   | 'lead_magnet'
   | 'recovery_resolution'
-  | 'reinstatement_appeal';
+  | 'reinstatement_appeal'
+  | 'citation_repair_package';
 
 export interface DeliverableTemplateInput {
   name: string;
@@ -443,6 +444,7 @@ export class MarketingDeliverableService extends BaseService {
       lead_magnet: 'Lead Magnet',
       recovery_resolution: 'Recovery Resolution',
       reinstatement_appeal: 'Reinstatement Appeal',
+      citation_repair_package: 'Citation & Profile Repair Package',
     };
     return labels[type] || type;
   }
