@@ -21,6 +21,8 @@ export interface IntakeContext {
   serviceDate: string | null;
   expiresAt: string;
   alreadySubmitted: boolean;
+  intakeKind?: 'dispute' | 'profile_repair';
+  issueType?: string | null;
 }
 
 export interface SubmitResult {
@@ -94,6 +96,39 @@ export class RecoveryIntakePublicService extends PublicApiSingleton {
     );
     if (!result.success) {
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to submit intake');
+    }
+    return result.data?.data ?? result.data;
+  }
+
+  async submitProfileRepairIntake(
+    token: string,
+    payload: {
+      ownerStatement: string;
+      ownerEmail: string;
+      ownerPhone?: string | null;
+      proposedResolution?: string;
+      issueType: string;
+      evidencePayload: {
+        proof_of_location: string[];
+        storefront_photos?: string[];
+        google_profile_id?: string | null;
+        suspension_notice_details?: { date?: string | null; quoted_reason?: string | null } | null;
+        duplicate_listing_url?: string | null;
+      };
+      attachmentIds?: string[];
+    },
+  ): Promise<SubmitResult> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/public/recovery/intake/submit',
+      {
+        method: 'POST',
+        body: JSON.stringify({ token, ...payload }),
+      },
+      undefined,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to submit profile repair intake');
     }
     return result.data?.data ?? result.data;
   }

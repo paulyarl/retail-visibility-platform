@@ -27,7 +27,8 @@ export type DeliverableType =
   | 'nap_report'
   | 'seo_content'
   | 'lead_magnet'
-  | 'recovery_resolution';
+  | 'recovery_resolution'
+  | 'reinstatement_appeal';
 
 export interface DeliverableTemplateInput {
   name: string;
@@ -441,6 +442,7 @@ export class MarketingDeliverableService extends BaseService {
       seo_content: 'SEO Content',
       lead_magnet: 'Lead Magnet',
       recovery_resolution: 'Recovery Resolution',
+      reinstatement_appeal: 'Reinstatement Appeal',
     };
     return labels[type] || type;
   }

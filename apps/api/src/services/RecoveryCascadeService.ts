@@ -208,8 +208,11 @@ export class RecoveryCascadeService extends BaseService {
 
       // Build message content based on the effective channel (not the original)
       const effectiveStep = { ...nextStep, channel: effectiveChannel };
-      const messageSnapshot = this.buildMessageSnapshot(campaign, intakeLink, effectiveStep);
-      const messageSubject = `Action Required: Recovery Resolution for ${campaign.business_name || 'Your Business'}`;
+      const isProfileRepair = campaign.campaign_category === 'profile_repair';
+      const messageSnapshot = this.buildMessageSnapshot(campaign, intakeLink, effectiveStep, isProfileRepair);
+      const messageSubject = isProfileRepair
+        ? `Action Required: Profile Repair Appeal for ${campaign.business_name || 'Your Business'}`
+        : `Action Required: Recovery Resolution for ${campaign.business_name || 'Your Business'}`;
 
       // Fire the contact via MarketingOutreachService
       await MarketingOutreachService.getInstance().logContact({
@@ -257,18 +260,32 @@ export class RecoveryCascadeService extends BaseService {
     }
   }
 
-  private buildMessageSnapshot(campaign: any, intakeLink: string, step: { day: number; channel: string; label: string }): string {
+  private buildMessageSnapshot(
+    campaign: any,
+    intakeLink: string,
+    step: { day: number; channel: string; label: string },
+    isProfileRepair = false,
+  ): string {
     const businessName = campaign.business_name || 'your business';
-    const bodies: Record<string, string> = {
-      email: `Hello ${businessName},\n\nWe've identified a complaint that needs your attention. Please complete the recovery intake form so we can draft a resolution on your behalf.\n\nIntake link: ${intakeLink}\n\nThis link will expire. If you have questions, reply to this email.\n\n— Recovery Team`,
-      phone: `${businessName} — we sent you an email about a complaint that needs your response. Please check your inbox for the intake link, or visit: ${intakeLink}. Reply STOP to opt out.`,
-      social: `Hello ${businessName}, we've been trying to reach you about a complaint on your profile. Please complete the intake form so we can draft your resolution: ${intakeLink}`,
-    };
+
+    const bodies: Record<string, string> = isProfileRepair
+      ? {
+          email: `Hello ${businessName},\n\nWe've identified an issue with your Google Business Profile (or another platform) that needs your attention — this could be a suspension, duplicate listing, or ownership dispute.\n\nTo file an appeal on your behalf, we need you to submit evidence proving your business ownership. Please complete the profile repair intake form at the link below.\n\nIntake link: ${intakeLink}\n\nThis link will expire. If you have questions, reply to this email.\n\n— Profile Repair Team`,
+          phone: `${businessName} — your Google Business Profile may be suspended or flagged. We sent you an email with a link to submit evidence for your appeal. Please check your inbox, or visit: ${intakeLink}. Reply STOP to opt out.`,
+          social: `Hello ${businessName}, we've been trying to reach you about an issue with your business profile (suspension/duplicate/ownership). Please complete the intake form so we can file your appeal: ${intakeLink}`,
+        }
+      : {
+          email: `Hello ${businessName},\n\nWe've identified a complaint that needs your attention. Please complete the recovery intake form so we can draft a resolution on your behalf.\n\nIntake link: ${intakeLink}\n\nThis link will expire. If you have questions, reply to this email.\n\n— Recovery Team`,
+          phone: `${businessName} — we sent you an email about a complaint that needs your response. Please check your inbox for the intake link, or visit: ${intakeLink}. Reply STOP to opt out.`,
+          social: `Hello ${businessName}, we've been trying to reach you about a complaint on your profile. Please complete the intake form so we can draft your resolution: ${intakeLink}`,
+        };
+
     return JSON.stringify({
       step: step.label,
       channel: step.channel,
       businessName,
       intakeLink,
+      intakeKind: isProfileRepair ? 'profile_repair' : 'dispute',
       body: bodies[step.channel] || bodies.email,
     });
   }

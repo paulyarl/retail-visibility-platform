@@ -64,7 +64,9 @@ export type DeliverableType =
   | 'testimonial_cards'
   | 'nap_report'
   | 'seo_content'
-  | 'lead_magnet';
+  | 'lead_magnet'
+  | 'recovery_resolution'
+  | 'reinstatement_appeal';
 
 export type DeliverableStatus = 'preview' | 'paid' | 'archived';
 

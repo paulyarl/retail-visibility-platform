@@ -26,6 +26,10 @@ import {
   reissueSchema,
   validateAttachment,
 } from '../validators/recovery-intake.schema';
+import {
+  profileRepairIntakeSubmitSchema,
+  validateEvidenceForIssueType,
+} from '../validators/profile-repair-intake.schema';
 import { unifiedConfig } from '../config/unifiedConfig';
 
 const router = express.Router();
@@ -69,6 +73,60 @@ router.get(
 router.post(
   '/public/recovery/intake/submit',
   asyncErrorWrapper(async (req, res) => {
+    // Dispatch on intake_kind: profile_repair intakes have a different
+    // schema (evidence payload + issue type) vs dispute intakes.
+    const token = req.body?.token as string;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'token is required' });
+    }
+
+    // Resolve the intake to determine the kind. We don't expose the full
+    // context here — just need the kind to pick the right schema.
+    let intakeKind: 'dispute' | 'profile_repair' = 'dispute';
+    try {
+      const resolved = await disputeIntakeService.resolveIntake(token, req.ctx);
+      if (resolved && 'intakeKind' in resolved && resolved.intakeKind) {
+        intakeKind = resolved.intakeKind;
+      }
+    } catch {
+      // If resolve fails, fall through to the dispute schema which will
+      // produce a clearer token-invalid error.
+    }
+
+    if (intakeKind === 'profile_repair') {
+      const parsed = profileRepairIntakeSubmitSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'invalid_payload',
+          details: parsed.error.flatten(),
+        });
+      }
+
+      // Issue-type-specific evidence validation
+      const evidenceErrors = validateEvidenceForIssueType(parsed.data.issueType, parsed.data.evidencePayload);
+      if (Object.keys(evidenceErrors).length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'missing_evidence',
+          details: evidenceErrors,
+        });
+      }
+
+      try {
+        const result = await disputeIntakeService.submitProfileRepairIntake(parsed.data, req.ctx);
+        return res.json({ success: true, data: result });
+      } catch (error) {
+        const msg = (error as Error).message;
+        if (msg.includes('expired') || msg.includes('Invalid')) {
+          return res.status(400).json({ success: false, error: msg });
+        }
+        logger.error('[recovery-intake-public] POST /submit (profile_repair) error', req.ctx, { error: msg });
+        return res.status(500).json({ success: false, error: 'Failed to submit profile repair intake' });
+      }
+    }
+
+    // Default: dispute intake
     const parsed = intakeSubmitSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({

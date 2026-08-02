@@ -30,6 +30,8 @@ export interface IntakeContext {
   serviceDate: string | null;
   expiresAt: string;
   alreadySubmitted: boolean;
+  intakeKind: 'dispute' | 'profile_repair';
+  issueType?: string | null;
 }
 
 export interface SubmitResult {
@@ -129,6 +131,7 @@ export class DisputeIntakeService extends BaseService {
       });
 
       const alreadySubmitted = record.submitted_at !== null;
+      const intakeKind = ((record as any).intake_kind as 'dispute' | 'profile_repair') || 'dispute';
 
       return {
         intakeId: record.id,
@@ -140,6 +143,8 @@ export class DisputeIntakeService extends BaseService {
         serviceDate: record.service_date ? record.service_date.toISOString().split('T')[0] : null,
         expiresAt: record.expires_at.toISOString(),
         alreadySubmitted,
+        intakeKind,
+        issueType: (campaign as any)?.repair_issue_type ?? null,
       };
     } catch (error) {
       logger.error('Failed to resolve dispute intake', ctx, { error: (error as Error).message });
@@ -222,6 +227,104 @@ export class DisputeIntakeService extends BaseService {
       };
     } catch (error) {
       logger.error('Failed to submit dispute intake', ctx, { error: (error as Error).message });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // SUBMIT PROFILE REPAIR INTAKE (Track B — escalated)
+  // ====================
+
+  async submitProfileRepairIntake(
+    input: {
+      token: string;
+      ownerStatement: string;
+      ownerEmail: string;
+      ownerPhone?: string | null;
+      proposedResolution?: string;
+      issueType: string;
+      evidencePayload: any;
+      attachmentIds?: string[];
+    },
+    ctx?: RequestCtx,
+  ): Promise<SubmitResult> {
+    try {
+      const record = await this.repo.findByToken(input.token, ctx);
+      if (!record) throw new Error('Invalid or expired token');
+
+      const now = new Date();
+      if (record.expires_at < now) throw new Error('Token has expired');
+
+      // Idempotency
+      if (record.submitted_at) {
+        const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+          where: { id: record.campaign_id },
+        });
+        logger.info('Profile repair intake double-submit blocked (idempotent)', ctx, { intakeId: record.id });
+        return {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+          stage: campaign?.stage || 'intake_submitted',
+          alreadySubmitted: true,
+        };
+      }
+
+      // Persist the submission (owner statement + email + phone)
+      await this.repo.submitIntake(record.id, {
+        ownerStatement: input.ownerStatement,
+        ownerEmail: input.ownerEmail,
+        ownerPhone: input.ownerPhone || null,
+        serviceDate: null,
+        proposedResolution: input.proposedResolution || '',
+        statusFlag: undefined,
+      }, ctx);
+
+      // Persist the evidence payload + revised issue type on the intake row
+      await this.prisma.mkt_dispute_intake.update({
+        where: { id: record.id },
+        data: {
+          evidence_payload: input.evidencePayload as any,
+        },
+      });
+
+      // Update the campaign's repair_issue_type if the owner provided a revised one
+      await this.prisma.mkt_campaigns_list.update({
+        where: { id: record.campaign_id },
+        data: { repair_issue_type: input.issueType },
+      });
+
+      // Transition the campaign to intake_submitted
+      const updated = await MarketingCampaignService.transitionStage({
+        campaignId: record.campaign_id,
+        toStage: 'intake_submitted',
+        triggerType: 'system',
+        notes: 'Owner submitted profile repair evidence intake',
+      }, ctx);
+
+      // Enqueue the Recovery AI Agent — same scheduler job handles profile repair
+      try {
+        const { default: RecoveryResolutionService } = await import('./RecoveryResolutionService.js');
+        await RecoveryResolutionService.enqueue(record.campaign_id, record.id, ctx);
+        logger.info('Profile repair resolution execution enqueued after intake submission', ctx, {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+        });
+      } catch (enqueueError) {
+        logger.warn('Profile repair resolution enqueue failed — operator can manually re-run', ctx, {
+          intakeId: record.id,
+          campaignId: record.campaign_id,
+          error: (enqueueError as Error).message,
+        });
+      }
+
+      return {
+        intakeId: record.id,
+        campaignId: record.campaign_id,
+        stage: updated.stage,
+        alreadySubmitted: false,
+      };
+    } catch (error) {
+      logger.error('Failed to submit profile repair intake', ctx, { error: (error as Error).message });
       throw this.handleError(error, ctx);
     }
   }
