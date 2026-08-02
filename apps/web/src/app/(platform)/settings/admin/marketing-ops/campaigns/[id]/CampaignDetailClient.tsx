@@ -17,6 +17,7 @@ import BusinessContactCard from '@/components/marketing-ops/BusinessContactCard'
 import OutreachFollowUpCard from '@/components/marketing-ops/OutreachFollowUpCard';
 import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewResponsePipelineCard';
 import CascadePanel from '@/components/marketing-ops/CascadePanel';
+import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage' | 'cascade';
 
@@ -555,6 +556,9 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 {/* Business Contact card — visible before preview_built so the
                     operator has the right outreach channel at hand. */}
                 <BusinessContactCard campaign={campaign} onEnriched={fetchCampaign} />
+                {/* Channel Readiness — shows email/phone/social/website availability
+                    + cascade readiness indicator. */}
+                <ChannelReadinessWidget campaignId={campaign.id} />
                 {/* Outreach & Follow-Up card — only for business-scope campaigns
                     in outreach stages (preview_built/shown/paid). */}
                 {campaign.scope === 'business'

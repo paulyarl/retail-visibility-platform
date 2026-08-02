@@ -182,37 +182,53 @@ export class ReviewCascadeService extends BaseService {
         return { fired: false, exhausted: false };
       }
 
-      // Check channel availability
-      if (!this.hasChannelInfo(campaign, nextStep.channel)) {
-        logger.info('[ReviewCascade] Skipping step — channel contact info missing', ctx, {
-          campaignId: campaign.id,
-          channel: nextStep.channel,
-          step: nextStep.label,
-        });
-        // Log a skipped step so we don't re-evaluate it every pass
-        await MarketingOutreachService.getInstance().logContact({
-          campaignId: campaign.id,
-          contactChannel: nextStep.channel,
-          contactDate: now.toISOString(),
-          outcome: 'no_answer',
-          notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label} (SKIPPED — no contact info)`,
-          contactedBy: 'review-cascade',
-        }, ctx);
+      // Check channel availability. If the primary channel is missing,
+      // fall back to email (if available) so the cascade doesn't lose
+      // momentum. If email is also missing, skip the step entirely.
+      let effectiveChannel: 'email' | 'phone' | 'social' = nextStep.channel;
+      let isFallback = false;
 
-        return { fired: false, exhausted: false };
+      if (!this.hasChannelInfo(campaign, nextStep.channel)) {
+        if (nextStep.channel !== 'email' && this.hasChannelInfo(campaign, 'email')) {
+          effectiveChannel = 'email';
+          isFallback = true;
+          logger.info('[ReviewCascade] Falling back to email — primary channel unavailable', ctx, {
+            campaignId: campaign.id,
+            primaryChannel: nextStep.channel,
+            step: nextStep.label,
+          });
+        } else {
+          logger.info('[ReviewCascade] Skipping step — no contact info for channel or fallback', ctx, {
+            campaignId: campaign.id,
+            channel: nextStep.channel,
+            step: nextStep.label,
+          });
+          await MarketingOutreachService.getInstance().logContact({
+            campaignId: campaign.id,
+            contactChannel: nextStep.channel,
+            contactDate: now.toISOString(),
+            outcome: 'no_answer',
+            notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label} (SKIPPED — no contact info)`,
+            contactedBy: 'review-cascade',
+          }, ctx);
+          return { fired: false, exhausted: false };
+        }
       }
 
-      // Build message content based on step
-      const messageSnapshot = this.buildMessageSnapshot(campaign, nextStep);
+      // Build message content based on the effective channel
+      const effectiveStep: CascadeStep = { ...nextStep, channel: effectiveChannel };
+      const messageSnapshot = this.buildMessageSnapshot(campaign, effectiveStep);
       const messageSubject = `Frame Preview for ${campaign.business_name || 'Your Business'}`;
 
       // Fire the contact via MarketingOutreachService
       await MarketingOutreachService.getInstance().logContact({
         campaignId: campaign.id,
-        contactChannel: nextStep.channel,
+        contactChannel: effectiveChannel,
         contactDate: now.toISOString(),
         outcome: 'left_message',
-        notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label}`,
+        notes: isFallback
+          ? `${CASCADE_NOTE_PREFIX} ${nextStep.label} (FALLBACK — ${nextStep.channel} unavailable, used email)`
+          : `${CASCADE_NOTE_PREFIX} ${nextStep.label}`,
         messageSnapshot,
         messageSubject,
         contactedBy: 'review-cascade',
@@ -221,7 +237,8 @@ export class ReviewCascadeService extends BaseService {
       logger.info('[ReviewCascade] Step fired', ctx, {
         campaignId: campaign.id,
         step: nextStep.label,
-        channel: nextStep.channel,
+        channel: effectiveChannel,
+        fallback: isFallback,
         elapsedDays,
       });
 

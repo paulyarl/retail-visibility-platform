@@ -5,6 +5,7 @@ import { RefreshCw, CheckCircle, Sparkles, Save, AlertCircle, FileText, Papercli
 import Link from 'next/link';
 import recoveryOpsService, { DisputeIntake, RecoveryDraft } from '@/services/RecoveryOpsService';
 import { StageBadge } from '@/components/marketing-ops/StageBadge';
+import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 
 export default function RecoveryDetailClient({ campaignId }: { campaignId: string }) {
   const [intake, setIntake] = useState<DisputeIntake | null>(null);
@@ -342,6 +343,13 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
               </div>
             </div>
           )}
+
+          {/* Channel Readiness — shows email/phone/social availability +
+              cascade readiness + intake email status. */}
+          <ChannelReadinessWidget
+            campaignId={campaignId}
+            intakeEmail={intake?.owner_email ?? null}
+          />
         </div>
 
         {/* Right column: Draft + Actions */}

@@ -139,40 +139,87 @@ export class RecoveryCascadeService extends BaseService {
         return { fired: false };
       }
 
-      // Check channel availability — skip the step if the contact info
-      // for this channel is missing. Log the skip so we don't re-evaluate
-      // it on every cascade pass.
-      if (!this.hasChannelInfo(campaign, nextStep.channel)) {
-        logger.info('[RecoveryCascade] Skipping step — channel contact info missing', ctx, {
-          campaignId: campaign.id,
-          channel: nextStep.channel,
-          step: nextStep.label,
-        });
-        await MarketingOutreachService.getInstance().logContact({
-          campaignId: campaign.id,
-          contactChannel: nextStep.channel,
-          contactDate: now.toISOString(),
-          outcome: 'no_answer',
-          notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label} (SKIPPED — no contact info)`,
-          contactedBy: 'recovery-cascade',
-        }, ctx);
+      // ContactReadiness gate — if the campaign has NO contact channels at
+      // all (no email, no phone, no social), skip the cascade entirely.
+      // The operator needs to enrich the campaign with contact info first.
+      const hasAnyChannel =
+        this.hasChannelInfo(campaign, 'email') ||
+        this.hasChannelInfo(campaign, 'phone') ||
+        this.hasChannelInfo(campaign, 'social');
+      if (!hasAnyChannel) {
+        // Only log this once per campaign (check if we already logged a
+        // "no channels" warning)
+        const existingWarning = existingContacts.some(
+          (c: any) => c.notes?.includes('SKIPPED — no contact channels'),
+        );
+        if (!existingWarning) {
+          logger.warn('[RecoveryCascade] Campaign has no contact channels — cascade blocked', ctx, {
+            campaignId: campaign.id,
+          });
+          await MarketingOutreachService.getInstance().logContact({
+            campaignId: campaign.id,
+            contactChannel: 'other',
+            contactDate: now.toISOString(),
+            outcome: 'no_answer',
+            notes: `${CASCADE_NOTE_PREFIX} BLOCKED — no contact channels available (add email, phone, or social to the campaign)`,
+            contactedBy: 'recovery-cascade',
+          }, ctx);
+        }
         return { fired: false };
+      }
+
+      // Check channel availability. If the primary channel is missing,
+      // fall back to email (if available) so the cascade doesn't lose
+      // momentum. If email is also missing, skip the step entirely.
+      let effectiveChannel = nextStep.channel;
+      let isFallback = false;
+
+      if (!this.hasChannelInfo(campaign, nextStep.channel)) {
+        if (nextStep.channel !== 'email' && this.hasChannelInfo(campaign, 'email')) {
+          // Fallback: use email instead of the primary channel
+          effectiveChannel = 'email';
+          isFallback = true;
+          logger.info('[RecoveryCascade] Falling back to email — primary channel unavailable', ctx, {
+            campaignId: campaign.id,
+            primaryChannel: nextStep.channel,
+            step: nextStep.label,
+          });
+        } else {
+          // No fallback available — skip the step
+          logger.info('[RecoveryCascade] Skipping step — no contact info for channel or fallback', ctx, {
+            campaignId: campaign.id,
+            channel: nextStep.channel,
+            step: nextStep.label,
+          });
+          await MarketingOutreachService.getInstance().logContact({
+            campaignId: campaign.id,
+            contactChannel: nextStep.channel,
+            contactDate: now.toISOString(),
+            outcome: 'no_answer',
+            notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label} (SKIPPED — no contact info)`,
+            contactedBy: 'recovery-cascade',
+          }, ctx);
+          return { fired: false };
+        }
       }
 
       // Build the intake link
       const intakeLink = `${unifiedConfig.webBaseUrl || ''}/recovery/intake?token=${intake.access_token}`;
 
-      // Build message content based on step
-      const messageSnapshot = this.buildMessageSnapshot(campaign, intakeLink, nextStep);
+      // Build message content based on the effective channel (not the original)
+      const effectiveStep = { ...nextStep, channel: effectiveChannel };
+      const messageSnapshot = this.buildMessageSnapshot(campaign, intakeLink, effectiveStep);
       const messageSubject = `Action Required: Recovery Resolution for ${campaign.business_name || 'Your Business'}`;
 
       // Fire the contact via MarketingOutreachService
       await MarketingOutreachService.getInstance().logContact({
         campaignId: campaign.id,
-        contactChannel: nextStep.channel,
+        contactChannel: effectiveChannel,
         contactDate: now.toISOString(),
         outcome: 'left_message',
-        notes: `${CASCADE_NOTE_PREFIX} ${nextStep.label}`,
+        notes: isFallback
+          ? `${CASCADE_NOTE_PREFIX} ${nextStep.label} (FALLBACK — ${nextStep.channel} unavailable, used email)`
+          : `${CASCADE_NOTE_PREFIX} ${nextStep.label}`,
         messageSnapshot,
         messageSubject,
         contactedBy: 'recovery-cascade',
