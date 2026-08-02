@@ -8,9 +8,10 @@ import MarketingOpsPageShell from '@/components/marketing-ops/MarketingOpsPageSh
 
 /**
  * Human-readable suffix appended to the rendered prompt when the template
- * declares an `output_schema`. Mirrors the backend `MARKET_ANALYSIS_PROMPT_SUFFIX`
- * contract: the exported/copy/downloaded text tells the external agent what
- * JSON shape to return, so the import flow can validate it.
+ * declares an `output_schema`. Mirrors the backend `*_PROMPT_SUFFIX` constants
+ * (market_analysis, regional_city_opportunity, business_analysis,
+ * city_category_opportunity): the exported/copy/downloaded text tells the
+ * external agent what JSON shape to return, so the import flow can validate it.
  *
  * Kept inline (not imported from the API package) because the web app cannot
  * import from apps/api. The backend remains the source of truth for actual
@@ -74,6 +75,30 @@ CRITICAL JSON RULES:
   "source_2: { ... }" is INVALID).
 - Do not wrap the JSON in Markdown code fences.
 - Do not include any text before or after the JSON object.
+
+Return ONLY the JSON object, no markdown fences, no commentary.`,
+  city_category_opportunity: `
+
+Return your response as JSON matching the City Category Opportunity schema.
+Top-level keys: audit_metadata, summary, market_size, category_benchmarks,
+competitive_landscape, top_competitors, sampled_businesses,
+common_digital_issues, opportunity_gaps, category_digital_opportunity_score,
+outreach_recommendation, recommended_tier, tier_rationale,
+estimated_monthly_service_fee, data_quality, sources.
+
+Each "top_competitors" and "sampled_businesses" element is a bare JSON object
+{ ... } with keys including rank, business_name, ownership_type, google,
+yelp, facebook, website_assessment, competitive_visibility_score (competitors)
+or nap_status, observed_opportunities, data_confidence (sampled businesses).
+
+CRITICAL JSON RULES:
+- Every element of a JSON array MUST be a bare JSON object "{ ... }" separated by
+  a comma. NEVER prefix array elements with a label or identifier (e.g.
+  "competitor_2: { ... }" is INVALID).
+- Do not wrap the JSON in Markdown code fences.
+- Do not include any text before or after the JSON object.
+- Exclude national/regional chains and franchise locations. Include only
+  independent operators and local chains (2-5 metro-area locations).
 
 Return ONLY the JSON object, no markdown fences, no commentary.`,
 };

@@ -911,22 +911,3 @@ Preserve all enum values exactly.
 }
 ]
 }
-
-
-Return your response as JSON matching this schema:
-{
-  "market_analysis": {
-    "location": "<string>",
-    "industry": "<string>",
-    "total_approximate_businesses": <number>,
-    "average_gbp_metrics": { "average_rating": <number>, "average_review_count": <number> },
-    "gbp_claimed_percentage": <number 0-100>,
-    "website_presence_percentage": <number 0-100>,
-    "top_5_competitors": [{ "name": "<string>", "approximate_rating": <number>, "approximate_review_count": <number>, "location_status": "<string>" }],
-    "common_pain_points": ["<string>"],
-    "opportunity_gaps": ["<string>"],
-    "recommended_outreach_angle": "<string>"
-  }
-}
-
-Return ONLY the JSON object, no markdown fences, no commentary.
