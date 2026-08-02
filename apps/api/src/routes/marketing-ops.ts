@@ -653,6 +653,32 @@ router.post('/:id/transition', async (req: any, res: Response) => {
   }
 });
 
+// Profile Repair — switch track (standard ↔ escalated) with stage remap
+const switchTrackSchema = z.object({
+  to_track: z.enum(['standard', 'escalated']),
+  issue_type: z.string().optional(),
+  reason: z.string().min(1, 'Reason is required'),
+});
+
+router.post('/:id/switch-track', async (req: any, res: Response) => {
+  try {
+    const parsed = switchTrackSchema.parse(req.body);
+    const campaign = await MarketingCampaignService.switchRepairTrack({
+      campaignId: req.params.id,
+      toTrack: parsed.to_track,
+      issueType: parsed.issue_type,
+      reason: parsed.reason,
+      changedBy: req.user?.id,
+    }, getCtx(req));
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 // Enrich campaign contact fields from Google Places API (opt-in, 72h cache)
 router.post('/:id/enrich-contact', async (req: any, res: Response) => {
   try {
@@ -2888,11 +2914,17 @@ router.post('/deliverable/:campaignId/render', async (req: any, res: Response) =
 // Sprint 4 — Recovery Management Engine.
 // All routes are admin-authed (mounted at /api/admin/marketing-ops).
 
-// List recovery campaigns grouped by stage
+// List recovery-pipeline campaigns grouped by stage.
+// Includes recovery_management campaigns AND profile_repair/escalated campaigns.
 router.get('/recovery/campaigns', async (req: any, res: Response) => {
   try {
     const campaigns = await prisma.mkt_campaigns_list.findMany({
-      where: { campaign_category: 'recovery_management' },
+      where: {
+        OR: [
+          { campaign_category: 'recovery_management' },
+          { campaign_category: 'profile_repair', repair_track: 'escalated' },
+        ],
+      },
       orderBy: { stage_entered_at: 'desc' },
       select: {
         id: true,
@@ -2905,6 +2937,9 @@ router.get('/recovery/campaigns', async (req: any, res: Response) => {
         notes: true,
         assigned_to: true,
         created_at: true,
+        campaign_category: true,
+        repair_track: true,
+        repair_issue_type: true,
       },
     });
 

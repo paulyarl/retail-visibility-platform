@@ -41,7 +41,9 @@ export type CampaignStage =
 // column (VARCHAR(50), no DB enum). The literals are centralized in
 // recoveryStages.ts; the transition map is below. A campaign's
 // campaign_category determines which transition table governs it.
-export type CampaignCategory = 'review_management' | 'recovery_management';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair';
+
+export type RepairTrack = 'standard' | 'escalated';
 
 export const CAMPAIGN_CATEGORY_DEFAULT: CampaignCategory = 'review_management';
 
@@ -89,13 +91,36 @@ const RECOVERY_TRANSITIONS: Record<string, string[]> = {
 };
 
 /**
- * Returns the transition map for the given campaign category.
- * Review campaigns use the sales-pipeline machine; recovery campaigns use
- * the dispute-intake machine. Defaults to review_management so every
- * existing caller that does not pass a category gets unchanged behavior.
+ * Returns the transition map for the given campaign category + repair track.
+ * - review_management → review machine
+ * - recovery_management → recovery machine
+ * - profile_repair + NULL (triage) → review machine (safe default)
+ * - profile_repair + 'standard' → review machine
+ * - profile_repair + 'escalated' → recovery machine
+ * Defaults to review_management so every existing caller that does not
+ * pass a category gets unchanged behavior.
  */
-export function transitionsFor(category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT): Record<string, string[]> {
-  return category === 'recovery_management' ? RECOVERY_TRANSITIONS : REVIEW_TRANSITIONS;
+export function transitionsFor(
+  category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT,
+  repairTrack?: RepairTrack | null,
+): Record<string, string[]> {
+  if (category === 'recovery_management') return RECOVERY_TRANSITIONS;
+  if (category === 'profile_repair' && repairTrack === 'escalated') return RECOVERY_TRANSITIONS;
+  return REVIEW_TRANSITIONS;
+}
+
+/**
+ * Derives the pipeline name for a campaign — used by the web app to
+ * filter Openers/Follow-Ups (review pipeline) vs Recovery tab
+ * (recovery pipeline) without re-implementing the dispatch rule.
+ */
+export function pipelineFor(
+  category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT,
+  repairTrack?: RepairTrack | null,
+): 'review' | 'recovery' {
+  if (category === 'recovery_management') return 'recovery';
+  if (category === 'profile_repair' && repairTrack === 'escalated') return 'recovery';
+  return 'review';
 }
 
 const RESURRECTION_STAGES = ['lost', 'dead'];
@@ -113,6 +138,8 @@ const STAGE_DATE_FIELDS: Record<string, string> = {
 export interface CampaignInput {
   scope?: CampaignScope;
   campaignCategory?: CampaignCategory;
+  repairTrack?: RepairTrack | null;
+  repairIssueType?: string;
   businessName?: string;
   category: string;
   city: string;
@@ -266,9 +293,14 @@ export class MarketingCampaignService extends BaseService {
   // VALIDATION
   // ====================
 
-  isValidTransition(from: string | null, to: string, category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT): boolean {
+  isValidTransition(
+    from: string | null,
+    to: string,
+    category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT,
+    repairTrack?: RepairTrack | null,
+  ): boolean {
     if (!from) return true;
-    const allowed = transitionsFor(category)[from];
+    const allowed = transitionsFor(category, repairTrack)[from];
     return allowed ? allowed.includes(to) : false;
   }
 
@@ -287,6 +319,7 @@ export class MarketingCampaignService extends BaseService {
 
       const campaignCategory = input.campaignCategory || CAMPAIGN_CATEGORY_DEFAULT;
       const initialStage = campaignCategory === 'recovery_management' ? 'audit_identified' : 'seek';
+      // profile_repair starts in 'seek' (triage) — the track is decided later
 
       const campaign = await this.prisma.mkt_campaigns_list.create({
         data: {
@@ -294,6 +327,8 @@ export class MarketingCampaignService extends BaseService {
           display_id: input.displayId || null,
           scope: input.scope ?? 'business',
           campaign_category: campaignCategory,
+          repair_track: input.repairTrack || null,
+          repair_issue_type: input.repairIssueType || null,
           business_name: input.businessName || null,
           category: input.category,
           city: input.city,
@@ -563,8 +598,19 @@ export class MarketingCampaignService extends BaseService {
         this.prisma.mkt_campaigns_list.count({ where }),
       ]);
 
+      // Derive the pipeline field for each campaign so the web app
+      // can filter Openers/Follow-Ups (review) vs Recovery tab (recovery)
+      // without re-implementing the dispatch rule.
+      const itemsWithPipeline = items.map((item: any) => ({
+        ...item,
+        pipeline: pipelineFor(
+          (item.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT,
+          (item.repair_track as RepairTrack | null) ?? null,
+        ),
+      }));
+
       return {
-        items,
+        items: itemsWithPipeline,
         total,
         page,
         limit,
@@ -656,7 +702,8 @@ export class MarketingCampaignService extends BaseService {
 
       const fromStage = campaign.stage as string;
       const category = (campaign.campaign_category as CampaignCategory) || CAMPAIGN_CATEGORY_DEFAULT;
-      if (!this.isValidTransition(fromStage, toStage, category)) {
+      const repairTrack = (campaign.repair_track as RepairTrack | null) ?? null;
+      if (!this.isValidTransition(fromStage, toStage, category, repairTrack)) {
         throw new Error(`Invalid stage transition: ${fromStage} → ${toStage}`);
       }
 
@@ -677,19 +724,21 @@ export class MarketingCampaignService extends BaseService {
       }
 
       // Recovery Engine: auto-generate dispute intake link when a recovery
-      // campaign enters outreach_dispatched. The link URL is included in the
-      // outreach opener payload so the owner can submit their side of the
-      // dispute. Best-effort — failure must NOT block the transition.
+      // campaign (or escalated profile repair campaign) enters
+      // outreach_dispatched. The link URL is included in the outreach
+      // opener payload so the owner can submit their side of the dispute.
+      // Best-effort — failure must NOT block the transition.
       if (
         toStage === 'outreach_dispatched' &&
-        category === 'recovery_management'
+        (category === 'recovery_management' || (category === 'profile_repair' && repairTrack === 'escalated'))
       ) {
         try {
           const { DisputeIntakeService } = await import('./DisputeIntakeService.js');
-          await DisputeIntakeService.getInstance().generateIntakeLink(campaignId, ctx);
-          logger.info('Recovery intake link auto-generated for outreach_dispatched', ctx, { campaignId });
+          const intakeKind = category === 'profile_repair' ? 'profile_repair' : 'dispute';
+          await DisputeIntakeService.getInstance().generateIntakeLink(campaignId, ctx, intakeKind);
+          logger.info('Intake link auto-generated for outreach_dispatched', ctx, { campaignId, intakeKind });
         } catch (intakeError) {
-          logger.warn('Recovery intake link generation failed, proceeding with transition', ctx, {
+          logger.warn('Intake link generation failed, proceeding with transition', ctx, {
             campaignId,
             error: (intakeError as Error).message,
           });
@@ -728,6 +777,176 @@ export class MarketingCampaignService extends BaseService {
       return updated;
     } catch (error) {
       logger.error('Failed to transition campaign stage', ctx, { error: (error as Error).message, campaignId, toStage });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
+  // PROFILE REPAIR — TRACK SWITCHING
+  // ====================
+
+  /**
+   * Stage remap table for track switches (§4.3 of spec).
+   * Review → Recovery: seek → audit_identified, preview_built → framework_preview_generated,
+   *   shown → outreach_dispatched. paid+ → BLOCKED.
+   * Recovery → Review: audit_identified → seek, framework_preview_generated → preview_built,
+   *   outreach_dispatched → shown (BLOCKED — reverse not allowed),
+   *   awaiting_owner_intake → shown (allowed — de-escalation before intake).
+   *   intake_submitted+ → BLOCKED.
+   */
+  private static readonly TRACK_REMAP_REVIEW_TO_RECOVERY: Record<string, string | null> = {
+    seek: 'audit_identified',
+    preview_built: 'framework_preview_generated',
+    shown: 'outreach_dispatched',
+    // paid and later → blocked (return null)
+  };
+
+  private static readonly TRACK_REMAP_RECOVERY_TO_REVIEW: Record<string, string | null> = {
+    audit_identified: 'seek',
+    framework_preview_generated: 'preview_built',
+    outreach_dispatched: 'shown',
+    awaiting_owner_intake: 'shown', // de-escalation before intake — allowed
+    // intake_submitted and later → blocked (return null)
+  };
+
+  /**
+   * Switch a profile_repair campaign between standard (review pipeline)
+   * and escalated (recovery pipeline) tracks. Remaps the current stage
+   * to its counterpart in the target machine, with guardrails.
+   */
+  async switchRepairTrack(input: {
+    campaignId: string;
+    toTrack: RepairTrack;
+    issueType?: string;
+    reason: string;
+    changedBy?: string;
+  }, ctx?: RequestCtx): Promise<any> {
+    try {
+      const campaign = await this.prisma.mkt_campaigns_list.findUnique({
+        where: { id: input.campaignId },
+      });
+      if (!campaign) throw new Error(`Campaign ${input.campaignId} not found`);
+
+      if (campaign.campaign_category !== 'profile_repair') {
+        throw new Error('Track switching is only available for profile_repair campaigns');
+      }
+
+      const fromTrack = (campaign.repair_track as RepairTrack | null) ?? null;
+      const fromStage = campaign.stage as string;
+      const toTrack = input.toTrack;
+
+      if (fromTrack === toTrack) {
+        throw new Error(`Campaign is already on the ${toTrack} track`);
+      }
+
+      if (!input.reason || input.reason.trim().length === 0) {
+        throw new Error('A reason is required for track switches');
+      }
+
+      // Determine the remapped stage
+      let remappedStage: string | null;
+      if (toTrack === 'escalated') {
+        // Review → Recovery
+        remappedStage = MarketingCampaignService.TRACK_REMAP_REVIEW_TO_RECOVERY[fromStage] ?? null;
+        if (!remappedStage) {
+          throw new Error(
+            `Cannot escalate from stage '${fromStage}'. Escalate before payment or refund first (operator procedure).`
+          );
+        }
+      } else {
+        // Recovery → Review (de-escalation)
+        remappedStage = MarketingCampaignService.TRACK_REMAP_RECOVERY_TO_REVIEW[fromStage] ?? null;
+        if (!remappedStage) {
+          throw new Error(
+            `Cannot de-escalate from stage '${fromStage}'. Evidence already collected — finish on the recovery track.`
+          );
+        }
+      }
+
+      // If switching TO escalated while entering outreach_dispatched equivalent,
+      // we need to auto-generate the intake link (same hook as transitionStage).
+      // The remapped stage for 'shown' → 'outreach_dispatched' triggers this.
+      const needsIntakeLink = toTrack === 'escalated' && remappedStage === 'outreach_dispatched';
+
+      // If switching AWAY from escalated during awaiting_owner_intake,
+      // void the outstanding intake token.
+      const needsTokenVoid = fromTrack === 'escalated' && fromStage === 'awaiting_owner_intake';
+
+      const updateData: any = {
+        repair_track: toTrack,
+        stage: remappedStage,
+        stage_entered_at: new Date(),
+        track_decided_at: new Date(),
+        track_decision_reason: input.reason,
+      };
+
+      if (input.issueType) {
+        updateData.repair_issue_type = input.issueType;
+      }
+
+      const updated = await this.prisma.mkt_campaigns_list.update({
+        where: { id: input.campaignId },
+        data: updateData,
+      });
+
+      // Log the track switch in stage history
+      await this.logStageTransition({
+        campaignId: input.campaignId,
+        fromStage,
+        toStage: remappedStage,
+        notes: `Track switch: ${fromTrack ?? 'triage'} → ${toTrack}. Reason: ${input.reason}`,
+        triggerType: 'track_switch',
+        changedBy: input.changedBy,
+      });
+
+      // Auto-generate intake link if needed
+      if (needsIntakeLink) {
+        try {
+          const { DisputeIntakeService } = await import('./DisputeIntakeService.js');
+          await DisputeIntakeService.getInstance().generateIntakeLink(input.campaignId, ctx, 'profile_repair');
+          logger.info('Intake link auto-generated for track switch to escalated', ctx, { campaignId: input.campaignId });
+        } catch (intakeError) {
+          logger.warn('Intake link generation failed during track switch', ctx, {
+            campaignId: input.campaignId,
+            error: (intakeError as Error).message,
+          });
+        }
+      }
+
+      // Void outstanding intake token if de-escalating from awaiting_owner_intake
+      if (needsTokenVoid) {
+        try {
+          await this.prisma.mkt_dispute_intake.updateMany({
+            where: {
+              campaign_id: input.campaignId,
+              submitted_at: null,
+              expires_at: { gt: new Date() },
+            },
+            data: { expires_at: new Date() },
+          });
+          logger.info('Outstanding intake token voided during de-escalation', ctx, { campaignId: input.campaignId });
+        } catch (voidError) {
+          logger.warn('Failed to void intake token during de-escalation', ctx, {
+            campaignId: input.campaignId,
+            error: (voidError as Error).message,
+          });
+        }
+      }
+
+      logger.info('Profile repair track switched', ctx, {
+        campaignId: input.campaignId,
+        fromTrack,
+        toTrack,
+        fromStage,
+        remappedStage,
+      });
+
+      return updated;
+    } catch (error) {
+      logger.error('Failed to switch repair track', ctx, {
+        error: (error as Error).message,
+        campaignId: input.campaignId,
+      });
       throw this.handleError(error, ctx);
     }
   }

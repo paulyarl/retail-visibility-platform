@@ -63,7 +63,11 @@ export class DisputeIntakeService extends BaseService {
   // GENERATE INTAKE LINK
   // ====================
 
-  async generateIntakeLink(campaignId: string, ctx?: RequestCtx): Promise<{ intakeId: string; token: string; url: string }> {
+  async generateIntakeLink(
+    campaignId: string,
+    ctx?: RequestCtx,
+    intakeKind: 'dispute' | 'profile_repair' = 'dispute',
+  ): Promise<{ intakeId: string; token: string; url: string }> {
     try {
       const campaign = await this.prisma.mkt_campaigns_list.findUnique({
         where: { id: campaignId },
@@ -78,20 +82,21 @@ export class DisputeIntakeService extends BaseService {
       if (existing) {
         const reissued = await this.repo.reissueToken(existing.id, undefined, ctx);
         const url = this.buildIntakeUrl(reissued.access_token);
-        logger.info('Dispute intake link reissued', ctx, { campaignId, intakeId: existing.id });
+        logger.info('Intake link reissued', ctx, { campaignId, intakeId: existing.id, intakeKind });
         return { intakeId: existing.id, token: reissued.access_token, url };
       }
 
       const record = await this.repo.create({
         campaignId,
         tenantId: campaign.tenant_id || undefined,
+        intakeKind,
       }, ctx);
 
       const url = this.buildIntakeUrl(record.access_token);
-      logger.info('Dispute intake link generated', ctx, { campaignId, intakeId: record.id });
+      logger.info('Intake link generated', ctx, { campaignId, intakeId: record.id, intakeKind });
       return { intakeId: record.id, token: record.access_token, url };
     } catch (error) {
-      logger.error('Failed to generate dispute intake link', ctx, {
+      logger.error('Failed to generate intake link', ctx, {
         error: (error as Error).message,
         campaignId,
       });

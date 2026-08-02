@@ -87,10 +87,11 @@ export default function FollowUpWorkspaceClient() {
   // Follow-ups build on the review pipeline's opener (A1-A4 archetype +
   // close_variant). Recovery campaigns have their own outreach cycle
   // (Day 1/2/4 cascade handled by RecoveryCascadeService) and are
-  // intentionally excluded here.
+  // intentionally excluded here. Profile repair campaigns on the standard
+  // track (or in triage) are included — they use the review pipeline.
   const reviewCampaigns = useMemo(
     () => campaigns.filter(
-      (c) => (c.campaign_category ?? 'review_management') === 'review_management',
+      (c) => (c as any).pipeline === 'review',
     ),
     [campaigns],
   );
