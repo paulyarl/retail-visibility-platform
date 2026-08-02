@@ -113,6 +113,32 @@ const websiteStatusEnum = z.enum([
   'unable_to_verify',
 ]);
 const mobileFriendlyEnum = z.enum(['yes', 'likely', 'no', 'unable_to_verify']);
+/**
+ * Normalize `website.mobile_friendly` synonyms agents commonly emit. The
+ * prompt documents `yes|likely|no|unable_to_verify`, but some agents emit the
+ * same "verified"/"unable_to_verify" sentinel strings they use for the
+ * tri-state boolean website fields. Without this preprocessor those audits
+ * fail validation on `mobile_friendly` alone, even though the boolean fields
+ * (https, contact_information_visible, ...) already tolerate "verified" via
+ * `coercedBooleanNullableTolerant`.
+ *
+ *   - "verified" / "present" / "confirmed" / "true" / "1"  -> "yes"
+ *   - "not_verified" / "not present" / "absent" / "missing" / "false" / "0" -> "no"
+ *   - "unverified" / "unknown" / "n/a" / "na" -> "unable_to_verify"
+ *
+ * "yes", "likely", "no", and "unable_to_verify" pass through unchanged.
+ * Unknown strings fall through to the enum check so genuine typos still
+ * surface as validation errors.
+ */
+const mobileFriendlyCoerced = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'verified' || s === 'present' || s === 'confirmed' || s === 'true' || s === '1') return 'yes';
+    if (s === 'not_verified' || s === 'not present' || s === 'absent' || s === 'missing' || s === 'false' || s === '0') return 'no';
+    if (s === 'unverified' || s === 'unknown' || s === 'n/a' || s === 'na') return 'unable_to_verify';
+  }
+  return val;
+}, mobileFriendlyEnum);
 const napStatusEnum = z.enum([
   'consistent',
   'minor_variations',
@@ -223,7 +249,7 @@ const combinedReviewMetricsSchema = z.object({
 const websiteSchema = z.object({
   url: z.string().nullable().optional(),
   status: websiteStatusEnum,
-  mobile_friendly: mobileFriendlyEnum.nullable().optional(),
+  mobile_friendly: mobileFriendlyCoerced.nullable().optional(),
   https: coercedBooleanNullableTolerant.optional(),
   contact_information_visible: coercedBooleanNullableTolerant.optional(),
   click_to_call_available: coercedBooleanNullableTolerant.optional(),
@@ -391,7 +417,7 @@ Return your response as JSON matching this exact schema:
   "website": {
     "url": "<string|null>",
     "status": "working|broken|none_found|social_media_only|unable_to_verify",
-    "mobile_friendly": "yes|likely|no|unable_to_verify",
+    "mobile_friendly": "yes|likely|no|unable_to_verify" (use "yes" when confirmed mobile-friendly; do NOT use "verified"),
     "https": <boolean|null> (null when unable to verify),
     "contact_information_visible": <boolean|null> (null when unable to verify),
     "click_to_call_available": <boolean|null> (null when unable to verify),
