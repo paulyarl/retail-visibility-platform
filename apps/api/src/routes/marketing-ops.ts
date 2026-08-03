@@ -162,6 +162,7 @@ import MarketingPlaybookCatalogService from '../services/MarketingPlaybookCatalo
 import MarketingSignalRegistryService from '../services/MarketingSignalRegistryService';
 import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
+import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -3010,6 +3011,165 @@ router.post('/checklist-suggestions/:id/reject', async (req: any, res: Response)
       getCtx(req),
     );
     res.json({ success: true, data: suggestion });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// PROSPECT QUEUE ROUTES (Add to Queue Sprint)
+// ====================
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
+// otherwise Express matches /prospect-queue against /:id. All /prospect-queue
+// routes are single-segment literals and are matched before the catch-all.
+
+const prospectQueueAddSchema = z.object({
+  business_name: z.string().min(1).max(255),
+  category: z.string().max(255).optional(),
+  city: z.string().max(255).optional(),
+  state: z.string().max(255).optional(),
+  source_kind: z.enum(['category_analysis', 'city_category_audit', 'scan_unmatched', 'manual']),
+  source_campaign_id: z.string().min(1),
+  source_audit_id: z.string().optional(),
+  source_execution_id: z.string().optional(),
+  audit_date: z.string().datetime().optional(),
+  business_snapshot: z.record(z.any()).default({}),
+  priority: z.enum(['high', 'normal']).default('normal'),
+  note: z.string().max(2000).optional(),
+});
+
+// POST /prospect-queue — add a business to the queue (no navigation).
+router.post('/prospect-queue', async (req: any, res: Response) => {
+  try {
+    const parsed = prospectQueueAddSchema.parse(req.body);
+    const result = await MarketingProspectQueueService.addToQueue({
+      business_name: parsed.business_name,
+      category: parsed.category,
+      city: parsed.city,
+      state: parsed.state,
+      source_kind: parsed.source_kind,
+      source_campaign_id: parsed.source_campaign_id,
+      source_audit_id: parsed.source_audit_id,
+      source_execution_id: parsed.source_execution_id,
+      audit_date: parsed.audit_date ? new Date(parsed.audit_date) : undefined,
+      business_snapshot: parsed.business_snapshot,
+      priority: parsed.priority,
+      note: parsed.note,
+      queuedBy: req.user?.id,
+    }, getCtx(req));
+
+    if (result.kind === 'campaign_exists') {
+      return res.status(409).json({
+        success: false,
+        error: 'campaign_exists',
+        data: { campaignId: result.campaignId },
+      });
+    }
+    res.status(result.created ? 201 : 200).json({
+      success: true,
+      data: result.entry,
+      created: result.created,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// GET /prospect-queue — list entries (filters: status, category, city,
+// source_kind, assigned_to, limit, include). status accepts comma-separated
+// values (e.g. ?status=queued,campaign_created for the board view).
+router.get('/prospect-queue', async (req: any, res: Response) => {
+  try {
+    const statusRaw = req.query.status as string | undefined;
+    const status = statusRaw
+      ? (statusRaw.split(',').map((s) => s.trim()).filter(Boolean) as any)
+      : undefined;
+    const assignedTo = req.query.assigned_to as string | undefined;
+    // 'me' resolves to the caller's id; 'unassigned' → null filter; any other
+    // value is treated as a literal user id.
+    const resolvedAssignedTo =
+      assignedTo === 'me' ? req.user?.id :
+      assignedTo === 'unassigned' ? 'unassigned' :
+      assignedTo;
+
+    const result = await MarketingProspectQueueService.list({
+      status,
+      category: req.query.category as string | undefined,
+      city: req.query.city as string | undefined,
+      source_kind: req.query.source_kind as any,
+      assigned_to: resolvedAssignedTo,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+      includeCampaigns: req.query.include === 'campaigns',
+    }, getCtx(req));
+
+    res.json({ success: true, data: result.entries, queuedCount: result.queuedCount });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+const prospectQueuePatchSchema = z.object({
+  priority: z.enum(['high', 'normal']).optional(),
+  note: z.string().max(2000).nullable().optional(),
+  assigned_to: z.string().min(1).nullable().optional(),
+});
+
+// PATCH /prospect-queue/:id — update priority / note / assigned_to (claim semantics).
+router.patch('/prospect-queue/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = prospectQueuePatchSchema.parse(req.body);
+    const updated = await MarketingProspectQueueService.update(req.params.id, {
+      priority: parsed.priority,
+      note: parsed.note,
+      assigned_to: parsed.assigned_to,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// POST /prospect-queue/:id/create-campaign — replay snapshot through the
+// existing derive services; idempotent on repeat calls.
+router.post('/prospect-queue/:id/create-campaign', async (req: any, res: Response) => {
+  try {
+    const result = await MarketingProspectQueueService.createCampaignFromQueue({
+      queueEntryId: req.params.id,
+      actingUserId: req.user?.id,
+    }, getCtx(req));
+    res.status(result.created ? 201 : 200).json({
+      success: true,
+      data: result.campaign,
+      created: result.created,
+      queueEntry: result.queueEntry,
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+const prospectQueueDismissSchema = z.object({
+  reason: z.enum(['already_customer', 'bad_fit', 'duplicate', 'other']).optional(),
+});
+
+// POST /prospect-queue/:id/dismiss — mark entry dismissed (idempotent).
+router.post('/prospect-queue/:id/dismiss', async (req: any, res: Response) => {
+  try {
+    const parsed = prospectQueueDismissSchema.parse(req.body ?? {});
+    const updated = await MarketingProspectQueueService.dismiss({
+      queueEntryId: req.params.id,
+      reason: parsed.reason,
+    }, getCtx(req));
+    res.json({ success: true, data: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
