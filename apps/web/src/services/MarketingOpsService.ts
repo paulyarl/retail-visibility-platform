@@ -3381,3 +3381,97 @@ MarketingOpsService.prototype.getCascadeStatus = async function (campaignId: str
   const json = await res.json();
   return json.data;
 };
+
+// ─── Signal registry + triage methods (Sprint 3.5) ───────────────────────
+
+export interface SignalRegistryEntry {
+  id: string;
+  code: string;
+  family: string;
+  label: string;
+  description?: string | null;
+  detectionSource: 'model_emitted' | 'derived' | 'operator_input';
+  isActive: boolean;
+}
+
+export interface DetectedSignal {
+  code: string;
+  label: string;
+  family: string;
+  contributedToRule: boolean;
+}
+
+export interface TriageResult {
+  id: string;
+  campaignId: string;
+  recommendedPlaybook: {
+    id: string;
+    code: string;
+    name: string;
+    category: string;
+    archetype: string;
+    archetypeLabel: string;
+    fitdOfferTitle: string;
+    fitdDefaultFeeCents: number;
+    retainerPitchTitle: string;
+    retainerFeeCents: number;
+    previewDeliverableType?: string | null;
+  };
+  overriddenPlaybook: TriageResult['recommendedPlaybook'] | null;
+  confidenceScore: number;
+  triageReasoning: string;
+  detectedSignals: DetectedSignal[];
+  isOperatorAccepted: boolean | null;
+  evaluatedAt: string;
+}
+
+MarketingOpsService.prototype.listSignals = async function (): Promise<SignalRegistryEntry[]> {
+  const res = await fetch(`${BASE_URL}/signals`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to list signals (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};
+
+MarketingOpsService.prototype.getTriage = async function (campaignId: string): Promise<TriageResult | null> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/triage`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to get triage (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};
+
+MarketingOpsService.prototype.evaluateTriage = async function (
+  campaignId: string,
+  input: {
+    bbb?: { bbb_grade?: string; unanswered_bbb_complaints?: number };
+    operator_added_signals?: string[];
+    operator_removed_signals?: string[];
+  },
+): Promise<TriageResult> {
+  const res = await fetch(`${BASE_URL}/${campaignId}/triage/evaluate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to evaluate triage (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data;
+};

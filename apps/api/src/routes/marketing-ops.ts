@@ -519,6 +519,8 @@ const triageEvaluateSchema = z.object({
     bbb_grade: z.string().max(5).optional(),
     unanswered_bbb_complaints: z.number().int().min(0).optional(),
   }).optional(),
+  operator_added_signals: z.array(z.string()).optional(),
+  operator_removed_signals: z.array(z.string()).optional(),
 });
 
 const triageOverrideSchema = z.object({
@@ -3625,6 +3627,8 @@ router.post('/:campaignId/triage/evaluate', async (req: any, res: Response) => {
         bbbGrade: parsed.bbb.bbb_grade,
         unansweredBbbComplaints: parsed.bbb.unanswered_bbb_complaints,
       } : undefined,
+      operatorAddedSignals: parsed.operator_added_signals,
+      operatorRemovedSignals: parsed.operator_removed_signals,
     }, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {

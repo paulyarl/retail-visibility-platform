@@ -40,6 +40,20 @@ export interface TriageEvaluateInput {
     bbbGrade?: string;
     unansweredBbbComplaints?: number;
   };
+  /**
+   * Operator-enriched signals to ADD to the AI-extracted set.
+   * Use case: the scan missed a signal the operator verified manually
+   * (e.g. BBB grade, NAP drift visible on Google Maps but not in audit).
+   * These are merged AFTER extraction, BEFORE the engine evaluates.
+   */
+  operatorAddedSignals?: string[];
+  /**
+   * Operator-removed signals to SUBTRACT from the AI-extracted set.
+   * Use case: the scan flagged a false positive (e.g. WC_URL_MISMATCH
+   * because of a www vs non-www difference that's actually a redirect).
+   * These are removed AFTER extraction, BEFORE the engine evaluates.
+   */
+  operatorRemovedSignals?: string[];
 }
 
 export interface TriageAcceptInput {
@@ -94,7 +108,7 @@ export class CampaignTriageService extends BaseService {
    * Re-evaluating overwrites the previous result (one row per campaign).
    */
   async evaluateTriageForCampaign(input: TriageEvaluateInput, ctx?: RequestCtx): Promise<StoredTriageResult> {
-    const { campaignId, bbb } = input;
+    const { campaignId, bbb, operatorAddedSignals, operatorRemovedSignals } = input;
 
     // 1. Load campaign
     const campaign = await this.prisma.mkt_campaigns_list.findUnique({
@@ -124,7 +138,25 @@ export class CampaignTriageService extends BaseService {
       auditData,
       bbb,
     };
-    const signals: SignalCode[] = extractSignals(extractorInput);
+    let signals: SignalCode[] = extractSignals(extractorInput);
+
+    // 3a. Operator enrichment — merge manually added signals, remove false positives.
+    // This is the "human-in-the-loop" correction path: the AI scan may miss
+    // signals (e.g. BBB grade not in audit) or flag false positives (e.g.
+    // www vs non-www URL "mismatch"). Operators can enrich on re-evaluate.
+    if (operatorAddedSignals?.length) {
+      const existing = new Set(signals);
+      for (const code of operatorAddedSignals) {
+        if (typeof code === 'string' && code.length > 0) {
+          existing.add(code as SignalCode);
+        }
+      }
+      signals = Array.from(existing);
+    }
+    if (operatorRemovedSignals?.length) {
+      const removeSet = new Set(operatorRemovedSignals);
+      signals = signals.filter((s) => !removeSet.has(s));
+    }
 
     // 4. Load active playbooks ordered by priority_rank (the cascade order
     //    lives in the catalog, not in code — Sprint 2A generic evaluator).
