@@ -359,6 +359,76 @@ exclamation points, emojis, "just checking in", introducing new data.
 
 Output the follow-up only.`;
 
+// ─── A5: Dual-Signal Footprint Triage ────────────────────────────────────
+//
+// A5_DUAL_TRIAGE combines repair (NAP/URL) and review-gap signals. The
+// follow-up leads with whichever dimension changed (doing) or reminds the
+// prospect of the combined footprint (telling). Sprint 6 will refine the
+// copy; these stubs are complete enough to compile and generate usable text.
+
+const DOING_TEMPLATE_A5 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Data diff (what changed since the opener):
+{{data_diff}}
+
+Task: Write the follow-up, ~70 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Since the snapshot last week —"
+
+3. New proof (USE THE DATA DIFF):
+   - If new repair signals appeared: "noticed [new NAP/URL issue] on top
+     of the listing drift — and the review gap is still open."
+   - If new reviews landed unanswered: "[N] more reviews went unanswered
+     since, on top of the listing drift."
+   - Do NOT stack two numbers. Lead with whichever dimension changed;
+     reference the other as context, not a second stat.
+
+4. One line: "Updated the footprint repair plan — new previews attached."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: stacking stats, repeating the opener's hook verbatim,
+pricing/tier jargon, exclamation points, emojis.
+
+Output the follow-up only.`;
+
+const TELLING_TEMPLATE_A5 = `${FOLLOWUP_PERSONA}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write the follow-up, ~60 words max body:
+
+1. Greeting as above.
+
+2. Context anchor: "Following up on the visibility snapshot from
+   last week —"
+
+3. Reminder:
+   "the three previews are still there — the footprint diff, the
+   review-gap breakdown, and what synced looks like across every
+   platform."
+
+4. Soft re-engagement: "Happy to walk through any of them if useful."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: repeating the opener's hook, pricing/tier jargon,
+exclamation points, emojis, "just checking in", introducing new data.
+
+Output the follow-up only.`;
+
 // ─── Template registry ──────────────────────────────────────────────────
 
 const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = {
@@ -366,4 +436,5 @@ const FOLLOWUP_TEMPLATES: Record<ArchetypeCode, Record<FollowUpType, string>> = 
   A2: { doing: DOING_TEMPLATE_A2, telling: TELLING_TEMPLATE_A2 },
   A3: { doing: DOING_TEMPLATE_A3, telling: TELLING_TEMPLATE_A3 },
   A4: { doing: DOING_TEMPLATE_A4, telling: TELLING_TEMPLATE_A4 },
+  A5: { doing: DOING_TEMPLATE_A5, telling: TELLING_TEMPLATE_A5 },
 };
