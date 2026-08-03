@@ -335,6 +335,7 @@ const buildAdminNavItems = (): NavItem[] => [
       { label: 'Dashboard',            href: '/settings/admin/marketing-ops' },
       { label: 'Campaigns',            href: '/settings/admin/marketing-ops/campaigns' },
       { label: 'Recovery',             href: '/settings/admin/marketing-ops/recovery' },
+      { label: 'Playbooks',            href: '/settings/admin/marketing-ops/playbooks' },
       { label: 'Prompt Library',       href: '/settings/admin/marketing-ops/prompts' },
       { label: 'Deliverable Templates', href: '/settings/admin/marketing-ops/deliverable-templates' },
       { label: 'Branding',             href: '/settings/admin/marketing-ops/branding' },

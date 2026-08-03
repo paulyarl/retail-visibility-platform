@@ -2576,6 +2576,24 @@ router.post('/playbooks', async (req: any, res: Response) => {
   }
 });
 
+// Bulk priority_rank reorder — must be BEFORE /:id to avoid shadowing.
+// Reordering IS retuning the cascade (Sprint 3 route + Sprint 4 UI).
+router.put('/playbooks/reorder', async (req: any, res: Response) => {
+  try {
+    const parsed = playbookReorderSchema.parse(req.body);
+    const updated = await MarketingPlaybookCatalogService.reorderPlaybooks(
+      parsed.rankings.map((r) => ({ id: r.id, priorityRank: r.priority_rank })),
+      getCtx(req),
+    );
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.put('/playbooks/:id', async (req: any, res: Response) => {
   try {
     const parsed = playbookUpdateSchema.parse(req.body);
@@ -2608,24 +2626,6 @@ router.delete('/playbooks/:id', async (req: any, res: Response) => {
     await MarketingPlaybookCatalogService.deletePlaybook(req.params.id, getCtx(req));
     res.json({ success: true });
   } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
-// Bulk priority_rank reorder — the cascade reorder affordance for the admin
-// table (Sprint 3 route + Sprint 4 UI). Reordering IS retuning the cascade.
-router.put('/playbooks/reorder', async (req: any, res: Response) => {
-  try {
-    const parsed = playbookReorderSchema.parse(req.body);
-    const updated = await MarketingPlaybookCatalogService.reorderPlaybooks(
-      parsed.rankings.map((r) => ({ id: r.id, priorityRank: r.priority_rank })),
-      getCtx(req),
-    );
-    res.json({ success: true, data: updated });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
-    }
     handleServiceError(res, error, getCtx(req));
   }
 });

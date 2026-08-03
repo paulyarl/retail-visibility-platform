@@ -3199,9 +3199,182 @@ class MarketingOpsService extends AdminApiSingleton {
     const json = await res.json();
     return json.data;
   }
-}
 
-export interface CascadeStatus {
+  // ─── Signal registry + triage methods (Sprint 3.5) ──────────────────
+
+  async listSignals(): Promise<SignalRegistryEntry[]> {
+    const res = await fetch(`${BASE_URL}/signals`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to list signals (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async getTriage(campaignId: string): Promise<TriageResult | null> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/triage`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to get triage (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async evaluateTriage(
+    campaignId: string,
+    input: {
+      bbb?: { bbb_grade?: string; unanswered_bbb_complaints?: number };
+      operator_added_signals?: string[];
+      operator_removed_signals?: string[];
+    },
+  ): Promise<TriageResult> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/triage/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to evaluate triage (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  // ─── Playbook catalog CRUD (Sprint 4) ────────────────────────────────
+
+  async listPlaybooks(filters?: { category?: string; isActive?: boolean }): Promise<PlaybookCatalogEntry[]> {
+    const params = new URLSearchParams();
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.isActive !== undefined) params.set('is_active', String(filters.isActive));
+    const qs = params.toString();
+    const res = await fetch(`${BASE_URL}/playbooks${qs ? `?${qs}` : ''}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to list playbooks (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  async createPlaybook(input: PlaybookCreateInput): Promise<PlaybookCatalogEntry> {
+    const res = await fetch(`${BASE_URL}/playbooks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to create playbook (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async updatePlaybook(id: string, input: Partial<PlaybookCreateInput>): Promise<PlaybookCatalogEntry> {
+    const res = await fetch(`${BASE_URL}/playbooks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to update playbook (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async deletePlaybook(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/playbooks/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to delete playbook (${res.status})`);
+  }
+
+  async reorderPlaybooks(rankings: { id: string; priority_rank: number }[]): Promise<PlaybookCatalogEntry[]> {
+    const res = await fetch(`${BASE_URL}/playbooks/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ rankings }),
+    });
+    if (!res.ok) throw new Error(`Failed to reorder playbooks (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  // ─── Signal registry CRUD (Sprint 4) ─────────────────────────────────
+
+  async createSignal(input: {
+    code: string;
+    family: string;
+    label: string;
+    description?: string;
+    detection_source?: string;
+    is_active?: boolean;
+  }): Promise<SignalRegistryEntry> {
+    const res = await fetch(`${BASE_URL}/signals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to create signal (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async updateSignal(id: string, input: Partial<{
+    family: string;
+    label: string;
+    description: string | null;
+    detection_source: string;
+    is_active: boolean;
+  }>): Promise<SignalRegistryEntry> {
+    const res = await fetch(`${BASE_URL}/signals/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to update signal (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async deleteSignal(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/signals/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to delete signal (${res.status})`);
+  }
+}
   campaignId: string;
   cascadeEnabled: boolean;
   cascadeConfig: any;
@@ -3425,53 +3598,48 @@ export interface TriageResult {
   evaluatedAt: string;
 }
 
-MarketingOpsService.prototype.listSignals = async function (): Promise<SignalRegistryEntry[]> {
-  const res = await fetch(`${BASE_URL}/signals`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to list signals (${res.status})`);
-  }
-  const json = await res.json();
-  return json.data;
-};
+// ─── Playbook catalog types (Sprint 4) ───────────────────────────────────
 
-MarketingOpsService.prototype.getTriage = async function (campaignId: string): Promise<TriageResult | null> {
-  const res = await fetch(`${BASE_URL}/${campaignId}/triage`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to get triage (${res.status})`);
-  }
-  const json = await res.json();
-  return json.data;
-};
+export interface MatchingRules {
+  any: string[];
+  all: string[];
+  none: string[];
+  dual: { groupA: string[]; groupB: string[] } | null;
+  confidence: number;
+}
 
-MarketingOpsService.prototype.evaluateTriage = async function (
-  campaignId: string,
-  input: {
-    bbb?: { bbb_grade?: string; unanswered_bbb_complaints?: number };
-    operator_added_signals?: string[];
-    operator_removed_signals?: string[];
-  },
-): Promise<TriageResult> {
-  const res = await fetch(`${BASE_URL}/${campaignId}/triage/evaluate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to evaluate triage (${res.status})`);
-  }
-  const json = await res.json();
-  return json.data;
-};
+export interface PlaybookCatalogEntry {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  archetype: string;
+  archetypeLabel: string;
+  description: string | null;
+  matchingRules: MatchingRules;
+  priorityRank: number;
+  fitdOfferTitle: string;
+  fitdDefaultFeeCents: number;
+  retainerPitchTitle: string;
+  retainerFeeCents: number;
+  openerPromptTemplateId: string | null;
+  previewDeliverableType: string | null;
+  isActive: boolean;
+}
+
+export interface PlaybookCreateInput {
+  code: string;
+  name: string;
+  category: string;
+  archetype: string;
+  description?: string;
+  matching_rules?: MatchingRules;
+  priority_rank?: number;
+  fitd_offer_title: string;
+  fitd_default_fee_cents: number;
+  retainer_pitch_title: string;
+  retainer_fee_cents: number;
+  opener_prompt_template_id?: string;
+  preview_deliverable_type?: string;
+  is_active?: boolean;
+}
