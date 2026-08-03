@@ -1,19 +1,51 @@
 /**
- * Triage Engine — barrel export.
+ * Triage Engine — barrel export (Sprint 2A pivot).
  *
  * Consumers import from a single path:
- *   import { extractSignals, evaluateTriage } from '../services/triage';
+ *   import { extractSignals, evaluateTriage, ruleMatches } from '../services/triage';
+ *
+ * The engine input is SignalCode[] (Sprint 2A). NormalizedSignals is
+ * extractor-internal only.
  */
 
+// Signal taxonomy (Sprint 2A §2A.1)
+export {
+  KNOWN_SIGNAL_CODES,
+  SIGNAL_FAMILIES,
+  FAMILY_LABELS,
+  SIGNAL_LABELS,
+  DETECTION_SOURCES,
+  signalFamily,
+  isRepairSignal,
+  isReviewSignal,
+  isCrisisSignal,
+  isVisualSignal,
+  isKnownSignalCode,
+  signalLabel,
+  invalidateSignalRegistryCache,
+  getSignalRegistryCache,
+  setSignalRegistryCache,
+} from './signal-taxonomy';
+
+export type {
+  SignalCode,
+  SignalFamily,
+  DetectionSource,
+  SignalRegistryRow,
+} from './signal-taxonomy';
+
+// Signal extractor (emits SignalCode[])
 export {
   extractSignals,
-  signalPredicates,
-  SIGNAL_THRESHOLDS,
+  labelSignals,
+  filterKnownSignals,
 } from './signal-extractor';
 
+// Triage engine (generic DSL evaluator)
 export {
   evaluateTriage,
-  CONFIDENCE,
+  ruleMatches,
+  fallbackRecommendation,
 } from './TriageEngineService';
 
 export type {
@@ -25,6 +57,7 @@ export type {
   ArchetypeCodeWithA5,
   SignalExtractorInput,
   PlaybookCatalogRow,
+  MatchingRules,
 } from './types';
 
 export {

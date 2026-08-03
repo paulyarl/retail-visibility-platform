@@ -1649,6 +1649,15 @@ export function generateCampaignTriageId(): string {
 }
 
 /**
+ * Generate signal registry entry ID
+ * Format: sig-{nanoid} (12 chars)
+ */
+export function generateSignalRegistryId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `sig-${nanoid()}`;
+}
+
+/**
  * Generate marketing stage history ID
  * Format: msh-{nanoid} (12 chars)
  */

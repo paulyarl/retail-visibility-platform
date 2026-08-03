@@ -6808,11 +6808,12 @@ model mkt_playbook_catalog {
   is_active                            Boolean                       @default(true)
   created_at                           DateTime                      @default(now()) @db.Timestamptz(6)
   updated_at                           DateTime                      @default(now()) @db.Timestamptz(6)
+  priority_rank                        Int                           @default(99)
   mkt_campaign_triage_results_override mkt_campaign_triage_results[] @relation("mkt_campaign_triage_results_overridden_playbook")
   mkt_campaign_triage_results          mkt_campaign_triage_results[]
 
   @@index([code], map: "idx_mkt_playbook_catalog_code")
-  @@index([is_active], map: "idx_mkt_playbook_catalog_active")
+  @@index([is_active, priority_rank], map: "idx_mkt_playbook_catalog_active")
 }
 
 /// Per-campaign triage result + operator accept/override decision.
@@ -6835,6 +6836,26 @@ model mkt_campaign_triage_results {
   playbook                mkt_playbook_catalog  @relation(fields: [recommended_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_playbook")
 
   @@index([campaign_id], map: "idx_mkt_campaign_triage_campaign")
+}
+
+/// Signal registry — signal codes as DATA so admins can register future
+/// unknown signals without an engine deploy. No RLS (platform-admin scoped
+/// global table, same as mkt_playbook_catalog). Backed by
+/// database/migrations/158_mkt_signal_registry.sql.
+model mkt_signal_registry {
+  id               String   @id @db.VarChar(255)
+  code             String   @unique @db.VarChar(60)
+  family           String   @db.VarChar(10)
+  label            String   @db.VarChar(255)
+  description      String?
+  detection_source String   @default("model_emitted") @db.VarChar(20)
+  derived_rule     Json?
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([code], map: "idx_mkt_signal_registry_code")
+  @@index([family, is_active], map: "idx_mkt_signal_registry_family")
 }
 
 enum action {

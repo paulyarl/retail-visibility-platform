@@ -109,6 +109,19 @@
  *     GET    /openers/pitches           — list assembled pitches (filter: campaignId)
  *     POST   /openers/pitches           — assemble + persist a full pitch from variant IDs + review pairs
  *     GET    /openers/pitches/:id       — get single assembled pitch
+ *
+ *   Playbook Catalog (Sprint 3 — Triage Engine):
+ *     GET    /playbooks                 — list playbooks (filter: category, archetype, is_active)
+ *     GET    /playbooks/:id             — get single playbook
+ *     POST   /playbooks                 — create playbook
+ *     PUT    /playbooks/:id             — update playbook
+ *     DELETE /playbooks/:id             — delete playbook
+ *
+ *   Campaign Triage (Sprint 3 — Triage Engine):
+ *     POST   /:campaignId/triage/evaluate  — run the cascade, upsert triage result (no campaign mutation)
+ *     GET    /:campaignId/triage           — read the latest stored triage result
+ *     POST   /:campaignId/triage/accept    — accept recommendation (re-categorize campaign + apply FITD fee)
+ *     POST   /:campaignId/triage/override  — override with a different playbook (re-categorize + apply FITD fee)
  */
 
 import { Router, Response } from 'express';
@@ -145,6 +158,9 @@ import DeliverableRenderService from '../services/deliverable/DeliverableRenderS
 import RecoveryResolutionService from '../services/RecoveryResolutionService';
 import disputeIntakeService from '../services/DisputeIntakeService';
 import ReviewCascadeService from '../services/ReviewCascadeService';
+import MarketingPlaybookCatalogService from '../services/MarketingPlaybookCatalogService';
+import MarketingSignalRegistryService from '../services/MarketingSignalRegistryService';
+import CampaignTriageService from '../services/CampaignTriageService';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -400,6 +416,114 @@ const scorecardUpdateSchema = z.object({
   retainers_pitched: z.number().int().optional(),
   retainers_won: z.number().int().optional(),
   notes: z.string().optional(),
+});
+
+// ─── Playbook Catalog + Triage schemas (Sprint 3) ───────────────────────
+const playbookCodeEnum = z.enum(['PB-01', 'PB-02', 'PB-03', 'PB-04', 'PB-05']);
+const playbookCategoryEnum = z.enum(['review_management', 'recovery_management', 'triage_management']);
+const archetypeEnum = z.enum(['A1', 'A2', 'A3', 'A4', 'A5']);
+
+// ─── Matching rules DSL schema (§6.4) ────────────────────────────────────
+// Structured validation for the any/all/none/dual set-membership DSL.
+const matchingRulesSchema = z.object({
+  any: z.array(z.string()).default([]),
+  all: z.array(z.string()).default([]),
+  none: z.array(z.string()).default([]),
+  dual: z.object({
+    groupA: z.array(z.string()),
+    groupB: z.array(z.string()),
+  }).nullable().default(null),
+  confidence: z.number().min(0).max(1).default(0.85),
+});
+
+const playbookCreateSchema = z.object({
+  code: playbookCodeEnum,
+  name: z.string().min(1).max(255),
+  category: playbookCategoryEnum,
+  archetype: archetypeEnum,
+  description: z.string().optional(),
+  matching_rules: matchingRulesSchema.optional(),
+  priority_rank: z.number().int().min(0).max(999).optional(),
+  fitd_offer_title: z.string().min(1).max(255),
+  fitd_default_fee_cents: z.number().int().min(0),
+  retainer_pitch_title: z.string().min(1).max(255),
+  retainer_fee_cents: z.number().int().min(0),
+  opener_prompt_template_id: z.string().max(255).optional(),
+  preview_deliverable_type: z.string().max(50).optional(),
+  is_active: z.boolean().optional(),
+});
+
+const playbookUpdateSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  category: playbookCategoryEnum.optional(),
+  archetype: archetypeEnum.optional(),
+  description: z.string().nullable().optional(),
+  matching_rules: matchingRulesSchema.optional(),
+  priority_rank: z.number().int().min(0).max(999).optional(),
+  fitd_offer_title: z.string().min(1).max(255).optional(),
+  fitd_default_fee_cents: z.number().int().min(0).optional(),
+  retainer_pitch_title: z.string().min(1).max(255).optional(),
+  retainer_fee_cents: z.number().int().min(0).optional(),
+  opener_prompt_template_id: z.string().max(255).nullable().optional(),
+  preview_deliverable_type: z.string().max(50).nullable().optional(),
+  is_active: z.boolean().optional(),
+});
+
+// ─── Signal registry schemas (Sprint 3) ──────────────────────────────────
+
+const signalCodePattern = /^[A-Z]{2}_[A-Z0-9_]+$/;
+const detectionSourceEnum = z.enum(['model_emitted', 'derived', 'operator_input']);
+
+const signalCreateSchema = z.object({
+  code: z.string().regex(signalCodePattern, 'Must match FAMILY_UPPER_SNAKE (e.g. RA_REVIEW_DROUGHT)'),
+  family: z.string().min(2).max(10),
+  label: z.string().min(1).max(255),
+  description: z.string().optional(),
+  detection_source: detectionSourceEnum.optional(),
+  derived_rule: z.object({
+    field: z.string(),
+    op: z.string(),
+    threshold: z.union([z.number(), z.boolean()]),
+  }).nullable().optional(),
+  is_active: z.boolean().optional(),
+});
+
+const signalUpdateSchema = z.object({
+  family: z.string().min(2).max(10).optional(),
+  label: z.string().min(1).max(255).optional(),
+  description: z.string().nullable().optional(),
+  detection_source: detectionSourceEnum.optional(),
+  derived_rule: z.object({
+    field: z.string(),
+    op: z.string(),
+    threshold: z.union([z.number(), z.boolean()]),
+  }).nullable().optional(),
+  is_active: z.boolean().optional(),
+});
+
+const signalActivateSchema = z.object({
+  is_active: z.boolean(),
+});
+
+// ─── Playbook reorder schema (Sprint 3 — cascade reorder affordance) ─────
+
+const playbookReorderSchema = z.object({
+  rankings: z.array(z.object({
+    id: z.string().min(1),
+    priority_rank: z.number().int().min(0).max(999),
+  })).min(1),
+});
+
+const triageEvaluateSchema = z.object({
+  bbb: z.object({
+    bbb_grade: z.string().max(5).optional(),
+    unanswered_bbb_complaints: z.number().int().min(0).optional(),
+  }).optional(),
+});
+
+const triageOverrideSchema = z.object({
+  playbook_code: playbookCodeEnum,
+  reason: z.string().max(500).optional(),
 });
 
 const deliverableTemplateCreateSchema = z.object({
@@ -2391,6 +2515,213 @@ router.get('/openers/:id', async (req: any, res: Response) => {
   }
 });
 
+// ====================
+// PLAYBOOK CATALOG ROUTES (Sprint 3 — Triage Engine)
+// ====================
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
+// otherwise Express matches /playbooks as a campaign ID param and returns 404.
+// Same hazard as /openers above.
+
+router.get('/playbooks', async (req: any, res: Response) => {
+  try {
+    const playbooks = await MarketingPlaybookCatalogService.listPlaybooks({
+      category: req.query.category,
+      archetype: req.query.archetype,
+      isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
+    }, getCtx(req));
+    res.json({ success: true, data: playbooks });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/playbooks/:id', async (req: any, res: Response) => {
+  try {
+    const playbook = await MarketingPlaybookCatalogService.getPlaybook(req.params.id, getCtx(req));
+    res.json({ success: true, data: playbook });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/playbooks', async (req: any, res: Response) => {
+  try {
+    const parsed = playbookCreateSchema.parse(req.body);
+    const playbook = await MarketingPlaybookCatalogService.createPlaybook({
+      code: parsed.code,
+      name: parsed.name,
+      category: parsed.category,
+      archetype: parsed.archetype,
+      description: parsed.description,
+      matchingRules: parsed.matching_rules,
+      priorityRank: parsed.priority_rank,
+      fitdOfferTitle: parsed.fitd_offer_title,
+      fitdDefaultFeeCents: parsed.fitd_default_fee_cents,
+      retainerPitchTitle: parsed.retainer_pitch_title,
+      retainerFeeCents: parsed.retainer_fee_cents,
+      openerPromptTemplateId: parsed.opener_prompt_template_id,
+      previewDeliverableType: parsed.preview_deliverable_type,
+      isActive: parsed.is_active,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: playbook });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/playbooks/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = playbookUpdateSchema.parse(req.body);
+    const playbook = await MarketingPlaybookCatalogService.updatePlaybook(req.params.id, {
+      name: parsed.name,
+      category: parsed.category,
+      archetype: parsed.archetype,
+      description: parsed.description,
+      matchingRules: parsed.matching_rules,
+      priorityRank: parsed.priority_rank,
+      fitdOfferTitle: parsed.fitd_offer_title,
+      fitdDefaultFeeCents: parsed.fitd_default_fee_cents,
+      retainerPitchTitle: parsed.retainer_pitch_title,
+      retainerFeeCents: parsed.retainer_fee_cents,
+      openerPromptTemplateId: parsed.opener_prompt_template_id,
+      previewDeliverableType: parsed.preview_deliverable_type,
+      isActive: parsed.is_active,
+    }, getCtx(req));
+    res.json({ success: true, data: playbook });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.delete('/playbooks/:id', async (req: any, res: Response) => {
+  try {
+    await MarketingPlaybookCatalogService.deletePlaybook(req.params.id, getCtx(req));
+    res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Bulk priority_rank reorder — the cascade reorder affordance for the admin
+// table (Sprint 3 route + Sprint 4 UI). Reordering IS retuning the cascade.
+router.put('/playbooks/reorder', async (req: any, res: Response) => {
+  try {
+    const parsed = playbookReorderSchema.parse(req.body);
+    const updated = await MarketingPlaybookCatalogService.reorderPlaybooks(
+      parsed.rankings.map((r) => ({ id: r.id, priorityRank: r.priority_rank })),
+      getCtx(req),
+    );
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// SIGNAL REGISTRY ROUTES (Sprint 3 — Triage Engine)
+// ====================
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...)
+// below, otherwise Express matches /signals as a campaign ID param.
+// Same hazard as /playbooks and /openers above.
+
+router.get('/signals', async (req: any, res: Response) => {
+  try {
+    const signals = await MarketingSignalRegistryService.listSignals({
+      family: req.query.family,
+      isActive: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
+      detectionSource: req.query.detection_source,
+    }, getCtx(req));
+    res.json({ success: true, data: signals });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/signals/:id', async (req: any, res: Response) => {
+  try {
+    const signal = await MarketingSignalRegistryService.getSignal(req.params.id, getCtx(req));
+    res.json({ success: true, data: signal });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/signals', async (req: any, res: Response) => {
+  try {
+    const parsed = signalCreateSchema.parse(req.body);
+    const signal = await MarketingSignalRegistryService.createSignal({
+      code: parsed.code,
+      family: parsed.family,
+      label: parsed.label,
+      description: parsed.description,
+      detectionSource: parsed.detection_source,
+      derivedRule: parsed.derived_rule,
+      isActive: parsed.is_active,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: signal });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/signals/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = signalUpdateSchema.parse(req.body);
+    const signal = await MarketingSignalRegistryService.updateSignal(req.params.id, {
+      family: parsed.family,
+      label: parsed.label,
+      description: parsed.description,
+      detectionSource: parsed.detection_source,
+      derivedRule: parsed.derived_rule,
+      isActive: parsed.is_active,
+    }, getCtx(req));
+    res.json({ success: true, data: signal });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.delete('/signals/:id', async (req: any, res: Response) => {
+  try {
+    await MarketingSignalRegistryService.deleteSignal(req.params.id, getCtx(req));
+    res.json({ success: true });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/signals/:id/activate', async (req: any, res: Response) => {
+  try {
+    const parsed = signalActivateSchema.parse(req.body);
+    const signal = await MarketingSignalRegistryService.setSignalActive(
+      req.params.id,
+      parsed.is_active,
+      getCtx(req),
+    );
+    res.json({ success: true, data: signal });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
 router.get('/:id', async (req: any, res: Response) => {
   try {
     const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
@@ -3270,6 +3601,77 @@ router.get('/:campaignId/cascade/status', async (req: any, res: Response) => {
     const result = await ReviewCascadeService.getCascadeStatus(campaignId, getCtx(req));
     res.json({ success: true, data: result });
   } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// CAMPAIGN TRIAGE ROUTES (Sprint 3 — Triage Engine)
+// ====================
+// These use /:campaignId/triage/* (multi-segment) so they are NOT shadowed
+// by router.get('/:id', ...) above — Express only matches /:id against a
+// single path segment. Safe to declare at the end.
+
+// Evaluate the triage cascade for a campaign. Upserts the triage result row
+// but does NOT mutate the campaign — accept/override is a separate step.
+router.post('/:campaignId/triage/evaluate', async (req: any, res: Response) => {
+  try {
+    const parsed = triageEvaluateSchema.parse(req.body ?? {});
+    const result = await CampaignTriageService.evaluateTriageForCampaign({
+      campaignId: req.params.campaignId,
+      bbb: parsed.bbb ? {
+        bbbGrade: parsed.bbb.bbb_grade,
+        unansweredBbbComplaints: parsed.bbb.unanswered_bbb_complaints,
+      } : undefined,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Read the latest stored triage result for a campaign.
+router.get('/:campaignId/triage', async (req: any, res: Response) => {
+  try {
+    const result = await CampaignTriageService.getTriageResult(req.params.campaignId, getCtx(req));
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'No triage result found — call /triage/evaluate first' });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Accept the recommended playbook. Re-categorizes the campaign + applies FITD fee.
+router.post('/:campaignId/triage/accept', async (req: any, res: Response) => {
+  try {
+    const result = await CampaignTriageService.acceptTriage({
+      campaignId: req.params.campaignId,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// Override the recommendation with a different playbook.
+router.post('/:campaignId/triage/override', async (req: any, res: Response) => {
+  try {
+    const parsed = triageOverrideSchema.parse(req.body);
+    const result = await CampaignTriageService.overrideTriage({
+      campaignId: req.params.campaignId,
+      playbookCode: parsed.playbook_code,
+      reason: parsed.reason,
+    }, getCtx(req));
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
     handleServiceError(res, error, getCtx(req));
   }
 });

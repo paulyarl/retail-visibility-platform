@@ -1,235 +1,252 @@
 /**
- * TriageEngineService — deterministic priority cascade over NormalizedSignals
+ * TriageEngineService — GENERIC evaluator over the matching_rules DSL
  *
- * Pure function: no DB, no async, no side effects. Maps NormalizedSignals to
- * a TriageRecommendation using the spec's fixed priority order:
+ * Pure function: no DB, no async, no side effects. Evaluates active playbooks
+ * (loaded from mkt_playbook_catalog ordered by priority_rank) against the
+ * campaign's SignalCode[] set, using the §6.4 DSL (any/all/none/dual set
+ * membership). First match in priority_rank order wins.
  *
- *   Rule 1 (PB-04) BBB Emergency Recovery      — highest priority, requires BBB input
- *   Rule 2 (PB-05) Multi-Signal Footprint Triage — both repair AND review signals
- *   Rule 3 (PB-01) Pure Profile Repair          — repair signal, no review gap
- *   Rule 4 (PB-02) Pure Review Gap              — review gap, no repair signal
- *   Rule 5 (PB-03) Fallback CTA Gap             — lowest priority
+ * This is NOT a hardcoded if/else cascade. The cascade order lives in the
+ * catalog's `priority_rank` column; the rule criteria live in each
+ * playbook's `matching_rules` JSONB. Admins can reorder, add, or disable
+ * playbooks/rules from the UI without a deploy (Sprint 4 Rule Builder).
  *
- * Hardcoded confidence scores (roadmap §6.2):
- *   PB-04: 0.95  |  PB-05: 0.90  |  PB-01/PB-02: 0.85  |  PB-03: 0.70
+ * §6.4 DSL semantics:
+ *   A playbook matches when:
+ *     - at least one `any` code is present (or `any` is empty), AND
+ *     - every `all` code is present, AND
+ *     - no `none` code is present, AND
+ *     - (if `dual` set) ≥1 code from each of `groupA` and `groupB` is present.
+ *   First match in `priority_rank` order wins. `none` is how PB-05 expresses
+ *   "no active BBB crisis."
  *
- * `confidence` is a proxy for rule specificity/severity, NOT an ML probability.
- * The UI must label it "Rule Confidence" / "Signal Match Strength".
+ * Unknown codes in rules or detected signals are ignored with a warning log
+ * — forward-compatible with signals registered later.
  *
- * Spec: docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md §6
- * Sprint 2 — Signal Extractor & Triage Engine.
+ * `confidence` comes from the winning playbook's matching_rules.confidence
+ * (admin-tunable). The UI must label it "Rule Confidence" / "Signal Match
+ * Strength" per Risk 3 — NOT "ML confidence."
+ *
+ * Spec: docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md
+ * Sprint 2A — Platform Signal Taxonomy & Signal-Code Pipeline (§6.4 DSL)
  */
 
 import type {
-  NormalizedSignals,
   TriageRecommendation,
   DetectedSignal,
+  PlaybookCatalogRow,
+  MatchingRules,
   PlaybookCode,
-  PlaybookCategory,
-  ArchetypeCodeWithA5,
 } from './types';
-import { signalPredicates } from './signal-extractor';
+import {
+  isRepairSignal,
+  isReviewSignal,
+  isCrisisSignal,
+  isVisualSignal,
+  signalLabel,
+  type SignalCode,
+} from './signal-taxonomy';
 
-// ─── Hardcoded confidence scores ─────────────────────────────────────────
-
-export const CONFIDENCE: Record<PlaybookCode, number> = {
-  'PB-01': 0.85,
-  'PB-02': 0.85,
-  'PB-03': 0.70,
-  'PB-04': 0.95,
-  'PB-05': 0.90,
-};
-
-// ─── Rule metadata ───────────────────────────────────────────────────────
-
-interface RuleOutcome {
-  playbookCode: PlaybookCode;
-  category: PlaybookCategory;
-  archetype: ArchetypeCodeWithA5;
-  confidence: number;
-  reasoning: string;
-}
-
-// ─── Signal recording helper ─────────────────────────────────────────────
+// ─── DSL evaluator ───────────────────────────────────────────────────────
 
 /**
- * Build the detected_signals array for the recommendation. Every signal is
- * recorded with its raw value; `contributedToRule` marks the ones that
- * triggered the winning rule (for the admin UI's "triggered signals" view).
+ * Evaluate a single playbook's matching_rules against a SignalCode[] set.
+ * Returns true if the playbook matches (all clauses satisfied).
+ *
+ * Semantics (§6.4):
+ *   - `any`: ≥1 code present (or empty → pass)
+ *   - `all`: every code present (or empty → pass)
+ *   - `none`: no code present (or empty → pass)
+ *   - `dual`: ≥1 from groupA AND ≥1 from groupB (or null → pass)
  */
-function recordSignals(
-  signals: NormalizedSignals,
-  contributed: Array<keyof NormalizedSignals>,
+export function ruleMatches(
+  rules: MatchingRules,
+  signals: ReadonlySet<SignalCode>,
+): boolean {
+  // any: at least one code present (empty array → pass)
+  if (rules.any.length > 0) {
+    const anyMatch = rules.any.some((code) => signals.has(code));
+    if (!anyMatch) return false;
+  }
+
+  // all: every code present (empty array → pass)
+  if (rules.all.length > 0) {
+    const allMatch = rules.all.every((code) => signals.has(code));
+    if (!allMatch) return false;
+  }
+
+  // none: no code present (empty array → pass)
+  if (rules.none.length > 0) {
+    const nonePresent = rules.none.some((code) => signals.has(code));
+    if (nonePresent) return false;
+  }
+
+  // dual: ≥1 from groupA AND ≥1 from groupB (null → pass)
+  if (rules.dual) {
+    const groupAMatch = rules.dual.groupA.some((code) => signals.has(code));
+    if (!groupAMatch) return false;
+    const groupBMatch = rules.dual.groupB.some((code) => signals.has(code));
+    if (!groupBMatch) return false;
+  }
+
+  return true;
+}
+
+// ─── Reasoning builder ───────────────────────────────────────────────────
+
+/**
+ * Build a human-readable reasoning string for the winning playbook, naming
+ * the triggered signals and which clause matched. Uses the family predicates
+ * for natural-language grouping (e.g., "repair + review signals present").
+ */
+function buildReasoning(
+  playbook: PlaybookCatalogRow,
+  signals: ReadonlySet<SignalCode>,
+  rules: MatchingRules,
+): string {
+  const detected = Array.from(signals);
+  const repair = detected.filter(isRepairSignal);
+  const review = detected.filter(isReviewSignal);
+  const crisis = detected.filter(isCrisisSignal);
+  const visual = detected.filter(isVisualSignal);
+
+  const parts: string[] = [];
+
+  // Name the winning playbook + its primary trigger
+  parts.push(`${playbook.code} (${playbook.name})`);
+
+  if (rules.dual) {
+    parts.push(
+      `dual trigger: ${repair.length} repair signal(s) + ${review.length} review signal(s) present, no active BBB crisis`,
+    );
+  } else if (rules.none.length > 0 && crisis.length === 0) {
+    parts.push(`crisis guard passed (no ${rules.none.join('/')} present)`);
+  } else if (crisis.length > 0) {
+    parts.push(`crisis signal(s): ${crisis.join(', ')}`);
+  }
+
+  if (repair.length > 0 && rules.dual === null) {
+    parts.push(`repair signals: ${repair.join(', ')}`);
+  }
+  if (review.length > 0 && rules.dual === null) {
+    parts.push(`review signals: ${review.join(', ')}`);
+  }
+  if (visual.length > 0) {
+    parts.push(`visual signals: ${visual.join(', ')}`);
+  }
+
+  // List any other detected signals not yet mentioned
+  const mentioned = new Set<SignalCode>([
+    ...repair,
+    ...review,
+    ...crisis,
+    ...visual,
+  ]);
+  const other = detected.filter((s) => !mentioned.has(s));
+  if (other.length > 0) {
+    parts.push(`other signals: ${other.join(', ')}`);
+  }
+
+  if (detected.length === 0) {
+    parts.push('no actionable signals detected — fallback playbook');
+  }
+
+  return parts.join('; ');
+}
+
+// ─── DetectedSignal[] builder ────────────────────────────────────────────
+
+/**
+ * Build the DetectedSignal[] array for the recommendation, marking which
+ * signals contributed to the winning rule (appeared in any/all/dual clauses)
+ * vs. which were merely detected.
+ */
+function buildDetectedSignals(
+  signals: ReadonlySet<SignalCode>,
+  rules: MatchingRules,
 ): DetectedSignal[] {
-  const contributedSet = new Set(contributed);
-  return (Object.keys(signals) as Array<keyof NormalizedSignals>).map((signal) => ({
-    signal,
-    value: signals[signal] as DetectedSignal['value'],
-    contributedToRule: contributedSet.has(signal),
+  const contributingCodes = new Set<SignalCode>([
+    ...rules.any,
+    ...rules.all,
+    ...(rules.dual?.groupA ?? []),
+    ...(rules.dual?.groupB ?? []),
+  ]);
+
+  return Array.from(signals).map((code) => ({
+    code,
+    label: signalLabel(code),
+    contributedToRule: contributingCodes.has(code),
   }));
 }
 
-// ─── Cascade ─────────────────────────────────────────────────────────────
+// ─── Main evaluator ──────────────────────────────────────────────────────
 
 /**
- * Evaluate normalized signals against the deterministic priority cascade and
- * return a TriageRecommendation. Pure function.
+ * Evaluate the triage cascade: load active playbooks ordered by priority_rank,
+ * evaluate each playbook's matching_rules against the SignalCode[] set, and
+ * return the first match.
  *
- * Order matters: the first matching rule wins. PB-04 is gated on BBB input
- * being present (roadmap Risk 1) — when bbbGrade is undefined AND
- * unansweredBbbComplaints is 0, Rule 1 is skipped entirely.
+ * @param signals  The campaign's detected SignalCode[] array
+ * @param playbooks Active playbooks from mkt_playbook_catalog, ordered by
+ *                  priority_rank ascending. The caller (CampaignTriageService)
+ *                  is responsible for fetching + ordering.
+ * @returns TriageRecommendation, or null if no playbook matched (should not
+ *          happen if PB-03 is seeded with empty any/all/none as the fallback).
  */
-export function evaluateTriage(signals: NormalizedSignals): TriageRecommendation {
-  const preds = signalPredicates;
+export function evaluateTriage(
+  signals: SignalCode[],
+  playbooks: PlaybookCatalogRow[],
+): TriageRecommendation | null {
+  const signalSet = new Set(signals);
 
-  // ── Rule 1: BBB Emergency Recovery (PB-04) ────────────────────────────
-  // Highest priority. Requires operator-supplied BBB input. When BBB data is
-  // absent (bbbGrade undefined AND unansweredBbbComplaints 0), skip — PB-04
-  // cannot fire on inferred signals alone.
-  const bbbProvided =
-    signals.bbbGrade !== undefined || signals.unansweredBbbComplaints > 0;
-  if (bbbProvided && preds.bbbEmergency(signals)) {
-    return buildRecommendation(
-      signals,
-      {
-        playbookCode: 'PB-04',
-        category: 'recovery_management',
-        archetype: 'A2',
-        confidence: CONFIDENCE['PB-04'],
-        reasoning: bbbReasoning(signals),
-      },
-      ['bbbGrade', 'unansweredBbbComplaints'],
-    );
+  // Playbooks are expected to be pre-sorted by priority_rank ascending.
+  // Sort defensively in case the caller didn't.
+  const sorted = [...playbooks].sort((a, b) => a.priorityRank - b.priorityRank);
+
+  for (const playbook of sorted) {
+    if (!playbook.isActive) continue;
+
+    const rules = playbook.matchingRules;
+    if (ruleMatches(rules, signalSet)) {
+      return {
+        playbookCode: playbook.code,
+        category: playbook.category,
+        archetype: playbook.archetype,
+        confidence: rules.confidence,
+        reasoning: buildReasoning(playbook, signalSet, rules),
+        detectedSignals: buildDetectedSignals(signalSet, rules),
+      };
+    }
   }
 
-  // ── Rule 2: Multi-Signal Footprint Triage (PB-05) ─────────────────────
-  // Both a repair signal (NAP/dead-URL/mismatch) AND a review gap must fire.
-  const repair = preds.hasRepairSignal(signals);
-  const reviewGap = preds.hasReviewGap(signals);
-  if (repair && reviewGap) {
-    return buildRecommendation(
-      signals,
-      {
-        playbookCode: 'PB-05',
-        category: 'triage_management',
-        archetype: 'A5',
-        confidence: CONFIDENCE['PB-05'],
-        reasoning: dualTriageReasoning(signals),
-      },
-      ['napInconsistent', 'hasDeadUrl', 'urlMismatch', 'daysSinceLastReview', 'unaddressedReviewCount'],
-    );
-  }
-
-  // ── Rule 3: Pure Profile Repair (PB-01) ───────────────────────────────
-  if (repair) {
-    return buildRecommendation(
-      signals,
-      {
-        playbookCode: 'PB-01',
-        category: 'review_management',
-        archetype: 'A3',
-        confidence: CONFIDENCE['PB-01'],
-        reasoning: profileRepairReasoning(signals),
-      },
-      ['napInconsistent', 'hasDeadUrl', 'urlMismatch'],
-    );
-  }
-
-  // ── Rule 4: Pure Review Gap (PB-02) ───────────────────────────────────
-  if (reviewGap) {
-    return buildRecommendation(
-      signals,
-      {
-        playbookCode: 'PB-02',
-        category: 'review_management',
-        archetype: 'A1',
-        confidence: CONFIDENCE['PB-02'],
-        reasoning: reviewGapReasoning(signals),
-      },
-      ['daysSinceLastReview', 'unaddressedReviewCount'],
-    );
-  }
-
-  // ── Rule 5: Fallback CTA Gap (PB-03) ───────────────────────────────────
-  // Lowest priority. Fires when no repair or review signal fired but there is
-  // website CTA friction. If even CTA is clean, still returns PB-03 as the
-  // spec's terminal fallback (confidence 0.70).
-  return buildRecommendation(
-    signals,
-    {
-      playbookCode: 'PB-03',
-      category: 'review_management',
-      archetype: 'A4',
-      confidence: CONFIDENCE['PB-03'],
-      reasoning: ctaFallbackReasoning(signals),
-    },
-    signals.hasCtaFriction ? ['hasCtaFriction'] : [],
-  );
+  // No playbook matched. This is a configuration error if PB-03 (the
+  // fallback) is seeded correctly with empty any/all/none — it should match
+  // any signal set (including empty). Return null to signal the issue.
+  return null;
 }
 
-// ─── Reasoning builders ──────────────────────────────────────────────────
+// ─── Fallback recommendation (for misconfiguration) ──────────────────────
 
-function bbbReasoning(s: NormalizedSignals): string {
-  if (s.unansweredBbbComplaints > 0 && s.bbbGrade) {
-    return `BBB emergency: grade ${s.bbbGrade} with ${s.unansweredBbbComplaints} unanswered BBB complaints`;
-  }
-  if (s.unansweredBbbComplaints > 0) {
-    return `BBB emergency: ${s.unansweredBbbComplaints} unanswered BBB complaints`;
-  }
-  return `BBB emergency: grade ${s.bbbGrade} (C or below)`;
-}
-
-function dualTriageReasoning(s: NormalizedSignals): string {
-  const repairParts: string[] = [];
-  if (s.napInconsistent) repairParts.push('NAP inconsistency');
-  if (s.hasDeadUrl) repairParts.push('dead URL');
-  if (s.urlMismatch) repairParts.push('URL mismatch');
-  const repair = repairParts.join(', ') || 'repair signal';
-  const review =
-    s.daysSinceLastReview >= 90
-      ? `${s.daysSinceLastReview} days since last review`
-      : `${s.unaddressedReviewCount} unaddressed reviews`;
-  return `Dual-signal triage: ${repair} AND review gap (${review})`;
-}
-
-function profileRepairReasoning(s: NormalizedSignals): string {
-  const parts: string[] = [];
-  if (s.napInconsistent) parts.push('NAP inconsistency');
-  if (s.hasDeadUrl) parts.push('dead URL');
-  if (s.urlMismatch) parts.push('URL mismatch');
-  return `Profile repair: ${parts.join(', ')}`;
-}
-
-function reviewGapReasoning(s: NormalizedSignals): string {
-  if (s.daysSinceLastReview >= 90 && s.unaddressedReviewCount > 0) {
-    return `Review gap: ${s.daysSinceLastReview} days since last review, ${s.unaddressedReviewCount} unaddressed`;
-  }
-  if (s.daysSinceLastReview >= 90) {
-    return `Review gap: ${s.daysSinceLastReview} days since last review`;
-  }
-  return `Review gap: ${s.unaddressedReviewCount} unaddressed reviews`;
-}
-
-function ctaFallbackReasoning(s: NormalizedSignals): string {
-  if (s.hasCtaFriction) {
-    return 'CTA friction: missing call-to-action / click-to-call / online booking';
-  }
-  return 'Fallback: no repair, review, or CTA signal fired — defaulting to CTA gap playbook';
-}
-
-// ─── Recommendation assembly ─────────────────────────────────────────────
-
-function buildRecommendation(
-  signals: NormalizedSignals,
-  outcome: RuleOutcome,
-  contributed: Array<keyof NormalizedSignals>,
+/**
+ * Build a fallback recommendation pointing at PB-03 (the seeded fallback
+ * playbook) when no playbook matched. This is a safety net for
+ * misconfiguration — the caller should log a warning.
+ */
+export function fallbackRecommendation(
+  signals: SignalCode[],
+  fallback: PlaybookCatalogRow,
 ): TriageRecommendation {
+  const signalSet = new Set(signals);
   return {
-    playbookCode: outcome.playbookCode,
-    category: outcome.category,
-    archetype: outcome.archetype,
-    confidence: outcome.confidence,
-    reasoning: outcome.reasoning,
-    detectedSignals: recordSignals(signals, contributed),
+    playbookCode: fallback.code,
+    category: fallback.category,
+    archetype: fallback.archetype,
+    confidence: fallback.matchingRules.confidence,
+    reasoning: `fallback: no playbook rule matched; defaulting to ${fallback.code} (${fallback.name})`,
+    detectedSignals: buildDetectedSignals(signalSet, fallback.matchingRules),
   };
 }
+
+// ─── Re-export for callers ───────────────────────────────────────────────
+
+export type { PlaybookCode };
