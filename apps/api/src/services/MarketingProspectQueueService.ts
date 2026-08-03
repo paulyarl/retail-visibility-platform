@@ -131,8 +131,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
         where: {
           status: 'queued',
           business_name: { equals: businessName, mode: 'insensitive' },
-          city: city ? { equals: city, mode: 'insensitive' } : null,
-          category: category ? { equals: category, mode: 'insensitive' } : null,
+          ...insensitiveEq('city', city),
+          ...insensitiveEq('category', category),
         },
       });
       if (existingQueued) {
@@ -148,8 +148,8 @@ class MarketingProspectQueueServiceClass extends BaseService {
         where: {
           scope: 'business',
           business_name: { equals: businessName, mode: 'insensitive' },
-          city: city ? { equals: city, mode: 'insensitive' } : null,
-          category: category ? { equals: category, mode: 'insensitive' } : null,
+          ...insensitiveEq('city', city),
+          ...insensitiveEq('category', category),
         },
         select: { id: true },
       });
@@ -490,6 +490,16 @@ function normalizeStatusFilter(status?: ProspectStatus | ProspectStatus[]): Pros
   if (!status) return undefined;
   if (Array.isArray(status)) return status.length ? status : undefined;
   return [status];
+}
+
+/**
+ * Build a Prisma insensitive-equals filter for an optional string field.
+ * Returns `{}` (spread no-op) when the value is null/undefined so Prisma
+ * treats the field as "not filtered" rather than "must be null".
+ */
+function insensitiveEq(field: string, value: string | null | undefined): Record<string, any> {
+  if (value == null) return {};
+  return { [field]: { equals: value, mode: 'insensitive' as const } };
 }
 
 // Singleton export (mirrors MarketingHotProspectService.getInstance pattern).

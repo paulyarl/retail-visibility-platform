@@ -3036,7 +3036,7 @@ const prospectQueueAddSchema = z.object({
   source_audit_id: z.string().optional(),
   source_execution_id: z.string().optional(),
   audit_date: z.string().datetime().optional(),
-  business_snapshot: z.record(z.any()).default({}),
+  business_snapshot: z.record(z.string(), z.any()).default({}),
   priority: z.enum(['high', 'normal']).default('normal'),
   note: z.string().max(2000).optional(),
 });
