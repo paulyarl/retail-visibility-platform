@@ -79,7 +79,7 @@ customers so that a business owner who pays for a campaign can:
 - G10. Coupon parity with the tenant experience: save platform coupons to
   the existing wallet, purchase with coupon awareness (applicable coupons at
   checkout, savings on receipts, redeemed/expired lifecycle, expiry
-  reminders) — all via the `_platform_` scope, no new wallet infrastructure
+  reminders) — all via the `platform` scope, no new wallet infrastructure
   (§7.5).
 - G11. Support & address parity: marketing customers file support tickets to
   the platform through the existing CRM ticket stack (landing in the
@@ -158,11 +158,11 @@ Key files:
 | Tenant receipt view (parity target) | `apps/web/src/components/checkout/OrderReceipt.tsx` | full HTML receipt + **QR to tenant location** via `TenantQRCode` |
 | QR styling engine | `apps/web/src/lib/qr-style-config.ts`, `apps/web/src/lib/qr-engine.ts` | `qr-code-styling`: dot/corner themes, **center-logo embedding** (`imageSize 0.35`, `hideBackgroundDots`, `errorCorrectionLevel: 'H'`) |
 | Server-side QR generation | `qrcode@^1.5.4` in `apps/api` | PNG/SVG data-URL generation for PDF embedding |
-| Operator branding precedent | `mkt_branding_config.operator_logo_url` (`schema.prisma:6098`) | logo already fetched + embedded in generated PDFs |
+| Operator branding precedent | `mkt_branding_config.operator_logo_url` (`schema.prisma`: model at 6095, field at 6098) | logo already fetched + embedded in generated PDFs |
 | Coupon wallet (backend) | `apps/api/src/routes/customer-coupons.ts`, `apps/api/src/services/CustomerCouponWalletService.ts` | save, **save-by-code**, list, stats, expiring, reminders |
 | Coupon wallet (frontend) | `apps/web/src/services/CustomerCouponWalletService.ts` | extends `CustomerApiSingleton`; `/account/coupons` page |
 | Coupon models | `tenant_coupons`, `customer_saved_coupons`, `customer_coupon_reminders`, `coupon_redemptions` (`schema.prisma:5998–6068`) | wallet rows keyed `(customer_id, coupon_id)`, scoped by `tenant_id` |
-| Coupon validation | `apps/api/src/services/CouponService.ts` (`validateCoupon`:336) | min-spend, expiry, redemption caps, targeting; **already called with `_platform_` fallback by the pay page** (`marketing-ops-public.ts:152,232`) |
+| Coupon validation | `apps/api/src/services/CouponService.ts` (`validateCoupon`:336) | min-spend, expiry, redemption caps, targeting; **already called with `platform` fallback by the pay page** (`marketing-ops-public.ts:152,232`) |
 | Customer support tickets | `apps/api/src/routes/crm/customer/crm-customer.ts`, `apps/web/src/services/crm/CrmCustomerService.ts` | customer→tenant tickets with messages, read states, per-tenant capability gate (`customerTicketsEnabled`); `crm_support_tickets.customer_id` FK + nullable `tenant_id` (`schema.prisma:875`) |
 | Platform ticket precedent | `apps/api/src/routes/crm/personal/crm-personal.ts` (`PLATFORM_TENANT_ID = 'platform'`:34) | operator hub **already aggregates user→platform tickets** — customer→platform tickets land in the same admin surface |
 | Address wallet | `customer_addresses` (`schema.prisma`:994), `CustomerAddressesService` (front + back), `/account/addresses` | **globally per-customer — no tenant scoping at all**; `is_billing` flag already exists |
@@ -177,7 +177,7 @@ Marketing ops payments are **platform-collected** (platform Stripe account via
 `SubscriptionBillingService`), so the per-tenant model doesn't fit directly.
 
 The codebase already has a convention for this: the coupon validator falls
-back to the `_platform_` sentinel when a campaign has no tenant
+back to the `platform` sentinel when a campaign has no tenant
 (`marketing-ops-public.ts:152`, `marketing-ops-public.ts:232`). We adopt the
 same sentinel as the payment-method scope for platform-collected payments
 (see §5.3).
@@ -196,7 +196,7 @@ audience contexts are **strictly separated, with no bleed**:
   tenant orders, tenant-scoped payment methods, coupon wallet. This is
   commerce between the customer and a *tenant* (the merchant).
 - **Platform context (marketing ops):** new `mkt_campaigns_list.customer_id`
-  link + `marketing_revenue.customer_id` link, `_platform_`-scoped payment
+  link + `marketing_revenue.customer_id` link, `platform`-scoped payment
   methods, deliverables, receipts. This is commerce between the customer and
   the *platform* (the operator).
 
@@ -337,8 +337,9 @@ apps/api
 
 ## 5. Data Model Changes
 
-One migration (`mkt_customer_portal`), all columns nullable/additive. No
-existing rows require backfill beyond the claim sweep at runtime.
+Migrations are split per phase (see §10 rollout plan), all columns
+nullable/additive. No existing rows require backfill beyond the claim sweep
+at runtime.
 
 ### 5.1 `mkt_campaigns_list` — add customer link
 
@@ -370,37 +371,47 @@ model marketing_revenue {
 
 `receipt_emailed_at` tracks G5 delivery.
 
-### 5.3 `customer_payment_methods` — no schema change, sentinel scope
+### 5.3 `customer_payment_methods` — no schema change, unified platform scope
 
 Reuse as-is. Platform-collected cards are stored with
-`tenant_id = '_platform_'`, matching the coupon-fallback convention. The
-backend `CustomerPaymentMethodsService` already creates a Stripe customer per
-(customer, tenant) pair; for `_platform_` it must use the **platform Stripe
-account** instead of a tenant connection — a small branch in the
+`tenant_id = 'platform'`, matching the unified platform sentinel (see
+§5.3a). The backend `CustomerPaymentMethodsService` already creates a Stripe
+customer per (customer, tenant) pair; for `'platform'` it must use the
+**platform Stripe account** (`platform_payment_config` /
+`STRIPE_SECRET_KEY`) instead of a tenant connection — a small branch in the
 gateway-resolution logic (see §6.3).
 
 Rationale over a separate `platform_payment_methods` table: keeps one card
-wallet UI, one set of CRUD endpoints, one masking/audit path. The sentinel is
-already an accepted pattern in this codebase.
+wallet UI, one set of CRUD endpoints, one masking/audit path. The platform
+tenant row already exists (seeded in `apps/api/prisma/seed-platform-tenant.ts`
+with `id = 'platform'`), so no new tenant row is needed.
 
-### 5.3a `customer_saved_coupons` / `tenant_coupons` — no schema change, sentinel scope
+### 5.3a `customer_saved_coupons` / `tenant_coupons` — no schema change, unified platform scope
 
-Coupon-wallet parity works the same way (§7.6). Platform coupons are
-`tenant_coupons` rows under `tenant_id = '_platform_'`; marketing customers
+Coupon-wallet parity works the same way (§7.5). Platform coupons are
+`tenant_coupons` rows under `tenant_id = 'platform'`; marketing customers
 save them into the **existing** `customer_saved_coupons` wallet with
-`tenant_id = '_platform_'`. Because both tables have hard FKs to `tenants`,
-the migration **seeds the platform pseudo-tenant row** (`tenants.id =
-'_platform_'`) if absent — this also hardens today's pay-page coupon path,
-which already validates against `_platform_` when a campaign has no tenant.
+`tenant_id = 'platform'`. Both tables have hard FKs to `tenants`, satisfied
+by the **existing** `platform` tenant row (already seeded in
+`seed-platform-tenant.ts`, already the FK target for CRM tickets via
+`PLATFORM_TENANT_ID` in `crm-personal.ts:34`). No new tenant row is created.
+
+**Code change required in Phase 1:** the pay-page coupon fallback in
+`marketing-ops-public.ts` (lines 152 and 232) currently uses `'_platform_'`
+as the fallback sentinel. These two lines must be updated to `'platform'` so
+that coupon validation, wallet rows, payment methods, and CRM tickets all
+share one unified platform scope. No existing data references `'_platform_'`
+(verified: no migrations, no `tenant_coupons` rows, no other code files use
+this string).
 
 Prerequisites the migration must guarantee for the platform scope:
-- `tenants` row `_platform_` exists (FK target for coupons, wallet rows,
-  payment methods).
-- `resolveEffectiveCapabilities('_platform_')` resolves coupon-enabled
+- `tenants` row `'platform'` exists (already seeded — verify, do not
+  re-create).
+- `resolveEffectiveCapabilities('platform')` resolves coupon-enabled
   defaults (`coupon_options.enabled = true`, all discount types allowed,
   targeting allowed) — today the pay page's coupon failure path is
   warn-and-continue, which masks a misconfigured platform scope.
-- Wallet DTO mapper resolves `_platform_` → platform name + operator logo
+- Wallet DTO mapper resolves `'platform'` → platform name + operator logo
   (`platform_settings_list` / `mkt_branding_config`) instead of a tenant
   profile.
 - `CrmOptionsService.resolveCrmOptionsState` resolves
@@ -408,16 +419,10 @@ Prerequisites the migration must guarantee for the platform scope:
   scope (§7.7) — support tickets reuse the same capability gate as tenant
   tickets.
 
-**Sentinel drift warning:** the codebase has **two** platform sentinels —
-`'_platform_'` (coupon validation fallback, this spec's commerce scope) and
-`'platform'` (`PLATFORM_TENANT_ID` in `crm-personal.ts`, used for
-user→platform CRM tickets). This spec keeps both in place deliberately (see
-§7.7: tickets use `'platform'` because the operator hub already aggregates
-it) and resolves open question #3 as: introduce shared constants
-`PLATFORM_COMMERCE_SCOPE = '_platform_'` and `PLATFORM_CRM_SCOPE =
-'platform'`, with a follow-up task to unify them behind one tenant row +
-constant in a later migration. New code must never introduce a third
-spelling.
+**Shared constant:** introduce `PLATFORM_SCOPE = 'platform'` in Phase 1 and
+use it everywhere (commerce + CRM). This replaces the prior dual-sentinel
+design (`PLATFORM_COMMERCE_SCOPE` / `PLATFORM_CRM_SCOPE`) — see resolved
+open question #3.
 
 ### 5.4 New table: `mkt_customer_claim_tokens` (core — Path B, §4.3)
 
@@ -564,7 +569,11 @@ Rules:
 - Every claim writes an `audit_log` row (`action: customer_claim`,
   `entity_type: mkt_campaign`, diff includes campaign_id + customer_id +
   claim path) and a `mkt_stage_history_list` note so operators see "Customer
-  claimed account" in the campaign timeline.
+  claimed account" in the campaign timeline. **Note:** the existing `audit()`
+  helper in `apps/api/src/audit.ts` hardcodes `actor_type: 'system'` (line
+  48). Phase 1 extends it to accept an optional `actorType` parameter
+  (defaulting to `'system'` for backward compatibility) so claim,
+  saved-card, and receipt-resend audit rows can stamp `actor_type: 'customer'`.
 - The claim summary returned to the frontend includes `campaignsLinked`
   (count + names) so the success UI can say "We found 3 purchases for your
   account" — multi-campaign awareness is surfaced at the moment of claim,
@@ -598,7 +607,7 @@ Session/context payload change (shared with storefront side):
 | GET | `/api/customer/marketing/campaigns` | claimed campaigns with **customer-safe** projection (see §6.4) |
 | GET | `/api/customer/marketing/campaigns/:campaignId` | campaign detail: status timeline, deliverables, receipts |
 | GET | `/api/customer/marketing/campaigns/:campaignId/deliverables` | paid deliverables with download URLs (reuses existing deliverable file serving) |
-| POST | `/api/customer/marketing/payment-methods/save-from-payment` | `{ paymentIntentId }` — attaches the PI's payment method to the customer's `_platform_` scope (Stripe `setup_future_usage` path, see §6.3) |
+| POST | `/api/customer/marketing/payment-methods/save-from-payment` | `{ paymentIntentId }` — attaches the PI's payment method to the customer's `platform` scope (Stripe `setup_future_usage` path, see §6.3) |
 | GET | `/api/customer/marketing/coupons/applicable?campaignId=` | wallet coupons (platform scope) currently valid for this campaign's price + service category — powers the one-click-apply list at portal checkout (§7.5) |
 | POST | `/api/customer/marketing/checkout` | `{ campaignId, couponCode? \| savedCouponId?, useSavedMethodId?, billingAddressId? }` — repeat-purchase checkout for a claimed campaign's follow-on package or retainer; if `useSavedMethodId`, off-session charge via saved PM; `savedCouponId` redeems a wallet coupon (§7.5); `billingAddressId` snapshots the wallet address onto the receipt (§7.8) |
 | GET | `/api/customer/marketing/support/tickets?status=` | customer's platform-scope tickets (`tenant_id = 'platform'`), same DTO as `/api/customer/crm/tickets` (§7.7) |
@@ -612,7 +621,7 @@ Session/context payload change (shared with storefront side):
 
 ### 6.3 Saved-card plumbing (extend backend `CustomerPaymentMethodsService`)
 
-- **Gateway resolution:** when `tenant_id === '_platform_'`, use the platform
+- **Gateway resolution:** when `tenant_id === 'platform'`, use the platform
   Stripe account (`platform_payment_config` / `STRIPE_SECRET_KEY`) instead of
   `merchant_stripe_connections`. One branch in the existing resolver.
 - **Save at payment time:** `SubscriptionBillingService.createOneTimePaymentIntent`
@@ -714,14 +723,15 @@ retry, same pattern as recovery delivery):
    → pay conversion funnel is the operator's revenue path and must not gain
    friction.
 5. **Returning-payer state (link lifecycle).** The pay endpoint already
-   returns `alreadyPaid` — the page must act on it. A payer who revisits
-   their foot-in-the-door link after paying sees **not** the payment form
-   but a "You're all set" state: payment confirmation, receipt download, and
-   the account-creation CTA (Path A) or "Track my purchase" (Path B). The
-   same link the operator shared for payment thus becomes the customer's
-   account-creation path after the money lands — one URL, two jobs, in
-   sequence. Expired tokens keep the existing expired-page behavior with a
-   "Request new link" escape hatch.
+   returns `alreadyPaid` (line 111) and the page already renders an "Already
+   Paid" screen with receipt download (`PayPageClient.tsx:275-298`). The gap
+   is that this screen lacks the account-creation CTA (Path A) and "Track my
+   purchase" link (Path B). Phase 1 augments the existing alreadyPaid screen
+   to add: the account-creation CTA, the "Track my purchase" (Path B) link,
+   and the "You're all set" framing. The same link the operator shared for
+   payment thus becomes the customer's account-creation path after the money
+   lands — one URL, two jobs, in sequence. Expired tokens keep the existing
+   expired-page behavior with a "Request new link" escape hatch.
 
 ### 7.1a Public claim pages (Path B, §4.3)
 
@@ -758,8 +768,8 @@ Follows existing `/account` page conventions — server-fetched via the new
 | `/account/marketing/settings` | **Business profile & branding:** logo upload (with live QR-style preview), asset URL field, brand color picker; explains where these appear (receipts, QR codes) | platform |
 | `/account/marketing/support` | **Support tickets to the platform** (§7.7): list, create (with optional "which service is this about?" campaign picker), threaded view, reply | platform |
 | `/account/addresses` | Existing address wallet — becomes **context-agnostic** (§7.8): visible in either context; billing addresses feed marketing checkout + receipts | shared |
-| `/account/payment-methods` | Cards grouped by scope: storefront scopes under their tenant name, `_platform_` cards under "VisibleShelf services". Each group renders only when its context is active; the page itself stays available in either context | per-group |
-| `/account/coupons` | Existing wallet page — coupons grouped by scope: tenant groups under tenant names, `_platform_` coupons under "VisibleShelf services" (§7.5). Add-by-code accepts platform codes. Per-group context rendering, same as payment methods | per-group |
+| `/account/payment-methods` | Cards grouped by scope: storefront scopes under their tenant name, `platform` cards under "VisibleShelf services". Each group renders only when its context is active; the page itself stays available in either context | per-group |
+| `/account/coupons` | Existing wallet page — coupons grouped by scope: tenant groups under tenant names, `platform` coupons under "VisibleShelf services" (§7.5). Add-by-code accepts platform codes. Per-group context rendering, same as payment methods | per-group |
 
 Direct URL access without the context: the route group checks the context
 signal client-side (redirect to `/account`) **and** the API returns
@@ -838,7 +848,7 @@ prints.
 Tenant customers can **save coupons** to a wallet (`/account/coupons`) and
 **purchase with coupon awareness** (applicable coupons surfaced at checkout,
 savings shown, status lifecycle saved → redeemed/expired, expiry reminders).
-Marketing customers get the same, via the `_platform_` scope (§5.3a) — **no
+Marketing customers get the same, via the `platform` scope (§5.3a) — **no
 new wallet tables, no new wallet endpoints**: the existing
 `/api/customer-coupons/*` routes and `CustomerCouponWalletService` accept the
 platform scope as their `tenantId` parameter.
@@ -854,7 +864,7 @@ platform scope as their `tenantId` parameter.
 **Redemption flow (portal checkout with `savedCouponId`):**
 1. Server loads the wallet row (must belong to the JWT customer, platform
    scope, status `saved`).
-2. Re-validates via `CouponService.validateCoupon('_platform_', code, …)`
+2. Re-validates via `CouponService.validateCoupon('platform', code, …)`
    against the campaign's price and **service category** — coupon targeting
    (`target_type = 'categories'`) maps to marketing `service_category`
    values, so operators can issue category-specific offers (e.g., recovery-
@@ -897,9 +907,9 @@ customer→platform tickets land in an admin surface that is already built and
 already staffed.
 
 **Scope decision:** tickets use `tenant_id = 'platform'` (the existing
-`PLATFORM_TENANT_ID`), **not** `'_platform_'` — because the operator
-aggregation queries that value today. This is the one sanctioned exception
-to the `_platform_` commerce sentinel; see the sentinel-drift note in §5.3a.
+`PLATFORM_TENANT_ID` in `crm-personal.ts:34`), the same unified platform
+scope used for commerce (coupons, payment methods — see §5.3a). The operator
+aggregation queries already filter on this value today.
 
 | Element | Tenant ticket (today) | Marketing ticket (this spec) |
 |---------|----------------------|------------------------------|
@@ -1126,8 +1136,9 @@ Chip: customer linked ✓                         │
 
 ### Phase 1 — Linkage + Receipts (foundation)
 1. Migration: §5.1, §5.2 columns + indexes; §5.4 `mkt_customer_claim_tokens`;
-   §5.3a platform pseudo-tenant seed (`_platform_`) + coupon capability
-   defaults for the platform scope.
+   §5.3a — update `marketing-ops-public.ts:152,232` fallback from
+   `'_platform_'` to `'platform'` + verify existing `platform` tenant row
+   has coupon capability defaults for the unified platform scope.
 2. Extract receipt PDF generator into shared module (used by public route +
    portal route).
 3. `MarketingReceiptEmailService` + `receipt_emailed_at` + admin resend;
@@ -1188,7 +1199,7 @@ customer gets 403 on marketing routes and never sees the My Services group;
 both-context customer sees both groups with no merged data.
 
 ### Phase 3 — Card on File + Repeat Purchase
-12. `_platform_` scope in backend `CustomerPaymentMethodsService`.
+12. `platform` scope in backend `CustomerPaymentMethodsService`.
 13. `setup_future_usage` + `save-from-payment` + checkbox UI.
 14. Portal repeat/retainer checkout (§7.6) incl. off-session + SCA fallback.
 15. Coupon parity (§7.5): platform-scope coupon capability defaults + wallet
@@ -1227,7 +1238,7 @@ redeemed with savings shown on the receipt.
   `contexts` flags for storefront-only, platform-only, both, and zero-context
   accounts; flags flip correctly after first claim / first storefront order.
 - Status mapper: every internal stage maps to a customer status or is hidden.
-- `_platform_` payment-method CRUD; Stripe attach/detach mocked.
+- `platform` payment-method CRUD; Stripe attach/detach mocked.
 - Receipt email idempotency (`receipt_emailed_at`).
 - Receipt QR: destination priority (asset_url → campaign website_url →
   omitted), `asset_url` validation rejects non-https and platform-internal
@@ -1237,12 +1248,12 @@ redeemed with savings shown on the receipt.
 - Branding endpoints: logo size/type rejection, SVG sanitization, one row
   per customer (upsert), delete falls back to platform branding.
 - Coupon parity: platform-scope coupon validates via existing
-  `CouponService` (capability gate resolves enabled for `_platform_`);
+  `CouponService` (capability gate resolves enabled for `platform`);
   save-by-code under platform scope; applicable-coupons endpoint honors
   min-spend, expiry, redemption caps, and service-category targeting;
   checkout redemption is transactional (payment failure leaves wallet row
   `saved`, retry with same idempotency key cannot double-redeem or
-  double-increment `redemption_count`); wallet DTO maps `_platform_` to
+  double-increment `redemption_count`); wallet DTO maps `platform` to
   platform name/logo; campaign coupon auto-saved at claim.
 - Support tickets: marketing ticket endpoints stamp `tenant_id = 'platform'`
   server-side (client-supplied scope ignored); `campaignId` rejected when
@@ -1318,14 +1329,17 @@ portal walkthrough → retainer checkout with saved card.
 2. **Retainer billing owner:** should portal-initiated retainers go through
    `SubscriptionBillingService` subscriptions (platform Stripe) or remain
    operator-managed? Affects whether Phase 3 includes subscription creation.
-3. ~~**`_platform_` sentinel formalization:**~~ **RESOLVED (2026-08-03):**
-   two sentinels exist today — `'_platform_'` (commerce: coupons, payment
-   methods) and `'platform'` (CRM tickets, `PLATFORM_TENANT_ID` in
-   `crm-personal.ts`). Both are kept deliberately: tickets stay on
-   `'platform'` because the operator hub already aggregates it (§7.7).
-   Introduce shared constants `PLATFORM_COMMERCE_SCOPE` and
-   `PLATFORM_CRM_SCOPE` in Phase 1, and never introduce a third spelling;
-   unifying them behind one tenant row is a later migration.
+3. ~~**`platform` sentinel formalization:**~~ **RESOLVED (2026-08-03,
+   updated 2026-08-03):** the codebase previously had two platform sentinels
+   — `'_platform_'` (coupon validation fallback in `marketing-ops-public.ts`
+   lines 152/232) and `'platform'` (`PLATFORM_TENANT_ID` in
+   `crm-personal.ts`, used for CRM tickets, already seeded as a tenant row in
+   `seed-platform-tenant.ts`). **Decision: unify on `'platform'`** — one
+   tenant row, one sentinel, one constant (`PLATFORM_SCOPE = 'platform'`).
+   Phase 1 updates the two `'_platform_'` fallback lines in
+   `marketing-ops-public.ts` to `'platform'`. No existing data or other code
+   references `'_platform_'` (verified). This eliminates the dual-sentinel
+   confusion entirely.
 4. ~~**Multiple campaigns per customer:** business/agency grouping?~~
    **RESOLVED (2026-08-03):** per-customer branding confirmed; the account is
    explicitly **multi-campaign aware** — one flat, filterable list across
