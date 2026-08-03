@@ -19,7 +19,7 @@ import { logger } from '../logger';
 import { audit } from '../audit';
 import { generateCustomerClaimTokenId, generateClaimTokenSecret, generateStageHistoryId } from '../lib/id-generator';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
-import type { RequestCtx } from '../middleware/auth';
+import type { RequestCtx } from '../context';
 
 export type ClaimPath = 'A' | 'B' | 'C' | 'operator_invite';
 

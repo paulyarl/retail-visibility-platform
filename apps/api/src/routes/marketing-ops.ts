@@ -163,6 +163,9 @@ import MarketingSignalRegistryService from '../services/MarketingSignalRegistryS
 import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import MarketingProspectQueueService from '../services/MarketingProspectQueueService';
+import { MarketingCustomerService } from '../services/MarketingCustomerService';
+import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
+import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -4134,6 +4137,259 @@ router.post('/:campaignId/triage/override', async (req: any, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
     }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// PAYMENT LINK PANEL (§8.1) + SEND CLAIM INVITE (§8.2)
+// ====================
+
+const payLinkCreateSchema = z.object({
+  token_type: z.enum(['deliverable', 'demo_storefront']).default('deliverable'),
+  deliverable_id: z.string().optional(),
+  expires_in_days: z.number().int().min(1).max(365).default(30),
+});
+
+/**
+ * GET /campaigns/:id/pay-links
+ *
+ * Returns all preview tokens for the campaign with status fields + resolved
+ * pay URLs. Powers the Payment Link panel (§8.1).
+ */
+router.get('/campaigns/:id/pay-links', async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id },
+      select: { id: true, business_name: true, package_price_cents: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    const tokens = await prisma.mkt_deliverable_preview_tokens.findMany({
+      where: { campaign_id: id },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
+    const data = tokens.map((t: any) => {
+      const now = new Date();
+      const isExpired = t.expires_at && t.expires_at < now;
+      const isPaid = !!t.paid_at;
+      const isConverted = !!t.converted_at;
+      // Lifecycle status: created → viewed → paid (or expired/converted)
+      let lifecycleStatus: 'created' | 'viewed' | 'paid' | 'expired' | 'converted' = 'created';
+      if (isPaid) lifecycleStatus = 'paid';
+      else if (isConverted) lifecycleStatus = 'converted';
+      else if (isExpired) lifecycleStatus = 'expired';
+      else if (t.viewed_at) lifecycleStatus = 'viewed';
+
+      return {
+        id: t.id,
+        token: t.token,
+        tokenType: t.token_type,
+        deliverableId: t.deliverable_id || null,
+        payUrl: `${baseUrl}/marketing/pay?ptoken=${t.token}`,
+        qrPayload: `${baseUrl}/marketing/pay?ptoken=${t.token}`,
+        lifecycleStatus,
+        viewedAt: t.viewed_at || null,
+        paidAt: t.paid_at || null,
+        convertedAt: t.converted_at || null,
+        expiresAt: t.expires_at,
+        createdAt: t.created_at,
+        isExpired: !!isExpired,
+        isPaid,
+      };
+    });
+
+    return res.json({
+      success: true,
+      campaign: {
+        id: campaign.id,
+        businessName: campaign.business_name,
+        packagePriceCents: campaign.package_price_cents,
+        hasPrice: campaign.package_price_cents != null && campaign.package_price_cents > 0,
+      },
+      tokens: data,
+    });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * POST /campaigns/:id/pay-links
+ *
+ * Mint/regenerate a preview token. Returns the new URL + QR payload.
+ * Per §8.1: supersedes expired tokens (marks them converted) so only one
+ * active token per type remains.
+ */
+router.post('/campaigns/:id/pay-links', async (req: any, res: Response) => {
+  try {
+    const parsed = payLinkCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: parsed.error.issues });
+    }
+    const { id } = req.params;
+    const { token_type, deliverable_id, expires_in_days } = parsed.data;
+
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id },
+      select: { id: true, package_price_cents: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    // Price guard (§8.1): warn but still allow minting (operator may have a
+    // custom-priced follow-on). The frontend panel hides the link when unset.
+    // Supersede prior unconverted tokens of the same type for this campaign
+    // so only one active token per type remains.
+    await prisma.mkt_deliverable_preview_tokens.updateMany({
+      where: {
+        campaign_id: id,
+        token_type: token_type,
+        converted_at: null,
+        paid_at: null,
+      },
+      data: { converted_at: new Date() },
+    });
+
+    const token = await MarketingDeliverableService.generateCampaignToken(
+      id,
+      token_type,
+      deliverable_id,
+      expires_in_days,
+      getCtx(req),
+    );
+
+    const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
+    const payUrl = `${baseUrl}/marketing/pay?ptoken=${token.token}`;
+
+    return res.status(201).json({
+      success: true,
+      token: {
+        id: token.id,
+        token: token.token,
+        tokenType: token.token_type,
+        deliverableId: token.deliverable_id || null,
+        payUrl,
+        qrPayload: payUrl,
+        expiresAt: token.expires_at,
+        createdAt: token.created_at,
+      },
+      priceWarning: campaign.package_price_cents == null || campaign.package_price_cents <= 0,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+/**
+ * POST /campaigns/:id/send-claim-invite
+ *
+ * Operator "Send claim invite" action (§8.2). Triggers the Path B claim email
+ * to campaign.email. Only allowed when the campaign is paid but unclaimed
+ * (no customer_id). Returns 400 if already claimed or unpaid.
+ */
+router.post('/campaigns/:id/send-claim-invite', async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const campaign = await prisma.mkt_campaigns_list.findUnique({
+      where: { id },
+      select: { id: true, email: true, customer_id: true, date_paid: true, business_name: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+    }
+
+    if (campaign.customer_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'already_claimed',
+        message: 'This campaign is already linked to a customer account.',
+      });
+    }
+
+    if (!campaign.date_paid) {
+      return res.status(400).json({
+        success: false,
+        error: 'not_paid',
+        message: 'Cannot send a claim invite for an unpaid campaign.',
+      });
+    }
+
+    const email = (campaign.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'no_email',
+        message: 'This campaign has no email address on file.',
+      });
+    }
+
+    // Issue a claim token (voids prior unclaimed tokens for this email) and
+    // send the invite email. Uses the same Path B plumbing as the public
+    // /claim/request endpoint so the operator-driven invite records path
+    // 'operator_invite' in the audit log via claimAllEligible when the
+    // customer eventually completes the claim.
+    const issued = await MarketingCustomerService.issueClaimToken(email);
+    if (!issued) {
+      // No eligible campaigns — shouldn't happen since we checked above, but
+      // guard against races.
+      return res.status(409).json({
+        success: false,
+        error: 'no_eligible_campaigns',
+        message: 'No unclaimed paid campaigns found for this email.',
+      });
+    }
+
+    const emailResult = await MarketingReceiptEmailService.sendClaimInviteEmail(email, issued.token);
+
+    // Audit the operator-initiated invite
+    try {
+      const { audit } = await import('../audit');
+      await audit({
+        tenantId: 'platform',
+        actor: req.user?.id || 'unknown',
+        actorType: 'system',
+        action: 'create',
+        payload: {
+          entity_type: 'other',
+          id: issued.token,
+          campaign_id: id,
+          action_description: 'operator_send_claim_invite',
+          email,
+          campaigns_linked: issued.campaignIds.length,
+        },
+      });
+    } catch (e) {
+      logger.error('[marketing-ops] send-claim-invite audit failed', getCtx(req), { error: (e as Error).message });
+    }
+
+    logger.info('[marketing-ops] Operator sent claim invite', getCtx(req), {
+      campaignId: id,
+      email,
+      campaignIds: issued.campaignIds.length,
+      emailSent: emailResult.sent,
+    });
+
+    return res.json({
+      success: true,
+      message: emailResult.sent
+        ? `Claim invite sent to ${email}.`
+        : `Claim link generated, but the email could not be sent (${emailResult.error || 'unknown error'}). Share the link manually.`,
+      emailSent: emailResult.sent,
+      campaignCount: issued.campaignIds.length,
+    });
+  } catch (error) {
     handleServiceError(res, error, getCtx(req));
   }
 });

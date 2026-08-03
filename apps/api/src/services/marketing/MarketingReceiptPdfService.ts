@@ -13,7 +13,7 @@
 
 import { prisma } from '../../prisma';
 import MarketingServiceCategoryService from '../MarketingServiceCategoryService';
-import type { RequestCtx } from '../../middleware/auth';
+import type { RequestCtx } from '../../context';
 
 export interface ReceiptBranding {
   platformName: string;
@@ -27,7 +27,7 @@ export interface ReceiptBranding {
 
 export interface ReceiptPdfInput {
   campaignId: string;
-  revenueId: string;
+  revenueId?: string;
   ctx?: RequestCtx;
 }
 

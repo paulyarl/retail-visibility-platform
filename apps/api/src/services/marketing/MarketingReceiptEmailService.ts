@@ -17,7 +17,8 @@ import { prisma } from '../../prisma';
 import { logger } from '../../logger';
 import { PLATFORM_SCOPE } from '../../lib/platform-scope';
 import { MarketingReceiptPdfService, loadPlatformBranding } from './MarketingReceiptPdfService';
-import type { RequestCtx } from '../../middleware/auth';
+import { unifiedConfig } from '../../config/unifiedConfig';
+import type { RequestCtx } from '../../context';
 
 export interface ReceiptEmailInput {
   campaignId: string;
@@ -99,7 +100,6 @@ export async function sendReceiptEmail(input: ReceiptEmailInput): Promise<Receip
 
     // Build the email
     const { emailService } = await import('../email-service');
-    const { unifiedConfig } = await import('../../config');
 
     const subject = `Receipt from ${branding.platformName} — ${campaign.business_name || 'Your Campaign'}`;
     const claimUrl = `${unifiedConfig.frontendUrl || unifiedConfig.webUrl}/marketing/claim`;
@@ -294,7 +294,6 @@ export async function sendClaimInviteEmail(email: string, token: string): Promis
     const normalizedEmail = email.toLowerCase().trim();
     const branding = await loadPlatformBranding();
     const { emailService } = await import('../email-service');
-    const { unifiedConfig } = await import('../../config');
 
     const baseUrl = unifiedConfig.frontendUrl || unifiedConfig.webUrl;
     const claimUrl = `${baseUrl}/marketing/claim/${token}`;
