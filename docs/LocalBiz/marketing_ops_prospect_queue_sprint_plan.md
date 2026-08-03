@@ -25,7 +25,7 @@ Decisions locked with the requester (2026-08-03):
 
 - **Add to Queue never navigates.** Spawning stays available for "act now" prospects; queueing is for "act later" prospects. Both buttons coexist.
 - **Queue entries are self-contained.** Campaign creation from the queue must work entirely from the stored snapshot — the source audit/execution is provenance, not a runtime dependency.
-- **Queue is operator-global** (all `mkt_*` tables are platform-admin scoped, no RLS), not per-user. `queued_by` is recorded for accountability only.
+- **Queue is operator-global** (all `mkt_*` tables are platform-admin scoped, no RLS), not per-user. `queued_by` records who captured the prospect (attribution, immutable); `assigned_to` records who owns working it (mutable claim, name shown on the card). Assignment is claim semantics, not a visibility boundary — anyone can see and reassign anything.
 - **The board is a view, not a stage machine.** The kanban role derives entirely from the existing queue row → `processed_campaign_id` → `mkt_campaigns_list.stage` join and the existing category-aware transition tables. No new stage column, no parallel state — the board can never disagree with the campaign detail page.
 - **Board v1 advances by click, not drag.** Drag-and-drop is a later refinement; correctness of module-aware transitions and the checklist soft gate comes first.
 
@@ -217,7 +217,7 @@ Server-side denormalization at insert: `source_scope` is read from the parent ca
 
 ### 6.2 `GET /api/admin/marketing-ops/prospect-queue`
 
-Query params: `status` (default `queued`), `category`, `city`, `source_kind`, `limit` (default 100), `include=campaigns`. Ordered by `priority DESC, signal_count DESC, created_at ASC`. Response includes `queuedCount` (for the nav badge / widget header) regardless of filters.
+Query params: `status` (default `queued`), `category`, `city`, `source_kind`, `assigned_to` (`me` resolves to `req.user.id`, a user id, or `unassigned`), `limit` (default 100), `include=campaigns`. Ordered by `priority DESC, signal_count DESC, created_at ASC`. Response includes `queuedCount` (for the nav badge / widget header) regardless of filters.
 
 `include=campaigns` powers the **board view** (§7.3): LEFT JOINs `processed_campaign_id → mkt_campaigns_list` and decorates each entry with `{ campaign_stage, campaign_category, repair_track, is_hot_prospect, stage_entered_at }`. For the board the client passes `status=queued,campaign_created` (comma-separated) so graduated entries appear in their stage columns; `dismissed` never boards.
 
@@ -405,6 +405,8 @@ Irreversible-looking moves (`lost`, `dead`) ask for confirmation and accept the 
 12. **AC12 (board)** — Click-to-advance offers only stages valid per `transitionsFor(category, repair_track)`; an advance goes through `POST /:id/transition`, and a `checklist_incomplete` 409 surfaces the soft-gate dialog with proceed-anyway working.
 13. **AC13 (board)** — `lost`/`dead` columns are collapsed by default; dismissing an entry removes it from the board; profile-repair track switches move the card between board modes.
 14. **AC14 (audit-aware cards)** — A queued card renders priority, audit date (distinct from queued date), category, source scope, and signal chips without opening the source audit; crisis signals render red; an `audit_date` older than 14 days shows the stale tint. Values persist correctly even if the source audit/execution is subsequently deleted (denormalized at queue time).
+15. **AC15 (assignment)** — An operator can claim an unassigned card from board or list ("Assign to me"), and their display name appears on the card (via `staffDisplayName`) for all viewers on next fetch. Reassign/unassign works via PATCH; `assigned_at` follows. When a campaign is created from a claimed entry, the campaign's `assigned_to` equals the entry's assignee (unassigned entries fall back to the creating user).
+16. **AC16 (assignment filtering)** — The "Assigned to me" toggle filters to the caller's claimed entries + unclaimed ones; `assigned_to=me|unassigned|<id>` query params behave as specified.
 
 ---
 
