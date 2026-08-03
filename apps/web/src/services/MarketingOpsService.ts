@@ -1167,6 +1167,7 @@ class MarketingOpsService extends AdminApiSingleton {
     rating?: number;
     review_count?: number;
     location?: string;
+    detected_signals?: string[];
     assigned_to?: string;
   }): Promise<Campaign> {
     const result = await this.makeDefaultRequest<any>(
