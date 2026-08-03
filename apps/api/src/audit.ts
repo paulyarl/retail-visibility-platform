@@ -9,6 +9,7 @@ export type AuditPayload = Record<string, any> | null | undefined;
 export async function audit(opts: {
   tenantId?: string;
   actor?: string | null;
+  actorType?: 'user' | 'system' | 'integration' | 'customer';
   action: string;
   payload?: AuditPayload;
 }) {
@@ -45,7 +46,7 @@ export async function audit(opts: {
       tenant_id: opts.tenantId || 'platform',
       action: mappedAction, // Use mapped enum value instead of string
       actor_id: opts.actor || 'system', // Prisma model expects snake_case
-      actor_type: 'system', // Prisma model expects snake_case
+      actor_type: opts.actorType || 'system', // Defaults to 'system' for backward compat; claim/saved-card flows pass 'customer'
       entity_id: opts.payload?.id || 'unknown', // Prisma model expects snake_case
       entity_type: entityType,
       diff: opts.payload || {}, // Required field

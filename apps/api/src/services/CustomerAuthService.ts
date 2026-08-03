@@ -395,6 +395,15 @@ export class CustomerAuthService {
       // Reconcile any guest orders placed with this email
       await this.reconcileGuestOrders(customer.id, customer.email);
 
+      // Path C: OAuth emails are auto-verified, so run the marketing claim
+      // sweep immediately. Fire-and-forget.
+      this.runMarketingClaimSweep(customer.id, customer.email).catch((e) => {
+        logger.error('[CustomerAuth] Marketing claim sweep failed after oauthLogin', undefined, {
+          customerId: customer.id,
+          error: (e as Error).message,
+        });
+      });
+
       return {
         success: true,
         customer: this.formatCustomer(customer),
@@ -436,6 +445,15 @@ export class CustomerAuthService {
           email_verification_expires: null,
           updated_at: new Date(),
         },
+      });
+
+      // Path C: run the marketing claim sweep now that the email is verified.
+      // Fire-and-forget — failures must not break the verification flow.
+      this.runMarketingClaimSweep(customer.id, customer.email).catch((e) => {
+        logger.error('[CustomerAuth] Marketing claim sweep failed after verifyEmail', undefined, {
+          customerId: customer.id,
+          error: (e as Error).message,
+        });
       });
 
       return { success: true };
@@ -571,6 +589,33 @@ export class CustomerAuthService {
     });
 
     return customer ? this.formatCustomer(customer) : null;
+  }
+
+  /**
+   * Path C: Marketing claim sweep — links any paid, unclaimed marketing
+   * campaigns matching the customer's verified email to their account.
+   * Mirrors reconcileGuestOrders but for marketing campaigns. Fire-and-forget
+   * at call sites; failures are logged but never break the auth flow.
+   *
+   * Per §4.3 Path C: only call this for VERIFIED emails (verifyEmail success
+   * or oauthLogin, where email_verified is true).
+   */
+  private async runMarketingClaimSweep(customerId: string, email: string): Promise<void> {
+    try {
+      const { registrationClaimSweep } = await import('./MarketingCustomerService');
+      const result = await registrationClaimSweep(customerId, email);
+      if (result.campaignsLinked > 0) {
+        logger.info('[CustomerAuth] Marketing claim sweep linked campaigns', undefined, {
+          customerId,
+          email,
+          campaignsLinked: result.campaignsLinked,
+          campaignNames: result.campaignNames,
+        });
+      }
+    } catch (e) {
+      // Re-throw so the caller's .catch() handler logs it
+      throw e;
+    }
   }
 
   /**

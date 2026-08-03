@@ -21,6 +21,11 @@ import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { CouponService } from '../services/CouponService';
 import MarketingServiceCategoryService from '../services/MarketingServiceCategoryService';
+import { MarketingReceiptPdfService } from '../services/marketing/MarketingReceiptPdfService';
+import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
+import { MarketingCustomerService } from '../services/MarketingCustomerService';
+import { CustomerAuthService } from '../services/CustomerAuthService';
+import { CustomerTokenService } from '../services/CustomerTokenService';
 
 const router = express.Router();
 
@@ -40,6 +45,7 @@ const payConfirmSchema = z.object({
   paymentIntentId: z.string().min(1, 'paymentIntentId is required'),
   couponCode: z.string().optional(),
   subscriptionTierId: z.string().optional(),
+  email: z.string().email().optional(), // optional email from pay page (§7.1 item 1); falls back to campaign.email
 });
 
 async function resolvePreviewToken(ptoken: string) {
@@ -149,7 +155,7 @@ router.post('/public/marketing/checkout', async (req, res) => {
     if (couponCode) {
       try {
         const couponResult = await CouponService.getInstance().validateCoupon(
-          campaign.tenant_id || campaign.demo_tenant_id || '_platform_',
+          campaign.tenant_id || campaign.demo_tenant_id || 'platform',
           couponCode,
           { subtotalCents: amountCents },
         );
@@ -229,7 +235,7 @@ router.post('/public/marketing/coupons/validate', async (req, res) => {
 
     try {
       const result = await CouponService.getInstance().validateCoupon(
-        campaign.tenant_id || campaign.demo_tenant_id || '_platform_',
+        campaign.tenant_id || campaign.demo_tenant_id || 'platform',
         couponCode,
         { subtotalCents: amountCents },
       );
@@ -253,7 +259,7 @@ router.post('/public/marketing/pay/confirm', async (req, res) => {
       return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const { ptoken, paymentIntentId, couponCode, subscriptionTierId } = parsed.data;
+    const { ptoken, paymentIntentId, couponCode, subscriptionTierId, email } = parsed.data;
     const token = await resolvePreviewToken(ptoken);
     if (!token) {
       return res.status(404).json({ success: false, error: 'Invalid or expired token' });
@@ -308,6 +314,19 @@ router.post('/public/marketing/pay/confirm', async (req, res) => {
       },
     });
 
+    // Fire-and-forget receipt email (§6.6). Failures are logged but never
+    // surface to the client. Idempotency via marketing_revenue.receipt_emailed_at.
+    void MarketingReceiptEmailService.send({
+      campaignId: campaign.id,
+      toEmail: email,
+      ctx: req.ctx,
+    }).catch((e) => {
+      logger.error('[marketing-ops-public] Receipt email fire-and-forget failed', undefined, {
+        campaignId: campaign.id,
+        error: (e as Error).message,
+      });
+    });
+
     return res.json({
       success: true,
       data: {
@@ -327,174 +346,398 @@ router.post('/public/marketing/pay/confirm', async (req, res) => {
 router.get('/public/marketing/receipt/:campaignId', async (req, res) => {
   try {
     const { campaignId } = req.params;
-    const campaign = await prisma.mkt_campaigns_list.findUnique({ where: { id: campaignId } });
+    const { pdfBuffer, filename } = await MarketingReceiptPdfService.generate({
+      campaignId,
+      ctx: req.ctx,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    return res.send(pdfBuffer);
+  } catch (error: any) {
+    const msg = (error as Error).message || 'Failed to generate receipt';
+    if (msg.includes('not found') || msg.includes('No payment records')) {
+      return res.status(404).json({ success: false, error: msg });
+    }
+    logger.error('[marketing-ops-public] GET /receipt error', undefined, { error: msg, campaignId: req.params.campaignId });
+    return res.status(500).json({ success: false, error: 'Failed to generate receipt' });
+  }
+});
+
+// ── Claim endpoints (§6.1) ────────────────────────────────────────────────
+//
+// Path A (ptoken-gated, paid), Path B (email-awareness), and Path B completion.
+// All paths funnel through MarketingCustomerService.claimAllEligible(), which
+// links every paid, unclaimed campaign matching the verified email (plus the
+// ptoken's specific campaign for Path A) to the customer.
+
+const customerAuthService = CustomerAuthService.getInstance();
+const customerTokenService = CustomerTokenService.getInstance();
+
+const claimRegisterSchema = z.object({
+  ptoken: z.string().min(1, 'ptoken is required'),
+  email: z.string().email(),
+  password: z.string().min(8).optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  oauthProvider: z.string().optional(),
+  oauthId: z.string().optional(),
+});
+
+const claimLoginSchema = z.object({
+  ptoken: z.string().min(1, 'ptoken is required'),
+  email: z.string().email(),
+  password: z.string().min(1, 'password is required'),
+});
+
+const claimRequestSchema = z.object({
+  email: z.string().email(),
+});
+
+const claimCompleteSchema = z.object({
+  mode: z.enum(['register', 'login']),
+  email: z.string().email().optional(),
+  password: z.string().min(8).optional(),
+  oauthProvider: z.string().optional(),
+  oauthId: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+});
+
+/**
+ * Path A: POST /api/public/marketing/pay/claim
+ *
+ * Resolve ptoken → campaign. If email matches an existing verified customer →
+ * 409 with `requires_login` (caller should hit /pay/claim/login). Else register
+ * (or OAuth-login) the customer, run claimAllEligible with the ptoken's
+ * campaign as specificCampaignId, return JWT tokens + claim summary.
+ */
+router.post('/public/marketing/pay/claim', async (req, res) => {
+  try {
+    const parsed = claimRegisterSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+    const { ptoken, email, password, firstName, lastName, oauthProvider, oauthId } = parsed.data;
+
+    // ptoken must be paid (§6.1 rule: claims before payment are rejected)
+    const token = await resolvePreviewToken(ptoken);
+    if (!token) {
+      return res.status(404).json({ success: false, error: 'Invalid or expired token' });
+    }
+    if (!token.paid_at) {
+      return res.status(402).json({ success: false, error: 'not_paid', message: 'Pay before claiming your account.' });
+    }
+    const campaign = token.mkt_campaigns_list;
     if (!campaign) {
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
 
-    const revenueRecords = await prisma.marketing_revenue.findMany({
-      where: { campaign_id: campaignId },
-      orderBy: { recorded_at: 'desc' },
-      take: 1,
-    });
-
-    if (revenueRecords.length === 0) {
-      return res.status(404).json({ success: false, error: 'No payment records found' });
+    // If email matches an existing VERIFIED customer → require login (Path A
+    // only registers new accounts; existing accounts use /pay/claim/login).
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await prisma.customers.findUnique({ where: { email: normalizedEmail } });
+    if (existing && existing.email_verified) {
+      return res.status(409).json({
+        success: false,
+        error: 'requires_login',
+        message: 'An account already exists for this email. Please log in to claim your purchase.',
+      });
     }
 
-    const revenue = revenueRecords[0];
+    // Register or OAuth-login
+    let authResult: { success: boolean; customer?: any; error?: string };
+    if (oauthProvider && oauthId) {
+      authResult = await customerAuthService.oauthLogin(
+        oauthProvider,
+        oauthId,
+        normalizedEmail,
+        firstName,
+        lastName,
+        req.headers['user-agent'],
+        req.ip || (req.headers['x-forwarded-for'] as string),
+      );
+    } else {
+      if (!password) {
+        return res.status(400).json({ success: false, error: 'missing_password', message: 'Password is required.' });
+      }
+      authResult = await customerAuthService.register({
+        email: normalizedEmail,
+        password,
+        firstName,
+        lastName,
+      });
+    }
 
-    const platformSettings = await prisma.platform_settings_list.findFirst();
-    const branding = {
-      platformName: platformSettings?.platform_name || 'Visible Shelf',
-      logoUrl: platformSettings?.logo_url,
-      primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
-      contactEmail: platformSettings?.contact_email || 'billing@visibleshelf.store',
-      contactPhone: platformSettings?.contact_phone || '(913) 703-6157',
-      contactAddress: platformSettings?.contact_address || '',
-      contactWebsite: platformSettings?.contact_website || 'https://visibleshelf.store',
-    };
+    if (!authResult.success || !authResult.customer) {
+      return res.status(400).json({ success: false, error: 'registration_failed', message: authResult.error });
+    }
 
-    const { jsPDF } = await import('jspdf');
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    let yPos = 20;
+    const customerId = authResult.customer.id;
 
-    let logoWidth = 0;
-    const logoHeight = 15;
-    if (branding.logoUrl) {
+    // Run the claim service (Path A: include the ptoken's specific campaign)
+    const claimResult = await MarketingCustomerService.claimAllEligible(customerId, normalizedEmail, {
+      via: 'A',
+      specificCampaignId: campaign.id,
+    });
+
+    const tokens = await customerTokenService.generateTokens(customerId, normalizedEmail);
+
+    return res.status(201).json({
+      success: true,
+      customer: authResult.customer,
+      tokens,
+      claim: claimResult,
+    });
+  } catch (error: any) {
+    if (error?.code === 'already_claimed_by_other') {
+      return res.status(409).json({ success: false, error: 'already_claimed', message: error.message });
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[marketing-ops-public] POST /pay/claim error', undefined, { error: msg });
+    return res.status(500).json({ success: false, error: 'Failed to claim account' });
+  }
+});
+
+/**
+ * Path A, existing account: POST /api/public/marketing/pay/claim/login
+ *
+ * Login → claimAllEligible (with the ptoken's campaign as specificCampaignId)
+ * → return tokens + claim summary.
+ */
+router.post('/public/marketing/pay/claim/login', async (req, res) => {
+  try {
+    const parsed = claimLoginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+    const { ptoken, email, password } = parsed.data;
+
+    const token = await resolvePreviewToken(ptoken);
+    if (!token) {
+      return res.status(404).json({ success: false, error: 'Invalid or expired token' });
+    }
+    if (!token.paid_at) {
+      return res.status(402).json({ success: false, error: 'not_paid', message: 'Pay before claiming your account.' });
+    }
+    const campaign = token.mkt_campaigns_list;
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const authResult = await customerAuthService.login({
+      email: normalizedEmail,
+      password,
+      deviceInfo: req.headers['user-agent'],
+      ipAddress: req.ip || (req.headers['x-forwarded-for'] as string),
+    });
+    if (!authResult.success || !authResult.customer) {
+      return res.status(401).json({ success: false, error: 'login_failed', message: authResult.error });
+    }
+
+    const customerId = authResult.customer.id;
+    const claimResult = await MarketingCustomerService.claimAllEligible(customerId, normalizedEmail, {
+      via: 'A',
+      specificCampaignId: campaign.id,
+    });
+
+    const tokens = await customerTokenService.generateTokens(customerId, normalizedEmail);
+
+    return res.json({
+      success: true,
+      customer: authResult.customer,
+      tokens,
+      claim: claimResult,
+    });
+  } catch (error: any) {
+    if (error?.code === 'already_claimed_by_other') {
+      return res.status(409).json({ success: false, error: 'already_claimed', message: error.message });
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[marketing-ops-public] POST /pay/claim/login error', undefined, { error: msg });
+    return res.status(500).json({ success: false, error: 'Failed to claim account' });
+  }
+});
+
+/**
+ * Path B: POST /api/public/marketing/claim/request
+ *
+ * If email matches ≥1 paid, unclaimed campaign → issue a claim token and send
+ * the claim email. Always returns the same generic success message
+ * (enumeration resistance). Rate-limited per email + IP (basic in-process
+ * throttle; production should use Redis).
+ */
+const claimRequestThrottle = new Map<string, number>();
+const CLAIM_REQUEST_THROTTLE_MS = 60 * 1000; // 1 minute per (email+ip)
+
+router.post('/public/marketing/claim/request', async (req, res) => {
+  try {
+    const parsed = claimRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      // Still return generic success to avoid enumeration via validation errors
+      return res.json({ success: true, message: 'If we found any purchases for that email, we sent a claim link.' });
+    }
+    const { email } = parsed.data;
+    const normalizedEmail = email.toLowerCase().trim();
+    const ip = (req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown') as string;
+
+    // Throttle: 1 request per email+IP per minute
+    const throttleKey = `${normalizedEmail}:${ip}`;
+    const last = claimRequestThrottle.get(throttleKey);
+    if (last && Date.now() - last < CLAIM_REQUEST_THROTTLE_MS) {
+      return res.json({ success: true, message: 'If we found any purchases for that email, we sent a claim link.' });
+    }
+    claimRequestThrottle.set(throttleKey, Date.now());
+
+    const issued = await MarketingCustomerService.issueClaimToken(normalizedEmail);
+    if (issued) {
+      // Send the claim email (best-effort; failures logged, not surfaced)
       try {
-        const logoResponse = await fetch(branding.logoUrl);
-        if (logoResponse.ok) {
-          const logoBuffer = await logoResponse.arrayBuffer();
-          const logoBase64 = Buffer.from(logoBuffer).toString('base64');
-          const contentType = logoResponse.headers.get('content-type') || 'image/png';
-          const logoDataUri = `data:${contentType};base64,${logoBase64}`;
-          const imgProps = doc.getImageProperties(logoDataUri);
-          const aspectRatio = imgProps.width / imgProps.height;
-          logoWidth = logoHeight * aspectRatio;
-          doc.addImage(logoDataUri, 'PNG', margin, yPos - 5, logoWidth, logoHeight);
-          yPos += 12;
-        }
-      } catch {
-        // Continue without logo
+        await MarketingReceiptEmailService.sendClaimInviteEmail(normalizedEmail, issued.token);
+      } catch (e) {
+        logger.error('[marketing-ops-public] claim invite email failed', undefined, {
+          email: normalizedEmail,
+          error: (e as Error).message,
+        });
       }
     }
 
-    doc.setFontSize(24);
-    doc.setTextColor(branding.primaryColor);
-    const textX = logoWidth > 0 ? margin + logoWidth + 5 : margin;
-    doc.text(branding.platformName, textX, yPos);
-
-    doc.setFontSize(18);
-    doc.setTextColor(0, 0, 0);
-    doc.text('PAYMENT RECEIPT', pageWidth - margin - 50, 20, { align: 'left' });
-
-    doc.setFontSize(12);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`#${revenue.id}`, pageWidth - margin - 50, 28, { align: 'left' });
-
-    yPos = 50;
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
-    doc.text('From:', margin, yPos);
-    doc.setFont('helvetica', 'normal');
-    yPos += 5;
-    doc.text(branding.platformName, margin, yPos);
-    yPos += 5;
-    if (branding.contactEmail) doc.text(branding.contactEmail, margin, yPos);
-
-    yPos = 50;
-    const toX = pageWidth / 2;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Bill To:', toX, yPos);
-    doc.setFont('helvetica', 'normal');
-    yPos += 5;
-    doc.text(campaign.business_name ?? '', toX, yPos);
-
-    yPos = Math.max(yPos, 75) + 10;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 10;
-
-    const formatDate = (date: string | Date | null | undefined) => {
-      if (!date) return '-';
-      return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    };
-    const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
-    const serviceCategoryLabel = await MarketingServiceCategoryService.getLabel(
-      revenue.service_category || '',
-      req.ctx,
-    );
-
-    const infoRows: [string, string][] = [
-      ['Receipt ID:', revenue.id],
-      ['Campaign ID:', campaign.id],
-      ['Business:', campaign.business_name ?? ''],
-      ['Service:', serviceCategoryLabel],
-      ['Payment Date:', formatDate(revenue.recorded_at)],
-      ['Payment Method:', revenue.gateway_type || 'N/A'],
-      ['Transaction ID:', revenue.gateway_transaction_id || 'N/A'],
-      ['Source:', revenue.source],
-    ];
-
-    for (const [label, value] of infoRows) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(label, margin, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(value, margin + 40, yPos);
-      yPos += 6;
-    }
-
-    yPos += 10;
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.text('Description', margin + 2, yPos + 5);
-    doc.text('Amount', pageWidth - margin - 20, yPos + 5, { align: 'right' });
-    yPos += 12;
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${serviceCategoryLabel} — ${campaign.business_name}`, margin + 2, yPos);
-    doc.text(formatPrice(revenue.amount_cents), pageWidth - margin - 20, yPos, { align: 'right' });
-    yPos += 8;
-
-    if (revenue.discount_cents > 0) {
-      yPos += 5;
-      doc.text('Discount Applied:', margin + 2, yPos);
-      doc.text(`-${formatPrice(revenue.discount_cents)}`, pageWidth - margin - 20, yPos, { align: 'right' });
-      yPos += 8;
-    }
-
-    yPos += 5;
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 8;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Paid:', margin + 2, yPos);
-    doc.text(formatPrice(revenue.amount_cents), pageWidth - margin - 20, yPos, { align: 'right' });
-
-    yPos = doc.internal.pageSize.getHeight() - 30;
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 120);
-    doc.text('Thank you for your business!', margin, yPos);
-    yPos += 10;
-    if (branding.contactPhone) {
-      doc.text(`Phone: ${branding.contactPhone}  |  Email: ${branding.contactEmail}`, margin, yPos);
-    } else {
-      doc.text(`Email: ${branding.contactEmail}`, margin, yPos);
-    }
-
-    const filename = `marketing-receipt-${revenue.id}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
-    return res.send(pdfBuffer);
+    // Always the same generic message
+    return res.json({ success: true, message: 'If we found any purchases for that email, we sent a claim link.' });
   } catch (error) {
-    logger.error('[marketing-ops-public] GET /receipt error', undefined, { error: (error as Error).message, campaignId: req.params.campaignId });
-    return res.status(500).json({ success: false, error: 'Failed to generate receipt' });
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[marketing-ops-public] POST /claim/request error', undefined, { error: msg });
+    // Never leak error details — return generic success
+    return res.json({ success: true, message: 'If we found any purchases for that email, we sent a claim link.' });
+  }
+});
+
+/**
+ * Path B: GET /api/public/marketing/claim/:token
+ *
+ * Validate claim token → return masked summary for the claim landing page.
+ * Never returns full purchase details pre-auth.
+ */
+router.get('/public/marketing/claim/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const summary = await MarketingCustomerService.getClaimTokenSummary(token);
+    if (!summary) {
+      return res.status(404).json({ success: false, error: 'invalid_token', message: 'This claim link is invalid.' });
+    }
+    return res.json({ success: true, summary });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[marketing-ops-public] GET /claim/:token error', undefined, { error: msg });
+    return res.status(500).json({ success: false, error: 'Failed to validate claim link' });
+  }
+});
+
+/**
+ * Path B: POST /api/public/marketing/claim/:token/complete
+ *
+ * Register or login → claimAllEligible links all eligible campaigns → mark
+ * token claimed_at → return JWT tokens + claim summary.
+ *
+ * Register: email is prefilled & locked to the token's email.
+ * Login: must match an existing verified account with the token's email.
+ */
+router.post('/public/marketing/claim/:token/complete', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const parsed = claimCompleteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+    const { mode, password, oauthProvider, oauthId, firstName, lastName } = parsed.data;
+
+    // Validate the token first
+    const tokenRow = await prisma.mkt_customer_claim_tokens.findUnique({ where: { token } });
+    if (!tokenRow) {
+      return res.status(404).json({ success: false, error: 'invalid_token', message: 'This claim link is invalid.' });
+    }
+    if (tokenRow.claimed_at) {
+      return res.status(410).json({ success: false, error: 'token_claimed', message: 'This claim link has already been used.' });
+    }
+    if (tokenRow.expires_at < new Date()) {
+      return res.status(410).json({ success: false, error: 'token_expired', message: 'This claim link has expired.' });
+    }
+
+    const normalizedEmail = tokenRow.email; // locked to the token's email
+
+    let authResult: { success: boolean; customer?: any; error?: string };
+    if (mode === 'register') {
+      if (oauthProvider && oauthId) {
+        authResult = await customerAuthService.oauthLogin(
+          oauthProvider,
+          oauthId,
+          normalizedEmail,
+          firstName,
+          lastName,
+          req.headers['user-agent'],
+          req.ip || (req.headers['x-forwarded-for'] as string),
+        );
+      } else {
+        if (!password) {
+          return res.status(400).json({ success: false, error: 'missing_password', message: 'Password is required.' });
+        }
+        authResult = await customerAuthService.register({
+          email: normalizedEmail,
+          password,
+          firstName,
+          lastName,
+        });
+      }
+    } else {
+      // login mode
+      if (!password) {
+        return res.status(400).json({ success: false, error: 'missing_password', message: 'Password is required.' });
+      }
+      authResult = await customerAuthService.login({
+        email: normalizedEmail,
+        password,
+        deviceInfo: req.headers['user-agent'],
+        ipAddress: req.ip || (req.headers['x-forwarded-for'] as string),
+      });
+      // Per spec: login must match a verified account with the token's email
+      if (authResult.success && authResult.customer && !authResult.customer.emailVerified) {
+        return res.status(403).json({
+          success: false,
+          error: 'email_not_verified',
+          message: 'Please verify your email before claiming your purchases.',
+        });
+      }
+    }
+
+    if (!authResult.success || !authResult.customer) {
+      return res.status(400).json({ success: false, error: 'auth_failed', message: authResult.error });
+    }
+
+    const customerId = authResult.customer.id;
+
+    // Run the claim service (Path B: no specificCampaignId — link all eligible)
+    const claimResult = await MarketingCustomerService.claimAllEligible(customerId, normalizedEmail, {
+      via: 'B',
+    });
+
+    // Mark the token as consumed
+    await MarketingCustomerService.consumeClaimToken(token);
+
+    const tokens = await customerTokenService.generateTokens(customerId, normalizedEmail);
+
+    return res.json({
+      success: true,
+      customer: authResult.customer,
+      tokens,
+      claim: claimResult,
+    });
+  } catch (error: any) {
+    if (error?.code === 'already_claimed_by_other') {
+      return res.status(409).json({ success: false, error: 'already_claimed', message: error.message });
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[marketing-ops-public] POST /claim/:token/complete error', undefined, { error: msg });
+    return res.status(500).json({ success: false, error: 'Failed to complete claim' });
   }
 });
 

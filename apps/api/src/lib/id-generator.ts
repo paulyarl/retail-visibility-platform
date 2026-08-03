@@ -1946,3 +1946,23 @@ export function generateProspectQueueId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `pque-${nanoid()}`;
 }
+
+/**
+ * Generate customer claim token ID (row ID for mkt_customer_claim_tokens)
+ * Format: mclm-{nanoid} (13 chars)
+ * Global (not tenant-scoped) — claim tokens are keyed by email, not tenant.
+ */
+export function generateCustomerClaimTokenId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `mclm-${nanoid()}`;
+}
+
+/**
+ * Generate the unguessable single-use claim token string (not the row ID).
+ * Format: 32 chars from the full URL-safe nanoid alphabet.
+ * Delivered only to the campaign email address; single-use, 24h TTL.
+ */
+export function generateClaimTokenSecret(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
+  return nanoid();
+}
