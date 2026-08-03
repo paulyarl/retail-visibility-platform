@@ -3375,6 +3375,8 @@ class MarketingOpsService extends AdminApiSingleton {
     if (!res.ok) throw new Error(`Failed to delete signal (${res.status})`);
   }
 }
+
+export interface CascadeStatus {
   campaignId: string;
   cascadeEnabled: boolean;
   cascadeConfig: any;
