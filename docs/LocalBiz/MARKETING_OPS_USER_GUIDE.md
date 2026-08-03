@@ -18,10 +18,11 @@
 
 Marketing Ops turns each local business prospect into a **campaign journey**. An admin tracks the prospect from first discovery (`seek`) through preview, payment, delivery, and ultimately a recurring retainer or tenant conversion.
 
-Campaigns belong to one of two categories:
+Campaigns belong to one of three categories:
 
 - **Review Management** — the default pipeline (seek → preview → paid → retainer). Covers prospecting, audit, deliverable generation, payment, and tenant conversion.
 - **Recovery Management** — dispute resolution for businesses that have received complaints on review platforms. The engine drafts a professional response on behalf of the owner, provides a submission guide, and delivers the approved resolution via email.
+- **Triage Management** — dual-signal footprint campaigns where the business has both repair issues (NAP drift, dead URL) and review gaps (drought, unanswered reviews). Assigned by the Intelligent Triage Engine when PB-05 matches. See §31.
 
 ### Core Admin Workflows
 
@@ -34,6 +35,7 @@ Campaigns belong to one of two categories:
 - **Tenant conversion** — link a campaign to a real or demo tenant and track first/last-touch attribution.
 - **Recovery management** — generate intake links, collect owner statements, draft AI-powered resolution responses, and deliver approved resolutions to business owners.
 - **Multi-channel cascade** — opt-in a review campaign to an automated email → SMS → DM outreach sequence (Day 1/2/4).
+- **Intelligent triage** — the triage engine automatically matches seek-stage campaigns to the best outreach playbook based on signals detected in the audit data. Operators review, enrich, accept, or override the recommendation. See §31.
 
 ---
 
@@ -1238,3 +1240,138 @@ This script discovers all `Local Business Digital Opportunity Audit - One Hour -
 - `apps/api/src/routes/marketing-ops-public.ts`
 - `apps/api/src/routes/recovery-intake-public.ts`
 - `apps/api/src/services/subscription/SubscriptionBillingService.ts`
+- `docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md`
+- `docs/LocalBiz/marketing_ops_triage_admin_runbook.md`
+- `apps/api/src/services/triage/TriageEngineService.ts`
+- `apps/api/src/services/triage/signal-extractor.ts`
+- `apps/api/src/services/triage/signal-taxonomy.ts`
+- `apps/api/src/services/CampaignTriageService.ts`
+- `apps/api/src/services/MarketingPlaybookCatalogService.ts`
+- `apps/api/src/services/MarketingSignalRegistryService.ts`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/playbooks/PlaybookCatalogClient.tsx`
+- `apps/web/src/app/(platform)/settings/admin/marketing-ops/playbooks/RuleBuilder.tsx`
+- `apps/web/src/components/marketing-ops/IntelligentTriageCard.tsx`
+- `apps/web/src/components/marketing-ops/SignalEnrichmentPanel.tsx`
+
+---
+
+## 31. Intelligent Playbook Catalog & Triage Engine
+
+**Pages:** `/settings/admin/marketing-ops/playbooks` (admin config) · Campaign detail triage card (operator workflow)
+
+The Intelligent Triage Engine automatically matches business campaigns to the best outreach playbook based on signals detected in the audit data. This replaces manual category selection with a data-driven, rules-based recommendation that the operator reviews, enriches, and accepts or overrides.
+
+### How It Works
+
+```
+Business Analysis Audit (AI scan)
+  → detected_signals[] (24 known signal codes across 5 families)
+  → Signal Extractor (emits SignalCode[] from audit + campaign fields)
+  → Triage Engine (generic DSL evaluator: any/all/none/dual clauses)
+  → Playbook Catalog (6 seeded playbooks, ordered by priority_rank)
+  → Recommended Playbook (code, archetype, FITD offer, retainer pitch)
+  → Operator decision: Accept / Override / Enrich signals
+  → Opener generation (archetype-specific prompt → LLM → quality gate)
+```
+
+### Campaign Categories
+
+The triage engine can assign one of three campaign categories:
+
+| Category | When | Archetypes |
+|----------|------|------------|
+| **Review Management** | Default — unanswered reviews, review drought | A1 (gap), A2 (negative theme) |
+| **Recovery Management** | Crisis — BBB grade suppression, unanswered complaints | A2 (crisis recovery) |
+| **Triage Management** | Dual-signal footprint — repair + review signals combined | A5 (dual triage) |
+
+### Signal Families
+
+Signals are grouped into 5 families, each color-coded in the UI:
+
+| Code | Family | Color | Examples |
+|------|--------|-------|----------|
+| RA | Reputation & Administrative | Red | `RA_REVIEW_DROUGHT`, `RA_UNANSWERED_GAP`, `RA_BBB_GRADE_SUPPRESSION` |
+| DS | Digital Surface & Profile | Orange | `DS_GBP_UNCLAIMED`, `DS_GBP_INACTIVE_POSTS` |
+| WC | Website & Conversion | Blue | `WC_NO_CTA`, `WC_DEAD_URL`, `WC_URL_MISMATCH` |
+| CP | Cross-Platform & NAP | Purple | `CP_NAP_DRIFT_NAME`, `CP_NAP_DRIFT_ADDRESS` |
+| VP | Content & Visual Proof | Teal | `VP_NO_RECENT_PHOTOS`, `VP_LOW_PHOTO_COUNT` |
+
+### Operator Workflow (Campaign Detail — Seek Stage)
+
+When a campaign is in the `seek` stage, the **Intelligent Triage** card appears above the tabs on the campaign detail page. This is a prerequisite gate — the triage decision should be made before moving to `preview_built`.
+
+1. **Evaluate** — Click the Evaluate button to run the signal extractor + triage engine. The card displays:
+   - Recommended playbook (code, name, category, archetype)
+   - **Rule Confidence** (signal match strength, NOT ML probability)
+   - Triggered signals (color-coded family badges)
+   - Plain-language rationale
+   - FITD offer + retainer fee preview
+
+2. **BBB Pre-Flight (optional)** — If BBB data is needed for the crisis playbook (PB-04), expand the BBB pre-flight inputs and enter the BBB grade (A–F or NR) and unanswered complaint count. This is manual — the platform does not auto-ingest BBB data.
+
+3. **Signal Enrichment (optional)** — If the AI scan missed signals or flagged false positives:
+   - Click **Enrich signals**
+   - Use the dropdown picker to add known signals (sourced from the signal registry — no free-text)
+   - Click X on any signal to remove it (false positive correction)
+   - Click **Re-run triage** to re-evaluate with the enriched set
+
+4. **Accept** — Re-categorizes the campaign to the playbook's category and applies the FITD fee. The opener generation will use the triage-derived archetype (including A5, which the deterministic selector never produces).
+
+5. **Override** — If the operator disagrees with the recommendation, they can select a different playbook from the dropdown. An optional reason can be provided.
+
+### Playbook Catalog Admin (`/settings/admin/marketing-ops/playbooks`)
+
+The Playbook Catalog page has two tabs:
+
+#### Playbooks Tab
+
+- **Table view:** code, name, category badge, archetype, FITD fee, retainer fee, active status, priority rank
+- **Reorder:** up/down arrows swap priority ranks. The triage engine evaluates in ascending order (lowest rank = highest priority). First match wins.
+- **Edit/Create modal:** all playbook fields + the **Rule Builder**
+
+#### Rule Builder
+
+Structured visual editor for the matching rules DSL — no raw JSON required:
+
+- **ANY (trigger):** Match if at least ONE signal is present
+- **ALL (required):** Match only if ALL signals are present
+- **NONE (guard):** Block match if ANY signal is present (crisis guard)
+- **DUAL (cross-family):** Match if ≥1 from groupA AND ≥1 from groupB (e.g. repair + review)
+- **Confidence slider:** 0–100% (labeled "Rule Confidence / Signal Match Strength")
+- **Plain-language preview:** "Matches when ANY of … is present AND NONE of … is present"
+- **Raw JSON toggle:** Advanced escape hatch with round-trip validation
+
+#### Signals Tab
+
+- **Table view:** code badge, family, label, detection source, active toggle
+- **Register Signal modal:** code (FAMILY_UPPER_SNAKE), family, label, description, detection source
+- **Warning:** `derived` signals need extractor code in `signal-extractor.ts` to fire automatically. Registering here makes the code available in the Rule Builder, but it won't be auto-detected until the extractor is updated.
+
+### Seeded Playbook Cascade (Default)
+
+| Rank | Code | Name | Archetype | Category | Key Rule |
+|------|------|------|-----------|----------|----------|
+| 1 | PB-04 | Crisis Reputation Recovery | A2 | recovery_management | ANY: BBB crisis signals |
+| 2 | PB-01 | Review Response Gap | A1 | review_management | ANY: RA_UNANSWERED_GAP |
+| 3 | PB-02 | Negative Review Recovery | A2 | review_management | ANY: RA_NEGATIVE_THEME_CLUSTER |
+| 4 | PB-05 | Dual-Signal Footprint Triage | A5 | triage_management | DUAL: repair + review |
+| 5 | PB-06 | Listing Inconsistency Repair | A3 | recovery_management | ANY: CP_NAP_DRIFT_* |
+| 99 | PB-03 | Review Response Gap (Fallback) | A1 | review_management | ANY: RA_UNANSWERED_GAP (catch-all) |
+
+### Opener Generation (Triage-Accepted Archetype)
+
+When the triage recommendation is accepted, the opener generation service uses the triage-derived archetype instead of the deterministic `selectArchetype` function. This is the only way the A5 (Dual-Signal Triage) archetype reaches the opener prompt — `selectArchetype` never returns A5.
+
+The A5 opener combines repair-signal context (NAP drift, dead URL) with review-gap context (drought, unaddressed count) without stacking stats. The hook leads with the combined footprint as a single observation, with only ONE number appearing (either day count OR unaddressed count, never both).
+
+### Key Distinction: Profile Repair Triage vs Intelligent Triage
+
+The profile repair pipeline (§28) has its own triage system for choosing between `standard` and `escalated` repair tracks. The Intelligent Triage Engine (§31) is a separate system that matches campaigns to outreach playbooks. They coexist:
+
+- **Profile Repair Triage** (§28): Decides repair track severity (standard vs escalated) for `profile_repair` campaigns.
+- **Intelligent Triage** (§31): Decides outreach playbook (PB-01 through PB-06) for `seek`-stage campaigns across all categories.
+
+### See Also
+
+- `docs/LocalBiz/marketing_ops_triage_admin_runbook.md` — detailed admin runbook with troubleshooting
+- `docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md` — full sprint plan and architecture
