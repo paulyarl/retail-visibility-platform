@@ -9,6 +9,10 @@ import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/Plat
 import SuggestiveSelect, { distinctValues } from '@/components/marketing-ops/SuggestiveSelect';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
+/** Terminal stages collapsed behind "Show closed" by default. Mirrors the
+ *  queue board's CLOSED_STAGES behavior, scoped to the review pipeline stages
+ *  that appear on the campaigns page. */
+const CLOSED_STAGES: CampaignStage[] = ['lost', 'dead'];
 const RETAINER_OPTIONS: Array<'Fast' | 'Medium' | 'Slow' | ''> = ['Fast', 'Medium', 'Slow'];
 const ATTRIBUTE_OPTIONS = ['High Ticket', 'Upscale', 'Friendly', 'Professional', 'Fast Retainers'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
@@ -50,6 +54,7 @@ export default function CampaignListClient() {
   const [retainerFilter, setRetainerFilter] = useState<'Fast' | 'Medium' | 'Slow' | ''>('');
   const [attributeFilter, setAttributeFilter] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('');
+  const [showClosed, setShowClosed] = useState(false);
   const staffUsers = useStaffUsers();
 
   const fetchCampaigns = useCallback(async () => {
@@ -83,8 +88,9 @@ export default function CampaignListClient() {
 
   const campaignsByStage = (stage: CampaignStage) => campaigns.filter((c) => c.stage === stage);
   const filteredCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesFollowUpFilter(c, followUpFilter)),
-    [campaigns, followUpFilter],
+    () => campaigns.filter((c) => matchesFollowUpFilter(c, followUpFilter))
+      .filter((c) => showClosed || !CLOSED_STAGES.includes(c.stage)),
+    [campaigns, followUpFilter, showClosed],
   );
 
   return (
@@ -95,7 +101,7 @@ export default function CampaignListClient() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Campaigns</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''} in pipeline
+              {filteredCampaigns.length} of {campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}{!showClosed && campaigns.some((c) => CLOSED_STAGES.includes(c.stage)) ? ' (closed hidden)' : ''}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -186,6 +192,10 @@ export default function CampaignListClient() {
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
+          <label className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700">
+            <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} className="rounded" />
+            Show closed
+          </label>
         </div>
 
         {/* Follow-up quick filter chips */}
@@ -307,7 +317,7 @@ export default function CampaignListClient() {
         ) : (
           <div className="overflow-x-auto pb-4">
             <div className="flex gap-4 min-w-max">
-              {PIPELINE_STAGES.map((stage) => {
+              {PIPELINE_STAGES.filter((stage) => showClosed || !CLOSED_STAGES.includes(stage)).map((stage) => {
                 const items = filteredCampaigns.filter((c) => c.stage === stage);
                 return (
                   <div key={stage} className="w-72 flex-shrink-0">
