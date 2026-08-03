@@ -3253,6 +3253,35 @@ class MarketingOpsService extends AdminApiSingleton {
     return json.data;
   }
 
+  async acceptTriage(campaignId: string): Promise<TriageResult> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/triage/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to accept triage (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async overrideTriage(campaignId: string, playbookCode: string, reason?: string): Promise<TriageResult> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/triage/override`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ playbook_code: playbookCode, reason }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to override triage (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
   // ─── Playbook catalog CRUD (Sprint 4) ────────────────────────────────
 
   async listPlaybooks(filters?: { category?: string; isActive?: boolean }): Promise<PlaybookCatalogEntry[]> {
