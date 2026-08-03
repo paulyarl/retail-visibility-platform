@@ -59,7 +59,7 @@ The `profile_repair` category already introduced a "triage-first" pattern: campa
 | Admin Playbook Catalog page | Does not exist. | New Next.js route under `/settings/admin/marketing-ops/`. |
 | Campaign triage card with Accept/Override | Does not exist. | Add to `CampaignDetailClient.tsx` and call new API. |
 | `openerPromptTemplateId` on playbook | Existing openers are built from `archetype-prompts.ts`, not DB templates. | Decide whether to template-ize prompts in DB or keep the prompt builder keyed by archetype. |
-| Standardized `audit_signals: SignalCode[]` array (5 families: RA/DS/WC/CP/VP) | Audit outputs are free-form `audit_data` JSON; no signal codes exist. `business_analysis` audits have the raw fields but not the taxonomy. | New `signal-taxonomy.ts` + extractor + audit prompt contract update (Sprint 2A). Legacy audits derive codes from raw fields. |
+| Standardized `detected_signals: SignalCode[]` array (5 families: RA/DS/WC/CP/VP) | Audit outputs are free-form `audit_data` JSON; no signal codes exist. `business_analysis` audits have the raw fields but not the taxonomy. | New `signal-taxonomy.ts` + extractor + audit prompt contract update (Sprint 2A). Legacy audits derive codes from raw fields. |
 | PB-06 Visual & Asset Refresh | Not in original spec. | New seed row; new cascade tier; reuses A3 archetype (no new prompt needed). |
 | Admin-managed dynamic rules (future unknown signals) | Hardcoded TS unions (`SignalCode`) and hardcoded cascades cannot absorb new signals/playbooks without a deploy. | Signals become data (`mkt_signal_registry` table); the engine becomes a generic set-membership evaluator; admins add signals + playbook rules via a Rule Builder UI (Sprint 4 extension). |
 
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS mkt_playbook_catalog (
 -- Signal registry: signals as DATA so admins can register future unknown
 -- signals without an engine deploy. detection_source tells the extractor how
 -- the signal is produced:
---   model_emitted  — audit LLM output includes the code in audit_signals[]
+--   model_emitted  — audit LLM output includes the code in detected_signals[]
 --   derived        — computed from raw audit/campaign fields by code (thresholds)
 --   operator_input — manually supplied (e.g. BBB pre-flight inputs)
 CREATE TABLE IF NOT EXISTS mkt_signal_registry (
@@ -401,10 +401,10 @@ Five signal families, each with stable code strings (stored in `mkt_campaign_tri
    ```json
    {
      "business_name": "One Hour Heating & Air Conditioning",
-     "audit_signals": ["WC_URL_MISMATCH", "RA_REVIEW_DROUGHT", "CP_NAP_NAME_DRIFT", "VP_MISSING_PROJECT_PHOTOS"]
+     "detected_signals": ["WC_URL_MISMATCH", "RA_REVIEW_DROUGHT", "CP_NAP_NAME_DRIFT", "VP_MISSING_PROJECT_PHOTOS"]
    }
    ```
-   Extractor precedence: model-emitted `audit_signals` first; derive codes from raw fields only for legacy audits that lack the array.
+   Extractor precedence: model-emitted `detected_signals` first; derive codes from raw fields only for legacy audits that lack the array.
 4. **Generic rules evaluator** — `TriageEngineService` implements the §6.4 DSL (`any`/`all`/`none`/`dual`) as pure set-membership over `SignalCode[]`, evaluating active playbooks in `priority_rank` order. No per-playbook code branches. Seed `matching_rules` for all 6 playbooks from the §2A.2 matrix (PB-05 uses `dual` + `none: [RA_BBB_GRADE_SUPPRESSION, RA_UNANSWERED_COMPLAINTS]` for the "no active crisis" guard).
 5. **Seed PB-06** (Visual & Asset Refresh) — catalog grows to 6 playbooks (§5.3).
 6. **Unit tests:** per-family detection, threshold edge cases (exactly 180 days, exactly 15 reviews), dual-trigger PB-05, PB-06 visual-only path, legacy-audit derivation fallback, `priority_rank` ordering, DSL semantics (`any`/`all`/`none`/`dual` combinations), unknown-code tolerance, and registry-driven dynamic rule changes (add a new signal + new playbook rule at runtime, verify it matches without code changes).
@@ -533,7 +533,7 @@ The following were verified against the live codebase and supersede any conflict
 ## 9. Acceptance Criteria
 
 - [ ] Migration creates both tables and seed playbooks (6, including PB-06) are queryable with `priority_rank` and `matching_rules` populated.
-- [ ] `SignalExtractor` emits the canonical `SignalCode[]` array (5 families) from audit data, campaign columns, and operator BBB inputs; legacy audits without `audit_signals` derive codes correctly.
+- [ ] `SignalExtractor` emits the canonical `SignalCode[]` array (5 families) from audit data, campaign columns, and operator BBB inputs; legacy audits without `detected_signals` derive codes correctly.
 - [ ] `TriageEngineService.evaluateTriage` consumes `SignalCode[]` and produces the expected playbook for each of the 6 cascade branches in `priority_rank` order.
 - [ ] Accepting a triage recommendation updates the campaign's `campaign_category`, `package_price_cents`, `archetype` selection, and logs a decision.
 - [ ] Override creates a `mkt_campaign_triage_results` row with `is_operator_accepted = false` and `overridden_playbook_id` populated.
@@ -549,7 +549,7 @@ The following were verified against the live codebase and supersede any conflict
 ## 10. Dependencies / Blockers
 
 - **BBB data source** for PB-04 to be fully functional (operator manual input is the agreed short-term path — see Risk 1).
-- **Audit prompt contract update** — seek/`business_analysis` templates in `docs/LocalBiz/Audit Prompts/` must emit the `audit_signals: SignalCode[]` array; Sprint 2A's model-emitted path depends on it (legacy derivation covers the gap until templates ship).
+- **Audit prompt contract update** — seek/`business_analysis` templates in `docs/LocalBiz/Audit Prompts/` must emit the `detected_signals: SignalCode[]` array; Sprint 2A's model-emitted path depends on it (legacy derivation covers the gap until templates ship). **DONE** — all 4 seek prompts now emit `detected_signals`.
 - **Product confirmation** on `triage_management` as a new `campaign_category` vs. reusing `profile_repair` / `review_management` as the category and using a triage flag.
 - **Design approval** on the Campaign Triage Card layout (spec provides an ASCII wireframe).
 - **Archetype A5 prompt copy** from Marketing / Ops.

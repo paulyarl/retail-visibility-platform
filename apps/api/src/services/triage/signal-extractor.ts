@@ -6,9 +6,9 @@
  * the standardized SignalCode[] array that the triage engine evaluates.
  *
  * Extraction precedence (per Sprint 2A task 2):
- *   1. model_emitted — if audit_data.audit_signals[] is present (new audit
+ *   1. model_emitted — if audit_data.detected_signals[] is present (new audit
  *      prompt contract), use it directly as the canonical set.
- *   2. derived — for legacy audits without audit_signals[], derive codes
+ *   2. derived — for legacy audits without detected_signals[], derive codes
  *      from raw fields + thresholds (the bulk of this file).
  *   3. operator_input — BBB codes (RA_BBB_GRADE_SUPPRESSION,
  *      RA_UNANSWERED_COMPLAINTS) are only emitted when the operator supplies
@@ -141,7 +141,7 @@ function unansweredPositiveReviews(auditData: BusinessAnalysisAuditData | null |
  * Extract the canonical SignalCode[] from campaign columns, audit_data, and
  * operator BBB inputs.
  *
- * Precedence: model_emitted audit_signals[] first (new audit contract);
+ * Precedence: model_emitted detected_signals[] first (new audit contract);
  * derived codes from raw fields for legacy audits; operator_input BBB codes
  * always added when supplied.
  */
@@ -149,8 +149,12 @@ export function extractSignals(input: SignalExtractorInput): SignalCode[] {
   const { campaign, auditData, bbb } = input;
   const signals = new Set<SignalCode>();
 
-  // ── 1. model_emitted: audit_signals[] from the new audit prompt contract ──
-  const modelEmitted = (auditData as any)?.audit_signals;
+  // ── 1. model_emitted: detected_signals[] from the new audit prompt contract ──
+  // The seek prompts (v1 + v2) emit a top-level `detected_signals` string
+  // array constrained to the platform's signal codes. This is the canonical
+  // path — derived codes below are the legacy fallback for audits that
+  // predate the signal-aware prompt contract.
+  const modelEmitted = (auditData as any)?.detected_signals;
   if (Array.isArray(modelEmitted)) {
     for (const code of modelEmitted) {
       if (typeof code === 'string' && code.length > 0) {

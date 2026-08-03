@@ -598,17 +598,17 @@ describe('extractSignals — emits SignalCode[] from campaign + audit + BBB', ()
     expect(signals).toContain('RA_UNANSWERED_COMPLAINTS');
   });
 
-  it('model_emitted: audit_signals[] used directly when present', () => {
+  it('model_emitted: detected_signals[] used directly when present', () => {
     const signals = extractSignals(makeInput({
-      auditData: { audit_signals: ['WC_URL_MISMATCH', 'RA_REVIEW_DROUGHT'] } as any,
+      auditData: { detected_signals: ['WC_URL_MISMATCH', 'RA_REVIEW_DROUGHT'] } as any,
     }));
     expect(signals).toContain('WC_URL_MISMATCH');
     expect(signals).toContain('RA_REVIEW_DROUGHT');
   });
 
-  it('model_emitted: unknown codes in audit_signals[] are accepted', () => {
+  it('model_emitted: unknown codes in detected_signals[] are accepted', () => {
     const signals = extractSignals(makeInput({
-      auditData: { audit_signals: ['FUTURE_SIGNAL'] } as any,
+      auditData: { detected_signals: ['FUTURE_SIGNAL'] } as any,
     }));
     expect(signals).toContain('FUTURE_SIGNAL');
   });

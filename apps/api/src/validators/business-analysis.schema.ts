@@ -325,6 +325,7 @@ const sourceSchema = z.object({
 
 export const businessAnalysisSchema = z.object({
   audit_metadata: auditMetadataSchema,
+  detected_signals: z.array(z.string()).optional(),
   summary: z.string(),
   platforms: platformsSchema,
   combined_review_metrics: combinedReviewMetricsSchema.optional(),

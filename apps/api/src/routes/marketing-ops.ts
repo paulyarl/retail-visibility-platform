@@ -1107,6 +1107,7 @@ const deriveBusinessSchema = z.object({
   rating: z.number().min(0).max(5).optional(),
   review_count: z.number().int().min(0).optional(),
   location: z.string().max(500).optional(),
+  detected_signals: z.array(z.string()).optional(),
   assigned_to: z.string().optional(),
 });
 
@@ -1119,6 +1120,7 @@ router.post('/:id/derive-business', async (req: any, res: Response) => {
       rating: parsed.rating,
       reviewCount: parsed.review_count,
       location: parsed.location,
+      detectedSignals: parsed.detected_signals,
       assignedTo: parsed.assigned_to ?? req.user?.id,
     }, getCtx(req));
     res.status(201).json({ success: true, data: campaign });
