@@ -160,6 +160,7 @@ import disputeIntakeService from '../services/DisputeIntakeService';
 import ReviewCascadeService from '../services/ReviewCascadeService';
 import MarketingPlaybookCatalogService from '../services/MarketingPlaybookCatalogService';
 import MarketingSignalRegistryService from '../services/MarketingSignalRegistryService';
+import PlaybookChecklistService from '../services/PlaybookChecklistService';
 import CampaignTriageService from '../services/CampaignTriageService';
 import { prisma } from '../prisma';
 
@@ -226,6 +227,7 @@ const stageTransitionSchema = z.object({
   to_stage: z.enum(['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded']),
   notes: z.string().optional(),
   trigger_type: z.enum(['manual', 'automated', 'system']).optional(),
+  acknowledge_incomplete: z.boolean().optional(),
 });
 
 const linkTenantSchema = z.object({
@@ -514,6 +516,60 @@ const playbookReorderSchema = z.object({
   })).min(1),
 });
 
+// ─── Checklist step schemas (Operator Checklist Sprint) ───────────────────
+
+const checklistStepTypeEnum = z.enum(['manual', 'url_check', 'ai_prompt', 'deliverable', 'outreach', 'credentials']);
+
+const checklistStepCreateSchema = z.object({
+  title: z.string().min(1).max(255),
+  instructions: z.string().optional(),
+  step_type: checklistStepTypeEnum.optional(),
+  action_config: z.record(z.string(), z.any()).optional(),
+  is_required: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+});
+
+const checklistStepUpdateSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  instructions: z.string().nullable().optional(),
+  step_type: checklistStepTypeEnum.optional(),
+  action_config: z.record(z.string(), z.any()).optional(),
+  is_required: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  step_order: z.number().int().min(0).optional(),
+});
+
+const checklistReorderSchema = z.object({
+  rankings: z.array(z.object({
+    id: z.string().min(1),
+    step_order: z.number().int().min(0),
+  })).min(1),
+});
+
+const checklistProgressToggleSchema = z.object({
+  completed: z.boolean(),
+  note: z.string().nullable().optional(),
+});
+
+const checklistSuggestionKindEnum = z.enum(['add', 'modify', 'remove']);
+const checklistSuggestionPositionEnum = z.enum(['before', 'after', 'supersede']);
+
+const checklistSuggestionSubmitSchema = z.object({
+  step_id: z.string().min(1).nullable().optional(),
+  suggestion_kind: checklistSuggestionKindEnum,
+  position: checklistSuggestionPositionEnum.nullable().optional(),
+  proposed_step: z.record(z.string(), z.any()),
+  rationale: z.string().min(1, 'Rationale is required — a suggestion without a why is unreviewable'),
+});
+
+const checklistSuggestionAcceptSchema = z.object({
+  proposed_step: z.record(z.string(), z.any()).optional(),
+});
+
+const checklistSuggestionRejectSchema = z.object({
+  review_note: z.string().nullable().optional(),
+});
+
 const triageEvaluateSchema = z.object({
   bbb: z.object({
     bbb_grade: z.string().max(5).optional(),
@@ -763,6 +819,21 @@ router.delete('/:id', async (req: any, res: Response) => {
 router.post('/:id/transition', async (req: any, res: Response) => {
   try {
     const parsed = stageTransitionSchema.parse(req.body);
+
+    // Soft gate: if the campaign has an effective playbook with incomplete
+    // required checklist steps, warn unless acknowledge_incomplete is true.
+    // Never hard-blocks — the operator may acknowledge and proceed.
+    if (!parsed.acknowledge_incomplete) {
+      const incomplete = await PlaybookChecklistService.getIncompleteRequiredSteps(req.params.id, getCtx(req));
+      if (incomplete.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'checklist_incomplete',
+          incomplete_steps: incomplete.map((s) => ({ id: s.id, title: s.title })),
+        });
+      }
+    }
+
     const campaign = await MarketingCampaignService.transitionStage({
       campaignId: req.params.id,
       toStage: parsed.to_stage,
@@ -2718,6 +2789,227 @@ router.post('/signals/:id/activate', async (req: any, res: Response) => {
       getCtx(req),
     );
     res.json({ success: true, data: signal });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// PLAYBOOK CHECKLIST ROUTES (Operator Checklist Sprint)
+// ====================
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...)
+// below, otherwise Express matches /playbooks as a campaign ID param.
+// Same hazard as /signals and /playbooks above.
+
+// ─── Step template CRUD (builder tab) ─────────────────────────────────────
+
+router.get('/playbooks/:id/checklist', async (req: any, res: Response) => {
+  try {
+    const includeInactive = req.query.include_inactive === 'true';
+    const steps = includeInactive
+      ? await PlaybookChecklistService.listAllSteps(req.params.id, getCtx(req))
+      : await PlaybookChecklistService.listSteps(req.params.id, getCtx(req));
+    res.json({ success: true, data: steps });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/playbooks/:id/checklist', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistStepCreateSchema.parse(req.body);
+    const step = await PlaybookChecklistService.createStep(req.params.id, {
+      title: parsed.title,
+      instructions: parsed.instructions,
+      stepType: parsed.step_type ?? 'manual',
+      actionConfig: parsed.action_config,
+      isRequired: parsed.is_required,
+      isActive: parsed.is_active,
+    }, getCtx(req));
+    res.status(201).json({ success: true, data: step });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/playbooks/:id/checklist/reorder', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistReorderSchema.parse(req.body);
+    const updated = await PlaybookChecklistService.reorderSteps(
+      req.params.id,
+      parsed.rankings.map((r) => ({ id: r.id, stepOrder: r.step_order })),
+      getCtx(req),
+    );
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/checklist-steps/:id', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistStepUpdateSchema.parse(req.body);
+    const step = await PlaybookChecklistService.updateStep(req.params.id, {
+      title: parsed.title,
+      instructions: parsed.instructions,
+      stepType: parsed.step_type,
+      actionConfig: parsed.action_config,
+      isRequired: parsed.is_required,
+      isActive: parsed.is_active,
+      stepOrder: parsed.step_order,
+    }, getCtx(req));
+    res.json({ success: true, data: step });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.delete('/checklist-steps/:id', async (req: any, res: Response) => {
+  try {
+    await PlaybookChecklistService.deleteStep(req.params.id, getCtx(req));
+    res.json({ success: true });
+  } catch (error: any) {
+    if (error?.code === 'step_has_progress' || error?.statusCode === 409) {
+      return res.status(409).json({ success: false, error: error.code ?? 'step_has_progress', message: error.message });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Campaign checklist (resolved view + progress toggle) ─────────────────
+
+router.get('/:id/checklist', async (req: any, res: Response) => {
+  try {
+    const view = await PlaybookChecklistService.getCampaignChecklist(req.params.id, getCtx(req));
+    res.json({ success: true, data: view });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.put('/:id/checklist/:stepId', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistProgressToggleSchema.parse(req.body);
+    const actor = req.user?.id || req.user?.email || 'unknown';
+    const view = await PlaybookChecklistService.setStepProgress(
+      req.params.id,
+      req.params.stepId,
+      parsed.completed,
+      parsed.note,
+      actor,
+      getCtx(req),
+    );
+    res.json({ success: true, data: view });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    if ((error as any)?.code === 'no_effective_playbook' || (error as any)?.code === 'stale_step' || (error as any)?.statusCode === 409) {
+      return res.status(409).json({ success: false, error: (error as any).code, message: (error as any).message });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Suggestions (operator feedback loop) ─────────────────────────────────
+
+router.post('/:id/checklist/suggestions', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistSuggestionSubmitSchema.parse(req.body);
+    const actor = req.user?.id || req.user?.email || 'unknown';
+    const suggestion = await PlaybookChecklistService.submitSuggestion(
+      req.params.id,
+      {
+        stepId: parsed.step_id,
+        suggestionKind: parsed.suggestion_kind,
+        position: parsed.position,
+        proposedStep: parsed.proposed_step,
+        rationale: parsed.rationale,
+      },
+      actor,
+      getCtx(req),
+    );
+    res.status(201).json({ success: true, data: suggestion });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    if ((error as any)?.code === 'no_effective_playbook' || (error as any)?.statusCode === 409) {
+      return res.status(409).json({ success: false, error: (error as any).code, message: (error as any).message });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/:id/checklist/suggestions', async (req: any, res: Response) => {
+  try {
+    const suggestions = await PlaybookChecklistService.listCampaignSuggestions(req.params.id, getCtx(req));
+    res.json({ success: true, data: suggestions });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.get('/playbooks/:id/checklist/suggestions', async (req: any, res: Response) => {
+  try {
+    const status = req.query.status as 'pending' | 'accepted' | 'rejected' | undefined;
+    const suggestions = await PlaybookChecklistService.listPlaybookSuggestions(req.params.id, status, getCtx(req));
+    res.json({ success: true, data: suggestions });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/checklist-suggestions/:id/accept', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistSuggestionAcceptSchema.parse(req.body);
+    const reviewer = req.user?.id || req.user?.email || 'unknown';
+    const suggestion = await PlaybookChecklistService.acceptSuggestion(
+      req.params.id,
+      parsed.proposed_step,
+      reviewer,
+      getCtx(req),
+    );
+    res.json({ success: true, data: suggestion });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });
+    }
+    if ((error as any)?.code === 'suggestion_stale' || (error as any)?.statusCode === 409) {
+      return res.status(409).json({
+        success: false,
+        error: (error as any).code ?? 'suggestion_stale',
+        message: (error as any).message,
+        currentValues: (error as any).currentValues,
+      });
+    }
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+router.post('/checklist-suggestions/:id/reject', async (req: any, res: Response) => {
+  try {
+    const parsed = checklistSuggestionRejectSchema.parse(req.body);
+    const reviewer = req.user?.id || req.user?.email || 'unknown';
+    const suggestion = await PlaybookChecklistService.rejectSuggestion(
+      req.params.id,
+      parsed.review_note,
+      reviewer,
+      getCtx(req),
+    );
+    res.json({ success: true, data: suggestion });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'validation_error', details: error.issues });

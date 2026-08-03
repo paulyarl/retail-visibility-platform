@@ -135,6 +135,29 @@ rely on `DEFAULT NOW()` + app-layer Prisma `@updatedAt`. New `mkt_*` tables
 follow the same pattern (no `CREATE TRIGGER` block in the migration).
 - **Verification:** Add commented-out `SELECT` queries at the bottom for manual verification
 
+### Migration 159 — Operator Playbook Checklists (worked example)
+
+`database/migrations/159_mkt_playbook_checklists.sql` adds three `mkt_*` tables
+following the namespace conventions above:
+
+- `mkt_playbook_checklist_steps` — ordered step templates per playbook
+  (`step_order INT`, `step_type VARCHAR(30)` with CHECK constraint,
+  `action_config JSONB DEFAULT '{}'`, `is_required BOOLEAN DEFAULT true`,
+  `is_active BOOLEAN DEFAULT true`). Indexed on `(playbook_id, is_active)`
+  and `(playbook_id, step_order)` for the builder tab's ordered list query.
+- `mkt_campaign_checklist_progress` — per-campaign check-off rows, unique on
+  `(campaign_id, step_id)` so `upsert` is the natural write path. Both FKs
+  cascade (`ON DELETE CASCADE`) so deleting a campaign or step cleans up
+  progress automatically.
+- `mkt_playbook_checklist_suggestions` — operator feedback queue. Indexed on
+  `(playbook_id, status)` for the admin review queue and `(campaign_id)` for
+  the campaign-side list. `step_id` is nullable + `ON UPDATE NO ACTION` so
+  supersede/deactivate flows don't orphan suggestions.
+
+No RLS, no triggers — matches the `mkt_*` family policy. CHECK constraints
+on `step_type`, `suggestion_kind`, `position`, and `status` enforce the
+enum-like columns at the DB layer (Prisma introspects them as comments).
+
 ---
 
 ## 5. Enforcement Checklist

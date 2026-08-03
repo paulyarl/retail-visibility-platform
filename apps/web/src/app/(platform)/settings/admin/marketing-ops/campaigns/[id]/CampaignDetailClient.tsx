@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight } from 'lucide-react';
+import { RefreshCw, Pencil, Trash2, ChevronRight, FileText, Download, Send, Sparkles, Store, Link2, Copy, ExternalLink, Flame, ArrowRight, Circle } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, { CampaignDetail, CampaignStage, Audit, MarketingFile, StageHistory, Deliverable, DeliverableType, DeliverableTemplate, DemoStorefrontResult, MarketingRevenue, PromptTemplate, PromptType } from '@/services/MarketingOpsService';
 import marketingPayPublicService from '@/services/MarketingPayPublicService';
@@ -21,8 +21,9 @@ import CascadePanel from '@/components/marketing-ops/CascadePanel';
 import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
 import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageCard';
+import CampaignChecklistTab from './CampaignChecklistTab';
 
-type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage' | 'cascade';
+type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'checklist' | 'history' | 'lineage' | 'cascade';
 
 const PIPELINE_STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 
@@ -83,6 +84,11 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
   const [readinessDialog, setReadinessDialog] = useState<{ toStage: CampaignStage } | null>(null);
   const [readinessChecking, setReadinessChecking] = useState(false);
   const [readinessEnriching, setReadinessEnriching] = useState(false);
+  // Soft gate for incomplete required checklist steps — operator may acknowledge and proceed.
+  const [checklistIncompleteDialog, setChecklistIncompleteDialog] = useState<{
+    toStage: CampaignStage;
+    incompleteSteps: { id: string; title: string }[];
+  } | null>(null);
   const [contactReadiness, setContactReadiness] = useState<{ hasPhone: boolean; hasEmail: boolean; hasWebsite: boolean; hasSocial: boolean; complete: boolean } | null>(null);
   // Sprint 5: latest city_analysis execution for SyncReportCard
   const [cityScanExecutionId, setCityScanExecutionId] = useState<string | null>(null);
@@ -206,17 +212,33 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     await runTransition(toStage);
   };
 
-  const runTransition = async (toStage: CampaignStage) => {
+  const runTransition = async (toStage: CampaignStage, acknowledgeIncomplete = false) => {
     setTransitioning(true);
     try {
-      await marketingOpsService.transitionStage(campaignId, { to_stage: toStage, trigger_type: 'manual' });
+      await marketingOpsService.transitionStage(campaignId, {
+        to_stage: toStage,
+        trigger_type: 'manual',
+        acknowledge_incomplete: acknowledgeIncomplete,
+      });
       await fetchCampaign();
     } catch (err: any) {
-      setError(err.message || 'Failed to transition stage');
+      // Soft gate: required checklist steps incomplete — surface the list and
+      // let the operator acknowledge and proceed (never hard-blocks).
+      if (err?.code === 'checklist_incomplete' && Array.isArray(err?.incompleteSteps)) {
+        setChecklistIncompleteDialog({ toStage, incompleteSteps: err.incompleteSteps });
+      } else {
+        setError(err.message || 'Failed to transition stage');
+      }
     } finally {
       setTransitioning(false);
       setReadinessDialog(null);
     }
+  };
+
+  const handleAcknowledgeIncomplete = async () => {
+    if (!checklistIncompleteDialog) return;
+    await runTransition(checklistIncompleteDialog.toStage, true);
+    setChecklistIncompleteDialog(null);
   };
 
   const handleEnrichFromDialog = async () => {
@@ -296,6 +318,7 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
     { key: 'files', label: 'Files', count: campaign?.files?.length },
     { key: 'deliverables', label: 'Deliverables', count: deliverables.length },
     { key: 'prompts', label: 'Prompts' },
+    { key: 'checklist', label: 'Checklist' },
     { key: 'history', label: 'Stage History', count: campaign?.stage_history?.length },
     { key: 'lineage', label: 'Derived Campaigns', count: campaign?.children?.length },
     // Cascade tab is review-pipeline only (Track A yes, Track B no).
@@ -342,6 +365,50 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
               <button
                 type="button"
                 onClick={() => setReadinessDialog(null)}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {checklistIncompleteDialog && (
+          <div className="mb-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
+            <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Required checklist steps incomplete
+            </h3>
+            <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+              The campaign's playbook has required checklist steps that haven't been checked off yet.
+              You can complete them on the Checklist tab, or acknowledge and proceed with the transition.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {checklistIncompleteDialog.incompleteSteps.map((s) => (
+                <li key={s.id} className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <Circle className="w-3 h-3" /> {s.title}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('checklist'); setChecklistIncompleteDialog(null); }}
+                className="rounded-md bg-white dark:bg-neutral-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-neutral-600 hover:bg-gray-50 dark:hover:bg-neutral-600"
+              >
+                Go to Checklist
+              </button>
+              <button
+                type="button"
+                onClick={handleAcknowledgeIncomplete}
+                disabled={transitioning}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {transitioning ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                Acknowledge &amp; proceed
+              </button>
+              <button
+                type="button"
+                onClick={() => setChecklistIncompleteDialog(null)}
                 className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               >
                 Cancel
@@ -967,6 +1034,13 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                   );
                 })()}
               </div>
+            )}
+
+            {activeTab === 'checklist' && campaign && (
+              <CampaignChecklistTab
+                campaignId={campaign.id}
+                onGoToTriage={() => setActiveTab('overview')}
+              />
             )}
 
             {activeTab === 'history' && (

@@ -6086,85 +6086,86 @@ model mkt_branding_config {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model mkt_campaigns_list {
-  id                                                        String                           @id @db.VarChar(255)
-  display_id                                                String?                          @unique @db.VarChar(20)
-  business_name                                             String?                          @db.VarChar(255)
-  category                                                  String                           @db.VarChar(100)
-  city                                                      String                           @db.VarChar(100)
-  neighborhood                                              String?                          @db.VarChar(100)
-  contact_method                                            String?                          @db.VarChar(50)
-  contact_info                                              String?                          @db.VarChar(255)
-  gbp_claimed                                               Boolean                          @default(false)
-  unaddressed_reviews                                       Int                              @default(0)
-  last_review_date                                          DateTime?                        @db.Date
-  has_website                                               String?                          @db.VarChar(20)
+  id                                                        String                               @id @db.VarChar(255)
+  display_id                                                String?                              @unique @db.VarChar(20)
+  business_name                                             String?                              @db.VarChar(255)
+  category                                                  String                               @db.VarChar(100)
+  city                                                      String                               @db.VarChar(100)
+  neighborhood                                              String?                              @db.VarChar(100)
+  contact_method                                            String?                              @db.VarChar(50)
+  contact_info                                              String?                              @db.VarChar(255)
+  gbp_claimed                                               Boolean                              @default(false)
+  unaddressed_reviews                                       Int                                  @default(0)
+  last_review_date                                          DateTime?                            @db.Date
+  has_website                                               String?                              @db.VarChar(20)
   nap_consistent                                            Boolean?
-  estimated_tier                                            String?                          @db.VarChar(20)
-  estimated_fee_cents                                       Int                              @default(0)
-  pain_score                                                Int                              @default(0)
-  stage                                                     String                           @default("seek") @db.VarChar(50)
-  stage_entered_at                                          DateTime                         @default(now()) @db.Timestamptz(6)
-  date_entered                                              DateTime                         @default(now()) @db.Timestamptz(6)
-  date_preview_built                                        DateTime?                        @db.Timestamptz(6)
-  date_shown                                                DateTime?                        @db.Timestamptz(6)
-  date_paid                                                 DateTime?                        @db.Timestamptz(6)
-  date_delivered                                            DateTime?                        @db.Timestamptz(6)
-  date_retainer_pitched                                     DateTime?                        @db.Timestamptz(6)
-  date_retainer_won                                         DateTime?                        @db.Timestamptz(6)
+  estimated_tier                                            String?                              @db.VarChar(20)
+  estimated_fee_cents                                       Int                                  @default(0)
+  pain_score                                                Int                                  @default(0)
+  stage                                                     String                               @default("seek") @db.VarChar(50)
+  stage_entered_at                                          DateTime                             @default(now()) @db.Timestamptz(6)
+  date_entered                                              DateTime                             @default(now()) @db.Timestamptz(6)
+  date_preview_built                                        DateTime?                            @db.Timestamptz(6)
+  date_shown                                                DateTime?                            @db.Timestamptz(6)
+  date_paid                                                 DateTime?                            @db.Timestamptz(6)
+  date_delivered                                            DateTime?                            @db.Timestamptz(6)
+  date_retainer_pitched                                     DateTime?                            @db.Timestamptz(6)
+  date_retainer_won                                         DateTime?                            @db.Timestamptz(6)
   package_delivered                                         String?
-  amount_paid_cents                                         Int                              @default(0)
-  retainer_status                                           String                           @default("not_pitched") @db.VarChar(50)
-  retainer_amount_cents                                     Int                              @default(0)
-  retainer_start_date                                       DateTime?                        @db.Date
+  amount_paid_cents                                         Int                                  @default(0)
+  retainer_status                                           String                               @default("not_pitched") @db.VarChar(50)
+  retainer_amount_cents                                     Int                                  @default(0)
+  retainer_start_date                                       DateTime?                            @db.Date
   notes                                                     String?
   assigned_to                                               String?
   created_by                                                String?
-  created_at                                                DateTime                         @default(now()) @db.Timestamptz(6)
-  updated_at                                                DateTime                         @default(now()) @db.Timestamptz(6)
-  tenant_id                                                 String?                          @db.VarChar(255)
-  date_tenant_onboarded                                     DateTime?                        @db.Timestamptz(6)
-  first_touch_source                                        String?                          @db.VarChar(50)
-  last_touch_source                                         String?                          @db.VarChar(50)
-  campaign_origin                                           String                           @default("prospect") @db.VarChar(20)
-  demo_tenant_id                                            String?                          @db.VarChar(255)
+  created_at                                                DateTime                             @default(now()) @db.Timestamptz(6)
+  updated_at                                                DateTime                             @default(now()) @db.Timestamptz(6)
+  tenant_id                                                 String?                              @db.VarChar(255)
+  date_tenant_onboarded                                     DateTime?                            @db.Timestamptz(6)
+  first_touch_source                                        String?                              @db.VarChar(50)
+  last_touch_source                                         String?                              @db.VarChar(50)
+  campaign_origin                                           String                               @default("prospect") @db.VarChar(20)
+  demo_tenant_id                                            String?                              @db.VarChar(255)
   gbp_lookup_cache                                          Json?
-  gbp_lookup_cached_at                                      DateTime?                        @db.Timestamptz(6)
-  package_price_cents                                       Int?                             @default(0)
-  subscription_tier_id                                      String?                          @db.VarChar(255)
-  coupon_code                                               String?                          @db.VarChar(100)
-  service_category                                          String?                          @db.VarChar(100)
-  tone                                                      String?                          @db.VarChar(50)
-  retainer                                                  String?                          @db.VarChar(20)
-  attributes                                                Json?                            @default("[]")
-  scope                                                     String                           @default("business") @db.VarChar(20)
-  phone                                                     String?                          @db.VarChar(40)
-  email                                                     String?                          @db.VarChar(255)
-  website_url                                               String?                          @db.VarChar(500)
+  gbp_lookup_cached_at                                      DateTime?                            @db.Timestamptz(6)
+  package_price_cents                                       Int?                                 @default(0)
+  subscription_tier_id                                      String?                              @db.VarChar(255)
+  coupon_code                                               String?                              @db.VarChar(100)
+  service_category                                          String?                              @db.VarChar(100)
+  tone                                                      String?                              @db.VarChar(50)
+  retainer                                                  String?                              @db.VarChar(20)
+  attributes                                                Json?                                @default("[]")
+  scope                                                     String                               @default("business") @db.VarChar(20)
+  phone                                                     String?                              @db.VarChar(40)
+  email                                                     String?                              @db.VarChar(255)
+  website_url                                               String?                              @db.VarChar(500)
   social_profiles                                           Json?
-  parent_campaign_id                                        String?                          @db.VarChar(255)
-  last_contacted_at                                         DateTime?                        @db.Timestamptz(6)
-  next_follow_up_at                                         DateTime?                        @db.Timestamptz(6)
-  last_contact_channel                                      String?                          @db.VarChar(20)
-  state                                                     String?                          @db.VarChar(50)
-  is_hot_prospect                                           Boolean                          @default(false)
-  hot_prospect_reason                                       String?                          @db.VarChar(255)
-  hot_prospect_set_at                                       DateTime?                        @db.Timestamptz(6)
-  hot_prospect_deprioritized                                Boolean                          @default(false)
-  auto_followup_count                                       Int                              @default(0)
-  campaign_category                                         String                           @default("review_management") @db.VarChar(30)
-  cascade_enabled                                           Boolean                          @default(false)
-  cascade_config                                            Json?                            @db.Json
-  repair_track                                              String?                          @db.VarChar(20)
-  repair_issue_type                                         String?                          @db.VarChar(40)
-  track_decided_at                                          DateTime?                        @db.Timestamptz(6)
+  parent_campaign_id                                        String?                              @db.VarChar(255)
+  last_contacted_at                                         DateTime?                            @db.Timestamptz(6)
+  next_follow_up_at                                         DateTime?                            @db.Timestamptz(6)
+  last_contact_channel                                      String?                              @db.VarChar(20)
+  state                                                     String?                              @db.VarChar(50)
+  is_hot_prospect                                           Boolean                              @default(false)
+  hot_prospect_reason                                       String?                              @db.VarChar(255)
+  hot_prospect_set_at                                       DateTime?                            @db.Timestamptz(6)
+  hot_prospect_deprioritized                                Boolean                              @default(false)
+  auto_followup_count                                       Int                                  @default(0)
+  campaign_category                                         String                               @default("review_management") @db.VarChar(30)
+  cascade_enabled                                           Boolean                              @default(false)
+  cascade_config                                            Json?                                @db.Json
+  repair_track                                              String?                              @db.VarChar(20)
+  repair_issue_type                                         String?                              @db.VarChar(40)
+  track_decided_at                                          DateTime?                            @db.Timestamptz(6)
   track_decision_reason                                     String?
   marketing_revenue                                         marketing_revenue[]
   mkt_audits_list                                           mkt_audits_list[]
+  mkt_campaign_checklist_progress                           mkt_campaign_checklist_progress[]
   mkt_campaign_triage_results                               mkt_campaign_triage_results?
-  tenants_mkt_campaigns_list_demo_tenant_idTotenants        tenants?                         @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
-  parent                                                    mkt_campaigns_list?              @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list", fields: [parent_campaign_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_parent")
-  mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list mkt_campaigns_list[]             @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list")
-  tenants_mkt_campaigns_list_tenant_idTotenants             tenants?                         @relation("mkt_campaigns_list_tenant_idTotenants", fields: [tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_tenant")
+  tenants_mkt_campaigns_list_demo_tenant_idTotenants        tenants?                             @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
+  parent                                                    mkt_campaigns_list?                  @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list", fields: [parent_campaign_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_parent")
+  mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list mkt_campaigns_list[]                 @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list")
+  tenants_mkt_campaigns_list_tenant_idTotenants             tenants?                             @relation("mkt_campaigns_list_tenant_idTotenants", fields: [tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_tenant")
   mkt_deliverable_preview_tokens                            mkt_deliverable_preview_tokens[]
   mkt_deliverable_review_slot                               mkt_deliverable_review_slot[]
   mkt_deliverable_section                                   mkt_deliverable_section[]
@@ -6178,6 +6179,7 @@ model mkt_campaigns_list {
   mkt_outreach_openers_list                                 mkt_outreach_openers_list[]
   mkt_outreach_pitches_list                                 mkt_outreach_pitches_list[]
   mkt_owner_voice_profile                                   mkt_owner_voice_profile?
+  mkt_playbook_checklist_suggestions                        mkt_playbook_checklist_suggestions[]
   mkt_prompt_executions_list                                mkt_prompt_executions_list[]
   mkt_review_response_pipeline                              mkt_review_response_pipeline[]
   mkt_stage_history_list                                    mkt_stage_history_list[]
@@ -6791,26 +6793,28 @@ model mkt_dispute_intake {
 /// Platform-admin scoped (no RLS — same as other mkt_* tables).
 /// Backed by database/migrations/157_mkt_playbook_catalog.sql.
 model mkt_playbook_catalog {
-  id                                   String                        @id @db.VarChar(255)
-  code                                 String                        @unique @db.VarChar(20)
-  name                                 String                        @db.VarChar(255)
-  category                             String                        @db.VarChar(30)
-  archetype                            String                        @db.VarChar(20)
-  archetype_label                      String                        @db.VarChar(40)
+  id                                   String                               @id @db.VarChar(255)
+  code                                 String                               @unique @db.VarChar(20)
+  name                                 String                               @db.VarChar(255)
+  category                             String                               @db.VarChar(30)
+  archetype                            String                               @db.VarChar(20)
+  archetype_label                      String                               @db.VarChar(40)
   description                          String?
-  matching_rules                       Json                          @default("{}")
-  fitd_offer_title                     String                        @db.VarChar(255)
-  fitd_default_fee_cents               Int                           @default(0)
-  retainer_pitch_title                 String                        @db.VarChar(255)
-  retainer_fee_cents                   Int                           @default(0)
-  opener_prompt_template_id            String?                       @db.VarChar(255)
-  preview_deliverable_type             String?                       @db.VarChar(50)
-  is_active                            Boolean                       @default(true)
-  created_at                           DateTime                      @default(now()) @db.Timestamptz(6)
-  updated_at                           DateTime                      @default(now()) @db.Timestamptz(6)
-  priority_rank                        Int                           @default(99)
-  mkt_campaign_triage_results_override mkt_campaign_triage_results[] @relation("mkt_campaign_triage_results_overridden_playbook")
+  matching_rules                       Json                                 @default("{}")
+  fitd_offer_title                     String                               @db.VarChar(255)
+  fitd_default_fee_cents               Int                                  @default(0)
+  retainer_pitch_title                 String                               @db.VarChar(255)
+  retainer_fee_cents                   Int                                  @default(0)
+  opener_prompt_template_id            String?                              @db.VarChar(255)
+  preview_deliverable_type             String?                              @db.VarChar(50)
+  is_active                            Boolean                              @default(true)
+  created_at                           DateTime                             @default(now()) @db.Timestamptz(6)
+  updated_at                           DateTime                             @default(now()) @db.Timestamptz(6)
+  priority_rank                        Int                                  @default(99)
+  mkt_campaign_triage_results_override mkt_campaign_triage_results[]        @relation("mkt_campaign_triage_results_overridden_playbook")
   mkt_campaign_triage_results          mkt_campaign_triage_results[]
+  mkt_playbook_checklist_steps         mkt_playbook_checklist_steps[]
+  mkt_playbook_checklist_suggestions   mkt_playbook_checklist_suggestions[]
 
   @@index([code], map: "idx_mkt_playbook_catalog_code")
   @@index([is_active, priority_rank], map: "idx_mkt_playbook_catalog_active")
@@ -6856,6 +6860,75 @@ model mkt_signal_registry {
 
   @@index([code], map: "idx_mkt_signal_registry_code")
   @@index([family, is_active], map: "idx_mkt_signal_registry_family")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_campaign_checklist_progress {
+  id                           String                       @id @db.VarChar(255)
+  campaign_id                  String                       @db.VarChar(255)
+  step_id                      String                       @db.VarChar(255)
+  completed_at                 DateTime?                    @db.Timestamptz(6)
+  completed_by                 String?                      @db.VarChar(255)
+  note                         String?
+  created_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list           mkt_campaigns_list           @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_checklist_progress_campaign")
+  mkt_playbook_checklist_steps mkt_playbook_checklist_steps @relation(fields: [step_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_checklist_progress_step")
+
+  @@unique([campaign_id, step_id], map: "uq_checklist_progress_campaign_step")
+  @@index([campaign_id], map: "idx_mkt_campaign_checklist_progress_campaign")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_playbook_checklist_steps {
+  id                                 String                               @id @db.VarChar(255)
+  playbook_id                        String                               @db.VarChar(255)
+  step_order                         Int
+  title                              String                               @db.VarChar(255)
+  instructions                       String?
+  step_type                          String                               @default("manual") @db.VarChar(30)
+  action_config                      Json                                 @default("{}")
+  is_required                        Boolean                              @default(true)
+  is_active                          Boolean                              @default(true)
+  created_at                         DateTime                             @default(now()) @db.Timestamptz(6)
+  updated_at                         DateTime                             @default(now()) @db.Timestamptz(6)
+  mkt_campaign_checklist_progress    mkt_campaign_checklist_progress[]
+  mkt_playbook_catalog               mkt_playbook_catalog                 @relation(fields: [playbook_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_checklist_steps_playbook")
+  mkt_playbook_checklist_suggestions mkt_playbook_checklist_suggestions[]
+
+  @@index([playbook_id, is_active], map: "idx_mkt_playbook_checklist_steps_active")
+  @@index([playbook_id, step_order], map: "idx_mkt_playbook_checklist_steps_playbook_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mkt_playbook_checklist_suggestions {
+  id                           String                        @id @db.VarChar(255)
+  playbook_id                  String                        @db.VarChar(255)
+  campaign_id                  String                        @db.VarChar(255)
+  step_id                      String?                       @db.VarChar(255)
+  suggestion_kind              String                        @db.VarChar(20)
+  position                     String?                       @db.VarChar(20)
+  proposed_step                Json
+  rationale                    String
+  status                       String                        @default("pending") @db.VarChar(20)
+  submitted_by                 String                        @db.VarChar(255)
+  reviewed_by                  String?                       @db.VarChar(255)
+  reviewed_at                  DateTime?                     @db.Timestamptz(6)
+  review_note                  String?
+  created_at                   DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                      @default(now()) @db.Timestamptz(6)
+  mkt_campaigns_list           mkt_campaigns_list            @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_checklist_suggestions_campaign")
+  mkt_playbook_catalog         mkt_playbook_catalog          @relation(fields: [playbook_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_checklist_suggestions_playbook")
+  mkt_playbook_checklist_steps mkt_playbook_checklist_steps? @relation(fields: [step_id], references: [id], onUpdate: NoAction, map: "fk_checklist_suggestions_step")
+
+  @@index([campaign_id], map: "idx_mkt_playbook_checklist_suggestions_campaign")
+  @@index([playbook_id, status], map: "idx_mkt_playbook_checklist_suggestions_queue")
+  @@index([step_id], map: "idx_mkt_playbook_checklist_suggestions_step")
 }
 
 enum action {

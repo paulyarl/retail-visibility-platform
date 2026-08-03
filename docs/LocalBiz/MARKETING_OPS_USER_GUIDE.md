@@ -627,6 +627,7 @@ If the Tenant Prospecting Channel is enabled, Marketing Ops becomes a tenant acq
 - **Audits** — `marketing_audits` records (e.g., GBP scores, pain score).
 - **Files** — attached campaign files.
 - **Deliverables** — generate, download, and mark deliverables as sent.
+- **Checklist** — the campaign's playbook operator checklist: step-by-step execution with check-off progress (visible once a playbook is assigned via triage; see §32).
 - **Stage History** — chronological transition log.
 - **Cascade** — multi-channel cascade controls (see §17).
 
@@ -1375,3 +1376,87 @@ The profile repair pipeline (§28) has its own triage system for choosing betwee
 
 - `docs/LocalBiz/marketing_ops_triage_admin_runbook.md` — detailed admin runbook with troubleshooting
 - `docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md` — full sprint plan and architecture
+- §32 — Operator Playbook Checklists (step-by-step execution per playbook)
+
+---
+
+## 32. Operator Playbook Checklists
+
+**Pages:** `/settings/admin/marketing-ops/playbooks` → **Operator Checklist** tab (builder) · Campaign detail → **Checklist** tab (execution)
+
+Playbooks define *what* to do for a campaign; checklists define *how to execute it, step by step*. Each playbook can carry an ordered operator checklist — some playbooks require systematic execution where a missed step (an unchecked listing, an unsent message) silently degrades the outcome. The checklist makes the playbook's operations explicit, and each campaign checks steps off as it progresses.
+
+### Step Types
+
+Steps are heterogeneous — a checklist can mix any of these:
+
+| Type | What the operator does | Optional inline action |
+|------|------------------------|------------------------|
+| **Manual** | Follow the written instructions and check the box | — |
+| **URL Check** | Verify something on a live site (GBP listing, website CTA, directory profile) | **Open site** button |
+| **AI Prompt** | Run a specific prompt template for the campaign | **Run prompt** — jumps to the Prompts tab with the template preselected |
+| **Deliverable** | Create/send a deliverable of a given type | **Open deliverables** — jumps to the Deliverables tab |
+| **Outreach** | Send a message on a given channel and log it | **Log outreach** — jumps to the outreach logger |
+| **Credentials** | Retrieve credentials needed for the task | Shows a **reference label** (e.g. "1Password › LocalBiz › GBP vault") with a copy button. The checklist stores *where the credentials live*, never the credentials themselves |
+
+Inline actions are conveniences, not requirements — every step can be completed by hand and checked off.
+
+### Building a Checklist (Playbooks Page → Operator Checklist Tab)
+
+1. Select a playbook from the dropdown. Its **operations overview** appears: code, name, category, archetype, FITD offer, retainer pitch, and description — full playbook context without leaving the tab.
+2. Add steps with **Add Step**: title (short imperative, e.g. "Verify GBP listing is claimed"), instructions (what to check, what "done" looks like), step type, type-specific config, and whether the step is **required**.
+3. Reorder steps with the up/down arrows (same pattern as playbook priority ranking).
+4. Deactivate steps rather than deleting them once campaigns have checked them off — deletion is blocked when progress exists, to preserve the audit trail.
+
+### Executing a Checklist (Campaign Detail → Checklist Tab)
+
+When a campaign has an effective playbook — triage **accepted** or **overridden** (§31) — the **Checklist** tab appears with that playbook's steps:
+
+- **Header:** playbook chip (code, name, category), an "Overridden from PB-XX" indicator when the operator overrode the recommendation, and a progress bar (`x / y steps`, with a required-steps sub-count). The tab badge shows remaining required steps.
+- **Steps:** checkbox, order number, type badge, title, expandable instructions, and the inline action button for the step type. Checking a step records who completed it and when; an optional note captures evidence (a link, a result summary). Unchecking reopens the step while keeping the audit trail.
+- **Empty states:** no triage decision yet → "run Intelligent Triage above to assign a playbook"; playbook has no steps → deep-link to the builder tab to define them.
+
+### Soft Gate on Stage Transitions
+
+Advancing a campaign's stage with **incomplete required steps** triggers a warning dialog listing the missing steps:
+
+- **Go to Checklist** — jump to the Checklist tab and finish the work.
+- **Continue anyway** — proceed with the transition; the acknowledgment is recorded in the stage history.
+
+The gate never hard-blocks. Optional steps never trigger it, and campaigns without an effective playbook (or whose playbook has no required steps) are unaffected.
+
+### Suggesting Improvements (Operator Feedback Loop)
+
+Checklists are governed, but not rigid. Operators executing checklist-aware campaigns are the ones who discover efficiencies in the field — a verification step that's missing, a better URL to check, a step that's redundant. The suggestion loop turns those discoveries into playbook improvements:
+
+**From a campaign (suggest):**
+
+1. On any step in the Checklist tab, click **Suggest improvement** and choose:
+   - **Add a step** — tagged *before this step*, *after this step*, or *instead of this step (supersede)*. Fill in the proposed title, instructions, type, and config.
+   - **Change this step** — edit a pre-filled copy of the step; only your changes are submitted.
+   - **Remove this step** — explain why it's unnecessary.
+   - Or use **Suggest a step** at the bottom of the list for a general addition at the end of the playbook.
+2. **Rationale is required** — "What did you discover?" A suggestion without the *why* can't be reviewed.
+3. Submit. Your suggestion appears in the tab with a **pending** status chip, so you know it's in the queue.
+
+**On the playbook's Operator Checklist tab (review):**
+
+- A **review queue** panel (with a pending-count badge) lists suggestions for the selected playbook. Each card shows the proposal, the anchor step it's tagged against ("after step 3"), your rationale, and a link to the campaign where you discovered it. Modification suggestions render as a field-by-field diff against the step's current values.
+- An **admin accepts** (optionally amending the proposal first — tightening a title, fixing a URL) or **rejects** with a reason.
+  - *Accept — add*: the step is inserted at the tagged position.
+  - *Accept — supersede*: the new step takes the old step's place; the old step is deactivated, never deleted, so campaign history stays intact.
+  - *Accept — change/remove*: the patch is applied / the step is deactivated.
+  - If the step changed since the suggestion was submitted, the reviewer is warned to re-review rather than applying blindly.
+
+**Closing the loop:** you see the outcome on your suggestion — **accepted** (and every future campaign on that playbook inherits your improvement) or **rejected** with the reviewer's reason, which helps calibrate future suggestions.
+
+Operators can't edit playbook templates directly from a campaign — suggestions are the write path. This keeps every playbook improvement reviewed while making the operator's field experience the primary driver of playbook quality.
+
+### Relationship to the Triage Engine
+
+The checklist **follows the triage decision**: whichever playbook is effective for the campaign (recommended-and-accepted, or overridden) supplies the checklist. Overriding to a different playbook swaps the checklist; progress on the previous playbook's steps is retained for audit and restored if the operator overrides back.
+
+### See Also
+
+- `docs/LocalBiz/marketing_ops_operator_checklist_sprint_plan.md` — full sprint plan: data model, API, UI, soft-gate mechanics, testing
+- §31 — Intelligent Playbook Catalog & Triage Engine (how campaigns get their playbook)

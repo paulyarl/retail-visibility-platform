@@ -1904,3 +1904,33 @@ export function generateDisputeToken(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 32);
   return nanoid();
 }
+
+// ─── Playbook Checklists (Operator Checklist Sprint) ──────────────────────
+// Global IDs (admin-scoped, no tenant key) — matches the Marketing Ops family.
+
+/**
+ * Generate playbook checklist step ID (template row)
+ * Format: pbcs-{nanoid} (13 chars)
+ */
+export function generatePlaybookChecklistStepId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pbcs-${nanoid()}`;
+}
+
+/**
+ * Generate campaign checklist progress ID (per-campaign check-off row)
+ * Format: cckp-{nanoid} (13 chars)
+ */
+export function generateCampaignChecklistProgressId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `cckp-${nanoid()}`;
+}
+
+/**
+ * Generate playbook checklist suggestion ID (operator feedback queue row)
+ * Format: pbsg-{nanoid} (13 chars)
+ */
+export function generatePlaybookChecklistSuggestionId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pbsg-${nanoid()}`;
+}

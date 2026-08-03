@@ -903,6 +903,13 @@ export interface StageTransitionInput {
   to_stage: CampaignStage;
   notes?: string;
   trigger_type?: 'manual' | 'automated' | 'system';
+  acknowledge_incomplete?: boolean;
+}
+
+export interface ChecklistIncompleteError {
+  code: 'checklist_incomplete';
+  incompleteSteps: { id: string; title: string }[];
+  message: string;
 }
 
 export interface ContactReadiness {
@@ -1220,6 +1227,16 @@ class MarketingOpsService extends AdminApiSingleton {
       0,
     );
     if (!result.success) {
+      // Surface the checklist_incomplete 409 payload so the UI can show the soft-gate dialog.
+      const err = result as any;
+      if (err?.error === 'checklist_incomplete' && Array.isArray(err?.incomplete_steps)) {
+        const checklistErr: ChecklistIncompleteError & { message: string } = {
+          code: 'checklist_incomplete',
+          incompleteSteps: err.incomplete_steps,
+          message: 'Required checklist steps are incomplete',
+        };
+        throw checklistErr;
+      }
       throw new Error(typeof result.error === 'string' ? result.error : 'Failed to transition stage');
     }
     await this.invalidateCachePattern('mkt-ops-campaign');
@@ -3403,6 +3420,185 @@ class MarketingOpsService extends AdminApiSingleton {
     });
     if (!res.ok) throw new Error(`Failed to delete signal (${res.status})`);
   }
+
+  // ─── Playbook checklist CRUD (Operator Checklist Sprint) ──────────────
+
+  async listChecklistSteps(playbookId: string, includeInactive = false): Promise<PlaybookChecklistStep[]> {
+    const qs = includeInactive ? '?include_inactive=true' : '';
+    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist${qs}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to list checklist steps (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  async createChecklistStep(playbookId: string, input: ChecklistStepInput): Promise<PlaybookChecklistStep> {
+    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        title: input.title,
+        instructions: input.instructions,
+        step_type: input.stepType,
+        action_config: input.actionConfig,
+        is_required: input.isRequired,
+        is_active: input.isActive,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to create checklist step (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async updateChecklistStep(id: string, input: Partial<ChecklistStepInput> & { stepOrder?: number }): Promise<PlaybookChecklistStep> {
+    const res = await fetch(`${BASE_URL}/checklist-steps/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        title: input.title,
+        instructions: input.instructions,
+        step_type: input.stepType,
+        action_config: input.actionConfig,
+        is_required: input.isRequired,
+        is_active: input.isActive,
+        step_order: input.stepOrder,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || `Failed to update checklist step (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async deleteChecklistStep(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/checklist-steps/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || body?.error || `Failed to delete checklist step (${res.status})`);
+    }
+  }
+
+  async reorderChecklistSteps(playbookId: string, rankings: { id: string; step_order: number }[]): Promise<PlaybookChecklistStep[]> {
+    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ rankings }),
+    });
+    if (!res.ok) throw new Error(`Failed to reorder checklist steps (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  // ─── Campaign checklist (resolved view + progress toggle) ────────────
+
+  async getCampaignChecklist(campaignId: string): Promise<CampaignChecklistView> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/checklist`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to get campaign checklist (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  async setChecklistStepProgress(campaignId: string, stepId: string, input: { completed: boolean; note?: string | null }): Promise<CampaignChecklistView> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/checklist/${stepId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || body?.error || `Failed to toggle checklist step (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  // ─── Checklist suggestions (operator feedback loop) ───────────────────
+
+  async submitChecklistSuggestion(campaignId: string, input: ChecklistSuggestionInput): Promise<PlaybookChecklistSuggestion> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/checklist/suggestions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        step_id: input.stepId,
+        suggestion_kind: input.suggestionKind,
+        position: input.position,
+        proposed_step: input.proposedStep,
+        rationale: input.rationale,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || body?.error || `Failed to submit suggestion (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async listCampaignChecklistSuggestions(campaignId: string): Promise<PlaybookChecklistSuggestion[]> {
+    const res = await fetch(`${BASE_URL}/${campaignId}/checklist/suggestions`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to list campaign suggestions (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  async listPlaybookChecklistSuggestions(playbookId: string, status?: 'pending' | 'accepted' | 'rejected'): Promise<PlaybookChecklistSuggestion[]> {
+    const qs = status ? `?status=${status}` : '';
+    const res = await fetch(`${BASE_URL}/playbooks/${playbookId}/checklist/suggestions${qs}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Failed to list playbook suggestions (${res.status})`);
+    const json = await res.json();
+    return json.data;
+  }
+
+  async acceptChecklistSuggestion(id: string, amendedStep?: Record<string, any>): Promise<PlaybookChecklistSuggestion> {
+    const res = await fetch(`${BASE_URL}/checklist-suggestions/${id}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ proposed_step: amendedStep }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || body?.error || `Failed to accept suggestion (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
+  async rejectChecklistSuggestion(id: string, reviewNote?: string): Promise<PlaybookChecklistSuggestion> {
+    const res = await fetch(`${BASE_URL}/checklist-suggestions/${id}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ review_note: reviewNote }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || body?.error || `Failed to reject suggestion (${res.status})`);
+    }
+    const json = await res.json();
+    return json.data;
+  }
 }
 
 export interface CascadeStatus {
@@ -3673,4 +3869,86 @@ export interface PlaybookCreateInput {
   opener_prompt_template_id?: string;
   preview_deliverable_type?: string;
   is_active?: boolean;
+}
+
+// ─── Playbook checklist types (Operator Checklist Sprint) ────────────────
+
+export const CHECKLIST_STEP_TYPES = ['manual', 'url_check', 'ai_prompt', 'deliverable', 'outreach', 'credentials'] as const;
+export type ChecklistStepType = (typeof CHECKLIST_STEP_TYPES)[number];
+
+export const SUGGESTION_KINDS = ['add', 'modify', 'remove'] as const;
+export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
+
+export const SUGGESTION_POSITIONS = ['before', 'after', 'supersede'] as const;
+export type SuggestionPosition = (typeof SUGGESTION_POSITIONS)[number];
+
+export interface ChecklistStepInput {
+  title: string;
+  instructions?: string;
+  stepType: ChecklistStepType;
+  actionConfig?: Record<string, any>;
+  isRequired?: boolean;
+  isActive?: boolean;
+}
+
+export interface PlaybookChecklistStep {
+  id: string;
+  playbookId: string;
+  stepOrder: number;
+  title: string;
+  instructions: string | null;
+  stepType: ChecklistStepType;
+  actionConfig: Record<string, any>;
+  isRequired: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChecklistStepView extends PlaybookChecklistStep {
+  progress: {
+    completedAt: string | null;
+    completedBy: string | null;
+    note: string | null;
+  } | null;
+}
+
+export interface CampaignChecklistView {
+  playbook: {
+    id: string;
+    code: string;
+    name: string;
+    category: string;
+    isOverride: boolean;
+  } | null;
+  steps: ChecklistStepView[];
+  completedCount: number;
+  requiredTotal: number;
+  requiredCompleted: number;
+}
+
+export interface ChecklistSuggestionInput {
+  stepId?: string | null;
+  suggestionKind: SuggestionKind;
+  position?: SuggestionPosition | null;
+  proposedStep: Record<string, any>;
+  rationale: string;
+}
+
+export interface PlaybookChecklistSuggestion {
+  id: string;
+  playbookId: string;
+  campaignId: string;
+  stepId: string | null;
+  suggestionKind: SuggestionKind;
+  position: SuggestionPosition | null;
+  proposedStep: Record<string, any>;
+  rationale: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  submittedBy: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

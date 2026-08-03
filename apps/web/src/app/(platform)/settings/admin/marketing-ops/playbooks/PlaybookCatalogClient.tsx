@@ -20,6 +20,7 @@ import marketingOpsService, {
   type SignalRegistryEntry,
 } from '@/services/MarketingOpsService';
 import RuleBuilder from './RuleBuilder';
+import ChecklistBuilderTab from './ChecklistBuilderTab';
 
 const ARCHETYPES = ['A1', 'A2', 'A3', 'A4', 'A5'];
 const CATEGORIES = ['review_management', 'recovery_management', 'triage_management'];
@@ -72,7 +73,7 @@ const emptyPlaybookForm = (): PlaybookCreateInput => ({
 });
 
 export default function PlaybookCatalogClient() {
-  const [tab, setTab] = useState<'playbooks' | 'signals'>('playbooks');
+  const [tab, setTab] = useState<'playbooks' | 'signals' | 'checklist'>('playbooks');
   const [playbooks, setPlaybooks] = useState<PlaybookCatalogEntry[]>([]);
   const [signals, setSignals] = useState<SignalRegistryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,6 +266,16 @@ export default function PlaybookCatalogClient() {
         >
           Signal Registry ({signals.length})
         </button>
+        <button
+          onClick={() => setTab('checklist')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 ${
+            tab === 'checklist'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          Checklist Builder
+        </button>
       </div>
 
       {/* Status messages */}
@@ -444,7 +455,7 @@ export default function PlaybookCatalogClient() {
             </div>
           )}
         </div>
-      ) : (
+      ) : tab === 'signals' ? (
         /* ─── Signals tab ─── */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -543,6 +554,13 @@ export default function PlaybookCatalogClient() {
             </div>
           )}
         </div>
+      ) : (
+        /* ─── Checklist builder tab ─── */
+        <ChecklistBuilderTab
+          playbooks={playbooks}
+          onError={setError}
+          onSuccess={setSuccess}
+        />
       )}
     </div>
   );

@@ -105,6 +105,12 @@ Some IDs are **global** (not tenant-scoped) and omit the tenant key:
 | `generateDeliverableId()` | `mdlv-{nanoid}` | Marketing deliverables |
 | `generateBrandingConfigId()` | `mbcfg-{nanoid}` | Marketing branding configs |
 | `generatePreviewTokenId()` | `mdpt-{nanoid}` | Marketing deliverable preview tokens |
+| `generatePlaybookCatalogId()` | `pbk-{nanoid}` | Marketing playbook catalog entries |
+| `generateCampaignTriageId()` | `trg-{nanoid}` | Marketing campaign triage results |
+| `generateSignalRegistryId()` | `sig-{nanoid}` | Marketing signal registry entries |
+| `generatePlaybookChecklistStepId()` | `pbcs-{nanoid}` | Playbook checklist step templates |
+| `generateCampaignChecklistProgressId()` | `cckp-{nanoid}` | Per-campaign checklist check-off progress |
+| `generatePlaybookChecklistSuggestionId()` | `pbsg-{nanoid}` | Operator suggestion feedback queue rows |
 
 ### Multi-Entity Correlation IDs
 
@@ -250,6 +256,21 @@ Added during Marketing Ops Sprint 1. These are global (no tenant key) because ma
 | `generateDisputeIntakeId()` | `mdint` | `mdint-{nanoid}` | Recovery dispute intake records |
 | `generateDisputeAttachmentId()` | `mdatt` | `mdatt-{nanoid}` | Recovery dispute attachments |
 | `generateDisputeToken()` | — | `{32-char nanoid}` | Recovery intake magic-link token (URL-safe, no prefix — mirrors `generatePreviewToken()`) |
+| `generatePlaybookCatalogId()` | `pbk` | `pbk-{nanoid}` | Marketing playbook catalog entries (Sprint 2A) |
+| `generateCampaignTriageId()` | `trg` | `trg-{nanoid}` | Marketing campaign triage results (Sprint 2A) |
+| `generateSignalRegistryId()` | `sig` | `sig-{nanoid}` | Marketing signal registry entries (Sprint 3) |
+| `generateOutreachLogId()` | `mol` | `mol-{nanoid(12)}` | Marketing outreach log entries (Sprint 2B) |
+| `generateReviewResponsePipelineId()` | `mrrp` | `mrrp-{nanoid(12)}` | Review response pipeline rows (Sprint 2B) |
+| `generateReviewResponseLogId()` | `mrrl` | `mrrl-{nanoid(12)}` | Review response log entries (Sprint 2B) |
+| `generateOutreachOpenerId()` | `mop` | `mop-{nanoid}` | Outreach opener templates (Sprint 2B) |
+| `generateOutreachHeaderId()` | `moh` | `moh-{nanoid}` | Outreach header templates (Sprint 2B) |
+| `generateOutreachCloserId()` | `moc` | `moc-{nanoid}` | Outreach closer templates (Sprint 2B) |
+| `generateOutreachContactId()` | `mct` | `mct-{nanoid}` | Outreach contact rows (Sprint 2B) |
+| `generateOutreachPitchId()` | `mptc` | `mptc-{nanoid}` | Outreach pitch templates (Sprint 2B) |
+| `generateOwnerVoiceProfileId()` | `movp` | `movp-{nanoid}` | Owner voice profile rows (Sprint 2B) |
+| `generatePlaybookChecklistStepId()` | `pbcs` | `pbcs-{nanoid}` | Playbook checklist step templates (Operator Checklist Sprint) |
+| `generateCampaignChecklistProgressId()` | `cckp` | `cckp-{nanoid}` | Per-campaign checklist check-off progress (Operator Checklist Sprint) |
+| `generatePlaybookChecklistSuggestionId()` | `pbsg` | `pbsg-{nanoid}` | Operator suggestion feedback queue rows (Operator Checklist Sprint) |
 
 ---
 
