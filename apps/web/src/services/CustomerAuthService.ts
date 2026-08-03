@@ -61,6 +61,23 @@ class CustomerAuthService extends CustomerApiSingleton {
   }
 
   /**
+   * Apply external auth result — persists JWT tokens + customer from an
+   * auth flow that didn't go through register/login/oauthLogin (e.g. the
+   * Marketing Ops claim endpoints, which return tokens + customer directly).
+   *
+   * Mirrors the post-success block in register/login/oauthLogin: stores the
+   * access token in localStorage, sets the in-memory customer, and registers
+   * the customer context for downstream authenticated requests.
+   */
+  applyExternalAuth(customer: Customer, tokens?: { accessToken: string; refreshToken: string }): void {
+    this.customer = customer;
+    if (tokens?.accessToken) {
+      this.setToken(tokens.accessToken);
+    }
+    this.setCurrentCustomer(customer.id, customer);
+  }
+
+  /**
    * Get stored token from localStorage
    */
   private getToken(): string | null {
