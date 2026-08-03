@@ -91,7 +91,7 @@ export default function MarketingOpsNavPanel({ counts }: MarketingOpsNavPanelPro
             item.label === 'Deliverable Templates' ? 'deliverableTemplates' :
             undefined
           ) as keyof NonNullable<typeof counts> | undefined;
-          const count = countKey ? counts?.[countKey] : (item.label === 'Queue' ? queuedCount : undefined);
+          const count = countKey ? counts?.[countKey] : (item.label === 'Queue' ? queuedCount ?? undefined : undefined);
 
           return (
             <NavLink

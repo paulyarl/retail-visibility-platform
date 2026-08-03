@@ -81,7 +81,9 @@ export default function ProspectQueueWidget() {
                   </span>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {entry.priority === 'high' && (
-                      <Flame className="h-3 w-3 text-red-500" title="High priority" />
+                      <span title="High priority">
+                        <Flame className="h-3 w-3 text-red-500" />
+                      </span>
                     )}
                     {signals.length > 0 && (
                       <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
