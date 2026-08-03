@@ -12,6 +12,7 @@ import {
   Select,
   TextInput,
   Alert,
+  Anchor,
   Group,
   Stack,
   Divider,
@@ -477,7 +478,14 @@ export default function IntakePageClient() {
                           key={att.attachmentId}
                           icon={<IconFile size={16} />}
                         >
-                          <Text size="sm">{att.fileName} ({att.fileType}, {(att.fileSize / 1024).toFixed(0)}KB)</Text>
+                          <Anchor
+                            size="sm"
+                            href={`/api/public/recovery/intake/attachments/${att.attachmentId}?token=${encodeURIComponent(token || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {att.fileName} ({att.fileType}, {(att.fileSize / 1024).toFixed(0)}KB)
+                          </Anchor>
                         </List.Item>
                       ))}
                     </List>
@@ -542,7 +550,14 @@ export default function IntakePageClient() {
                           key={att.attachmentId}
                           icon={<IconFile size={16} />}
                         >
-                          <Text size="sm">{att.fileName} ({att.fileType}, {(att.fileSize / 1024).toFixed(0)}KB)</Text>
+                          <Anchor
+                            size="sm"
+                            href={`/api/public/recovery/intake/attachments/${att.attachmentId}?token=${encodeURIComponent(token || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {att.fileName} ({att.fileType}, {(att.fileSize / 1024).toFixed(0)}KB)
+                          </Anchor>
                         </List.Item>
                       ))}
                     </List>

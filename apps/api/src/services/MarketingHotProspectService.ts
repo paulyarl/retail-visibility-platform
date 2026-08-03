@@ -20,6 +20,7 @@ import type { RequestCtx } from '../context';
 import { NotFoundError } from '../middleware/errorHandler';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { generateMarketingAuditId, generateCampaignId } from '../lib/id-generator';
+import CampaignTriageService from './CampaignTriageService';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ interface BusinessJson {
   ownership_type?: string;
   address?: string | null;
   business_phone?: string | null;
+  detected_signals?: string[];
   platforms?: {
     google?: {
       profile_status?: string;
@@ -760,6 +762,43 @@ export class MarketingHotProspectService extends BaseService {
       logger.info('deriveBusinessCampaignFromScanBusiness: created child campaign', ctx, {
         parentId, campaignId, businessName, isHot,
       });
+
+      // If the scan business has detected_signals, create a business_analysis
+      // audit with them and auto-trigger triage — the "spawn pre-triaged"
+      // flow. The city_analysis audit above preserves the full business JSON;
+      // this business_analysis audit is what the triage extractor reads.
+      if (business.detected_signals && business.detected_signals.length > 0) {
+        const triageAuditId = generateMarketingAuditId();
+        await this.prisma.mkt_audits_list.create({
+          data: {
+            id: triageAuditId,
+            campaign_id: campaignId,
+            platform: 'business_analysis',
+            audit_data: {
+              audit_metadata: {
+                business_name: businessName,
+                source: 'derived_from_city_scan',
+                parent_campaign_id: parentId,
+              },
+              detected_signals: business.detected_signals,
+              summary: `Derived from city scan with ${business.detected_signals.length} detected signals.`,
+            } as any,
+          },
+        });
+
+        try {
+          const triageResult = await CampaignTriageService.evaluateTriageForCampaign({
+            campaignId,
+          }, ctx);
+          logger.info('Auto-triage completed for scan-derived campaign', ctx, {
+            campaignId, playbookCode: triageResult.recommendedPlaybook.code,
+          });
+        } catch (triageError) {
+          logger.warn('Auto-triage failed for scan-derived campaign (non-fatal)', ctx, {
+            campaignId, error: (triageError as Error).message,
+          });
+        }
+      }
 
       return { campaign, created: true };
     } catch (error) {

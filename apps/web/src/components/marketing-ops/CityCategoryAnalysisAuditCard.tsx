@@ -30,6 +30,7 @@ interface SampledBusiness {
   address?: string;
   phone?: string | null;
   website?: string | null;
+  detected_signals?: string[];
   nap_status?: string;
   data_confidence?: string;
   google?: {
@@ -55,6 +56,7 @@ interface TopCompetitor {
   ownership_type?: string;
   address?: string;
   website?: string | null;
+  detected_signals?: string[];
   google?: {
     rating?: number | null;
     review_count?: number | null;
@@ -168,6 +170,7 @@ export default function CityCategoryAnalysisAuditCard({
         rating: b.google?.rating ?? undefined,
         review_count: b.google?.review_count ?? undefined,
         location: b.address ?? undefined,
+        detected_signals: b.detected_signals,
       });
       router.push(`/settings/admin/marketing-ops/campaigns/${child.id}`);
     } catch (err: any) {
@@ -315,51 +318,102 @@ export default function CityCategoryAnalysisAuditCard({
         </div>
       )}
 
-      {/* Sampled businesses with spawn buttons */}
+      {/* Sampled businesses with spawn buttons — sorted by signal count (priority) */}
       {sampled.length > 0 && (
         <div className="mb-4">
           <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
             Sampled businesses ({sampled.length})
+            {sampled.some((b) => (b.detected_signals?.length ?? 0) > 0) && (
+              <span className="ml-2 text-[10px] text-gray-400">sorted by signal count</span>
+            )}
           </p>
           <div className="space-y-1">
-            {sampled.map((b, i) => (
-              <div key={i} className="flex items-center justify-between text-xs bg-white dark:bg-neutral-800 rounded px-2 py-1.5 border border-gray-200 dark:border-neutral-700">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900 dark:text-white truncate">{b.business_name}</span>
-                    {b.google?.rating != null && (
-                      <span className="text-gray-500 dark:text-gray-400 flex items-center gap-0.5 flex-shrink-0">
-                        <Star className="w-3 h-3 text-amber-400" />
-                        {Number(b.google.rating).toFixed(1)}
-                      </span>
-                    )}
-                    {b.google?.review_count != null && (
-                      <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">{b.google.review_count} reviews</span>
-                    )}
+            {[...sampled]
+              .map((b, originalIdx) => ({ b, originalIdx }))
+              .sort((a, z) => (z.b.detected_signals?.length ?? 0) - (a.b.detected_signals?.length ?? 0))
+              .map(({ b, originalIdx }, displayIdx) => {
+                const signals = b.detected_signals ?? [];
+                const hasCrisis = signals.includes('RA_BBB_GRADE_SUPPRESSION') || signals.includes('RA_UNANSWERED_COMPLAINTS');
+                return (
+                  <div
+                    key={originalIdx}
+                    className={`flex items-center justify-between text-xs bg-white dark:bg-neutral-800 rounded px-2 py-1.5 border ${
+                      hasCrisis
+                        ? 'border-red-300 dark:border-red-800'
+                        : signals.length > 0
+                          ? 'border-amber-200 dark:border-amber-800'
+                          : 'border-gray-200 dark:border-neutral-700'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-white truncate">{b.business_name}</span>
+                        {b.google?.rating != null && (
+                          <span className="text-gray-500 dark:text-gray-400 flex items-center gap-0.5 flex-shrink-0">
+                            <Star className="w-3 h-3 text-amber-400" />
+                            {Number(b.google.rating).toFixed(1)}
+                          </span>
+                        )}
+                        {b.google?.review_count != null && (
+                          <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">{b.google.review_count} reviews</span>
+                        )}
+                        {signals.length > 0 && (
+                          <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                            hasCrisis
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                          }`}>
+                            {signals.length} signal{signals.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-gray-500 dark:text-gray-400">
+                        {b.address && (
+                          <span className="flex items-center gap-0.5 truncate">
+                            <MapPin className="w-3 h-3" />
+                            {b.address}
+                          </span>
+                        )}
+                        {b.nap_status && b.nap_status !== 'consistent' && (
+                          <span className="text-amber-600 dark:text-amber-400">NAP: {b.nap_status.replace(/_/g, ' ')}</span>
+                        )}
+                      </div>
+                      {signals.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {signals.map((code) => {
+                            const family = code.split('_')[0];
+                            const familyColors: Record<string, string> = {
+                              RA: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+                              DS: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+                              WC: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+                              CP: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+                              VP: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+                            };
+                            return (
+                              <span
+                                key={code}
+                                className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-mono font-medium ${familyColors[family] ?? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                                title={code}
+                              >
+                                {code}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleDeriveFromSampled(originalIdx)}
+                      disabled={derivingIdx !== null}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900/40 disabled:opacity-50 flex-shrink-0 ml-2"
+                      title={`Create a business-scope campaign for ${b.business_name}${signals.length > 0 ? ` (auto-triaged with ${signals.length} signals)` : ''}`}
+                    >
+                      {derivingIdx === originalIdx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                      Campaign
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-gray-500 dark:text-gray-400">
-                    {b.address && (
-                      <span className="flex items-center gap-0.5 truncate">
-                        <MapPin className="w-3 h-3" />
-                        {b.address}
-                      </span>
-                    )}
-                    {b.nap_status && b.nap_status !== 'consistent' && (
-                      <span className="text-amber-600 dark:text-amber-400">NAP: {b.nap_status.replace(/_/g, ' ')}</span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleDeriveFromSampled(i)}
-                  disabled={derivingIdx !== null}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900/40 disabled:opacity-50 flex-shrink-0 ml-2"
-                  title={`Create a business-scope campaign for ${b.business_name}`}
-                >
-                  {derivingIdx === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  Campaign
-                </button>
-              </div>
-            ))}
+                );
+              })}
           </div>
         </div>
       )}

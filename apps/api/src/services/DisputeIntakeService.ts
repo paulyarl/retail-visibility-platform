@@ -482,6 +482,57 @@ export class DisputeIntakeService extends BaseService {
   }
 
   // ====================
+  // DOWNLOAD ATTACHMENT (ADMIN) — no intake token, relies on platform-admin auth
+  // ====================
+
+  async downloadAttachmentByCampaign(
+    campaignId: string,
+    attachmentId: string,
+    ctx?: RequestCtx,
+  ): Promise<{ buffer: Buffer; fileName: string; fileType: string } | null> {
+    try {
+      const record = await this.repo.findByCampaign(campaignId, ctx);
+      if (!record) return null;
+
+      const attachments = await this.repo.listAttachments(record.id, ctx);
+      const attachment = attachments.find((a: any) => a.id === attachmentId);
+      if (!attachment) return null;
+
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = unifiedConfig.supabaseUrl;
+      const supabaseKey = unifiedConfig.supabaseServiceRoleKey;
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Storage backend not configured');
+      }
+
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { StorageBuckets } = await import('../storage-config');
+
+      const { data, error: downloadError } = await supabase.storage
+        .from(StorageBuckets.DISPUTES.name)
+        .download(attachment.file_url);
+
+      if (downloadError || !data) {
+        throw new Error(`Storage download failed: ${downloadError?.message || 'no data'}`);
+      }
+
+      const buffer = Buffer.from(await data.arrayBuffer());
+      return {
+        buffer,
+        fileName: attachment.file_name,
+        fileType: attachment.file_type,
+      };
+    } catch (error) {
+      logger.error('Failed to download dispute attachment (admin)', ctx, {
+        error: (error as Error).message,
+        campaignId,
+        attachmentId,
+      });
+      throw this.handleError(error, ctx);
+    }
+  }
+
+  // ====================
   // HELPERS
   // ====================
 

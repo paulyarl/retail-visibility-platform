@@ -25,6 +25,9 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
   const [importError, setImportError] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [reissuing, setReissuing] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState<{
     deliveryLog: {
@@ -148,6 +151,53 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
       setActionMessage({ type: 'error', text: err.message || 'Failed to copy prompt' });
     } finally {
       setCopying(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachmentId: string, fileName: string) => {
+    setDownloadingAttachmentId(attachmentId);
+    setActionMessage(null);
+    try {
+      await recoveryOpsService.downloadAttachment(campaignId, attachmentId, fileName);
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to download attachment' });
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  };
+
+  const buildIntakeUrl = (token: string) =>
+    `${typeof window !== 'undefined' ? window.location.origin : ''}/recovery/intake?token=${encodeURIComponent(token)}`;
+
+  const handleCopyIntakeLink = async () => {
+    if (!intake?.access_token) return;
+    setActionMessage(null);
+    try {
+      await navigator.clipboard.writeText(buildIntakeUrl(intake.access_token));
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to copy link' });
+    }
+  };
+
+  const handleReissueLink = async () => {
+    setReissuing(true);
+    setActionMessage(null);
+    try {
+      const result = await recoveryOpsService.reissueLink(campaignId);
+      // Update local intake state so the new token is reflected immediately.
+      if (intake) {
+        setIntake({ ...intake, access_token: result.token, expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() });
+      }
+      await navigator.clipboard.writeText(result.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      setActionMessage({ type: 'success', text: 'New intake link minted and copied to clipboard.' });
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to reissue link' });
+    } finally {
+      setReissuing(false);
     }
   };
 
@@ -292,6 +342,35 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
             {intake ? (
               <div className="space-y-3">
                 <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Intake Link</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <code className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-neutral-700 px-2 py-1 rounded truncate max-w-[200px]">
+                      {intake.access_token ? buildIntakeUrl(intake.access_token) : '—'}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyIntakeLink}
+                      disabled={!intake.access_token}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                    >
+                      <Copy className="w-3 h-3" />
+                      {linkCopied ? 'Copied!' : 'Copy link'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReissueLink}
+                      disabled={reissuing}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {reissuing ? 'Minting…' : 'Reissue link'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Expires {new Date(intake.expires_at).toLocaleString()}
+                    {intake.submitted_at && ' · already submitted'}
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Owner Statement</p>
                   <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{intake.owner_statement}</p>
                 </div>
@@ -382,7 +461,17 @@ export default function RecoveryDetailClient({ campaignId }: { campaignId: strin
                       <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       <span className="text-gray-700 dark:text-gray-300 truncate">{a.file_name}</span>
                     </div>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 uppercase">{a.file_type}</span>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 uppercase">{a.file_type}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadAttachment(a.id, a.file_name)}
+                        disabled={downloadingAttachmentId === a.id}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {downloadingAttachmentId === a.id ? 'Downloading…' : 'Download'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

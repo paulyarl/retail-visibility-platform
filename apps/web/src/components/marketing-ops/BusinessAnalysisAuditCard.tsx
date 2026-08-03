@@ -195,6 +195,36 @@ export default function BusinessAnalysisAuditCard({ audit, campaignId, onSynced 
       )}
 
       <div className="px-4 pb-4">
+        {/* Detected Signals (Triage Engine Mapping) */}
+        {Array.isArray(d.detected_signals) && d.detected_signals.length > 0 && (
+          <Section title={`Detected Signals (${d.detected_signals.length})`}>
+            <div className="flex flex-wrap gap-1.5">
+              {d.detected_signals.map((code: string) => {
+                const family = code.split('_')[0];
+                const familyColors: Record<string, string> = {
+                  RA: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+                  DS: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+                  WC: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+                  CP: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+                  VP: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+                };
+                return (
+                  <span
+                    key={code}
+                    className={`inline-block rounded px-2 py-0.5 text-[10px] font-mono font-medium ${familyColors[family] ?? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    title={code}
+                  >
+                    {code}
+                  </span>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[10px] text-gray-400">
+              These signals feed the triage engine to auto-assign a playbook, archetype, and FITD offer.
+            </p>
+          </Section>
+        )}
+
         {/* 2. Summary */}
         {d.summary && (
           <Section title="Summary">

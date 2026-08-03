@@ -65,7 +65,20 @@ export interface A4Fields extends CommonFields {
   conversion_opportunities: string[];
 }
 
-export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields;
+export type ArchetypeFields = A1Fields | A2Fields | A3Fields | A4Fields | A5Fields;
+
+/**
+ * A5: Dual-Signal Footprint Triage. Combines repair (NAP/URL) and review-gap
+ * context without stacking stats. Populated by Sprint 6; the field shape is
+ * defined here so the dispatcher is exhaustive and the triage engine can
+ * reference it.
+ */
+export interface A5Fields extends CommonFields {
+  repair_signals: string[];              // ['nap_inconsistent', 'dead_url', 'url_mismatch']
+  days_since_last_review: number;
+  unaddressed_review_count: number;
+  platforms_with_listings: string[];
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -166,6 +179,37 @@ export function extractA4Fields(
   };
 }
 
+/**
+ * A5: Dual-Signal Footprint Triage. Combines repair-signal identifiers with
+ * review-gap counts. Deliberately does NOT stack stats — the opener leads
+ * with the combined footprint, not two numbers.
+ *
+ * Sprint 6 wires this into the A5 prompt; the extractor is defined now so
+ * the dispatcher is exhaustive.
+ */
+export function extractA5Fields(
+  auditData: BusinessAnalysisAuditData,
+  common: CommonFields,
+): A5Fields {
+  const nap = auditData.nap_consistency;
+  const website = auditData.website;
+  const m = auditData.combined_review_metrics;
+
+  const repairSignals: string[] = [];
+  if (nap && nap.overall_status !== 'consistent') repairSignals.push('nap_inconsistent');
+  if (website && ['dead', 'timeout', 'dns_error', 'redirect_loop'].includes(website.status?.toLowerCase() ?? '')) {
+    repairSignals.push('dead_url');
+  }
+
+  return {
+    ...common,
+    repair_signals: repairSignals,
+    days_since_last_review: -1, // filled by the caller from campaign.last_review_date
+    unaddressed_review_count: m.observable_unanswered_reviews,
+    platforms_with_listings: platformLabels(auditData),
+  };
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────
 
 export function extractFields(
@@ -184,5 +228,7 @@ export function extractFields(
       return extractA3Fields(auditData, common);
     case 'A4':
       return extractA4Fields(auditData, common);
+    case 'A5':
+      return extractA5Fields(auditData, common);
   }
 }

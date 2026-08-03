@@ -38,6 +38,7 @@ export interface RecoveryCampaignListResult {
 export interface DisputeIntake {
   id: string;
   campaign_id: string;
+  access_token: string;
   owner_statement: string;
   owner_email: string | null;
   owner_phone: string | null;
@@ -327,6 +328,70 @@ class RecoveryOpsService extends AdminApiSingleton {
     }
     await this.invalidateCachePattern(`recovery-delivery-${campaignId}`);
     return result.data?.data ?? result.data;
+  }
+
+  // ─── Reissue intake link (admin) ───────────────────────────────
+
+  async reissueLink(campaignId: string): Promise<{ intakeId: string; token: string; url: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/${campaignId}/reissue-link`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `recovery-reissue-${campaignId}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to reissue intake link');
+    }
+    // Invalidate cached intake so the new access_token is picked up.
+    await this.invalidateCachePattern(`recovery-intake-${campaignId}`);
+    return result.data?.data ?? result.data;
+  }
+
+  // ─── Download intake attachment (admin) ────────────────────────
+  // Fetches the binary with Auth0 session headers (a plain <a href> cannot
+  // send the x-auth0-id/x-auth0-email headers the API requires), then triggers
+  // a browser download via a blob URL.
+
+  async downloadAttachment(campaignId: string, attachmentId: string, fileName: string): Promise<void> {
+    const url = `${BASE_URL}/${campaignId}/intake/attachments/${attachmentId}`;
+    const headers: Record<string, string> = {};
+    const auth0Id = this.readCookie('auth0_id');
+    const auth0Email = this.readCookie('auth0_email');
+    if (auth0Id) headers['x-auth0-id'] = auth0Id;
+    if (auth0Email) headers['x-auth0-email'] = auth0Email;
+
+    const response = await fetch(url, { headers, credentials: 'include' });
+    if (!response.ok) {
+      clientLogger.error('[RecoveryOpsService] downloadAttachment failed', {
+        campaignId, attachmentId, status: response.status,
+      });
+      throw new Error(`Failed to download attachment (status ${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName || 'attachment';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Revoke on next tick so the download has started.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+
+  private readCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    try {
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [k, v] = cookie.trim().split('=');
+        if (k === name && v) return decodeURIComponent(v);
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }
 

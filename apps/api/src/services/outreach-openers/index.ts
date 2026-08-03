@@ -25,12 +25,14 @@ export {
   extractA2Fields,
   extractA3Fields,
   extractA4Fields,
+  extractA5Fields,
   type CommonFields,
   type ArchetypeFields,
   type A1Fields,
   type A2Fields,
   type A3Fields,
   type A4Fields,
+  type A5Fields,
 } from './field-extractors';
 
 export {

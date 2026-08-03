@@ -84,6 +84,10 @@ export function buildArchetypePrompt(
       return A4_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
         .replace('{{close_line}}', closeLine);
+    case 'A5':
+      return A5_PROMPT
+        .replace('{{extracted_fields}}', extractedFieldsJson)
+        .replace('{{close_line}}', closeLine);
   }
 }
 
@@ -277,5 +281,73 @@ Task: Write the opener, ~80 words max body:
 
 Forbidden: listing every missing CTA — pick the one highest-impact
 gap, pricing/tier jargon, exclamation points, emojis.
+
+Output the opener only.`;
+
+// ─── A5: Dual-Signal Footprint Triage ───────────────────────────────────
+//
+// A5 is the only archetype NOT produced by selectArchetype — it is emitted
+// exclusively by the TriageEngineService for PB-05 (dual-signal footprint).
+// The opener combines repair-signal context (NAP drift, dead URL) with
+// review-gap context (drought, unaddressed count) WITHOUT stacking stats.
+// The hook leads with the combined footprint as a single observation, then
+// names the review silence as the consequence. One stat only — the
+// unaddressed count — woven into the footprint narrative, not listed
+// alongside a second number.
+
+const A5_PROMPT = `${PERSONA_PREAMBLE}
+
+Inputs (JSON):
+{{extracted_fields}}
+${NAP_CONTEXT_NOTE}
+
+Task: Write the opener, ~80 words max body:
+
+1. Greeting: "Hi [contact_name] —" if present.
+   Otherwise: "Hi [business_name] team —"
+
+2. One sentence: "Pulled together a quick visibility snapshot for
+   [business_name]."
+
+3. The hook — LEAD WITH THE COMBINED FOOTPRINT, not two separate stats.
+   The opener must read as ONE observation about the business's overall
+   footprint, not a list of two problems.
+
+   Structure: "[business_name]'s public footprint has gaps on two fronts —
+   [repair observation in plain language] AND [review silence observation]."
+
+   Repair observation (pick the strongest from repair_signals):
+   - 'nap_inconsistent' → "the listing shows up differently across
+     [platforms_with_listings]"
+   - 'dead_url' → "the website link isn't loading"
+   Combine multiple repair signals into one clause if present, but never
+   list more than two.
+
+   Review silence observation:
+   - If days_since_last_review > 180: "customer reviews have gone quiet
+     for over [round to nearest 30] days"
+   - If unaddressed_review_count > 0: "and [unaddressed_review_count]
+     reviews are sitting without a response"
+   - If BOTH: pick the one that's more striking — do NOT stack both
+     numbers. Lead with the drought if days > 365, otherwise lead with
+     the unaddressed count.
+
+   CRITICAL: Only ONE number appears in the hook. Either the day count
+   OR the unaddressed count — never both. The other observation is
+   phrased without a number ("reviews have gone quiet" / "listings are
+   drifting apart").
+
+4. One line: "Three previews attached — the footprint audit, the fix
+   roadmap, and what a synced presence looks like across every
+   platform."
+
+5. Close: "{{close_line}}"
+
+6. Signoff: "— [your name]"
+
+Forbidden: stacking two stats in the hook, listing every repair signal,
+pricing/tier/opportunity-score jargon, HTTPS/mobile positives,
+exclamation points, emojis, naming more than one number anywhere in the
+opener body.
 
 Output the opener only.`;

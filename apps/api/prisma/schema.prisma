@@ -6182,6 +6182,7 @@ model mkt_campaigns_list {
   track_decision_reason                                     String?
   marketing_revenue                                         marketing_revenue[]
   mkt_audits_list                                           mkt_audits_list[]
+  mkt_campaign_triage_results                               mkt_campaign_triage_results?
   tenants_mkt_campaigns_list_demo_tenant_idTotenants        tenants?                         @relation("mkt_campaigns_list_demo_tenant_idTotenants", fields: [demo_tenant_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_demo_tenant")
   parent                                                    mkt_campaigns_list?              @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list", fields: [parent_campaign_id], references: [id], onUpdate: NoAction, map: "fk_mkt_campaigns_parent")
   mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list mkt_campaigns_list[]             @relation("mkt_campaigns_list_parent_campaign_idTomkt_campaigns_list")
@@ -6806,6 +6807,77 @@ model mkt_dispute_intake {
 
   @@index([campaign_id], map: "idx_dispute_intake_campaign")
   @@index([access_token], map: "idx_dispute_intake_token")
+}
+
+/// Playbook Catalog — standardized playbooks the triage engine recommends.
+/// Platform-admin scoped (no RLS — same as other mkt_* tables).
+/// Backed by database/migrations/157_mkt_playbook_catalog.sql.
+model mkt_playbook_catalog {
+  id                                   String                        @id @db.VarChar(255)
+  code                                 String                        @unique @db.VarChar(20)
+  name                                 String                        @db.VarChar(255)
+  category                             String                        @db.VarChar(30)
+  archetype                            String                        @db.VarChar(20)
+  archetype_label                      String                        @db.VarChar(40)
+  description                          String?
+  matching_rules                       Json                          @default("{}")
+  fitd_offer_title                     String                        @db.VarChar(255)
+  fitd_default_fee_cents               Int                           @default(0)
+  retainer_pitch_title                 String                        @db.VarChar(255)
+  retainer_fee_cents                   Int                           @default(0)
+  opener_prompt_template_id            String?                       @db.VarChar(255)
+  preview_deliverable_type             String?                       @db.VarChar(50)
+  is_active                            Boolean                       @default(true)
+  created_at                           DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                           DateTime                      @default(now()) @db.Timestamptz(6)
+  priority_rank                        Int                           @default(99)
+  mkt_campaign_triage_results_override mkt_campaign_triage_results[] @relation("mkt_campaign_triage_results_overridden_playbook")
+  mkt_campaign_triage_results          mkt_campaign_triage_results[]
+
+  @@index([code], map: "idx_mkt_playbook_catalog_code")
+  @@index([is_active, priority_rank], map: "idx_mkt_playbook_catalog_active")
+}
+
+/// Per-campaign triage result + operator accept/override decision.
+/// One row per campaign (campaign_id is @unique).
+/// Backed by database/migrations/157_mkt_playbook_catalog.sql.
+model mkt_campaign_triage_results {
+  id                      String                @id @db.VarChar(255)
+  campaign_id             String                @unique @db.VarChar(255)
+  recommended_playbook_id String                @db.VarChar(255)
+  confidence_score        Decimal               @db.Decimal(4, 3)
+  triage_reasoning        String?
+  detected_signals        Json                  @default("[]")
+  is_operator_accepted    Boolean?
+  overridden_playbook_id  String?               @db.VarChar(255)
+  evaluated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  created_at              DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime              @default(now()) @db.Timestamptz(6)
+  campaign                mkt_campaigns_list    @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_campaign_triage_campaign")
+  overridden_playbook     mkt_playbook_catalog? @relation("mkt_campaign_triage_results_overridden_playbook", fields: [overridden_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_override_playbook")
+  playbook                mkt_playbook_catalog  @relation(fields: [recommended_playbook_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_campaign_triage_playbook")
+
+  @@index([campaign_id], map: "idx_mkt_campaign_triage_campaign")
+}
+
+/// Signal registry — signal codes as DATA so admins can register future
+/// unknown signals without an engine deploy. No RLS (platform-admin scoped
+/// global table, same as mkt_playbook_catalog). Backed by
+/// database/migrations/158_mkt_signal_registry.sql.
+model mkt_signal_registry {
+  id               String   @id @db.VarChar(255)
+  code             String   @unique @db.VarChar(60)
+  family           String   @db.VarChar(10)
+  label            String   @db.VarChar(255)
+  description      String?
+  detection_source String   @default("model_emitted") @db.VarChar(20)
+  derived_rule     Json?
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([code], map: "idx_mkt_signal_registry_code")
+  @@index([family, is_active], map: "idx_mkt_signal_registry_family")
 }
 
 enum action {

@@ -13,7 +13,8 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { NotFoundError } from '../middleware/errorHandler';
-import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId } from '../lib/id-generator';
+import { generateCampaignId, generateStageHistoryId, generateMarketingRevenueId, generateMarketingAuditId } from '../lib/id-generator';
+import CampaignTriageService from './CampaignTriageService';
 import MarketingCategoryToneService from './MarketingCategoryToneService';
 import DemoTenantService from './DemoTenantService';
 import { unifiedConfig } from '../config/unifiedConfig';
@@ -41,7 +42,7 @@ export type CampaignStage =
 // column (VARCHAR(50), no DB enum). The literals are centralized in
 // recoveryStages.ts; the transition map is below. A campaign's
 // campaign_category determines which transition table governs it.
-export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management';
 
 export type RepairTrack = 'standard' | 'escalated';
 
@@ -97,6 +98,9 @@ const RECOVERY_TRANSITIONS: Record<string, string[]> = {
  * - profile_repair + NULL (triage) → review machine (safe default)
  * - profile_repair + 'standard' → review machine
  * - profile_repair + 'escalated' → recovery machine
+ * - triage_management → review machine (campaign stays in 'seek' until the
+ *   operator accepts a triage recommendation, at which point the category is
+ *   re-written to the playbook's category; see roadmap Risk 4)
  * Defaults to review_management so every existing caller that does not
  * pass a category gets unchanged behavior.
  */
@@ -113,6 +117,9 @@ export function transitionsFor(
  * Derives the pipeline name for a campaign — used by the web app to
  * filter Openers/Follow-Ups (review pipeline) vs Recovery tab
  * (recovery pipeline) without re-implementing the dispatch rule.
+ *
+ * triage_management maps to 'review' until the operator accepts a triage
+ * recommendation that re-categorizes the campaign.
  */
 export function pipelineFor(
   category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT,
@@ -492,6 +499,7 @@ export class MarketingCampaignService extends BaseService {
     rating?: number;
     reviewCount?: number;
     location?: string;
+    detectedSignals?: string[];
     assignedTo?: string;
   }, ctx?: RequestCtx): Promise<any> {
     try {
@@ -526,10 +534,11 @@ export class MarketingCampaignService extends BaseService {
         input.rating != null ? `Rating: ${input.rating.toFixed(1)}` : null,
         input.reviewCount != null ? `Reviews: ${input.reviewCount}` : null,
         outreachAngle ? `Outreach angle: ${outreachAngle}` : null,
+        input.detectedSignals?.length ? `Detected signals: ${input.detectedSignals.join(', ')}` : null,
       ].filter(Boolean);
       const notes = noteParts.join('\n');
 
-      return await this.createCampaign({
+      const child = await this.createCampaign({
         scope: 'business',
         businessName: input.businessName,
         category: parent.category,
@@ -542,6 +551,55 @@ export class MarketingCampaignService extends BaseService {
         notes,
         parentCampaignId: input.parentId,
       }, ctx);
+
+      // If the caller passed detected_signals (from the category audit's
+      // per-business detected_signals[]), create a business_analysis audit
+      // on the child so the triage engine can read them, then auto-trigger
+      // triage to assign a playbook immediately — the "spawn pre-triaged"
+      // flow.
+      if (input.detectedSignals && input.detectedSignals.length > 0) {
+        const auditId = generateMarketingAuditId();
+        await this.prisma.mkt_audits_list.create({
+          data: {
+            id: auditId,
+            campaign_id: child.id,
+            platform: 'business_analysis',
+            audit_data: {
+              audit_metadata: {
+                business_name: input.businessName,
+                source: 'derived_from_parent',
+                parent_campaign_id: input.parentId,
+              },
+              detected_signals: input.detectedSignals,
+              summary: `Derived from parent campaign with ${input.detectedSignals.length} detected signals.`,
+            } as any,
+          },
+        });
+        logger.info('Derived audit with signals created', ctx, {
+          campaignId: child.id,
+          auditId,
+          signalCount: input.detectedSignals.length,
+        });
+
+        // Auto-trigger triage so the campaign is born with a playbook.
+        try {
+          const triageResult = await CampaignTriageService.evaluateTriageForCampaign({
+            campaignId: child.id,
+          }, ctx);
+          logger.info('Auto-triage completed for derived campaign', ctx, {
+            campaignId: child.id,
+            playbookCode: triageResult.recommendedPlaybook.code,
+          });
+        } catch (triageError) {
+          // Non-fatal — the campaign is created; triage can be re-run.
+          logger.warn('Auto-triage failed for derived campaign (non-fatal)', ctx, {
+            campaignId: child.id,
+            error: (triageError as Error).message,
+          });
+        }
+      }
+
+      return child;
     } catch (error) {
       logger.error('Failed to derive business campaign', ctx, {
         error: (error as Error).message,

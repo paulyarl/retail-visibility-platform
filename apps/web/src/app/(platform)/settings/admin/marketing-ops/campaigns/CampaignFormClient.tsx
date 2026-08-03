@@ -11,7 +11,7 @@ import PlatformUserSelect from '@/components/marketing-ops/PlatformUserSelect';
 
 const STAGES: CampaignStage[] = ['seek', 'preview_built', 'shown', 'paid', 'delivered', 'retainer_pitched', 'retainer_won', 'lost', 'dead', 'tenant_onboarded'];
 const SCOPES: CampaignScope[] = ['business', 'category', 'city'];
-const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair'];
+const CATEGORIES: CampaignCategory[] = ['review_management', 'recovery_management', 'profile_repair', 'triage_management'];
 
 const REPAIR_ISSUE_TYPES_STANDARD = ['nap_drift', 'unclaimed_profile', 'missing_category', 'missing_hours', 'platform_gap'];
 const REPAIR_ISSUE_TYPES_ESCALATED = ['suspension', 'duplicate_listing', 'hijacked_listing', 'ownership_dispute', 'address_verification_block'];
@@ -348,7 +348,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Campaign Category" required>
               <select value={form.campaign_category} onChange={(e) => handleChange('campaign_category', e.target.value as CampaignCategory)}
                 className={inputClass}>
-                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : 'Profile Repair'}</option>)}
+                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat === 'review_management' ? 'Review Management' : cat === 'recovery_management' ? 'Recovery Management' : cat === 'profile_repair' ? 'Profile Repair' : 'Triage Management'}</option>)}
               </select>
               <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
                 {form.campaign_category === 'review_management' ? (
@@ -367,13 +367,20 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                     <p className="mt-1"><strong>AI workflows:</strong> Recovery detail → AI Workspace (Copy-Paste Bridge + Direct API). Outreach is the Day 1/2/4 cascade (email → SMS → DM), auto-fired by the scheduler.</p>
                     <p className="mt-1"><strong>Deliverables:</strong> Recovery resolution (response draft + submission guide, emailed to owner on approval)</p>
                   </>
-                ) : (
+                ) : form.campaign_category === 'profile_repair' ? (
                   <>
                     <p className="font-medium">Profile Repair</p>
                     <p className="mt-1"><strong>Triage-first:</strong> Campaigns start in triage (no track). The triage prompt analyzes audit signals and recommends a track — the operator confirms or overrides.</p>
                     <p className="mt-1"><strong>Standard track:</strong> Uses the review pipeline (Seek → Preview → Shown → Paid → Delivered). For NAP drift, unclaimed profiles, missing categories. Pitched as a package.</p>
                     <p className="mt-1"><strong>Escalated track:</strong> Uses the recovery pipeline (Audit Identified → … → Resolved & Closed). For suspensions, hijacked/duplicate listings, ownership disputes. Evidence intake + appeal letter.</p>
                     <p className="mt-1"><strong>Switchable:</strong> Track can be switched mid-flight with guardrails (escalate freely before payment; de-escalate only before intake submission).</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">Triage Management</p>
+                    <p className="mt-1"><strong>Intelligent triage:</strong> Campaigns start in 'seek'. The Triage Engine evaluates audit signals (NAP, website, reviews, BBB) and recommends one of five standard playbooks (PB-01..PB-05).</p>
+                    <p className="mt-1"><strong>Operator gate:</strong> The operator accepts or overrides the recommendation on the campaign detail page. Accepting re-categorizes the campaign to the playbook's category (review/recovery/triage) and applies the FITD fee + archetype.</p>
+                    <p className="mt-1"><strong>Pipeline:</strong> Uses the review machine until a triage decision is accepted. BBB recovery (PB-04) requires manual BBB input — no automated BBB source yet.</p>
                   </>
                 )}
               </div>

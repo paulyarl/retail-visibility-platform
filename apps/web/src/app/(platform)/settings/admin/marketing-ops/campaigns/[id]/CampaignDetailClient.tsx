@@ -20,6 +20,7 @@ import ReviewResponsePipelineCard from '@/components/marketing-ops/ReviewRespons
 import CascadePanel from '@/components/marketing-ops/CascadePanel';
 import ChannelReadinessWidget from '@/components/marketing-ops/ChannelReadinessWidget';
 import RepairTrackPanel from '@/components/marketing-ops/RepairTrackPanel';
+import IntelligentTriageCard from '@/components/marketing-ops/IntelligentTriageCard';
 
 type Tab = 'overview' | 'audits' | 'files' | 'deliverables' | 'prompts' | 'history' | 'lineage' | 'cascade';
 
@@ -533,6 +534,13 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 })}
               </div>
             </div>
+
+            {/* Intelligent Triage Card — above the tabs, only for seek-stage
+                campaigns. The triage decision is a prerequisite gate, not a
+                parallel view (Sprint 5). */}
+            {campaign.stage === 'seek' && (
+              <IntelligentTriageCard campaign={campaign} onRefresh={fetchCampaign} />
+            )}
 
             {/* Tabs */}
             <div className="flex items-center gap-1 mb-4 border-b border-gray-200 dark:border-neutral-700">
