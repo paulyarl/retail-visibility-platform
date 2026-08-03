@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw, Plus, Loader2, Flag, Star, MapPin, Flame, Inbox, X,
-  Pencil, Check, ExternalLink, UserPlus, UserX,
+  Pencil, Check, ExternalLink, UserPlus, UserX, Table as TableIcon, LayoutGrid,
 } from 'lucide-react';
 import Link from 'next/link';
 import marketingOpsService, {
   ProspectQueueEntry, ProspectStatus, ProspectPriority, ProspectDismissReason,
 } from '@/services/MarketingOpsService';
 import { useStaffUsers, staffDisplayName } from '@/components/marketing-ops/PlatformUserSelect';
+import ProspectQueueBoard from '@/components/marketing-ops/ProspectQueueBoard';
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -70,6 +71,18 @@ export default function ProspectQueueClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // View mode — persists in localStorage so operators land on their preferred view.
+  const [viewMode, setViewMode] = useState<'list' | 'board'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('prospectQueueView') as 'list' | 'board') ?? 'list';
+    }
+    return 'list';
+  });
+  const toggleViewMode = (mode: 'list' | 'board') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') localStorage.setItem('prospectQueueView', mode);
+  };
+
   // Filters
   const [statusTab, setStatusTab] = useState<ProspectStatus>('queued');
   const [assignedToMe, setAssignedToMe] = useState(true);
@@ -96,12 +109,16 @@ export default function ProspectQueueClient() {
     setLoading(true);
     setError(null);
     try {
+      // Board view needs both queued + campaign_created entries and the
+      // campaign join (for stage columns). List view uses the active status tab.
+      const isBoard = viewMode === 'board';
       const result = await marketingOpsService.listProspectQueue({
-        status: statusTab,
-        assigned_to: assignedToMe && statusTab === 'queued' ? 'me' : undefined,
+        status: isBoard ? ['queued', 'campaign_created'] : statusTab,
+        assigned_to: assignedToMe && (isBoard || statusTab === 'queued') ? 'me' : undefined,
         category: categoryFilter || undefined,
         city: cityFilter || undefined,
         limit: 200,
+        includeCampaigns: isBoard,
       });
       setEntries(result.entries);
       setQueuedCount(result.queuedCount);
@@ -110,7 +127,7 @@ export default function ProspectQueueClient() {
     } finally {
       setLoading(false);
     }
-  }, [statusTab, assignedToMe, categoryFilter, cityFilter]);
+  }, [statusTab, assignedToMe, categoryFilter, cityFilter, viewMode]);
 
   useEffect(() => {
     fetchQueue();
@@ -230,16 +247,46 @@ export default function ProspectQueueClient() {
               {queuedCount} queued prospect{queuedCount !== 1 ? 's' : ''} awaiting action
             </p>
           </div>
-          <button
-            onClick={fetchQueue}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {/* List / Board view toggle */}
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
+              <button
+                onClick={() => toggleViewMode('list')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium ${
+                  viewMode === 'list'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-300 dark:hover:bg-neutral-700'
+                }`}
+                title="List view"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                List
+              </button>
+              <button
+                onClick={() => toggleViewMode('board')}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium ${
+                  viewMode === 'board'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-300 dark:hover:bg-neutral-700'
+                }`}
+                title="Board view (mini kanban)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                Board
+              </button>
+            </div>
+            <button
+              onClick={fetchQueue}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:border-neutral-700 dark:hover:bg-neutral-700"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Filter bar */}
+        {/* Filter bar — list view only */}
+        {viewMode === 'list' && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {/* Status tabs */}
           <div className="inline-flex rounded-lg border border-gray-200 dark:border-neutral-700 overflow-hidden">
@@ -291,6 +338,7 @@ export default function ProspectQueueClient() {
             {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -307,8 +355,8 @@ export default function ProspectQueueClient() {
           </div>
         )}
 
-        {/* Empty state */}
-        {!loading && entries.length === 0 && (
+        {/* Empty state — list view only */}
+        {viewMode === 'list' && !loading && entries.length === 0 && (
           <div className="text-center py-12">
             <Inbox className="w-12 h-12 mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -319,8 +367,8 @@ export default function ProspectQueueClient() {
           </div>
         )}
 
-        {/* Table */}
-        {!loading && entries.length > 0 && (
+        {/* Table — list view only */}
+        {viewMode === 'list' && !loading && entries.length > 0 && (
           <div className="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -569,6 +617,15 @@ export default function ProspectQueueClient() {
               </table>
             </div>
           </div>
+        )}
+
+        {/* Board view */}
+        {viewMode === 'board' && !loading && (
+          <ProspectQueueBoard
+            entries={entries}
+            onRefresh={fetchQueue}
+            onError={(msg) => setError(msg || null)}
+          />
         )}
       </div>
     </div>
