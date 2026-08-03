@@ -7,6 +7,7 @@ import marketingOpsService, { DashboardStats, ConversionStats, CampaignStage } f
 import FollowUpsDueWidget from '@/components/marketing-ops/FollowUpsDueWidget';
 import ReviewFollowUpsDueWidget from '@/components/marketing-ops/ReviewFollowUpsDueWidget';
 import HotProspectsWidget from '@/components/marketing-ops/HotProspectsWidget';
+import ProspectQueueWidget from '@/components/marketing-ops/ProspectQueueWidget';
 
 const STAGE_LABELS: Record<CampaignStage, string> = {
   seek: 'Seek',
@@ -221,10 +222,11 @@ export default function MarketingOpsDashboardClient() {
               </div>
             </div>
 
-            {/* Follow-ups due widget (Sprint 2) + Hot prospects widget (Sprint 3) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+            {/* Follow-ups due widget (Sprint 2) + Hot prospects widget (Sprint 3) + Prospect queue widget (Queue sprint) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
               <FollowUpsDueWidget />
               <HotProspectsWidget />
+              <ProspectQueueWidget />
             </div>
 
             {/* Review follow-ups due widget (Sprint 4) */}

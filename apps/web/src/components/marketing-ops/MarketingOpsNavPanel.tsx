@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Paper, NavLink, Group, Text, Divider, Badge, Box } from '@mantine/core';
+import marketingOpsService from '@/services/MarketingOpsService';
 import {
   IconLayoutDashboard,
   IconTarget,
@@ -44,6 +46,17 @@ interface MarketingOpsNavPanelProps {
 
 export default function MarketingOpsNavPanel({ counts }: MarketingOpsNavPanelProps) {
   const pathname = usePathname();
+  const [queuedCount, setQueuedCount] = useState<number | null>(null);
+
+  // Lightweight fetch of the queued-prospect count for the Queue nav badge.
+  // limit=1 minimizes payload — we only need queuedCount from the response.
+  useEffect(() => {
+    let cancelled = false;
+    marketingOpsService.listProspectQueue({ status: 'queued', limit: 1 })
+      .then((r) => { if (!cancelled) setQueuedCount(r.queuedCount); })
+      .catch(() => { /* silent — badge just won't show */ });
+    return () => { cancelled = true; };
+  }, []);
 
   function isActive(href: string) {
     if (href === '/settings/admin/marketing-ops') return pathname === '/settings/admin/marketing-ops';
@@ -78,7 +91,7 @@ export default function MarketingOpsNavPanel({ counts }: MarketingOpsNavPanelPro
             item.label === 'Deliverable Templates' ? 'deliverableTemplates' :
             undefined
           ) as keyof NonNullable<typeof counts> | undefined;
-          const count = countKey ? counts?.[countKey] : undefined;
+          const count = countKey ? counts?.[countKey] : (item.label === 'Queue' ? queuedCount : undefined);
 
           return (
             <NavLink
