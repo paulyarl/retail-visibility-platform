@@ -1631,6 +1631,24 @@ export function generateMarketingAuditId(): string {
 }
 
 /**
+ * Generate playbook catalog ID
+ * Format: pbk-{nanoid} (12 chars)
+ */
+export function generatePlaybookCatalogId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pbk-${nanoid()}`;
+}
+
+/**
+ * Generate campaign triage result ID
+ * Format: trg-{nanoid} (12 chars)
+ */
+export function generateCampaignTriageId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `trg-${nanoid()}`;
+}
+
+/**
  * Generate marketing stage history ID
  * Format: msh-{nanoid} (12 chars)
  */
