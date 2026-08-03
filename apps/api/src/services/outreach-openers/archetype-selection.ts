@@ -8,12 +8,18 @@
  * Specificity + urgency wins. A recurring-theme negative beats a raw volume
  * gap; volume beats listing drift; listing drift beats a soft conversion gap.
  *
+ * A5_DUAL_TRIAGE is NOT produced by selectArchetype — it is only emitted by
+ * the TriageEngineService (services/triage) for PB-05 multi-signal footprint
+ * triage. A5 is included in ArchetypeCode so the prompt builder and field
+ * extractor can be exhaustive; selectArchetype itself never returns A5.
+ *
  * See: docs/LocalBiz/marketing_ops_outreach_opener_sprint_plan.md §4
+ *      docs/LocalBiz/marketing_ops_playbook_catalog_triage_sprint_plan.md §6
  */
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4';
+export type ArchetypeCode = 'A1' | 'A2' | 'A3' | 'A4' | 'A5';
 
 export interface NegativeReviewTheme {
   theme: string;

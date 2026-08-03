@@ -28,7 +28,7 @@ export type CampaignStage =
 
 // Recovery Management stages run on the same stage column; literals are
 // app-layer-enforced (no DB enum). See recoveryStages.ts on the API side.
-export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management';
 export type RepairTrack = 'standard' | 'escalated';
 
 export type ConversionSource =

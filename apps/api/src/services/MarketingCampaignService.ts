@@ -41,7 +41,7 @@ export type CampaignStage =
 // column (VARCHAR(50), no DB enum). The literals are centralized in
 // recoveryStages.ts; the transition map is below. A campaign's
 // campaign_category determines which transition table governs it.
-export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair';
+export type CampaignCategory = 'review_management' | 'recovery_management' | 'profile_repair' | 'triage_management';
 
 export type RepairTrack = 'standard' | 'escalated';
 
@@ -97,6 +97,9 @@ const RECOVERY_TRANSITIONS: Record<string, string[]> = {
  * - profile_repair + NULL (triage) → review machine (safe default)
  * - profile_repair + 'standard' → review machine
  * - profile_repair + 'escalated' → recovery machine
+ * - triage_management → review machine (campaign stays in 'seek' until the
+ *   operator accepts a triage recommendation, at which point the category is
+ *   re-written to the playbook's category; see roadmap Risk 4)
  * Defaults to review_management so every existing caller that does not
  * pass a category gets unchanged behavior.
  */
@@ -113,6 +116,9 @@ export function transitionsFor(
  * Derives the pipeline name for a campaign — used by the web app to
  * filter Openers/Follow-Ups (review pipeline) vs Recovery tab
  * (recovery pipeline) without re-implementing the dispatch rule.
+ *
+ * triage_management maps to 'review' until the operator accepts a triage
+ * recommendation that re-categorizes the campaign.
  */
 export function pipelineFor(
   category: CampaignCategory = CAMPAIGN_CATEGORY_DEFAULT,

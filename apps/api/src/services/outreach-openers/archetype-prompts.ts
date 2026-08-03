@@ -84,6 +84,12 @@ export function buildArchetypePrompt(
       return A4_PROMPT
         .replace('{{extracted_fields}}', extractedFieldsJson)
         .replace('{{close_line}}', closeLine);
+    case 'A5':
+      // Sprint 6: A5_DUAL_TRIAGE prompt. Until then, A5 campaigns fall back
+      // to the existing selectArchetype (A2 > A1 > A3 > A4) for opener
+      // generation. Throwing here is correct — callers must not invoke
+      // buildArchetypePrompt('A5') until Sprint 6 lands the A5_PROMPT.
+      throw new Error('A5 prompt not yet implemented — see Sprint 6 (marketing_ops_playbook_catalog_triage_sprint_plan.md)');
   }
 }
 
