@@ -19,6 +19,7 @@ import {
   Box,
   ThemeIcon,
   Paper,
+  Tabs,
 } from '@mantine/core';
 import {
   IconCheck,
@@ -31,7 +32,7 @@ import {
   IconPackage,
   IconMail,
   IconUserPlus,
-  IconLogIn,
+  IconLogin,
 } from '@tabler/icons-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -412,7 +413,7 @@ export default function PayPageClient() {
               <Tabs value={claimMode} onChange={(v) => { setClaimMode(v as 'register' | 'login'); setClaimError(null); }}>
                 <Tabs.List>
                   <Tabs.Tab value="register" leftSection={<IconUserPlus size="0.9rem" />}>Create account</Tabs.Tab>
-                  <Tabs.Tab value="login" leftSection={<IconLogIn size="0.9rem" />}>I have an account</Tabs.Tab>
+                  <Tabs.Tab value="login" leftSection={<IconLogin size="0.9rem" />}>I have an account</Tabs.Tab>
                 </Tabs.List>
 
                 <form onSubmit={handleClaimAccount}>
@@ -544,7 +545,7 @@ export default function PayPageClient() {
               <Tabs value={claimMode} onChange={(v) => { setClaimMode(v as 'register' | 'login'); setClaimError(null); }}>
                 <Tabs.List>
                   <Tabs.Tab value="register" leftSection={<IconUserPlus size="0.9rem" />}>Create account</Tabs.Tab>
-                  <Tabs.Tab value="login" leftSection={<IconLogIn size="0.9rem" />}>I have an account</Tabs.Tab>
+                  <Tabs.Tab value="login" leftSection={<IconLogin size="0.9rem" />}>I have an account</Tabs.Tab>
                 </Tabs.List>
 
                 <form onSubmit={handleClaimAccount}>
