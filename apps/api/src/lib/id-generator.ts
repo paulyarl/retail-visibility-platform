@@ -1934,3 +1934,15 @@ export function generatePlaybookChecklistSuggestionId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `pbsg-${nanoid()}`;
 }
+
+// ─── Prospect Queue (Add to Queue Sprint) ─────────────────────────────────
+// Global ID (admin-scoped, no tenant key) — matches the Marketing Ops family.
+
+/**
+ * Generate prospect queue entry ID
+ * Format: pque-{nanoid} (13 chars)
+ */
+export function generateProspectQueueId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `pque-${nanoid()}`;
+}
