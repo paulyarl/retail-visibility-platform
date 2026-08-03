@@ -17,6 +17,7 @@ import { logger } from '../logger';
 import type { RequestCtx } from '../context';
 import { generateOutreachOpenerId } from '../lib/id-generator';
 import MarketingCampaignService from './MarketingCampaignService';
+import CampaignTriageService from './CampaignTriageService';
 import aiProviderFactory from './ai-providers';
 import {
   selectArchetype,
@@ -171,13 +172,68 @@ export class OutreachOpenerService extends BaseService {
     const campaign = await MarketingCampaignService.getCampaign(campaignId, ctx);
     const common = this.buildCommonFields(campaign);
 
-    const selection = selectArchetype(auditResult.auditData);
+    // Sprint 6: If the campaign has an accepted triage result, use the
+    // triage-derived archetype (which may be A5 — the only archetype
+    // selectArchetype never returns). This is the "triage → opener" flow:
+    // the operator accepts a playbook recommendation, and the opener
+    // generation respects that decision instead of re-running the
+    // deterministic selector.
+    let selection: ArchetypeSelection;
+    let triageArchetype: string | null = null;
+    try {
+      const triage = await CampaignTriageService.getTriageResult(campaignId, ctx);
+      if (triage?.isOperatorAccepted === true) {
+        const pb = triage.recommendedPlaybook;
+        if (pb?.archetype) {
+          triageArchetype = pb.archetype;
+        }
+      }
+    } catch {
+      // Triage not found or not accepted — fall through to selectArchetype
+    }
+
+    if (triageArchetype && ['A1', 'A2', 'A3', 'A4', 'A5'].includes(triageArchetype)) {
+      // Use the triage-derived archetype. For A2, we still need a theme —
+      // re-run selectArchetype to get the theme if the triage archetype is A2.
+      // For A5, there is no theme (it's dual-signal, not theme-driven).
+      if (triageArchetype === 'A2') {
+        const autoSel = selectArchetype(auditResult.auditData);
+        selection = {
+          archetype: 'A2',
+          reason: `triage-accepted: A2 (PB recommendation). Theme: ${autoSel.theme?.theme ?? 'recurring negatives'}`,
+          theme: autoSel.theme,
+        };
+      } else {
+        selection = {
+          archetype: triageArchetype as ArchetypeSelection['archetype'],
+          reason: `triage-accepted: ${triageArchetype} (playbook recommendation)`,
+        };
+      }
+    } else {
+      selection = selectArchetype(auditResult.auditData);
+    }
+
     const extractedFields = extractFields(
       selection.archetype,
       auditResult.auditData,
       common,
       selection.theme,
     );
+
+    // Sprint 6: A5 fields leave days_since_last_review = -1 for the caller
+    // to fill from campaign.last_review_date. Compute it here so the prompt
+    // gets the real drought duration.
+    if (selection.archetype === 'A5' && (extractedFields as any).days_since_last_review === -1) {
+      const lastReview = (campaign as any).last_review_date as Date | string | null;
+      if (lastReview) {
+        const last = lastReview instanceof Date ? lastReview : new Date(lastReview);
+        const days = Math.floor((Date.now() - last.getTime()) / (1000 * 60 * 60 * 24));
+        (extractedFields as any).days_since_last_review = days;
+      } else {
+        // No last_review_date — use the unaddressed count as the signal
+        (extractedFields as any).days_since_last_review = 0;
+      }
+    }
 
     let resolvedPrompt = buildArchetypePrompt(
       selection.archetype,
