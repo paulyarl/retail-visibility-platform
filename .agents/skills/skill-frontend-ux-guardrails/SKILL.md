@@ -26,6 +26,7 @@ Use this skill to harden visible product UI before delivery. Treat it as a quali
 - Prefer dense but readable operational layouts over marketing hero sections inside app surfaces.
 - Use stable dimensions for metric cards, charts, tables, sidebars, toolbars, and status chips so content changes do not shift the layout.
 - Make filters explicit and recoverable: show active filters, empty results, reset actions, and persisted query state when the product already supports it.
+- Collapse terminal/closed stages behind a "Show closed" checkbox by default on list and board views. As pipelines grow, closed/lost/dead entries clutter active work. Pattern: define `CLOSED_STAGES` (mirrors backend `prospectQueueStageMaps.ts`), default `showClosed=false`, hide closed-stage rows/cards and kanban columns until checked, and reflect the filtered count in the header (e.g. `X of Y campaigns (closed hidden)`). Applied consistently in `ProspectQueueBoard.tsx` and `CampaignListClient.tsx`.
 - Do not hide critical actions only behind hover on touch layouts.
 - Do not require horizontal scrolling for core comprehension. If a data table must scroll, keep labels, actions, and context visible.
 
