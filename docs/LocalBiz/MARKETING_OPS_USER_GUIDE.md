@@ -36,6 +36,7 @@ Campaigns belong to one of three categories:
 - **Recovery management** — generate intake links, collect owner statements, draft AI-powered resolution responses, and deliver approved resolutions to business owners.
 - **Multi-channel cascade** — opt-in a review campaign to an automated email → SMS → DM outreach sequence (Day 1/2/4).
 - **Intelligent triage** — the triage engine automatically matches seek-stage campaigns to the best outreach playbook based on signals detected in the audit data. Operators review, enrich, accept, or override the recommendation. See §31.
+- **Prospect queue** — capture prospects from audit surfaces without leaving the audit, triage them later from a dedicated queue page (List or Board view), and create campaigns when ready. See §33.
 
 ---
 
@@ -153,6 +154,7 @@ Profile Repair is a **third vector** that reuses both existing pipelines via a t
   - Weekly revenue (with sub-line showing online payment revenue when available)
 - **Tenant Conversion widget** (if the Tenant Prospecting Channel is enabled): total conversions, conversion rate, resurrected conversions, QR view-to-conversion rate, demo claim rate, and average days to convert.
 - **Pipeline by Stage:** horizontal bars showing campaign count per stage.
+- **Widget grid:** Follow-ups Due, Hot Prospects, and Prospect Queue widgets — each shows a count + top entries + a link to the full list. The Prospect Queue widget (§33) shows the queued-prospect count and top 3 entries with a "Work the queue →" link.
 - **Quick action cards:**
   - Campaign Tracker
   - New Campaign
@@ -1460,3 +1462,108 @@ The checklist **follows the triage decision**: whichever playbook is effective f
 
 - `docs/LocalBiz/marketing_ops_operator_checklist_sprint_plan.md` — full sprint plan: data model, API, UI, soft-gate mechanics, testing
 - §31 — Intelligent Playbook Catalog & Triage Engine (how campaigns get their playbook)
+
+---
+
+## 33. Prospect Queue — `/settings/admin/marketing-ops/queue`
+
+**Page:** `/settings/admin/marketing-ops/queue` · Nav: **Queue** (📥, directly after Dashboard) · Dashboard widget: **Prospect Queue (n)**
+
+The Prospect Queue is the operator's "start of day" surface for capturing and triaging prospects *before* committing to a campaign. Every audit surface (City Category Analysis, Category Analysis, Sync Report) has an **Add to Queue** button next to the existing **Campaign** (spawn) button. Queueing captures the prospect with a full snapshot — no navigation, no campaign created — so the operator can keep working the audit and decide later.
+
+### Add to Queue vs. Spawn — when to use which
+
+| Action | When | What happens |
+|--------|------|--------------|
+| **Campaign** (spawn) | You're ready to act *now* — the prospect is hot, you have time to run the seek prompt and build a preview today | A business-scope campaign is created immediately, triaged, and enters the pipeline at `seek` |
+| **Queue** | You see an opportunity but can't act on it right now — you're working through a batch of audits, the prospect is one of several, or you want to review the full set before committing | The prospect is saved to the queue with its audit snapshot (signals, rating, address, source). No campaign is created. You triage it later from the queue page |
+
+**Rule of thumb:** act now → **Campaign**; act later → **Queue**.
+
+### The Queue Page
+
+The page has two view modes, toggled in the header. The toggle persists in `localStorage`, so you land on your preferred view each day.
+
+#### List View (default)
+
+A dense table — one row per queued prospect. Columns:
+
+| Column | Content |
+|--------|---------|
+| **Business** | Name (bold) + city/state; flame icon if the snapshot implies hot |
+| **Signals** | Signal-count badge + first 2 signal codes (crisis signals render red); tooltip for the rest |
+| **Rating** | ★ rating · review_count |
+| **Source** | Source kind (Category Analysis / City Category Audit / Scan Unmatched) with a link to the parent campaign |
+| **Queued** | Relative time ("yesterday", "3d ago") + who queued it |
+| **Priority** | `high` / `normal` toggle (Flag icon) — click to flip |
+| **Assigned** | Operator display name or "Unassigned" with inline assign-to-me / unassign |
+| **Note** | Inline pencil edit — "call after Tuesday", "asked for by name" |
+| **Actions** | **Create Campaign** (primary, violet) · **Dismiss** (ghost, opens reason dropdown) |
+
+**Header controls:**
+- **Status tabs:** Queued (n) · Created · Dismissed. Default is Queued.
+- **Assigned to me** toggle (default on for Queued) — shows your claimed prospects + anything unclaimed. Flip off to see the whole team queue.
+- **Category / city filters** — same pattern as the campaign list.
+
+**Create from queue:** spinner → the row flips in-place to a "View campaign →" link. No forced navigation — you stay on the queue and keep working.
+
+**Dismiss:** opens a reason dropdown (`already_customer` / `bad_fit` / `duplicate` / `other`). Dismissed entries leave the default view but remain in the Dismissed tab for audit trail. A dismissed business can be re-queued later (new row).
+
+#### Board View — the queue as a mini kanban
+
+The same data, rendered as columns. The board answers: *"what happened to every prospect I've queued?"* — from capture through conversion, at a glance.
+
+**Pipeline toggle (Review / Recovery):** the board renders one pipeline at a time, mirroring the two cycles in §3. Review is default.
+
+**Module-aware columns** — column sets are not hard-coded; they come from the same transition maps the backend uses (`transitionsFor(category, repair_track)`):
+
+| Board mode | Columns |
+|-----------|---------|
+| **Review pipeline** | Queued → Seek → Preview Built → Shown → Paid → Delivered → Retainer Pitched → Retainer Won → Tenant Onboarded → (Lost / Dead collapsed) |
+| **Recovery pipeline** | Queued → Audit Identified → Framework Preview → Outreach Dispatched → Awaiting Owner Intake → Intake Submitted → Final Resolution Drafted → Owner Approved → Resolved & Closed → (Dead collapsed) |
+
+A campaign's pipeline is determined by its category + repair track — `recovery_management` or `profile_repair` + `escalated` → Recovery; everything else → Review. If a profile-repair campaign switches tracks mid-flight, its card simply appears in the other board mode on next fetch.
+
+**The Queued column is always first** — same `status='queued'` entries as the List view, with the same **Create Campaign** / **Dismiss** actions.
+
+**Cards are audit-aware** — everything you need to decide *before* hitting Create Campaign is on the card, captured from the source audit at queue time:
+
+| Field | Rendering |
+|-------|-----------|
+| **Business** | Name (bold) + city/state; flame if hot |
+| **Priority** | Flag toggle (red when `high`) — adjustable in place |
+| **Assignee** | Display name chip or "Unassigned" with assign-to-me / unassign |
+| **Audit date** | Date chip ("audit: Jul 28"); amber tint when > 14 days stale — the finding may have drifted |
+| **Category** | Text badge |
+| **Scope** | Small badge (`category` / `city`) — the audit's blast radius |
+| **Signals** | Up to 3 signal-code chips (crisis = red) + overflow tooltip + count badge |
+| **Rating / reviews** | ★ rating · review_count |
+| **Queued** | Relative time + who captured it (distinct from the assignee) |
+| **Note** | Inline pencil preview |
+| **Days in stage** | Chip on campaign cards — amber after 7 days, red after 14 (staleness is the kanban's main signal) |
+
+**Click-to-advance (v1):** each campaign card has an **Advance** overflow menu listing only the valid next stages for its current pipeline. Selecting one calls the existing `POST /:id/transition` endpoint:
+
+- **Success** → card moves columns.
+- **`checklist_incomplete` (409)** → the soft-gate dialog (§32) lists incomplete required steps with **Proceed anyway**.
+- **Invalid transition** → toast; the card snaps back. Only possible if the stage maps drifted or the campaign changed mid-session — the backend is authoritative.
+
+`lost` / `dead` / `closed` / `resolved_and_closed` columns are collapsed behind a **Show closed** toggle to keep the board narrow.
+
+**What the board does not do (v1):** no drag-and-drop (click-to-advance only), no WIP limits, no swimlanes — priority flag + staleness chips carry the signal. The board is not a global pipeline board — only queue-sourced campaigns appear.
+
+### Nav Badge + Dashboard Widget
+
+- **Nav:** the Queue item shows a live count badge (number of `status='queued'` entries) so the queue is unmissable at the start of day.
+- **Dashboard:** the Prospect Queue widget shows the count + top 3 queued entries (name, signal badge, relative time) with a "Work the queue →" link.
+
+### Queue Entries Are Pre-Campaign
+
+Queue entries are not campaigns and do not appear in pipeline metrics. They are a capture + triage layer *before* the pipeline. Once you hit **Create Campaign** from a queue entry, the resulting campaign enters the pipeline normally and the entry is marked `campaign_created` (with a link to the campaign). The entry is retained for the audit trail — it's how you trace "where did this campaign come from?"
+
+### See Also
+
+- `docs/LocalBiz/marketing_ops_prospect_queue_sprint_plan.md` — full sprint plan: data model, API, UI, board mechanics, testing
+- §3 — Campaign Cycle Mental Model (Review vs Recovery vs Profile Repair)
+- §19 — Stage Transitions and Rules (the transition tables the board columns mirror)
+- §32 — Operator Playbook Checklists (the soft gate that board stage advances go through)
