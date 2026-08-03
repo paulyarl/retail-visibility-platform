@@ -22,6 +22,7 @@ export interface PayPageData {
   tokenType: string;
   deliverableId: string | null;
   alreadyPaid: boolean;
+  email: string | null;
 }
 
 export interface CheckoutResult {
@@ -99,12 +100,12 @@ export class MarketingPayPublicService extends PublicApiSingleton {
     return result.data?.data ?? result.data;
   }
 
-  async confirmPayment(ptoken: string, paymentIntentId: string, couponCode?: string, subscriptionTierId?: string): Promise<PayConfirmResult> {
+  async confirmPayment(ptoken: string, paymentIntentId: string, couponCode?: string, subscriptionTierId?: string, email?: string): Promise<PayConfirmResult> {
     const result = await this.makeDefaultRequest<any>(
       '/api/public/marketing/pay/confirm',
       {
         method: 'POST',
-        body: JSON.stringify({ ptoken, paymentIntentId, couponCode, subscriptionTierId }),
+        body: JSON.stringify({ ptoken, paymentIntentId, couponCode, subscriptionTierId, email }),
       },
       undefined,
       0,

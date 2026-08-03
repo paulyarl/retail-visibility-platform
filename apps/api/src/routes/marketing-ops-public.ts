@@ -115,6 +115,7 @@ router.get('/public/marketing/pay', async (req, res) => {
         tokenType: token.token_type,
         deliverableId: token.deliverable_id || null,
         alreadyPaid: token.paid_at !== null || campaign.stage === 'paid' || campaign.stage === 'delivered',
+        email: campaign.email || null, // §7.1 item 1: prefill the pay-page email field
       },
     });
   } catch (error) {
