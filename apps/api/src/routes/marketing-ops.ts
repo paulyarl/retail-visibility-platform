@@ -3062,10 +3062,14 @@ router.post('/prospect-queue', async (req: any, res: Response) => {
     }, getCtx(req));
 
     if (result.kind === 'campaign_exists') {
-      return res.status(409).json({
-        success: false,
-        error: 'campaign_exists',
-        data: { campaignId: result.campaignId },
+      // 200 with a kind discriminator — the operation succeeded in
+      // determining the prospect is already in the pipeline. (We avoid 409
+      // because the web client's makeDefaultRequest discards the body on
+      // non-2xx, which would lose the campaignId link.)
+      return res.status(200).json({
+        success: true,
+        data: { kind: 'campaign_exists', campaignId: result.campaignId },
+        created: false,
       });
     }
     res.status(result.created ? 201 : 200).json({

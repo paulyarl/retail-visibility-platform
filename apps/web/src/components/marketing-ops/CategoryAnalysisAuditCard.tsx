@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Check, ArrowRight, Sparkles, StickyNote, Plus, Loader2, X } from 'lucide-react';
+import { Copy, Check, ArrowRight, Sparkles, StickyNote, Plus, Loader2, X, Inbox } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Audit } from '@/services/MarketingOpsService';
@@ -71,6 +71,8 @@ export default function CategoryAnalysisAuditCard({
   const [showCustomDerive, setShowCustomDerive] = useState(false);
   const [customName, setCustomName] = useState('');
   const [derivingCustom, setDerivingCustom] = useState(false);
+  const [queueingIdx, setQueueingIdx] = useState<number | null>(null);
+  const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'exists' | 'already'>>({});
   const router = useRouter();
 
   if (!ma) return null;
@@ -110,6 +112,36 @@ export default function CategoryAnalysisAuditCard({
     } catch (err: any) {
       setDeriveError(err.message || 'Failed to create campaign');
       setDerivingCustom(false);
+    }
+  };
+
+  const handleAddToQueue = async (idx: number) => {
+    const c = data.top_5_competitors[idx];
+    if (!c) return;
+    setQueueingIdx(idx);
+    setDeriveError(null);
+    try {
+      const { default: service } = await import('@/services/MarketingOpsService');
+      const result = await service.addToQueue({
+        business_name: c.name,
+        source_kind: 'category_analysis',
+        source_campaign_id: campaignId,
+        source_audit_id: audit.id,
+        audit_date: audit.created_at,
+        business_snapshot: {
+          rating: c.approximate_rating,
+          review_count: c.approximate_review_count,
+          location: c.location_status,
+        },
+      } as any);
+      setQueuedFeedback((prev) => ({
+        ...prev,
+        [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : 'queued',
+      }));
+    } catch (err: any) {
+      setDeriveError(err.message || 'Failed to add to queue');
+    } finally {
+      setQueueingIdx(null);
     }
   };
 
@@ -184,15 +216,32 @@ export default function CategoryAnalysisAuditCard({
                     {Number(c.approximate_rating).toFixed(1)} ★ · {c.approximate_review_count} reviews · {c.location_status}
                   </span>
                 </div>
-                <button
-                  onClick={() => handleDeriveFromCompetitor(i)}
-                  disabled={derivingIdx !== null}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800 dark:hover:bg-violet-900/40 disabled:opacity-50 flex-shrink-0 ml-2"
-                  title={`Create a business-scope campaign for ${c.name}`}
-                >
-                  {derivingIdx === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  Campaign
-                </button>
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  <button
+                    onClick={() => handleAddToQueue(i)}
+                    disabled={queueingIdx !== null || queuedFeedback[i] === 'queued'}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100 dark:bg-slate-900/20 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-900/40 disabled:opacity-50"
+                    title={queuedFeedback[i] === 'queued' ? 'Added to queue' : `Add ${c.name} to the prospect queue for later`}
+                  >
+                    {queueingIdx === i ? <Loader2 className="w-3 h-3 animate-spin" /> : queuedFeedback[i] === 'queued' ? <Check className="w-3 h-3 text-green-600" /> : <Inbox className="w-3 h-3" />}
+                    {queuedFeedback[i] === 'queued' ? 'Queued' : 'Queue'}
+                  </button>
+                  {queuedFeedback[i] === 'already' && (
+                    <span className="text-[10px] text-slate-400" title="Already in the queue">already queued</span>
+                  )}
+                  {queuedFeedback[i] === 'exists' && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400" title="A campaign already exists for this business">campaign exists</span>
+                  )}
+                  <button
+                    onClick={() => handleDeriveFromCompetitor(i)}
+                    disabled={derivingIdx !== null}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800 dark:hover:bg-violet-900/40 disabled:opacity-50"
+                    title={`Create a business-scope campaign for ${c.name}`}
+                  >
+                    {derivingIdx === i ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                    Campaign
+                  </button>
+                </div>
               </div>
             ))}
           </div>

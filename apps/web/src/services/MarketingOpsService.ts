@@ -608,6 +608,85 @@ export interface DeriveAllUnmatchedResult {
   message?: string;
 }
 
+// ─── Prospect Queue types (Add to Queue sprint) ──────────────────────────
+
+export type ProspectSourceKind = 'category_analysis' | 'city_category_audit' | 'scan_unmatched' | 'manual';
+export type ProspectStatus = 'queued' | 'campaign_created' | 'dismissed';
+export type ProspectPriority = 'high' | 'normal';
+export type ProspectDismissReason = 'already_customer' | 'bad_fit' | 'duplicate' | 'other';
+
+export interface AddToQueueInput {
+  business_name: string;
+  category?: string;
+  city?: string;
+  state?: string;
+  source_kind: ProspectSourceKind;
+  source_campaign_id: string;
+  source_audit_id?: string;
+  source_execution_id?: string;
+  audit_date?: string; // ISO datetime
+  business_snapshot?: Record<string, any>;
+  priority?: ProspectPriority;
+  note?: string;
+}
+
+export type AddToQueueResult =
+  | { kind: 'created'; entry: ProspectQueueEntry; created: true }
+  | { kind: 'already_queued'; entry: ProspectQueueEntry; created: false }
+  | { kind: 'campaign_exists'; campaignId: string };
+
+export interface ProspectQueueListFilters {
+  status?: ProspectStatus | ProspectStatus[];
+  category?: string;
+  city?: string;
+  source_kind?: ProspectSourceKind;
+  assigned_to?: string; // 'me' | 'unassigned' | <userId>
+  limit?: number;
+  includeCampaigns?: boolean;
+}
+
+export interface ProspectQueuePatch {
+  priority?: ProspectPriority;
+  note?: string | null;
+  assigned_to?: string | null;
+}
+
+export interface ProspectQueueEntry {
+  id: string;
+  business_name: string;
+  category?: string | null;
+  city?: string | null;
+  state?: string | null;
+  source_kind: ProspectSourceKind;
+  source_scope?: string | null;
+  source_campaign_id?: string | null;
+  source_audit_id?: string | null;
+  source_execution_id?: string | null;
+  audit_date?: string | null;
+  business_snapshot?: Record<string, any>;
+  detected_signals?: string[];
+  signal_count: number;
+  rating?: number | null;
+  review_count?: number | null;
+  status: ProspectStatus;
+  priority: ProspectPriority;
+  note?: string | null;
+  queued_by?: string | null;
+  assigned_to?: string | null;
+  assigned_at?: string | null;
+  processed_campaign_id?: string | null;
+  processed_at?: string | null;
+  dismissed_reason?: ProspectDismissReason | null;
+  created_at: string;
+  updated_at: string;
+  // Board-view decoration (present when includeCampaigns=true)
+  campaign_stage?: string | null;
+  campaign_category?: string | null;
+  repair_track?: string | null;
+  is_hot_prospect?: boolean | null;
+  stage_entered_at?: string | null;
+}
+
 export interface LogContactInput {
   contact_channel: ContactChannel;
   contact_date: string;
@@ -3598,6 +3677,111 @@ class MarketingOpsService extends AdminApiSingleton {
     }
     const json = await res.json();
     return json.data;
+  }
+
+  // ─── Prospect Queue (Add to Queue sprint) ──────────────────────────────
+  // Capture businesses from audit surfaces for later campaign creation
+  // without navigating away. Mirrors the backend service's lifecycle:
+  // queued → campaign_created / dismissed.
+
+  async addToQueue(input: AddToQueueInput): Promise<AddToQueueResult> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue`,
+      { method: 'POST', body: JSON.stringify(input) },
+      `mkt-ops-prospect-queue-add`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to add to queue');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    const data = result.data?.data ?? result.data;
+    const created = result.data?.created ?? true;
+    // campaign_exists is returned as 200 with a kind discriminator (the
+    // backend avoids 409 so the client can read the campaignId link).
+    if (data?.kind === 'campaign_exists') {
+      return { kind: 'campaign_exists', campaignId: data.campaignId };
+    }
+    return {
+      kind: created ? 'created' : 'already_queued',
+      entry: data,
+      created,
+    };
+  }
+
+  async listProspectQueue(filters?: ProspectQueueListFilters): Promise<{ entries: ProspectQueueEntry[]; queuedCount: number }> {
+    const params = new URLSearchParams();
+    if (filters?.status) {
+      const s = Array.isArray(filters.status) ? filters.status.join(',') : filters.status;
+      params.set('status', s);
+    }
+    if (filters?.category) params.set('category', filters.category);
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.source_kind) params.set('source_kind', filters.source_kind);
+    if (filters?.assigned_to) params.set('assigned_to', filters.assigned_to);
+    if (filters?.limit) params.set('limit', String(filters.limit));
+    if (filters?.includeCampaigns) params.set('include', 'campaigns');
+    const query = params.toString();
+    const url = `${BASE_URL}/prospect-queue${query ? `?${query}` : ''}`;
+
+    const result = await this.makeDefaultRequest<any>(url, {}, 'mkt-ops-prospect-queue', this.cacheTTL);
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to list prospect queue');
+    }
+    const data = result.data?.data ?? result.data;
+    return {
+      entries: Array.isArray(data) ? data : [],
+      queuedCount: result.data?.queuedCount ?? 0,
+    };
+  }
+
+  async updateProspectQueue(id: string, patch: ProspectQueuePatch): Promise<ProspectQueueEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}`,
+      { method: 'PATCH', body: JSON.stringify(patch) },
+      `mkt-ops-prospect-queue-update-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to update queue entry');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    return result.data?.data ?? result.data;
+  }
+
+  async createCampaignFromQueue(id: string): Promise<{ campaign: Campaign; created: boolean; queueEntry: ProspectQueueEntry }> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}/create-campaign`,
+      { method: 'POST', body: JSON.stringify({}) },
+      `mkt-ops-prospect-queue-create-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create campaign from queue');
+    }
+    // Invalidate both the queue and the campaign list — the new campaign
+    // appears in the list, and the queue entry graduates to campaign_created.
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    await this.invalidateCachePattern('mkt-ops-campaigns-list');
+    return {
+      campaign: result.data?.data ?? result.data,
+      created: result.data?.created ?? true,
+      queueEntry: result.data?.queueEntry ?? (result.data?.data?.queueEntry ?? null),
+    };
+  }
+
+  async dismissProspectQueue(id: string, reason?: ProspectDismissReason): Promise<ProspectQueueEntry> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/prospect-queue/${id}/dismiss`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+      `mkt-ops-prospect-queue-dismiss-${id}`,
+      0,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to dismiss queue entry');
+    }
+    await this.invalidateCachePattern('mkt-ops-prospect-queue');
+    return result.data?.data ?? result.data;
   }
 }
 

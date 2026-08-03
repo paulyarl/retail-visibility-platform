@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Flame, Plus, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Flame, Plus, RefreshCw, AlertCircle, Loader2, Inbox, Check } from 'lucide-react';
 import marketingOpsService, { type SyncReport } from '@/services/MarketingOpsService';
 
 interface SyncReportCardProps {
@@ -20,6 +20,8 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
   const [bulkCreating, setBulkCreating] = useState(false);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [queueingIdx, setQueueingIdx] = useState<number | null>(null);
+  const [queuedFeedback, setQueuedFeedback] = useState<Record<number, 'queued' | 'exists' | 'already' | 'error'>>({});
 
   const fetchReport = async () => {
     setLoading(true);
@@ -95,6 +97,32 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
       setError(e.message || 'Failed to create campaigns');
     } finally {
       setBulkCreating(false);
+    }
+  };
+
+  const handleQueueOne = async (idx: number, businessName: string) => {
+    setQueueingIdx(idx);
+    setError(null);
+    try {
+      const result = await marketingOpsService.addToQueue({
+        business_name: businessName,
+        source_kind: 'scan_unmatched',
+        source_campaign_id: campaignId,
+        source_execution_id: executionId,
+        // Sync report rows only carry {businessName, reason} — no rating/
+        // review/signal data. The snapshot is intentionally thin; the
+        // operator can enrich it from the campaign detail page later.
+        business_snapshot: { business_name: businessName },
+      });
+      setQueuedFeedback((prev) => ({
+        ...prev,
+        [idx]: result.kind === 'campaign_exists' ? 'exists' : result.kind === 'already_queued' ? 'already' : 'queued',
+      }));
+    } catch (e: any) {
+      setQueuedFeedback((prev) => ({ ...prev, [idx]: 'error' }));
+      setError(e.message || 'Failed to add to queue');
+    } finally {
+      setQueueingIdx(null);
     }
   };
 
@@ -231,14 +259,31 @@ export default function SyncReportCard({ executionId, campaignId, initialReport,
                     <span className="text-gray-700 dark:text-gray-300">{u.businessName}</span>
                     <span className="text-gray-400 ml-2">— {u.reason}</span>
                   </div>
-                  <button
-                    onClick={() => handleCreateOne(i, u.businessName)}
-                    disabled={creatingIdx === i || bulkCreating}
-                    className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50 flex-shrink-0"
-                  >
-                    {creatingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />}
-                    Create
-                  </button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleQueueOne(i, u.businessName)}
+                      disabled={queueingIdx === i || queuedFeedback[i] === 'queued'}
+                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/40 disabled:opacity-50"
+                      title={queuedFeedback[i] === 'queued' ? 'Added to queue' : `Add ${u.businessName} to the prospect queue for later`}
+                    >
+                      {queueingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : queuedFeedback[i] === 'queued' ? <Check className="h-2.5 w-2.5 text-green-600" /> : <Inbox className="h-2.5 w-2.5" />}
+                      {queuedFeedback[i] === 'queued' ? 'Queued' : 'Queue'}
+                    </button>
+                    {queuedFeedback[i] === 'already' && (
+                      <span className="text-[9px] text-slate-400">already</span>
+                    )}
+                    {queuedFeedback[i] === 'exists' && (
+                      <span className="text-[9px] text-amber-600 dark:text-amber-400">campaign exists</span>
+                    )}
+                    <button
+                      onClick={() => handleCreateOne(i, u.businessName)}
+                      disabled={creatingIdx === i || bulkCreating}
+                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50"
+                    >
+                      {creatingIdx === i ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />}
+                      Create
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

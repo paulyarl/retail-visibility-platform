@@ -15,10 +15,12 @@ import {
   IconFlask,
   IconShield,
   IconBook,
+  IconListCheck,
 } from '@tabler/icons-react';
 
 const NAV_ITEMS = [
   { href: '/settings/admin/marketing-ops', label: 'Dashboard', icon: IconLayoutDashboard, emoji: '📊' },
+  { href: '/settings/admin/marketing-ops/queue', label: 'Queue', icon: IconListCheck, emoji: '📥' },
   { href: '/settings/admin/marketing-ops/campaigns', label: 'Campaigns', icon: IconTarget, emoji: '🎯' },
   { href: '/settings/admin/marketing-ops/recovery', label: 'Recovery', icon: IconShield, emoji: '🛡️' },
   { href: '/settings/admin/marketing-ops/playbooks', label: 'Playbooks', icon: IconBook, emoji: '📚' },
