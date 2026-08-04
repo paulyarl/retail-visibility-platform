@@ -55,7 +55,14 @@ export default function CampaignListClient() {
   const [attributeFilter, setAttributeFilter] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('');
   const [showClosed, setShowClosed] = useState(false);
+  const [presetTones, setPresetTones] = useState<string[]>([]);
   const staffUsers = useStaffUsers();
+
+  useEffect(() => {
+    marketingOpsService.listTonePresets()
+      .then(setPresetTones)
+      .catch(() => {});
+  }, []);
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -84,7 +91,10 @@ export default function CampaignListClient() {
 
   const formatCurrency = (cents: number | null) => cents != null ? `$${(cents / 100).toLocaleString()}` : '—';
 
-  const toneOptions = useMemo(() => distinctValues(campaigns, (c) => c.tone), [campaigns]);
+  const toneOptions = useMemo(
+    () => [...new Set([...presetTones, ...distinctValues(campaigns, (c) => c.tone)])].sort((a, b) => a.localeCompare(b)),
+    [presetTones, campaigns],
+  );
 
   const campaignsByStage = (stage: CampaignStage) => campaigns.filter((c) => c.stage === stage);
   const filteredCampaigns = useMemo(

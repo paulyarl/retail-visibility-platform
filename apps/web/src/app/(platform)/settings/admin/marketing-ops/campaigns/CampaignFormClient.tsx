@@ -119,15 +119,20 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
 
   useEffect(() => {
-    marketingOpsService.listCampaigns({ limit: 1000 })
-      .then(({ items }) => {
+    Promise.all([
+      marketingOpsService.listCampaigns({ limit: 1000 }).catch(() => ({ items: [] as any[] })),
+      marketingOpsService.listTonePresets().catch(() => [] as string[]),
+    ])
+      .then(([{ items }, presetTones]) => {
+        const recordTones = distinctValues(items, (c) => c.tone);
+        const mergedTones = [...new Set([...presetTones, ...recordTones])].sort((a, b) => a.localeCompare(b));
         setVocab({
           categories: distinctValues(items, (c) => c.category),
           cities: distinctValues(items, (c) => c.city),
           neighborhoods: distinctValues(items, (c) => c.neighborhood),
           contactMethods: distinctValues(items, (c) => c.contact_method),
           estimatedTiers: distinctValues(items, (c) => c.estimated_tier),
-          tones: distinctValues(items, (c) => c.tone),
+          tones: mergedTones,
         });
       })
       .catch(() => {});

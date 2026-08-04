@@ -2347,6 +2347,33 @@ class MarketingOpsService extends AdminApiSingleton {
     return result.data?.data ?? [];
   }
 
+  /**
+   * Fetch the canonical list of tone values from the category-tone presets
+   * table. These are always available in every Tone dropdown (campaign form,
+   * campaign list filter, prompt library filter, prompt modal) — even when
+   * no existing record uses them yet.
+   *
+   * Returns the distinct, sorted list of `tone` strings.
+   */
+  async listTonePresets(): Promise<string[]> {
+    const result = await this.makeDefaultRequest<any>(
+      `${BASE_URL}/category-tone-presets`,
+      {},
+      'mkt-ops-category-tone-presets',
+      this.cacheTTL,
+    );
+    if (!result.success) {
+      throw new Error(typeof result.error === 'string' ? result.error : 'Failed to fetch tone presets');
+    }
+    const rows: any[] = result.data?.data ?? [];
+    const set = new Set<string>();
+    for (const r of rows) {
+      const t = typeof r === 'string' ? r : r?.tone;
+      if (t && typeof t === 'string') set.add(t.trim());
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }
+
   async createServiceCategory(value: string, label: string): Promise<ServiceCategory> {
     const result = await this.makeDefaultRequest<any>(
       `${BASE_URL}/pricing/service-categories`,

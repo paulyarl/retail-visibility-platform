@@ -39,6 +39,7 @@ export default function PromptLibraryClient() {
   const [toneFilter, setToneFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
+  const [presetTones, setPresetTones] = useState<string[]>([]);
 
   // S3b: deep-link from campaign detail (?campaignId=&angle=)
   const searchParams = useSearchParams();
@@ -71,8 +72,17 @@ export default function PromptLibraryClient() {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  useEffect(() => {
+    marketingOpsService.listTonePresets()
+      .then(setPresetTones)
+      .catch(() => {});
+  }, []);
+
   const categoryOptions = useMemo(() => distinctValues(templates, (t) => t.category), [templates]);
-  const toneOptions = useMemo(() => distinctValues(templates, (t) => t.tone), [templates]);
+  const toneOptions = useMemo(
+    () => [...new Set([...presetTones, ...distinctValues(templates, (t) => t.tone)])].sort((a, b) => a.localeCompare(b)),
+    [presetTones, templates],
+  );
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this prompt template?')) return;
