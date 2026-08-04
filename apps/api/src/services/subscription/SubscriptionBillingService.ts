@@ -85,6 +85,11 @@ interface BillingPaymentMethodRow {
 export class SubscriptionBillingService {
   private stripe: Stripe | null = null;
 
+  /** Public accessor for the Stripe instance (used by portal checkout off-session charges, §6.3) */
+  get stripeInstance(): Stripe | null {
+    return this.stripe;
+  }
+
   constructor() {
     // Initialize Stripe if configured
     const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -1552,6 +1557,8 @@ export class SubscriptionBillingService {
     serviceCategory?: string;
     couponCode?: string;
     metadata?: Record<string, string>;
+    setupFutureUsage?: 'off_session';
+    customer?: string;
   }): Promise<{ clientSecret: string; paymentIntentId: string } | { error: string }> {
     if (!this.stripe) {
       return { error: 'Stripe not configured' };
@@ -1562,6 +1569,8 @@ export class SubscriptionBillingService {
         currency: 'usd',
         description: params.description,
         automatic_payment_methods: { enabled: true },
+        setup_future_usage: params.setupFutureUsage,
+        customer: params.customer,
         metadata: {
           type: 'marketing_ops_payment',
           campaignId: params.campaignId,

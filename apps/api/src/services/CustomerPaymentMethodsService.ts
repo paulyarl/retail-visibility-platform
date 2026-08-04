@@ -17,6 +17,7 @@ import { prisma } from '../prisma';
 import { generateCustomerPaymentMethodId } from '../lib/id-generator';
 import Stripe from 'stripe';
 import { logger } from '../logger';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 
 // ==================
 // TYPES
@@ -349,6 +350,24 @@ export class CustomerPaymentMethodsService {
     return this.mapRow(row as unknown as CustomerPaymentMethodRow);
   }
 
+  /**
+   * Save a payment method from a completed PaymentIntent (§6.3).
+   * Used by the marketing pay page when the customer opts in to "save this card"
+   * and has an authenticated account. Attaches the PI's payment_method to the
+   * customer's platform-scoped Stripe customer and inserts the DB row.
+   */
+  async savePaymentMethodFromIntent(
+    customerId: string,
+    paymentIntentId: string,
+  ): Promise<CustomerPaymentMethod> {
+    return this.addPaymentMethod(customerId, {
+      tenantId: PLATFORM_SCOPE,
+      gatewayType: 'stripe',
+      paymentMethodToken: paymentIntentId, // addPaymentMethod handles pi_xxx → pm_xxx resolution
+      type: 'card',
+    });
+  }
+
   // ==================
   // DEFAULT
   // ==================
@@ -611,7 +630,7 @@ export class CustomerPaymentMethodsService {
    * Get or create a Stripe customer for this customer+tenant combination
    * Stores the Stripe customer ID in the metadata field
    */
-  private async getOrCreateStripeCustomer(
+  async getOrCreateStripeCustomer(
     customerId: string,
     tenantId: string,
     email: string

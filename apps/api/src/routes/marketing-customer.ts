@@ -30,6 +30,12 @@ import { prisma } from '../prisma';
 import { logger } from '../logger';
 import { CustomerTokenService } from '../services/CustomerTokenService';
 import { CustomerAuthService } from '../services/CustomerAuthService';
+import { CustomerPaymentMethodsService } from '../services/CustomerPaymentMethodsService';
+import { CouponService } from '../services/CouponService';
+import { MarketingCampaignService } from '../services/MarketingCampaignService';
+import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
+import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
+import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
 import {
   buildPortalOverview,
   buildReceiptViewModel,
@@ -615,6 +621,460 @@ router.post('/alerts/mark-all-read', requireCustomerAuth, requirePlatformContext
   } catch (error: any) {
     logger.error('[marketing-customer] POST /alerts/mark-all-read error', undefined, { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to mark all read' });
+  }
+});
+
+// ── Save payment method from PaymentIntent (§6.3) ───────────────────────
+
+const saveFromPaymentSchema = z.object({
+  paymentIntentId: z.string().min(1),
+});
+
+router.post('/payment-methods/save-from-payment', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+    const parsed = saveFromPaymentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    // Verify the PaymentIntent succeeded before saving
+    const billingService = getSubscriptionBillingService();
+    const piStatus = await billingService.getPaymentIntentStatus(parsed.data.paymentIntentId);
+    if ('error' in piStatus) {
+      return res.status(400).json({ success: false, error: 'Payment intent not found' });
+    }
+    if (piStatus.status !== 'succeeded') {
+      return res.status(400).json({ success: false, error: `Payment not succeeded (status: ${piStatus.status})` });
+    }
+
+    const pmService = CustomerPaymentMethodsService.getInstance();
+    const pm = await pmService.savePaymentMethodFromIntent(customerId, parsed.data.paymentIntentId);
+
+    res.status(201).json({ success: true, data: pm });
+  } catch (error: any) {
+    logger.error('[marketing-customer] POST /payment-methods/save-from-payment error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to save payment method' });
+  }
+});
+
+// ── Applicable coupons (§7.5) ───────────────────────────────────────────
+
+router.get('/coupons/applicable', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+    const campaignId = req.query.campaignId as string;
+    if (!campaignId) {
+      return res.status(400).json({ success: false, error: 'campaignId is required' });
+    }
+
+    // Verify campaign belongs to customer
+    const campaign = await prisma.mkt_campaigns_list.findFirst({
+      where: { id: campaignId, customer_id: customerId },
+      select: { id: true, package_price_cents: true, service_category: true },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    const priceCents = campaign.package_price_cents || 0;
+    const serviceCategory = campaign.service_category || undefined;
+
+    // Fetch customer's saved platform-scope coupons
+    const savedCoupons = await prisma.customer_saved_coupons.findMany({
+      where: { customer_id: customerId, tenant_id: PLATFORM_SCOPE, status: 'saved' },
+      include: { coupons: true },
+    });
+
+    // Validate each coupon against the campaign price + service category
+    const applicable: Array<{
+      savedCouponId: string;
+      code: string;
+      label: string;
+      discountCents: number;
+      discountType: string;
+      expiresAt: string | null;
+    }> = [];
+
+    for (const sc of savedCoupons) {
+      const coupon = sc.coupons;
+      if (!coupon || !coupon.is_active) continue;
+      try {
+        const result = await CouponService.getInstance().validateCoupon(
+          PLATFORM_SCOPE,
+          coupon.code,
+          { subtotalCents: priceCents },
+        );
+        if (result?.valid && (result.discountCents || 0) > 0) {
+          applicable.push({
+            savedCouponId: sc.id,
+            code: coupon.code,
+            label: coupon.label || coupon.code,
+            discountCents: result.discountCents,
+            discountType: coupon.discount_type || 'fixed',
+            expiresAt: coupon.end_date ? coupon.end_date.toISOString() : null,
+          });
+        }
+      } catch {
+        // Coupon not applicable — skip
+      }
+    }
+
+    res.json({ success: true, data: applicable });
+  } catch (error: any) {
+    logger.error('[marketing-customer] GET /coupons/applicable error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to load applicable coupons' });
+  }
+});
+
+// ── Portal checkout — repeat purchase / retainer (§7.6) ─────────────────
+
+const portalCheckoutSchema = z.object({
+  campaignId: z.string().min(1),
+  couponCode: z.string().optional(),
+  savedCouponId: z.string().optional(),
+  useSavedMethodId: z.string().optional(),
+  billingAddressId: z.string().optional(),
+});
+
+router.post('/checkout', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+    const parsed = portalCheckoutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    const { campaignId, couponCode, savedCouponId, useSavedMethodId, billingAddressId } = parsed.data;
+
+    // Verify campaign belongs to customer and has a follow-on price
+    const campaign = await prisma.mkt_campaigns_list.findFirst({
+      where: { id: campaignId, customer_id: customerId },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    let amountCents = campaign.package_price_cents || 0;
+    if (amountCents <= 0) {
+      return res.status(400).json({ success: false, error: 'No follow-on package price set for this campaign' });
+    }
+
+    let discountCents = 0;
+
+    // Coupon redemption (§7.5)
+    let redeemedCouponCode: string | undefined;
+    if (savedCouponId) {
+      const sc = await prisma.customer_saved_coupons.findFirst({
+        where: { id: savedCouponId, customer_id: customerId, tenant_id: PLATFORM_SCOPE, status: 'saved' },
+        include: { coupons: true },
+      });
+      if (!sc || !sc.coupons) {
+        return res.status(400).json({ success: false, error: 'invalid_coupon' });
+      }
+      redeemedCouponCode = sc.coupons.code;
+      try {
+        const result = await CouponService.getInstance().validateCoupon(
+          PLATFORM_SCOPE,
+          redeemedCouponCode,
+          { subtotalCents: amountCents },
+        );
+        if (result?.valid && result.discountCents) {
+          discountCents = result.discountCents;
+          amountCents = Math.max(0, amountCents - discountCents);
+        }
+      } catch {
+        return res.status(400).json({ success: false, error: 'Coupon no longer valid' });
+      }
+    } else if (couponCode) {
+      try {
+        const result = await CouponService.getInstance().validateCoupon(
+          PLATFORM_SCOPE,
+          couponCode,
+          { subtotalCents: amountCents },
+        );
+        if (result?.valid && result.discountCents) {
+          discountCents = result.discountCents;
+          amountCents = Math.max(0, amountCents - discountCents);
+          redeemedCouponCode = couponCode;
+        }
+      } catch {
+        // Invalid coupon — proceed without discount
+      }
+    }
+
+    const billingService = getSubscriptionBillingService();
+
+    // Off-session charge with saved payment method (§6.3)
+    if (useSavedMethodId) {
+      const pmService = CustomerPaymentMethodsService.getInstance();
+      const savedPm = await pmService.getPaymentMethod(customerId, useSavedMethodId);
+      if (!savedPm || savedPm.tenantId !== PLATFORM_SCOPE) {
+        return res.status(400).json({ success: false, error: 'invalid_payment_method' });
+      }
+
+      // Get or create the platform-scoped Stripe customer
+      const customer = await prisma.customers.findUnique({
+        where: { id: customerId },
+        select: { email: true, metadata: true },
+      });
+      if (!customer) {
+        return res.status(400).json({ success: false, error: 'Customer not found' });
+      }
+
+      const stripeCustomer = await pmService.getOrCreateStripeCustomer(
+        customerId,
+        PLATFORM_SCOPE,
+        customer.email,
+      );
+
+      try {
+        const paymentIntent = await billingService.stripeInstance!.paymentIntents.create({
+          amount: amountCents,
+          currency: 'usd',
+          customer: stripeCustomer.id,
+          payment_method: savedPm.paymentMethodToken || undefined,
+          off_session: true,
+          confirm: true,
+          description: `Marketing Ops — ${campaign.business_name} (repeat purchase)`,
+          metadata: {
+            type: 'marketing_ops_repeat_purchase',
+            campaignId: campaign.id,
+            customerId,
+            couponCode: redeemedCouponCode || 'N/A',
+          },
+        });
+
+        // Mark campaign paid + record revenue
+        const updated = await MarketingCampaignService.markCampaignPaid({
+          campaignId: campaign.id,
+          amountCents,
+          discountCents,
+          gatewayType: 'stripe',
+          gatewayTransactionId: paymentIntent.id,
+          source: 'portal_checkout',
+          couponCode: redeemedCouponCode,
+          serviceCategory: campaign.service_category || undefined,
+        });
+
+        // Flip wallet coupon to redeemed
+        if (savedCouponId) {
+          await prisma.customer_saved_coupons.update({
+            where: { id: savedCouponId },
+            data: { status: 'redeemed', redeemed_at: new Date() },
+          });
+        }
+
+        // Fire-and-forget receipt email
+        void MarketingReceiptEmailService.send({
+          campaignId: campaign.id,
+          toEmail: customer.email,
+          ctx: req.ctx,
+        }).catch((e) => {
+          logger.error('[marketing-customer] receipt email failed', undefined, { error: (e as Error).message });
+        });
+
+        return res.json({
+          success: true,
+          data: {
+            campaignId: campaign.id,
+            stage: updated.stage,
+            amountCents,
+            discountCents,
+            gatewayTransactionId: paymentIntent.id,
+            receiptUrl: `/api/customer/marketing/receipts`,
+          },
+        });
+      } catch (stripeError: any) {
+        // SCA failure — return authentication_required for frontend to handle
+        if (stripeError.code === 'authentication_required') {
+          return res.status(402).json({
+            success: false,
+            error: 'authentication_required',
+            message: 'This card requires authentication. Please use the interactive checkout.',
+            clientSecret: stripeError.raw?.payment_intent?.client_secret,
+          });
+        }
+        logger.error('[marketing-customer] off-session charge failed', undefined, { error: stripeError.message });
+        return res.status(400).json({ success: false, error: stripeError.message || 'Charge failed' });
+      }
+    }
+
+    // Interactive checkout — create a PaymentIntent with setup_future_usage
+    const customer = await prisma.customers.findUnique({
+      where: { id: customerId },
+      select: { email: true, metadata: true },
+    });
+    let stripeCustomerId: string | undefined;
+    if (customer) {
+      const pmService = CustomerPaymentMethodsService.getInstance();
+      const stripeCustomer = await pmService.getOrCreateStripeCustomer(
+        customerId,
+        PLATFORM_SCOPE,
+        customer.email,
+      );
+      stripeCustomerId = stripeCustomer.id;
+    }
+
+    const result = await billingService.createOneTimePaymentIntent({
+      amountCents,
+      description: `Marketing Ops — ${campaign.business_name} (repeat purchase)`,
+      campaignId: campaign.id,
+      serviceCategory: campaign.service_category || undefined,
+      couponCode: redeemedCouponCode,
+      setupFutureUsage: 'off_session',
+      customer: stripeCustomerId,
+      metadata: {
+        customerId,
+        billingAddressId: billingAddressId || 'N/A',
+      },
+    });
+
+    if ('error' in result) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        clientSecret: result.clientSecret,
+        paymentIntentId: result.paymentIntentId,
+        amountCents,
+        discountCents,
+        campaignId: campaign.id,
+      },
+    });
+  } catch (error: any) {
+    logger.error('[marketing-customer] POST /checkout error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to create checkout' });
+  }
+});
+
+// ── Confirm portal checkout (after interactive payment succeeds) ─────────
+
+const portalCheckoutConfirmSchema = z.object({
+  campaignId: z.string().min(1),
+  paymentIntentId: z.string().min(1),
+  couponCode: z.string().optional(),
+  savedCouponId: z.string().optional(),
+  billingAddressId: z.string().optional(),
+});
+
+router.post('/checkout/confirm', requireCustomerAuth, requirePlatformContext, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+    const parsed = portalCheckoutConfirmSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    const { campaignId, paymentIntentId, couponCode, savedCouponId } = parsed.data;
+
+    // Verify campaign belongs to customer
+    const campaign = await prisma.mkt_campaigns_list.findFirst({
+      where: { id: campaignId, customer_id: customerId },
+    });
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'not_found' });
+    }
+
+    const billingService = getSubscriptionBillingService();
+    const piStatus = await billingService.getPaymentIntentStatus(paymentIntentId);
+    if ('error' in piStatus) {
+      return res.status(400).json({ success: false, error: 'Payment intent not found' });
+    }
+    if (piStatus.status !== 'succeeded') {
+      return res.status(400).json({ success: false, error: `Payment not succeeded (status: ${piStatus.status})` });
+    }
+
+    const charge = piStatus.charges?.[0];
+    const gatewayTransactionId = charge?.id || paymentIntentId;
+    const amountCents = campaign.package_price_cents || 0;
+    let discountCents = 0;
+
+    // Re-validate coupon if provided
+    let redeemedCouponCode: string | undefined;
+    if (savedCouponId) {
+      const sc = await prisma.customer_saved_coupons.findFirst({
+        where: { id: savedCouponId, customer_id: customerId, tenant_id: PLATFORM_SCOPE },
+        include: { coupons: true },
+      });
+      if (sc?.coupons) {
+        redeemedCouponCode = sc.coupons.code;
+        try {
+          const result = await CouponService.getInstance().validateCoupon(
+            PLATFORM_SCOPE,
+            redeemedCouponCode,
+            { subtotalCents: amountCents, serviceCategory: campaign.service_category || undefined },
+          );
+          if (result?.valid && result.discountCents) {
+            discountCents = result.discountCents;
+          }
+        } catch { /* coupon invalid at confirm time — no discount */ }
+      }
+    } else if (couponCode) {
+      try {
+        const result = await CouponService.getInstance().validateCoupon(
+          PLATFORM_SCOPE,
+          couponCode,
+          { subtotalCents: amountCents },
+        );
+        if (result?.valid && result.discountCents) {
+          discountCents = result.discountCents;
+          redeemedCouponCode = couponCode;
+        }
+      } catch { /* invalid — no discount */ }
+    }
+
+    const finalAmount = Math.max(0, amountCents - discountCents);
+
+    const updated = await MarketingCampaignService.markCampaignPaid({
+      campaignId: campaign.id,
+      amountCents: finalAmount,
+      discountCents,
+      gatewayType: 'stripe',
+      gatewayTransactionId,
+      source: 'portal_checkout',
+      couponCode: redeemedCouponCode,
+      serviceCategory: campaign.service_category || undefined,
+    });
+
+    // Flip wallet coupon to redeemed
+    if (savedCouponId) {
+      await prisma.customer_saved_coupons.update({
+        where: { id: savedCouponId },
+        data: { status: 'redeemed', redeemed_at: new Date() },
+      });
+    }
+
+    // Fire-and-forget receipt email
+    const customer = await prisma.customers.findUnique({
+      where: { id: customerId },
+      select: { email: true },
+    });
+    if (customer) {
+      void MarketingReceiptEmailService.send({
+        campaignId: campaign.id,
+        toEmail: customer.email,
+        ctx: req.ctx,
+      }).catch((e) => {
+        logger.error('[marketing-customer] receipt email failed', undefined, { error: (e as Error).message });
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        campaignId: campaign.id,
+        stage: updated.stage,
+        amountCents: finalAmount,
+        discountCents,
+        gatewayTransactionId,
+      },
+    });
+  } catch (error: any) {
+    logger.error('[marketing-customer] POST /checkout/confirm error', undefined, { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to confirm checkout' });
   }
 });
 

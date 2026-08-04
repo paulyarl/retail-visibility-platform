@@ -56,7 +56,8 @@ export type ConversionSource =
   | 'gbp_enhancer'
   | 'directory_preview'
   | 'manual'
-  | 'external';
+  | 'external'
+  | 'portal_checkout';
 
 export type CampaignOrigin = 'prospect' | 'upsell';
 
