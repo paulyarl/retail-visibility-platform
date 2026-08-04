@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
+import marketingCustomerService from '@/services/MarketingCustomerService';
 
 // Storefront context items (§7.2) — visible when contexts.storefront is true
 const storefrontNavItems = [
@@ -34,6 +36,7 @@ const platformNavItems = [
   { href: '/account/marketing', label: 'My Services', icon: Briefcase },
   { href: '/account/marketing/purchases', label: 'Purchases', icon: ShoppingBag },
   { href: '/account/marketing/support', label: 'Support', icon: LifeBuoy },
+  { href: '/account/marketing/alerts', label: 'Service Alerts', icon: Bell },
   { href: '/account/marketing/settings', label: 'Branding', icon: Palette },
 ];
 
@@ -48,13 +51,38 @@ const sharedNavItems = [
 export function CustomerSidebar() {
   const pathname = usePathname();
   const { customer, contexts, logout } = useCustomerAuth();
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+
+  // Fetch unread alert count when platform context is active (§7.9)
+  useEffect(() => {
+    if (!contexts?.platform) {
+      setUnreadAlerts(0);
+      return;
+    }
+    let cancelled = false;
+    const loadUnread = async () => {
+      try {
+        const count = await marketingCustomerService.getUnreadAlertCount();
+        if (!cancelled) setUnreadAlerts(count);
+      } catch {
+        // Silently fail — badge is non-critical
+      }
+    };
+    loadUnread();
+    // Refresh every 60s
+    const interval = setInterval(loadUnread, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [contexts?.platform, pathname]);
 
   const handleLogout = async () => {
     await logout();
     window.location.href = '/';
   };
 
-  const renderNavItem = (item: { href: string; label: string; icon: any }) => {
+  const renderNavItem = (item: { href: string; label: string; icon: any; badge?: number }) => {
     const isActive = pathname === item.href ||
       (item.href !== '/account' && pathname.startsWith(item.href));
 
@@ -70,7 +98,12 @@ export function CustomerSidebar() {
         )}
       >
         <item.icon className="w-5 h-5" />
-        {item.label}
+        <span className="flex-1">{item.label}</span>
+        {!!item.badge && item.badge > 0 && (
+          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold">
+            {item.badge > 99 ? '99+' : item.badge}
+          </span>
+        )}
       </Link>
     );
   };
@@ -121,7 +154,12 @@ export function CustomerSidebar() {
         <div className="pt-4 pb-1 px-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Account</p>
         </div>
-        {sharedNavItems.map(renderNavItem)}
+        {sharedNavItems.map((item) =>
+          renderNavItem({
+            ...item,
+            badge: item.href === '/account/notifications' ? unreadAlerts : undefined,
+          }),
+        )}
       </nav>
 
       {/* Logout */}
