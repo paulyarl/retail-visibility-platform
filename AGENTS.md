@@ -93,3 +93,48 @@ Migrations:
 - `163_crm_tickets_campaign_id.sql` — additive `campaign_id` on `crm_support_tickets`
 - `164_crm_customer_alert_states.sql` — per-customer alert read/dismiss state
 
+## Marketing Ops Customer Portal (Phase 3 — Card on File + Repeat Purchase)
+
+Saved-card plumbing (§6.3):
+- `CustomerPaymentMethodsService.savePaymentMethodFromIntent(customerId, pi)` — attaches a PI's payment_method to the customer's platform-scoped Stripe customer
+- `CustomerPaymentMethodsService.getOrCreateStripeCustomer` is now public (was private)
+- `SubscriptionBillingService.createOneTimePaymentIntent` accepts `setupFutureUsage` + `customer` params
+- `SubscriptionBillingService.stripeInstance` getter (public accessor for the private Stripe instance)
+- `ConversionSource` type extended with `'portal_checkout'`
+- Pay page (`/marketing/pay`) passes `saveCard` → `setup_future_usage: 'off_session'` on the PI; post-confirmation, if authenticated + opted in, calls `savePaymentMethodFromIntent`
+
+Portal checkout (§7.6, §7.5):
+- `POST /api/customer/marketing/checkout` — repeat-purchase checkout:
+  - Off-session charge with `useSavedMethodId` (customer + payment_method + off_session: true)
+  - SCA failure → 402 `authentication_required` with clientSecret for frontend fallback
+  - Interactive checkout → PI with `setup_future_usage: 'off_session'` + platform Stripe customer
+  - Coupon redemption: `savedCouponId` (wallet) or `couponCode` (ad-hoc) → validates + applies discount → flips wallet row to `redeemed`
+- `POST /api/customer/marketing/checkout/confirm` — confirms interactive checkout, marks campaign paid, flips coupon, sends receipt email
+- `GET /api/customer/marketing/coupons/applicable?campaignId=` — wallet coupons valid for the campaign's price (§7.5)
+- `POST /api/customer/marketing/payment-methods/save-from-payment` — attaches PI's PM to platform scope
+
+Frontend checkout:
+- `apps/web/src/app/account/marketing/campaigns/[id]/checkout/page.tsx` — portal checkout page:
+  - Saved card selection (platform-scope payment methods)
+  - Applicable coupon list (one-click apply) + ad-hoc coupon code entry
+  - Off-session charge for saved cards; Stripe Elements fallback for new cards
+  - Order summary with discount + total
+- Campaign detail page gains "Purchase again / Upgrade" button (§7.6)
+- `MarketingCustomerService` (frontend) gains `savePaymentMethodFromIntent`, `getApplicableCoupons`, `createCheckout`, `confirmCheckout`
+- `MarketingPayPublicService.createCheckout` accepts `saveCard` param
+- Pay page shows "Save this card" checkbox when customer is authenticated
+
+## Marketing Ops Customer Portal — Tests (§11)
+
+- `apps/api/src/services/__tests__/MarketingCustomerProjection.test.ts` (24 tests):
+  - Status mapper: every internal stage maps to a customer status or is hidden
+  - Hidden stages (seek, preview_built, shown, lost, dead) return null
+  - Active subscription overrides stage
+  - `projectCampaign` whitelists fields (no notes, pain_score, estimated_*, assigned_to)
+  - `projectCampaigns` filters out hidden-stage campaigns
+- `apps/api/src/tests/marketing-customer-routes.test.ts` (7 tests):
+  - JWT required: no auth → 401, invalid token → 401
+  - Context gating: storefront-only → 403 context_required, zero-context → 403, platform → 200
+  - Cross-customer isolation: customer A gets 404 on customer B's campaign + receipt
+
+
