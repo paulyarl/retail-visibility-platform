@@ -175,6 +175,17 @@ class MarketingCustomerService extends CustomerApiSingleton {
     }
   }
 
+  /**
+   * Normalize the polymorphic `error` field from makeDefaultRequest into a string.
+   * The base class types error as `string | { status, message, code }`.
+   */
+  private errMsg(result: any, fallback: string): string {
+    if (!result.error) return fallback;
+    if (typeof result.error === 'string') return result.error;
+    if (result.error?.message) return result.error.message;
+    return fallback;
+  }
+
   // ── Overview (§7.2) ───────────────────────────────────────────────────
 
   async getOverview(): Promise<CustomerPortalOverview> {
@@ -183,7 +194,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       'marketing-portal-overview',
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load overview');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load overview'));
     return result.data?.data ?? result.data;
   }
 
@@ -195,7 +206,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       'marketing-portal-campaigns',
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load campaigns');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load campaigns'));
     return result.data?.data ?? result.data;
   }
 
@@ -205,7 +216,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       `marketing-portal-campaign-${id}`,
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load campaign');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load campaign'));
     return result.data?.data ?? result.data;
   }
 
@@ -217,7 +228,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       'marketing-portal-purchases',
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load purchases');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load purchases'));
     return result.data?.data ?? result.data;
   }
 
@@ -229,7 +240,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       `marketing-portal-receipt-${revenueId}`,
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load receipt');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load receipt'));
     return result.data?.data ?? result.data;
   }
 
@@ -245,7 +256,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       'marketing-portal-branding',
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load branding');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load branding'));
     return result.data?.data ?? result.data;
   }
 
@@ -259,7 +270,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'Failed to update branding');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to update branding'));
     await this.invalidateCache('marketing-portal-branding');
     return result.data?.data ?? result.data;
   }
@@ -272,7 +283,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       'marketing-portal-tickets',
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load tickets');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load tickets'));
     return result.data?.data ?? result.data;
   }
 
@@ -282,7 +293,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       `marketing-portal-ticket-${id}`,
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load ticket');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load ticket'));
     return result.data?.data ?? result.data;
   }
 
@@ -301,7 +312,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'Failed to create ticket');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to create ticket'));
     await this.invalidateCache('marketing-portal-tickets');
     return result.data?.data ?? result.data;
   }
@@ -316,7 +327,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       undefined,
       0,
     );
-    if (!result.success) throw new Error(result.error || 'Failed to reply');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to reply'));
     await this.invalidateCache(`marketing-portal-ticket-${ticketId}`);
     return result.data?.data ?? result.data;
   }
@@ -329,7 +340,7 @@ class MarketingCustomerService extends CustomerApiSingleton {
       {},
       'marketing-portal-alerts',
     );
-    if (!result.success) throw new Error(result.error || 'Failed to load alerts');
+    if (!result.success) throw new Error(this.errMsg(result, 'Failed to load alerts'));
     return result.data?.data ?? result.data;
   }
 
