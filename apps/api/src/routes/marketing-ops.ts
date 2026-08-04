@@ -167,6 +167,7 @@ import { MarketingCustomerService } from '../services/MarketingCustomerService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
 import { unifiedConfig } from '../config/unifiedConfig';
 import { prisma } from '../prisma';
+import { PLATFORM_SCOPE } from '../lib/platform-scope';
 
 const router = Router();
 
@@ -4391,6 +4392,282 @@ router.post('/campaigns/:id/send-claim-invite', async (req: any, res: Response) 
     });
   } catch (error) {
     handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ─── Customer Alerts (§8.3) ──────────────────────────────────────────────
+// Operator composer for targeted / broadcast / campaign-scoped alerts to
+// marketing customers. Alerts are stored as crm_alerts with tenant_id =
+// PLATFORM_SCOPE; the customer-side reader (marketing-customer.ts /alerts)
+// filters by metadata.customer_id / metadata.campaign_id at read time.
+
+const alertCreateSchema = z.object({
+  type: z.enum(['mkt_direct', 'mkt_broadcast', 'mkt_campaign']),
+  alertType: z.string().default('info'),
+  title: z.string().min(1).max(255),
+  body: z.string().optional(),
+  icon: z.string().max(10).optional(),
+  customerId: z.string().optional(),
+  campaignId: z.string().optional(),
+  ctaLabel: z.string().optional(),
+  ctaHref: z.string().optional(),
+});
+
+/**
+ * GET /api/admin/marketing-ops/alerts/customers
+ * List marketing customers (customers with ≥1 claimed campaign) for the
+ * recipient picker. Returns id, email, name, customer_number, claimed
+ * campaign count, last campaign business name.
+ */
+router.get('/alerts/customers', async (req: any, res: Response) => {
+  try {
+    const search = (req.query.search as string) || '';
+    // Customers with at least one claimed campaign (customer_id IS NOT NULL)
+    const customers = await prisma.customers.findMany({
+      where: search
+        ? {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' } },
+              { first_name: { contains: search, mode: 'insensitive' } },
+              { last_name: { contains: search, mode: 'insensitive' } },
+              { customer_number: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : undefined,
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        customer_number: true,
+        mkt_campaigns_list: {
+          where: { customer_id: { not: null } },
+          select: { id: true, business_name: true, stage: true },
+        },
+      },
+      take: 500,
+      orderBy: { created_at: 'desc' },
+    });
+
+    // Filter to only customers with claimed campaigns (platform context)
+    const marketingCustomers = customers
+      .filter((c) => c.mkt_campaigns_list.length > 0)
+      .map((c) => {
+        const campaigns = c.mkt_campaigns_list;
+        const lastCampaign = campaigns[0];
+        return {
+          id: c.id,
+          email: c.email,
+          name: [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email,
+          customerNumber: c.customer_number,
+          campaignCount: campaigns.length,
+          lastBusinessName: lastCampaign?.business_name || null,
+        };
+      });
+
+    res.json({ success: true, data: marketingCustomers });
+  } catch (error: any) {
+    logger.error('[marketing-ops] GET /alerts/customers error', getCtx(req), { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to load marketing customers' });
+  }
+});
+
+/**
+ * GET /api/admin/marketing-ops/alerts/recipient-count
+ * Pre-send recipient estimate for the confirmation dialog.
+ * Query params: type=mkt_broadcast | mkt_campaign (with campaignId)
+ */
+router.get('/alerts/recipient-count', async (req: any, res: Response) => {
+  try {
+    const type = (req.query.type as string) || 'mkt_broadcast';
+    const campaignId = req.query.campaignId as string | undefined;
+
+    if (type === 'mkt_direct') {
+      // Single customer — count is 1 if customer has platform context
+      const customerId = req.query.customerId as string;
+      if (!customerId) return res.json({ success: true, data: { count: 0 } });
+      const campaigns = await prisma.mkt_campaigns_list.count({
+        where: { customer_id: customerId },
+      });
+      return res.json({ success: true, data: { count: campaigns > 0 ? 1 : 0 } });
+    }
+
+    if (type === 'mkt_campaign' && campaignId) {
+      // Count customers who have claimed this specific campaign
+      const campaign = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: campaignId },
+        select: { customer_id: true },
+      });
+      if (!campaign?.customer_id) {
+        return res.json({ success: true, data: { count: 0 } });
+      }
+      return res.json({ success: true, data: { count: 1 } });
+    }
+
+    // Broadcast: all customers with ≥1 claimed campaign
+    const count = await prisma.mkt_campaigns_list.groupBy({
+      by: ['customer_id'],
+      where: { customer_id: { not: null } },
+      _count: { id: true },
+    });
+    res.json({ success: true, data: { count: count.length } });
+  } catch (error: any) {
+    logger.error('[marketing-ops] GET /alerts/recipient-count error', getCtx(req), { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to count recipients' });
+  }
+});
+
+/**
+ * POST /api/admin/marketing-ops/alerts
+ * Create a targeted / broadcast / campaign-scoped alert for marketing customers.
+ *
+ * - mkt_direct: requires customerId (a platform-context customer)
+ * - mkt_campaign: requires campaignId (campaign with a claimed customer)
+ * - mkt_broadcast: no target — all platform-context customers see it
+ *
+ * Alerts are informational only — no payment demands or card-link phishing (§9).
+ */
+router.post('/alerts', async (req: any, res: Response) => {
+  try {
+    const parsed = alertCreateSchema.parse(req.body);
+    const actorId = req.user?.userId || req.user?.user_id || 'unknown';
+
+    // Validate target per type
+    if (parsed.type === 'mkt_direct') {
+      if (!parsed.customerId) {
+        return res.status(400).json({ success: false, error: 'invalid_input', message: 'customerId is required for mkt_direct' });
+      }
+      const hasCampaigns = await prisma.mkt_campaigns_list.count({
+        where: { customer_id: parsed.customerId },
+      });
+      if (hasCampaigns === 0) {
+        return res.status(400).json({ success: false, error: 'no_platform_context', message: 'Customer has no claimed marketing campaigns' });
+      }
+    } else if (parsed.type === 'mkt_campaign') {
+      if (!parsed.campaignId) {
+        return res.status(400).json({ success: false, error: 'invalid_input', message: 'campaignId is required for mkt_campaign' });
+      }
+      const campaign = await prisma.mkt_campaigns_list.findUnique({
+        where: { id: parsed.campaignId },
+        select: { customer_id: true },
+      });
+      if (!campaign) {
+        return res.status(404).json({ success: false, error: 'not_found', message: 'Campaign not found' });
+      }
+      if (!campaign.customer_id) {
+        return res.status(400).json({ success: false, error: 'not_claimed', message: 'Campaign has no claimed customer' });
+      }
+    }
+
+    // Build metadata for read-time targeting (§7.9)
+    const metadata: Record<string, any> = {};
+    if (parsed.type === 'mkt_direct' && parsed.customerId) {
+      metadata.customer_id = parsed.customerId;
+    }
+    if (parsed.type === 'mkt_campaign' && parsed.campaignId) {
+      metadata.campaign_id = parsed.campaignId;
+    }
+    if (parsed.ctaLabel) {
+      metadata.cta_label = parsed.ctaLabel;
+      metadata.cta_href = parsed.ctaHref || undefined;
+    }
+
+    const alert = await prisma.crm_alerts.create({
+      data: {
+        tenant_id: PLATFORM_SCOPE,
+        type: parsed.alertType,
+        title: parsed.title,
+        body: parsed.body || null,
+        icon: parsed.icon || null,
+        metadata,
+      },
+    });
+
+    // Audit
+    const { audit } = await import('../audit');
+    await audit({
+      tenantId: PLATFORM_SCOPE,
+      actor: actorId,
+      actorType: 'user',
+      action: 'create',
+      payload: {
+        entity_type: 'mkt_customer_alert',
+        id: alert.id,
+        alert_type: parsed.type,
+        title: parsed.title,
+        customer_id: parsed.customerId,
+        campaign_id: parsed.campaignId,
+      },
+    });
+
+    res.json({ success: true, data: { id: alert.id, createdAt: alert.created_at } });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: 'invalid_input', message: error.message });
+    }
+    logger.error('[marketing-ops] POST /alerts error', getCtx(req), { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to create alert' });
+  }
+});
+
+/**
+ * GET /api/admin/marketing-ops/alerts
+ * List sent platform-scope alerts with recipient/read/dismissed counts.
+ */
+router.get('/alerts', async (req: any, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    const [alerts, total] = await Promise.all([
+      prisma.crm_alerts.findMany({
+        where: { tenant_id: PLATFORM_SCOPE },
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: offset,
+        include: {
+          crm_customer_alert_states: true,
+        },
+      }),
+      prisma.crm_alerts.count({ where: { tenant_id: PLATFORM_SCOPE } }),
+    ]);
+
+    // Compute recipient/read/dismissed counts per alert
+    const result = alerts.map((alert) => {
+      const meta = alert.metadata as any;
+      const targetType = !meta || Object.keys(meta).length === 0
+        ? 'mkt_broadcast'
+        : meta.customer_id
+          ? 'mkt_direct'
+          : meta.campaign_id
+            ? 'mkt_campaign'
+            : 'mkt_broadcast';
+
+      const states = alert.crm_customer_alert_states || [];
+      const readCount = states.filter((s) => s.read_at).length;
+      const dismissedCount = states.filter((s) => s.dismissed_at).length;
+
+      return {
+        id: alert.id,
+        type: alert.type,
+        title: alert.title,
+        body: alert.body,
+        icon: alert.icon,
+        targetType,
+        customerId: meta?.customer_id || null,
+        campaignId: meta?.campaign_id || null,
+        createdAt: alert.created_at,
+        readCount,
+        dismissedCount,
+        recipientCount: states.length,
+      };
+    });
+
+    res.json({ success: true, data: result, total, page, totalPages: Math.ceil(total / limit) });
+  } catch (error: any) {
+    logger.error('[marketing-ops] GET /alerts error', getCtx(req), { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to load alerts' });
   }
 });
 
