@@ -32,7 +32,7 @@ import { CustomerTokenService } from '../services/CustomerTokenService';
 import { CustomerAuthService } from '../services/CustomerAuthService';
 import { CustomerPaymentMethodsService } from '../services/CustomerPaymentMethodsService';
 import { CouponService } from '../services/CouponService';
-import { MarketingCampaignService } from '../services/MarketingCampaignService';
+import MarketingCampaignService from '../services/MarketingCampaignService';
 import { MarketingDeliverableService } from '../services/MarketingDeliverableService';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
 import { MarketingReceiptEmailService } from '../services/marketing/MarketingReceiptEmailService';
@@ -683,7 +683,7 @@ router.get('/coupons/applicable', requireCustomerAuth, requirePlatformContext, a
     // Fetch customer's saved platform-scope coupons
     const savedCoupons = await prisma.customer_saved_coupons.findMany({
       where: { customer_id: customerId, tenant_id: PLATFORM_SCOPE, status: 'saved' },
-      include: { coupons: true },
+      include: { tenant_coupons: true },
     });
 
     // Validate each coupon against the campaign price + service category
@@ -697,7 +697,7 @@ router.get('/coupons/applicable', requireCustomerAuth, requirePlatformContext, a
     }> = [];
 
     for (const sc of savedCoupons) {
-      const coupon = sc.coupons;
+      const coupon = sc.tenant_coupons;
       if (!coupon || !coupon.is_active) continue;
       try {
         const result = await CouponService.getInstance().validateCoupon(
@@ -767,16 +767,16 @@ router.post('/checkout', requireCustomerAuth, requirePlatformContext, async (req
     if (savedCouponId) {
       const sc = await prisma.customer_saved_coupons.findFirst({
         where: { id: savedCouponId, customer_id: customerId, tenant_id: PLATFORM_SCOPE, status: 'saved' },
-        include: { coupons: true },
+        include: { tenant_coupons: true },
       });
-      if (!sc || !sc.coupons) {
+      if (!sc || !sc.tenant_coupons) {
         return res.status(400).json({ success: false, error: 'invalid_coupon' });
       }
-      redeemedCouponCode = sc.coupons.code;
+      redeemedCouponCode = sc.tenant_coupons.code;
       try {
         const result = await CouponService.getInstance().validateCoupon(
           PLATFORM_SCOPE,
-          redeemedCouponCode,
+          redeemedCouponCode!,
           { subtotalCents: amountCents },
         );
         if (result?.valid && result.discountCents) {
@@ -997,15 +997,15 @@ router.post('/checkout/confirm', requireCustomerAuth, requirePlatformContext, as
     if (savedCouponId) {
       const sc = await prisma.customer_saved_coupons.findFirst({
         where: { id: savedCouponId, customer_id: customerId, tenant_id: PLATFORM_SCOPE },
-        include: { coupons: true },
+        include: { tenant_coupons: true },
       });
-      if (sc?.coupons) {
-        redeemedCouponCode = sc.coupons.code;
+      if (sc?.tenant_coupons) {
+        redeemedCouponCode = sc.tenant_coupons.code;
         try {
           const result = await CouponService.getInstance().validateCoupon(
             PLATFORM_SCOPE,
-            redeemedCouponCode,
-            { subtotalCents: amountCents, serviceCategory: campaign.service_category || undefined },
+            redeemedCouponCode!,
+            { subtotalCents: amountCents },
           );
           if (result?.valid && result.discountCents) {
             discountCents = result.discountCents;
