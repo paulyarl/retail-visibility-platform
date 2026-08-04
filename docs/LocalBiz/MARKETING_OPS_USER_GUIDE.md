@@ -1647,6 +1647,8 @@ Platform alerts from the operator:
 - Mark read / dismiss individually, or mark all read
 - Storefront-only customers see neither the badge nor the alerts page
 
+**How operators send alerts — see §34.11.**
+
 ### 34.9 Saved cards + repeat purchase (Phase 3)
 
 **Saving a card at payment time (§6.3):**
@@ -1680,7 +1682,36 @@ Operators interact with the customer portal indirectly:
 - **Send claim invite** (§8.2) — emails a claim link to a paid, unclaimed campaign's email
 - **Personal CRM hub** — platform-scope support tickets already aggregate here
 - **Alert composer** (§8.3) — send targeted or broadcast alerts to platform-context customers
-- **Campaign detail** — shows support ticket chip when `campaign_id`-linked tickets exist
+- **Campaign detail** — shows "Customer Account" section with claim status + "Send Alert" action
+
+#### Sending alerts to marketing customers
+
+There are two surfaces for sending alerts:
+
+**1. Marketing Broadcast page — `/settings/admin/crm/broadcast/marketing`**
+
+The dedicated composer for marketing customer alerts. Mirrors the tenant broadcast page (`/settings/admin/crm/broadcast`) but recipients are marketing customers (business owners with claimed campaigns) instead of tenants.
+
+- **Recipient picker:** lists all marketing customers with their email, customer number, campaign count, and last campaign business name. Search by name, email, or customer number. Select individual customers or "Send to all".
+- **Alert composition:** title, body, icon (emoji), alert type preset (Announcement, Milestone, Congratulations, Service Notice, Subscription, Promotion). Optional CTA with label + link.
+- **Confirmation modal:** shows a preview of the alert + recipient count before sending. For "Send to all", a warning banner reminds the operator to verify the message.
+- **Sent alerts history:** below the composer — shows recent alerts with target type (direct/broadcast/campaign), recipient count, and read count.
+
+The tenant broadcast page (`/settings/admin/crm/broadcast`) has a cross-link banner at the top pointing to the marketing broadcast page, so operators don't accidentally send tenant alerts to marketing customers or vice versa.
+
+**2. Campaign detail "Send Alert" action — `/settings/admin/marketing-ops/campaigns/[id]`**
+
+On the campaign detail Overview tab, the "Customer Account" section shows:
+- **If claimed:** a green "Claimed" badge with the customer ID + a "Send Alert" link that opens the marketing broadcast page with the campaign pre-scoped
+- **If paid but unclaimed:** "Payment received — no account yet" + a "Send Claim Invite" button that emails a claim link to the campaign's email
+- **If not paid:** "No customer account (not claimed)" — no action available
+
+**Alert targeting rules (§7.9):**
+- `mkt_broadcast` — visible to every customer with ≥1 claimed campaign (no metadata)
+- `mkt_direct` — visible only to the specified customer (`metadata.customer_id`)
+- `mkt_campaign` — visible only to customers who have claimed the specified campaign (`metadata.campaign_id`)
+
+**Safety:** alerts are informational only — no payment demands, no links asking for card details (phishing-surface guard, §9). Every send writes an audit log entry.
 
 ### 34.12 See Also
 

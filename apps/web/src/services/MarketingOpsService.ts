@@ -3788,7 +3788,7 @@ class MarketingOpsService extends AdminApiSingleton {
   // ─── Customer Alerts (§8.3) ──────────────────────────────────────────────
 
   async sendClaimInvite(campaignId: string): Promise<{ claimUrl: string; emailSent: boolean; campaignCount: number }> {
-    const result = await this.makeDefaultRequest<{ claimUrl: string; emailSent: boolean; campaignCount: number }>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/marketing-ops/campaigns/${campaignId}/send-claim-invite`,
       { method: 'POST' },
     );
@@ -3798,7 +3798,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async listMarketingAlertCustomers(search?: string): Promise<MarketingAlertCustomer[]> {
     const qs = search ? `?search=${encodeURIComponent(search)}` : '';
-    const result = await this.makeDefaultRequest<MarketingAlertCustomer[]>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/marketing-ops/alerts/customers${qs}`,
       { method: 'GET' },
     );
@@ -3812,7 +3812,7 @@ class MarketingOpsService extends AdminApiSingleton {
       ...(params.customerId && { customerId: params.customerId }),
       ...(params.campaignId && { campaignId: params.campaignId }),
     }).toString();
-    const result = await this.makeDefaultRequest<{ count: number }>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/marketing-ops/alerts/recipient-count?${qs}`,
       { method: 'GET' },
     );
@@ -3831,7 +3831,7 @@ class MarketingOpsService extends AdminApiSingleton {
     ctaLabel?: string;
     ctaHref?: string;
   }): Promise<{ id: string; createdAt: string }> {
-    const result = await this.makeDefaultRequest<{ id: string; createdAt: string }>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/admin/marketing-ops/alerts',
       { method: 'POST', body: JSON.stringify(data) },
     );
@@ -3841,7 +3841,7 @@ class MarketingOpsService extends AdminApiSingleton {
 
   async listMarketingAlerts(page?: number): Promise<{ alerts: MarketingAlertHistory[]; total: number; totalPages: number }> {
     const qs = page ? `?page=${page}` : '';
-    const result = await this.makeDefaultRequest<{ data: MarketingAlertHistory[]; total: number; totalPages: number }>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/marketing-ops/alerts${qs}`,
       { method: 'GET' },
     );
