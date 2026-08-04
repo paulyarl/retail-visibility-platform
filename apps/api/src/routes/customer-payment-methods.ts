@@ -80,40 +80,6 @@ router.get('/', requireCustomerAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/customer-payment-methods/:id
- * 
- * Get a single payment method by ID (with ownership check)
- */
-router.get('/:id', requireCustomerAuth, async (req: Request, res: Response) => {
-  try {
-    const customerId = (req as any).customerId;
-    const { id } = req.params;
-
-    const method = await paymentMethodsService.getPaymentMethod(customerId, id);
-
-    if (!method) {
-      return res.status(404).json({
-        success: false,
-        error: 'not_found',
-        message: 'Payment method not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      paymentMethod: paymentMethodsService.maskForResponse(method),
-    });
-  } catch (error: any) {
-    logger.error('[Customer Payment Methods] Get error:', undefined, { error: { name: 'Error', message: String(error.message) } });
-    return res.status(500).json({
-      success: false,
-      error: 'get_failed',
-      message: 'Failed to retrieve payment method',
-    });
-  }
-});
-
-/**
  * GET /api/customer-payment-methods/default/:tenantId
  * 
  * Get the default payment method for a specific tenant
@@ -539,6 +505,47 @@ router.post('/paypal/save-payment-method', requireCustomerAuth, async (req: Requ
       success: false,
       error: 'paypal_save_failed',
       message: 'Failed to save PayPal payment method',
+    });
+  }
+});
+
+// ====================
+// CATCH-ALL: GET /:id
+// IMPORTANT: This MUST be the last GET route. It matches any 1-segment GET
+// path, so static 1-segment GET routes (e.g. /expiring, /default/:tenantId)
+// declared after it would be shadowed.
+// ====================
+
+/**
+ * GET /api/customer-payment-methods/:id
+ * 
+ * Get a single payment method by ID (with ownership check)
+ */
+router.get('/:id', requireCustomerAuth, async (req: Request, res: Response) => {
+  try {
+    const customerId = (req as any).customerId;
+    const { id } = req.params;
+
+    const method = await paymentMethodsService.getPaymentMethod(customerId, id);
+
+    if (!method) {
+      return res.status(404).json({
+        success: false,
+        error: 'not_found',
+        message: 'Payment method not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      paymentMethod: paymentMethodsService.maskForResponse(method),
+    });
+  } catch (error: any) {
+    logger.error('[Customer Payment Methods] Get error:', undefined, { error: { name: 'Error', message: String(error.message) } });
+    return res.status(500).json({
+      success: false,
+      error: 'get_failed',
+      message: 'Failed to retrieve payment method',
     });
   }
 });

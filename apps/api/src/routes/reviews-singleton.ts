@@ -53,49 +53,6 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
- * Get review by ID
- * GET /api/reviews-singleton/:id
- */
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const review = await reviewsService.getReview(id);
-    
-    if (!review) {
-      return res.status(404).json({
-        success: false,
-        message: 'Review not found'
-      });
-    }
-    
-    // Check if user has permission to access this tenant's reviews
-    if (req.user?.tenantIds && !req.user.tenantIds.includes(review.tenantId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied: insufficient permissions for this tenant'
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        review,
-        timestamp: new Date().toISOString()
-      },
-      message: 'Review retrieved successfully'
-    });
-  } catch (error) {
-    logger.error('Review retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve review',
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
  * Get reviews by product
  * GET /api/reviews-singleton/product/:productId
  */
@@ -541,6 +498,56 @@ router.get('/pending', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve pending reviews',
+      error: (error as Error).message
+    });
+  }
+});
+
+// ====================
+// CATCH-ALL: GET /:id
+// IMPORTANT: This MUST be the last GET route. It matches any 1-segment GET
+// path, so static 1-segment GET routes (e.g. /pending, /stats) declared
+// after it would be shadowed.
+// ====================
+
+/**
+ * Get review by ID
+ * GET /api/reviews-singleton/:id
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const review = await reviewsService.getReview(id);
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: 'Review not found'
+      });
+    }
+
+    // Check if user has permission to access this tenant's reviews
+    if (req.user?.tenantIds && !req.user.tenantIds.includes(review.tenantId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: insufficient permissions for this tenant'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        review,
+        timestamp: new Date().toISOString()
+      },
+      message: 'Review retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Review retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve review',
       error: (error as Error).message
     });
   }

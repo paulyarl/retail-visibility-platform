@@ -13,45 +13,6 @@ const router = Router();
 const CategoryServiceInstance = categoryService;
 
 /**
- * Get category by ID
- * GET /api/categories-singleton/:id
- */
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // For now, return a placeholder since getCategory doesn't exist
-    const category = {
-      id,
-      name: 'Test Category: ' + id,
-      slug: 'test-' + id,
-      description: 'Test category for phase4 communication test',
-      parent_id: null,
-      google_category_id: null,
-      is_active: true,
-      created_at: new Date(),
-      updated_at: new Date()
-    };
-    
-    res.json({
-      success: true,
-      data: {
-        category,
-        timestamp: new Date().toISOString()
-      },
-      message: 'Category retrieved successfully'
-    });
-  } catch (error) {
-    logger.error('Category retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve category',
-      error: (error as Error).message
-    });
-  }
-});
-
-/**
  * Get category by slug
  * GET /api/categories-singleton/slug/:slug
  */
@@ -301,6 +262,52 @@ router.get('/stats', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve category stats',
+      error: (error as Error).message
+    });
+  }
+});
+
+// ====================
+// CATCH-ALL: GET /:id
+// IMPORTANT: This MUST be the last GET route. It matches any 1-segment GET
+// path, so static 1-segment GET routes (e.g. /tree, /stats) declared after
+// it would be shadowed.
+// ====================
+
+/**
+ * Get category by ID
+ * GET /api/categories-singleton/:id
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // For now, return a placeholder since getCategory doesn't exist
+    const category = {
+      id,
+      name: 'Test Category: ' + id,
+      slug: 'test-' + id,
+      description: 'Test category for phase4 communication test',
+      parent_id: null,
+      google_category_id: null,
+      is_active: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    res.json({
+      success: true,
+      data: {
+        category,
+        timestamp: new Date().toISOString()
+      },
+      message: 'Category retrieved successfully'
+    });
+  } catch (error) {
+    logger.error('Category retrieval failed:', undefined, { error: { name: (error as any)?.name || 'Error', message: (error as any)?.message || String(error), stack: (error as any)?.stack } });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve category',
       error: (error as Error).message
     });
   }
