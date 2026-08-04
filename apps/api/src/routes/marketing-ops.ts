@@ -3186,20 +3186,10 @@ router.post('/prospect-queue/:id/dismiss', async (req: any, res: Response) => {
   }
 });
 
-router.get('/:id', async (req: any, res: Response) => {
-  try {
-    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
-    if (!campaign) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    res.json({ success: true, data: campaign });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
-
 // ====================
 // CATEGORY-TONE PRESET ROUTES
+// IMPORTANT: These routes MUST be declared before router.get('/:id', ...) below,
+// otherwise Express will match /category-tone-presets against /:id.
 // ====================
 
 const categoryTonePresetCreateSchema = z.object({
@@ -3266,6 +3256,22 @@ router.delete('/category-tone-presets/:id', async (req: any, res: Response) => {
     handleServiceError(res, error, getCtx(req));
   }
 });
+
+router.get('/:id', async (req: any, res: Response) => {
+  try {
+    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
+  }
+});
+
+// ====================
+// (category-tone preset routes moved above router.get('/:id', ...))
+// ====================
 
 // ─── Review-response pipeline (Sprint 5 — Option B) ─────────────────────
 const reviewResponseService = ReviewResponseService.getInstance();
