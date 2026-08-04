@@ -472,3 +472,32 @@ await MarketingCampaignService.getInstance().autoAdvanceStaleShownCampaigns(7); 
 import MarketingCampaignService from '../MarketingCampaignService';
 await MarketingCampaignService.autoAdvanceStaleShownCampaigns(7);
 ```
+
+### 5.5 Route testing with supertest + vi.hoisted — all mock vars must be hoisted
+
+When testing Express route files with `supertest`, **all** mock variables referenced inside `vi.mock()` factories must be declared via `vi.hoisted()`. Declaring them as plain `const` outside `vi.hoisted()` causes `ReferenceError: Cannot access '<var>' before initialization` because `vi.mock()` calls are hoisted above variable declarations.
+
+```ts
+// WRONG — mockVerifyAccessToken is not hoisted, vi.mock factory can't see it
+const mockVerifyAccessToken = vi.fn();
+vi.mock('../services/CustomerTokenService', () => ({
+  CustomerTokenService: { getInstance: () => ({ verifyAccessToken: mockVerifyAccessToken }) },
+}));
+
+// CORRECT — all mock vars in vi.hoisted()
+const { mockVerifyAccessToken, mockComputeContexts } = vi.hoisted(() => ({
+  mockVerifyAccessToken: vi.fn(),
+  mockComputeContexts: vi.fn(),
+}));
+vi.mock('../services/CustomerTokenService', () => ({
+  CustomerTokenService: { getInstance: () => ({ verifyAccessToken: mockVerifyAccessToken }) },
+}));
+```
+
+**Pattern for route tests:** Mount the router on a minimal Express app, mock all service dependencies + prisma + logger, then use `supertest` to make HTTP requests. See `apps/api/src/tests/marketing-customer-routes.test.ts` for the full pattern (auth gating, context gating, cross-customer isolation).
+
+### 5.6 Platform-scope payment methods — use `PLATFORM_SCOPE` constant, not string literal
+
+When working with platform-scoped payment methods (`customer_payment_methods.tenant_id = 'platform'`), always import and use the `PLATFORM_SCOPE` constant from `apps/api/src/lib/platform-scope.ts`. Never hardcode `'platform'` or `'_platform_'` — the dual-sentinel design was resolved in favor of the single `PLATFORM_SCOPE` constant (see resolved open question #3 in the spec).
+```
+

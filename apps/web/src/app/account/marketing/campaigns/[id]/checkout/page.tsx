@@ -57,24 +57,19 @@ export default function PortalCheckoutPage() {
         setCampaign(camp);
         setCoupons(applicableCoupons);
 
-        // Fetch saved payment methods (platform scope)
-        // These come from the existing customer-payment-methods service
+        // Fetch saved payment methods (platform scope) via singleton service
         try {
-          const res = await fetch('/api/customer-payment-methods?tenantId=platform', {
-            credentials: 'include',
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const methods = (data.data || data || []).filter((m: any) => m.tenantId === 'platform');
-            setSavedMethods(methods);
-            const defaultMethod = methods.find((m: any) => m.isDefault);
-            if (defaultMethod) {
-              setSelectedMethodId(defaultMethod.id);
-            } else if (methods.length > 0) {
-              setSelectedMethodId(methods[0].id);
-            } else {
-              setUseNewCard(true);
-            }
+          const { default: customerPmService } = await import('@/services/CustomerPaymentMethodsService');
+          const result = await customerPmService.listPaymentMethods('platform');
+          const methods = (result.paymentMethods || []).filter((m: any) => m.tenantId === 'platform');
+          setSavedMethods(methods);
+          const defaultMethod = methods.find((m: any) => m.isDefault);
+          if (defaultMethod) {
+            setSelectedMethodId(defaultMethod.id);
+          } else if (methods.length > 0) {
+            setSelectedMethodId(methods[0].id);
+          } else {
+            setUseNewCard(true);
           }
         } catch {
           // Non-critical — fall back to new card
