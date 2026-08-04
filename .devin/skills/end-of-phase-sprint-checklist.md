@@ -111,12 +111,17 @@ cd apps/web && npx tsc --noEmit
 
 - [ ] **Routes mounted in `index.ts`.** Any new route file must be imported and mounted in `apps/api/src/index.ts`. Verify the mount path matches the route prefix.
 
-- [ ] **Route order and catch-all ordering.** If the session added or reordered routes, verify no static sub-route is mounted after a catch-all (`/:id`, `/:slug`, `/:tenantId`) in the same `Router()`. Run the catch-all lint and route coverage tests:
+- [ ] **Route order and catch-all ordering (HARD FAIL).** If the session added or reordered routes, verify no static sub-route is mounted after a catch-all (`/:id`, `/:slug`, `/:tenantId`) in the same `Router()`. This is the #1 cause of mysterious 404s on routes that exist in code but never reach their handler. Run the catch-all lint and route coverage tests with the hard-fail flag enabled:
   ```bash
   cd apps/api
   npx tsx src/scripts/lint-catchall-order.ts
-  npx vitest run src/tests/route-coverage.test.ts
+  FAIL_ON_ROUTE_ORDER_VIOLATIONS=true npx vitest run src/tests/route-coverage.test.ts
   ```
+  - **The `FAIL_ON_ROUTE_ORDER_VIOLATIONS=true` flag is mandatory.** Without it, the test only logs warnings and violations are easy to miss in noisy output. A passing test with the flag off is NOT a pass.
+  - **The test is method-aware** (checks HTTP method overlap, not just path structure). `GET /:id` does NOT shadow `POST /foo` — only same-method conflicts are real bugs.
+  - **If the test fails**: Move the static route above the param route. For `/:id` catch-alls that match many 1-segment paths, move `router.get('/:id', ...)` to the END of the file (just before `export default router`). Multi-segment `/:id/...` sub-paths are not affected by this ordering.
+  - **Common pattern**: `router.get('/:id', ...)` declared in the middle of a file, followed by `router.get('/alerts', ...)`, `router.get('/signals', ...)`, etc. The `/alerts` handler is never reached — Express matches `/:id` first with `id='alerts'`.
+  - **Verify the fix**: Re-run the test with the flag on. Zero violations in files touched this session.
   If the count of `app.use` in `index.ts` has grown significantly, also regenerate the route map and OpenAPI spec:
   ```bash
   npx tsx src/scripts/generate-route-map.ts

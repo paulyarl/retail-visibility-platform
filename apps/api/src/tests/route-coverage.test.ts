@@ -146,23 +146,28 @@ describe('Route Registry Coverage', () => {
       if (!entry.router?.stack || !Array.isArray(entry.router.stack)) continue;
 
       const stack = entry.router.stack as any[];
-      // Collect (index, path) pairs for route handlers (skip middleware).
-      const routes: { index: number; path: string }[] = [];
+      // Collect (index, path, methods) tuples for route handlers (skip middleware).
+      // Express stores methods on layer.route.methods as { get: true, post: true, ... }.
+      const routes: { index: number; path: string; methods: Set<string> }[] = [];
       for (let i = 0; i < stack.length; i++) {
         const layer = stack[i];
         if (!layer.route) continue; // skip middleware (no .route)
         const path = layer.route.path;
         if (typeof path !== 'string') continue;
-        routes.push({ index: i, path });
+        const methods = new Set<string>(
+          layer.route.methods ? Object.keys(layer.route.methods) : [],
+        );
+        routes.push({ index: i, path, methods });
       }
 
       // For each param route (contains :param), check that no static route
-      // with the same segment structure appears after it.
+      // with the same segment structure AND overlapping HTTP methods appears after it.
       //
       // Express matches routes by segment count, so /:id matches /foo (1 segment)
       // but NOT /foo/bar (2 segments). We must compare segment-by-segment:
       // a param route shadows a static route only when they have the same number
-      // of segments and every non-param segment matches exactly.
+      // of segments, every non-param segment matches exactly, AND they share at
+      // least one HTTP method (GET /:id does NOT shadow POST /foo).
       for (const paramRoute of routes) {
         if (!paramRoute.path.includes(':')) continue;
 
@@ -185,10 +190,18 @@ describe('Route Registry Coverage', () => {
           }
           if (!conflicts) continue;
 
-          // staticRoute has the same segment structure as paramRoute, declared AFTER
-          // the param route → Express will match it as the param values. Bug.
+          // Must share at least one HTTP method to actually shadow
+          const sharedMethods = [...paramRoute.methods].filter(m => staticRoute.methods.has(m));
+          if (sharedMethods.length === 0) continue;
+
+          // staticRoute has the same segment structure + method as paramRoute,
+          // declared AFTER the param route → Express will match it as the param
+          // values. Bug.
+          const methodStr = sharedMethods.length === paramRoute.methods.size
+            ? `[${sharedMethods.join(',')}]`
+            : `[${sharedMethods.join(',')}]`;
           const msg =
-            `Route-ordering bug in ${entry.path}: param route "${paramRoute.path}" ` +
+            `Route-ordering bug in ${entry.path}: param route "${paramRoute.path}" ${methodStr} ` +
             `(stack #${paramRoute.index}) is declared before static route ` +
             `"${staticRoute.path}" (stack #${staticRoute.index}). ` +
             `Express will match "${staticRoute.path}" as the param route. ` +

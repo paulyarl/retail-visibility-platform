@@ -3257,20 +3257,12 @@ router.delete('/category-tone-presets/:id', async (req: any, res: Response) => {
   }
 });
 
-router.get('/:id', async (req: any, res: Response) => {
-  try {
-    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
-    if (!campaign) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
-    }
-    res.json({ success: true, data: campaign });
-  } catch (error) {
-    handleServiceError(res, error, getCtx(req));
-  }
-});
+// NOTE: router.get('/:id') was moved to the END of this file to avoid shadowing
+// static 1-segment GET routes (e.g. /alerts, /category-tone-presets, /signals).
+// All static GET routes must be declared before it.
 
 // ====================
-// (category-tone preset routes moved above router.get('/:id', ...))
+// (category-tone preset routes moved above where router.get('/:id', ...) used to be)
 // ====================
 
 // ─── Review-response pipeline (Sprint 5 — Option B) ─────────────────────
@@ -4674,6 +4666,26 @@ router.get('/alerts', async (req: any, res: Response) => {
   } catch (error: any) {
     logger.error('[marketing-ops] GET /alerts error', getCtx(req), { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to load alerts' });
+  }
+});
+
+// ====================
+// CATCH-ALL: GET /:id
+// IMPORTANT: This MUST be the last GET route in this file. It matches any
+// 1-segment GET path, so any static 1-segment GET route declared after it
+// (e.g. /alerts, /category-tone-presets, /signals) would be shadowed.
+// Multi-segment /:id/... routes (e.g. /:id/review-response/pipelines) are
+// not affected by ordering relative to this route.
+// ====================
+router.get('/:id', async (req: any, res: Response) => {
+  try {
+    const campaign = await MarketingCampaignService.getCampaign(req.params.id, getCtx(req));
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
+    }
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    handleServiceError(res, error, getCtx(req));
   }
 });
 
