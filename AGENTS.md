@@ -137,4 +137,26 @@ Frontend checkout:
   - Context gating: storefront-only → 403 context_required, zero-context → 403, platform → 200
   - Cross-customer isolation: customer A gets 404 on customer B's campaign + receipt
 
+## Marketing Ops Customer Portal — Alert Composer (§8.3)
+
+Operator composer for sending alerts to marketing customers (platform-context only).
+
+Backend endpoints (in `marketing-ops.ts`):
+- `GET  /api/admin/marketing-ops/alerts/customers` — list marketing customers for recipient picker
+- `GET  /api/admin/marketing-ops/alerts/recipient-count` — pre-send recipient estimate
+- `POST /api/admin/marketing-ops/alerts` — create targeted / broadcast / campaign-scoped alert
+- `GET  /api/admin/marketing-ops/alerts` — sent alerts history with read/dismissed counts
+
+Frontend:
+- `/settings/admin/crm/broadcast/marketing` — dedicated marketing broadcast page (mirrors tenant broadcast)
+- Campaign detail "Customer Account" section — "Send Alert" link + "Send Claim Invite" button
+- `MarketingOpsService` gains `listMarketingAlertCustomers`, `getAlertRecipientCount`, `createMarketingAlert`, `listMarketingAlerts`, `sendClaimInvite`
+
+Alert targeting (stored in `crm_alerts.metadata`):
+- `mkt_broadcast` — no metadata, visible to all platform-context customers
+- `mkt_direct` — `metadata.customer_id`, visible to one customer
+- `mkt_campaign` — `metadata.campaign_id`, visible to customers who claimed that campaign
+
+All alerts use `tenant_id = PLATFORM_SCOPE`. Customer-side reader is in `marketing-customer.ts` (`GET /alerts`, `POST /alerts/:id/read`, etc.).
+
 
