@@ -709,10 +709,10 @@ router.get('/coupons/applicable', requireCustomerAuth, requirePlatformContext, a
           applicable.push({
             savedCouponId: sc.id,
             code: coupon.code,
-            label: coupon.label || coupon.code,
+            label: coupon.terms_summary || coupon.code,
             discountCents: result.discountCents,
             discountType: coupon.discount_type || 'fixed',
-            expiresAt: coupon.end_date ? coupon.end_date.toISOString() : null,
+            expiresAt: coupon.expires_at ? coupon.expires_at.toISOString() : null,
           });
         }
       } catch {
