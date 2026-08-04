@@ -89,6 +89,8 @@ export interface Campaign {
   email: string | null;
   website_url: string | null;
   social_profiles: { platform: string; url: string }[] | null;
+  owner_names: string[] | null;
+  phones: { label: string; number: string }[] | null;
   gbp_claimed: boolean | null;
   unaddressed_reviews: number | null;
   last_review_date: string | null;
@@ -948,6 +950,8 @@ export interface CampaignCreateInput {
   email?: string;
   website_url?: string;
   social_profiles?: { platform: string; url: string }[];
+  owner_names?: string[];
+  phones?: { label: string; number: string }[];
   display_id?: string;
   gbp_claimed?: boolean;
   unaddressed_reviews?: number;

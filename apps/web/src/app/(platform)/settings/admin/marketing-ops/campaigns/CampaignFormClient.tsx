@@ -34,6 +34,8 @@ interface FormState {
   email: string;
   website_url: string;
   social_profiles: { platform: string; url: string }[];
+  owner_names: string[];
+  phones: { label: string; number: string }[];
   display_id: string;
   gbp_claimed: boolean | '';
   unaddressed_reviews: number | '';
@@ -75,6 +77,8 @@ const EMPTY_FORM: FormState = {
   email: '',
   website_url: '',
   social_profiles: [],
+  owner_names: [],
+  phones: [],
   display_id: '',
   gbp_claimed: '',
   unaddressed_reviews: '',
@@ -160,6 +164,8 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
         email: c.email ?? '',
         website_url: c.website_url ?? '',
         social_profiles: c.social_profiles ?? [],
+        owner_names: c.owner_names ?? [],
+        phones: c.phones ?? [],
         display_id: c.display_id ?? '',
         gbp_claimed: c.gbp_claimed ?? '',
         unaddressed_reviews: c.unaddressed_reviews ?? '',
@@ -197,7 +203,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
     fetchCampaign();
   }, [fetchCampaign]);
 
-  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[]) => {
+  const handleChange = (field: keyof FormState, value: string | number | boolean | '' | string[] | { platform: string; url: string }[] | { label: string; number: string }[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -219,6 +225,13 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
       const numOrUndef = (v: number | '') => v === '' ? undefined : v;
       const boolOrUndef = (v: boolean | '') => v === '' ? undefined : v;
       const strOrUndef = (v: string) => v === '' ? undefined : v;
+
+      // Filter out empty entries from structured arrays so partial rows
+      // (e.g. a social profile with only a platform label and no URL) don't
+      // get persisted or trip backend validation.
+      const cleanSocial = form.social_profiles.filter((sp) => sp.platform.trim() || sp.url.trim());
+      const cleanOwnerNames = form.owner_names.map((n) => n.trim()).filter(Boolean);
+      const cleanPhones = form.phones.filter((p) => p.label.trim() || p.number.trim());
 
       if (mode === 'create') {
         // Backfill legacy contact_method/contact_info from the first non-empty
@@ -247,7 +260,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           phone: strOrUndef(form.phone),
           email: strOrUndef(form.email),
           website_url: strOrUndef(form.website_url),
-          social_profiles: form.social_profiles.length > 0 ? form.social_profiles : undefined,
+          social_profiles: cleanSocial.length > 0 ? cleanSocial : undefined,
+          owner_names: cleanOwnerNames.length > 0 ? cleanOwnerNames : undefined,
+          phones: cleanPhones.length > 0 ? cleanPhones : undefined,
           display_id: strOrUndef(form.display_id),
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
@@ -290,7 +305,9 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
           phone: strOrUndef(form.phone),
           email: strOrUndef(form.email),
           website_url: strOrUndef(form.website_url),
-          social_profiles: form.social_profiles.length > 0 ? form.social_profiles : undefined,
+          social_profiles: cleanSocial.length > 0 ? cleanSocial : undefined,
+          owner_names: cleanOwnerNames.length > 0 ? cleanOwnerNames : undefined,
+          phones: cleanPhones.length > 0 ? cleanPhones : undefined,
           gbp_claimed: boolOrUndef(form.gbp_claimed),
           unaddressed_reviews: numOrUndef(form.unaddressed_reviews),
           last_review_date: form.last_review_date ? new Date(form.last_review_date).toISOString() : undefined,
@@ -479,7 +496,7 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
 
           {/* Contact & Audit Info */}
           <FormSection title="Contact & GBP Audit">
-            <FormField label="Phone">
+            <FormField label="Primary Phone">
               <input type="tel" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
                 placeholder="+1 555-0100"
                 className={inputClass} />
@@ -494,18 +511,61 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 placeholder="https://business.com"
                 className={inputClass} />
             </FormField>
+            <FormField label="Has Website">
+              <select value={form.has_website} onChange={(e) => handleChange('has_website', e.target.value)}
+                className={inputClass}>
+                <option value="">Unknown</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="none">None</option>
+                <option value="wix">Wix</option>
+                <option value="squarespace">Squarespace</option>
+                <option value="wordpress">WordPress</option>
+                <option value="shopify">Shopify</option>
+                <option value="godaddy">GoDaddy</option>
+                <option value="custom">Custom / Self-hosted</option>
+                <option value="other">Other</option>
+              </select>
+            </FormField>
+            <FormField label="Additional Phones" className="sm:col-span-2">
+              <div className="space-y-2">
+                {form.phones.map((p, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input type="text" value={p.label} placeholder="Label (e.g. Mobile, Landline, After-hours)"
+                      onChange={(e) => {
+                        const next = [...form.phones];
+                        next[idx] = { ...p, label: e.target.value };
+                        handleChange('phones', next);
+                      }}
+                      className={`${inputClass} w-1/3`} />
+                    <input type="tel" value={p.number} placeholder="+1 555-0100"
+                      onChange={(e) => {
+                        const next = [...form.phones];
+                        next[idx] = { ...p, number: e.target.value };
+                        handleChange('phones', next);
+                      }}
+                      className={`${inputClass} flex-1`} />
+                    <button type="button" onClick={() => handleChange('phones', form.phones.filter((_, i) => i !== idx))}
+                      className="px-2 text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
+                  </div>
+                ))}
+                <button type="button"
+                  onClick={() => handleChange('phones', [...form.phones, { label: '', number: '' }])}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add phone number</button>
+              </div>
+            </FormField>
             <FormField label="Social Profiles" className="sm:col-span-2">
               <div className="space-y-2">
                 {form.social_profiles.map((sp, idx) => (
                   <div key={idx} className="flex gap-2">
-                    <input type="text" value={sp.platform} placeholder="Platform (e.g. Instagram)"
+                    <input type="text" value={sp.platform} placeholder="Platform (e.g. Instagram, Facebook, LinkedIn)"
                       onChange={(e) => {
                         const next = [...form.social_profiles];
                         next[idx] = { ...sp, platform: e.target.value };
                         handleChange('social_profiles', next);
                       }}
                       className={`${inputClass} w-1/3`} />
-                    <input type="url" value={sp.url} placeholder="https://instagram.com/business"
+                    <input type="url" value={sp.url} placeholder="Full profile URL (e.g. https://instagram.com/business)"
                       onChange={(e) => {
                         const next = [...form.social_profiles];
                         next[idx] = { ...sp, url: e.target.value };
@@ -519,6 +579,27 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
                 <button type="button"
                   onClick={() => handleChange('social_profiles', [...form.social_profiles, { platform: '', url: '' }])}
                   className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add social profile</button>
+              </div>
+            </FormField>
+            <FormField label="Business Owner Names" className="sm:col-span-2">
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Owners discovered during manual profile audit verification (one per row).</p>
+                {form.owner_names.map((name, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input type="text" value={name} placeholder="Owner full name (e.g. Jane Smith)"
+                      onChange={(e) => {
+                        const next = [...form.owner_names];
+                        next[idx] = e.target.value;
+                        handleChange('owner_names', next);
+                      }}
+                      className={`${inputClass} flex-1`} />
+                    <button type="button" onClick={() => handleChange('owner_names', form.owner_names.filter((_, i) => i !== idx))}
+                      className="px-2 text-red-600 hover:text-red-700 dark:text-red-400">Remove</button>
+                  </div>
+                ))}
+                <button type="button"
+                  onClick={() => handleChange('owner_names', [...form.owner_names, ''])}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">+ Add owner name</button>
               </div>
             </FormField>
             <FormField label="Legacy contact method (optional)" className="sm:col-span-2">
@@ -548,10 +629,6 @@ export default function CampaignFormClient({ mode, campaignId }: { mode: 'create
             <FormField label="Last Review Date">
               <input type="date" value={form.last_review_date} onChange={(e) => handleChange('last_review_date', e.target.value)}
                 className={inputClass} />
-            </FormField>
-            <FormField label="Has Website">
-              <input type="text" value={form.has_website} onChange={(e) => handleChange('has_website', e.target.value)}
-                className={inputClass} placeholder="yes, no, wix..." />
             </FormField>
             <FormField label="NAP Consistent">
               <select value={form.nap_consistent === true ? 'true' : form.nap_consistent === false ? 'false' : ''} onChange={(e) => handleChange('nap_consistent', e.target.value === '' ? '' : e.target.value === 'true')}
