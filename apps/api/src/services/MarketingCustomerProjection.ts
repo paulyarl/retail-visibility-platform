@@ -7,7 +7,7 @@
  */
 
 import { prisma } from '../prisma';
-import { MarketingServiceCategoryService } from './MarketingServiceCategoryService';
+import MarketingServiceCategoryService from './MarketingServiceCategoryService';
 import { PLATFORM_SCOPE } from '../lib/platform-scope';
 import type { RequestCtx } from '../context';
 
@@ -120,7 +120,7 @@ export interface CustomerReceiptProjection {
  */
 export async function projectCampaign(
   campaign: any,
-  ctx: RequestCtx,
+  ctx?: RequestCtx,
 ): Promise<CustomerCampaignProjection | null> {
   const statusInfo = mapCustomerStatus(campaign.stage, false);
   if (!statusInfo) return null; // hidden stage — don't expose
@@ -159,7 +159,7 @@ export async function projectCampaign(
         date: r.created_at,
         receiptUrl: `/api/customer/marketing/receipts/${r.id}/pdf`,
         serviceCategoryLabel,
-        businessName: campaign.business_name,
+        businessName: campaign.business_name || '',
       });
     }
   }
@@ -167,7 +167,7 @@ export async function projectCampaign(
   return {
     id: campaign.id,
     displayId: campaign.display_id || campaign.id,
-    businessName: campaign.business_name,
+    businessName: campaign.business_name || '',
     city: campaign.city || '',
     category: campaign.category || '',
     serviceCategory: campaign.service_category || null,
@@ -186,7 +186,7 @@ export async function projectCampaign(
  */
 export async function projectCampaigns(
   campaigns: any[],
-  ctx: RequestCtx,
+  ctx?: RequestCtx,
 ): Promise<CustomerCampaignProjection[]> {
   const results: CustomerCampaignProjection[] = [];
   for (const c of campaigns) {
@@ -212,7 +212,7 @@ export interface CustomerPortalOverview {
  */
 export async function buildPortalOverview(
   customerId: string,
-  ctx: RequestCtx,
+  ctx?: RequestCtx,
 ): Promise<CustomerPortalOverview> {
   const campaigns = await prisma.mkt_campaigns_list.findMany({
     where: { customer_id: customerId },
@@ -287,7 +287,7 @@ export interface ReceiptViewModel {
 export async function buildReceiptViewModel(
   revenueId: string,
   customerId: string,
-  ctx: RequestCtx,
+  ctx?: RequestCtx,
 ): Promise<ReceiptViewModel | null> {
   const revenue = await prisma.marketing_revenue.findUnique({
     where: { id: revenueId },
@@ -328,7 +328,7 @@ export async function buildReceiptViewModel(
     where: { customer_id: customerId, is_billing: true, is_default: true },
   });
   const billingAddressStr = billingAddress
-    ? [billingAddress.line_1, billingAddress.city, billingAddress.state, billingAddress.postal_code]
+    ? [billingAddress.address_line1, billingAddress.city, billingAddress.state, billingAddress.postal_code]
         .filter(Boolean)
         .join(', ')
     : null;
@@ -339,7 +339,7 @@ export async function buildReceiptViewModel(
   return {
     revenueId: revenue.id,
     campaignId: campaign.id,
-    businessName: campaign.business_name,
+    businessName: campaign.business_name || '',
     city: campaign.city || '',
     serviceCategoryLabel,
     amountCents: totalCents + discountCents,

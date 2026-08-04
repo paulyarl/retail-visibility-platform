@@ -406,9 +406,11 @@ router.post('/support/tickets/:id/messages', requireCustomerAuth, requirePlatfor
       data: {
         id: `tktmsg-${customerId}-${Date.now()}`,
         ticket_id: req.params.id,
-        message: parsed.data.message,
+        content: parsed.data.message,
+        author_id: customerId,
+        author_type: 'customer',
+        author_name: 'Customer',
         is_internal: false,
-        sender_type: 'customer',
         created_at: new Date(),
       },
     });
