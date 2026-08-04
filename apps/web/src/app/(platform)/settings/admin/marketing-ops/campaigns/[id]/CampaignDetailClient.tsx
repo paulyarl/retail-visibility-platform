@@ -776,6 +776,56 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 </div>
                 )}
 
+                {/* Customer Account (§8.2) — claimed customer + send alert action */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Customer Account</h3>
+                  {campaign.customer_id ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400">
+                          <Circle className="w-2 h-2 fill-current" />
+                          Claimed
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">{campaign.customer_id}</span>
+                      </div>
+                      <a
+                        href={`/settings/admin/crm/broadcast/marketing`}
+                        className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          // Quick send: pre-fill campaign target via the broadcast page
+                          window.location.href = `/settings/admin/crm/broadcast/marketing?campaignId=${campaignId}&businessName=${encodeURIComponent(campaign.business_name || '')}`;
+                        }}
+                      >
+                        <Send className="w-3 h-3" />
+                        Send Alert
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {campaign.date_paid ? 'Payment received — no account yet' : 'No customer account (not claimed)'}
+                      </span>
+                      {campaign.date_paid && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await marketingOpsService.sendClaimInvite(campaignId);
+                              alert('Claim invite sent to ' + (campaign.email || 'the campaign email'));
+                            } catch (err) {
+                              alert('Failed to send claim invite: ' + (err instanceof Error ? err.message : 'unknown error'));
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          <Send className="w-3 h-3" />
+                          Send Claim Invite
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Conversion (Tenant Prospecting Channel) */}
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-neutral-700">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Conversion</h3>

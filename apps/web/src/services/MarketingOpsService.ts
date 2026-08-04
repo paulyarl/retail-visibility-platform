@@ -140,6 +140,7 @@ export interface Campaign {
   hot_prospect_set_at?: string | null;
   hot_prospect_deprioritized?: boolean;
   auto_followup_count?: number;
+  customer_id?: string | null;
 }
 
 export interface CampaignLineageEntry {
@@ -3783,6 +3784,71 @@ class MarketingOpsService extends AdminApiSingleton {
     await this.invalidateCachePattern('mkt-ops-prospect-queue');
     return result.data?.data ?? result.data;
   }
+
+  // ─── Customer Alerts (§8.3) ──────────────────────────────────────────────
+
+  async sendClaimInvite(campaignId: string): Promise<{ claimUrl: string; emailSent: boolean; campaignCount: number }> {
+    const result = await this.makeDefaultRequest<{ claimUrl: string; emailSent: boolean; campaignCount: number }>(
+      `/api/admin/marketing-ops/campaigns/${campaignId}/send-claim-invite`,
+      { method: 'POST' },
+    );
+    if (!result.success) throw new Error(typeof result.error === 'string' ? result.error : 'Failed to send claim invite');
+    return result.data?.data ?? result.data;
+  }
+
+  async listMarketingAlertCustomers(search?: string): Promise<MarketingAlertCustomer[]> {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+    const result = await this.makeDefaultRequest<MarketingAlertCustomer[]>(
+      `/api/admin/marketing-ops/alerts/customers${qs}`,
+      { method: 'GET' },
+    );
+    if (!result.success) throw new Error('Failed to load marketing customers');
+    return result.data?.data ?? result.data;
+  }
+
+  async getAlertRecipientCount(params: { type: string; customerId?: string; campaignId?: string }): Promise<number> {
+    const qs = new URLSearchParams({
+      type: params.type,
+      ...(params.customerId && { customerId: params.customerId }),
+      ...(params.campaignId && { campaignId: params.campaignId }),
+    }).toString();
+    const result = await this.makeDefaultRequest<{ count: number }>(
+      `/api/admin/marketing-ops/alerts/recipient-count?${qs}`,
+      { method: 'GET' },
+    );
+    if (!result.success) throw new Error('Failed to count recipients');
+    return (result.data?.data ?? result.data)?.count ?? 0;
+  }
+
+  async createMarketingAlert(data: {
+    type: 'mkt_direct' | 'mkt_broadcast' | 'mkt_campaign';
+    alertType?: string;
+    title: string;
+    body?: string;
+    icon?: string;
+    customerId?: string;
+    campaignId?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+  }): Promise<{ id: string; createdAt: string }> {
+    const result = await this.makeDefaultRequest<{ id: string; createdAt: string }>(
+      '/api/admin/marketing-ops/alerts',
+      { method: 'POST', body: JSON.stringify(data) },
+    );
+    if (!result.success) throw new Error(typeof result.error === 'string' ? result.error : 'Failed to create alert');
+    return result.data?.data ?? result.data;
+  }
+
+  async listMarketingAlerts(page?: number): Promise<{ alerts: MarketingAlertHistory[]; total: number; totalPages: number }> {
+    const qs = page ? `?page=${page}` : '';
+    const result = await this.makeDefaultRequest<{ data: MarketingAlertHistory[]; total: number; totalPages: number }>(
+      `/api/admin/marketing-ops/alerts${qs}`,
+      { method: 'GET' },
+    );
+    if (!result.success) throw new Error('Failed to load alerts');
+    const unwrapped = result.data?.data ?? result.data;
+    return { alerts: unwrapped?.data ?? unwrapped ?? [], total: unwrapped?.total ?? 0, totalPages: unwrapped?.totalPages ?? 0 };
+  }
 }
 
 export interface CascadeStatus {
@@ -3899,6 +3965,30 @@ export interface RenderResult {
   txtPath: string;
   fileName: string;
   fileSize: number;
+}
+
+export interface MarketingAlertCustomer {
+  id: string;
+  email: string;
+  name: string;
+  customerNumber: string;
+  campaignCount: number;
+  lastBusinessName: string | null;
+}
+
+export interface MarketingAlertHistory {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  icon: string | null;
+  targetType: 'mkt_direct' | 'mkt_broadcast' | 'mkt_campaign';
+  customerId: string | null;
+  campaignId: string | null;
+  createdAt: string;
+  readCount: number;
+  dismissedCount: number;
+  recipientCount: number;
 }
 
 const marketingOpsService = MarketingOpsService.getInstance();

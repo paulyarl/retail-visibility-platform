@@ -186,6 +186,20 @@ export default function BroadcastAlertsClient() {
         { label: 'Broadcast' },
       ]}
     >
+      {/* Cross-link to marketing broadcast */}
+      <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 flex items-center gap-3">
+        <span className="text-lg">📢</span>
+        <p className="text-xs text-blue-800 dark:text-blue-300 flex-1">
+          Looking to alert <strong>marketing customers</strong> (business owners with claimed campaigns)?
+        </p>
+        <a
+          href="/settings/admin/crm/broadcast/marketing"
+          className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400 whitespace-nowrap"
+        >
+          Marketing Broadcast →
+        </a>
+      </div>
+
       {/* Success banner */}
       {sentResult && (
         <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 flex items-start gap-3">
