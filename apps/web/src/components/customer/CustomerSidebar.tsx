@@ -2,26 +2,43 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Package, 
-  MapPin, 
-  Bell, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Package,
+  MapPin,
+  Bell,
+  Settings,
   LogOut,
   User,
   CreditCard,
   Download,
-  Ticket
+  Ticket,
+  Briefcase,
+  Receipt,
+  LifeBuoy,
+  Palette,
+  ShoppingBag,
 } from 'lucide-react';
 import { useCustomerAuth } from '@/contexts/CustomerAuthContext';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { href: '/account', label: 'Overview', icon: LayoutDashboard },
+// Storefront context items (§7.2) — visible when contexts.storefront is true
+const storefrontNavItems = [
   { href: '/account/orders', label: 'Orders', icon: Package },
   { href: '/account/coupons', label: 'My Coupons', icon: Ticket },
   { href: '/account/downloads', label: 'Digital Downloads', icon: Download },
+];
+
+// Platform context items (§7.2) — "My Services" group, visible when contexts.platform is true
+const platformNavItems = [
+  { href: '/account/marketing', label: 'My Services', icon: Briefcase },
+  { href: '/account/marketing/purchases', label: 'Purchases', icon: ShoppingBag },
+  { href: '/account/marketing/support', label: 'Support', icon: LifeBuoy },
+  { href: '/account/marketing/settings', label: 'Branding', icon: Palette },
+];
+
+// Context-agnostic items (§7.8) — visible in either context
+const sharedNavItems = [
   { href: '/account/addresses', label: 'Addresses', icon: MapPin },
   { href: '/account/payment-methods', label: 'Payment Methods', icon: CreditCard },
   { href: '/account/notifications', label: 'Notifications', icon: Bell },
@@ -30,15 +47,36 @@ const navItems = [
 
 export function CustomerSidebar() {
   const pathname = usePathname();
-  const { customer, logout } = useCustomerAuth();
+  const { customer, contexts, logout } = useCustomerAuth();
 
   const handleLogout = async () => {
     await logout();
     window.location.href = '/';
   };
 
+  const renderNavItem = (item: { href: string; label: string; icon: any }) => {
+    const isActive = pathname === item.href ||
+      (item.href !== '/account' && pathname.startsWith(item.href));
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-blue-50 text-blue-700'
+            : 'text-gray-700 hover:bg-gray-50'
+        )}
+      >
+        <item.icon className="w-5 h-5" />
+        {item.label}
+      </Link>
+    );
+  };
+
   return (
-    <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
+    <div className="w-64 bg-white border-r border-gray-200 min-h-screen relative">
       {/* Customer Info */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center gap-3">
@@ -55,31 +93,39 @@ export function CustomerSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== '/account' && pathname.startsWith(item.href));
-          
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-50'
-              )}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+        {/* Overview — always visible */}
+        {renderNavItem({ href: '/account', label: 'Overview', icon: LayoutDashboard })}
+
+        {/* Storefront group (§7.2) — visible when contexts.storefront is true */}
+        {contexts?.storefront && (
+          <>
+            <div className="pt-4 pb-1 px-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Shopping</p>
+            </div>
+            {storefrontNavItems.map(renderNavItem)}
+          </>
+        )}
+
+        {/* Platform group (§7.2) — "My Services", visible when contexts.platform is true */}
+        {contexts?.platform && (
+          <>
+            <div className="pt-4 pb-1 px-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Services</p>
+            </div>
+            {platformNavItems.map(renderNavItem)}
+          </>
+        )}
+
+        {/* Shared items — context-agnostic (§7.8) */}
+        <div className="pt-4 pb-1 px-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Account</p>
+        </div>
+        {sharedNavItems.map(renderNavItem)}
       </nav>
 
       {/* Logout */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 w-full transition-colors"
