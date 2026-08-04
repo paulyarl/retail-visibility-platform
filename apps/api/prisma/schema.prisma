@@ -6166,6 +6166,8 @@ model mkt_campaigns_list {
   track_decided_at                                                                DateTime?                            @db.Timestamptz(6)
   track_decision_reason                                                           String?
   customer_id                                                                     String?                              @db.VarChar(255)
+  owner_names                                                                     Json?                                @db.Json
+  phones                                                                          Json?                                @db.Json
   marketing_revenue                                                               marketing_revenue[]
   mkt_audits_list                                                                 mkt_audits_list[]
   mkt_campaign_checklist_progress                                                 mkt_campaign_checklist_progress[]

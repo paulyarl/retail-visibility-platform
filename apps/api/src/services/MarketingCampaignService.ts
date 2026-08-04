@@ -158,6 +158,8 @@ export interface CampaignInput {
   email?: string;
   websiteUrl?: string;
   socialProfiles?: { platform: string; url: string }[];
+  ownerNames?: string[];
+  phones?: { label: string; number: string }[];
   displayId?: string;
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
@@ -188,6 +190,8 @@ export interface CampaignUpdateInput {
   email?: string;
   websiteUrl?: string;
   socialProfiles?: { platform: string; url: string }[];
+  ownerNames?: string[];
+  phones?: { label: string; number: string }[];
   gbpClaimed?: boolean;
   unaddressedReviews?: number;
   lastReviewDate?: Date | null;
@@ -347,6 +351,8 @@ export class MarketingCampaignService extends BaseService {
           email: input.email || null,
           website_url: input.websiteUrl || null,
           social_profiles: (input.socialProfiles ?? undefined) as any,
+          owner_names: (input.ownerNames ?? undefined) as any,
+          phones: (input.phones ?? undefined) as any,
           gbp_claimed: input.gbpClaimed || false,
           unaddressed_reviews: input.unaddressedReviews || 0,
           last_review_date: input.lastReviewDate || null,
@@ -707,6 +713,8 @@ export class MarketingCampaignService extends BaseService {
       if (input.websiteUrl) data.has_website = 'yes';
     }
     if (input.socialProfiles !== undefined) data.social_profiles = (input.socialProfiles || undefined) as any;
+    if (input.ownerNames !== undefined) data.owner_names = (input.ownerNames || undefined) as any;
+    if (input.phones !== undefined) data.phones = (input.phones || undefined) as any;
     if (input.gbpClaimed !== undefined) data.gbp_claimed = input.gbpClaimed;
     if (input.unaddressedReviews !== undefined) data.unaddressed_reviews = input.unaddressedReviews;
     if (input.lastReviewDate !== undefined) data.last_review_date = input.lastReviewDate;
